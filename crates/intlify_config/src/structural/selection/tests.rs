@@ -9,7 +9,7 @@ use crate::structural::admission_tests::{analyze_fixture, analyze_with_limits, l
 
 use super::{
     InvalidSelectorType, ProvisionalSelection, Selection, SelectionFailure, SelectionInvariant,
-    SelectionPrerequisite, SelectorInput,
+    SelectionPrerequisite, SelectorInput, StringLengthFact,
 };
 
 fn selected(
@@ -233,6 +233,56 @@ fn normalized_input_cannot_silently_cross_bootstrap_contexts() {
             analysis.select(&input).err(),
             Some(SelectionInvariant::BootstrapBoundMismatch)
         );
+    }
+}
+
+#[test]
+fn the_length_fact_follows_the_final_authority_and_never_recovers_a_discarded_length() {
+    let bound = |value| Bound::new(value).unwrap();
+    // 015's example: a 100-byte selector observed under a 200-byte
+    // capability is `over-limit` under a 50-byte policy.
+    let selector = SelectorInput::string(&"p".repeat(100), bound(200));
+    for (authority, fact) in [
+        (200, StringLengthFact::Exact(100)),
+        (100, StringLengthFact::Exact(100)),
+        (99, StringLengthFact::OverLimit),
+        (50, StringLengthFact::OverLimit),
+        // A complete string keeps its length under any authority.
+        (300, StringLengthFact::Exact(100)),
+    ] {
+        assert_eq!(selector.length_fact(bound(authority)), Ok(Some(fact)));
+    }
+    // Bytes, not characters.
+    let japanese = SelectorInput::string("日本", bound(200));
+    assert_eq!(
+        japanese.length_fact(bound(6)),
+        Ok(Some(StringLengthFact::Exact(6)))
+    );
+    assert_eq!(
+        japanese.length_fact(bound(5)),
+        Ok(Some(StringLengthFact::OverLimit))
+    );
+    // A string past the bound it was observed under is over every authority
+    // up to that bound and has no fact above it.
+    let past = SelectorInput::string(&"p".repeat(201), bound(200));
+    for authority in [200, 50] {
+        assert_eq!(
+            past.length_fact(bound(authority)),
+            Ok(Some(StringLengthFact::OverLimit))
+        );
+    }
+    assert_eq!(
+        past.length_fact(bound(201)),
+        Err(SelectionInvariant::BootstrapBoundMismatch)
+    );
+    // Absence and a non-string type have no String Length Fact.
+    for input in [
+        SelectorInput::absent(bound(200)),
+        SelectorInput::invalid_type(InvalidSelectorType::Array, bound(200)),
+    ] {
+        for authority in [50, 300] {
+            assert_eq!(input.length_fact(bound(authority)), Ok(None));
+        }
     }
 }
 

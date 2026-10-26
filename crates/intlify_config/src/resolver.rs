@@ -6,8 +6,8 @@
 //! Evidence, or a registry: each resolution phase records which of its checks it
 //! evaluated and why the others were not, and hands later phases the values it
 //! admitted. Phases that need construction authority or a confirmed Resource
-//! Limit Policy take them as values that only tests build until the phases
-//! producing them exist.
+//! Limit Policy take them as values. Phase 4 confirms the policy; until an
+//! entry runs the phases in order, tests build both.
 
 pub(crate) mod bootstrap;
 pub(crate) mod coverage;
