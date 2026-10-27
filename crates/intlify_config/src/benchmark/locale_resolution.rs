@@ -255,7 +255,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::CompatiblePolicy
         | Check::AdmissibleMember
         | Check::SingleOccurrence
-        | Check::ConsistentContent => return Err(OutputFailure::LocaleResolutionInvariant),
+        | Check::ConsistentContent
+        | Check::ResolvedReference => return Err(OutputFailure::LocaleResolutionInvariant),
     });
     Ok(())
 }
@@ -576,6 +577,7 @@ mod tests {
             Check::AdmissibleMember,
             Check::SingleOccurrence,
             Check::ConsistentContent,
+            Check::ResolvedReference,
         ] {
             assert_eq!(
                 unit(&mut frame, &locale_unit(LocaleSubject::Occurrences, check)),

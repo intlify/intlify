@@ -75,12 +75,7 @@ pub(crate) fn admit_candidate(
     verification: &impl ResourcePolicyVerification,
 ) -> Result<AdmittedResourcePolicy, Blocking> {
     let not_admitted = |reason| issue(Code::ArtifactReferenceNotAdmitted, reason);
-    if reference.kind != ArtifactKind::ResourceLimitPolicy {
-        return Err(not_admitted(Reason::RoleKindMismatch));
-    }
-    if reference.specification_revision.as_str() != SPECIFICATION_REVISION {
-        return Err(not_admitted(Reason::SpecificationRevisionUnsupported));
-    }
+    reference_checks(reference, ArtifactKind::ResourceLimitPolicy).map_err(not_admitted)?;
     let envelopes: Vec<Envelope<'_>> = members.iter().filter_map(FormalMember::envelope).collect();
     let conflict_group: Vec<&Envelope<'_>> = envelopes
         .iter()
@@ -112,11 +107,10 @@ pub(crate) fn admit_candidate(
         .filter(|envelope| envelope.tuple().semantic_digest == reference.semantic_digest)
         .collect();
     match exact_group.as_slice() {
-        [] => Err(not_admitted(mismatch(
-            reference,
-            &envelopes,
-            !conflict_group.is_empty(),
-        ))),
+        [] => {
+            let tuples: Vec<&ExactTuple> = envelopes.iter().map(Envelope::tuple).collect();
+            Err(not_admitted(mismatch(reference, &tuples)))
+        }
         [candidate] => admit_body(candidate, verification),
         [_, _, ..] => Err(issue(
             Code::ArtifactCollectionNotAdmitted,
@@ -154,17 +148,31 @@ fn admit_body(
     })
 }
 
-/// The closest tier some candidate occupies when no envelope names the
-/// reference exactly. Each tier is tried only after every closer one is empty,
-/// so a candidate there also differs in what the closer tiers share.
-fn mismatch(reference: &ExactTuple, envelopes: &[Envelope<'_>], digest_differs: bool) -> Reason {
-    let any = |predicate: &dyn Fn(&ExactTuple) -> bool| {
-        envelopes.iter().any(|envelope| predicate(envelope.tuple()))
-    };
+/// The two checks of a reference itself, made before any candidate is
+/// examined: its kind is the one its role takes, and the resolver supports
+/// the specification revision it requests.
+pub(crate) fn reference_checks(reference: &ExactTuple, role: ArtifactKind) -> Result<(), Reason> {
+    if reference.kind != role {
+        return Err(Reason::RoleKindMismatch);
+    }
+    if reference.specification_revision.as_str() != SPECIFICATION_REVISION {
+        return Err(Reason::SpecificationRevisionUnsupported);
+    }
+    Ok(())
+}
+
+/// The closest tier some candidate occupies when none of `tuples` is the
+/// reference's. Each tier is tried only after every closer one is empty, so a
+/// candidate there also differs in what the closer tiers share: one sharing
+/// everything but the digest differs in the digest.
+pub(crate) fn mismatch(reference: &ExactTuple, tuples: &[&ExactTuple]) -> Reason {
+    let any = |predicate: &dyn Fn(&ExactTuple) -> bool| tuples.iter().any(|tuple| predicate(tuple));
     let kind = |tuple: &ExactTuple| tuple.kind == reference.kind;
     let identity = |tuple: &ExactTuple| tuple.identity == reference.identity;
     let revision = |tuple: &ExactTuple| tuple.revision == reference.revision;
-    if digest_differs {
+    let specification =
+        |tuple: &ExactTuple| tuple.specification_revision == reference.specification_revision;
+    if any(&|tuple| kind(tuple) && identity(tuple) && revision(tuple) && specification(tuple)) {
         Reason::DigestMismatch
     } else if any(&|tuple| kind(tuple) && identity(tuple) && revision(tuple)) {
         Reason::SpecificationRevisionMismatch

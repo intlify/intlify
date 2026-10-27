@@ -250,7 +250,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::UniqueDomain
         | Check::AdmissibleMember
         | Check::SingleOccurrence
-        | Check::ConsistentContent => return Err(OutputFailure::ResourcePolicyInvariant),
+        | Check::ConsistentContent
+        | Check::ResolvedReference => return Err(OutputFailure::ResourcePolicyInvariant),
     });
     Ok(())
 }
@@ -457,6 +458,7 @@ mod tests {
             Check::AdmissibleMember,
             Check::SingleOccurrence,
             Check::ConsistentContent,
+            Check::ResolvedReference,
         ] {
             assert_eq!(
                 unit(&mut frame, &policy_unit(PolicySubject::Artifacts, check)),
