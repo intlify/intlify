@@ -247,7 +247,10 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::EffectiveMode
         | Check::VocabularyMember
         | Check::UniqueSurfaceClass
-        | Check::UniqueDomain => return Err(OutputFailure::ResourcePolicyInvariant),
+        | Check::UniqueDomain
+        | Check::AdmissibleMember
+        | Check::SingleOccurrence
+        | Check::ConsistentContent => return Err(OutputFailure::ResourcePolicyInvariant),
     });
     Ok(())
 }
@@ -451,6 +454,9 @@ mod tests {
             Check::VocabularyMember,
             Check::UniqueSurfaceClass,
             Check::UniqueDomain,
+            Check::AdmissibleMember,
+            Check::SingleOccurrence,
+            Check::ConsistentContent,
         ] {
             assert_eq!(
                 unit(&mut frame, &policy_unit(PolicySubject::Artifacts, check)),

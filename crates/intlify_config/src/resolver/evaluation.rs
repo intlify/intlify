@@ -15,6 +15,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::input_limits::Bound;
 
+use super::artifact_resolution::CollectionSubject;
 use super::coverage::CoverageSubject;
 use super::fallback::FallbackSubject;
 use super::identity::DeclarationField;
@@ -94,6 +95,9 @@ pub(crate) enum Subject {
     /// The declaration's coverage rules, a rule's selector item, a normalized
     /// domain, or the decision table and one of its cells.
     Coverage(CoverageSubject),
+    /// One distinct submitted body, or one group of tuples differing only in
+    /// their digest, of the complete artifact collection.
+    ArtifactCollection(CollectionSubject),
     /// The declaration's delivery placement, a singleton.
     DeliveryPlacement,
 }
@@ -140,6 +144,13 @@ pub(crate) enum Check {
     BootstrapCandidate,
     /// The admitted policy needs no bound past the capability's value.
     CompatiblePolicy,
+    /// The member declares an admitted kind, establishes its tuple, and its
+    /// body is admitted.
+    AdmissibleMember,
+    /// The member was submitted once.
+    SingleOccurrence,
+    /// The group's members have one canonical body.
+    ConsistentContent,
 }
 
 /// One atomic evaluation unit. Units order as 015 evaluates and commits them:
@@ -268,6 +279,8 @@ pub(crate) enum Reason {
     BodySchemaInvalid,
     ProjectProfileResolutionMissing,
     ProjectProfileResolutionInvalid,
+    EnvelopeInvalid,
+    KindUnsupported,
 }
 
 impl Reason {
@@ -301,6 +314,8 @@ impl Reason {
             Self::BodySchemaInvalid => "body-schema-invalid",
             Self::ProjectProfileResolutionMissing => "project-profile-resolution-missing",
             Self::ProjectProfileResolutionInvalid => "project-profile-resolution-invalid",
+            Self::EnvelopeInvalid => "envelope-invalid",
+            Self::KindUnsupported => "kind-unsupported",
         }
     }
 }
@@ -454,6 +469,11 @@ pub(crate) fn both<A, B>(first: Admitted<A>, second: Admitted<B>) -> Admitted<(A
         (Err(causes), Ok(_)) | (Ok(_), Err(causes)) => Err(causes),
         (Err(first), Err(second)) => Err(first.union(second)),
     }
+}
+
+/// Whether both hold, or the causes of each that does not.
+pub(crate) fn and(first: Admitted<()>, second: Admitted<()>) -> Admitted<()> {
+    both(first, second).map(|((), ())| ())
 }
 
 /// A unit's evaluation status. A unit that found a blocking result was still
@@ -741,6 +761,8 @@ mod tests {
                 Reason::BodySchemaInvalid,
                 Reason::ProjectProfileResolutionMissing,
                 Reason::ProjectProfileResolutionInvalid,
+                Reason::EnvelopeInvalid,
+                Reason::KindUnsupported,
             ]
             .map(Reason::as_str),
             [
@@ -772,6 +794,8 @@ mod tests {
                 "body-schema-invalid",
                 "project-profile-resolution-missing",
                 "project-profile-resolution-invalid",
+                "envelope-invalid",
+                "kind-unsupported",
             ]
         );
     }

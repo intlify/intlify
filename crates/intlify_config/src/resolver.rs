@@ -9,6 +9,7 @@
 //! Limit Policy take them as values. Phase 4 confirms the policy; until an
 //! entry runs the phases in order, tests build both.
 
+pub(crate) mod artifact_resolution;
 pub(crate) mod bootstrap;
 pub(crate) mod coverage;
 pub(crate) mod delivery;

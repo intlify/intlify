@@ -252,7 +252,10 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::UniqueDomain
         | Check::WithinCapability
         | Check::BootstrapCandidate
-        | Check::CompatiblePolicy => return Err(OutputFailure::LocaleResolutionInvariant),
+        | Check::CompatiblePolicy
+        | Check::AdmissibleMember
+        | Check::SingleOccurrence
+        | Check::ConsistentContent => return Err(OutputFailure::LocaleResolutionInvariant),
     });
     Ok(())
 }
@@ -570,6 +573,9 @@ mod tests {
             Check::VocabularyMember,
             Check::UniqueSurfaceClass,
             Check::UniqueDomain,
+            Check::AdmissibleMember,
+            Check::SingleOccurrence,
+            Check::ConsistentContent,
         ] {
             assert_eq!(
                 unit(&mut frame, &locale_unit(LocaleSubject::Occurrences, check)),
