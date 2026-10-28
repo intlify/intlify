@@ -236,7 +236,7 @@ pub(crate) struct ConfigurationMeasures<'a> {
 }
 
 /// What Phase 4 settles for the phases after it.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct PolicyOutcome {
     /// The selector's String Length Fact under the final projection
     /// authority, or none for an absent or non-string selector.

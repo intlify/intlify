@@ -20,7 +20,7 @@ use super::resource_policy::Rechecked;
 pub(crate) const SECTION: &str = "projectProfileResolution";
 
 /// Every bound is required; 015 defines none by default.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ResolutionLimits {
     pub(crate) configuration_input: ConfigurationInputLimits,
     pub(crate) locale_resolution: LocaleResolutionLimits,
@@ -32,13 +32,13 @@ pub(crate) struct ResolutionLimits {
 /// The materialized root and structural analysis. Its bounds are the ones the
 /// entry and structural stages already take, so the Policy recheck hands them
 /// the same values.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ConfigurationInputLimits {
     pub(crate) value: ValueLimits,
     pub(crate) structural: StructuralLimits,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[expect(clippy::struct_field_names, reason = "mirror 015's explicit bound IDs")]
 pub(crate) struct LocaleResolutionLimits {
     pub(crate) max_locale_identifier_bytes: Bound,
@@ -54,7 +54,7 @@ pub(crate) struct LocaleResolutionLimits {
     pub(crate) max_coverage_rule_cell_comparisons: Bound,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[expect(clippy::struct_field_names, reason = "mirror 015's explicit bound IDs")]
 pub(crate) struct ArtifactAdmissionLimits {
     pub(crate) max_artifacts: Bound,
@@ -67,7 +67,7 @@ pub(crate) struct ArtifactAdmissionLimits {
     pub(crate) max_total_reference_canonical_bytes: Bound,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[expect(clippy::struct_field_names, reason = "mirror 015's explicit bound IDs")]
 pub(crate) struct TargetGroupingLimits {
     pub(crate) max_target_profiles: Bound,
@@ -81,13 +81,13 @@ pub(crate) struct TargetGroupingLimits {
 
 /// Two independent reporting domains. The same bound name in both is two
 /// values and two counters; nothing bounds the domains together.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct DiagnosticsLimits {
     pub(crate) entry: EntryDiagnosticsLimits,
     pub(crate) shared: SharedDiagnosticsLimits,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[expect(clippy::struct_field_names, reason = "mirror 015's explicit bound IDs")]
 pub(crate) struct EntryDiagnosticsLimits {
     pub(crate) max_finding_occurrences: Bound,
@@ -103,7 +103,7 @@ pub(crate) struct EntryDiagnosticsLimits {
     pub(crate) max_total_canonical_bytes: Bound,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[expect(clippy::struct_field_names, reason = "mirror 015's explicit bound IDs")]
 pub(crate) struct SharedDiagnosticsLimits {
     pub(crate) max_finding_occurrences: Bound,
@@ -561,7 +561,7 @@ impl ResolutionLimits {
 /// which also confirms the provisional profile selection. Post-policy phases
 /// run only under it. Besides Phase 4, only tests and the owners of the finite
 /// locale fixtures, the measurements and the developer example state one.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ConfirmedPolicy {
     limits: ResolutionLimits,
 }

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 
-use crate::input_limits::Bound;
+use crate::input_limits::{Bound, ValueCounts};
 use crate::materialize::{ByteSpan, MaterializedDocument, NodeId, NodeKind};
 use crate::model::{
     valid_identity, IntlifyConfig, ProfileDeclaration, CONFIGURATION_SCHEMA_VERSION,
@@ -31,7 +31,7 @@ pub mod example;
 mod observation;
 
 /// Explicit bounds for this stage, not a default or a formal capability body.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[expect(clippy::struct_field_names, reason = "mirror the 015 bound IDs")]
 pub(crate) struct StructuralLimits {
     pub(crate) max_profiles: Bound,
@@ -196,6 +196,10 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
     }
     pub(crate) fn structural_units(&self) -> Option<u64> {
         self.evaluation.as_ref().map(|e| e.units)
+    }
+    /// The materialized root's value counts, which Phase 4 rechecks.
+    pub(crate) fn value_counts(&self) -> ValueCounts {
+        self.doc.counts().value
     }
     pub(crate) const fn version_selected(&self) -> bool {
         self.selected_version
