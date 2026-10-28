@@ -100,7 +100,7 @@ fn issues(resolved: &Resolved) -> Vec<(String, Code)> {
 #[test]
 fn resolution_cases_keep_their_rows_and_append_after_the_icu4x_rows() {
     let cases = declarations();
-    assert_eq!(cases.len(), 213);
+    assert_eq!(cases.len(), 252);
     let resolution = |cases: &[Declaration]| {
         cases
             .iter()
@@ -114,10 +114,24 @@ fn resolution_cases_keep_their_rows_and_append_after_the_icu4x_rows() {
         .iter()
         .all(|case| case.operation == Operation::LocaleCanonicalization));
     assert!(resolution(&cases[141..160]));
+    assert!(cases[160..213]
+        .iter()
+        .all(|case| case.operation != Operation::LocalePolicyResolution));
+    // Phase 8's workloads follow the Phase 9 rows: the finite recipes, the
+    // eight bounds' edges on every role, and the ICU4X scales.
+    assert!(resolution(&cases[213..]));
+    assert!(cases[244..].iter().all(|case| matches!(
+        case.fixture,
+        Recipe::Icu4xLocalePolicyResolution { input, .. }
+            if R::POLICY_ICU4X.contains(&input)
+    )));
     for (rows, edges) in [
         (&cases[94..127], 8),
         (&cases[141..150], 2),
         (&cases[150..160], 0),
+        (&cases[213..228], 0),
+        (&cases[228..244], 16),
+        (&cases[244..], 0),
     ] {
         assert_eq!(
             rows.iter().filter(|case| case.limit.is_some()).count(),
@@ -869,5 +883,338 @@ fn the_input_context_refuses_a_provider_or_engine_other_than_the_declared_one() 
             observe(&candidate),
             Err(ContextFailure::LocaleInputMismatch)
         );
+    }
+}
+
+/// A Phase 8 subject as its policy, its key, and its locale or spelling.
+fn describe_policy(subject: &Subject) -> String {
+    use crate::resolver::coverage::SurfaceKey;
+    use crate::resolver::fallback::FallbackSubject as F;
+    use crate::resolver::negotiation::NegotiationSubject as N;
+
+    match subject {
+        Subject::Locale(own) => describe(own),
+        Subject::Negotiation(N::Aliases) => "aliases".to_owned(),
+        Subject::Negotiation(N::Key(own)) => format!("alias {}", key(own)),
+        Subject::Negotiation(N::Destination(owner, own)) => {
+            format!("alias {} to {}", key(owner), key(own))
+        }
+        Subject::Fallback(F::Sources) => "fallback sources".to_owned(),
+        Subject::Fallback(F::Source(own)) => format!("fallback {}", key(own)),
+        Subject::Fallback(F::Literal(owner, own)) => {
+            format!("fallback {} literal {}", key(owner), key(own))
+        }
+        Subject::Fallback(F::IntentSource(owner)) => {
+            format!("fallback {} intent source", key(owner))
+        }
+        Subject::Coverage(CoverageSubject::Locale(_, own)) => format!("coverage {}", key(own)),
+        Subject::Coverage(CoverageSubject::SurfaceClass(_, own)) => match own {
+            SurfaceKey::Member(member) => format!("surface {}", member.as_str()),
+            SurfaceKey::Content(content) => format!("surface {}", content.as_str()),
+        },
+        Subject::Coverage(CoverageSubject::Domain(domain)) => format!(
+            "domain {} by {}",
+            names(domain.locales()).join(","),
+            domain
+                .surfaces()
+                .iter()
+                .map(intlify_shared_json::token::Token::as_str)
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
+        Subject::Coverage(CoverageSubject::Cell(locale, surface)) => {
+            format!("cell {} {}", locale.as_str(), surface.as_str())
+        }
+        Subject::Coverage(other) => format!("{other:?}"),
+        other => panic!("not a Phase 7 or Phase 8 subject: {other:?}"),
+    }
+}
+
+/// Each blocking result as its subject, code, and reason, in 015's order.
+fn policy_issues(
+    resolved: &Resolved,
+) -> Vec<(String, Code, Option<crate::resolver::evaluation::Reason>)> {
+    resolved
+        .evaluation
+        .issues()
+        .map(|issue| {
+            (
+                describe_policy(&issue.unit().subject),
+                issue.code(),
+                issue.reason(),
+            )
+        })
+        .collect()
+}
+
+/// One change to every role blocks the one Phase 8 check it names, with its
+/// exact subject, code, and reason; the dense declaration blocks four at
+/// once. Its conflicting rule normalizes, but every cell waits on the rule
+/// naming an unknown surface class, so the conflict is never decided.
+#[test]
+fn phase_8_workloads_block_exactly_the_check_each_change_names() {
+    use crate::resolver::evaluation::Reason;
+
+    let duplicate = Code::NegotiationAliasDuplicate;
+    let sequence = Code::MessageFallbackSequenceInvalid;
+    let rule = Code::CoverageRuleInvalid;
+    for (recipe, expected) in [
+        (
+            R::AliasConflictingKeys,
+            vec![(
+                "alias en-US",
+                duplicate,
+                Some(Reason::ConflictingDestination),
+            )],
+        ),
+        (
+            R::AliasRepeatedKeys,
+            vec![("alias en-US", duplicate, Some(Reason::SameDestination))],
+        ),
+        (
+            R::AliasUnrequestedDestination,
+            vec![(
+                "alias fr to fr-FR",
+                Code::NegotiationAliasDestinationNotRequested,
+                None,
+            )],
+        ),
+        (
+            R::FallbackUnrequestedSource,
+            vec![("fallback de", Code::MessageFallbackSourceNotRequested, None)],
+        ),
+        (
+            R::FallbackSelfReference,
+            vec![(
+                "fallback he-IL literal he-IL",
+                sequence,
+                Some(Reason::LiteralSelfReference),
+            )],
+        ),
+        (
+            R::FallbackRepeatedLiteral,
+            vec![(
+                "fallback he-IL literal en",
+                sequence,
+                Some(Reason::LiteralDuplicate),
+            )],
+        ),
+        (
+            R::FallbackRepeatedIntentSource,
+            vec![(
+                "fallback ja intent source",
+                sequence,
+                Some(Reason::IntentSourceDuplicate),
+            )],
+        ),
+        (
+            R::CoverageUnrequestedLocale,
+            vec![("coverage fr", rule, Some(Reason::LocaleNotRequested))],
+        ),
+        (
+            R::CoverageRepeatedLocale,
+            vec![("coverage ja", Code::LocaleDuplicate, None)],
+        ),
+        (
+            R::CoverageUnknownSurface,
+            vec![("surface footer", rule, Some(Reason::SurfaceClassUnknown))],
+        ),
+        (
+            R::CoverageRepeatedSurface,
+            vec![(
+                "surface checkout",
+                rule,
+                Some(Reason::SurfaceClassDuplicate),
+            )],
+        ),
+        (
+            R::CoverageRepeatedDomain,
+            vec![(
+                "domain ja by checkout,internal-tool,nav",
+                Code::CoverageRuleDuplicate,
+                None,
+            )],
+        ),
+        (
+            R::CoverageConflict,
+            vec![("cell ja nav", Code::CoverageRuleConflict, None)],
+        ),
+        (
+            R::PolicyDense,
+            vec![
+                (
+                    "alias en-US",
+                    duplicate,
+                    Some(Reason::ConflictingDestination),
+                ),
+                (
+                    "fallback he-IL literal he-IL",
+                    sequence,
+                    Some(Reason::LiteralSelfReference),
+                ),
+                (
+                    "fallback ja intent source",
+                    sequence,
+                    Some(Reason::IntentSourceDuplicate),
+                ),
+                ("surface footer", rule, Some(Reason::SurfaceClassUnknown)),
+            ],
+        ),
+    ] {
+        let resolved = resolved(&case(recipe));
+        let expected = expected
+            .into_iter()
+            .map(|(subject, code, reason)| (subject.to_owned(), code, reason))
+            .collect::<Vec<_>>();
+        assert_eq!(policy_issues(&resolved), expected, "{recipe:?}");
+        // Phase 7 resolved the project; what Phase 8 blocked is unavailable.
+        assert!(locales(&resolved).project.is_ok(), "{recipe:?}");
+    }
+    let dense = resolved(&case(R::PolicyDense));
+    let (mut domains, mut cells) = (Vec::new(), 0);
+    for (unit, status) in dense.evaluation.statuses() {
+        match &unit.subject {
+            Subject::Coverage(CoverageSubject::Domain(_)) => {
+                assert_eq!(*status, Status::Evaluated);
+                domains.push(describe_policy(&unit.subject));
+            }
+            Subject::Coverage(CoverageSubject::Cell(..)) => {
+                assert_ne!(*status, Status::Evaluated);
+                cells += 1;
+            }
+            _ => {}
+        }
+    }
+    // The conflicting rule's domain is among them; the rule naming `footer`
+    // has none.
+    assert_eq!(
+        domains,
+        [
+            "domain en,ja by nav",
+            "domain he-IL,ja by checkout",
+            "domain ja by checkout,internal-tool,nav"
+        ]
+    );
+    assert_eq!(cells, 9);
+}
+
+/// The rules and their selector items in another order change neither the
+/// shared nor the entry domain: the authoring order decides nothing, and
+/// Phase 7 places no coverage selector. Only the input differs.
+#[test]
+fn reordered_rules_and_selector_items_change_no_observation() {
+    let (every, reordered) = (
+        prepare(&case(R::EveryRole)).unwrap(),
+        prepare(&case(R::PolicyReordered)).unwrap(),
+    );
+    assert_eq!(every.observation, reordered.observation);
+    assert_ne!(
+        super::context::observe(&every).unwrap(),
+        super::context::observe(&reordered).unwrap()
+    );
+}
+
+/// Each of Phase 8's eight bounds counts every role at its exact value, and
+/// one under it blocks with that bound's own name, limit, and count.
+#[test]
+fn phase_8_bounds_count_every_role_at_their_exact_values_and_first_over() {
+    for (kind, name, exact) in [
+        (
+            LimitKind::ResolutionNegotiationAliases,
+            "maxNegotiationAliases",
+            2,
+        ),
+        (
+            LimitKind::ResolutionFallbackSources,
+            "maxFallbackSources",
+            2,
+        ),
+        (
+            LimitKind::ResolutionFallbackCandidatesPerSource,
+            "maxFallbackCandidatesPerSource",
+            2,
+        ),
+        (LimitKind::ResolutionCoverageRules, "maxCoverageRules", 3),
+        (
+            LimitKind::ResolutionCoverageLocaleSelectorOccurrences,
+            "maxCoverageLocaleSelectorOccurrences",
+            3,
+        ),
+        (
+            LimitKind::ResolutionCoverageSurfaceSelectorOccurrences,
+            "maxCoverageSurfaceSelectorOccurrences",
+            2,
+        ),
+        (
+            LimitKind::ResolutionCoverageDecisionCells,
+            "maxCoverageDecisionCells",
+            9,
+        ),
+        (
+            LimitKind::ResolutionCoverageRuleCellComparisons,
+            "maxCoverageRuleCellComparisons",
+            27,
+        ),
+    ] {
+        for edge in [LimitEdge::Exact, LimitEdge::FirstOver] {
+            let declaration = declarations()
+                .into_iter()
+                .find(|case| {
+                    case.fixture == Recipe::LocalePolicyResolution(R::EveryRole)
+                        && case.limit == Some((kind, edge))
+                })
+                .unwrap();
+            let resolved = resolved(&declaration);
+            let issues = resolved.evaluation.issues().collect::<Vec<_>>();
+            if edge == LimitEdge::Exact {
+                assert!(issues.is_empty(), "{kind:?}");
+                continue;
+            }
+            assert_eq!(issues.len(), 1, "{kind:?}");
+            assert_eq!(issues[0].code(), Code::ResourceLimitExceeded, "{kind:?}");
+            let exceeded = resolved.evaluation.limit(issues[0]).unwrap();
+            assert_eq!(
+                (exceeded.bound.name, exceeded.limit.get(), exceeded.actual),
+                (name, exact - 1, Actual::Exact(exact)),
+                "{kind:?}"
+            );
+        }
+    }
+}
+
+/// Each ICU4X scale grows one Phase 8 dimension and resolves it whole at the
+/// other recipes' Phase 7 capacity, through either engine.
+#[test]
+fn the_policy_scales_grow_one_dimension_each_through_icu4x() {
+    for engine in [Engine::Reused, Engine::Fresh] {
+        let policies = |input| {
+            let resolved = resolved(&icu4x_case(input, engine));
+            assert!(resolved.evaluation.issues().next().is_none(), "{input:?}");
+            resolved.result.unwrap()
+        };
+        let aliases = policies(R::AliasScale);
+        assert_eq!(aliases.negotiation.unwrap().aliases().len(), 24);
+        let sources = policies(R::FallbackSourceScale).fallback.unwrap();
+        assert_eq!(sources.sequences().len(), 40);
+        assert!(sources
+            .sequences()
+            .values()
+            .all(|sequence| sequence.len() == 1));
+        let sequence = policies(R::FallbackSequenceScale).fallback.unwrap();
+        assert_eq!(
+            sequence
+                .sequences()
+                .values()
+                .map(Vec::len)
+                .collect::<Vec<_>>(),
+            [48]
+        );
+        let coverage = policies(R::CoverageRuleScale).coverage.unwrap();
+        assert_eq!(coverage.basis().len(), 180);
+        // Each language's rule decides its three cells alone.
+        assert!(coverage.basis().values().all(|basis| matches!(
+            &basis.decision,
+            Decision::Rules(domains) if domains.len() == 1
+        )));
     }
 }

@@ -117,7 +117,7 @@ fn expectation_objects_are_closed_and_nullable_fields_must_be_present() {
 #[test]
 fn planning_work_is_complete_and_checked_before_fixture_preparation() {
     let registry = Registry::load().unwrap();
-    assert_eq!(registry.expectations().len(), 213);
+    assert_eq!(registry.expectations().len(), 252);
     for row in registry.expectations() {
         assert_eq!(work_digest(row.work()).unwrap(), row.logical_work);
         let fixture = registry.prepare(row.declaration()).unwrap();

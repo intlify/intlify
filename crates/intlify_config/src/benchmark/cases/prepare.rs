@@ -134,6 +134,14 @@ pub(in crate::benchmark) fn prepare(
             | LimitKind::ResolutionRequestedLocales
             | LimitKind::ResolutionRawIdentifierBytes
             | LimitKind::ResolutionCanonicalIdentifierBytes
+            | LimitKind::ResolutionNegotiationAliases
+            | LimitKind::ResolutionFallbackSources
+            | LimitKind::ResolutionFallbackCandidatesPerSource
+            | LimitKind::ResolutionCoverageRules
+            | LimitKind::ResolutionCoverageLocaleSelectorOccurrences
+            | LimitKind::ResolutionCoverageSurfaceSelectorOccurrences
+            | LimitKind::ResolutionCoverageDecisionCells
+            | LimitKind::ResolutionCoverageRuleCellComparisons
             | LimitKind::BootstrapArtifacts
             | LimitKind::RecheckArtifacts
             | LimitKind::RecheckProfileIdBytes => {
@@ -163,6 +171,14 @@ pub(in crate::benchmark) fn prepare(
             | LimitKind::ResolutionRequestedLocales
             | LimitKind::ResolutionRawIdentifierBytes
             | LimitKind::ResolutionCanonicalIdentifierBytes
+            | LimitKind::ResolutionNegotiationAliases
+            | LimitKind::ResolutionFallbackSources
+            | LimitKind::ResolutionFallbackCandidatesPerSource
+            | LimitKind::ResolutionCoverageRules
+            | LimitKind::ResolutionCoverageLocaleSelectorOccurrences
+            | LimitKind::ResolutionCoverageSurfaceSelectorOccurrences
+            | LimitKind::ResolutionCoverageDecisionCells
+            | LimitKind::ResolutionCoverageRuleCellComparisons
             | LimitKind::BootstrapArtifacts
             | LimitKind::RecheckArtifacts
             | LimitKind::RecheckProfileIdBytes => unreachable!(),
@@ -373,6 +389,11 @@ fn resolution_edge(
 ) -> Result<u64, PreparationFailure> {
     use LocalePolicyResolutionRecipe as R;
 
+    if recipe == R::EveryRole {
+        if let Some(count) = every_role_policy_count(kind) {
+            return Ok(count);
+        }
+    }
     Ok(match (kind, recipe) {
         // Four requested locales, the default and the source, and the
         // browser target's requested locale.
@@ -383,6 +404,24 @@ fn resolution_edge(
         (LimitKind::ResolutionRawIdentifierBytes, R::Minimal) => 2,
         (LimitKind::ResolutionCanonicalIdentifierBytes, R::ExpandingAlias) => 22,
         _ => return Err(PreparationFailure::UndeclaredCase),
+    })
+}
+
+/// Phase 8's counts over every role: two aliases, two fallback sources whose
+/// longest sequence is `ja`'s two candidates, and two surface items; three
+/// rules with three locale items; and three requested locales by three
+/// vocabulary members, each cell compared with the three rules.
+const fn every_role_policy_count(kind: LimitKind) -> Option<u64> {
+    Some(match kind {
+        LimitKind::ResolutionNegotiationAliases
+        | LimitKind::ResolutionFallbackSources
+        | LimitKind::ResolutionFallbackCandidatesPerSource
+        | LimitKind::ResolutionCoverageSurfaceSelectorOccurrences => 2,
+        LimitKind::ResolutionCoverageRules
+        | LimitKind::ResolutionCoverageLocaleSelectorOccurrences => 3,
+        LimitKind::ResolutionCoverageDecisionCells => 9,
+        LimitKind::ResolutionCoverageRuleCellComparisons => 27,
+        _ => return None,
     })
 }
 
@@ -400,6 +439,33 @@ fn policy_capacity(limits: &mut crate::resolver::limits::LocaleResolutionLimits)
     limits.max_coverage_surface_selector_occurrences = bound(112);
     limits.max_coverage_decision_cells = bound(1024);
     limits.max_coverage_rule_cell_comparisons = bound(65_536);
+}
+
+/// The Phase 8 bound a case's edge replaces.
+fn policy_bound(
+    limits: &mut crate::resolver::limits::LocaleResolutionLimits,
+    kind: LimitKind,
+    bound: Bound,
+) {
+    match kind {
+        LimitKind::ResolutionNegotiationAliases => limits.max_negotiation_aliases = bound,
+        LimitKind::ResolutionFallbackSources => limits.max_fallback_sources = bound,
+        LimitKind::ResolutionFallbackCandidatesPerSource => {
+            limits.max_fallback_candidates_per_source = bound;
+        }
+        LimitKind::ResolutionCoverageRules => limits.max_coverage_rules = bound,
+        LimitKind::ResolutionCoverageLocaleSelectorOccurrences => {
+            limits.max_coverage_locale_selector_occurrences = bound;
+        }
+        LimitKind::ResolutionCoverageSurfaceSelectorOccurrences => {
+            limits.max_coverage_surface_selector_occurrences = bound;
+        }
+        LimitKind::ResolutionCoverageDecisionCells => limits.max_coverage_decision_cells = bound,
+        LimitKind::ResolutionCoverageRuleCellComparisons => {
+            limits.max_coverage_rule_cell_comparisons = bound;
+        }
+        _ => unreachable!("only a Phase 8 bound reaches here"),
+    }
 }
 
 fn prepare_resolution(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
@@ -442,6 +508,7 @@ fn prepare_resolution(declaration: &Declaration) -> Result<Candidate, Preparatio
     } else {
         (bound(128), bound(64), bound(128))
     };
+    let mut policy_edge = None;
     if let Some((kind, edge)) = declaration.limit {
         let exact = resolution_edge(kind, recipe)?;
         let bound = Bound::new(match edge {
@@ -454,7 +521,7 @@ fn prepare_resolution(declaration: &Declaration) -> Result<Candidate, Preparatio
             LimitKind::ResolutionRequestedLocales => requested = bound,
             LimitKind::ResolutionRawIdentifierBytes
             | LimitKind::ResolutionCanonicalIdentifierBytes => identifier_bytes = bound,
-            _ => unreachable!(),
+            _ => policy_edge = Some((kind, bound)),
         }
     }
     // Phase 7's three bounds as the case gives them, and Phase 8's eight at
@@ -464,6 +531,9 @@ fn prepare_resolution(declaration: &Declaration) -> Result<Candidate, Preparatio
         .limits()
         .clone();
     policy_capacity(&mut limits.locale_resolution);
+    if let Some((kind, bound)) = policy_edge {
+        policy_bound(&mut limits.locale_resolution, kind, bound);
+    }
     let policy = ConfirmedPolicy::fixture_owned(limits);
     let limit = policy
         .limits()

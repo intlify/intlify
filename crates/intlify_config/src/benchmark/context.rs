@@ -236,7 +236,7 @@ mod tests {
         }
         drop(context);
         drop(registry);
-        assert_eq!(retained.len(), 213);
+        assert_eq!(retained.len(), 252);
         assert!(!serde_json::to_vec(&retained).unwrap().is_empty());
         assert_eq!(
             serde_json::to_vec(&decoded_context).unwrap(),
