@@ -153,11 +153,11 @@ Design 015 lists these beside the Phase 2 items. None is approximated here; Phas
 | --- | --- |
 | Explicit compatibility conversions such as `en_US` to `en-US`, `root` to `und`, and `Latn` to `und-Latn`, with conversion evidence | Design 029, whose compatibility adapter converts a legacy spelling before resolution (Decision 015-018) |
 | The blocking configuration Finding for an invalid identifier, and the non-blocking Finding that carries a canonical replacement and its source | Phase 5. This crate's provider reports the rejection or the replacement |
-| Duplicate locales after canonicalization, one locale in independent roles, set order by unsigned bytes, permutations, and explicitly ordered sequences | Phase 3. The byte order itself is `canonical_locale_order_is_unsigned_byte_order_and_keeps_prefixes` |
+| Duplicate locales after canonicalization, one locale in independent roles, set order by unsigned bytes, permutations, and explicitly ordered sequences | Phase 3, in its [locale rows](../phase3/README.md#locales). The byte order itself is `canonical_locale_order_is_unsigned_byte_order_and_keeps_prefixes` |
 | Authoring spellings and the canonicalization specification in profile equality and digests | Phase 5 |
-| A missing `locale-canonicalization` slot or an unsupported specification in the specification input, and the configuration `schemaVersion` staying the same when only the canonicalization specification changes | Phase 3, which brings the specification input to the resolver |
+| A missing `locale-canonicalization` slot or an unsupported specification in the specification input, and the configuration `schemaVersion` staying the same when only the canonicalization specification changes | Phase 3, which brings the specification input to the resolver ([its rows](../phase3/README.md#the-specification-input)) |
 | Canonicalization data in the `storefront` blueprint, Resolver Input Component Paths, the semantic inventory, replay sets, and suppression of downstream checks | Phases 5 and 6 |
-| Requested locales, negotiation, and the default source locale | Phase 3 |
+| Requested locales, negotiation, and the default source locale | Phase 3 ([its fixtures](../phase3/README.md)) |
 
 ## Deliberately not covered in Phase 2
 

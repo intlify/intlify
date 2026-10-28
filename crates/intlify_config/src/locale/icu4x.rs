@@ -341,6 +341,28 @@ mod tests {
         assert_eq!(count, 95);
     }
 
+    /// Within a requested-locale list, a wildcard, a language range, and a
+    /// protocol token are invalid identifiers, never expanded or parsed. `all`
+    /// is no exception: CLDR 48.2.0 lists it as a regular language code, so it
+    /// is that language, not every locale. Structural admission refuses `all`
+    /// only in place of the list.
+    #[test]
+    fn wildcards_ranges_and_protocol_tokens_are_no_locales_but_all_is_a_language() {
+        let canonicalizer = bind(committed()).unwrap();
+        for input in ["*", "en-*", "*-US", "en-US;q=0.8", "en-US,fr"] {
+            assert_eq!(
+                canonicalizer.canonicalize(input).err(),
+                Some(CanonicalizationFailure::Provider(
+                    ProviderFailure::InvalidIdentifier
+                )),
+                "{input}"
+            );
+        }
+        let all = canonicalizer.canonicalize("all").unwrap();
+        assert_eq!(all.locale().as_str(), "all");
+        assert_eq!(all.suggested_replacement(), None);
+    }
+
     #[test]
     fn an_artifact_that_is_not_admitted_never_becomes_a_provider() {
         let failure =
