@@ -123,11 +123,11 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
                 .map_err(|_| ContextFailure::Encoding)?,
             );
         }
-        Prepared::LocaleResolution(prepared) => {
+        Prepared::LocalePolicyResolution(prepared) => {
             // The declared provider and engine state are the prepared ones.
             let declared = match candidate.declaration.fixture {
-                Recipe::LocaleResolution(_) => None,
-                Recipe::Icu4xLocaleResolution { engine, .. } => Some(engine),
+                Recipe::LocalePolicyResolution(_) => None,
+                Recipe::Icu4xLocalePolicyResolution { engine, .. } => Some(engine),
                 _ => return Err(ContextFailure::LocaleInputMismatch),
             };
             if declared != prepared.icu4x().map(PreparedEngine::engine)

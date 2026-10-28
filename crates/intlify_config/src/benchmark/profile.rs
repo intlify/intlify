@@ -111,7 +111,7 @@ impl MeasurementProfile {
                 identity: "intlify-design-026".into(),
                 revision: "0".into(),
             },
-            scope: "internal-configuration-locale-resolution-canonicalization-with-icu4x-resource-policy-bootstrap-and-artifact-collection-admission"
+            scope: "internal-configuration-locale-policy-resolution-canonicalization-with-icu4x-resource-policy-bootstrap-artifact-collection-admission-and-resolved-binding-construction"
                 .into(),
             fixture_registry: registry.binding().clone(),
             cases: registry.declarations().cloned().collect(),
@@ -137,16 +137,16 @@ impl MeasurementProfile {
                 failed_capture: "stop-case-retain-diagnostic-prefix-only".into(),
             },
             // Every state a case runs in, once: each operation's own, and both
-            // engine states of canonicalization and Phase 7 through the
-            // ICU4X provider. Phase 7's own state is the one its reused
-            // engine runs in.
+            // engine states of canonicalization and Phases 7 and 8 through
+            // the ICU4X provider. Phases 7 and 8's own state is the one their
+            // reused engine runs in.
             operation_states: Operation::ALL
                 .into_iter()
                 .map(|operation| (operation, None))
                 .chain(
                     [
                         Operation::LocaleCanonicalization,
-                        Operation::LocaleResolution,
+                        Operation::LocalePolicyResolution,
                     ]
                     .into_iter()
                     .flat_map(|operation| {

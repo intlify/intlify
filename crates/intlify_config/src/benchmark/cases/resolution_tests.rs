@@ -7,46 +7,54 @@ use super::*;
 use crate::benchmark::locale_resolution::Resolved;
 use crate::benchmark::operation::Output;
 use crate::locale::CanonicalLocale;
-use crate::resolver::evaluation::{Actual, Admitted, Code, Status, Subject};
+use crate::model::CoverageMode;
+use crate::resolver::coverage::{CoverageSubject, Decision};
+use crate::resolver::evaluation::{Actual, Admitted, Check, Code, Status, Subject};
+use crate::resolver::fallback::{Candidate, FallbackSubject};
 use crate::resolver::locales::{FallbackLocale, LocaleKey, LocaleSubject, ResolvedLocales};
+use crate::resolver::negotiation::NegotiationSubject;
 
-use LocaleResolutionRecipe as R;
+use LocalePolicyResolutionRecipe as R;
 
-fn case(recipe: LocaleResolutionRecipe) -> Declaration {
+fn case(recipe: LocalePolicyResolutionRecipe) -> Declaration {
     declarations()
         .into_iter()
-        .find(|case| case.fixture == Recipe::LocaleResolution(recipe) && case.limit.is_none())
+        .find(|case| case.fixture == Recipe::LocalePolicyResolution(recipe) && case.limit.is_none())
         .unwrap()
 }
 
-fn icu4x_case(input: LocaleResolutionRecipe, engine: Engine) -> Declaration {
+fn icu4x_case(input: LocalePolicyResolutionRecipe, engine: Engine) -> Declaration {
     declarations()
         .into_iter()
-        .find(|case| case.fixture == Recipe::Icu4xLocaleResolution { input, engine })
+        .find(|case| case.fixture == Recipe::Icu4xLocalePolicyResolution { input, engine })
         .unwrap()
 }
 
 fn resolved(declaration: &Declaration) -> Resolved {
-    let Output::LocaleResolution(resolved) = prepare(declaration).unwrap().output else {
+    let Output::LocalePolicyResolution(resolved) = prepare(declaration).unwrap().output else {
         panic!("wrong owner boundary")
     };
     resolved
 }
 
 fn locales(resolved: &Resolved) -> &ResolvedLocales {
-    resolved.result.as_ref().unwrap()
+    &resolved.result.as_ref().unwrap().locales
 }
 
 fn names(locales: &[CanonicalLocale]) -> Vec<&str> {
     locales.iter().map(CanonicalLocale::as_str).collect()
 }
 
-/// A subject as its role, its owner, and its locale or rejected spelling.
-fn describe(subject: &LocaleSubject) -> String {
-    let key = |key: &LocaleKey| match key {
+/// A subject key's locale or rejected spelling.
+fn key(key: &LocaleKey) -> String {
+    match key {
         LocaleKey::Canonical(locale) => locale.as_str().to_owned(),
         LocaleKey::Content(content) => content.as_str().to_owned(),
-    };
+    }
+}
+
+/// A subject as its role, its owner, and its locale or rejected spelling.
+fn describe(subject: &LocaleSubject) -> String {
     match subject {
         LocaleSubject::Occurrences => "occurrences".to_owned(),
         LocaleSubject::RequestedLocale(own) => format!("requested {}", key(own)),
@@ -70,16 +78,21 @@ fn describe(subject: &LocaleSubject) -> String {
     }
 }
 
-/// Each blocking result as its subject and its code, in 015's order.
+/// Each blocking result as its subject and its code, in 015's order. No
+/// recipe here blocks a Phase 8 unit but a coverage selector's locale.
 fn issues(resolved: &Resolved) -> Vec<(String, Code)> {
     resolved
         .evaluation
         .issues()
         .map(|issue| {
-            let Subject::Locale(subject) = &issue.unit().subject else {
-                panic!("only Phase 7 runs in this boundary")
+            let subject = match &issue.unit().subject {
+                Subject::Locale(subject) => describe(subject),
+                Subject::Coverage(CoverageSubject::Locale(_, own)) => {
+                    format!("coverage {}", key(own))
+                }
+                other => panic!("no recipe blocks {other:?}"),
             };
-            (describe(subject), issue.code())
+            (subject, issue.code())
         })
         .collect()
 }
@@ -91,11 +104,11 @@ fn resolution_cases_keep_their_rows_and_append_after_the_icu4x_rows() {
     let resolution = |cases: &[Declaration]| {
         cases
             .iter()
-            .all(|case| case.operation == Operation::LocaleResolution)
+            .all(|case| case.operation == Operation::LocalePolicyResolution)
     };
     assert!(cases[..94]
         .iter()
-        .all(|case| case.operation != Operation::LocaleResolution));
+        .all(|case| case.operation != Operation::LocalePolicyResolution));
     assert!(resolution(&cases[94..127]));
     assert!(cases[127..141]
         .iter()
@@ -113,20 +126,20 @@ fn resolution_cases_keep_their_rows_and_append_after_the_icu4x_rows() {
     }
     for declaration in cases
         .iter()
-        .filter(|case| case.operation == Operation::LocaleResolution)
+        .filter(|case| case.operation == Operation::LocalePolicyResolution)
     {
         let candidate = prepare(declaration).unwrap();
         assert!(
             candidate.input_limits.is_some(),
             "complete config preparation is explicit"
         );
-        let Output::LocaleResolution(resolved) = candidate.output else {
+        let Output::LocalePolicyResolution(resolved) = candidate.output else {
             panic!("wrong owner boundary")
         };
         assert!(resolved.result.is_ok());
         assert_eq!(
             resolved.evaluation.issues().next().is_none(),
-            declaration.expected_kind == ExpectedKind::LocaleResolutionComplete,
+            declaration.expected_kind == ExpectedKind::LocalePolicyResolutionComplete,
             "{declaration:?}"
         );
     }
@@ -152,7 +165,7 @@ fn aliases_add_suggestions_and_never_change_a_value_or_unit() {
     for (canonical, aliased, corrected) in [
         (R::Multi, R::Aliased, 5),
         (R::ExpandedAlias, R::ExpandingAlias, 2),
-        (R::EveryRole, R::EveryRoleAliased, 11),
+        (R::EveryRole, R::EveryRoleAliased, 12),
     ] {
         let observed = |recipe| prepare(&case(recipe)).unwrap().observation;
         assert_ne!(observed(canonical).shared, observed(aliased).shared);
@@ -163,6 +176,13 @@ fn aliases_add_suggestions_and_never_change_a_value_or_unit() {
         assert_eq!(left.negotiation_aliases, right.negotiation_aliases);
         assert_eq!(left.message_fallback, right.message_fallback);
         assert_eq!(left.targets, right.targets);
+        let (before, after) = (
+            canonical.result.as_ref().unwrap(),
+            aliased.result.as_ref().unwrap(),
+        );
+        assert_eq!(before.negotiation, after.negotiation);
+        assert_eq!(before.fallback, after.fallback);
+        assert_eq!(before.coverage, after.coverage);
         assert!(canonical
             .evaluation
             .statuses()
@@ -192,22 +212,40 @@ fn changed_meanings_change_the_shared_domain_and_unread_inputs_do_not() {
         assert_ne!(shared(R::Multi), shared(changed), "{changed:?}");
     }
     assert_ne!(shared(R::Minimal), shared(R::SourceUnd));
-    // An unselected profile, and a coverage selector Phase 7 only counts,
-    // change the input and nothing Phase 7 decides.
-    for (left, right) in [
-        (R::Minimal, R::OtherProfile),
-        (R::EveryRole, R::CoverageUncanonicalized),
-    ] {
-        let (left, right) = (
-            prepare(&case(left)).unwrap(),
-            prepare(&case(right)).unwrap(),
-        );
-        assert_eq!(left.observation, right.observation);
-        assert_ne!(
-            super::context::observe(&left).unwrap(),
-            super::context::observe(&right).unwrap()
-        );
-    }
+    // An unselected profile changes the input and nothing Phases 7 and 8
+    // decide.
+    let (left, right) = (
+        prepare(&case(R::Minimal)).unwrap(),
+        prepare(&case(R::OtherProfile)).unwrap(),
+    );
+    assert_eq!(left.observation, right.observation);
+    assert_ne!(
+        super::context::observe(&left).unwrap(),
+        super::context::observe(&right).unwrap()
+    );
+}
+
+/// Phase 7 counts a coverage selector and leaves it to Phase 8, which
+/// rejects `zz`: the coverage policy is unavailable while negotiation and
+/// message fallback resolve, and no spelling Phase 7 placed moves.
+#[test]
+fn a_coverage_selector_phase_7_counts_is_phase_8s_to_reject() {
+    let (every, rejected) = (
+        prepare(&case(R::EveryRole)).unwrap(),
+        prepare(&case(R::CoverageUncanonicalized)).unwrap(),
+    );
+    assert_ne!(every.observation.shared, rejected.observation.shared);
+    assert_eq!(every.observation.entry, rejected.observation.entry);
+    let resolved = resolved(&case(R::CoverageUncanonicalized));
+    assert_eq!(
+        issues(&resolved),
+        [("coverage zz".to_owned(), Code::LocaleInvalid)]
+    );
+    let policies = resolved.result.as_ref().unwrap();
+    assert!(policies.locales.project.is_ok());
+    assert!(policies.negotiation.is_ok());
+    assert!(policies.fallback.is_ok());
+    assert!(policies.coverage.is_err());
 }
 
 #[test]
@@ -255,10 +293,8 @@ fn complete_recipes_have_independent_value_and_correction_expectations() {
             R::ChangedDefault => (Some("en"), &multi, "ja", 7, 0),
             R::ChangedSource => (Some("fr"), &multi, "en-US", 7, 0),
             R::AbsentSource => (None, &multi, "en-US", 6, 0),
-            R::EveryRole | R::EveryRoleReordered | R::CoverageUncanonicalized => {
-                (Some("en"), &every, "ja", 21, 0)
-            }
-            R::EveryRoleAliased => (Some("en"), &every, "ja", 21, 11),
+            R::EveryRole | R::EveryRoleReordered => (Some("en"), &every, "ja", 21, 0),
+            R::EveryRoleAliased => (Some("en"), &every, "ja", 21, 12),
             R::ExpandingAlias => (None, &expanded, expanded[0], 3, 2),
             R::ExpandedAlias => (None, &expanded, expanded[0], 3, 0),
             R::ManyTargets => (None, &["en"], "en", 34, 0),
@@ -297,7 +333,7 @@ fn complete_recipes_have_independent_value_and_correction_expectations() {
 }
 
 #[test]
-fn every_role_hands_each_locale_policy_input_to_the_later_phases() {
+fn every_role_hands_each_locale_policy_input_to_phase_8_which_resolves_each_policy() {
     fn canonical(locale: &Admitted<CanonicalLocale>) -> &str {
         locale.as_ref().unwrap().as_str()
     }
@@ -310,7 +346,7 @@ fn every_role_hands_each_locale_policy_input_to_the_later_phases() {
         .iter()
         .map(|alias| (canonical(&alias.key.locale), canonical(&alias.value.locale)))
         .collect::<Vec<_>>();
-    assert_eq!(aliases, [("en-US", "en"), ("fr", "fr-FR")]);
+    assert_eq!(aliases, [("en-US", "en"), ("fr", "en")]);
     let fallback = locales
         .message_fallback
         .as_ref()
@@ -358,6 +394,80 @@ fn every_role_hands_each_locale_policy_input_to_the_later_phases() {
         [
             ("browser", vec!["en", "ja"], Some("ja")),
             ("server", vec!["en", "he-IL"], None)
+        ]
+    );
+    // Phase 8 resolves each policy under the fixture-owned specifications
+    // and vocabulary.
+    let policies = resolved.result.as_ref().unwrap();
+    let negotiation = policies.negotiation.as_ref().unwrap();
+    assert_eq!(
+        negotiation.specification().identity,
+        "intlify-locale-negotiation"
+    );
+    assert_eq!(
+        negotiation
+            .aliases()
+            .iter()
+            .map(|(key, destination)| (key.as_str(), destination.as_str()))
+            .collect::<Vec<_>>(),
+        [("en-US", "en"), ("fr", "en")]
+    );
+    let fallback = policies.fallback.as_ref().unwrap();
+    assert_eq!(
+        fallback.specification().identity,
+        "intlify-message-locale-fallback"
+    );
+    assert_eq!(
+        fallback
+            .sequences()
+            .iter()
+            .map(|(source, candidates)| {
+                let candidates = candidates
+                    .iter()
+                    .map(|candidate| match candidate {
+                        Candidate::Literal(literal) => literal.as_str(),
+                        Candidate::IntentSource => "intent-source-locale",
+                    })
+                    .collect::<Vec<_>>();
+                (source.as_str(), candidates)
+            })
+            .collect::<Vec<_>>(),
+        [
+            ("he-IL", vec!["en"]),
+            ("ja", vec!["en", "intent-source-locale"])
+        ]
+    );
+    // The default, the `ja` rule, the `checkout` rule, and the rule over
+    // both: it outranks the `checkout` rule, and shares `ja`/`checkout` with
+    // the `ja` rule, since neither of those two is narrower.
+    let coverage = policies.coverage.as_ref().unwrap();
+    assert_eq!(
+        coverage.specification().identity,
+        "intlify-localization-coverage"
+    );
+    let (direct, fallback_allowed) = (CoverageMode::DirectRequired, CoverageMode::FallbackAllowed);
+    assert_eq!(
+        coverage
+            .basis()
+            .iter()
+            .map(|((locale, surface), basis)| {
+                let rules = match &basis.decision {
+                    Decision::Default => None,
+                    Decision::Rules(domains) => Some(domains.len()),
+                };
+                (locale.as_str(), surface.as_str(), basis.mode, rules)
+            })
+            .collect::<Vec<_>>(),
+        [
+            ("en", "checkout", direct, Some(1)),
+            ("en", "internal-tool", direct, None),
+            ("en", "nav", direct, None),
+            ("he-IL", "checkout", fallback_allowed, Some(1)),
+            ("he-IL", "internal-tool", direct, None),
+            ("he-IL", "nav", direct, None),
+            ("ja", "checkout", fallback_allowed, Some(2)),
+            ("ja", "internal-tool", fallback_allowed, Some(1)),
+            ("ja", "nav", fallback_allowed, Some(1)),
         ]
     );
 }
@@ -509,7 +619,7 @@ fn the_occurrence_bound_counts_every_role_at_its_exact_value_and_first_over() {
         let declaration = declarations()
             .into_iter()
             .find(|case| {
-                case.fixture == Recipe::LocaleResolution(R::EveryRole)
+                case.fixture == Recipe::LocalePolicyResolution(R::EveryRole)
                     && case.limit == Some((LimitKind::ResolutionLocaleOccurrences, edge))
             })
             .unwrap();
@@ -529,11 +639,47 @@ fn the_occurrence_bound_counts_every_role_at_its_exact_value_and_first_over() {
             (exceeded.bound.name, exceeded.limit.get(), exceeded.actual),
             ("maxLocaleOccurrences", 20, Actual::Exact(21))
         );
-        // Nothing past the bound is canonicalized or checked.
-        assert!(resolved.evaluation.statuses().all(|(unit, status)| {
-            unit.subject == Subject::Locale(LocaleSubject::Occurrences)
-                || matches!(status, Status::NotEvaluated(_))
-        }));
+        // Nothing past the bound is canonicalized or checked. Phase 8's
+        // bounds over what was declared, the Intent source candidate, and the
+        // two surface items naming a vocabulary member need no canonical
+        // locale, so they still run; every other unit waits on the bound.
+        let runs = |unit: &crate::resolver::evaluation::Unit| match &unit.subject {
+            Subject::Locale(subject) => *subject == LocaleSubject::Occurrences,
+            Subject::Negotiation(NegotiationSubject::Aliases)
+            | Subject::Fallback(FallbackSubject::Sources | FallbackSubject::IntentSource(_))
+            | Subject::Coverage(
+                CoverageSubject::Rules
+                | CoverageSubject::LocaleSelectors
+                | CoverageSubject::SurfaceSelectors
+                | CoverageSubject::SurfaceClass(..),
+            ) => true,
+            Subject::Fallback(FallbackSubject::Source(_)) => unit.check == Check::WithinBound,
+            _ => false,
+        };
+        assert!(resolved
+            .evaluation
+            .statuses()
+            .all(|(unit, status)| runs(unit) == (*status == Status::Evaluated)));
+        assert_eq!(
+            resolved
+                .evaluation
+                .statuses()
+                .filter(|(unit, _)| runs(unit))
+                .count(),
+            13
+        );
+        // Evaluated and waiting, per policy.
+        let mut policies = [[0; 2]; 3];
+        for (unit, status) in resolved.evaluation.statuses() {
+            let policy = match unit.subject {
+                Subject::Negotiation(_) => 0,
+                Subject::Fallback(_) => 1,
+                Subject::Coverage(_) => 2,
+                _ => continue,
+            };
+            policies[policy][usize::from(*status != Status::Evaluated)] += 1;
+        }
+        assert_eq!(policies, [[1, 4], [4, 8], [7, 11]]);
     }
 }
 
@@ -549,7 +695,7 @@ fn the_input_context_refuses_a_candidate_bound_to_another_input() {
 
     for change in 0..4 {
         let mut candidate = prepare(&case(R::Minimal)).unwrap();
-        let Prepared::LocaleResolution(prepared) = &mut candidate.prepared else {
+        let Prepared::LocalePolicyResolution(prepared) = &mut candidate.prepared else {
             unreachable!()
         };
         match change {
@@ -584,11 +730,11 @@ fn the_input_context_refuses_a_candidate_bound_to_another_input() {
 #[test]
 fn icu4x_resolution_cases_follow_every_finite_row_with_both_engines_for_each_input() {
     let cases = declarations();
-    let expected = LocaleResolutionRecipe::ICU4X
+    let expected = LocalePolicyResolutionRecipe::ICU4X
         .into_iter()
         .flat_map(|input| {
             [Engine::Reused, Engine::Fresh]
-                .map(|engine| Recipe::Icu4xLocaleResolution { input, engine })
+                .map(|engine| Recipe::Icu4xLocalePolicyResolution { input, engine })
         })
         .collect::<Vec<_>>();
     assert_eq!(
@@ -599,21 +745,21 @@ fn icu4x_resolution_cases_follow_every_finite_row_with_both_engines_for_each_inp
         expected
     );
     for case in &cases[150..160] {
-        assert_eq!(case.operation, Operation::LocaleResolution);
+        assert_eq!(case.operation, Operation::LocalePolicyResolution);
         assert_eq!(case.selector, Selector::App);
-        let Recipe::Icu4xLocaleResolution { input, .. } = case.fixture else {
+        let Recipe::Icu4xLocalePolicyResolution { input, .. } = case.fixture else {
             unreachable!()
         };
         // The scales are no finite rows; every other input is one.
         assert_eq!(
-            LocaleResolutionRecipe::ALL.contains(&input),
+            LocalePolicyResolutionRecipe::ALL.contains(&input),
             !input.scales(),
             "{input:?}"
         );
     }
     assert!(cases[..150]
         .iter()
-        .all(|case| !matches!(case.fixture, Recipe::Icu4xLocaleResolution { .. })));
+        .all(|case| !matches!(case.fixture, Recipe::Icu4xLocalePolicyResolution { .. })));
 }
 
 /// The finite table agrees with the ICU4X provider on every row (PR 4d), and
@@ -641,7 +787,7 @@ fn either_provider_resolves_a_finite_recipe_to_one_observation_and_work() {
 /// input, the scales included, both engines give one semantic observation and
 /// one logical work, and the checked-in rows pin the same equivalence.
 #[test]
-fn fresh_and_reused_engines_agree_on_phase_7_for_every_input() {
+fn fresh_and_reused_engines_agree_on_phases_7_and_8_for_every_input() {
     use super::context::observe;
 
     let registry = super::registry::Registry::load().unwrap();

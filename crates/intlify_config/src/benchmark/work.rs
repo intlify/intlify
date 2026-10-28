@@ -2,10 +2,10 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Versioned workload facts for input/structural/selection, single-locale
-//! canonicalization, 015 Phase 7 locale resolution, 015 Phase 4 resource
-//! policy admission, and 015 Phase 9 collection admission and exact
-//! resolution. These are not physical metrics, formal Resource Policy
-//! observations, or whole-profile locale-policy / target work.
+//! canonicalization, 015 Phases 7 and 8 locale and locale-policy resolution,
+//! 015 Phase 4 resource policy admission, and 015 Phase 9 collection admission
+//! and exact resolution. These are not physical metrics, formal Resource
+//! Policy observations, or whole-profile target work.
 
 use serde::{Deserialize, Serialize};
 
@@ -44,14 +44,22 @@ pub(super) enum WorkKind {
     CanonicalLocaleIdentifierBytes,
     RetainedCanonicalLocaleValues,
     LocaleCorrectionSuggestions,
-    LocaleResolutionOccurrences,
-    LocaleResolutionRawIdentifierBytes,
-    LocaleResolutionCanonicalizedOccurrences,
-    LocaleResolutionCanonicalRequestedLocales,
-    LocaleResolutionEvaluationUnits,
-    LocaleResolutionNotEvaluatedUnits,
-    LocaleResolutionBlockingIssues,
-    LocaleResolutionCorrections,
+    LocalePolicyResolutionOccurrences,
+    LocalePolicyResolutionRawIdentifierBytes,
+    LocalePolicyResolutionCanonicalizedOccurrences,
+    LocalePolicyResolutionCanonicalRequestedLocales,
+    LocalePolicyResolutionEvaluationUnits,
+    LocalePolicyResolutionNotEvaluatedUnits,
+    LocalePolicyResolutionBlockingIssues,
+    LocalePolicyResolutionCorrections,
+    LocalePolicyResolutionNegotiationAliases,
+    LocalePolicyResolutionFallbackSources,
+    LocalePolicyResolutionMaximumFallbackCandidates,
+    LocalePolicyResolutionCoverageRules,
+    LocalePolicyResolutionCoverageLocaleSelectorItems,
+    LocalePolicyResolutionCoverageSurfaceSelectorItems,
+    LocalePolicyResolutionCoverageDecisionCells,
+    LocalePolicyResolutionCoverageRuleCellComparisons,
     ResourcePolicyArtifactOccurrences,
     ResourcePolicyPolicyArtifacts,
     ResourcePolicyTargetProfileArtifacts,
@@ -106,15 +114,23 @@ impl WorkKind {
         Self::LocaleCorrectionSuggestions,
     ];
 
-    const LOCALE_RESOLUTION: [Self; 8] = [
-        Self::LocaleResolutionOccurrences,
-        Self::LocaleResolutionRawIdentifierBytes,
-        Self::LocaleResolutionCanonicalizedOccurrences,
-        Self::LocaleResolutionCanonicalRequestedLocales,
-        Self::LocaleResolutionEvaluationUnits,
-        Self::LocaleResolutionNotEvaluatedUnits,
-        Self::LocaleResolutionBlockingIssues,
-        Self::LocaleResolutionCorrections,
+    const LOCALE_POLICY_RESOLUTION: [Self; 16] = [
+        Self::LocalePolicyResolutionOccurrences,
+        Self::LocalePolicyResolutionRawIdentifierBytes,
+        Self::LocalePolicyResolutionCanonicalizedOccurrences,
+        Self::LocalePolicyResolutionCanonicalRequestedLocales,
+        Self::LocalePolicyResolutionEvaluationUnits,
+        Self::LocalePolicyResolutionNotEvaluatedUnits,
+        Self::LocalePolicyResolutionBlockingIssues,
+        Self::LocalePolicyResolutionCorrections,
+        Self::LocalePolicyResolutionNegotiationAliases,
+        Self::LocalePolicyResolutionFallbackSources,
+        Self::LocalePolicyResolutionMaximumFallbackCandidates,
+        Self::LocalePolicyResolutionCoverageRules,
+        Self::LocalePolicyResolutionCoverageLocaleSelectorItems,
+        Self::LocalePolicyResolutionCoverageSurfaceSelectorItems,
+        Self::LocalePolicyResolutionCoverageDecisionCells,
+        Self::LocalePolicyResolutionCoverageRuleCellComparisons,
     ];
 
     const RESOURCE_POLICY: [Self; 10] = [
@@ -155,7 +171,7 @@ impl WorkKind {
     pub(super) fn for_operation(operation: Operation) -> &'static [Self] {
         match operation {
             Operation::LocaleCanonicalization => &Self::LOCALE,
-            Operation::LocaleResolution => &Self::LOCALE_RESOLUTION,
+            Operation::LocalePolicyResolution => &Self::LOCALE_POLICY_RESOLUTION,
             Operation::ResourcePolicyBootstrap => &Self::RESOURCE_POLICY,
             Operation::ArtifactCollectionAdmission => &Self::ARTIFACT_COLLECTION,
             Operation::ResolvedBindingConstruction => &Self::RESOLVED_BINDING,
@@ -171,7 +187,7 @@ impl WorkKind {
             | Self::MaximumDeclaredProfileIdBytes
             | Self::SelectorIdBytes
             | Self::RawLocaleIdentifierBytes
-            | Self::LocaleResolutionRawIdentifierBytes
+            | Self::LocalePolicyResolutionRawIdentifierBytes
             | Self::CanonicalLocaleIdentifierBytes => WorkUnit::Utf8Octet,
             Self::ParserTokensVisited => WorkUnit::ParserToken,
             Self::LogicalValueNodes => WorkUnit::LogicalValue,
@@ -182,17 +198,29 @@ impl WorkKind {
             Self::RetainedAdmissionIssues
             | Self::RetainedSchemaFragments
             | Self::RetainedSchemaIssuesIncludingAlternatives
-            | Self::LocaleResolutionBlockingIssues
+            | Self::LocalePolicyResolutionBlockingIssues
             | Self::ResourcePolicyBlockingIssues
             | Self::ArtifactCollectionBlockingIssues
             | Self::ResolvedBindingBlockingIssues => WorkUnit::RetainedRecord,
             Self::LocaleOccurrences
-            | Self::LocaleResolutionOccurrences
-            | Self::LocaleResolutionCanonicalizedOccurrences => WorkUnit::LocaleOccurrence,
+            | Self::LocalePolicyResolutionOccurrences
+            | Self::LocalePolicyResolutionCanonicalizedOccurrences
+            | Self::LocalePolicyResolutionCoverageLocaleSelectorItems => WorkUnit::LocaleOccurrence,
+            Self::LocalePolicyResolutionNegotiationAliases => WorkUnit::NegotiationAlias,
+            Self::LocalePolicyResolutionFallbackSources => WorkUnit::FallbackSource,
+            Self::LocalePolicyResolutionMaximumFallbackCandidates => WorkUnit::FallbackCandidate,
+            Self::LocalePolicyResolutionCoverageRules => WorkUnit::CoverageRule,
+            Self::LocalePolicyResolutionCoverageSurfaceSelectorItems => {
+                WorkUnit::SurfaceClassOccurrence
+            }
+            Self::LocalePolicyResolutionCoverageDecisionCells => WorkUnit::DecisionCell,
+            Self::LocalePolicyResolutionCoverageRuleCellComparisons => WorkUnit::RuleCellComparison,
             Self::RetainedCanonicalLocaleValues
-            | Self::LocaleResolutionCanonicalRequestedLocales => WorkUnit::CanonicalLocaleValue,
-            Self::LocaleResolutionEvaluationUnits
-            | Self::LocaleResolutionNotEvaluatedUnits
+            | Self::LocalePolicyResolutionCanonicalRequestedLocales => {
+                WorkUnit::CanonicalLocaleValue
+            }
+            Self::LocalePolicyResolutionEvaluationUnits
+            | Self::LocalePolicyResolutionNotEvaluatedUnits
             | Self::ResourcePolicyEvaluationUnits
             | Self::ResourcePolicyNotEvaluatedUnits
             | Self::ArtifactCollectionEvaluationUnits
@@ -216,7 +244,7 @@ impl WorkKind {
             | Self::ResolvedBindingReferences
             | Self::ResolvedBindingDistinctReferences
             | Self::ResolvedBindingBindings => WorkUnit::ArtifactReference,
-            Self::LocaleCorrectionSuggestions | Self::LocaleResolutionCorrections => {
+            Self::LocaleCorrectionSuggestions | Self::LocalePolicyResolutionCorrections => {
                 WorkUnit::CorrectionSuggestion
             }
         }
@@ -243,6 +271,13 @@ enum WorkUnit {
     CanonicalArtifactBody,
     CanonicalOctet,
     ArtifactReference,
+    NegotiationAlias,
+    FallbackSource,
+    FallbackCandidate,
+    CoverageRule,
+    SurfaceClassOccurrence,
+    DecisionCell,
+    RuleCellComparison,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -260,7 +295,7 @@ enum UnavailableWork {
     ProfileContainerNotAdmitted,
     SchemaPrerequisiteUnavailable,
     LocaleNotCanonicalized,
-    LocaleResolutionRequestedNotResolved,
+    LocalePolicyResolutionRequestedNotResolved,
     ArtifactCollectionNotAdmitted,
     ArtifactReferencesNotResolved,
 }
@@ -313,7 +348,7 @@ impl LogicalWork {
         let mut work = Self {
             profile_identity: match prepared.operation() {
                 Operation::LocaleCanonicalization => "intlify-config-minimum-single-locale-work",
-                Operation::LocaleResolution => "intlify-config-locale-resolution-work",
+                Operation::LocalePolicyResolution => "intlify-config-locale-policy-resolution-work",
                 Operation::ResourcePolicyBootstrap => {
                     "intlify-config-resource-policy-bootstrap-work"
                 }
@@ -380,7 +415,10 @@ impl LogicalWork {
                 Prepared::Locale { input, .. } | Prepared::Icu4xLocale { input, .. },
                 Output::Locale(result),
             ) => work.single_locale(input, result)?,
-            (Prepared::LocaleResolution(prepared), Output::LocaleResolution(resolved)) => {
+            (
+                Prepared::LocalePolicyResolution(prepared),
+                Output::LocalePolicyResolution(resolved),
+            ) => {
                 work.locales(prepared, resolved)?;
             }
             (Prepared::ResourcePolicy(prepared), Output::ResourcePolicy(resolved)) => {

@@ -124,11 +124,12 @@ pub(crate) fn resolution_operation(value: &Value) -> Prepared {
     let analysis = analysis(value);
     let config = analysis.construct().unwrap().unwrap();
     let bound = |value| Bound::new(value).unwrap();
-    Prepared::LocaleResolution(Box::new(locale_resolution::PreparedLocales {
+    Prepared::LocalePolicyResolution(Box::new(locale_resolution::PreparedLocales {
         analysis,
         config,
         selected: serde_json::from_value(json!("app")).unwrap(),
         policy: crate::resolver::locales::fixture_policy(bound(128), bound(128), bound(64)),
+        inputs: locale_resolution::PolicyInputs::fixture_owned(),
         canonicalizer: locale_resolution::Canonicalizers::Finite(Arc::new(
             crate::locale::Canonicalizer::bind(
                 &crate::locale::fixtures::fixture_pins(),
@@ -172,9 +173,9 @@ fn every_active_pair_calls_its_real_core_operation_between_exact_markers() {
                 assert_eq!(result.locale().as_str(), "en-US");
                 assert_eq!(result.suggested_replacement(), Some("en-US"));
             }
-            Output::LocaleResolution(resolved) => {
+            Output::LocalePolicyResolution(resolved) => {
                 assert_eq!(resolved.evaluation.issues().count(), 0);
-                let locales = resolved.result.as_ref().unwrap();
+                let locales = &resolved.result.as_ref().unwrap().locales;
                 let project = locales.project.as_ref().unwrap();
                 assert_eq!(project.source_default(), None);
                 assert_eq!(
@@ -265,7 +266,7 @@ fn a_fresh_engine_that_binds_otherwise_fails_before_the_start_read() {
 
 fn icu4x_resolution_operation(engine: Engine) -> Prepared {
     let mut operation = resolution_operation(&minimal_config());
-    let Prepared::LocaleResolution(prepared) = &mut operation else {
+    let Prepared::LocalePolicyResolution(prepared) = &mut operation else {
         unreachable!()
     };
     prepared.canonicalizer = locale_resolution::Canonicalizers::Icu4x(
@@ -275,7 +276,7 @@ fn icu4x_resolution_operation(engine: Engine) -> Prepared {
 }
 
 #[test]
-fn both_icu4x_engines_run_phase_7_between_the_same_markers_as_the_finite_provider() {
+fn both_icu4x_engines_run_phases_7_and_8_between_the_same_markers_as_the_finite_provider() {
     let finite = resolution_operation(&minimal_config())
         .once(&ScriptedClock::nanos([0, 1]))
         .unwrap()
@@ -284,11 +285,11 @@ fn both_icu4x_engines_run_phase_7_between_the_same_markers_as_the_finite_provide
         .unwrap();
     for engine in [Engine::Reused, Engine::Fresh] {
         let prepared = icu4x_resolution_operation(engine);
-        assert_eq!(prepared.operation(), Operation::LocaleResolution);
+        assert_eq!(prepared.operation(), Operation::LocalePolicyResolution);
         assert_eq!(prepared.icu4x_engine(), Some(engine));
         assert!(prepared.prerequisites_admitted());
         // A fresh engine is admitted before the start read, so the two reads
-        // still enclose only Phase 7.
+        // still enclose only Phases 7 and 8.
         let clock = ScriptedClock::nanos([100, 137]);
         let measured = prepared.once(&clock).unwrap();
         assert_eq!(measured.duration, Quantity::new(37));
@@ -298,9 +299,9 @@ fn both_icu4x_engines_run_phase_7_between_the_same_markers_as_the_finite_provide
 }
 
 #[test]
-fn a_fresh_phase_7_engine_that_binds_otherwise_fails_before_the_start_read() {
+fn a_fresh_resolution_engine_that_binds_otherwise_fails_before_the_start_read() {
     let mut operation = icu4x_resolution_operation(Engine::Fresh);
-    let Prepared::LocaleResolution(prepared) = &mut operation else {
+    let Prepared::LocalePolicyResolution(prepared) = &mut operation else {
         unreachable!()
     };
     let locale_resolution::Canonicalizers::Icu4x(locale_icu4x::PreparedEngine::Fresh {
@@ -389,7 +390,7 @@ fn unavailable_authoring_prerequisites_do_not_produce_a_fake_construction_observ
 fn locale_resolution_requires_complete_preparation_and_declared_selection_before_clock_markers() {
     for missing_profile in [false, true] {
         let mut operation = resolution_operation(&minimal_config());
-        let Prepared::LocaleResolution(prepared) = &mut operation else {
+        let Prepared::LocalePolicyResolution(prepared) = &mut operation else {
             unreachable!()
         };
         if missing_profile {

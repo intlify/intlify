@@ -152,7 +152,7 @@ fn missing_or_unknown_fields_cannot_supply_implicit_method_defaults() {
         ];
         if matches!(
             operation.operation(),
-            Operation::LocaleCanonicalization | Operation::LocaleResolution
+            Operation::LocaleCanonicalization | Operation::LocalePolicyResolution
         ) {
             paths.extend([
                 "/localeInput",
@@ -162,8 +162,8 @@ fn missing_or_unknown_fields_cannot_supply_implicit_method_defaults() {
                 "/localeInput/providerSchema",
             ]);
         }
-        if operation.operation() == Operation::LocaleResolution {
-            paths.push("/localeResolutionInput");
+        if operation.operation() == Operation::LocalePolicyResolution {
+            paths.push("/localePolicyResolutionInput");
         }
         for path in paths {
             let mut extra = original.clone();
@@ -365,29 +365,29 @@ fn icu4x_descriptors_record_the_engine_state_and_the_admitted_binding() {
 
 #[test]
 fn locale_resolution_descriptor_binds_its_bounds_roles_and_actual_reuse() {
-    let mut operation = prepared(Operation::LocaleResolution);
+    let mut operation = prepared(Operation::LocalePolicyResolution);
     let descriptors = Descriptors::for_acquisition(&operation, clock(1));
     assert_eq!(descriptors.execution.scratch_reuse_state, "fresh");
     assert_eq!(descriptors.execution.cache_state, "disabled");
     let encoded = serde_json::to_value(&descriptors).unwrap();
-    let input = &encoded["localeResolutionInput"];
+    let input = &encoded["localePolicyResolutionInput"];
     assert_eq!(input["localeOccurrenceLimit"], "128");
     assert_eq!(input["requestedLocaleLimit"], "64");
     assert_eq!(input["identifierByteLimit"], "128");
     assert_eq!(input["occurrenceDomain"].as_array().unwrap().len(), 10);
     assert_eq!(input["selectedProfile"], "app");
     assert_eq!(encoded["localeInput"]["identifierByteLimit"], "128");
-    let Prepared::LocaleResolution(locales) = &mut operation else {
+    let Prepared::LocalePolicyResolution(locales) = &mut operation else {
         unreachable!()
     };
     let bound = |value| crate::input_limits::Bound::new(value).unwrap();
     locales.policy = crate::resolver::locales::fixture_policy(bound(128), bound(127), bound(64));
     assert_eq!(
         descriptors.validate(&operation, clock(1)),
-        [DescriptorIssue::LocaleResolutionInputBindingMismatch]
+        [DescriptorIssue::LocalePolicyResolutionInputBindingMismatch]
     );
-    let original = prepared(Operation::LocaleResolution);
-    for field in ["localeResolutionInput", "localeInput"] {
+    let original = prepared(Operation::LocalePolicyResolution);
+    for field in ["localePolicyResolutionInput", "localeInput"] {
         let mut missing = encoded.clone();
         missing[field] = Value::Null;
         let decoded: Descriptors = serde_json::from_value(missing).unwrap();
@@ -410,7 +410,7 @@ fn resource_policy_descriptor_binds_the_capability_and_the_collection() {
     assert_eq!(input["profileIdByteLimit"], "256");
     for field in [
         "localeInput",
-        "localeResolutionInput",
+        "localePolicyResolutionInput",
         "admittedLocaleInput",
         "artifactCollectionInput",
         "resolvedBindingInput",
@@ -463,7 +463,7 @@ fn artifact_collection_descriptor_binds_the_policy_and_the_collection() {
     assert_eq!(input["artifactLimit"], "1000");
     for field in [
         "localeInput",
-        "localeResolutionInput",
+        "localePolicyResolutionInput",
         "admittedLocaleInput",
         "resourcePolicyInput",
         "resolvedBindingInput",
@@ -517,7 +517,7 @@ fn resolved_binding_descriptor_binds_the_configuration_and_the_collection() {
     assert_eq!(input["submittedMembers"], "6");
     for field in [
         "localeInput",
-        "localeResolutionInput",
+        "localePolicyResolutionInput",
         "admittedLocaleInput",
         "resourcePolicyInput",
         "artifactCollectionInput",
@@ -561,7 +561,7 @@ fn resolved_binding_descriptor_binds_the_configuration_and_the_collection() {
 #[test]
 fn icu4x_resolution_descriptors_bind_the_admitted_provider_beside_the_resolution_input() {
     use crate::benchmark::cases::{
-        declarations, prepare::prepare, Engine, LocaleResolutionRecipe, Recipe,
+        declarations, prepare::prepare, Engine, LocalePolicyResolutionRecipe, Recipe,
     };
 
     let prepared = |fixture| {
@@ -571,13 +571,13 @@ fn icu4x_resolution_descriptors_bind_the_admitted_provider_beside_the_resolution
             .unwrap();
         prepare(&declaration).unwrap().prepared
     };
-    let input = LocaleResolutionRecipe::EveryRole;
-    let finite = prepared(Recipe::LocaleResolution(input));
-    let reused = prepared(Recipe::Icu4xLocaleResolution {
+    let input = LocalePolicyResolutionRecipe::EveryRole;
+    let finite = prepared(Recipe::LocalePolicyResolution(input));
+    let reused = prepared(Recipe::Icu4xLocalePolicyResolution {
         input,
         engine: Engine::Reused,
     });
-    let fresh = prepared(Recipe::Icu4xLocaleResolution {
+    let fresh = prepared(Recipe::Icu4xLocalePolicyResolution {
         input,
         engine: Engine::Fresh,
     });
@@ -598,19 +598,19 @@ fn icu4x_resolution_descriptors_bind_the_admitted_provider_beside_the_resolution
         assert!(descriptors.validate(operation, clock(1)).is_empty());
         assert_eq!(
             descriptors.boundary,
-            Boundary::for_operation(Operation::LocaleResolution)
+            Boundary::for_operation(Operation::LocalePolicyResolution)
         );
         assert_eq!(descriptors.execution.engine_state, engine);
         let encoded = serde_json::to_value(&descriptors).unwrap();
         assert_eq!(encoded["localeInput"], Value::Null);
         assert_eq!(encoded["admittedLocaleInput"]["providerReuse"], reuse);
         assert_eq!(
-            descriptors.locale_resolution_input,
-            record(&finite).locale_resolution_input
+            descriptors.locale_policy_resolution_input,
+            record(&finite).locale_policy_resolution_input
         );
     }
-    // Phase 7's own state is the one its reused engine runs in, so only the
-    // provider's facts tell the finite record from the ICU4X one.
+    // Phases 7 and 8's own state is the one their reused engine runs in, so
+    // only the provider's facts tell the finite record from the ICU4X one.
     assert_eq!(record(&reused).execution, record(&finite).execution);
     assert_eq!(
         record(&finite).validate(&reused, clock(1)),

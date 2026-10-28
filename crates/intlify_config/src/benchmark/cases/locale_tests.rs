@@ -176,7 +176,7 @@ fn icu4x_cases_follow_the_original_catalog_with_both_engines_for_each_input() {
     use crate::benchmark::operation::Prepared;
 
     let cases = declarations();
-    // Only Phase 7's later finite rows follow them, before its own ICU4X rows.
+    // Only Phases 7 and 8's later finite rows follow them, before their ICU4X rows.
     assert!(cases[..127]
         .iter()
         .chain(&cases[141..150])

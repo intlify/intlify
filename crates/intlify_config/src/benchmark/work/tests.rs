@@ -81,13 +81,19 @@ fn every_active_operation_retains_the_complete_ordered_vocabulary_and_its_stages
             ] {
                 assert_eq!(fact(&work, kind).stage, WorkStage::OperationResult);
             }
-        } else if prepared.operation() == Operation::LocaleResolution {
-            assert_eq!(work.facts.len(), 8);
+        } else if prepared.operation() == Operation::LocalePolicyResolution {
+            assert_eq!(work.facts.len(), 16);
             for item in &work.facts {
                 let expected = if matches!(
                     item.kind,
-                    WorkKind::LocaleResolutionOccurrences
-                        | WorkKind::LocaleResolutionRawIdentifierBytes
+                    WorkKind::LocalePolicyResolutionOccurrences
+                        | WorkKind::LocalePolicyResolutionRawIdentifierBytes
+                        | WorkKind::LocalePolicyResolutionNegotiationAliases
+                        | WorkKind::LocalePolicyResolutionFallbackSources
+                        | WorkKind::LocalePolicyResolutionMaximumFallbackCandidates
+                        | WorkKind::LocalePolicyResolutionCoverageRules
+                        | WorkKind::LocalePolicyResolutionCoverageLocaleSelectorItems
+                        | WorkKind::LocalePolicyResolutionCoverageSurfaceSelectorItems
                 ) {
                     WorkStage::PreparedInput
                 } else {
@@ -202,148 +208,241 @@ fn single_locale_work_counts_bytes_and_retention_without_inventing_unobserved_va
 }
 
 /// Each recipe's vector: occurrences, their raw bytes, the spellings that
-/// reached the provider, the canonical requested locales, units, units not
-/// evaluated, blocking issues, and corrections. Counted by hand from the
-/// recipes and the units Phase 7 records for each subject.
+/// reached the provider, the canonical requested locales, then the units,
+/// units not evaluated, blocking issues, and corrections of both phases; and
+/// Phase 8's alias entries, fallback sources, longest fallback sequence,
+/// coverage rules, locale and surface selector items, decision cells, and
+/// rule-cell comparisons. Counted by hand from the recipes and the units
+/// Phases 7 and 8 record for each subject: no policy declared adds seven
+/// Phase 8 units and one cell per requested locale and vocabulary member.
 #[test]
 fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailable() {
     use crate::benchmark::cases::{
-        declarations, prepare::prepare, Engine, LimitEdge, LimitKind, LocaleResolutionRecipe as R,
-        Recipe,
+        declarations, prepare::prepare, Engine, LimitEdge, LimitKind,
+        LocalePolicyResolutionRecipe as R, Recipe,
     };
     let over = |kind| Some((kind, LimitEdge::FirstOver));
+    let all = |values: [u64; 8]| values.map(Some);
+    let join = |phase_7: [Option<u64>; 8], phase_8: [Option<u64>; 8]| {
+        let mut joined = [None; 16];
+        joined[..8].copy_from_slice(&phase_7);
+        joined[8..].copy_from_slice(&phase_8);
+        joined
+    };
+    // No policy declared, over the requested locales Phase 7 resolved: a
+    // table of each by the vocabulary's three members, compared with no rule.
+    let undeclared = |requested: Option<u64>| {
+        let mut counts = [Some(0); 8];
+        counts[6] = requested.map(|requested| requested * 3);
+        counts[7] = requested.map(|_| 0);
+        counts
+    };
+    // Two aliases, two fallback sources whose longest sequence holds two
+    // candidates, and three rules with three locale and two surface items,
+    // compared with each of the nine cells.
+    let every_role = |resolved: bool| {
+        [
+            Some(2),
+            Some(2),
+            Some(2),
+            Some(3),
+            Some(3),
+            Some(2),
+            resolved.then_some(9),
+            resolved.then_some(27),
+        ]
+    };
     for (recipe, limit, expected) in [
-        (R::Minimal, None, [3, 6, 3, 1, 8, 0, 0, 0].map(Some)),
-        (R::Multi, None, [7, 23, 7, 4, 15, 0, 0, 0].map(Some)),
-        (R::Aliased, None, [7, 23, 7, 4, 15, 0, 0, 5].map(Some)),
-        (R::ExpandingAlias, None, [3, 36, 3, 1, 8, 0, 0, 2].map(Some)),
-        (R::InvalidSource, None, [4, 11, 4, 1, 9, 0, 1, 0].map(Some)),
+        (
+            R::Minimal,
+            None,
+            join(all([3, 6, 3, 1, 18, 0, 0, 0]), undeclared(Some(1))),
+        ),
+        (
+            R::Multi,
+            None,
+            join(all([7, 23, 7, 4, 34, 0, 0, 0]), undeclared(Some(4))),
+        ),
+        (
+            R::Aliased,
+            None,
+            join(all([7, 23, 7, 4, 34, 0, 0, 5]), undeclared(Some(4))),
+        ),
+        (
+            R::ExpandingAlias,
+            None,
+            join(all([3, 36, 3, 1, 18, 0, 0, 2]), undeclared(Some(1))),
+        ),
+        (
+            R::InvalidSource,
+            None,
+            join(all([4, 11, 4, 1, 19, 0, 1, 0]), undeclared(Some(1))),
+        ),
+        // Without the requested set, the table and its comparisons wait.
         (
             R::InvalidAndDuplicate,
             None,
-            [
-                Some(6),
-                Some(21),
-                Some(6),
-                None,
-                Some(11),
-                Some(3),
-                Some(3),
-                Some(1),
-            ],
+            join(
+                [
+                    Some(6),
+                    Some(21),
+                    Some(6),
+                    None,
+                    Some(18),
+                    Some(5),
+                    Some(3),
+                    Some(1),
+                ],
+                undeclared(None),
+            ),
         ),
         (
             R::DuplicateHeavy,
             None,
-            [34, 68, 34, 1, 8, 0, 1, 0].map(Some),
+            join(all([34, 68, 34, 1, 18, 0, 1, 0]), undeclared(Some(1))),
         ),
-        (R::ExactDuplicate, None, [4, 8, 4, 1, 8, 0, 1, 0].map(Some)),
+        (
+            R::ExactDuplicate,
+            None,
+            join(all([4, 8, 4, 1, 18, 0, 1, 0]), undeclared(Some(1))),
+        ),
         // Over the occurrence bound, every spelling stands for itself and
-        // waits on the bound.
+        // waits on the bound; Phase 8 still counts what was declared, and its
+        // table waits on the requested set.
         (
             R::Multi,
             over(LimitKind::ResolutionLocaleOccurrences),
-            [
-                Some(7),
-                Some(23),
-                Some(0),
-                None,
-                Some(15),
-                Some(14),
-                Some(1),
-                Some(0),
-            ],
+            join(
+                [
+                    Some(7),
+                    Some(23),
+                    Some(0),
+                    None,
+                    Some(22),
+                    Some(16),
+                    Some(1),
+                    Some(0),
+                ],
+                undeclared(None),
+            ),
         ),
         (
             R::Multi,
             over(LimitKind::ResolutionRequestedLocales),
-            [7, 23, 7, 4, 15, 0, 1, 0].map(Some),
+            join(all([7, 23, 7, 4, 34, 0, 1, 0]), undeclared(Some(4))),
         ),
         (
             R::Minimal,
             over(LimitKind::ResolutionRawIdentifierBytes),
-            [
-                Some(3),
-                Some(6),
-                Some(3),
-                None,
-                Some(8),
-                Some(4),
-                Some(3),
-                Some(0),
-            ],
+            join(
+                [
+                    Some(3),
+                    Some(6),
+                    Some(3),
+                    None,
+                    Some(15),
+                    Some(6),
+                    Some(3),
+                    Some(0),
+                ],
+                undeclared(None),
+            ),
         ),
         (
             R::ExpandingAlias,
             over(LimitKind::ResolutionCanonicalIdentifierBytes),
-            [
-                Some(3),
-                Some(36),
-                Some(3),
-                None,
-                Some(8),
-                Some(3),
-                Some(2),
-                Some(0),
-            ],
+            join(
+                [
+                    Some(3),
+                    Some(36),
+                    Some(3),
+                    None,
+                    Some(15),
+                    Some(5),
+                    Some(2),
+                    Some(0),
+                ],
+                undeclared(None),
+            ),
         ),
-        // Three of the 21 spellings are coverage selectors, counted only.
-        (R::EveryRole, None, [21, 60, 18, 3, 28, 0, 0, 0].map(Some)),
+        // Three of the 21 spellings are coverage selectors, which Phase 8
+        // canonicalizes: 47 Phase 8 units, nine of them cells.
+        (
+            R::EveryRole,
+            None,
+            join(all([21, 57, 18, 3, 75, 0, 0, 0]), every_role(true)),
+        ),
+        // Phase 8 still counts what was declared and checks each Intent
+        // source candidate and surface item: 12 of its 35 units run, and
+        // every unit needing a canonical locale waits on the bound.
         (
             R::EveryRole,
             over(LimitKind::ResolutionLocaleOccurrences),
-            [
-                Some(21),
-                Some(60),
-                Some(0),
-                None,
-                Some(28),
-                Some(27),
-                Some(1),
-                Some(0),
-            ],
+            join(
+                [
+                    Some(21),
+                    Some(57),
+                    Some(0),
+                    None,
+                    Some(63),
+                    Some(50),
+                    Some(1),
+                    Some(0),
+                ],
+                every_role(false),
+            ),
         ),
         (
             R::EveryRoleAliased,
             None,
-            [21, 60, 18, 3, 28, 0, 0, 11].map(Some),
+            join(all([21, 57, 18, 3, 75, 0, 0, 12]), every_role(true)),
         ),
+        // The invalid alias key and destination, fallback source, and
+        // literal leave six Phase 8 units unevaluated.
         (
             R::EveryRoleInvalid,
             None,
-            [21, 81, 18, 3, 28, 1, 6, 0].map(Some),
+            join(all([21, 78, 18, 3, 75, 7, 6, 0]), every_role(true)),
         ),
         (
             R::TargetDuplicate,
             None,
-            [22, 65, 19, 3, 28, 0, 1, 1].map(Some),
+            join(all([22, 62, 19, 3, 75, 0, 1, 1]), every_role(true)),
         ),
+        // The rejected selector item leaves its rule without a domain, so
+        // its two other units and the nine cells wait.
         (
             R::CoverageUncanonicalized,
             None,
-            [21, 60, 18, 3, 28, 0, 0, 0].map(Some),
+            join(all([21, 57, 18, 3, 74, 11, 1, 0]), every_role(true)),
         ),
-        (R::ManyTargets, None, [34, 68, 34, 1, 70, 0, 0, 0].map(Some)),
+        (
+            R::ManyTargets,
+            None,
+            join(all([34, 68, 34, 1, 80, 0, 0, 0]), undeclared(Some(1))),
+        ),
         (
             R::EveryFixtureLocale,
             None,
-            [27, 204, 27, 13, 56, 0, 0, 0].map(Some),
+            join(all([27, 204, 27, 13, 102, 0, 0, 0]), undeclared(Some(13))),
         ),
     ] {
         let declaration = declarations()
             .into_iter()
-            .find(|case| case.fixture == Recipe::LocaleResolution(recipe) && case.limit == limit)
+            .find(|case| {
+                case.fixture == Recipe::LocalePolicyResolution(recipe) && case.limit == limit
+            })
             .unwrap();
         let work = prepare(&declaration).unwrap().logical_work;
         assert_eq!(
             work.profile_identity,
-            "intlify-config-locale-resolution-work"
+            "intlify-config-locale-policy-resolution-work"
         );
         assert_eq!(work.facts.len(), expected.len());
         for (item, value) in work.facts.iter().zip(expected) {
             let expected = value.map_or(
                 WorkValue::Unavailable {
-                    reason: UnavailableWork::LocaleResolutionRequestedNotResolved,
+                    reason: UnavailableWork::LocalePolicyResolutionRequestedNotResolved,
                 },
                 WorkValue::exact,
             );
@@ -362,22 +461,31 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
     }
     // The ICU4X scales, through either engine: 256 targets of one locale,
     // two units each beyond the first; and 128 locales requested by the
-    // project and its target, two units each in both sets.
+    // project and its target, two units each in both sets and 384 cells.
     for (input, expected) in [
-        (R::OccurrenceScale, [258, 516, 258, 1, 518, 0, 0, 0]),
-        (R::CanonicalScale, [257, 514, 257, 128, 516, 0, 0, 0]),
+        (
+            R::OccurrenceScale,
+            join(all([258, 516, 258, 1, 528, 0, 0, 0]), undeclared(Some(1))),
+        ),
+        (
+            R::CanonicalScale,
+            join(
+                all([257, 514, 257, 128, 907, 0, 0, 0]),
+                undeclared(Some(128)),
+            ),
+        ),
     ] {
         for engine in [Engine::Reused, Engine::Fresh] {
             let declaration = declarations()
                 .into_iter()
-                .find(|case| case.fixture == Recipe::Icu4xLocaleResolution { input, engine })
+                .find(|case| case.fixture == Recipe::Icu4xLocalePolicyResolution { input, engine })
                 .unwrap();
             let work = prepare(&declaration).unwrap().logical_work;
             assert_eq!(work.facts.len(), expected.len());
             for (item, value) in work.facts.iter().zip(expected) {
                 assert_eq!(
                     item.observation,
-                    WorkValue::exact(value),
+                    WorkValue::exact(value.unwrap()),
                     "{input:?}, {engine:?}, {:?}",
                     item.kind
                 );

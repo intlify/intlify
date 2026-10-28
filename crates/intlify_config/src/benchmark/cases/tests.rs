@@ -38,7 +38,7 @@ fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
         if !matches!(
             case.operation,
             Operation::ProfileSelection
-                | Operation::LocaleResolution
+                | Operation::LocalePolicyResolution
                 | Operation::ResourcePolicyBootstrap
                 | Operation::ResolvedBindingConstruction
         ) {
@@ -96,7 +96,7 @@ fn declared_unbounded_case_kinds_agree_with_independently_checked_fixture_semant
             && !matches!(
                 case.operation,
                 Operation::LocaleCanonicalization
-                    | Operation::LocaleResolution
+                    | Operation::LocalePolicyResolution
                     | Operation::ResourcePolicyBootstrap
                     | Operation::ArtifactCollectionAdmission
                     | Operation::ResolvedBindingConstruction
@@ -161,7 +161,7 @@ fn declared_unbounded_case_kinds_agree_with_independently_checked_fixture_semant
             }
             Operation::FileMaterialization
             | Operation::LocaleCanonicalization
-            | Operation::LocaleResolution
+            | Operation::LocalePolicyResolution
             | Operation::ResourcePolicyBootstrap
             | Operation::ArtifactCollectionAdmission
             | Operation::ResolvedBindingConstruction => unreachable!(),
@@ -244,7 +244,7 @@ fn every_finite_case_prepares_its_exact_result_and_work_including_all_limit_edge
                         actual,
                         ..
                     })) => assert_eq!(*actual, limit.get() + 1),
-                    Output::LocaleResolution(resolved) => {
+                    Output::LocalePolicyResolution(resolved) => {
                         // Only the bound itself, one past its value.
                         let evaluation = &resolved.evaluation;
                         assert!(evaluation.issues().next().is_some());

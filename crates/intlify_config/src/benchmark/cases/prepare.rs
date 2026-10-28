@@ -26,7 +26,7 @@ use super::super::work::LogicalWork;
 use super::policy_inputs::capacity;
 use super::{
     declarations, Declaration, Engine, ExpectedKind, Icu4xRecipe, LimitEdge, LimitKind,
-    LocaleResolutionRecipe, Recipe, ResourcePolicyRecipe, Selector,
+    LocalePolicyResolutionRecipe, Recipe, ResourcePolicyRecipe, Selector,
 };
 
 pub(in crate::benchmark) struct Candidate {
@@ -87,7 +87,7 @@ pub(in crate::benchmark) fn prepare(
         }
         return prepare_locale(declaration);
     }
-    if declaration.operation == Operation::LocaleResolution {
+    if declaration.operation == Operation::LocalePolicyResolution {
         return prepare_resolution(declaration);
     }
     if declaration.operation == Operation::ResourcePolicyBootstrap {
@@ -204,7 +204,7 @@ pub(in crate::benchmark) fn prepare(
             }
             Operation::FileMaterialization
             | Operation::LocaleCanonicalization
-            | Operation::LocaleResolution
+            | Operation::LocalePolicyResolution
             | Operation::ResourcePolicyBootstrap
             | Operation::ArtifactCollectionAdmission
             | Operation::ResolvedBindingConstruction => unreachable!(),
@@ -226,7 +226,7 @@ pub(in crate::benchmark) fn prepare(
         Prepared::Locale { .. } | Prepared::Icu4xLocale { .. } => {
             unreachable!("locale preparation has no file stages")
         }
-        Prepared::LocaleResolution(_)
+        Prepared::LocalePolicyResolution(_)
         | Prepared::ResourcePolicy(_)
         | Prepared::ArtifactCollection(_)
         | Prepared::ResolvedBinding(_) => {
@@ -369,9 +369,9 @@ fn prepare_icu4x(
 /// derived from the resolver under test.
 fn resolution_edge(
     kind: LimitKind,
-    recipe: LocaleResolutionRecipe,
+    recipe: LocalePolicyResolutionRecipe,
 ) -> Result<u64, PreparationFailure> {
-    use LocaleResolutionRecipe as R;
+    use LocalePolicyResolutionRecipe as R;
 
     Ok(match (kind, recipe) {
         // Four requested locales, the default and the source, and the
@@ -386,13 +386,32 @@ fn resolution_edge(
     })
 }
 
+/// Phase 8's eight bounds at distinct capacities that every case passing
+/// Phase 7's requested bound and the rule bound fits: a decision table of 256
+/// requested locales by the vocabulary's three members, compared with 64
+/// rules.
+fn policy_capacity(limits: &mut crate::resolver::limits::LocaleResolutionLimits) {
+    let bound = |value| Bound::new(value).expect("explicit finite policy capacity");
+    limits.max_negotiation_aliases = bound(32);
+    limits.max_fallback_sources = bound(48);
+    limits.max_fallback_candidates_per_source = bound(56);
+    limits.max_coverage_rules = bound(64);
+    limits.max_coverage_locale_selector_occurrences = bound(96);
+    limits.max_coverage_surface_selector_occurrences = bound(112);
+    limits.max_coverage_decision_cells = bound(1024);
+    limits.max_coverage_rule_cell_comparisons = bound(65_536);
+}
+
 fn prepare_resolution(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
-    use crate::benchmark::locale_resolution::{resolve, Canonicalizers, PreparedLocales};
+    use crate::benchmark::locale_resolution::{
+        resolve, Canonicalizers, PolicyInputs, PreparedLocales,
+    };
+    use crate::resolver::limits::ConfirmedPolicy;
     use crate::resolver::locales::fixture_policy;
 
     let (recipe, engine) = match declaration.fixture {
-        Recipe::LocaleResolution(recipe) => (recipe, None),
-        Recipe::Icu4xLocaleResolution { input, engine } => (input, Some(engine)),
+        Recipe::LocalePolicyResolution(recipe) => (recipe, None),
+        Recipe::Icu4xLocalePolicyResolution { input, engine } => (input, Some(engine)),
         _ => return Err(PreparationFailure::UndeclaredCase),
     };
     let (input_limits, structural_limits) = fixture_capacity();
@@ -438,8 +457,14 @@ fn prepare_resolution(declaration: &Declaration) -> Result<Candidate, Preparatio
             _ => unreachable!(),
         }
     }
-    // Phase 5 binds the canonicalizer under the policy's identifier bound.
-    let policy = fixture_policy(identifier_bytes, occurrences, requested);
+    // Phase 7's three bounds as the case gives them, and Phase 8's eight at
+    // a capacity no recipe reaches. Phase 5 binds the canonicalizer under the
+    // policy's identifier bound.
+    let mut limits = fixture_policy(identifier_bytes, occurrences, requested)
+        .limits()
+        .clone();
+    policy_capacity(&mut limits.locale_resolution);
+    let policy = ConfirmedPolicy::fixture_owned(limits);
     let limit = policy
         .limits()
         .locale_resolution
@@ -459,6 +484,7 @@ fn prepare_resolution(declaration: &Declaration) -> Result<Candidate, Preparatio
         config,
         selected: selected.id().clone(),
         policy,
+        inputs: PolicyInputs::fixture_owned(),
         canonicalizer,
     };
     let fields = prepared
@@ -466,23 +492,25 @@ fn prepare_resolution(declaration: &Declaration) -> Result<Candidate, Preparatio
         .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
     // The reference output comes from the engine the case measures.
     let resolved = match &prepared.canonicalizer {
-        Canonicalizers::Finite(core) => resolve(&prepared.policy, core.as_ref(), &fields),
+        Canonicalizers::Finite(core) => {
+            resolve(&prepared.policy, &prepared.inputs, core.as_ref(), &fields)
+        }
         Canonicalizers::Icu4x(engine) => engine
-            .with_engine(|core| resolve(&prepared.policy, core, &fields))
+            .with_engine(|core| resolve(&prepared.policy, &prepared.inputs, core, &fields))
             .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?,
     };
     let kind = match &resolved.result {
         Ok(_) if resolved.evaluation.issues().next().is_none() => {
-            ExpectedKind::LocaleResolutionComplete
+            ExpectedKind::LocalePolicyResolutionComplete
         }
-        Ok(_) => ExpectedKind::LocaleResolutionBlocked,
+        Ok(_) => ExpectedKind::LocalePolicyResolutionBlocked,
         Err(_) => return Err(PreparationFailure::Observation),
     };
     if declaration.expected_kind != kind {
         return Err(PreparationFailure::UnexpectedOutputKind);
     }
-    let output = Output::LocaleResolution(resolved);
-    let prepared = Prepared::LocaleResolution(Box::new(prepared));
+    let output = Output::LocalePolicyResolution(resolved);
+    let prepared = Prepared::LocalePolicyResolution(Box::new(prepared));
     let observation = output
         .observe()
         .map_err(|_| PreparationFailure::Observation)?;

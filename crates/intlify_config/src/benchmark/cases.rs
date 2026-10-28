@@ -13,7 +13,7 @@ use super::operation::Operation;
 mod inputs;
 pub(super) use inputs::Recipe;
 mod resolution_inputs;
-pub(super) use resolution_inputs::LocaleResolutionRecipe;
+pub(super) use resolution_inputs::LocalePolicyResolutionRecipe;
 mod policy_inputs;
 pub(super) use policy_inputs::ResourcePolicyRecipe;
 mod collection_inputs;
@@ -98,8 +98,8 @@ pub(super) enum ExpectedKind {
     SelectionUnavailable,
     LocaleCanonicalized,
     LocaleRejected,
-    LocaleResolutionComplete,
-    LocaleResolutionBlocked,
+    LocalePolicyResolutionComplete,
+    LocalePolicyResolutionBlocked,
     ResourcePolicyConfirmed,
     ResourcePolicyBlocked,
     ArtifactCollectionAdmitted,
@@ -305,7 +305,7 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 Operation::AuthoringConstruction => ExpectedKind::AuthoringComplete,
                 Operation::ProfileSelection => ExpectedKind::Selected,
                 Operation::LocaleCanonicalization
-                | Operation::LocaleResolution
+                | Operation::LocalePolicyResolution
                 | Operation::ResourcePolicyBootstrap
                 | Operation::ArtifactCollectionAdmission
                 | Operation::ResolvedBindingConstruction => unreachable!(),
@@ -491,28 +491,28 @@ pub(super) fn declarations() -> Vec<Declaration> {
             cases.push(case);
         }
     }
-    // Append 015 Phase 7 without changing any of the 94 rows.
+    // Append 015 Phases 7 and 8 without changing any of the 94 rows.
     let (before, after) =
-        LocaleResolutionRecipe::ALL.split_at(LocaleResolutionRecipe::BEFORE_ICU4X);
+        LocalePolicyResolutionRecipe::ALL.split_at(LocalePolicyResolutionRecipe::BEFORE_ICU4X);
     resolution_cases(
         &mut cases,
         before,
         &[
             (
                 LimitKind::ResolutionLocaleOccurrences,
-                LocaleResolutionRecipe::Multi,
+                LocalePolicyResolutionRecipe::Multi,
             ),
             (
                 LimitKind::ResolutionRequestedLocales,
-                LocaleResolutionRecipe::Multi,
+                LocalePolicyResolutionRecipe::Multi,
             ),
             (
                 LimitKind::ResolutionRawIdentifierBytes,
-                LocaleResolutionRecipe::Minimal,
+                LocalePolicyResolutionRecipe::Minimal,
             ),
             (
                 LimitKind::ResolutionCanonicalIdentifierBytes,
-                LocaleResolutionRecipe::ExpandingAlias,
+                LocalePolicyResolutionRecipe::ExpandingAlias,
             ),
         ],
     );
@@ -533,28 +533,28 @@ pub(super) fn declarations() -> Vec<Declaration> {
             ));
         }
     }
-    // Append Phase 7 over every occurrence role without changing any of the
+    // Append Phases 7 and 8 over every occurrence role without changing any of the
     // 141 rows.
     resolution_cases(
         &mut cases,
         after,
         &[(
             LimitKind::ResolutionLocaleOccurrences,
-            LocaleResolutionRecipe::EveryRole,
+            LocalePolicyResolutionRecipe::EveryRole,
         )],
     );
-    // Append Phase 7 through the ICU4X provider without changing any of the
+    // Append Phases 7 and 8 through the ICU4X provider without changing any of the
     // 150 rows. Each input runs once reused and once fresh.
-    for input in LocaleResolutionRecipe::ICU4X {
+    for input in LocalePolicyResolutionRecipe::ICU4X {
         for engine in [Engine::Reused, Engine::Fresh] {
             cases.push(declaration(
-                Operation::LocaleResolution,
-                Recipe::Icu4xLocaleResolution { input, engine },
+                Operation::LocalePolicyResolution,
+                Recipe::Icu4xLocalePolicyResolution { input, engine },
                 Selector::App,
                 if input.completes() {
-                    ExpectedKind::LocaleResolutionComplete
+                    ExpectedKind::LocalePolicyResolutionComplete
                 } else {
-                    ExpectedKind::LocaleResolutionBlocked
+                    ExpectedKind::LocalePolicyResolutionBlocked
                 },
             ));
         }
@@ -630,35 +630,35 @@ pub(super) fn declarations() -> Vec<Declaration> {
     cases
 }
 
-/// One Phase 7 case per recipe, then the exact and first-over edges of each
+/// One Phases 7 and 8 case per recipe, then the exact and first-over edges of each
 /// bound on its recipe.
 fn resolution_cases(
     cases: &mut Vec<Declaration>,
-    recipes: &[LocaleResolutionRecipe],
-    edges: &[(LimitKind, LocaleResolutionRecipe)],
+    recipes: &[LocalePolicyResolutionRecipe],
+    edges: &[(LimitKind, LocalePolicyResolutionRecipe)],
 ) {
     for &recipe in recipes {
         cases.push(declaration(
-            Operation::LocaleResolution,
-            Recipe::LocaleResolution(recipe),
+            Operation::LocalePolicyResolution,
+            Recipe::LocalePolicyResolution(recipe),
             Selector::App,
             if recipe.completes() {
-                ExpectedKind::LocaleResolutionComplete
+                ExpectedKind::LocalePolicyResolutionComplete
             } else {
-                ExpectedKind::LocaleResolutionBlocked
+                ExpectedKind::LocalePolicyResolutionBlocked
             },
         ));
     }
     for &(limit, recipe) in edges {
         for edge in [LimitEdge::Exact, LimitEdge::FirstOver] {
             let mut case = declaration(
-                Operation::LocaleResolution,
-                Recipe::LocaleResolution(recipe),
+                Operation::LocalePolicyResolution,
+                Recipe::LocalePolicyResolution(recipe),
                 Selector::App,
                 if edge == LimitEdge::Exact {
-                    ExpectedKind::LocaleResolutionComplete
+                    ExpectedKind::LocalePolicyResolutionComplete
                 } else {
-                    ExpectedKind::LocaleResolutionBlocked
+                    ExpectedKind::LocalePolicyResolutionBlocked
                 },
             );
             case.limit = Some((limit, edge));

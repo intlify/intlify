@@ -10,7 +10,7 @@ use crate::profile_fixtures::{complete_config, minimal_config, reference};
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
 )]
 #[serde(rename_all = "kebab-case")]
-pub(in crate::benchmark) enum LocaleResolutionRecipe {
+pub(in crate::benchmark) enum LocalePolicyResolutionRecipe {
     Minimal,
     SourceUnd,
     SourceEn,
@@ -47,7 +47,7 @@ pub(in crate::benchmark) enum LocaleResolutionRecipe {
     CanonicalScale,
 }
 
-impl LocaleResolutionRecipe {
+impl LocalePolicyResolutionRecipe {
     pub(super) const ALL: [Self; 32] = [
         Self::Minimal,
         Self::SourceUnd,
@@ -101,7 +101,7 @@ impl LocaleResolutionRecipe {
         matches!(self, Self::OccurrenceScale | Self::CanonicalScale)
     }
 
-    /// Whether no Phase 7 unit finds a blocking result.
+    /// Whether no Phase 7 or Phase 8 unit finds a blocking result.
     pub(super) const fn completes(self) -> bool {
         !matches!(
             self,
@@ -118,6 +118,7 @@ impl LocaleResolutionRecipe {
                 | Self::InvalidReordered
                 | Self::EveryRoleInvalid
                 | Self::TargetDuplicate
+                | Self::CoverageUncanonicalized
         )
     }
 
@@ -126,8 +127,9 @@ impl LocaleResolutionRecipe {
         matches!(self, Self::Reordered | Self::EveryRoleReordered)
     }
 
-    /// Complete structural inputs; Phase 7 resolves every locale spelling of
-    /// the selected declaration. No ambient configuration or data.
+    /// Complete structural inputs; Phases 7 and 8 resolve every locale
+    /// spelling and locale policy of the selected declaration. No ambient
+    /// configuration or data.
     pub(super) fn value(self) -> Value {
         match self {
             Self::EveryRole
@@ -220,14 +222,15 @@ impl LocaleResolutionRecipe {
     }
 
     /// A declaration with a spelling in each of 015's ten occurrence roles:
-    /// 21 spellings, three of them coverage selectors.
+    /// 21 spellings, three of them coverage selectors. Each alias leads to a
+    /// requested locale, so Phase 8 resolves the policies whole.
     fn every_role_value(self) -> Value {
         let mut value = complete_config();
         let app = &mut value["profiles"]["app"];
         app["requestedLocales"] = json!(["en", "ja", "he-IL"]);
         app["defaultRequestedLocale"] = json!("ja");
         app["defaultSourceLocale"] = json!("en");
-        app["localeNegotiation"] = json!({"aliases": {"en-US": "en", "fr": "fr-FR"}});
+        app["localeNegotiation"] = json!({"aliases": {"en-US": "en", "fr": "en"}});
         app["messageFallback"] = json!({
             "he-IL": ["en"],
             "ja": ["en", {"kind": "intent-source-locale"}]
@@ -250,7 +253,7 @@ impl LocaleResolutionRecipe {
             Self::EveryRoleAliased => {
                 app["requestedLocales"] = json!(["EN", "ja", "iw-IL"]);
                 app["defaultSourceLocale"] = json!("EN");
-                app["localeNegotiation"] = json!({"aliases": {"EN-us": "EN", "fr": "fr-FR"}});
+                app["localeNegotiation"] = json!({"aliases": {"EN-us": "EN", "fr": "EN"}});
                 app["messageFallback"] = json!({
                     "iw-IL": ["EN"],
                     "ja": ["EN", {"kind": "intent-source-locale"}]
@@ -260,7 +263,7 @@ impl LocaleResolutionRecipe {
             }
             // An invalid spelling in each role beyond the project's own.
             Self::EveryRoleInvalid => {
-                app["localeNegotiation"] = json!({"aliases": {"root": "zz", "fr": "fr-FR"}});
+                app["localeNegotiation"] = json!({"aliases": {"root": "zz", "fr": "en"}});
                 app["messageFallback"] = json!({
                     "en_US": ["en-x-brand"],
                     "ja": ["en", {"kind": "intent-source-locale"}]
@@ -273,7 +276,8 @@ impl LocaleResolutionRecipe {
                 app["targetProfiles"]["server"]["requestedLocales"] =
                     json!(["he-IL", "iw-IL", "en"]);
             }
-            // Phase 7 counts a coverage selector and leaves it to its owner.
+            // Phase 7 counts a coverage selector and leaves it to Phase 8,
+            // which rejects it.
             Self::CoverageUncanonicalized => {
                 app["coverage"]["rules"][0]["requestedLocales"] = json!(["zz"]);
             }

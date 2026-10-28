@@ -1221,7 +1221,7 @@
             }
           ]
         },
-        "localeResolutionInput": {
+        "localePolicyResolutionInput": {
           "anyOf": [
             {
               "$ref": "#/definitions/InputFacts2"
@@ -2287,6 +2287,27 @@
     "InputFacts2": {
       "additionalProperties": false,
       "properties": {
+        "coverageDecisionCellLimit": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "coverageLocaleSelectorOccurrenceLimit": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "coverageRuleCellComparisonLimit": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "coverageRuleLimit": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "coverageSurfaceSelectorOccurrenceLimit": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "fallbackCandidatesPerSourceLimit": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "fallbackSourceLimit": {
+          "$ref": "#/definitions/UInt64"
+        },
         "identifierByteLimit": {
           "$ref": "#/definitions/UInt64"
         },
@@ -2294,6 +2315,9 @@
           "type": "string"
         },
         "localeOccurrenceLimit": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "negotiationAliasLimit": {
           "$ref": "#/definitions/UInt64"
         },
         "occurrenceDomain": {
@@ -2325,8 +2349,20 @@
         "selectedProfile": {
           "type": "string"
         },
+        "specifications": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "structuralPreparation": {
           "type": "string"
+        },
+        "vocabulary": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "required": [
@@ -2338,6 +2374,16 @@
         "requestedLocaleLimit",
         "requestedCardinalityDomain",
         "identifierByteLimit",
+        "negotiationAliasLimit",
+        "fallbackSourceLimit",
+        "fallbackCandidatesPerSourceLimit",
+        "coverageRuleLimit",
+        "coverageLocaleSelectorOccurrenceLimit",
+        "coverageSurfaceSelectorOccurrenceLimit",
+        "coverageDecisionCellLimit",
+        "coverageRuleCellComparisonLimit",
+        "specifications",
+        "vocabulary",
         "prerequisites",
         "inputStorage",
         "structuralPreparation",
@@ -2559,25 +2605,7 @@
       ],
       "type": "string"
     },
-    "LocaleRecipe": {
-      "enum": [
-        "language",
-        "region",
-        "casing",
-        "alias",
-        "canonical-alias",
-        "extension-ordering",
-        "canonical-extensions",
-        "expanding-alias",
-        "canonical-expanded-alias",
-        "invalid-legacy",
-        "invalid-validity",
-        "invalid-extension",
-        "invalid-private"
-      ],
-      "type": "string"
-    },
-    "LocaleResolutionRecipe": {
+    "LocalePolicyResolutionRecipe": {
       "enum": [
         "minimal",
         "source-und",
@@ -2613,6 +2641,24 @@
         "every-fixture-locale",
         "occurrence-scale",
         "canonical-scale"
+      ],
+      "type": "string"
+    },
+    "LocaleRecipe": {
+      "enum": [
+        "language",
+        "region",
+        "casing",
+        "alias",
+        "canonical-alias",
+        "extension-ordering",
+        "canonical-extensions",
+        "expanding-alias",
+        "canonical-expanded-alias",
+        "invalid-legacy",
+        "invalid-validity",
+        "invalid-extension",
+        "invalid-private"
       ],
       "type": "string"
     },
@@ -3228,7 +3274,7 @@
         "authoring-construction",
         "profile-selection",
         "locale-canonicalization",
-        "locale-resolution",
+        "locale-policy-resolution",
         "resource-policy-bootstrap",
         "artifact-collection-admission",
         "resolved-binding-construction"
@@ -3469,11 +3515,11 @@
         {
           "additionalProperties": false,
           "properties": {
-            "locale-resolution": {
-              "$ref": "#/definitions/LocaleResolutionRecipe"
+            "locale-policy-resolution": {
+              "$ref": "#/definitions/LocalePolicyResolutionRecipe"
             }
           },
-          "required": ["locale-resolution"],
+          "required": ["locale-policy-resolution"],
           "type": "object"
         },
         {
@@ -3499,21 +3545,21 @@
         {
           "additionalProperties": false,
           "properties": {
-            "icu4x-locale-resolution": {
+            "icu4x-locale-policy-resolution": {
               "additionalProperties": false,
               "properties": {
                 "engine": {
                   "$ref": "#/definitions/Engine"
                 },
                 "input": {
-                  "$ref": "#/definitions/LocaleResolutionRecipe"
+                  "$ref": "#/definitions/LocalePolicyResolutionRecipe"
                 }
               },
               "required": ["input", "engine"],
               "type": "object"
             }
           },
-          "required": ["icu4x-locale-resolution"],
+          "required": ["icu4x-locale-policy-resolution"],
           "type": "object"
         },
         {
@@ -4082,7 +4128,7 @@
         "profile-container-not-admitted",
         "schema-prerequisite-unavailable",
         "locale-not-canonicalized",
-        "locale-resolution-requested-not-resolved",
+        "locale-policy-resolution-requested-not-resolved",
         "artifact-collection-not-admitted",
         "artifact-references-not-resolved"
       ],
@@ -4181,14 +4227,22 @@
         "canonical-locale-identifier-bytes",
         "retained-canonical-locale-values",
         "locale-correction-suggestions",
-        "locale-resolution-occurrences",
-        "locale-resolution-raw-identifier-bytes",
-        "locale-resolution-canonicalized-occurrences",
-        "locale-resolution-canonical-requested-locales",
-        "locale-resolution-evaluation-units",
-        "locale-resolution-not-evaluated-units",
-        "locale-resolution-blocking-issues",
-        "locale-resolution-corrections",
+        "locale-policy-resolution-occurrences",
+        "locale-policy-resolution-raw-identifier-bytes",
+        "locale-policy-resolution-canonicalized-occurrences",
+        "locale-policy-resolution-canonical-requested-locales",
+        "locale-policy-resolution-evaluation-units",
+        "locale-policy-resolution-not-evaluated-units",
+        "locale-policy-resolution-blocking-issues",
+        "locale-policy-resolution-corrections",
+        "locale-policy-resolution-negotiation-aliases",
+        "locale-policy-resolution-fallback-sources",
+        "locale-policy-resolution-maximum-fallback-candidates",
+        "locale-policy-resolution-coverage-rules",
+        "locale-policy-resolution-coverage-locale-selector-items",
+        "locale-policy-resolution-coverage-surface-selector-items",
+        "locale-policy-resolution-coverage-decision-cells",
+        "locale-policy-resolution-coverage-rule-cell-comparisons",
         "resource-policy-artifact-occurrences",
         "resource-policy-policy-artifacts",
         "resource-policy-target-profile-artifacts",
@@ -4240,7 +4294,14 @@
         "artifact-occurrence",
         "canonical-artifact-body",
         "canonical-octet",
-        "artifact-reference"
+        "artifact-reference",
+        "negotiation-alias",
+        "fallback-source",
+        "fallback-candidate",
+        "coverage-rule",
+        "surface-class-occurrence",
+        "decision-cell",
+        "rule-cell-comparison"
       ],
       "type": "string"
     },

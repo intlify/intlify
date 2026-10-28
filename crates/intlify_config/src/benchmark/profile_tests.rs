@@ -69,8 +69,8 @@ fn the_profile_declares_exactly_the_execution_states_its_cases_run_in() {
         }
     }
     // Each operation's own state, and both engine states of each operation
-    // that the ICU4X cases run. Phase 7's own state is the one its reused
-    // engine runs in, so it is declared once.
+    // that the ICU4X cases run. Phases 7 and 8's own state is the one their
+    // reused engine runs in, so it is declared once.
     assert_eq!(declared.len(), 12);
     assert_eq!(used.len(), declared.len());
 }
