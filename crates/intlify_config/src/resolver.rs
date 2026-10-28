@@ -6,8 +6,9 @@
 //! Evidence, or a registry: each resolution phase records which of its checks it
 //! evaluated and why the others were not, and hands later phases the values it
 //! admitted. Phases that need construction authority or a confirmed Resource
-//! Limit Policy take them as values. Phase 4 confirms the policy; until an
-//! entry runs the phases in order, tests build both.
+//! Limit Policy take them as values. Phase 4 confirms the policy, and
+//! `profile_resolution` runs the phases in 015's order; a test of one phase
+//! builds both.
 
 pub(crate) mod artifact_resolution;
 pub(crate) mod bootstrap;
@@ -20,6 +21,7 @@ pub(crate) mod identity;
 pub(crate) mod limits;
 pub(crate) mod locales;
 pub(crate) mod negotiation;
+pub(crate) mod profile_resolution;
 pub(crate) mod resource_policy;
 pub(crate) mod specification;
 pub(crate) mod tally;

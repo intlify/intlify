@@ -39,7 +39,7 @@ pub(crate) struct RawInputLimits {
     pub(crate) max_parser_tokens: Bound,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[expect(clippy::struct_field_names, reason = "mirror 015's explicit bound IDs")]
 pub(crate) struct ValueLimits {
     pub(crate) max_nodes: Bound,
