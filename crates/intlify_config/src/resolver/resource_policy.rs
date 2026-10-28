@@ -16,7 +16,7 @@
 use std::collections::BTreeSet;
 
 use crate::artifacts::collection::FormalCollection;
-use crate::artifacts::envelope::{Declaration, FormalMember};
+use crate::artifacts::envelope::{ArtifactKind, Declaration, FormalMember};
 use crate::input_limits::{Bound, ValueCounts};
 use crate::model::{NonEmptyMap, Policies, RequiredNullable, TargetDeclaration, TargetId};
 use crate::references::{PolicyReference, TargetProfileReference};
@@ -154,6 +154,30 @@ impl PolicySlot {
             Self::Trust => "trust",
         }
     }
+
+    /// The kind 017 assigns to the slot's configuration role.
+    pub(crate) const fn kind(self) -> ArtifactKind {
+        match self {
+            Self::Approval => ArtifactKind::ApprovalPolicy,
+            Self::GlossarySet => ArtifactKind::GlossarySet,
+            Self::ProviderRouting => ArtifactKind::ProviderRoutingPolicy,
+            Self::ResourceLimits => ArtifactKind::ResourceLimitPolicy,
+            Self::Selection => ArtifactKind::SelectionPolicy,
+            Self::SourceAdmission => ArtifactKind::SourceAdmissionPolicy,
+            Self::Trust => ArtifactKind::TrustPolicy,
+        }
+    }
+}
+
+impl ReferenceField {
+    /// The kind 017 assigns to the field's configuration role. A target's
+    /// `profile` takes `target-profile`, the only kind its reference spells.
+    pub(crate) const fn role_kind(&self) -> ArtifactKind {
+        match self {
+            Self::Policy(slot) => slot.kind(),
+            Self::TargetProfile(_) => ArtifactKind::TargetProfile,
+        }
+    }
 }
 
 /// The selected declaration's reference-bearing fields as structural
@@ -163,6 +187,37 @@ pub(crate) struct DeclarationReferences<'a> {
     pub(crate) policies: Admitted<&'a Policies<PolicyReference>>,
     pub(crate) target_profiles:
         Admitted<&'a NonEmptyMap<TargetId, TargetDeclaration<TargetProfileReference>>>,
+}
+
+impl DeclarationReferences<'_> {
+    /// Each present reference by its field, in the fields' logical order, as
+    /// `policy` or `target` projects it; and the causes behind each field
+    /// structural admission did not admit, which shows no references.
+    pub(crate) fn visible<T>(
+        &self,
+        policy: impl Fn(&PolicyReference) -> T,
+        target: impl Fn(&TargetProfileReference) -> T,
+    ) -> (Vec<(ReferenceField, T)>, Option<Causes>) {
+        let mut visible = Vec::new();
+        let mut unavailable: Option<Causes> = None;
+        match self.policies {
+            Ok(policies) => visible.extend(
+                present(policies)
+                    .map(|(slot, reference)| (ReferenceField::Policy(slot), policy(reference))),
+            ),
+            Err(ref causes) => unavailable = Some(join(unavailable, causes)),
+        }
+        match self.target_profiles {
+            Ok(targets) => visible.extend(targets.iter().map(|(id, declaration)| {
+                (
+                    ReferenceField::TargetProfile(id.clone()),
+                    target(&declaration.profile),
+                )
+            })),
+            Err(ref causes) => unavailable = Some(join(unavailable, causes)),
+        }
+        (visible, unavailable)
+    }
 }
 
 /// What Phases 1 to 3 measured of the configuration and the selector under
@@ -592,25 +647,10 @@ fn reference_bounds(
     resource_limits: Result<&PolicyReference, &Causes>,
     references: &DeclarationReferences<'_>,
 ) -> Result<(Admitted<()>, Admitted<()>), EvaluationInvariant> {
-    let mut visible: Vec<(ReferenceField, u64)> = Vec::new();
-    let mut unavailable: Option<Causes> = None;
-    match references.policies {
-        Ok(policies) => {
-            visible.extend(present(policies).map(|(slot, reference)| {
-                (ReferenceField::Policy(slot), reference.canonical_bytes())
-            }));
-        }
-        Err(ref causes) => unavailable = Some(join(unavailable, causes)),
-    }
-    match references.target_profiles {
-        Ok(targets) => visible.extend(targets.iter().map(|(id, target)| {
-            (
-                ReferenceField::TargetProfile(id.clone()),
-                target.profile.canonical_bytes(),
-            )
-        })),
-        Err(ref causes) => unavailable = Some(join(unavailable, causes)),
-    }
+    let (visible, unavailable) = references.visible(
+        PolicyReference::canonical_bytes,
+        TargetProfileReference::canonical_bytes,
+    );
     // The declaration's count and total never gate the decision for the
     // selected reference.
     let count = measured(

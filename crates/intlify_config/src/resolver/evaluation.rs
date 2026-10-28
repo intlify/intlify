@@ -22,7 +22,7 @@ use super::identity::DeclarationField;
 use super::limits::BoundId;
 use super::locales::LocaleSubject;
 use super::negotiation::NegotiationSubject;
-use super::resource_policy::PolicySubject;
+use super::resource_policy::{PolicySubject, ReferenceField};
 use super::specification::Slot;
 
 /// 015's resolution phases, declared in rank order.
@@ -98,6 +98,9 @@ pub(crate) enum Subject {
     /// One distinct submitted body, or one group of tuples differing only in
     /// their digest, of the complete artifact collection.
     ArtifactCollection(CollectionSubject),
+    /// One present reference of the selected declaration, resolved against
+    /// the Profile Resolution Artifact Set.
+    ArtifactReference(ReferenceField),
     /// The declaration's delivery placement, a singleton.
     DeliveryPlacement,
 }
@@ -151,6 +154,9 @@ pub(crate) enum Check {
     SingleOccurrence,
     /// The group's members have one canonical body.
     ConsistentContent,
+    /// The reference is of its role's kind and a supported specification
+    /// revision, and names an artifact of the Set.
+    ResolvedReference,
 }
 
 /// One atomic evaluation unit. Units order as 015 evaluates and commits them:
