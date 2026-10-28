@@ -226,6 +226,8 @@ pub(super) struct Descriptors {
     pub(super) admitted_locale_input: Option<AdmittedInputFacts>,
     #[serde(deserialize_with = "Option::deserialize")]
     pub(super) resource_policy_input: Option<super::resource_policy::InputFacts>,
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub(super) artifact_collection_input: Option<super::artifact_collection::InputFacts>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -239,6 +241,7 @@ pub(super) enum DescriptorIssue {
     LocaleInputBindingMismatch,
     LocaleResolutionInputBindingMismatch,
     ResourcePolicyInputBindingMismatch,
+    ArtifactCollectionInputBindingMismatch,
 }
 
 impl Descriptors {
@@ -260,6 +263,7 @@ impl Descriptors {
             },
             admitted_locale_input: admitted(prepared),
             resource_policy_input: policy(prepared),
+            artifact_collection_input: collection(prepared),
         }
     }
 
@@ -309,6 +313,9 @@ impl Descriptors {
         if self.resource_policy_input != policy(prepared) {
             issues.push(DescriptorIssue::ResourcePolicyInputBindingMismatch);
         }
+        if self.artifact_collection_input != collection(prepared) {
+            issues.push(DescriptorIssue::ArtifactCollectionInputBindingMismatch);
+        }
         issues
     }
 }
@@ -339,6 +346,16 @@ fn policy(prepared: &Prepared) -> Option<super::resource_policy::InputFacts> {
     match prepared {
         Prepared::ResourcePolicy(prepared) => {
             Some(super::resource_policy::InputFacts::observe(prepared))
+        }
+        _ => None,
+    }
+}
+
+/// The policy and collection facts of a Phase 9 case.
+fn collection(prepared: &Prepared) -> Option<super::artifact_collection::InputFacts> {
+    match prepared {
+        Prepared::ArtifactCollection(prepared) => {
+            Some(super::artifact_collection::InputFacts::observe(prepared))
         }
         _ => None,
     }

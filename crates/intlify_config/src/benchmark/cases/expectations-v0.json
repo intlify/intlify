@@ -21501,6 +21501,1170 @@
           }
         ]
       }
+    },
+    {
+      "declaration": {
+        "operation": "artifact-collection-admission",
+        "fixture": {
+          "artifact-collection": "policy-only"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "artifact-collection-admitted"
+      },
+      "inputContext": "7f77c7cd5916a7ddce8a9390a33557de0cb7b9513d094fb8325b3f067b05006f",
+      "result": {
+        "shared": "650c5cec872447434a1a1b416c2ba023c0d7527edca9b549057a40f63a1e43e3",
+        "entry": null
+      },
+      "logicalWork": "2a2a7c916ac7f6a2a364a5c96bcae16fec2968a6b83b1ad3abc15773290cfb41",
+      "work": {
+        "profileIdentity": "intlify-config-artifact-collection-admission-work",
+        "profileRevision": "0",
+        "operation": "artifact-collection-admission",
+        "facts": [
+          {
+            "kind": "artifact-collection-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "artifact-collection-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "artifact-collection-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "artifact-collection-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "artifact-collection-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3098"
+            }
+          },
+          {
+            "kind": "artifact-collection-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "artifact-collection-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "artifact-collection-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "artifact-collection-admission",
+        "fixture": {
+          "artifact-collection": "mixed"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "artifact-collection-admitted"
+      },
+      "inputContext": "5839da2948086f568eefa21e28fa1b860b668c3bd1d0cb824cfa6bac33518916",
+      "result": {
+        "shared": "bbb29811f5a82d89949fe3a948797ad1c0684c4b629dad49fd930acd27358cfc",
+        "entry": null
+      },
+      "logicalWork": "32280d79c2daf1cb6747d20c9c7b91faaf51e39aaa78fe85cb69fb6c5bbd06f2",
+      "work": {
+        "profileIdentity": "intlify-config-artifact-collection-admission-work",
+        "profileRevision": "0",
+        "operation": "artifact-collection-admission",
+        "facts": [
+          {
+            "kind": "artifact-collection-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "artifact-collection-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "artifact-collection-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "artifact-collection-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "artifact-collection-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "5959"
+            }
+          },
+          {
+            "kind": "artifact-collection-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "artifact-collection-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "artifact-collection-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "artifact-collection-admission",
+        "fixture": {
+          "artifact-collection": "mixed-reordered"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "artifact-collection-admitted"
+      },
+      "inputContext": "b2c38548d8144736934572ece8c723148edb281c8d9060ad7dcf60931707fd1a",
+      "result": {
+        "shared": "bbb29811f5a82d89949fe3a948797ad1c0684c4b629dad49fd930acd27358cfc",
+        "entry": null
+      },
+      "logicalWork": "32280d79c2daf1cb6747d20c9c7b91faaf51e39aaa78fe85cb69fb6c5bbd06f2",
+      "work": {
+        "profileIdentity": "intlify-config-artifact-collection-admission-work",
+        "profileRevision": "0",
+        "operation": "artifact-collection-admission",
+        "facts": [
+          {
+            "kind": "artifact-collection-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "artifact-collection-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "artifact-collection-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "artifact-collection-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "artifact-collection-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "5959"
+            }
+          },
+          {
+            "kind": "artifact-collection-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "artifact-collection-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "artifact-collection-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "artifact-collection-admission",
+        "fixture": {
+          "artifact-collection": "every-kind"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "artifact-collection-admitted"
+      },
+      "inputContext": "57f475bec59593e99d0b0a58994d7dbc1ef5714ed894413b8e2c497b57d8dbe9",
+      "result": {
+        "shared": "998adcce905b236a59a4e6bb31dee571b340938bbe9828148a9da6fe4e6453ec",
+        "entry": null
+      },
+      "logicalWork": "d8f12f67e8838991459ca7d77384f4c1c8b2d77248911acea72dae4b88e3309d",
+      "work": {
+        "profileIdentity": "intlify-config-artifact-collection-admission-work",
+        "profileRevision": "0",
+        "operation": "artifact-collection-admission",
+        "facts": [
+          {
+            "kind": "artifact-collection-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "artifact-collection-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "artifact-collection-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "artifact-collection-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "artifact-collection-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8596"
+            }
+          },
+          {
+            "kind": "artifact-collection-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "24"
+            }
+          },
+          {
+            "kind": "artifact-collection-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "artifact-collection-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "artifact-collection-admission",
+        "fixture": {
+          "artifact-collection": "many-artifacts"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "artifact-collection-admitted"
+      },
+      "inputContext": "dbdc07b90f5d91b606c731a0abc8fc193a59145f806d58d4582193d31cb0a84e",
+      "result": {
+        "shared": "7c49acc17c58a385cf9f16f2a4f1a3410b090d4789c424f48893226e6e8fd5f3",
+        "entry": null
+      },
+      "logicalWork": "8bf3d835834988a1fd0e3dd7d82fe37fab1ef8cc8936ad6c7467bb35e33e1b0a",
+      "work": {
+        "profileIdentity": "intlify-config-artifact-collection-admission-work",
+        "profileRevision": "0",
+        "operation": "artifact-collection-admission",
+        "facts": [
+          {
+            "kind": "artifact-collection-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "artifact-collection-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "artifact-collection-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "63"
+            }
+          },
+          {
+            "kind": "artifact-collection-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "artifact-collection-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "153542"
+            }
+          },
+          {
+            "kind": "artifact-collection-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "192"
+            }
+          },
+          {
+            "kind": "artifact-collection-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "artifact-collection-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "artifact-collection-admission",
+        "fixture": {
+          "artifact-collection": "unreferenced-duplicate"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "artifact-collection-blocked"
+      },
+      "inputContext": "14da0c8ee6216c897c5ccaed5cef2a54e4ced1f998b5ef9a99d2f3210acc6131",
+      "result": {
+        "shared": "becb3224dd6a5e078bd4b6cce89db93668a269dc0cb167bb30b6165487d773c9",
+        "entry": null
+      },
+      "logicalWork": "aba2ce8532fa05adc423903c486f4b668eb6cd150e04d82ee4370f3fd1a252a9",
+      "work": {
+        "profileIdentity": "intlify-config-artifact-collection-admission-work",
+        "profileRevision": "0",
+        "operation": "artifact-collection-admission",
+        "facts": [
+          {
+            "kind": "artifact-collection-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "artifact-collection-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "artifact-collection-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "artifact-collection-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "artifact-collection-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6438"
+            }
+          },
+          {
+            "kind": "artifact-collection-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "artifact-collection-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "artifact-collection-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "artifact-collection-not-admitted"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "artifact-collection-admission",
+        "fixture": {
+          "artifact-collection": "repeated-bodies"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "artifact-collection-blocked"
+      },
+      "inputContext": "c99bd15c4b9a2a0d13efaf45195d6781502bb55a94162b4898b4fe5b58997fa8",
+      "result": {
+        "shared": "b469792fe2c5aa6c9f87f017610121428abbcc3a859c4265e0b75680ad706ab5",
+        "entry": null
+      },
+      "logicalWork": "754f727ad7b47c51200a26303feb0c8e954fad7443077d0d1d02e0249714b135",
+      "work": {
+        "profileIdentity": "intlify-config-artifact-collection-admission-work",
+        "profileRevision": "0",
+        "operation": "artifact-collection-admission",
+        "facts": [
+          {
+            "kind": "artifact-collection-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "33"
+            }
+          },
+          {
+            "kind": "artifact-collection-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "artifact-collection-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "32"
+            }
+          },
+          {
+            "kind": "artifact-collection-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "artifact-collection-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "79322"
+            }
+          },
+          {
+            "kind": "artifact-collection-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "artifact-collection-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "artifact-collection-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "artifact-collection-not-admitted"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "artifact-collection-admission",
+        "fixture": {
+          "artifact-collection": "artifact-conflict"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "artifact-collection-blocked"
+      },
+      "inputContext": "2f1f66caf24f53f118219aa158524f8f6b27554a9cc80d5a5c652767bc1af44c",
+      "result": {
+        "shared": "f4c67d16ee800a6047c66c888a08ea0c22bdd12624341226a9ad7f54b62a8564",
+        "entry": null
+      },
+      "logicalWork": "ebee0fb7780d27899ca208eda3e3e7ff58d5f88e9cd463050132a01e9b49a4f7",
+      "work": {
+        "profileIdentity": "intlify-config-artifact-collection-admission-work",
+        "profileRevision": "0",
+        "operation": "artifact-collection-admission",
+        "facts": [
+          {
+            "kind": "artifact-collection-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "artifact-collection-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "artifact-collection-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "artifact-collection-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "artifact-collection-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6442"
+            }
+          },
+          {
+            "kind": "artifact-collection-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "11"
+            }
+          },
+          {
+            "kind": "artifact-collection-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "artifact-collection-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "artifact-collection-not-admitted"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "artifact-collection-admission",
+        "fixture": {
+          "artifact-collection": "many-conflicts"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "artifact-collection-blocked"
+      },
+      "inputContext": "7c5d05fc835e31e6fb70ca77996f81d8886b08c710fd6326ef6c566874fd70f3",
+      "result": {
+        "shared": "b8f5ac611b00181d4ce101fd00cf1438aac5a58cf61520f5941c16fa89ad5df5",
+        "entry": null
+      },
+      "logicalWork": "b5442db8929774ac51d2ea5cfaab94641a17d0f72558d59248f71448ba563582",
+      "work": {
+        "profileIdentity": "intlify-config-artifact-collection-admission-work",
+        "profileRevision": "0",
+        "operation": "artifact-collection-admission",
+        "facts": [
+          {
+            "kind": "artifact-collection-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "65"
+            }
+          },
+          {
+            "kind": "artifact-collection-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "65"
+            }
+          },
+          {
+            "kind": "artifact-collection-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "artifact-collection-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "65"
+            }
+          },
+          {
+            "kind": "artifact-collection-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "34074"
+            }
+          },
+          {
+            "kind": "artifact-collection-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "163"
+            }
+          },
+          {
+            "kind": "artifact-collection-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "32"
+            }
+          },
+          {
+            "kind": "artifact-collection-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "artifact-collection-not-admitted"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "artifact-collection-admission",
+        "fixture": {
+          "artifact-collection": "envelope-invalid"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "artifact-collection-blocked"
+      },
+      "inputContext": "93dd2cf31571120602287230bf3dd02cfaa1365404db791298292917347af4fa",
+      "result": {
+        "shared": "8dc4274ca2b74284af38d17962cfcf550180090afd3b03f13f69b5d53afb0d47",
+        "entry": null
+      },
+      "logicalWork": "265d309f1792199faed1ff06ce612140f23738d240c44a08ef7c1ab1928707df",
+      "work": {
+        "profileIdentity": "intlify-config-artifact-collection-admission-work",
+        "profileRevision": "0",
+        "operation": "artifact-collection-admission",
+        "facts": [
+          {
+            "kind": "artifact-collection-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "artifact-collection-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "artifact-collection-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "artifact-collection-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "artifact-collection-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6392"
+            }
+          },
+          {
+            "kind": "artifact-collection-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "artifact-collection-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "artifact-collection-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "artifact-collection-not-admitted"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "artifact-collection-admission",
+        "fixture": {
+          "artifact-collection": "no-tuple"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "artifact-collection-blocked"
+      },
+      "inputContext": "92c45afc99d68a29b42351034c448699f4af18d9ce0cb96d8c9c81696d618132",
+      "result": {
+        "shared": "1ee50eb00b0d03cc35cbd9a3ba5dd4dc8ade062147c0ca2d0698ee01f202124a",
+        "entry": null
+      },
+      "logicalWork": "dc670b3bbda7add34dd9bb0d9db1a8d4d3fece326450103e83e7227765b15539",
+      "work": {
+        "profileIdentity": "intlify-config-artifact-collection-admission-work",
+        "profileRevision": "0",
+        "operation": "artifact-collection-admission",
+        "facts": [
+          {
+            "kind": "artifact-collection-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "artifact-collection-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "artifact-collection-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "artifact-collection-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "artifact-collection-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8301"
+            }
+          },
+          {
+            "kind": "artifact-collection-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "10"
+            }
+          },
+          {
+            "kind": "artifact-collection-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "artifact-collection-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "artifact-collection-not-admitted"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "artifact-collection-admission",
+        "fixture": {
+          "artifact-collection": "kind-unsupported"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "artifact-collection-blocked"
+      },
+      "inputContext": "8411c5c6af3a05e2764dec1c5ba4771df9e4a49300b9141dff350c0222fb65af",
+      "result": {
+        "shared": "4789d732644a52f68a0ae862c9cba4bbd8ac9296aeab1f8e92991c92d4d83917",
+        "entry": null
+      },
+      "logicalWork": "3ee2e6dd217a161c67c4f37ec5f67e49f5060697cba243045b3f7faafc66c761",
+      "work": {
+        "profileIdentity": "intlify-config-artifact-collection-admission-work",
+        "profileRevision": "0",
+        "operation": "artifact-collection-admission",
+        "facts": [
+          {
+            "kind": "artifact-collection-artifact-occurrences",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "artifact-collection-policy-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "artifact-collection-target-profile-artifacts",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "artifact-collection-distinct-artifact-bodies",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "artifact-collection-artifact-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8350"
+            }
+          },
+          {
+            "kind": "artifact-collection-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "10"
+            }
+          },
+          {
+            "kind": "artifact-collection-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "artifact-collection-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "artifact-collection-not-admitted"
+            }
+          }
+        ]
+      }
     }
   ]
 }

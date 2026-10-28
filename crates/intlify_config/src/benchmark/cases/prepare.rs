@@ -12,7 +12,7 @@ use crate::input_limits::{Bound, InputLimits, RawInputLimits, ValueLimits};
 use crate::locale::fixtures::{fixture_pins, FixtureProvider};
 use crate::locale::Canonicalizer;
 use crate::materialize::materialize_file;
-use crate::resolver::limits::ImplementationCapability;
+use crate::resolver::limits::{ConfirmedPolicy, ImplementationCapability};
 use crate::structural::selection::{InvalidSelectorType, Selection, SelectorInput};
 use crate::structural::StructuralLimits;
 
@@ -89,6 +89,9 @@ pub(in crate::benchmark) fn prepare(
     }
     if declaration.operation == Operation::ResourcePolicyBootstrap {
         return prepare_policy(declaration);
+    }
+    if declaration.operation == Operation::ArtifactCollectionAdmission {
+        return prepare_collection(declaration);
     }
     let source = declaration.fixture.source();
     let (mut input_limits, mut structural_limits) = fixture_capacity();
@@ -196,7 +199,8 @@ pub(in crate::benchmark) fn prepare(
             Operation::FileMaterialization
             | Operation::LocaleCanonicalization
             | Operation::LocaleResolution
-            | Operation::ResourcePolicyBootstrap => unreachable!(),
+            | Operation::ResourcePolicyBootstrap
+            | Operation::ArtifactCollectionAdmission => unreachable!(),
         }
     };
     // Only dispatch is repeated here; both reference preparation and timed calls
@@ -215,8 +219,10 @@ pub(in crate::benchmark) fn prepare(
         Prepared::Locale { .. } | Prepared::Icu4xLocale { .. } => {
             unreachable!("locale preparation has no file stages")
         }
-        Prepared::LocaleResolution(_) | Prepared::ResourcePolicy(_) => {
-            unreachable!("Phases 7 and 4 have complete-root preparation")
+        Prepared::LocaleResolution(_)
+        | Prepared::ResourcePolicy(_)
+        | Prepared::ArtifactCollection(_) => {
+            unreachable!("Phases 7, 4, and 9 have their own preparation")
         }
     };
     let kind = match &output {
@@ -500,7 +506,7 @@ fn policy_edge(kind: LimitKind, recipe: ResourcePolicyRecipe) -> Result<u64, Pre
 
 /// The caller's finite limits on the collection at 015's pre-invocation
 /// boundary: explicit owner capacity, not the `artifactAdmission` bounds.
-const COLLECTION_LIMITS: CollectionLimits = CollectionLimits {
+pub(super) const COLLECTION_LIMITS: CollectionLimits = CollectionLimits {
     members: 1_000,
     member_bytes: 1_000_000,
     total_bytes: 10_000_000,
@@ -605,6 +611,54 @@ fn prepare_policy(declaration: &Declaration) -> Result<Candidate, PreparationFai
     Ok(Candidate {
         declaration: declaration.clone(),
         input_limits: Some(input_limits),
+        prepared,
+        output,
+        observation,
+        logical_work,
+    })
+}
+
+/// Phase 9 over a recipe's collection, read at 015's pre-invocation boundary,
+/// under the policy whose bounds its Resource Limit Policy sets. No
+/// configuration is materialized: the collection admission reads none.
+fn prepare_collection(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
+    use crate::benchmark::artifact_collection::PreparedCollection;
+
+    let Recipe::ArtifactCollection(recipe) = declaration.fixture else {
+        return Err(PreparationFailure::UndeclaredCase);
+    };
+    let members = recipe
+        .members()
+        .iter()
+        .map(serde_json::to_vec)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| PreparationFailure::CoreInvariant)?;
+    let bytes = members.iter().map(Vec::as_slice).collect::<Vec<_>>();
+    let collection = read_collection(Some(&bytes), &COLLECTION_LIMITS)
+        .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?;
+    let prepared = PreparedCollection {
+        policy: ConfirmedPolicy::fixture_owned(capacity()),
+        collection,
+    };
+    let resolved = prepared.resolve();
+    let kind = match &resolved.result {
+        Ok(Ok(_)) => ExpectedKind::ArtifactCollectionAdmitted,
+        Ok(Err(_)) => ExpectedKind::ArtifactCollectionBlocked,
+        Err(_) => return Err(PreparationFailure::Observation),
+    };
+    if declaration.expected_kind != kind {
+        return Err(PreparationFailure::UnexpectedOutputKind);
+    }
+    let output = Output::ArtifactCollection(resolved);
+    let prepared = Prepared::ArtifactCollection(Box::new(prepared));
+    let observation = output
+        .observe()
+        .map_err(|_| PreparationFailure::Observation)?;
+    let logical_work =
+        LogicalWork::observe(&prepared, &output).map_err(|_| PreparationFailure::Observation)?;
+    Ok(Candidate {
+        declaration: declaration.clone(),
+        input_limits: None,
         prepared,
         output,
         observation,

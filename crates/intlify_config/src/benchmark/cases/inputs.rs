@@ -53,6 +53,7 @@ pub(in crate::benchmark) enum Recipe {
         engine: super::Engine,
     },
     ResourcePolicy(super::ResourcePolicyRecipe),
+    ArtifactCollection(super::ArtifactCollectionRecipe),
 }
 
 impl Recipe {
@@ -93,6 +94,13 @@ impl Recipe {
             let fixture = recipe.fixture(&super::policy_inputs::capacity());
             return Arc::from(
                 serde_json::to_vec(&fixture.config).expect("finite owner resource-policy fixture"),
+            );
+        }
+        if let Self::ArtifactCollection(recipe) = self {
+            // Every member in submission order; no configuration is read.
+            return Arc::from(
+                serde_json::to_vec(&recipe.members())
+                    .expect("finite owner artifact-collection fixture"),
             );
         }
         let raw: Option<&[u8]> = match self {

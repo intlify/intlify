@@ -2,9 +2,10 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Versioned workload facts for input/structural/selection, single-locale
-//! canonicalization, 015 Phase 7 locale resolution, and 015 Phase 4 resource
-//! policy admission. These are not physical metrics, formal Resource Policy
-//! observations, or whole-profile locale-policy / target work.
+//! canonicalization, 015 Phase 7 locale resolution, 015 Phase 4 resource
+//! policy admission, and 015 Phase 9 collection admission. These are not
+//! physical metrics, formal Resource Policy observations, or whole-profile
+//! locale-policy / target work.
 
 use serde::{Deserialize, Serialize};
 
@@ -16,6 +17,7 @@ use crate::structural::selection::SelectorByteObservation;
 use super::operation::{Analysis, Operation, Output, Prepared};
 use super::quantity::Quantity;
 
+mod collection;
 mod policy;
 mod resolution;
 
@@ -59,6 +61,14 @@ pub(super) enum WorkKind {
     ResourcePolicyEvaluationUnits,
     ResourcePolicyNotEvaluatedUnits,
     ResourcePolicyBlockingIssues,
+    ArtifactCollectionArtifactOccurrences,
+    ArtifactCollectionPolicyArtifacts,
+    ArtifactCollectionTargetProfileArtifacts,
+    ArtifactCollectionDistinctArtifactBodies,
+    ArtifactCollectionArtifactCanonicalBytes,
+    ArtifactCollectionEvaluationUnits,
+    ArtifactCollectionBlockingIssues,
+    ArtifactCollectionSetArtifacts,
 }
 
 impl WorkKind {
@@ -111,11 +121,23 @@ impl WorkKind {
         Self::ResourcePolicyBlockingIssues,
     ];
 
+    const ARTIFACT_COLLECTION: [Self; 8] = [
+        Self::ArtifactCollectionArtifactOccurrences,
+        Self::ArtifactCollectionPolicyArtifacts,
+        Self::ArtifactCollectionTargetProfileArtifacts,
+        Self::ArtifactCollectionDistinctArtifactBodies,
+        Self::ArtifactCollectionArtifactCanonicalBytes,
+        Self::ArtifactCollectionEvaluationUnits,
+        Self::ArtifactCollectionBlockingIssues,
+        Self::ArtifactCollectionSetArtifacts,
+    ];
+
     pub(super) fn for_operation(operation: Operation) -> &'static [Self] {
         match operation {
             Operation::LocaleCanonicalization => &Self::LOCALE,
             Operation::LocaleResolution => &Self::LOCALE_RESOLUTION,
             Operation::ResourcePolicyBootstrap => &Self::RESOURCE_POLICY,
+            Operation::ArtifactCollectionAdmission => &Self::ARTIFACT_COLLECTION,
             _ => &Self::INPUT,
         }
     }
@@ -140,7 +162,8 @@ impl WorkKind {
             | Self::RetainedSchemaFragments
             | Self::RetainedSchemaIssuesIncludingAlternatives
             | Self::LocaleResolutionBlockingIssues
-            | Self::ResourcePolicyBlockingIssues => WorkUnit::RetainedRecord,
+            | Self::ResourcePolicyBlockingIssues
+            | Self::ArtifactCollectionBlockingIssues => WorkUnit::RetainedRecord,
             Self::LocaleOccurrences
             | Self::LocaleResolutionOccurrences
             | Self::LocaleResolutionCanonicalizedOccurrences => WorkUnit::LocaleOccurrence,
@@ -149,13 +172,20 @@ impl WorkKind {
             Self::LocaleResolutionEvaluationUnits
             | Self::LocaleResolutionNotEvaluatedUnits
             | Self::ResourcePolicyEvaluationUnits
-            | Self::ResourcePolicyNotEvaluatedUnits => WorkUnit::EvaluationUnit,
+            | Self::ResourcePolicyNotEvaluatedUnits
+            | Self::ArtifactCollectionEvaluationUnits => WorkUnit::EvaluationUnit,
             Self::ResourcePolicyArtifactOccurrences
             | Self::ResourcePolicyPolicyArtifacts
-            | Self::ResourcePolicyTargetProfileArtifacts => WorkUnit::ArtifactOccurrence,
-            Self::ResourcePolicyDistinctArtifactBodies => WorkUnit::CanonicalArtifactBody,
+            | Self::ResourcePolicyTargetProfileArtifacts
+            | Self::ArtifactCollectionArtifactOccurrences
+            | Self::ArtifactCollectionPolicyArtifacts
+            | Self::ArtifactCollectionTargetProfileArtifacts => WorkUnit::ArtifactOccurrence,
+            Self::ResourcePolicyDistinctArtifactBodies
+            | Self::ArtifactCollectionDistinctArtifactBodies
+            | Self::ArtifactCollectionSetArtifacts => WorkUnit::CanonicalArtifactBody,
             Self::ResourcePolicyArtifactCanonicalBytes
-            | Self::ResourcePolicyReferenceCanonicalBytes => WorkUnit::CanonicalOctet,
+            | Self::ResourcePolicyReferenceCanonicalBytes
+            | Self::ArtifactCollectionArtifactCanonicalBytes => WorkUnit::CanonicalOctet,
             Self::ResourcePolicyReferences => WorkUnit::ArtifactReference,
             Self::LocaleCorrectionSuggestions | Self::LocaleResolutionCorrections => {
                 WorkUnit::CorrectionSuggestion
@@ -202,6 +232,7 @@ enum UnavailableWork {
     SchemaPrerequisiteUnavailable,
     LocaleNotCanonicalized,
     LocaleResolutionRequestedNotResolved,
+    ArtifactCollectionNotAdmitted,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -255,6 +286,9 @@ impl LogicalWork {
                 Operation::LocaleResolution => "intlify-config-locale-resolution-work",
                 Operation::ResourcePolicyBootstrap => {
                     "intlify-config-resource-policy-bootstrap-work"
+                }
+                Operation::ArtifactCollectionAdmission => {
+                    "intlify-config-artifact-collection-admission-work"
                 }
                 _ => "intlify-config-minimum-input-work",
             }
@@ -318,6 +352,9 @@ impl LogicalWork {
             }
             (Prepared::ResourcePolicy(prepared), Output::ResourcePolicy(resolved)) => {
                 work.policy(prepared, resolved)?;
+            }
+            (Prepared::ArtifactCollection(prepared), Output::ArtifactCollection(resolved)) => {
+                work.collection(prepared, resolved)?;
             }
             _ => return Err(WorkFailure::OperationMismatch),
         }
