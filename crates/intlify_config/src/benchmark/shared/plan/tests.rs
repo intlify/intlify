@@ -89,7 +89,7 @@ fn each_case_projection_carries_the_execution_state_its_prepared_case_runs_in() 
 fn issuance_freezes_unique_case_inventory_but_fresh_instances_do_not_change_case_identity() {
     let first = issue();
     let second = issue();
-    assert_eq!(first.document().body.case_inventory.len(), 198);
+    assert_eq!(first.document().body.case_inventory.len(), 213);
     assert_eq!(
         first.document().body.case_inventory,
         second.document().body.case_inventory
@@ -160,7 +160,7 @@ fn native_capture_uses_the_plan_already_issued_before_collection_and_retains_it_
         value["result"]["plan"]["commonRunPlan"],
         serde_json::to_value(identity).unwrap()
     );
-    assert_eq!(value["result"]["attempts"].as_array().unwrap().len(), 198);
+    assert_eq!(value["result"]["attempts"].as_array().unwrap().len(), 213);
 }
 
 #[test]

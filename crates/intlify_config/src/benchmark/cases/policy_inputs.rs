@@ -254,7 +254,7 @@ fn other_section(limits: &ResolutionLimits) -> Value {
     section
 }
 
-fn tuple_of(member: &Value) -> ExactTuple {
+pub(super) fn tuple_of(member: &Value) -> ExactTuple {
     FormalMember::new(member.clone())
         .ok()
         .and_then(|member| member.envelope().map(|envelope| envelope.tuple().clone()))
@@ -262,7 +262,7 @@ fn tuple_of(member: &Value) -> ExactTuple {
 }
 
 /// The reference a declaration writes for `tuple`.
-fn reference_value(tuple: &ExactTuple) -> Value {
+pub(super) fn reference_value(tuple: &ExactTuple) -> Value {
     json!({
         "kind": tuple.kind.spelling(),
         "identity": tuple.identity.as_str(),

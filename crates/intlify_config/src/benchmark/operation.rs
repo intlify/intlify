@@ -26,7 +26,9 @@ use super::locale_icu4x::PreparedEngine;
 use super::locale_resolution::Canonicalizers;
 use super::measure::{measure, Measured, MeasurementFailure};
 use super::observation::{self, Frame, Observation};
-use super::{artifact_collection, locale, locale_icu4x, locale_resolution, resource_policy};
+use super::{
+    artifact_collection, locale, locale_icu4x, locale_resolution, resolved_binding, resource_policy,
+};
 
 pub(super) type Config = IntlifyConfig<PolicyReference, TargetProfileReference>;
 pub(super) type Analysis = StructuralAnalysis<PolicyReference, TargetProfileReference>;
@@ -45,10 +47,11 @@ pub(super) enum Operation {
     LocaleResolution,
     ResourcePolicyBootstrap,
     ArtifactCollectionAdmission,
+    ResolvedBindingConstruction,
 }
 
 impl Operation {
-    pub(super) const ALL: [Self; 8] = [
+    pub(super) const ALL: [Self; 9] = [
         Self::FileMaterialization,
         Self::StructuralAnalysis,
         Self::AuthoringConstruction,
@@ -57,6 +60,7 @@ impl Operation {
         Self::LocaleResolution,
         Self::ResourcePolicyBootstrap,
         Self::ArtifactCollectionAdmission,
+        Self::ResolvedBindingConstruction,
     ];
     pub(super) const fn phase(self) -> &'static str {
         match self {
@@ -64,9 +68,9 @@ impl Operation {
             Self::StructuralAnalysis | Self::AuthoringConstruction => "profile_structural_admit",
             Self::ProfileSelection => "profile_select",
             Self::LocaleCanonicalization | Self::LocaleResolution => "profile_locale_resolve",
-            Self::ResourcePolicyBootstrap | Self::ArtifactCollectionAdmission => {
-                "profile_artifact_admit"
-            }
+            Self::ResourcePolicyBootstrap
+            | Self::ArtifactCollectionAdmission
+            | Self::ResolvedBindingConstruction => "profile_artifact_admit",
         }
     }
     pub(super) const fn cost(self) -> &'static str {
@@ -79,6 +83,7 @@ impl Operation {
             Self::LocaleResolution => "locale_policy_resolution",
             Self::ResourcePolicyBootstrap => "resource_policy_bootstrap",
             Self::ArtifactCollectionAdmission => "complete_artifact_collection_admission",
+            Self::ResolvedBindingConstruction => "resolved_binding_construction",
         }
     }
     pub(super) const fn boundary(self) -> &'static str {
@@ -91,6 +96,7 @@ impl Operation {
             Self::LocaleResolution => "locale-resolution/0",
             Self::ResourcePolicyBootstrap => "resource-policy-bootstrap/0",
             Self::ArtifactCollectionAdmission => "artifact-collection-admission/0",
+            Self::ResolvedBindingConstruction => "resolved-binding-construction/0",
         }
     }
 }
@@ -117,6 +123,7 @@ pub(super) enum Prepared {
     LocaleResolution(Box<locale_resolution::PreparedLocales>),
     ResourcePolicy(Box<resource_policy::PreparedPolicy>),
     ArtifactCollection(Box<artifact_collection::PreparedCollection>),
+    ResolvedBinding(Box<resolved_binding::PreparedBindings>),
     Icu4xLocale {
         engine: locale_icu4x::PreparedEngine,
         input: Arc<str>,
@@ -132,6 +139,7 @@ pub(super) enum Output {
     LocaleResolution(locale_resolution::Resolved),
     ResourcePolicy(resource_policy::Resolved),
     ArtifactCollection(artifact_collection::Resolved),
+    ResolvedBinding(resolved_binding::Resolved),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -146,6 +154,7 @@ pub(super) enum OutputFailure {
     LocaleResolutionInvariant,
     ResourcePolicyInvariant,
     ArtifactCollectionInvariant,
+    ResolvedBindingInvariant,
 }
 
 impl Prepared {
@@ -159,6 +168,7 @@ impl Prepared {
             Self::LocaleResolution(_) => Operation::LocaleResolution,
             Self::ResourcePolicy(_) => Operation::ResourcePolicyBootstrap,
             Self::ArtifactCollection(_) => Operation::ArtifactCollectionAdmission,
+            Self::ResolvedBinding(_) => Operation::ResolvedBindingConstruction,
         }
     }
 
@@ -287,6 +297,21 @@ impl Prepared {
                     )),
                 })
             }
+            Self::ResolvedBinding(prepared) => {
+                // The collection is admitted into the Set before the start
+                // read; the resolution and the bindings borrow it, so they
+                // are copied out after the end read.
+                let inputs = prepared
+                    .inputs()
+                    .ok_or(MeasurementFailure::PrerequisiteUnavailable)?;
+                let measured = measure(clock, &inputs, resolved_binding::construct)?;
+                Ok(Measured {
+                    duration: measured.duration,
+                    output: Output::ResolvedBinding(resolved_binding::Resolved::retain(
+                        measured.output,
+                    )),
+                })
+            }
             Self::Icu4xLocale { engine, input } => {
                 // A fresh engine is admitted and bound before the start read
                 // and released after the end read.
@@ -310,6 +335,7 @@ impl Prepared {
             Self::Authoring(analysis) => analysis.is_complete(),
             Self::LocaleResolution(prepared) => prepared.fields().is_some(),
             Self::ResourcePolicy(prepared) => prepared.inputs().is_some(),
+            Self::ResolvedBinding(prepared) => prepared.inputs().is_some(),
             _ => true,
         }
     }
@@ -341,6 +367,7 @@ impl Output {
             Self::LocaleResolution(resolved) => locale_resolution::observe(resolved),
             Self::ResourcePolicy(resolved) => resource_policy::observe(resolved),
             Self::ArtifactCollection(resolved) => artifact_collection::observe(resolved),
+            Self::ResolvedBinding(resolved) => resolved_binding::observe(resolved),
         }
     }
 }

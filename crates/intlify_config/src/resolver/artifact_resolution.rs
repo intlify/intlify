@@ -58,8 +58,10 @@ pub(crate) struct AdmittedArtifact<'a> {
 pub(crate) struct ArtifactSet<'a>(BTreeMap<ExactTuple, AdmittedArtifact<'a>>);
 
 impl<'a> ArtifactSet<'a> {
-    pub(crate) fn get(&self, tuple: &ExactTuple) -> Option<&AdmittedArtifact<'a>> {
-        self.0.get(tuple)
+    /// The artifact with `tuple`, and the Set's own copy of the tuple, which
+    /// a resolution can then hold for as long as the artifact.
+    pub(crate) fn get(&self, tuple: &ExactTuple) -> Option<(&ExactTuple, &AdmittedArtifact<'a>)> {
+        self.0.get_key_value(tuple)
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = (&ExactTuple, &AdmittedArtifact<'a>)> {
@@ -574,14 +576,15 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(set.len(), 2);
-        let admitted = set.get(&tuple_of(&approval)).unwrap();
+        let (held, admitted) = set.get(&tuple_of(&approval)).unwrap();
+        assert_eq!(held, &tuple_of(&approval));
         assert_eq!(
             admitted.content,
             Content::Approval(LocalizedApproval::Required)
         );
         assert_eq!(admitted.member.value(), &approval);
         // The content of a Resource Limit Policy passes on as its object.
-        let admitted = set.get(&tuple_of(&limits)).unwrap();
+        let (_, admitted) = set.get(&tuple_of(&limits)).unwrap();
         assert_eq!(
             admitted.content,
             Content::External(

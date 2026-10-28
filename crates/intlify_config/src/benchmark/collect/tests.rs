@@ -94,6 +94,11 @@ fn fixture_observation(prepared: &Prepared) -> (Observation, LogicalWork) {
             assert_eq!(resolved.evaluation.issues().count(), 0);
             assert_eq!(resolved.result.as_ref().unwrap().as_ref().unwrap().len(), 1);
         }
+        Output::ResolvedBinding(resolved) => {
+            assert_eq!(resolved.evaluation.issues().count(), 0);
+            let retained = resolved.result.as_ref().unwrap().as_ref().unwrap();
+            assert_eq!(retained.bindings.len(), 6);
+        }
         _ => panic!("fixture preparation did not produce its known result"),
     }
     (

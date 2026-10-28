@@ -25,6 +25,7 @@ pub(in crate::benchmark) enum ContextFailure {
     LocaleInputMismatch,
     PolicyInputMismatch,
     CollectionInputMismatch,
+    BindingInputMismatch,
 }
 
 pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
@@ -221,6 +222,49 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
             }
             frame.json(
                 &serde_json::to_value(crate::benchmark::artifact_collection::InputFacts::observe(
+                    prepared,
+                ))
+                .map_err(|_| ContextFailure::Encoding)?,
+            );
+        }
+        Prepared::ResolvedBinding(prepared) => {
+            // The inputs exist only for a complete root whose configuration
+            // declares the selected profile.
+            if !matches!(candidate.declaration.fixture, Recipe::ResolvedBinding(_))
+                || candidate.declaration.selector != super::Selector::App
+                || prepared.inputs().is_none()
+            {
+                return Err(ContextFailure::BindingInputMismatch);
+            }
+            // The complete configuration, whose selected declaration the
+            // references come from; every member in submission order; the
+            // limits the collection was read under; and every bound of the
+            // confirmed policy.
+            frame.digest(prepared.analysis.benchmark_observation().identity());
+            frame.json(
+                &serde_json::to_value(&prepared.config).map_err(|_| ContextFailure::Encoding)?,
+            );
+            let members = prepared.collection.members();
+            frame.uint(u64::try_from(members.len()).map_err(|_| ContextFailure::Encoding)?);
+            for member in members {
+                frame.bytes(member.canonical_body());
+            }
+            let read = super::prepare::COLLECTION_LIMITS;
+            for bound in [
+                read.members,
+                read.member_bytes,
+                read.total_bytes,
+                read.depth,
+            ] {
+                frame.uint(bound);
+            }
+            for (id, bound) in prepared.policy.limits().bounds() {
+                frame.text(id.group.path());
+                frame.text(id.name);
+                frame.uint(bound.get());
+            }
+            frame.json(
+                &serde_json::to_value(crate::benchmark::resolved_binding::InputFacts::observe(
                     prepared,
                 ))
                 .map_err(|_| ContextFailure::Encoding)?,

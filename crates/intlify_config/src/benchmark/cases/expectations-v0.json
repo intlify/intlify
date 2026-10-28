@@ -22665,6 +22665,1461 @@
           }
         ]
       }
+    },
+    {
+      "declaration": {
+        "operation": "resolved-binding-construction",
+        "fixture": {
+          "resolved-binding": "required-only"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resolved-binding-constructed"
+      },
+      "inputContext": "639d541f469e03ab481bd40492b74d59e50632ac9f568703f0f72ee7e76a2a77",
+      "result": {
+        "shared": "f2a231f2e0c4ec7a3b52c4d92025336104a2dd4ff47b64e7b4de69565c2ce69f",
+        "entry": null
+      },
+      "logicalWork": "2170f6d5e99be2cf07cd7d3e0f6b08871e6df7a44a953666154b2282b024bdf2",
+      "work": {
+        "profileIdentity": "intlify-config-resolved-binding-construction-work",
+        "profileRevision": "0",
+        "operation": "resolved-binding-construction",
+        "facts": [
+          {
+            "kind": "resolved-binding-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-distinct-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1618"
+            }
+          },
+          {
+            "kind": "resolved-binding-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-bindings",
+            "unit": "artifact-reference",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resolved-binding-construction",
+        "fixture": {
+          "resolved-binding": "every-reference"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resolved-binding-constructed"
+      },
+      "inputContext": "f05696ebd7beab58ff73d7b44636bc5ed60d7c7f8b2bf1b9d66fad255dc360d3",
+      "result": {
+        "shared": "ef0e89fd4454e054f53a1bfc26d00ca7a0204ae6a4347e9360e77dc2a13b621b",
+        "entry": null
+      },
+      "logicalWork": "77fead14b47706f3c0e0d167d40b994acfad453f9e32300ae66e109b2ef6ad60",
+      "work": {
+        "profileIdentity": "intlify-config-resolved-binding-construction-work",
+        "profileRevision": "0",
+        "operation": "resolved-binding-construction",
+        "facts": [
+          {
+            "kind": "resolved-binding-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "resolved-binding-distinct-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "resolved-binding-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2426"
+            }
+          },
+          {
+            "kind": "resolved-binding-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "resolved-binding-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "resolved-binding-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-bindings",
+            "unit": "artifact-reference",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resolved-binding-construction",
+        "fixture": {
+          "resolved-binding": "every-reference-reordered"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resolved-binding-constructed"
+      },
+      "inputContext": "fcc0696c52c4203e327c986802aca32359b25f1d660ec3532d18dfbf0db3e663",
+      "result": {
+        "shared": "ef0e89fd4454e054f53a1bfc26d00ca7a0204ae6a4347e9360e77dc2a13b621b",
+        "entry": null
+      },
+      "logicalWork": "77fead14b47706f3c0e0d167d40b994acfad453f9e32300ae66e109b2ef6ad60",
+      "work": {
+        "profileIdentity": "intlify-config-resolved-binding-construction-work",
+        "profileRevision": "0",
+        "operation": "resolved-binding-construction",
+        "facts": [
+          {
+            "kind": "resolved-binding-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "resolved-binding-distinct-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "resolved-binding-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2426"
+            }
+          },
+          {
+            "kind": "resolved-binding-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "resolved-binding-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "resolved-binding-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-bindings",
+            "unit": "artifact-reference",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resolved-binding-construction",
+        "fixture": {
+          "resolved-binding": "many-targets"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resolved-binding-constructed"
+      },
+      "inputContext": "be549162e90b7fef6d29052c786e67f1802deb9bf6f31dd3b5c8e200b3c05795",
+      "result": {
+        "shared": "4531f24cc569b7b1d45b379c7fb680788b594553965e0e6f46c8cd4f5a91a41e",
+        "entry": null
+      },
+      "logicalWork": "799c945de507d523e6855a914e0041af5b11bc9f2435eee8d4405aa3da4d8961",
+      "work": {
+        "profileIdentity": "intlify-config-resolved-binding-construction-work",
+        "profileRevision": "0",
+        "operation": "resolved-binding-construction",
+        "facts": [
+          {
+            "kind": "resolved-binding-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "68"
+            }
+          },
+          {
+            "kind": "resolved-binding-distinct-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "68"
+            }
+          },
+          {
+            "kind": "resolved-binding-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "18298"
+            }
+          },
+          {
+            "kind": "resolved-binding-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "68"
+            }
+          },
+          {
+            "kind": "resolved-binding-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "68"
+            }
+          },
+          {
+            "kind": "resolved-binding-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-bindings",
+            "unit": "artifact-reference",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "68"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resolved-binding-construction",
+        "fixture": {
+          "resolved-binding": "shared-target-profile"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resolved-binding-constructed"
+      },
+      "inputContext": "9319e2d69d1d701814773a2271f3960efc86d9615f8f3127c352a2d6c3aac227",
+      "result": {
+        "shared": "5965ee9a9b5e3c0abfca1a36896df69a87d145ba3ffdfcafeec0af6f37f03c93",
+        "entry": null
+      },
+      "logicalWork": "c41a89317c5a418ee70ae490f0a60c833cea1afd9f943124b67714690aa1dedb",
+      "work": {
+        "profileIdentity": "intlify-config-resolved-binding-construction-work",
+        "profileRevision": "0",
+        "operation": "resolved-binding-construction",
+        "facts": [
+          {
+            "kind": "resolved-binding-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "68"
+            }
+          },
+          {
+            "kind": "resolved-binding-distinct-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "18172"
+            }
+          },
+          {
+            "kind": "resolved-binding-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "68"
+            }
+          },
+          {
+            "kind": "resolved-binding-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-bindings",
+            "unit": "artifact-reference",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resolved-binding-construction",
+        "fixture": {
+          "resolved-binding": "unreferenced-artifacts"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resolved-binding-constructed"
+      },
+      "inputContext": "4d7ddf7e7378d5698d994195b9c1b346ad9eb4b20c8172c5bbf78c9843bf0dd6",
+      "result": {
+        "shared": "f2a231f2e0c4ec7a3b52c4d92025336104a2dd4ff47b64e7b4de69565c2ce69f",
+        "entry": null
+      },
+      "logicalWork": "1e975586505c5eba0c3871011f7ed4cc25e504dc762e936b06bf840836e86480",
+      "work": {
+        "profileIdentity": "intlify-config-resolved-binding-construction-work",
+        "profileRevision": "0",
+        "operation": "resolved-binding-construction",
+        "facts": [
+          {
+            "kind": "resolved-binding-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-distinct-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1618"
+            }
+          },
+          {
+            "kind": "resolved-binding-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "69"
+            }
+          },
+          {
+            "kind": "resolved-binding-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-bindings",
+            "unit": "artifact-reference",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resolved-binding-construction",
+        "fixture": {
+          "resolved-binding": "role-kind-mismatch"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resolved-binding-blocked"
+      },
+      "inputContext": "1f4929954556ecd93edae6d8ccd9b610c739f0c6cadc97b47948834154725b5a",
+      "result": {
+        "shared": "545b5f410dbce1d4309b86f943668e01ad7534d21d08f08386b105f6a519ffa0",
+        "entry": null
+      },
+      "logicalWork": "fec5be1e496bed56c353398af9e075ed98da35341d36e8782d62b5e798754d06",
+      "work": {
+        "profileIdentity": "intlify-config-resolved-binding-construction-work",
+        "profileRevision": "0",
+        "operation": "resolved-binding-construction",
+        "facts": [
+          {
+            "kind": "resolved-binding-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-distinct-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "resolved-binding-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1624"
+            }
+          },
+          {
+            "kind": "resolved-binding-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resolved-binding-bindings",
+            "unit": "artifact-reference",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "artifact-references-not-resolved"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resolved-binding-construction",
+        "fixture": {
+          "resolved-binding": "specification-revision-unsupported"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resolved-binding-blocked"
+      },
+      "inputContext": "239e995fa10ed8f8f1d29404ca83e0dcbfd7c0ddf7226536c16879c44685fb22",
+      "result": {
+        "shared": "a4fd895de8df55a4d7aadd48ff7a6bd338de67b0ce8e90766b539bbb8bfb6e7a",
+        "entry": null
+      },
+      "logicalWork": "4f6ee7cc7f2079a112897db6673c164d078e1c77b6bf974899d0d0b674589d7b",
+      "work": {
+        "profileIdentity": "intlify-config-resolved-binding-construction-work",
+        "profileRevision": "0",
+        "operation": "resolved-binding-construction",
+        "facts": [
+          {
+            "kind": "resolved-binding-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-distinct-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1618"
+            }
+          },
+          {
+            "kind": "resolved-binding-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resolved-binding-bindings",
+            "unit": "artifact-reference",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "artifact-references-not-resolved"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resolved-binding-construction",
+        "fixture": {
+          "resolved-binding": "digest-mismatch"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resolved-binding-blocked"
+      },
+      "inputContext": "331cff22d9e1094d5be53175db71fd2b3070deac7ad8c31aa4ec67563b404341",
+      "result": {
+        "shared": "b7d7aa3df0de4668eebc39ee92d4898b5062f77ca4600fda7f02019b81d2969a",
+        "entry": null
+      },
+      "logicalWork": "4f6ee7cc7f2079a112897db6673c164d078e1c77b6bf974899d0d0b674589d7b",
+      "work": {
+        "profileIdentity": "intlify-config-resolved-binding-construction-work",
+        "profileRevision": "0",
+        "operation": "resolved-binding-construction",
+        "facts": [
+          {
+            "kind": "resolved-binding-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-distinct-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1618"
+            }
+          },
+          {
+            "kind": "resolved-binding-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resolved-binding-bindings",
+            "unit": "artifact-reference",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "artifact-references-not-resolved"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resolved-binding-construction",
+        "fixture": {
+          "resolved-binding": "revision-mismatch"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resolved-binding-blocked"
+      },
+      "inputContext": "4923be062edbf49e8155b59511f5ad16ebfce7aba95c7ab0c5d92ee43bd8efea",
+      "result": {
+        "shared": "cf060529ea44c4899b55c2961644128737fe34d640c6a9aa3b9b5233b0ca69de",
+        "entry": null
+      },
+      "logicalWork": "4f6ee7cc7f2079a112897db6673c164d078e1c77b6bf974899d0d0b674589d7b",
+      "work": {
+        "profileIdentity": "intlify-config-resolved-binding-construction-work",
+        "profileRevision": "0",
+        "operation": "resolved-binding-construction",
+        "facts": [
+          {
+            "kind": "resolved-binding-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-distinct-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1618"
+            }
+          },
+          {
+            "kind": "resolved-binding-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resolved-binding-bindings",
+            "unit": "artifact-reference",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "artifact-references-not-resolved"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resolved-binding-construction",
+        "fixture": {
+          "resolved-binding": "kind-mismatch"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resolved-binding-blocked"
+      },
+      "inputContext": "7b810c3ae551fbca49a353f1bed1b630b5e884e41061bf6ba9f255139de3aa97",
+      "result": {
+        "shared": "bc786d78c0bd357c1be6e0805bb582fcb67cd6b521be0b8f9c52c42eba6bcf0c",
+        "entry": null
+      },
+      "logicalWork": "1035c73b1b9bb9b9cd46ba34795fb6e6f50a8847dd2736c7c9ff2ee1a2dd7093",
+      "work": {
+        "profileIdentity": "intlify-config-resolved-binding-construction-work",
+        "profileRevision": "0",
+        "operation": "resolved-binding-construction",
+        "facts": [
+          {
+            "kind": "resolved-binding-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-distinct-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1619"
+            }
+          },
+          {
+            "kind": "resolved-binding-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resolved-binding-bindings",
+            "unit": "artifact-reference",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "artifact-references-not-resolved"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resolved-binding-construction",
+        "fixture": {
+          "resolved-binding": "identity-mismatch"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resolved-binding-blocked"
+      },
+      "inputContext": "a86952668bda4cf88744d3be4eb9400b39bc1ddafb35adeb2e2c5675ca68dede",
+      "result": {
+        "shared": "340c0add0adffa46681a80a992ef177f4dc8adeaa3332a423db5393ebb95aeac",
+        "entry": null
+      },
+      "logicalWork": "4f6ee7cc7f2079a112897db6673c164d078e1c77b6bf974899d0d0b674589d7b",
+      "work": {
+        "profileIdentity": "intlify-config-resolved-binding-construction-work",
+        "profileRevision": "0",
+        "operation": "resolved-binding-construction",
+        "facts": [
+          {
+            "kind": "resolved-binding-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-distinct-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1618"
+            }
+          },
+          {
+            "kind": "resolved-binding-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resolved-binding-bindings",
+            "unit": "artifact-reference",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "artifact-references-not-resolved"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resolved-binding-construction",
+        "fixture": {
+          "resolved-binding": "not-found"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resolved-binding-blocked"
+      },
+      "inputContext": "d03be2ae2473d128c3f086d7876a7773e94976aa733bab315c5f7054da28e903",
+      "result": {
+        "shared": "de4c2a08cff0e399931cdfebc7ae1dc198905353a580453466b60b10d8e89629",
+        "entry": null
+      },
+      "logicalWork": "f383f65e1c69ae07dd3f70417de47f9b9a10425e7646d2ed928a15c87d6dacf4",
+      "work": {
+        "profileIdentity": "intlify-config-resolved-binding-construction-work",
+        "profileRevision": "0",
+        "operation": "resolved-binding-construction",
+        "facts": [
+          {
+            "kind": "resolved-binding-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-distinct-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1618"
+            }
+          },
+          {
+            "kind": "resolved-binding-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "resolved-binding-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "resolved-binding-bindings",
+            "unit": "artifact-reference",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "artifact-references-not-resolved"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resolved-binding-construction",
+        "fixture": {
+          "resolved-binding": "many-not-found"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resolved-binding-blocked"
+      },
+      "inputContext": "8fdea805ea69f52aaf58605541f2ef2c9d941e1b43b07816b76fe4ec424a5c3a",
+      "result": {
+        "shared": "2b4d0af5542d36fb442b0185513cc3a89ab3148a527bb99c65cfbe06374e243b",
+        "entry": null
+      },
+      "logicalWork": "323a4ff48773db9167bd08d5ad02468af0f68d46f82d20281d3b2e43f24d6f6b",
+      "work": {
+        "profileIdentity": "intlify-config-resolved-binding-construction-work",
+        "profileRevision": "0",
+        "operation": "resolved-binding-construction",
+        "facts": [
+          {
+            "kind": "resolved-binding-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "68"
+            }
+          },
+          {
+            "kind": "resolved-binding-distinct-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "68"
+            }
+          },
+          {
+            "kind": "resolved-binding-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "18298"
+            }
+          },
+          {
+            "kind": "resolved-binding-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "resolved-binding-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "68"
+            }
+          },
+          {
+            "kind": "resolved-binding-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "63"
+            }
+          },
+          {
+            "kind": "resolved-binding-bindings",
+            "unit": "artifact-reference",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "artifact-references-not-resolved"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "resolved-binding-construction",
+        "fixture": {
+          "resolved-binding": "collection-not-admitted"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "resolved-binding-blocked"
+      },
+      "inputContext": "1474eaa6ca35246ba91487c359c25737413f74296481d49cb81acd8774638a04",
+      "result": {
+        "shared": "d7213cc2bd7a4d16d7c3bbddf1f67dc739a2d49362f26e4831f5a96be4fb258d",
+        "entry": null
+      },
+      "logicalWork": "4b783077075b7a136619df398b290e164acee1ad579d35929ed1e4f2351fc415",
+      "work": {
+        "profileIdentity": "intlify-config-resolved-binding-construction-work",
+        "profileRevision": "0",
+        "operation": "resolved-binding-construction",
+        "facts": [
+          {
+            "kind": "resolved-binding-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-distinct-references",
+            "unit": "artifact-reference",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-reference-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1618"
+            }
+          },
+          {
+            "kind": "resolved-binding-set-artifacts",
+            "unit": "canonical-artifact-body",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "artifact-collection-not-admitted"
+            }
+          },
+          {
+            "kind": "resolved-binding-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "resolved-binding-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "resolved-binding-bindings",
+            "unit": "artifact-reference",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "artifact-references-not-resolved"
+            }
+          }
+        ]
+      }
     }
   ]
 }

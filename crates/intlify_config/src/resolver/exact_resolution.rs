@@ -10,6 +10,12 @@
 //! takes the closest mismatch in the bootstrap's vocabulary and order. The Set
 //! holds one artifact for each tuple, so neither several matches nor
 //! conflicting content can occur here.
+//!
+//! When every present reference names its artifact, the resolution also makes
+//! the Resolved Profile Artifact Bindings, kept as Phase 3's internal sidecar
+//! (plan 022 #13). 015 derives them in profile projection (Phase 14) from the
+//! checked profile's references; until that phase exists they come from this
+//! resolution, and nothing projects them to a consumer.
 
 use std::collections::BTreeMap;
 
@@ -34,14 +40,51 @@ pub(crate) const fn unit(field: ReferenceField) -> Unit {
 }
 
 /// The Set's artifact each present reference of the selected declaration
-/// names, by the reference's field. An explicit `null` has no field here, and
-/// references repeating one exact tuple name the same artifact.
+/// names, and the Set's tuple for it, by the reference's field. An explicit
+/// `null` has no field here, and references repeating one exact tuple name the
+/// same artifact.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ResolvedReferences<'s>(BTreeMap<ReferenceField, &'s AdmittedArtifact<'s>>);
+pub(crate) struct ResolvedReferences<'s>(
+    BTreeMap<ReferenceField, (&'s ExactTuple, &'s AdmittedArtifact<'s>)>,
+);
 
 impl<'s> ResolvedReferences<'s> {
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (&ReferenceField, &'s AdmittedArtifact<'s>)> {
-        self.0.iter().map(|(field, artifact)| (field, *artifact))
+    pub(crate) fn iter(
+        &self,
+    ) -> impl Iterator<Item = (&ReferenceField, &'s ExactTuple, &'s AdmittedArtifact<'s>)> {
+        self.0
+            .iter()
+            .map(|(field, (tuple, artifact))| (field, *tuple, *artifact))
+    }
+}
+
+/// The Resolved Profile Artifact Bindings: each distinct exact reference
+/// bound to the one artifact of the Set with that tuple, in the tuples' order.
+/// Repeated use of one reference makes one binding, and an explicit `null`
+/// makes none. A submitted artifact no reference names is never bound,
+/// although the collection admission checked it, and the Locale
+/// Canonicalization Data Artifact is no member of the Set. A body is no part of
+/// the profile's semantics: the exact reference already identifies it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ArtifactBindings<'s>(BTreeMap<&'s ExactTuple, &'s AdmittedArtifact<'s>>);
+
+impl<'s> ArtifactBindings<'s> {
+    /// The bindings of a resolution in which every present reference named its
+    /// artifact. Each key is the tuple the Set holds the artifact under, which
+    /// is the reference's own.
+    pub(crate) fn bind(references: &ResolvedReferences<'s>) -> Self {
+        Self(
+            references
+                .iter()
+                .map(|(_, tuple, artifact)| (tuple, artifact))
+                .collect(),
+        )
+    }
+
+    pub(crate) fn iter(
+        &self,
+    ) -> impl Iterator<Item = (&'s ExactTuple, &'s AdmittedArtifact<'s>)> + '_ {
+        self.0.iter().map(|(tuple, artifact)| (*tuple, *artifact))
     }
 }
 
@@ -60,12 +103,12 @@ pub(crate) fn resolve_references<'s>(
     let mut resolved = BTreeMap::new();
     for (field, reference) in present {
         let role = field.role_kind();
-        let artifact = evaluation.check(unit(field.clone()), prerequisite.clone(), |set| {
+        let found = evaluation.check(unit(field.clone()), prerequisite.clone(), |set| {
             resolve(set, &reference, role)
         })?;
-        match artifact {
-            Ok(artifact) => {
-                resolved.insert(field, artifact);
+        match found {
+            Ok(found) => {
+                resolved.insert(field, found);
             }
             Err(causes) => holds = and(holds, Err(causes)),
         }
@@ -80,7 +123,7 @@ fn resolve<'s>(
     set: &'s ArtifactSet<'s>,
     reference: &ExactTuple,
     role: ArtifactKind,
-) -> Result<&'s AdmittedArtifact<'s>, Blocking> {
+) -> Result<(&'s ExactTuple, &'s AdmittedArtifact<'s>), Blocking> {
     let not_admitted = |reason| Blocking {
         code: Code::ArtifactReferenceNotAdmitted,
         reason: Some(reason),
@@ -230,9 +273,12 @@ mod tests {
         }
 
         /// Phase 9 over the inputs: the collection's admission, then the exact
-        /// resolution. Returns the evaluation, and the tuple of the artifact
-        /// each resolved field names.
-        fn run(&self) -> (Evaluation, Admitted<Vec<(ReferenceField, ExactTuple)>>) {
+        /// resolution, whose result `keep` copies out. Returns the evaluation
+        /// and the copy.
+        fn with<T>(
+            &self,
+            keep: impl FnOnce(Admitted<ResolvedReferences<'_>>) -> Admitted<T>,
+        ) -> (Evaluation, Admitted<T>) {
             let mut policies = Map::new();
             let mut targets = Map::new();
             for (field, reference) in &self.references {
@@ -262,18 +308,38 @@ mod tests {
                 policies: self.policies.clone().map(|()| &policies),
                 target_profiles: self.targets.clone().map(|()| &targets),
             };
-            let resolved = resolve_references(&mut evaluation, set.as_ref(), &references)
-                .unwrap()
-                .map(|resolved| {
+            let resolved = resolve_references(&mut evaluation, set.as_ref(), &references).unwrap();
+            (evaluation, keep(resolved))
+        }
+
+        /// The tuple of the artifact each resolved field names, read from the
+        /// artifact's own member, which the Set holds under that tuple.
+        fn run(&self) -> (Evaluation, Admitted<Vec<(ReferenceField, ExactTuple)>>) {
+            self.with(|resolved| {
+                resolved.map(|resolved| {
                     resolved
                         .iter()
-                        .map(|(field, artifact)| {
+                        .map(|(field, held, artifact)| {
                             let tuple = artifact.member.envelope().unwrap().tuple().clone();
+                            assert_eq!(held, &tuple);
                             (field.clone(), tuple)
                         })
                         .collect()
-                });
-            (evaluation, resolved)
+                })
+            })
+        }
+
+        /// Each binding's tuple and the member of its artifact.
+        fn bind(&self) -> Admitted<Vec<(ExactTuple, Value)>> {
+            self.with(|resolved| {
+                resolved.map(|resolved| {
+                    ArtifactBindings::bind(&resolved)
+                        .iter()
+                        .map(|(tuple, artifact)| (tuple.clone(), artifact.member.value().clone()))
+                        .collect()
+                })
+            })
+            .1
         }
     }
 
@@ -553,5 +619,77 @@ mod tests {
             .issues()
             .all(|key| !matches!(key.unit().subject, Subject::ArtifactReference(_))));
         assert_eq!(resolved, Err(behind));
+    }
+
+    #[test]
+    fn each_distinct_reference_is_bound_once_to_its_artifact() {
+        // Every field names its own artifact: nine bindings, in the tuples'
+        // order.
+        let mut expected: Vec<(ExactTuple, Value)> = artifacts()
+            .into_iter()
+            .map(|(_, value)| (tuple_of(&value), value))
+            .collect();
+        expected.sort_by(|left, right| left.0.cmp(&right.0));
+        assert_eq!(Inputs::new().bind(), Ok(expected));
+        // Two targets naming one Target Profile make one binding. The other
+        // Target Profile stays submitted, and no reference names it.
+        let mut inputs = Inputs::new();
+        let web = inputs.reference(&target("web")).clone();
+        *inputs.reference(&target("app")) = web;
+        let bound = inputs.bind().unwrap();
+        assert_eq!(bound.len(), 8);
+        let app = tuple_of(&valid(ArtifactKind::TargetProfile, "storefront-app"));
+        let web = tuple_of(&valid(ArtifactKind::TargetProfile, "storefront-web"));
+        assert!(bound.iter().all(|(tuple, _)| *tuple != app));
+        assert_eq!(bound.iter().filter(|(tuple, _)| *tuple == web).count(), 1);
+    }
+
+    #[test]
+    fn an_explicit_null_and_an_unreferenced_artifact_make_no_binding() {
+        let mut inputs = Inputs::new();
+        *inputs.reference(&policy(ProviderRouting)) = Value::Null;
+        // The routing policy stays submitted, and an approval policy no
+        // reference names is added.
+        inputs
+            .members
+            .push(valid(ArtifactKind::ApprovalPolicy, "storefront-unused"));
+        let bound = inputs.bind().unwrap();
+        assert_eq!(bound.len(), 8);
+        let kinds: Vec<ArtifactKind> = bound.iter().map(|(tuple, _)| tuple.kind).collect();
+        assert!(!kinds.contains(&ArtifactKind::ProviderRoutingPolicy));
+        assert_eq!(
+            kinds
+                .iter()
+                .filter(|kind| **kind == ArtifactKind::ApprovalPolicy)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn only_a_complete_resolution_makes_bindings() {
+        let mut inputs = Inputs::new();
+        inputs.reference(&policy(Trust))["revision"] = json!("2");
+        let Err(causes) = inputs.bind() else {
+            panic!("a failed reference was bound");
+        };
+        assert_eq!(
+            causes
+                .keys()
+                .map(|key| key.unit().clone())
+                .collect::<Vec<_>>(),
+            [unit(policy(Trust))]
+        );
+        // Without the Set, no reference is evaluated.
+        let mut inputs = Inputs::new();
+        inputs
+            .members
+            .push(valid(ArtifactKind::TrustPolicy, "storefront-trust"));
+        let Err(causes) = inputs.bind() else {
+            panic!("bound without a Set");
+        };
+        assert!(causes
+            .keys()
+            .all(|key| matches!(key.unit().subject, Subject::ArtifactCollection(_))));
     }
 }

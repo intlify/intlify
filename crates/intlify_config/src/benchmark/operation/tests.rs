@@ -37,7 +37,7 @@ fn analysis(value: &Value) -> Analysis {
         .unwrap()
 }
 
-pub(crate) fn operations() -> [Prepared; 8] {
+pub(crate) fn operations() -> [Prepared; 9] {
     let source: Arc<[u8]> = Arc::from(serde_json::to_vec(&minimal_config()).unwrap());
     let doc = Arc::new(
         materialize_file(Arc::clone(&source), crate::materialize_tests::limits()).unwrap(),
@@ -71,6 +71,7 @@ pub(crate) fn operations() -> [Prepared; 8] {
         resolution_operation(&minimal_config()),
         policy_operation(),
         collection_operation(),
+        binding_operation(),
     ]
 }
 
@@ -99,6 +100,20 @@ pub(crate) fn collection_operation() -> Prepared {
         .find(|case| {
             case.fixture == Recipe::ArtifactCollection(ArtifactCollectionRecipe::PolicyOnly)
         })
+        .unwrap();
+    crate::benchmark::cases::prepare::prepare(&declaration)
+        .unwrap()
+        .prepared
+}
+
+/// Phase 9's exact resolution of the required-only declaration, as its case
+/// prepares it.
+pub(crate) fn binding_operation() -> Prepared {
+    use crate::benchmark::cases::{declarations, Recipe, ResolvedBindingRecipe};
+
+    let declaration = declarations()
+        .into_iter()
+        .find(|case| case.fixture == Recipe::ResolvedBinding(ResolvedBindingRecipe::RequiredOnly))
         .unwrap();
     crate::benchmark::cases::prepare::prepare(&declaration)
         .unwrap()
@@ -180,6 +195,11 @@ fn every_active_pair_calls_its_real_core_operation_between_exact_markers() {
             Output::ArtifactCollection(resolved) => {
                 assert_eq!(resolved.evaluation.issues().count(), 0);
                 assert_eq!(resolved.result.as_ref().unwrap().as_ref().unwrap().len(), 1);
+            }
+            Output::ResolvedBinding(resolved) => {
+                assert_eq!(resolved.evaluation.issues().count(), 0);
+                let retained = resolved.result.as_ref().unwrap().as_ref().unwrap();
+                assert_eq!(retained.bindings.len(), 6);
             }
             _ => panic!("unexpected owner operation result"),
         }
