@@ -111,7 +111,7 @@ impl MeasurementProfile {
                 identity: "intlify-design-026".into(),
                 revision: "0".into(),
             },
-            scope: "internal-configuration-locale-resolution-canonicalization-with-icu4x-and-resource-policy-bootstrap"
+            scope: "internal-configuration-locale-resolution-canonicalization-with-icu4x-resource-policy-bootstrap-and-artifact-collection-admission"
                 .into(),
             fixture_registry: registry.binding().clone(),
             cases: registry.declarations().cloned().collect(),

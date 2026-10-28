@@ -315,9 +315,9 @@ fn limits(value: &Value) -> Option<TargetLimits> {
     })
 }
 
-/// An admitted content of `kind`, for tests and vectors. The values are test
-/// values, not artifacts any project admits.
-#[cfg(any(test, feature = "vectors"))]
+/// An admitted content of `kind`, for tests, vectors, and measurements. The
+/// values are test values, not artifacts any project admits.
+#[cfg(any(test, feature = "vectors", feature = "benchmark"))]
 pub(crate) fn sample(kind: ArtifactKind) -> Value {
     use serde_json::json;
 

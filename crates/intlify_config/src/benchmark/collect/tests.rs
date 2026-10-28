@@ -90,6 +90,10 @@ fn fixture_observation(prepared: &Prepared) -> (Observation, LogicalWork) {
             assert_eq!(resolved.evaluation.issues().count(), 0);
             assert!(resolved.result.as_ref().unwrap().confirmed.is_ok());
         }
+        Output::ArtifactCollection(resolved) => {
+            assert_eq!(resolved.evaluation.issues().count(), 0);
+            assert_eq!(resolved.result.as_ref().unwrap().as_ref().unwrap().len(), 1);
+        }
         _ => panic!("fixture preparation did not produce its known result"),
     }
     (

@@ -26,7 +26,7 @@ use super::locale_icu4x::PreparedEngine;
 use super::locale_resolution::Canonicalizers;
 use super::measure::{measure, Measured, MeasurementFailure};
 use super::observation::{self, Frame, Observation};
-use super::{locale, locale_icu4x, locale_resolution, resource_policy};
+use super::{artifact_collection, locale, locale_icu4x, locale_resolution, resource_policy};
 
 pub(super) type Config = IntlifyConfig<PolicyReference, TargetProfileReference>;
 pub(super) type Analysis = StructuralAnalysis<PolicyReference, TargetProfileReference>;
@@ -44,10 +44,11 @@ pub(super) enum Operation {
     LocaleCanonicalization,
     LocaleResolution,
     ResourcePolicyBootstrap,
+    ArtifactCollectionAdmission,
 }
 
 impl Operation {
-    pub(super) const ALL: [Self; 7] = [
+    pub(super) const ALL: [Self; 8] = [
         Self::FileMaterialization,
         Self::StructuralAnalysis,
         Self::AuthoringConstruction,
@@ -55,6 +56,7 @@ impl Operation {
         Self::LocaleCanonicalization,
         Self::LocaleResolution,
         Self::ResourcePolicyBootstrap,
+        Self::ArtifactCollectionAdmission,
     ];
     pub(super) const fn phase(self) -> &'static str {
         match self {
@@ -62,7 +64,9 @@ impl Operation {
             Self::StructuralAnalysis | Self::AuthoringConstruction => "profile_structural_admit",
             Self::ProfileSelection => "profile_select",
             Self::LocaleCanonicalization | Self::LocaleResolution => "profile_locale_resolve",
-            Self::ResourcePolicyBootstrap => "profile_artifact_admit",
+            Self::ResourcePolicyBootstrap | Self::ArtifactCollectionAdmission => {
+                "profile_artifact_admit"
+            }
         }
     }
     pub(super) const fn cost(self) -> &'static str {
@@ -74,6 +78,7 @@ impl Operation {
             Self::LocaleCanonicalization => "locale_canonicalization",
             Self::LocaleResolution => "locale_policy_resolution",
             Self::ResourcePolicyBootstrap => "resource_policy_bootstrap",
+            Self::ArtifactCollectionAdmission => "complete_artifact_collection_admission",
         }
     }
     pub(super) const fn boundary(self) -> &'static str {
@@ -85,6 +90,7 @@ impl Operation {
             Self::LocaleCanonicalization => "minimum-single-locale-canonicalization/0",
             Self::LocaleResolution => "locale-resolution/0",
             Self::ResourcePolicyBootstrap => "resource-policy-bootstrap/0",
+            Self::ArtifactCollectionAdmission => "artifact-collection-admission/0",
         }
     }
 }
@@ -110,6 +116,7 @@ pub(super) enum Prepared {
     },
     LocaleResolution(Box<locale_resolution::PreparedLocales>),
     ResourcePolicy(Box<resource_policy::PreparedPolicy>),
+    ArtifactCollection(Box<artifact_collection::PreparedCollection>),
     Icu4xLocale {
         engine: locale_icu4x::PreparedEngine,
         input: Arc<str>,
@@ -124,6 +131,7 @@ pub(super) enum Output {
     Locale(Result<crate::locale::Canonicalized, crate::locale::CanonicalizationFailure>),
     LocaleResolution(locale_resolution::Resolved),
     ResourcePolicy(resource_policy::Resolved),
+    ArtifactCollection(artifact_collection::Resolved),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -137,6 +145,7 @@ pub(super) enum OutputFailure {
     LocaleProviderInvariant,
     LocaleResolutionInvariant,
     ResourcePolicyInvariant,
+    ArtifactCollectionInvariant,
 }
 
 impl Prepared {
@@ -149,6 +158,7 @@ impl Prepared {
             Self::Locale { .. } | Self::Icu4xLocale { .. } => Operation::LocaleCanonicalization,
             Self::LocaleResolution(_) => Operation::LocaleResolution,
             Self::ResourcePolicy(_) => Operation::ResourcePolicyBootstrap,
+            Self::ArtifactCollection(_) => Operation::ArtifactCollectionAdmission,
         }
     }
 
@@ -262,6 +272,21 @@ impl Prepared {
                     output: Output::ResourcePolicy(measured.output),
                 })
             }
+            Self::ArtifactCollection(prepared) => {
+                let measured = measure(
+                    clock,
+                    (&prepared.policy, &prepared.collection),
+                    |(policy, collection)| artifact_collection::admit(policy, collection),
+                )?;
+                // The Set borrows the prepared collection, so it is copied out
+                // after the end read.
+                Ok(Measured {
+                    duration: measured.duration,
+                    output: Output::ArtifactCollection(artifact_collection::Resolved::retain(
+                        measured.output,
+                    )),
+                })
+            }
             Self::Icu4xLocale { engine, input } => {
                 // A fresh engine is admitted and bound before the start read
                 // and released after the end read.
@@ -315,6 +340,7 @@ impl Output {
             Self::Locale(result) => locale::observe(result),
             Self::LocaleResolution(resolved) => locale_resolution::observe(resolved),
             Self::ResourcePolicy(resolved) => resource_policy::observe(resolved),
+            Self::ArtifactCollection(resolved) => artifact_collection::observe(resolved),
         }
     }
 }

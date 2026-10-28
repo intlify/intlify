@@ -10,6 +10,8 @@ mod quantity;
 pub mod facade;
 
 #[cfg(feature = "benchmark")]
+mod artifact_collection;
+#[cfg(feature = "benchmark")]
 mod build;
 #[cfg(feature = "benchmark")]
 mod cases;

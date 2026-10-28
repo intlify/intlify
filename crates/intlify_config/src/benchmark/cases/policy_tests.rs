@@ -62,17 +62,17 @@ fn artifact_bound(name: &'static str) -> BoundId {
 #[test]
 fn policy_cases_keep_the_160_rows_and_append_after_them() {
     let cases = declarations();
-    assert_eq!(cases.len(), 186);
+    assert_eq!(cases.len(), 198);
     assert!(cases[..160]
         .iter()
         .all(|case| case.operation != Operation::ResourcePolicyBootstrap));
-    assert!(cases[160..]
+    assert!(cases[160..186]
         .iter()
         .all(|case| case.operation == Operation::ResourcePolicyBootstrap
             && case.selector == Selector::App));
     assert!(cases[160..180].iter().all(|case| case.limit.is_none()));
-    assert!(cases[180..].iter().all(|case| case.limit.is_some()));
-    for declaration in &cases[160..] {
+    assert!(cases[180..186].iter().all(|case| case.limit.is_some()));
+    for declaration in &cases[160..186] {
         let candidate = prepare(declaration).unwrap();
         assert!(
             candidate.input_limits.is_some(),

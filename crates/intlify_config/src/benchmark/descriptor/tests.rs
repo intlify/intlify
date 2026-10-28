@@ -62,8 +62,8 @@ fn all_active_pairs_keep_distinct_owner_boundaries_and_exact_method_meaning() {
         );
         assert!(!decoded.method.estimated_overhead_subtraction);
     }
-    assert_eq!(pairs.len(), 7);
-    assert_eq!(identities.len(), 7);
+    assert_eq!(pairs.len(), 8);
+    assert_eq!(identities.len(), 8);
 }
 
 #[test]
@@ -412,6 +412,7 @@ fn resource_policy_descriptor_binds_the_capability_and_the_collection() {
         "localeInput",
         "localeResolutionInput",
         "admittedLocaleInput",
+        "artifactCollectionInput",
     ] {
         assert_eq!(encoded[field], Value::Null, "{field}");
     }
@@ -439,6 +440,58 @@ fn resource_policy_descriptor_binds_the_capability_and_the_collection() {
                 .resource_policy_input
                 .is_some(),
             operation.operation() == Operation::ResourcePolicyBootstrap
+        );
+    }
+}
+
+#[test]
+fn artifact_collection_descriptor_binds_the_policy_and_the_collection() {
+    use crate::resolver::limits::ConfirmedPolicy;
+
+    let mut operation = prepared(Operation::ArtifactCollectionAdmission);
+    let descriptors = Descriptors::for_acquisition(&operation, clock(1));
+    assert_eq!(descriptors.execution.scratch_reuse_state, "fresh");
+    let encoded = serde_json::to_value(&descriptors).unwrap();
+    // 015's pair for the complete collection admission.
+    let boundary = &encoded["boundary"];
+    assert_eq!(boundary["identity"], "artifact-collection-admission/0");
+    assert_eq!(boundary["phase"], "profile_artifact_admit");
+    assert_eq!(boundary["cost"], "complete_artifact_collection_admission");
+    let input = &encoded["artifactCollectionInput"];
+    assert_eq!(input["submittedMembers"], "1");
+    assert_eq!(input["artifactLimit"], "1000");
+    for field in [
+        "localeInput",
+        "localeResolutionInput",
+        "admittedLocaleInput",
+        "resourcePolicyInput",
+    ] {
+        assert_eq!(encoded[field], Value::Null, "{field}");
+    }
+    let Prepared::ArtifactCollection(collection) = &mut operation else {
+        unreachable!()
+    };
+    let mut limits = collection.policy.limits().clone();
+    limits.artifact_admission.max_artifacts = crate::input_limits::Bound::new(999).unwrap();
+    collection.policy = ConfirmedPolicy::fixture_owned(limits);
+    assert_eq!(
+        descriptors.validate(&operation, clock(1)),
+        [DescriptorIssue::ArtifactCollectionInputBindingMismatch]
+    );
+    let original = prepared(Operation::ArtifactCollectionAdmission);
+    let mut missing = encoded;
+    missing["artifactCollectionInput"] = Value::Null;
+    let decoded: Descriptors = serde_json::from_value(missing).unwrap();
+    assert_eq!(
+        decoded.validate(&original, clock(1)),
+        [DescriptorIssue::ArtifactCollectionInputBindingMismatch]
+    );
+    for operation in &operations() {
+        assert_eq!(
+            Descriptors::for_acquisition(operation, clock(1))
+                .artifact_collection_input
+                .is_some(),
+            operation.operation() == Operation::ArtifactCollectionAdmission
         );
     }
 }

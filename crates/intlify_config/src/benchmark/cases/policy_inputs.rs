@@ -106,7 +106,7 @@ impl ResourcePolicyRecipe {
                 Bound::new(policy.artifact_admission.max_artifacts.get() + 1)
                     .expect("a finite fixture bound");
         }
-        let chosen = policy_member(IDENTITY, "1", json!({ SECTION: limits.section() }));
+        let chosen = selected_policy(&limits);
         let mut reference = reference_value(&tuple_of(&chosen));
         let members = match self {
             Self::PolicyOnly | Self::CapabilityIncompatible => vec![chosen],
@@ -211,6 +211,12 @@ pub(in crate::benchmark) fn capacity() -> ResolutionLimits {
         max_total_reference_canonical_bytes: bound(100_000),
     };
     limits
+}
+
+/// The selected policy setting `limits`: the member a confirming recipe's
+/// reference names, and Phase 9's collections submit.
+pub(super) fn selected_policy(limits: &ResolutionLimits) -> Value {
+    policy_member(IDENTITY, "1", json!({ SECTION: limits.section() }))
 }
 
 fn policy_member(identity: &str, revision: &str, content: Value) -> Value {

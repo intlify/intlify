@@ -24,6 +24,7 @@ pub(in crate::benchmark) enum ContextFailure {
     PreparationLimitsMismatch,
     LocaleInputMismatch,
     PolicyInputMismatch,
+    CollectionInputMismatch,
 }
 
 pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
@@ -36,12 +37,21 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
     // Pin the limits used before the measured operation too. These describe
     // fixture preparation, not additional work inside a component interval.
     match (&candidate.prepared, candidate.input_limits) {
-        (Prepared::Locale { .. } | Prepared::Icu4xLocale { .. }, None) => {
+        (
+            Prepared::Locale { .. }
+            | Prepared::Icu4xLocale { .. }
+            | Prepared::ArtifactCollection(_),
+            None,
+        ) => {
             frame.text("no-file-preparation");
         }
-        (Prepared::Locale { .. } | Prepared::Icu4xLocale { .. }, Some(_)) | (_, None) => {
-            return Err(ContextFailure::PreparationLimitsMismatch)
-        }
+        (
+            Prepared::Locale { .. }
+            | Prepared::Icu4xLocale { .. }
+            | Prepared::ArtifactCollection(_),
+            Some(_),
+        )
+        | (_, None) => return Err(ContextFailure::PreparationLimitsMismatch),
         (_, Some(limits)) => input_limits(&mut frame, limits),
     }
     frame.text(candidate.prepared.operation().boundary());
@@ -177,6 +187,40 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
             }
             frame.json(
                 &serde_json::to_value(crate::benchmark::resource_policy::InputFacts::observe(
+                    prepared,
+                ))
+                .map_err(|_| ContextFailure::Encoding)?,
+            );
+        }
+        Prepared::ArtifactCollection(prepared) => {
+            if !matches!(candidate.declaration.fixture, Recipe::ArtifactCollection(_))
+                || candidate.declaration.selector != super::Selector::Absent
+            {
+                return Err(ContextFailure::CollectionInputMismatch);
+            }
+            // Every member in submission order, the limits the collection was
+            // read under, and every bound of the confirmed policy.
+            let members = prepared.collection.members();
+            frame.uint(u64::try_from(members.len()).map_err(|_| ContextFailure::Encoding)?);
+            for member in members {
+                frame.bytes(member.canonical_body());
+            }
+            let read = super::prepare::COLLECTION_LIMITS;
+            for bound in [
+                read.members,
+                read.member_bytes,
+                read.total_bytes,
+                read.depth,
+            ] {
+                frame.uint(bound);
+            }
+            for (id, bound) in prepared.policy.limits().bounds() {
+                frame.text(id.group.path());
+                frame.text(id.name);
+                frame.uint(bound.get());
+            }
+            frame.json(
+                &serde_json::to_value(crate::benchmark::artifact_collection::InputFacts::observe(
                     prepared,
                 ))
                 .map_err(|_| ContextFailure::Encoding)?,

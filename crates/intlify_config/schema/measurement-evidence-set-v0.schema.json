@@ -162,6 +162,23 @@
       "enum": ["x86", "x86_64", "arm", "aarch64", "riscv32", "riscv64", "wasm32", "wasm64"],
       "type": "string"
     },
+    "ArtifactCollectionRecipe": {
+      "enum": [
+        "policy-only",
+        "mixed",
+        "mixed-reordered",
+        "every-kind",
+        "many-artifacts",
+        "unreferenced-duplicate",
+        "repeated-bodies",
+        "artifact-conflict",
+        "many-conflicts",
+        "envelope-invalid",
+        "no-tuple",
+        "kind-unsupported"
+      ],
+      "type": "string"
+    },
     "Boundary": {
       "additionalProperties": false,
       "properties": {
@@ -384,7 +401,7 @@
     },
     "CaseProjection": {
       "additionalProperties": false,
-      "description": "Exactly the applicable 026 Case dimensions. No source path, build revision,\nclock observation, run/record ID, expected result checksum, or sample value.\nArtifact/Target/Release/service-profile and memory-domain fields do not apply\nto these seven internal duration boundaries and are absent, not guessed.",
+      "description": "Exactly the applicable 026 Case dimensions. No source path, build revision,\nclock observation, run/record ID, expected result checksum, or sample value.\nArtifact/Target/Release/service-profile and memory-domain fields do not apply\nto these eight internal duration boundaries and are absent, not guessed.",
       "properties": {
         "category": {
           "$ref": "#/definitions/Category"
@@ -1169,6 +1186,16 @@
           "anyOf": [
             {
               "$ref": "#/definitions/AdmittedInputFacts"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artifactCollectionInput": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/InputFacts4"
             },
             {
               "type": "null"
@@ -2360,6 +2387,46 @@
       ],
       "type": "object"
     },
+    "InputFacts4": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactLimit": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "inputStorage": {
+          "type": "string"
+        },
+        "ordinaryOutput": {
+          "type": "string"
+        },
+        "policy": {
+          "type": "string"
+        },
+        "prerequisites": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "structuralPreparation": {
+          "type": "string"
+        },
+        "submittedMembers": {
+          "$ref": "#/definitions/UInt64"
+        }
+      },
+      "required": [
+        "scope",
+        "policy",
+        "submittedMembers",
+        "artifactLimit",
+        "prerequisites",
+        "inputStorage",
+        "structuralPreparation",
+        "ordinaryOutput"
+      ],
+      "type": "object"
+    },
     "Instrumentation": {
       "additionalProperties": false,
       "description": "What a harness installed while measuring, and what it did not.",
@@ -3112,7 +3179,8 @@
         "profile-selection",
         "locale-canonicalization",
         "locale-resolution",
-        "resource-policy-bootstrap"
+        "resource-policy-bootstrap",
+        "artifact-collection-admission"
       ],
       "type": "string"
     },
@@ -3405,6 +3473,16 @@
             }
           },
           "required": ["resource-policy"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "artifact-collection": {
+              "$ref": "#/definitions/ArtifactCollectionRecipe"
+            }
+          },
+          "required": ["artifact-collection"],
           "type": "object"
         }
       ]
@@ -3923,7 +4001,8 @@
         "profile-container-not-admitted",
         "schema-prerequisite-unavailable",
         "locale-not-canonicalized",
-        "locale-resolution-requested-not-resolved"
+        "locale-resolution-requested-not-resolved",
+        "artifact-collection-not-admitted"
       ],
       "type": "string"
     },
@@ -4037,7 +4116,15 @@
         "resource-policy-reference-canonical-bytes",
         "resource-policy-evaluation-units",
         "resource-policy-not-evaluated-units",
-        "resource-policy-blocking-issues"
+        "resource-policy-blocking-issues",
+        "artifact-collection-artifact-occurrences",
+        "artifact-collection-policy-artifacts",
+        "artifact-collection-target-profile-artifacts",
+        "artifact-collection-distinct-artifact-bodies",
+        "artifact-collection-artifact-canonical-bytes",
+        "artifact-collection-evaluation-units",
+        "artifact-collection-blocking-issues",
+        "artifact-collection-set-artifacts"
       ],
       "type": "string"
     },
