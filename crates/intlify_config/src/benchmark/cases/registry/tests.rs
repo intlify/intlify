@@ -354,26 +354,26 @@ fn cached_candidate_summaries_cannot_replace_reobservation_of_actual_output() {
 
 #[test]
 fn locale_resolution_preparation_and_bounds_are_bound_even_when_result_and_work_are_equal() {
-    use crate::benchmark::cases::LocaleResolutionRecipe as R;
+    use crate::benchmark::cases::LocalePolicyResolutionRecipe as R;
     use crate::locale::fixtures::{fixture_pins, FixtureProvider};
     use crate::locale::Canonicalizer;
     use crate::resolver::locales::fixture_policy;
 
     let declaration = case(
-        Operation::LocaleResolution,
-        Recipe::LocaleResolution(R::Minimal),
+        Operation::LocalePolicyResolution,
+        Recipe::LocalePolicyResolution(R::Minimal),
         Selector::App,
     );
     let other = case(
-        Operation::LocaleResolution,
-        Recipe::LocaleResolution(R::OtherProfile),
+        Operation::LocalePolicyResolution,
+        Recipe::LocalePolicyResolution(R::OtherProfile),
         Selector::App,
     );
     let registry = Registry::load().unwrap();
     let bound = |value| Bound::new(value).unwrap();
     for change in 0..6 {
         let mut candidate = prepare(&declaration).unwrap();
-        let Prepared::LocaleResolution(prepared) = &mut candidate.prepared else {
+        let Prepared::LocalePolicyResolution(prepared) = &mut candidate.prepared else {
             unreachable!()
         };
         match change {
@@ -387,7 +387,8 @@ fn locale_resolution_preparation_and_bounds_are_bound_even_when_result_and_work_
                 ));
             }
             _ => {
-                let Prepared::LocaleResolution(other) = prepare(&other).unwrap().prepared else {
+                let Prepared::LocalePolicyResolution(other) = prepare(&other).unwrap().prepared
+                else {
                     unreachable!()
                 };
                 if change == 4 {
@@ -422,7 +423,7 @@ fn locale_resolution_preparation_and_bounds_are_bound_even_when_result_and_work_
         ))
     );
     let mut candidate = prepare(&declaration).unwrap();
-    let Prepared::LocaleResolution(prepared) = &mut candidate.prepared else {
+    let Prepared::LocalePolicyResolution(prepared) = &mut candidate.prepared else {
         unreachable!()
     };
     prepared.selected = serde_json::from_value(json!("unknown")).unwrap();

@@ -44,7 +44,7 @@ pub(super) enum Operation {
     AuthoringConstruction,
     ProfileSelection,
     LocaleCanonicalization,
-    LocaleResolution,
+    LocalePolicyResolution,
     ResourcePolicyBootstrap,
     ArtifactCollectionAdmission,
     ResolvedBindingConstruction,
@@ -57,7 +57,7 @@ impl Operation {
         Self::AuthoringConstruction,
         Self::ProfileSelection,
         Self::LocaleCanonicalization,
-        Self::LocaleResolution,
+        Self::LocalePolicyResolution,
         Self::ResourcePolicyBootstrap,
         Self::ArtifactCollectionAdmission,
         Self::ResolvedBindingConstruction,
@@ -67,7 +67,7 @@ impl Operation {
             Self::FileMaterialization => "profile_entry_materialize",
             Self::StructuralAnalysis | Self::AuthoringConstruction => "profile_structural_admit",
             Self::ProfileSelection => "profile_select",
-            Self::LocaleCanonicalization | Self::LocaleResolution => "profile_locale_resolve",
+            Self::LocaleCanonicalization | Self::LocalePolicyResolution => "profile_locale_resolve",
             Self::ResourcePolicyBootstrap
             | Self::ArtifactCollectionAdmission
             | Self::ResolvedBindingConstruction => "profile_artifact_admit",
@@ -80,7 +80,7 @@ impl Operation {
             Self::AuthoringConstruction => "authoring_model_construction",
             Self::ProfileSelection => "named_profile_selection",
             Self::LocaleCanonicalization => "locale_canonicalization",
-            Self::LocaleResolution => "locale_policy_resolution",
+            Self::LocalePolicyResolution => "locale_policy_resolution",
             Self::ResourcePolicyBootstrap => "resource_policy_bootstrap",
             Self::ArtifactCollectionAdmission => "complete_artifact_collection_admission",
             Self::ResolvedBindingConstruction => "resolved_binding_construction",
@@ -93,7 +93,7 @@ impl Operation {
             Self::AuthoringConstruction => "minimum-authoring-construction/0",
             Self::ProfileSelection => "minimum-provisional-selection/0",
             Self::LocaleCanonicalization => "minimum-single-locale-canonicalization/0",
-            Self::LocaleResolution => "locale-resolution/0",
+            Self::LocalePolicyResolution => "locale-policy-resolution/0",
             Self::ResourcePolicyBootstrap => "resource-policy-bootstrap/0",
             Self::ArtifactCollectionAdmission => "artifact-collection-admission/0",
             Self::ResolvedBindingConstruction => "resolved-binding-construction/0",
@@ -120,7 +120,7 @@ pub(super) enum Prepared {
         core: Arc<locale::Core>,
         input: Arc<str>,
     },
-    LocaleResolution(Box<locale_resolution::PreparedLocales>),
+    LocalePolicyResolution(Box<locale_resolution::PreparedLocales>),
     ResourcePolicy(Box<resource_policy::PreparedPolicy>),
     ArtifactCollection(Box<artifact_collection::PreparedCollection>),
     ResolvedBinding(Box<resolved_binding::PreparedBindings>),
@@ -136,7 +136,7 @@ pub(super) enum Output {
     Authoring(Result<Option<Config>, AdmissionInvariant>),
     Select(Result<Selection<PolicyReference>, SelectionInvariant>),
     Locale(Result<crate::locale::Canonicalized, crate::locale::CanonicalizationFailure>),
-    LocaleResolution(locale_resolution::Resolved),
+    LocalePolicyResolution(locale_resolution::Resolved),
     ResourcePolicy(resource_policy::Resolved),
     ArtifactCollection(artifact_collection::Resolved),
     ResolvedBinding(resolved_binding::Resolved),
@@ -151,7 +151,7 @@ pub(super) enum OutputFailure {
     ObservationEncoding,
     LocaleProviderUnavailable,
     LocaleProviderInvariant,
-    LocaleResolutionInvariant,
+    LocalePolicyResolutionInvariant,
     ResourcePolicyInvariant,
     ArtifactCollectionInvariant,
     ResolvedBindingInvariant,
@@ -165,7 +165,7 @@ impl Prepared {
             Self::Authoring(_) => Operation::AuthoringConstruction,
             Self::Select { .. } => Operation::ProfileSelection,
             Self::Locale { .. } | Self::Icu4xLocale { .. } => Operation::LocaleCanonicalization,
-            Self::LocaleResolution(_) => Operation::LocaleResolution,
+            Self::LocalePolicyResolution(_) => Operation::LocalePolicyResolution,
             Self::ResourcePolicy(_) => Operation::ResourcePolicyBootstrap,
             Self::ArtifactCollection(_) => Operation::ArtifactCollectionAdmission,
             Self::ResolvedBinding(_) => Operation::ResolvedBindingConstruction,
@@ -177,7 +177,7 @@ impl Prepared {
     pub(super) fn icu4x_engine(&self) -> Option<Engine> {
         match self {
             Self::Icu4xLocale { engine, .. } => Some(engine.engine()),
-            Self::LocaleResolution(prepared) => prepared.icu4x().map(PreparedEngine::engine),
+            Self::LocalePolicyResolution(prepared) => prepared.icu4x().map(PreparedEngine::engine),
             _ => None,
         }
     }
@@ -235,16 +235,16 @@ impl Prepared {
                     output: Output::Locale(measured.output),
                 })
             }
-            Self::LocaleResolution(prepared) => {
+            Self::LocalePolicyResolution(prepared) => {
                 let fields = prepared
                     .fields()
                     .ok_or(MeasurementFailure::PrerequisiteUnavailable)?;
                 let measured = match &prepared.canonicalizer {
                     Canonicalizers::Finite(core) => measure(
                         clock,
-                        (&prepared.policy, core.as_ref(), &fields),
-                        |(policy, canonicalizer, fields)| {
-                            locale_resolution::resolve(policy, canonicalizer, fields)
+                        (&prepared.policy, &prepared.inputs, core.as_ref(), &fields),
+                        |(policy, inputs, canonicalizer, fields)| {
+                            locale_resolution::resolve(policy, inputs, canonicalizer, fields)
                         },
                     )?,
                     // A fresh engine is admitted and bound before the start
@@ -253,9 +253,14 @@ impl Prepared {
                         .with_engine(|core| {
                             measure(
                                 clock,
-                                (&prepared.policy, core, &fields),
-                                |(policy, canonicalizer, fields)| {
-                                    locale_resolution::resolve(policy, canonicalizer, fields)
+                                (&prepared.policy, &prepared.inputs, core, &fields),
+                                |(policy, inputs, canonicalizer, fields)| {
+                                    locale_resolution::resolve(
+                                        policy,
+                                        inputs,
+                                        canonicalizer,
+                                        fields,
+                                    )
                                 },
                             )
                         })
@@ -263,7 +268,7 @@ impl Prepared {
                 };
                 Ok(Measured {
                     duration: measured.duration,
-                    output: Output::LocaleResolution(measured.output),
+                    output: Output::LocalePolicyResolution(measured.output),
                 })
             }
             Self::ResourcePolicy(prepared) => {
@@ -333,7 +338,7 @@ impl Prepared {
     pub(super) fn prerequisites_admitted(&self) -> bool {
         match self {
             Self::Authoring(analysis) => analysis.is_complete(),
-            Self::LocaleResolution(prepared) => prepared.fields().is_some(),
+            Self::LocalePolicyResolution(prepared) => prepared.fields().is_some(),
             Self::ResourcePolicy(prepared) => prepared.inputs().is_some(),
             Self::ResolvedBinding(prepared) => prepared.inputs().is_some(),
             _ => true,
@@ -364,7 +369,7 @@ impl Output {
             Self::Select(Err(_)) => Err(OutputFailure::SelectionInvariant),
             Self::Select(Ok(selection)) => observe_selection(selection),
             Self::Locale(result) => locale::observe(result),
-            Self::LocaleResolution(resolved) => locale_resolution::observe(resolved),
+            Self::LocalePolicyResolution(resolved) => locale_resolution::observe(resolved),
             Self::ResourcePolicy(resolved) => resource_policy::observe(resolved),
             Self::ArtifactCollection(resolved) => artifact_collection::observe(resolved),
             Self::ResolvedBinding(resolved) => resolved_binding::observe(resolved),

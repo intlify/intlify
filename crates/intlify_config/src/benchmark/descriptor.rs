@@ -221,7 +221,7 @@ pub(super) struct Descriptors {
     #[serde(deserialize_with = "Option::deserialize")]
     pub(super) locale_input: Option<InputFacts>,
     #[serde(deserialize_with = "Option::deserialize")]
-    pub(super) locale_resolution_input: Option<super::locale_resolution::InputFacts>,
+    pub(super) locale_policy_resolution_input: Option<super::locale_resolution::InputFacts>,
     #[serde(deserialize_with = "Option::deserialize")]
     pub(super) admitted_locale_input: Option<AdmittedInputFacts>,
     #[serde(deserialize_with = "Option::deserialize")]
@@ -241,7 +241,7 @@ pub(super) enum DescriptorIssue {
     InvalidClockObservation,
     ExecutionMismatch,
     LocaleInputBindingMismatch,
-    LocaleResolutionInputBindingMismatch,
+    LocalePolicyResolutionInputBindingMismatch,
     ResourcePolicyInputBindingMismatch,
     ArtifactCollectionInputBindingMismatch,
     ResolvedBindingInputBindingMismatch,
@@ -258,8 +258,8 @@ impl Descriptors {
             clock_observation: clock.observation(),
             execution: prepared_core(operation, prepared.icu4x_engine()),
             locale_input: finite(prepared),
-            locale_resolution_input: match prepared {
-                Prepared::LocaleResolution(prepared) => {
+            locale_policy_resolution_input: match prepared {
+                Prepared::LocalePolicyResolution(prepared) => {
                     Some(super::locale_resolution::InputFacts::observe(prepared))
                 }
                 _ => None,
@@ -306,13 +306,13 @@ impl Descriptors {
             issues.push(DescriptorIssue::LocaleInputBindingMismatch);
         }
         let expected_resolution = match prepared {
-            Prepared::LocaleResolution(prepared) => {
+            Prepared::LocalePolicyResolution(prepared) => {
                 Some(super::locale_resolution::InputFacts::observe(prepared))
             }
             _ => None,
         };
-        if self.locale_resolution_input != expected_resolution {
-            issues.push(DescriptorIssue::LocaleResolutionInputBindingMismatch);
+        if self.locale_policy_resolution_input != expected_resolution {
+            issues.push(DescriptorIssue::LocalePolicyResolutionInputBindingMismatch);
         }
         if self.resource_policy_input != policy(prepared) {
             issues.push(DescriptorIssue::ResourcePolicyInputBindingMismatch);
@@ -331,7 +331,7 @@ impl Descriptors {
 fn finite(prepared: &Prepared) -> Option<InputFacts> {
     match prepared {
         Prepared::Locale { core, .. } => Some(InputFacts::observe(core)),
-        Prepared::LocaleResolution(prepared) => {
+        Prepared::LocalePolicyResolution(prepared) => {
             prepared.finite().map(|core| InputFacts::observe(core))
         }
         _ => None,
@@ -343,7 +343,9 @@ fn finite(prepared: &Prepared) -> Option<InputFacts> {
 fn admitted(prepared: &Prepared) -> Option<AdmittedInputFacts> {
     match prepared {
         Prepared::Icu4xLocale { engine, .. } => Some(AdmittedInputFacts::observe(engine)),
-        Prepared::LocaleResolution(prepared) => prepared.icu4x().map(AdmittedInputFacts::observe),
+        Prepared::LocalePolicyResolution(prepared) => {
+            prepared.icu4x().map(AdmittedInputFacts::observe)
+        }
         _ => None,
     }
 }

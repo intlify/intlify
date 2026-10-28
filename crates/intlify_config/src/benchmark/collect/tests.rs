@@ -70,10 +70,17 @@ fn fixture_observation(prepared: &Prepared) -> (Observation, LogicalWork) {
             assert_eq!(result.locale().as_str(), "en-US");
             assert_eq!(result.suggested_replacement(), Some("en-US"));
         }
-        Output::LocaleResolution(resolved) => {
+        Output::LocalePolicyResolution(resolved) => {
             assert_eq!(resolved.evaluation.issues().count(), 0);
             assert_eq!(resolved.evaluation.notices().count(), 0);
-            let project = resolved.result.as_ref().unwrap().project.as_ref().unwrap();
+            let project = resolved
+                .result
+                .as_ref()
+                .unwrap()
+                .locales
+                .project
+                .as_ref()
+                .unwrap();
             assert_eq!(project.source_default(), None);
             assert_eq!(
                 project

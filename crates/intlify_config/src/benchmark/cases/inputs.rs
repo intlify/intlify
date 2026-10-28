@@ -43,13 +43,13 @@ pub(in crate::benchmark) enum Recipe {
     InvalidResourceReference,
     DenseInvalid,
     Locale(super::LocaleRecipe),
-    LocaleResolution(super::LocaleResolutionRecipe),
+    LocalePolicyResolution(super::LocalePolicyResolutionRecipe),
     Icu4xLocale {
         input: super::Icu4xRecipe,
         engine: super::Engine,
     },
-    Icu4xLocaleResolution {
-        input: super::LocaleResolutionRecipe,
+    Icu4xLocalePolicyResolution {
+        input: super::LocalePolicyResolutionRecipe,
         engine: super::Engine,
     },
     ResourcePolicy(super::ResourcePolicyRecipe),
@@ -62,7 +62,7 @@ impl Recipe {
     /// `None` for every other case.
     pub(in crate::benchmark) const fn icu4x_engine(self) -> Option<super::Engine> {
         match self {
-            Self::Icu4xLocale { engine, .. } | Self::Icu4xLocaleResolution { engine, .. } => {
+            Self::Icu4xLocale { engine, .. } | Self::Icu4xLocalePolicyResolution { engine, .. } => {
                 Some(engine)
             }
             _ => None,
@@ -78,15 +78,15 @@ impl Recipe {
         if let Self::Icu4xLocale { input, .. } = self {
             return Arc::from(input.spelling().as_bytes());
         }
-        if let Self::LocaleResolution(recipe) | Self::Icu4xLocaleResolution { input: recipe, .. } =
-            self
+        if let Self::LocalePolicyResolution(recipe)
+        | Self::Icu4xLocalePolicyResolution { input: recipe, .. } = self
         {
             let mut value = recipe.value();
             if recipe.reverses_members() {
                 reverse_objects(&mut value);
             }
             return Arc::from(
-                serde_json::to_vec(&value).expect("finite owner locale-resolution fixture"),
+                serde_json::to_vec(&value).expect("finite owner locale-policy-resolution fixture"),
             );
         }
         if let Self::ResourcePolicy(recipe) = self {

@@ -52,7 +52,7 @@ impl SurfaceVocabulary {
 
     /// The vocabulary of `members`, given in any order and each once, standing
     /// in for one Phase 5 admitted.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "benchmark"))]
     pub(crate) fn fixture_owned(members: &[&str]) -> Self {
         let mut members: Vec<Token> = members
             .iter()

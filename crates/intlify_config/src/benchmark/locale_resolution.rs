@@ -1,10 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! 015 Phase 7 over the selected declaration of a complete configuration:
-//! every locale spelling counted, canonicalized through the finite provider
-//! or the ICU4X provider, and checked under a fixture-owned confirmed policy.
-//! Neither the result nor its observation is a Profile or a shared artifact.
+//! 015 Phases 7 and 8 over the selected declaration of a complete
+//! configuration: every locale spelling counted, canonicalized through the
+//! finite provider or the ICU4X provider, and checked, then the negotiation,
+//! message fallback, and coverage policies resolved from what Phase 7 left,
+//! under a fixture-owned confirmed policy and fixture-owned specifications and
+//! vocabulary. Neither the result nor its observation is a Profile or a shared
+//! artifact.
 
 use std::sync::Arc;
 
@@ -12,17 +15,28 @@ use serde::{Deserialize, Serialize};
 
 use crate::locale::{
     CanonicalLocale, CanonicalizationFailure, Canonicalizer, Provider, ProviderFailure,
+    VersionedIdentity,
 };
-use crate::model::ProfileId;
+use crate::model::{CoverageMode, ProfileId};
 use crate::references::TargetProfileReference;
+use crate::resolver::coverage::{
+    resolve_coverage, CoveragePolicy, CoverageSubject, Decision, Domain, RuleContent, RuleMember,
+    SurfaceKey,
+};
 use crate::resolver::evaluation::{
     Actual, Admitted, Causes, Check, Evaluation, IssueKey, LimitExceeded, Status, Subject, Unit,
 };
+use crate::resolver::fallback::{
+    resolve_fallback, Candidate, FallbackSubject, MessageFallbackPolicy,
+};
 use crate::resolver::limits::ConfirmedPolicy;
 use crate::resolver::locales::{
-    resolve_locales, AliasLocales, FallbackLocale, FallbackLocales, LocaleFields, LocaleInvariant,
-    LocaleKey, LocaleSet, LocaleSubject, Location, ProjectLocales, ResolvedLocales, TargetLocales,
+    resolve_locales, AliasLocales, Content, FallbackLocale, FallbackLocales, LocaleFields,
+    LocaleInvariant, LocaleKey, LocaleSet, LocaleSubject, Location, ProjectLocales,
+    ResolvedLocales, TargetLocales,
 };
+use crate::resolver::negotiation::{resolve_negotiation, NegotiationProfile, NegotiationSubject};
+use crate::resolver::vocabulary::SurfaceVocabulary;
 
 use super::locale;
 use super::locale_icu4x::PreparedEngine;
@@ -30,7 +44,7 @@ use super::observation::{Frame, Observation};
 use super::operation::{Analysis, Config, OutputFailure};
 use super::quantity::Quantity;
 
-/// The canonicalizer Phase 7 runs under: the finite provider's, or the
+/// The canonicalizer Phases 7 and 8 run under: the finite provider's, or the
 /// ICU4X provider's engine, which a case reuses or admits fresh before each
 /// invocation.
 pub(super) enum Canonicalizers {
@@ -38,13 +52,45 @@ pub(super) enum Canonicalizers {
     Icu4x(PreparedEngine),
 }
 
-/// A case's complete configuration, its selected declaration, and the policy
-/// and canonicalizer Phase 7 runs under.
+/// The members of the formal test vocabulary,
+/// `fixtures/vocabulary/vectors.json`'s `fixture`.
+pub(super) const VOCABULARY: [&str; 3] = ["checkout", "internal-tool", "nav"];
+
+/// What Phase 5 hands Phase 8, stated by the fixture owner: the Locale
+/// Negotiation, Message Locale Fallback, and Coverage Specifications at
+/// revision "0", and the Intent Surface-Class Vocabulary.
+pub(super) struct PolicyInputs {
+    pub(super) negotiation: Admitted<VersionedIdentity<&'static str>>,
+    pub(super) fallback: Admitted<VersionedIdentity<&'static str>>,
+    pub(super) coverage: Admitted<VersionedIdentity<&'static str>>,
+    pub(super) vocabulary: SurfaceVocabulary,
+}
+
+impl PolicyInputs {
+    pub(super) fn fixture_owned() -> Self {
+        let revision_zero = |identity| {
+            Ok(VersionedIdentity {
+                identity,
+                revision: "0",
+            })
+        };
+        Self {
+            negotiation: revision_zero("intlify-locale-negotiation"),
+            fallback: revision_zero("intlify-message-locale-fallback"),
+            coverage: revision_zero("intlify-localization-coverage"),
+            vocabulary: SurfaceVocabulary::fixture_owned(&VOCABULARY),
+        }
+    }
+}
+
+/// A case's complete configuration, its selected declaration, and the policy,
+/// Phase 5 results, and canonicalizer Phases 7 and 8 run under.
 pub(super) struct PreparedLocales {
     pub(super) analysis: Analysis,
     pub(super) config: Config,
     pub(super) selected: ProfileId,
     pub(super) policy: ConfirmedPolicy,
+    pub(super) inputs: PolicyInputs,
     pub(super) canonicalizer: Canonicalizers,
 }
 
@@ -77,23 +123,62 @@ impl PreparedLocales {
     }
 }
 
-/// Phase 7's record of every unit it ran and what it resolved: the complete
-/// ordinary output.
-pub(super) struct Resolved {
-    pub(super) evaluation: Evaluation,
-    pub(super) result: Result<ResolvedLocales, LocaleInvariant>,
+/// What Phases 7 and 8 resolved: the locales, then each policy or the causes
+/// it is unavailable.
+pub(super) struct Policies {
+    pub(super) locales: ResolvedLocales,
+    pub(super) negotiation: Admitted<NegotiationProfile<&'static str>>,
+    pub(super) fallback: Admitted<MessageFallbackPolicy<&'static str>>,
+    pub(super) coverage: Admitted<CoveragePolicy<&'static str>>,
 }
 
-/// Phase 7 over a fresh evaluation: what preparation and every timed
+/// Phases 7 and 8's record of every unit they ran and what they resolved:
+/// the complete ordinary output.
+pub(super) struct Resolved {
+    pub(super) evaluation: Evaluation,
+    pub(super) result: Result<Policies, LocaleInvariant>,
+}
+
+/// Phases 7 and 8 over a fresh evaluation: what preparation and every timed
 /// invocation run, through either provider.
 pub(super) fn resolve<P: Provider>(
     policy: &ConfirmedPolicy,
+    inputs: &PolicyInputs,
     canonicalizer: &Canonicalizer<P>,
     fields: &LocaleFields<'_, TargetProfileReference>,
 ) -> Resolved {
     let mut evaluation = Evaluation::default();
-    let result = resolve_locales(&mut evaluation, Ok(policy), Ok(canonicalizer), fields);
+    let result = policies(&mut evaluation, policy, inputs, canonicalizer, fields);
     Resolved { evaluation, result }
+}
+
+/// Phase 7, then Phase 8's negotiation, message fallback, and coverage, in
+/// the order the resolver's entry runs them.
+fn policies<P: Provider>(
+    evaluation: &mut Evaluation,
+    policy: &ConfirmedPolicy,
+    inputs: &PolicyInputs,
+    canonicalizer: &Canonicalizer<P>,
+    fields: &LocaleFields<'_, TargetProfileReference>,
+) -> Result<Policies, LocaleInvariant> {
+    let locales = resolve_locales(evaluation, Ok(policy), Ok(canonicalizer), fields)?;
+    let negotiation = resolve_negotiation(evaluation, Ok(policy), &inputs.negotiation, &locales)?;
+    let fallback = resolve_fallback(evaluation, Ok(policy), &inputs.fallback, &locales)?;
+    let coverage = resolve_coverage(
+        evaluation,
+        Ok(policy),
+        &inputs.coverage,
+        Ok(&inputs.vocabulary),
+        Ok(canonicalizer),
+        &locales,
+        fields.coverage.clone(),
+    )?;
+    Ok(Policies {
+        locales,
+        negotiation,
+        fallback,
+        coverage,
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -107,6 +192,16 @@ pub(super) struct InputFacts {
     requested_locale_limit: Quantity,
     requested_cardinality_domain: String,
     identifier_byte_limit: Quantity,
+    negotiation_alias_limit: Quantity,
+    fallback_source_limit: Quantity,
+    fallback_candidates_per_source_limit: Quantity,
+    coverage_rule_limit: Quantity,
+    coverage_locale_selector_occurrence_limit: Quantity,
+    coverage_surface_selector_occurrence_limit: Quantity,
+    coverage_decision_cell_limit: Quantity,
+    coverage_rule_cell_comparison_limit: Quantity,
+    specifications: Vec<String>,
+    vocabulary: Vec<String>,
     prerequisites: String,
     input_storage: String,
     structural_preparation: String,
@@ -116,8 +211,9 @@ pub(super) struct InputFacts {
 impl InputFacts {
     pub(super) fn observe(prepared: &PreparedLocales) -> Self {
         let limits = &prepared.policy.limits().locale_resolution;
+        let inputs = &prepared.inputs;
         Self {
-            scope: "selected-declaration-every-locale-occurrence".into(),
+            scope: "selected-declaration-every-locale-occurrence-and-locale-policy".into(),
             selected_profile: prepared.selected.as_str().into(),
             policy: "fixture-owned-confirmed-policy-not-an-admitted-resource-limit-policy".into(),
             locale_occurrence_limit: Quantity::new(limits.max_locale_occurrences.get()),
@@ -137,11 +233,45 @@ impl InputFacts {
             requested_locale_limit: Quantity::new(limits.max_requested_locales.get()),
             requested_cardinality_domain: "unique-canonical-project-requested-locales".into(),
             identifier_byte_limit: Quantity::new(limits.max_locale_identifier_bytes.get()),
-            prerequisites: "admitted-policy-canonicalizer-and-whole-declaration".into(),
+            negotiation_alias_limit: Quantity::new(limits.max_negotiation_aliases.get()),
+            fallback_source_limit: Quantity::new(limits.max_fallback_sources.get()),
+            fallback_candidates_per_source_limit: Quantity::new(
+                limits.max_fallback_candidates_per_source.get(),
+            ),
+            coverage_rule_limit: Quantity::new(limits.max_coverage_rules.get()),
+            coverage_locale_selector_occurrence_limit: Quantity::new(
+                limits.max_coverage_locale_selector_occurrences.get(),
+            ),
+            coverage_surface_selector_occurrence_limit: Quantity::new(
+                limits.max_coverage_surface_selector_occurrences.get(),
+            ),
+            coverage_decision_cell_limit: Quantity::new(limits.max_coverage_decision_cells.get()),
+            coverage_rule_cell_comparison_limit: Quantity::new(
+                limits.max_coverage_rule_cell_comparisons.get(),
+            ),
+            // The admitted assertions, in the slots' order.
+            specifications: [&inputs.negotiation, &inputs.fallback, &inputs.coverage]
+                .into_iter()
+                .filter_map(|admitted| admitted.as_ref().ok())
+                .map(|specification| {
+                    format!("{}/{}", specification.identity, specification.revision)
+                })
+                .collect(),
+            vocabulary: inputs
+                .vocabulary
+                .members()
+                .iter()
+                .map(|member| member.as_str().into())
+                .collect(),
+            prerequisites:
+                "admitted-policy-specifications-vocabulary-canonicalizer-and-whole-declaration"
+                    .into(),
             input_storage: "borrowed-selected-fields-of-resident-complete-config".into(),
             structural_preparation: "complete-model-selection-and-borrowed-fields-before-interval"
                 .into(),
-            ordinary_output: "fresh-evaluation-with-resolved-locales-or-resolver-defect".into(),
+            ordinary_output:
+                "fresh-evaluation-with-resolved-locales-and-locale-policies-or-resolver-defect"
+                    .into(),
         }
     }
 }
@@ -149,19 +279,19 @@ impl InputFacts {
 /// A resolver defect, or a spelling the provider cannot answer, is no blocked
 /// outcome: the case fails rather than completing as an expected failure.
 /// Logical work uses this screen too.
-pub(super) fn require_observable(resolved: &Resolved) -> Result<&ResolvedLocales, OutputFailure> {
+pub(super) fn require_observable(resolved: &Resolved) -> Result<&Policies, OutputFailure> {
     match &resolved.result {
-        Ok(locales) => Ok(locales),
+        Ok(policies) => Ok(policies),
         Err(LocaleInvariant::Canonicalization(CanonicalizationFailure::Provider(
             ProviderFailure::UnsupportedInput | ProviderFailure::Unavailable,
         ))) => Err(OutputFailure::LocaleProviderUnavailable),
         Err(LocaleInvariant::Canonicalization(_)) => Err(OutputFailure::LocaleProviderInvariant),
-        Err(LocaleInvariant::Evaluation(_)) => Err(OutputFailure::LocaleResolutionInvariant),
+        Err(LocaleInvariant::Evaluation(_)) => Err(OutputFailure::LocalePolicyResolutionInvariant),
     }
 }
 
 fn count(value: usize) -> Result<u64, OutputFailure> {
-    u64::try_from(value).map_err(|_| OutputFailure::LocaleResolutionInvariant)
+    u64::try_from(value).map_err(|_| OutputFailure::LocalePolicyResolutionInvariant)
 }
 
 fn key(frame: &mut Frame, key: &LocaleKey) {
@@ -226,37 +356,181 @@ fn subject(frame: &mut Frame, subject: &LocaleSubject) -> Result<(), OutputFailu
     Ok(())
 }
 
-/// Only Phase 7's own units can appear: every prerequisite of another phase
-/// was admitted.
+fn negotiation_subject(frame: &mut Frame, subject: &NegotiationSubject) {
+    match subject {
+        NegotiationSubject::Aliases => frame.uint(0),
+        NegotiationSubject::Key(own) => {
+            frame.uint(1);
+            key(frame, own);
+        }
+        NegotiationSubject::Destination(owner, own) => {
+            frame.uint(2);
+            key(frame, owner);
+            key(frame, own);
+        }
+    }
+}
+
+fn fallback_subject(frame: &mut Frame, subject: &FallbackSubject) {
+    match subject {
+        FallbackSubject::Sources => frame.uint(0),
+        FallbackSubject::Source(own) => {
+            frame.uint(1);
+            key(frame, own);
+        }
+        FallbackSubject::Literal(owner, own) => {
+            frame.uint(2);
+            key(frame, owner);
+            key(frame, own);
+        }
+        FallbackSubject::IntentSource(owner) => {
+            frame.uint(3);
+            key(frame, owner);
+        }
+    }
+}
+
+fn mode(frame: &mut Frame, mode: CoverageMode) {
+    frame.uint(match mode {
+        CoverageMode::DirectRequired => 0,
+        CoverageMode::FallbackAllowed => 1,
+    });
+}
+
+fn contents(frame: &mut Frame, items: &[Content]) -> Result<(), OutputFailure> {
+    frame.uint(count(items.len())?);
+    for item in items {
+        frame.text(item.as_str());
+    }
+    Ok(())
+}
+
+/// A rule as authored, which names it until it has a normalized domain.
+fn rule(frame: &mut Frame, rule: &RuleContent) -> Result<(), OutputFailure> {
+    frame.uint(count(rule.members().len())?);
+    for member in rule.members() {
+        match member {
+            RuleMember::IntentSurfaceClasses(items) => {
+                frame.uint(0);
+                contents(frame, items)?;
+            }
+            RuleMember::Mode(own) => {
+                frame.uint(1);
+                mode(frame, *own);
+            }
+            RuleMember::RequestedLocales(items) => {
+                frame.uint(2);
+                contents(frame, items)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn domain(frame: &mut Frame, domain: &Domain) -> Result<(), OutputFailure> {
+    frame.uint(count(domain.locales().len())?);
+    for locale in domain.locales() {
+        frame.text(locale.as_str());
+    }
+    frame.uint(count(domain.surfaces().len())?);
+    for surface in domain.surfaces() {
+        frame.text(surface.as_str());
+    }
+    Ok(())
+}
+
+fn coverage_subject(frame: &mut Frame, subject: &CoverageSubject) -> Result<(), OutputFailure> {
+    match subject {
+        CoverageSubject::Rules => frame.uint(0),
+        CoverageSubject::LocaleSelectors => frame.uint(1),
+        CoverageSubject::SurfaceSelectors => frame.uint(2),
+        CoverageSubject::Locale(owner, own) => {
+            frame.uint(3);
+            rule(frame, owner)?;
+            key(frame, own);
+        }
+        CoverageSubject::SurfaceClass(owner, own) => {
+            frame.uint(4);
+            rule(frame, owner)?;
+            match own {
+                SurfaceKey::Member(member) => {
+                    frame.uint(0);
+                    frame.text(member.as_str());
+                }
+                SurfaceKey::Content(content) => {
+                    frame.uint(1);
+                    frame.text(content.as_str());
+                }
+            }
+        }
+        CoverageSubject::Domain(own) => {
+            frame.uint(5);
+            domain(frame, own)?;
+        }
+        CoverageSubject::Cells => frame.uint(6),
+        CoverageSubject::Comparisons => frame.uint(7),
+        CoverageSubject::Cell(locale, surface) => {
+            frame.uint(8);
+            frame.text(locale.as_str());
+            frame.text(surface.as_str());
+        }
+    }
+    Ok(())
+}
+
+/// Only Phase 7's and Phase 8's own units can appear: every prerequisite of
+/// another phase was admitted.
 fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
-    let Subject::Locale(locale) = &unit.subject else {
-        return Err(OutputFailure::LocaleResolutionInvariant);
-    };
     frame.text(unit.phase.id());
-    subject(frame, locale)?;
+    match &unit.subject {
+        Subject::Locale(own) => {
+            frame.uint(0);
+            subject(frame, own)?;
+        }
+        Subject::Negotiation(own) => {
+            frame.uint(1);
+            negotiation_subject(frame, own);
+        }
+        Subject::Fallback(own) => {
+            frame.uint(2);
+            fallback_subject(frame, own);
+        }
+        Subject::Coverage(own) => {
+            frame.uint(3);
+            coverage_subject(frame, own)?;
+        }
+        Subject::Slot(_)
+        | Subject::Vocabulary
+        | Subject::CanonicalizationData
+        | Subject::ResourcePolicy(_)
+        | Subject::DeclarationField(_)
+        | Subject::ArtifactCollection(_)
+        | Subject::ArtifactReference(_)
+        | Subject::DeliveryPlacement => return Err(OutputFailure::LocalePolicyResolutionInvariant),
+    }
     frame.uint(match unit.check {
         Check::WithinBound => 0,
         Check::CanonicalLocale => 1,
         Check::UniqueLocale => 2,
         Check::RequestedMember => 3,
+        Check::DistinctFromSource => 4,
+        Check::UniqueCandidate => 5,
+        Check::VocabularyMember => 6,
+        Check::UniqueSurfaceClass => 7,
+        Check::UniqueDomain => 8,
+        Check::EffectiveMode => 9,
         Check::SupportedAssertion
         | Check::MatchingData
         | Check::IntactArtifact
         | Check::AssertedArtifact
         | Check::OpaqueIdentity
-        | Check::DistinctFromSource
-        | Check::UniqueCandidate
-        | Check::EffectiveMode
-        | Check::VocabularyMember
-        | Check::UniqueSurfaceClass
-        | Check::UniqueDomain
         | Check::WithinCapability
         | Check::BootstrapCandidate
         | Check::CompatiblePolicy
         | Check::AdmissibleMember
         | Check::SingleOccurrence
         | Check::ConsistentContent
-        | Check::ResolvedReference => return Err(OutputFailure::LocaleResolutionInvariant),
+        | Check::ResolvedReference => return Err(OutputFailure::LocalePolicyResolutionInvariant),
     });
     Ok(())
 }
@@ -303,7 +577,7 @@ fn limit(frame: &mut Frame, exceeded: Option<LimitExceeded>) {
     }
 }
 
-/// A value Phase 7 hands later phases, or the causes it is unavailable.
+/// A value Phase 7 or 8 resolved, or the causes it is unavailable.
 fn admitted<T>(
     frame: &mut Frame,
     value: &Admitted<T>,
@@ -391,6 +665,69 @@ fn targets(frame: &mut Frame, targets: &[TargetLocales]) -> Result<(), OutputFai
     Ok(())
 }
 
+fn specification(frame: &mut Frame, specification: &VersionedIdentity<&'static str>) {
+    frame.text(specification.identity);
+    frame.text(specification.revision);
+}
+
+fn negotiation(
+    frame: &mut Frame,
+    profile: &NegotiationProfile<&'static str>,
+) -> Result<(), OutputFailure> {
+    specification(frame, profile.specification());
+    frame.uint(count(profile.aliases().len())?);
+    for (key, destination) in profile.aliases() {
+        frame.text(key.as_str());
+        frame.text(destination.as_str());
+    }
+    Ok(())
+}
+
+fn message_fallback(
+    frame: &mut Frame,
+    policy: &MessageFallbackPolicy<&'static str>,
+) -> Result<(), OutputFailure> {
+    specification(frame, policy.specification());
+    frame.uint(count(policy.sequences().len())?);
+    for (source, candidates) in policy.sequences() {
+        frame.text(source.as_str());
+        frame.uint(count(candidates.len())?);
+        for candidate in candidates {
+            match candidate {
+                Candidate::Literal(literal) => {
+                    frame.uint(0);
+                    frame.text(literal.as_str());
+                }
+                Candidate::IntentSource => frame.uint(1),
+            }
+        }
+    }
+    Ok(())
+}
+
+/// The decision table with each cell's Coverage Decision Basis: Shared
+/// reporting, since a Basis names no source.
+fn coverage(frame: &mut Frame, policy: &CoveragePolicy<&'static str>) -> Result<(), OutputFailure> {
+    specification(frame, policy.specification());
+    frame.uint(count(policy.basis().len())?);
+    for ((locale, surface), basis) in policy.basis() {
+        frame.text(locale.as_str());
+        frame.text(surface.as_str());
+        mode(frame, basis.mode);
+        match &basis.decision {
+            Decision::Default => frame.uint(0),
+            Decision::Rules(domains) => {
+                frame.uint(1);
+                frame.uint(count(domains.len())?);
+                for own in domains {
+                    domain(frame, own)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 fn location(frame: &mut Frame, location: &Location) -> Result<(), OutputFailure> {
     match location {
         Location::RequestedLocale(index) => {
@@ -429,15 +766,18 @@ fn location(frame: &mut Frame, location: &Location) -> Result<(), OutputFailure>
     Ok(())
 }
 
-/// The shared domain is what Phase 7 decided, none of it positional: every
-/// unit's status, the blocking results with their details, the suggestions,
-/// the occurrence total, and the values later phases take. The entry domain
-/// is where each spelling sits, its subject, and whether it was corrected,
-/// so reordering a set changes the entry domain alone.
+/// The shared domain is what Phases 7 and 8 decided, none of it positional:
+/// every unit's status, the blocking results with their details, the
+/// suggestions, the occurrence total, the values Phase 7 hands Phase 8, and
+/// Phase 8's three policies. The entry domain is where each spelling sits, its
+/// subject, and whether it was corrected, so reordering a set changes the
+/// entry domain alone. Phase 8 names every subject by content, so it adds
+/// nothing to the entry domain.
 pub(super) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure> {
-    let locales = require_observable(resolved)?;
+    let policies = require_observable(resolved)?;
+    let locales = &policies.locales;
     let evaluation = &resolved.evaluation;
-    let mut shared = Frame::new("locale-resolution-result");
+    let mut shared = Frame::new("locale-policy-resolution-result");
     shared.uint(count(evaluation.statuses().count())?);
     for (recorded, status) in evaluation.statuses() {
         unit(&mut shared, recorded)?;
@@ -473,6 +813,11 @@ pub(super) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure>
     admitted(&mut shared, &locales.targets, |frame, list| {
         targets(frame, list)
     })?;
+    admitted(&mut shared, &policies.negotiation, negotiation)?;
+    admitted(&mut shared, &policies.fallback, message_fallback)?;
+    admitted(&mut shared, &policies.coverage, coverage)?;
+    // The entry domain holds Phase 7's spellings alone, so it keeps Phase 7's
+    // name.
     let mut entry = Frame::new("locale-resolution-entry");
     entry.uint(count(locales.occurrences.len())?);
     for occurrence in &locales.occurrences {
@@ -490,13 +835,27 @@ pub(super) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure>
 mod tests {
     use super::*;
     use crate::locale::ProviderFailure;
+    use crate::resolver::coverage::unit as coverage_unit;
     use crate::resolver::evaluation::EvaluationInvariant;
+    use crate::resolver::fallback::unit as fallback_unit;
+    use crate::resolver::locales::fixtures::{canonical, content, key};
     use crate::resolver::locales::unit as locale_unit;
+    use crate::resolver::negotiation::unit as negotiation_unit;
+    use crate::resolver::specification::Slot;
 
     fn digest(frame_with: impl FnOnce(&mut Frame)) -> super::super::observation::Digest {
         let mut frame = Frame::new("locale-resolution-test");
         frame_with(&mut frame);
         frame.finish()
+    }
+
+    fn distinct(digests: &[super::super::observation::Digest]) {
+        for (index, left) in digests.iter().enumerate() {
+            assert!(
+                digests[index + 1..].iter().all(|right| right != left),
+                "digest {index} repeats"
+            );
+        }
     }
 
     #[test]
@@ -525,7 +884,7 @@ mod tests {
                     LocaleSubject::Occurrences,
                     Check::WithinBound,
                 ))),
-                OutputFailure::LocaleResolutionInvariant,
+                OutputFailure::LocalePolicyResolutionInvariant,
             ),
         ] {
             let resolved = defect(invariant);
@@ -543,14 +902,12 @@ mod tests {
     }
 
     #[test]
-    fn only_phase_7_units_frame() {
+    fn only_phase_7_and_8_units_frame() {
         let mut frame = Frame::new("locale-resolution-test");
         for subject in [
+            Subject::Slot(Slot::Coverage),
             Subject::Vocabulary,
             Subject::CanonicalizationData,
-            Subject::Negotiation(crate::resolver::negotiation::NegotiationSubject::Aliases),
-            Subject::Fallback(crate::resolver::fallback::FallbackSubject::Sources),
-            Subject::Coverage(crate::resolver::coverage::CoverageSubject::Rules),
             Subject::DeliveryPlacement,
         ] {
             let foreign = Unit {
@@ -559,7 +916,7 @@ mod tests {
             };
             assert_eq!(
                 unit(&mut frame, &foreign),
-                Err(OutputFailure::LocaleResolutionInvariant)
+                Err(OutputFailure::LocalePolicyResolutionInvariant)
             );
         }
         for check in [
@@ -568,12 +925,9 @@ mod tests {
             Check::IntactArtifact,
             Check::AssertedArtifact,
             Check::OpaqueIdentity,
-            Check::DistinctFromSource,
-            Check::UniqueCandidate,
-            Check::EffectiveMode,
-            Check::VocabularyMember,
-            Check::UniqueSurfaceClass,
-            Check::UniqueDomain,
+            Check::WithinCapability,
+            Check::BootstrapCandidate,
+            Check::CompatiblePolicy,
             Check::AdmissibleMember,
             Check::SingleOccurrence,
             Check::ConsistentContent,
@@ -581,7 +935,7 @@ mod tests {
         ] {
             assert_eq!(
                 unit(&mut frame, &locale_unit(LocaleSubject::Occurrences, check)),
-                Err(OutputFailure::LocaleResolutionInvariant)
+                Err(OutputFailure::LocalePolicyResolutionInvariant)
             );
         }
         let checks = [
@@ -589,14 +943,87 @@ mod tests {
             Check::CanonicalLocale,
             Check::UniqueLocale,
             Check::RequestedMember,
+            Check::DistinctFromSource,
+            Check::UniqueCandidate,
+            Check::VocabularyMember,
+            Check::UniqueSurfaceClass,
+            Check::UniqueDomain,
+            Check::EffectiveMode,
         ]
         .map(|check| {
             digest(|frame| {
                 unit(frame, &locale_unit(LocaleSubject::Occurrences, check)).unwrap();
             })
         });
-        for (index, left) in checks.iter().enumerate() {
-            assert!(checks[index + 1..].iter().all(|right| right != left));
-        }
+        distinct(&checks);
+    }
+
+    /// Each Phase 8 subject frames apart from every other, across the three
+    /// policies and within each, and apart from Phase 7's.
+    #[test]
+    fn phase_8_subjects_frame_apart() {
+        let rule = |spelling: &str| {
+            let rule: crate::model::CoverageRule = serde_json::from_value(serde_json::json!({
+                "requestedLocales": [spelling],
+                "mode": "fallback-allowed"
+            }))
+            .unwrap();
+            RuleContent::of(&rule)
+        };
+        let token = |member| intlify_shared_json::token::Token::new(member).unwrap();
+        let units = [
+            locale_unit(LocaleSubject::Occurrences, Check::WithinBound),
+            negotiation_unit(NegotiationSubject::Aliases, Check::WithinBound),
+            negotiation_unit(NegotiationSubject::Key(key("en")), Check::UniqueLocale),
+            negotiation_unit(NegotiationSubject::Key(content("en")), Check::UniqueLocale),
+            negotiation_unit(
+                NegotiationSubject::Destination(key("en"), key("ja")),
+                Check::RequestedMember,
+            ),
+            fallback_unit(FallbackSubject::Sources, Check::WithinBound),
+            fallback_unit(FallbackSubject::Source(key("en")), Check::UniqueLocale),
+            fallback_unit(
+                FallbackSubject::Literal(key("en"), key("ja")),
+                Check::UniqueCandidate,
+            ),
+            fallback_unit(
+                FallbackSubject::IntentSource(key("en")),
+                Check::UniqueCandidate,
+            ),
+            coverage_unit(CoverageSubject::Rules, Check::WithinBound),
+            coverage_unit(CoverageSubject::LocaleSelectors, Check::WithinBound),
+            coverage_unit(CoverageSubject::SurfaceSelectors, Check::WithinBound),
+            coverage_unit(
+                CoverageSubject::Locale(rule("ja"), key("ja")),
+                Check::CanonicalLocale,
+            ),
+            coverage_unit(
+                CoverageSubject::Locale(rule("en"), key("ja")),
+                Check::CanonicalLocale,
+            ),
+            coverage_unit(
+                CoverageSubject::SurfaceClass(rule("ja"), SurfaceKey::Member(token("nav"))),
+                Check::VocabularyMember,
+            ),
+            coverage_unit(
+                CoverageSubject::SurfaceClass(rule("ja"), SurfaceKey::Content(Content::new("nav"))),
+                Check::VocabularyMember,
+            ),
+            coverage_unit(
+                CoverageSubject::SurfaceClass(
+                    rule("ja"),
+                    SurfaceKey::Content(Content::new("navigation")),
+                ),
+                Check::VocabularyMember,
+            ),
+            coverage_unit(CoverageSubject::Cells, Check::WithinBound),
+            coverage_unit(CoverageSubject::Comparisons, Check::WithinBound),
+            coverage_unit(
+                CoverageSubject::Cell(canonical("ja"), token("nav")),
+                Check::EffectiveMode,
+            ),
+        ]
+        .map(|recorded| digest(|frame| unit(frame, &recorded).unwrap()));
+        distinct(&units);
     }
 }

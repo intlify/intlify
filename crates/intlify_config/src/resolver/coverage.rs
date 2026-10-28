@@ -66,7 +66,13 @@ pub(crate) enum RuleMember {
 }
 
 impl RuleContent {
-    fn of(rule: &CoverageRule) -> Self {
+    /// The rule's members, in the byte order of their names.
+    pub(crate) fn members(&self) -> &[RuleMember] {
+        &self.0
+    }
+
+    /// The content identity of `rule`.
+    pub(crate) fn of(rule: &CoverageRule) -> Self {
         let sorted = |spellings: &[String]| {
             let mut spellings: Vec<Content> = spellings
                 .iter()
