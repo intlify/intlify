@@ -87,16 +87,16 @@ fn named(recipe: ResolvedBindingRecipe) -> Vec<ExactTuple> {
 #[test]
 fn binding_cases_keep_the_198_rows_and_append_after_them() {
     let cases = declarations();
-    assert_eq!(cases.len(), 213);
+    assert_eq!(cases.len(), 252);
     assert!(cases[..198]
         .iter()
         .all(|case| case.operation != Operation::ResolvedBindingConstruction));
-    assert!(cases[198..].iter().all(|case| {
+    assert!(cases[198..213].iter().all(|case| {
         case.operation == Operation::ResolvedBindingConstruction
             && case.selector == Selector::App
             && case.limit.is_none()
     }));
-    for declaration in &cases[198..] {
+    for declaration in &cases[198..213] {
         // The case's source is the configuration, and the members are what
         // preparation read.
         let Recipe::ResolvedBinding(recipe) = declaration.fixture else {

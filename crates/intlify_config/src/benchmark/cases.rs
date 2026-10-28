@@ -48,6 +48,14 @@ pub(super) enum LimitKind {
     ResolutionRequestedLocales,
     ResolutionRawIdentifierBytes,
     ResolutionCanonicalIdentifierBytes,
+    ResolutionNegotiationAliases,
+    ResolutionFallbackSources,
+    ResolutionFallbackCandidatesPerSource,
+    ResolutionCoverageRules,
+    ResolutionCoverageLocaleSelectorOccurrences,
+    ResolutionCoverageSurfaceSelectorOccurrences,
+    ResolutionCoverageDecisionCells,
+    ResolutionCoverageRuleCellComparisons,
     BootstrapArtifacts,
     RecheckArtifacts,
     RecheckProfileIdBytes,
@@ -627,11 +635,45 @@ pub(super) fn declarations() -> Vec<Declaration> {
             },
         ));
     }
+    // Append Phase 8's workloads without changing any of the 213 rows: each
+    // finite recipe, the exact and first-over edges of Phase 8's eight bounds
+    // on every role, and each scale through either ICU4X engine.
+    let every = LocalePolicyResolutionRecipe::EveryRole;
+    resolution_cases(
+        &mut cases,
+        &LocalePolicyResolutionRecipe::POLICY,
+        &[
+            (LimitKind::ResolutionNegotiationAliases, every),
+            (LimitKind::ResolutionFallbackSources, every),
+            (LimitKind::ResolutionFallbackCandidatesPerSource, every),
+            (LimitKind::ResolutionCoverageRules, every),
+            (
+                LimitKind::ResolutionCoverageLocaleSelectorOccurrences,
+                every,
+            ),
+            (
+                LimitKind::ResolutionCoverageSurfaceSelectorOccurrences,
+                every,
+            ),
+            (LimitKind::ResolutionCoverageDecisionCells, every),
+            (LimitKind::ResolutionCoverageRuleCellComparisons, every),
+        ],
+    );
+    for input in LocalePolicyResolutionRecipe::POLICY_ICU4X {
+        for engine in [Engine::Reused, Engine::Fresh] {
+            cases.push(declaration(
+                Operation::LocalePolicyResolution,
+                Recipe::Icu4xLocalePolicyResolution { input, engine },
+                Selector::App,
+                ExpectedKind::LocalePolicyResolutionComplete,
+            ));
+        }
+    }
     cases
 }
 
-/// One Phases 7 and 8 case per recipe, then the exact and first-over edges of each
-/// bound on its recipe.
+/// One case per recipe, then the exact and first-over edges of each bound on
+/// its recipe.
 fn resolution_cases(
     cases: &mut Vec<Declaration>,
     recipes: &[LocalePolicyResolutionRecipe],

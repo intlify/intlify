@@ -45,6 +45,25 @@ pub(in crate::benchmark) enum LocalePolicyResolutionRecipe {
     EveryFixtureLocale,
     OccurrenceScale,
     CanonicalScale,
+    AliasConflictingKeys,
+    AliasRepeatedKeys,
+    AliasUnrequestedDestination,
+    FallbackUnrequestedSource,
+    FallbackSelfReference,
+    FallbackRepeatedLiteral,
+    FallbackRepeatedIntentSource,
+    CoverageUnrequestedLocale,
+    CoverageRepeatedLocale,
+    CoverageUnknownSurface,
+    CoverageRepeatedSurface,
+    CoverageRepeatedDomain,
+    CoverageConflict,
+    PolicyDense,
+    PolicyReordered,
+    AliasScale,
+    FallbackSourceScale,
+    FallbackSequenceScale,
+    CoverageRuleScale,
 }
 
 impl LocalePolicyResolutionRecipe {
@@ -96,6 +115,37 @@ impl LocalePolicyResolutionRecipe {
         Self::CanonicalScale,
     ];
 
+    /// Phase 8's workloads through the finite provider, after the Phase 9
+    /// rows: one change to every role each, a dense declaration, and every
+    /// role with its coverage rules and selector items in another order.
+    pub(super) const POLICY: [Self; 15] = [
+        Self::AliasConflictingKeys,
+        Self::AliasRepeatedKeys,
+        Self::AliasUnrequestedDestination,
+        Self::FallbackUnrequestedSource,
+        Self::FallbackSelfReference,
+        Self::FallbackRepeatedLiteral,
+        Self::FallbackRepeatedIntentSource,
+        Self::CoverageUnrequestedLocale,
+        Self::CoverageRepeatedLocale,
+        Self::CoverageUnknownSurface,
+        Self::CoverageRepeatedSurface,
+        Self::CoverageRepeatedDomain,
+        Self::CoverageConflict,
+        Self::PolicyDense,
+        Self::PolicyReordered,
+    ];
+
+    /// Phase 8's scales, one dimension each, through the ICU4X provider,
+    /// which has the languages for them. Their Phase 7 counts fit the other
+    /// recipes' capacity.
+    pub(super) const POLICY_ICU4X: [Self; 4] = [
+        Self::AliasScale,
+        Self::FallbackSourceScale,
+        Self::FallbackSequenceScale,
+        Self::CoverageRuleScale,
+    ];
+
     /// Whether the recipe needs more room than the other recipes' capacity.
     pub(super) const fn scales(self) -> bool {
         matches!(self, Self::OccurrenceScale | Self::CanonicalScale)
@@ -119,6 +169,20 @@ impl LocalePolicyResolutionRecipe {
                 | Self::EveryRoleInvalid
                 | Self::TargetDuplicate
                 | Self::CoverageUncanonicalized
+                | Self::AliasConflictingKeys
+                | Self::AliasRepeatedKeys
+                | Self::AliasUnrequestedDestination
+                | Self::FallbackUnrequestedSource
+                | Self::FallbackSelfReference
+                | Self::FallbackRepeatedLiteral
+                | Self::FallbackRepeatedIntentSource
+                | Self::CoverageUnrequestedLocale
+                | Self::CoverageRepeatedLocale
+                | Self::CoverageUnknownSurface
+                | Self::CoverageRepeatedSurface
+                | Self::CoverageRepeatedDomain
+                | Self::CoverageConflict
+                | Self::PolicyDense
         )
     }
 
@@ -137,11 +201,30 @@ impl LocalePolicyResolutionRecipe {
             | Self::EveryRoleAliased
             | Self::EveryRoleInvalid
             | Self::TargetDuplicate
-            | Self::CoverageUncanonicalized => return self.every_role_value(),
+            | Self::CoverageUncanonicalized
+            | Self::AliasConflictingKeys
+            | Self::AliasRepeatedKeys
+            | Self::AliasUnrequestedDestination
+            | Self::FallbackUnrequestedSource
+            | Self::FallbackSelfReference
+            | Self::FallbackRepeatedLiteral
+            | Self::FallbackRepeatedIntentSource
+            | Self::CoverageUnrequestedLocale
+            | Self::CoverageRepeatedLocale
+            | Self::CoverageUnknownSurface
+            | Self::CoverageRepeatedSurface
+            | Self::CoverageRepeatedDomain
+            | Self::CoverageConflict
+            | Self::PolicyDense
+            | Self::PolicyReordered => return self.every_role_value(),
             Self::ManyTargets => return many_targets(32, 2),
             Self::EveryFixtureLocale => return every_fixture_locale(),
             Self::OccurrenceScale => return many_targets(256, 3),
             Self::CanonicalScale => return canonical_scale(),
+            Self::AliasScale => return alias_scale(),
+            Self::FallbackSourceScale => return fallback_source_scale(),
+            Self::FallbackSequenceScale => return fallback_sequence_scale(),
+            Self::CoverageRuleScale => return coverage_rule_scale(),
             _ => {}
         }
         let mut value = minimal_config();
@@ -281,6 +364,80 @@ impl LocalePolicyResolutionRecipe {
             Self::CoverageUncanonicalized => {
                 app["coverage"]["rules"][0]["requestedLocales"] = json!(["zz"]);
             }
+            // Two spellings of one key lead to different requested locales.
+            Self::AliasConflictingKeys => {
+                app["localeNegotiation"] = json!({"aliases": {"en-US": "en", "EN-us": "ja"}});
+            }
+            // Two spellings of one key lead to the same locale.
+            Self::AliasRepeatedKeys => {
+                app["localeNegotiation"] = json!({"aliases": {"en-US": "en", "EN-us": "en"}});
+            }
+            // The complete configuration's alias, to a locale not requested.
+            Self::AliasUnrequestedDestination => {
+                app["localeNegotiation"] = json!({"aliases": {"en-US": "en", "fr": "fr-FR"}});
+            }
+            Self::FallbackUnrequestedSource => {
+                app["messageFallback"]["de"] = json!(["en"]);
+                app["messageFallback"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("he-IL");
+            }
+            Self::FallbackSelfReference => app["messageFallback"]["he-IL"] = json!(["he-IL"]),
+            // `EN` is another spelling of `en`.
+            Self::FallbackRepeatedLiteral => app["messageFallback"]["he-IL"] = json!(["en", "EN"]),
+            Self::FallbackRepeatedIntentSource => {
+                app["messageFallback"]["ja"] = json!([
+                    "en",
+                    {"kind": "intent-source-locale"},
+                    {"kind": "intent-source-locale"}
+                ]);
+            }
+            Self::CoverageUnrequestedLocale => {
+                app["coverage"]["rules"][0]["requestedLocales"] = json!(["fr"]);
+            }
+            Self::CoverageRepeatedLocale => {
+                app["coverage"]["rules"][0]["requestedLocales"] = json!(["ja", "ja"]);
+            }
+            Self::CoverageUnknownSurface => {
+                app["coverage"]["rules"][1]["intentSurfaceClasses"] = json!(["footer"]);
+            }
+            Self::CoverageRepeatedSurface => {
+                app["coverage"]["rules"][1]["intentSurfaceClasses"] =
+                    json!(["checkout", "checkout"]);
+            }
+            // The `ja` rule again, its surface classes spelled out.
+            Self::CoverageRepeatedDomain => push_rule(
+                app,
+                json!({
+                    "requestedLocales": ["ja"],
+                    "intentSurfaceClasses": ["checkout", "internal-tool", "nav"],
+                    "mode": "direct-required"
+                }),
+            ),
+            // Neither this rule nor the `ja` rule is narrower, and their modes
+            // differ at `ja` / `nav`.
+            Self::CoverageConflict => push_rule(app, conflicting_rule()),
+            // A key two spellings name, a sequence naming its source and
+            // repeating the Intent source, a surface class the vocabulary
+            // lacks, and a conflicting rule, at once. The unknown surface class
+            // leaves every cell undecided, the conflicting one included.
+            Self::PolicyDense => {
+                app["localeNegotiation"] = json!({"aliases": {"en-US": "en", "EN-us": "ja"}});
+                app["messageFallback"] = json!({
+                    "he-IL": ["he-IL"],
+                    "ja": ["en", {"kind": "intent-source-locale"}, {"kind": "intent-source-locale"}]
+                });
+                app["coverage"]["rules"][1]["intentSurfaceClasses"] = json!(["footer"]);
+                push_rule(app, conflicting_rule());
+            }
+            // The rules and each selector in another order: the order they were
+            // authored in decides nothing.
+            Self::PolicyReordered => {
+                let rules = app["coverage"]["rules"].as_array_mut().unwrap();
+                rules.reverse();
+                rules[0]["requestedLocales"] = json!(["he-IL", "ja"]);
+            }
             _ => unreachable!("only every role recipes reach here"),
         }
         value
@@ -345,6 +502,86 @@ pub(super) const SCALE_LANGUAGES: &str = concat!(
     "lt lu lv mg mh mi mk ml mn mr ms mt my na nb nd ne ng nl nn no nr nv ny ", // spellchecker:disable-line
     "oc oj om or os pa pi pl"
 );
+
+fn push_rule(app: &mut Value, rule: Value) {
+    app["coverage"]["rules"].as_array_mut().unwrap().push(rule);
+}
+
+/// A rule over `en` and `ja` for `nav` alone, in the mode the `ja` rule does
+/// not use.
+fn conflicting_rule() -> Value {
+    json!({
+        "requestedLocales": ["en", "ja"],
+        "intentSurfaceClasses": ["nav"],
+        "mode": "direct-required"
+    })
+}
+
+/// The minimal declaration requesting `requested`, the first its default and
+/// its target's request.
+fn requesting(requested: &[&str]) -> Value {
+    let mut value = minimal_config();
+    let app = &mut value["profiles"]["app"];
+    app["requestedLocales"] = json!(requested);
+    app["defaultRequestedLocale"] = json!(requested[0]);
+    app["targetProfiles"]["browser"]["requestedLocales"] = json!([requested[0]]);
+    value
+}
+
+fn scale_languages() -> Vec<&'static str> {
+    SCALE_LANGUAGES.split(' ').collect()
+}
+
+/// 24 aliases, each from one of the first languages to `en`.
+fn alias_scale() -> Value {
+    let mut value = requesting(&["en"]);
+    value["profiles"]["app"]["localeNegotiation"] = json!({
+        "aliases": scale_languages()[..24]
+            .iter()
+            .map(|language| ((*language).to_owned(), json!("en")))
+            .collect::<serde_json::Map<_, _>>()
+    });
+    value
+}
+
+/// 40 requested sources, each falling back to `ja`.
+fn fallback_source_scale() -> Value {
+    let languages = scale_languages();
+    let mut value = requesting(&languages[..40]);
+    value["profiles"]["app"]["messageFallback"] = languages[..40]
+        .iter()
+        .map(|language| ((*language).to_owned(), json!(["ja"])))
+        .collect::<serde_json::Map<_, _>>()
+        .into();
+    value
+}
+
+/// One source, `ja`, falling back through 48 other languages in turn.
+fn fallback_sequence_scale() -> Value {
+    let candidates = scale_languages()
+        .into_iter()
+        .filter(|language| *language != "ja")
+        .take(48)
+        .collect::<Vec<_>>();
+    let mut value = requesting(&["ja"]);
+    value["profiles"]["app"]["messageFallback"] = json!({"ja": candidates});
+    value
+}
+
+/// 60 requested languages, each with a rule of its own: 180 cells, each
+/// compared with every rule.
+fn coverage_rule_scale() -> Value {
+    let languages = scale_languages();
+    let mut value = requesting(&languages[..60]);
+    value["profiles"]["app"]["coverage"] = json!({
+        "defaultMode": "direct-required",
+        "rules": languages[..60]
+            .iter()
+            .map(|language| json!({"requestedLocales": [language], "mode": "fallback-allowed"}))
+            .collect::<Vec<_>>()
+    });
+    value
+}
 
 /// The 128 languages, requested by the project and by its target: 257
 /// spellings, and as many canonical locales as requested ones.
