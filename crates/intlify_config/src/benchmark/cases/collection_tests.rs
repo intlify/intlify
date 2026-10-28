@@ -47,16 +47,16 @@ fn group(rank: usize) -> Unit {
 #[test]
 fn collection_cases_keep_the_186_rows_and_append_after_them() {
     let cases = declarations();
-    assert_eq!(cases.len(), 198);
+    assert_eq!(cases.len(), 213);
     assert!(cases[..186]
         .iter()
         .all(|case| case.operation != Operation::ArtifactCollectionAdmission));
-    assert!(cases[186..].iter().all(|case| {
+    assert!(cases[186..198].iter().all(|case| {
         case.operation == Operation::ArtifactCollectionAdmission
             && case.selector == Selector::Absent
             && case.limit.is_none()
     }));
-    for declaration in &cases[186..] {
+    for declaration in &cases[186..198] {
         // The case's source is its members in submission order, and they
         // are what preparation read.
         let Recipe::ArtifactCollection(recipe) = declaration.fixture else {

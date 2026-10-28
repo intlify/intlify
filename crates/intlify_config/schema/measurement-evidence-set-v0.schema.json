@@ -401,7 +401,7 @@
     },
     "CaseProjection": {
       "additionalProperties": false,
-      "description": "Exactly the applicable 026 Case dimensions. No source path, build revision,\nclock observation, run/record ID, expected result checksum, or sample value.\nArtifact/Target/Release/service-profile and memory-domain fields do not apply\nto these eight internal duration boundaries and are absent, not guessed.",
+      "description": "Exactly the applicable 026 Case dimensions. No source path, build revision,\nclock observation, run/record ID, expected result checksum, or sample value.\nArtifact/Target/Release/service-profile and memory-domain fields do not apply\nto these nine internal duration boundaries and are absent, not guessed.",
       "properties": {
         "category": {
           "$ref": "#/definitions/Category"
@@ -1233,6 +1233,16 @@
         },
         "method": {
           "$ref": "#/definitions/Method"
+        },
+        "resolvedBindingInput": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/InputFacts5"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "resourcePolicyInput": {
           "anyOf": [
@@ -2427,6 +2437,46 @@
       ],
       "type": "object"
     },
+    "InputFacts5": {
+      "additionalProperties": false,
+      "properties": {
+        "inputStorage": {
+          "type": "string"
+        },
+        "ordinaryOutput": {
+          "type": "string"
+        },
+        "policy": {
+          "type": "string"
+        },
+        "prerequisites": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "selectedProfile": {
+          "type": "string"
+        },
+        "structuralPreparation": {
+          "type": "string"
+        },
+        "submittedMembers": {
+          "$ref": "#/definitions/UInt64"
+        }
+      },
+      "required": [
+        "scope",
+        "selectedProfile",
+        "policy",
+        "submittedMembers",
+        "prerequisites",
+        "inputStorage",
+        "structuralPreparation",
+        "ordinaryOutput"
+      ],
+      "type": "object"
+    },
     "Instrumentation": {
       "additionalProperties": false,
       "description": "What a harness installed while measuring, and what it did not.",
@@ -3180,7 +3230,8 @@
         "locale-canonicalization",
         "locale-resolution",
         "resource-policy-bootstrap",
-        "artifact-collection-admission"
+        "artifact-collection-admission",
+        "resolved-binding-construction"
       ],
       "type": "string"
     },
@@ -3484,6 +3535,16 @@
           },
           "required": ["artifact-collection"],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "resolved-binding": {
+              "$ref": "#/definitions/ResolvedBindingRecipe"
+            }
+          },
+          "required": ["resolved-binding"],
+          "type": "object"
         }
       ]
     },
@@ -3618,6 +3679,26 @@
           "type": "object"
         }
       ]
+    },
+    "ResolvedBindingRecipe": {
+      "enum": [
+        "required-only",
+        "every-reference",
+        "every-reference-reordered",
+        "many-targets",
+        "shared-target-profile",
+        "unreferenced-artifacts",
+        "role-kind-mismatch",
+        "specification-revision-unsupported",
+        "digest-mismatch",
+        "revision-mismatch",
+        "kind-mismatch",
+        "identity-mismatch",
+        "not-found",
+        "many-not-found",
+        "collection-not-admitted"
+      ],
+      "type": "string"
     },
     "ResourcePolicyRecipe": {
       "enum": [
@@ -4002,7 +4083,8 @@
         "schema-prerequisite-unavailable",
         "locale-not-canonicalized",
         "locale-resolution-requested-not-resolved",
-        "artifact-collection-not-admitted"
+        "artifact-collection-not-admitted",
+        "artifact-references-not-resolved"
       ],
       "type": "string"
     },
@@ -4124,7 +4206,15 @@
         "artifact-collection-artifact-canonical-bytes",
         "artifact-collection-evaluation-units",
         "artifact-collection-blocking-issues",
-        "artifact-collection-set-artifacts"
+        "artifact-collection-set-artifacts",
+        "resolved-binding-references",
+        "resolved-binding-distinct-references",
+        "resolved-binding-reference-canonical-bytes",
+        "resolved-binding-set-artifacts",
+        "resolved-binding-evaluation-units",
+        "resolved-binding-not-evaluated-units",
+        "resolved-binding-blocking-issues",
+        "resolved-binding-bindings"
       ],
       "type": "string"
     },

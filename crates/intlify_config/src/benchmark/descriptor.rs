@@ -228,6 +228,8 @@ pub(super) struct Descriptors {
     pub(super) resource_policy_input: Option<super::resource_policy::InputFacts>,
     #[serde(deserialize_with = "Option::deserialize")]
     pub(super) artifact_collection_input: Option<super::artifact_collection::InputFacts>,
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub(super) resolved_binding_input: Option<super::resolved_binding::InputFacts>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -242,6 +244,7 @@ pub(super) enum DescriptorIssue {
     LocaleResolutionInputBindingMismatch,
     ResourcePolicyInputBindingMismatch,
     ArtifactCollectionInputBindingMismatch,
+    ResolvedBindingInputBindingMismatch,
 }
 
 impl Descriptors {
@@ -264,6 +267,7 @@ impl Descriptors {
             admitted_locale_input: admitted(prepared),
             resource_policy_input: policy(prepared),
             artifact_collection_input: collection(prepared),
+            resolved_binding_input: binding(prepared),
         }
     }
 
@@ -316,6 +320,9 @@ impl Descriptors {
         if self.artifact_collection_input != collection(prepared) {
             issues.push(DescriptorIssue::ArtifactCollectionInputBindingMismatch);
         }
+        if self.resolved_binding_input != binding(prepared) {
+            issues.push(DescriptorIssue::ResolvedBindingInputBindingMismatch);
+        }
         issues
     }
 }
@@ -356,6 +363,16 @@ fn collection(prepared: &Prepared) -> Option<super::artifact_collection::InputFa
     match prepared {
         Prepared::ArtifactCollection(prepared) => {
             Some(super::artifact_collection::InputFacts::observe(prepared))
+        }
+        _ => None,
+    }
+}
+
+/// The configuration and collection facts of a Phase 9 exact-resolution case.
+fn binding(prepared: &Prepared) -> Option<super::resolved_binding::InputFacts> {
+    match prepared {
+        Prepared::ResolvedBinding(prepared) => {
+            Some(super::resolved_binding::InputFacts::observe(prepared))
         }
         _ => None,
     }

@@ -7,18 +7,21 @@
 
 use std::sync::Arc;
 
-use crate::artifacts::collection::{read_collection, CollectionLimits};
+use serde_json::Value;
+
+use crate::artifacts::collection::{read_collection, CollectionLimits, FormalCollection};
 use crate::input_limits::{Bound, InputLimits, RawInputLimits, ValueLimits};
 use crate::locale::fixtures::{fixture_pins, FixtureProvider};
 use crate::locale::Canonicalizer;
 use crate::materialize::materialize_file;
+use crate::model::ProfileId;
 use crate::resolver::limits::{ConfirmedPolicy, ImplementationCapability};
 use crate::structural::selection::{InvalidSelectorType, Selection, SelectorInput};
 use crate::structural::StructuralLimits;
 
 use super::super::locale_icu4x::PreparedEngine;
 use super::super::observation::Observation;
-use super::super::operation::{Operation, Output, Prepared, Schema};
+use super::super::operation::{Analysis, Config, Operation, Output, Prepared, Schema};
 use super::super::work::LogicalWork;
 use super::policy_inputs::capacity;
 use super::{
@@ -92,6 +95,9 @@ pub(in crate::benchmark) fn prepare(
     }
     if declaration.operation == Operation::ArtifactCollectionAdmission {
         return prepare_collection(declaration);
+    }
+    if declaration.operation == Operation::ResolvedBindingConstruction {
+        return prepare_bindings(declaration);
     }
     let source = declaration.fixture.source();
     let (mut input_limits, mut structural_limits) = fixture_capacity();
@@ -200,7 +206,8 @@ pub(in crate::benchmark) fn prepare(
             | Operation::LocaleCanonicalization
             | Operation::LocaleResolution
             | Operation::ResourcePolicyBootstrap
-            | Operation::ArtifactCollectionAdmission => unreachable!(),
+            | Operation::ArtifactCollectionAdmission
+            | Operation::ResolvedBindingConstruction => unreachable!(),
         }
     };
     // Only dispatch is repeated here; both reference preparation and timed calls
@@ -221,7 +228,8 @@ pub(in crate::benchmark) fn prepare(
         }
         Prepared::LocaleResolution(_)
         | Prepared::ResourcePolicy(_)
-        | Prepared::ArtifactCollection(_) => {
+        | Prepared::ArtifactCollection(_)
+        | Prepared::ResolvedBinding(_) => {
             unreachable!("Phases 7, 4, and 9 have their own preparation")
         }
     };
@@ -519,7 +527,7 @@ fn prepare_policy(declaration: &Declaration) -> Result<Candidate, PreparationFai
     let Recipe::ResourcePolicy(recipe) = declaration.fixture else {
         return Err(PreparationFailure::UndeclaredCase);
     };
-    let (input_limits, structural_limits) = fixture_capacity();
+    let (input_limits, _) = fixture_capacity();
     let mut capability = capacity();
     let mut policy = capability.clone();
     if let Some((kind, edge)) = declaration.limit {
@@ -543,37 +551,13 @@ fn prepare_policy(declaration: &Declaration) -> Result<Candidate, PreparationFai
         }
     }
     let fixture = recipe.fixture(&policy);
-    let source =
-        serde_json::to_vec(&fixture.config).map_err(|_| PreparationFailure::CoreInvariant)?;
-    let doc = materialize_file(Arc::from(source), input_limits)
-        .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?;
-    let analysis = Schema::for_model()
-        .map_err(|_| PreparationFailure::CoreInvariant)?
-        .analyze(Arc::new(doc), structural_limits)
-        .map_err(|_| PreparationFailure::CoreInvariant)?;
-    let config = analysis
-        .construct()
-        .map_err(|_| PreparationFailure::CoreInvariant)?
-        .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
-    // The selector is observed under the bound the structural stage ran
-    // under, the capability's `maxProfileIdBytes`.
-    let selector = selector_input(declaration.selector, structural_limits.max_profile_id_bytes);
-    let selection = analysis
-        .select(&selector)
-        .map_err(|_| PreparationFailure::CoreInvariant)?;
-    let Selection::Selected(selected) = selection else {
-        return Err(PreparationFailure::PrerequisiteUnavailable);
-    };
-    let selected = selected.id().clone();
-    let members = fixture
-        .members
-        .iter()
-        .map(serde_json::to_vec)
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|_| PreparationFailure::CoreInvariant)?;
-    let bytes = members.iter().map(Vec::as_slice).collect::<Vec<_>>();
-    let collection = read_collection(Some(&bytes), &COLLECTION_LIMITS)
-        .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?;
+    let SelectedConfig {
+        analysis,
+        config,
+        selector,
+        selected,
+    } = select_config(&fixture.config, declaration.selector)?;
+    let collection = submitted(&fixture.members)?;
     let profile_ids = config
         .profiles()
         .iter()
@@ -627,15 +611,7 @@ fn prepare_collection(declaration: &Declaration) -> Result<Candidate, Preparatio
     let Recipe::ArtifactCollection(recipe) = declaration.fixture else {
         return Err(PreparationFailure::UndeclaredCase);
     };
-    let members = recipe
-        .members()
-        .iter()
-        .map(serde_json::to_vec)
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|_| PreparationFailure::CoreInvariant)?;
-    let bytes = members.iter().map(Vec::as_slice).collect::<Vec<_>>();
-    let collection = read_collection(Some(&bytes), &COLLECTION_LIMITS)
-        .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?;
+    let collection = submitted(&recipe.members())?;
     let prepared = PreparedCollection {
         policy: ConfirmedPolicy::fixture_owned(capacity()),
         collection,
@@ -664,6 +640,111 @@ fn prepare_collection(declaration: &Declaration) -> Result<Candidate, Preparatio
         observation,
         logical_work,
     })
+}
+
+/// Phase 9's exact resolution over a recipe's configuration, selected with
+/// `app`, and its collection, read at 015's pre-invocation boundary and
+/// admitted into the Set under the policy whose bounds its Resource Limit
+/// Policy sets.
+fn prepare_bindings(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
+    use crate::benchmark::resolved_binding::PreparedBindings;
+
+    let Recipe::ResolvedBinding(recipe) = declaration.fixture else {
+        return Err(PreparationFailure::UndeclaredCase);
+    };
+    let fixture = recipe.fixture();
+    let SelectedConfig {
+        analysis,
+        config,
+        selected,
+        ..
+    } = select_config(&fixture.config, declaration.selector)?;
+    let prepared = PreparedBindings {
+        analysis,
+        config,
+        selected,
+        policy: ConfirmedPolicy::fixture_owned(capacity()),
+        collection: submitted(&fixture.members)?,
+    };
+    let resolved = prepared
+        .resolve()
+        .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
+    let kind = match &resolved.result {
+        Ok(Ok(_)) => ExpectedKind::ResolvedBindingConstructed,
+        Ok(Err(_)) => ExpectedKind::ResolvedBindingBlocked,
+        Err(_) => return Err(PreparationFailure::Observation),
+    };
+    if declaration.expected_kind != kind {
+        return Err(PreparationFailure::UnexpectedOutputKind);
+    }
+    let output = Output::ResolvedBinding(resolved);
+    let prepared = Prepared::ResolvedBinding(Box::new(prepared));
+    let observation = output
+        .observe()
+        .map_err(|_| PreparationFailure::Observation)?;
+    let logical_work =
+        LogicalWork::observe(&prepared, &output).map_err(|_| PreparationFailure::Observation)?;
+    Ok(Candidate {
+        declaration: declaration.clone(),
+        input_limits: Some(fixture_capacity().0),
+        prepared,
+        output,
+        observation,
+        logical_work,
+    })
+}
+
+/// A complete configuration and the declaration its selector selects.
+struct SelectedConfig {
+    analysis: Analysis,
+    config: Config,
+    selector: SelectorInput,
+    selected: ProfileId,
+}
+
+/// `config` through Phases 1 to 3 under the fixture capacity: materialized,
+/// analyzed into a complete model, and selected with `selector`.
+fn select_config(config: &Value, selector: Selector) -> Result<SelectedConfig, PreparationFailure> {
+    let (input_limits, structural_limits) = fixture_capacity();
+    let source = serde_json::to_vec(config).map_err(|_| PreparationFailure::CoreInvariant)?;
+    let doc = materialize_file(Arc::from(source), input_limits)
+        .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?;
+    let analysis = Schema::for_model()
+        .map_err(|_| PreparationFailure::CoreInvariant)?
+        .analyze(Arc::new(doc), structural_limits)
+        .map_err(|_| PreparationFailure::CoreInvariant)?;
+    let config = analysis
+        .construct()
+        .map_err(|_| PreparationFailure::CoreInvariant)?
+        .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
+    // The selector is observed under the bound the structural stage ran
+    // under, the capability's `maxProfileIdBytes`.
+    let selector = selector_input(selector, structural_limits.max_profile_id_bytes);
+    let selection = analysis
+        .select(&selector)
+        .map_err(|_| PreparationFailure::CoreInvariant)?;
+    let Selection::Selected(selected) = selection else {
+        return Err(PreparationFailure::PrerequisiteUnavailable);
+    };
+    let selected = selected.id().clone();
+    Ok(SelectedConfig {
+        analysis,
+        config,
+        selector,
+        selected,
+    })
+}
+
+/// `members`, in submission order, read at 015's pre-invocation boundary.
+fn submitted(members: &[Value]) -> Result<FormalCollection, PreparationFailure> {
+    let members = members
+        .iter()
+        .map(serde_json::to_vec)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| PreparationFailure::CoreInvariant)?;
+    let bytes = members.iter().map(Vec::as_slice).collect::<Vec<_>>();
+    read_collection(Some(&bytes), &COLLECTION_LIMITS)
+        .map_err(|_| PreparationFailure::PrerequisiteUnavailable)
 }
 
 /// Only finite, non-secret owner fixture literals enter this constructor.

@@ -87,7 +87,7 @@ fn issues(resolved: &Resolved) -> Vec<(String, Code)> {
 #[test]
 fn resolution_cases_keep_their_rows_and_append_after_the_icu4x_rows() {
     let cases = declarations();
-    assert_eq!(cases.len(), 198);
+    assert_eq!(cases.len(), 213);
     let resolution = |cases: &[Declaration]| {
         cases
             .iter()

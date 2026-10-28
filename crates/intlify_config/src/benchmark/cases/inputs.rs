@@ -54,6 +54,7 @@ pub(in crate::benchmark) enum Recipe {
     },
     ResourcePolicy(super::ResourcePolicyRecipe),
     ArtifactCollection(super::ArtifactCollectionRecipe),
+    ResolvedBinding(super::ResolvedBindingRecipe),
 }
 
 impl Recipe {
@@ -101,6 +102,14 @@ impl Recipe {
             return Arc::from(
                 serde_json::to_vec(&recipe.members())
                     .expect("finite owner artifact-collection fixture"),
+            );
+        }
+        if let Self::ResolvedBinding(recipe) = self {
+            // The configuration whose selected declaration the references
+            // come from; the input context binds the members.
+            return Arc::from(
+                serde_json::to_vec(&recipe.fixture().config)
+                    .expect("finite owner resolved-binding fixture"),
             );
         }
         let raw: Option<&[u8]> = match self {
@@ -182,7 +191,7 @@ impl Recipe {
     }
 }
 
-fn reverse_objects(value: &mut Value) {
+pub(super) fn reverse_objects(value: &mut Value) {
     match value {
         Value::Object(object) => {
             for value in object.values_mut() {

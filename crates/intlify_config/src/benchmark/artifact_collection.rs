@@ -200,8 +200,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
 
 /// A blocking result of the collection: its unit, code, and reason. Each of
 /// the four reasons is a collection failure's, so one without a reason is a
-/// defect.
-fn issue(frame: &mut Frame, key: &IssueKey) -> Result<(), OutputFailure> {
+/// defect. Exact resolution frames the causes a missing Set leaves with it.
+pub(super) fn issue(frame: &mut Frame, key: &IssueKey) -> Result<(), OutputFailure> {
     unit(frame, key.unit())?;
     frame.text(key.code().as_str());
     let reason = key
@@ -220,7 +220,7 @@ fn causes(frame: &mut Frame, causes: &Causes) -> Result<(), OutputFailure> {
     Ok(())
 }
 
-fn tuple(frame: &mut Frame, tuple: &ExactTuple) {
+pub(super) fn tuple(frame: &mut Frame, tuple: &ExactTuple) {
     frame.text(tuple.kind.spelling());
     frame.text(tuple.identity.as_str());
     frame.text(tuple.revision.as_str());

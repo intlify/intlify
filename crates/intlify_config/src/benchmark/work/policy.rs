@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::artifacts::envelope::{ArtifactKind, Declaration, FormalMember};
+use crate::artifacts::envelope::{ArtifactKind, Declaration, ExactTuple, FormalMember};
 use crate::benchmark::resource_policy::{require_observable, PreparedPolicy, Resolved};
 use crate::model::{ProfileDeclaration, RequiredNullable};
 use crate::references::{PolicyReference, TargetProfileReference};
@@ -31,11 +31,12 @@ const fn nullable(slot: &RequiredNullable<PolicyReference>) -> Option<&PolicyRef
     }
 }
 
-/// The canonical bytes of every present `policies` reference and each
-/// target's `profile`; an explicit `null` is no reference.
-fn references(
+/// Every present `policies` reference and each target's `profile`, as the
+/// exact tuple it names and its canonical bytes; an explicit `null` is no
+/// reference.
+pub(super) fn references(
     declaration: &ProfileDeclaration<PolicyReference, TargetProfileReference>,
-) -> Vec<u64> {
+) -> Vec<(ExactTuple, u64)> {
     let slots = &declaration.policies;
     [
         Some(&slots.resource_limits),
@@ -48,12 +49,12 @@ fn references(
     ]
     .into_iter()
     .flatten()
-    .map(PolicyReference::canonical_bytes)
+    .map(|reference| (reference.tuple(), reference.canonical_bytes()))
     .chain(
         declaration
             .target_profiles
             .values()
-            .map(|target| target.profile.canonical_bytes()),
+            .map(|target| (target.profile.tuple(), target.profile.canonical_bytes())),
     )
     .collect()
 }
@@ -130,7 +131,7 @@ impl LogicalWork {
             (WorkKind::ResourcePolicyReferences, count(references.len())?),
             (
                 WorkKind::ResourcePolicyReferenceCanonicalBytes,
-                sum(references.into_iter())?,
+                sum(references.iter().map(|(_, bytes)| *bytes))?,
             ),
         ] {
             self.set(kind, WorkStage::PreparedInput, WorkValue::exact(value));
@@ -212,7 +213,7 @@ mod tests {
         // Both nullable `policies` present, and the server target too.
         let complete = declared(&complete_config());
         assert_eq!(complete.len(), 9);
-        assert!(complete.iter().all(|&bytes| bytes > 0));
+        assert!(complete.iter().all(|(_, bytes)| *bytes > 0));
     }
 
     /// A collection the evaluation never checked is no workload of it.

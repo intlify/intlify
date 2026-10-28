@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Finite owner case declarations for the eight active boundaries.
+//! Finite owner case declarations for the nine active boundaries.
 //! This is not a common Run Plan, case-identity codec, or a complete 015 suite.
 //! Preparation yields an unadmitted candidate; the separate fixture registry
 //! binds its exact input/result/work before method-bound collection can use it.
@@ -18,6 +18,8 @@ mod policy_inputs;
 pub(super) use policy_inputs::ResourcePolicyRecipe;
 mod collection_inputs;
 pub(super) use collection_inputs::ArtifactCollectionRecipe;
+mod binding_inputs;
+pub(super) use binding_inputs::ResolvedBindingRecipe;
 mod context;
 pub(super) mod prepare;
 pub(super) mod registry;
@@ -102,6 +104,8 @@ pub(super) enum ExpectedKind {
     ResourcePolicyBlocked,
     ArtifactCollectionAdmitted,
     ArtifactCollectionBlocked,
+    ResolvedBindingConstructed,
+    ResolvedBindingBlocked,
 }
 
 #[derive(
@@ -303,7 +307,8 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 Operation::LocaleCanonicalization
                 | Operation::LocaleResolution
                 | Operation::ResourcePolicyBootstrap
-                | Operation::ArtifactCollectionAdmission => unreachable!(),
+                | Operation::ArtifactCollectionAdmission
+                | Operation::ResolvedBindingConstruction => unreachable!(),
             };
             let selector = if operation == Operation::ProfileSelection {
                 Selector::App
@@ -606,6 +611,22 @@ pub(super) fn declarations() -> Vec<Declaration> {
             },
         ));
     }
+    // Append 015 Phase 9's exact resolution and bindings without changing
+    // any of the 198 rows: every recipe, and no bound edge, since Phase 4
+    // counted the references under the capability and rechecked them under
+    // the confirmed policy, and Phase 9 counts nothing again.
+    for recipe in ResolvedBindingRecipe::ALL {
+        cases.push(declaration(
+            Operation::ResolvedBindingConstruction,
+            Recipe::ResolvedBinding(recipe),
+            Selector::App,
+            if recipe.binds() {
+                ExpectedKind::ResolvedBindingConstructed
+            } else {
+                ExpectedKind::ResolvedBindingBlocked
+            },
+        ));
+    }
     cases
 }
 
@@ -660,3 +681,6 @@ mod policy_tests;
 
 #[cfg(test)]
 mod collection_tests;
+
+#[cfg(test)]
+mod binding_tests;

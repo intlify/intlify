@@ -62,8 +62,8 @@ fn all_active_pairs_keep_distinct_owner_boundaries_and_exact_method_meaning() {
         );
         assert!(!decoded.method.estimated_overhead_subtraction);
     }
-    assert_eq!(pairs.len(), 8);
-    assert_eq!(identities.len(), 8);
+    assert_eq!(pairs.len(), 9);
+    assert_eq!(identities.len(), 9);
 }
 
 #[test]
@@ -413,6 +413,7 @@ fn resource_policy_descriptor_binds_the_capability_and_the_collection() {
         "localeResolutionInput",
         "admittedLocaleInput",
         "artifactCollectionInput",
+        "resolvedBindingInput",
     ] {
         assert_eq!(encoded[field], Value::Null, "{field}");
     }
@@ -465,6 +466,7 @@ fn artifact_collection_descriptor_binds_the_policy_and_the_collection() {
         "localeResolutionInput",
         "admittedLocaleInput",
         "resourcePolicyInput",
+        "resolvedBindingInput",
     ] {
         assert_eq!(encoded[field], Value::Null, "{field}");
     }
@@ -492,6 +494,66 @@ fn artifact_collection_descriptor_binds_the_policy_and_the_collection() {
                 .artifact_collection_input
                 .is_some(),
             operation.operation() == Operation::ArtifactCollectionAdmission
+        );
+    }
+}
+
+#[test]
+fn resolved_binding_descriptor_binds_the_configuration_and_the_collection() {
+    use crate::benchmark::cases::prepare::prepare;
+    use crate::benchmark::cases::{declarations, Recipe, ResolvedBindingRecipe};
+
+    let mut operation = prepared(Operation::ResolvedBindingConstruction);
+    let descriptors = Descriptors::for_acquisition(&operation, clock(1));
+    assert_eq!(descriptors.execution.scratch_reuse_state, "fresh");
+    let encoded = serde_json::to_value(&descriptors).unwrap();
+    // 015's pair for the exact resolution and the bindings.
+    let boundary = &encoded["boundary"];
+    assert_eq!(boundary["identity"], "resolved-binding-construction/0");
+    assert_eq!(boundary["phase"], "profile_artifact_admit");
+    assert_eq!(boundary["cost"], "resolved_binding_construction");
+    let input = &encoded["resolvedBindingInput"];
+    assert_eq!(input["selectedProfile"], "app");
+    assert_eq!(input["submittedMembers"], "6");
+    for field in [
+        "localeInput",
+        "localeResolutionInput",
+        "admittedLocaleInput",
+        "resourcePolicyInput",
+        "artifactCollectionInput",
+    ] {
+        assert_eq!(encoded[field], Value::Null, "{field}");
+    }
+    // Another collection is another input.
+    let every = declarations()
+        .into_iter()
+        .find(|case| case.fixture == Recipe::ResolvedBinding(ResolvedBindingRecipe::EveryReference))
+        .unwrap();
+    let Prepared::ResolvedBinding(other) = prepare(&every).unwrap().prepared else {
+        unreachable!()
+    };
+    let Prepared::ResolvedBinding(bindings) = &mut operation else {
+        unreachable!()
+    };
+    bindings.collection = other.collection;
+    assert_eq!(
+        descriptors.validate(&operation, clock(1)),
+        [DescriptorIssue::ResolvedBindingInputBindingMismatch]
+    );
+    let original = prepared(Operation::ResolvedBindingConstruction);
+    let mut missing = encoded;
+    missing["resolvedBindingInput"] = Value::Null;
+    let decoded: Descriptors = serde_json::from_value(missing).unwrap();
+    assert_eq!(
+        decoded.validate(&original, clock(1)),
+        [DescriptorIssue::ResolvedBindingInputBindingMismatch]
+    );
+    for operation in &operations() {
+        assert_eq!(
+            Descriptors::for_acquisition(operation, clock(1))
+                .resolved_binding_input
+                .is_some(),
+            operation.operation() == Operation::ResolvedBindingConstruction
         );
     }
 }
