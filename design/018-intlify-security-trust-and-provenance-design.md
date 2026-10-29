@@ -240,7 +240,7 @@ The reserved members exist only to be refused; no revision gives them a meaning.
 
 ### Bootstrap work
 
-Authenticating the selected candidate, one pin lookup, is one unit of 015's `bootstrapOnly.artifactBootstrap.maxValidationWorkUnits`, and so are checking its integrity and evaluating its common body; `maxDecodedAllocationBytes` counts the candidate's canonical bytes `C(member)`. Admitting a Trust Policy content or another Resource Limit Policy content is ordinary collection admission under 015's `artifactAdmission` bounds. 015's Capability Specification implements this accounting.
+Authenticating the selected candidate, one pin lookup, is one unit of 015's `bootstrapOnly.artifactBootstrap.maxValidationWorkUnits`, and so are checking its integrity and evaluating its common body; `maxDecodedAllocationBytes` counts the UTF-8 bytes of the strings and keys decoded from the candidate's content. Admitting a Trust Policy content or another Resource Limit Policy content is ordinary collection admission under 015's `artifactAdmission` bounds. 015's Capability Specification implements this accounting.
 
 ## Minimum Web Localization Extension
 
