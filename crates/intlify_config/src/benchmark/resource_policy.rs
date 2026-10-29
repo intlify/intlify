@@ -256,7 +256,17 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::SupportedDefault
         | Check::KnownMember
         | Check::UniqueMember
-        | Check::SingleGroup => return Err(OutputFailure::ResourcePolicyInvariant),
+        | Check::SingleGroup
+        | Check::KnownEndpoints
+        | Check::DistinctEndpoints
+        | Check::SameGroupEndpoints
+        | Check::UniqueRelation
+        | Check::ServerRole
+        | Check::ClientRole
+        | Check::SameRequestedLocales
+        | Check::SameEffectiveDefault
+        | Check::StaticCompatibility
+        | Check::SingleRole => return Err(OutputFailure::ResourcePolicyInvariant),
     });
     Ok(())
 }

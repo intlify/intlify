@@ -19,6 +19,7 @@ use super::artifact_resolution::CollectionSubject;
 use super::coverage::CoverageSubject;
 use super::fallback::FallbackSubject;
 use super::groups::GroupSubject;
+use super::hydration::HydrationSubject;
 use super::identity::DeclarationField;
 use super::limits::BoundId;
 use super::locales::LocaleSubject;
@@ -110,6 +111,9 @@ pub(crate) enum Subject {
     /// The declaration's groups and their members, one group or member, or a
     /// Target ID's place among the groups.
     Group(GroupSubject),
+    /// The declaration's hydration relations, one relation, or a Target ID's
+    /// roles within one group.
+    Hydration(HydrationSubject),
 }
 
 /// The check a unit runs, declared in rank order within a subject kind.
@@ -174,6 +178,26 @@ pub(crate) enum Check {
     UniqueMember,
     /// The Target ID is a member of exactly one group.
     SingleGroup,
+    /// Both endpoints of the relation name declared Target IDs.
+    KnownEndpoints,
+    /// The relation's endpoints are two Target IDs.
+    DistinctEndpoints,
+    /// Both endpoints are members of the relation's group.
+    SameGroupEndpoints,
+    /// The relation occurs once in its group.
+    UniqueRelation,
+    /// The server endpoint's Target Profile renders server-side.
+    ServerRole,
+    /// The client endpoint's Target Profile hydrates in the browser.
+    ClientRole,
+    /// Both endpoints request the same locales.
+    SameRequestedLocales,
+    /// Both endpoints have the same effective default.
+    SameEffectiveDefault,
+    /// Nothing statically known makes the two Target Profiles incompatible.
+    StaticCompatibility,
+    /// The Target ID takes one role within its group's relations.
+    SingleRole,
 }
 
 /// One atomic evaluation unit. Units order as 015 evaluates and commits them:
@@ -216,6 +240,9 @@ pub(crate) enum Code {
     GroupMemberDuplicate,
     TargetUnassigned,
     TargetAssignedToMultipleGroups,
+    HydrationRelationInvalid,
+    HydrationLocalePolicyIncompatible,
+    HydrationCapabilityIncompatible,
     ResourcePolicyNotAdmitted,
     ResourcePolicyCapabilityIncompatible,
     ResourceLimitExceeded,
@@ -278,6 +305,13 @@ impl Code {
             Self::TargetAssignedToMultipleGroups => {
                 "project-profile-target-assigned-to-multiple-groups"
             }
+            Self::HydrationRelationInvalid => "project-profile-hydration-relation-invalid",
+            Self::HydrationLocalePolicyIncompatible => {
+                "project-profile-hydration-locale-policy-incompatible"
+            }
+            Self::HydrationCapabilityIncompatible => {
+                "project-profile-hydration-capability-incompatible"
+            }
             Self::ResourcePolicyNotAdmitted => "project-profile-resource-policy-not-admitted",
             Self::ResourcePolicyCapabilityIncompatible => {
                 "project-profile-resource-policy-capability-incompatible"
@@ -322,6 +356,15 @@ pub(crate) enum Reason {
     KindUnsupported,
     ExplicitOverride,
     InheritedProjectDefault,
+    EqualEndpoint,
+    UnknownEndpoint,
+    CrossGroup,
+    DuplicateRelation,
+    ServerCapabilityMissing,
+    ClientCapabilityMissing,
+    DualRole,
+    RequestedLocales,
+    EffectiveDefault,
 }
 
 impl Reason {
@@ -359,6 +402,15 @@ impl Reason {
             Self::KindUnsupported => "kind-unsupported",
             Self::ExplicitOverride => "explicit-override",
             Self::InheritedProjectDefault => "inherited-project-default",
+            Self::EqualEndpoint => "equal-endpoint",
+            Self::UnknownEndpoint => "unknown-endpoint",
+            Self::CrossGroup => "cross-group",
+            Self::DuplicateRelation => "duplicate-relation",
+            Self::ServerCapabilityMissing => "server-capability-missing",
+            Self::ClientCapabilityMissing => "client-capability-missing",
+            Self::DualRole => "dual-role",
+            Self::RequestedLocales => "requested-locales",
+            Self::EffectiveDefault => "effective-default",
         }
     }
 }
@@ -747,6 +799,9 @@ mod tests {
                 Code::GroupMemberDuplicate,
                 Code::TargetUnassigned,
                 Code::TargetAssignedToMultipleGroups,
+                Code::HydrationRelationInvalid,
+                Code::HydrationLocalePolicyIncompatible,
+                Code::HydrationCapabilityIncompatible,
                 Code::ResourcePolicyNotAdmitted,
                 Code::ResourcePolicyCapabilityIncompatible,
                 Code::ResourceLimitExceeded,
@@ -781,6 +836,9 @@ mod tests {
                 "project-profile-group-member-duplicate",
                 "project-profile-target-unassigned",
                 "project-profile-target-assigned-to-multiple-groups",
+                "project-profile-hydration-relation-invalid",
+                "project-profile-hydration-locale-policy-incompatible",
+                "project-profile-hydration-capability-incompatible",
                 "project-profile-resource-policy-not-admitted",
                 "project-profile-resource-policy-capability-incompatible",
                 "project-profile-resource-limit-exceeded",
@@ -820,6 +878,15 @@ mod tests {
                 Reason::KindUnsupported,
                 Reason::ExplicitOverride,
                 Reason::InheritedProjectDefault,
+                Reason::EqualEndpoint,
+                Reason::UnknownEndpoint,
+                Reason::CrossGroup,
+                Reason::DuplicateRelation,
+                Reason::ServerCapabilityMissing,
+                Reason::ClientCapabilityMissing,
+                Reason::DualRole,
+                Reason::RequestedLocales,
+                Reason::EffectiveDefault,
             ]
             .map(Reason::as_str),
             [
@@ -855,6 +922,15 @@ mod tests {
                 "kind-unsupported",
                 "explicit-override",
                 "inherited-project-default",
+                "equal-endpoint",
+                "unknown-endpoint",
+                "cross-group",
+                "duplicate-relation",
+                "server-capability-missing",
+                "client-capability-missing",
+                "dual-role",
+                "requested-locales",
+                "effective-default",
             ]
         );
     }

@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! 015's Semantic Profile Resolver over one invocation: Phase 0 and Phases 4
-//! to 12 of the Deterministic Resolution Algorithm, in 015's order, over one
+//! to 13 of the Deterministic Resolution Algorithm, in 015's order, over one
 //! evaluation. Each phase takes the values the earlier ones admitted, or the
 //! causes of their absence, and evaluates every check whose prerequisites were
 //! admitted, so a blocking result leaves only the checks that depend on it not
@@ -12,9 +12,8 @@
 //! results: a configuration structural admission admitted whole, and the
 //! declaration Phase 3 provisionally selected in it. What the entry returns is
 //! crate-private semantic state, not a `LocalizationProjectProfile`, a checked
-//! or blocked outcome, or Resolution Evidence. Hydration validation comes with
-//! the rest of 015's Implementation Phase 4, and the profile projection with
-//! its Implementation Phase 5.
+//! or blocked outcome, or Resolution Evidence. The profile projection is 015's
+//! Implementation Phase 5.
 
 use crate::artifacts::collection::FormalCollection;
 use crate::artifacts::vocabulary::FormalVocabulary;
@@ -33,6 +32,7 @@ use super::evaluation::{Admitted, Causes, Evaluation, EvaluationInvariant};
 use super::exact_resolution::{resolve_fields, ArtifactBindings, ResolvedReferences};
 use super::fallback::{resolve_fallback, MessageFallbackPolicy};
 use super::groups::{resolve_groups, ResolvedGroups};
+use super::hydration::{validate_hydration, ResolvedHydration, TargetCapabilities};
 use super::identity::{resolve_project_identity, ProjectIdentity};
 use super::limits::ImplementationCapability;
 use super::locales::{resolve_locales, LocaleFields, LocaleInvariant, ResolvedLocales};
@@ -119,14 +119,17 @@ impl<'a> CompleteConfiguration<'a> {
 /// One invocation's inputs besides the configuration, as resolver
 /// construction and 015's pre-invocation boundary admitted them: what the
 /// resolver supports, the Profile Resolution Specification Input, the Admitted
-/// Implementation Capability, 018's admission, and the formally admitted
-/// collection and vocabulary. Until 015's Implementation Phase 5 constructs
-/// them, only tests do.
-pub(crate) struct Invocation<'a, Id, V> {
+/// Implementation Capability, 018's admission, 024's answers about Target
+/// Profiles, and the formally admitted collection and vocabulary. Until 015's
+/// Implementation Phase 5 constructs them, only tests do.
+pub(crate) struct Invocation<'a, Id, V, C> {
     pub(crate) supported: &'a SupportedSpecifications<Id>,
     pub(crate) specifications: &'a SpecificationInput<Id>,
     pub(crate) capability: &'a ImplementationCapability,
     pub(crate) verification: &'a V,
+    /// The hydration roles and the static compatibility of Target Profiles,
+    /// which only tests answer until 024 defines them (plan 023 ◆#1).
+    pub(crate) capabilities: &'a C,
     pub(crate) collection: &'a FormalCollection,
     pub(crate) vocabulary: &'a FormalVocabulary,
 }
@@ -163,6 +166,8 @@ pub(crate) struct SemanticState<'s, Id> {
     /// Phase 12: each group's members, and whether the groups partition the
     /// targets.
     pub(crate) groups: Admitted<ResolvedGroups>,
+    /// Phase 13: each group's checked hydration relations.
+    pub(crate) hydration: Admitted<ResolvedHydration>,
 }
 
 /// A resolver defect some phase found, which no input can cause.
@@ -200,14 +205,14 @@ impl From<LocaleInvariant> for ResolverInvariant {
     }
 }
 
-/// Phase 0 and Phases 4 to 12 of one invocation over `evaluation`, in 015's
+/// Phase 0 and Phases 4 to 13 of one invocation over `evaluation`, in 015's
 /// order. `data` is the canonicalization data Phase 5 binds. The Profile
 /// Resolution Artifact Set Phase 9 admits is kept in `set`, which the resolved
 /// references and the bindings borrow.
-pub(crate) fn resolve_profile<'s, P, V>(
+pub(crate) fn resolve_profile<'s, P, V, C>(
     evaluation: &mut Evaluation,
     configuration: &CompleteConfiguration<'_>,
-    invocation: &Invocation<'s, P::Identity, V>,
+    invocation: &Invocation<'s, P::Identity, V, C>,
     data: P,
     set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
 ) -> Result<SemanticState<'s, P::Identity>, ResolverInvariant>
@@ -215,6 +220,7 @@ where
     P: Provider,
     P::Identity: AsRef<str>,
     V: ResourcePolicyVerification,
+    C: TargetCapabilities,
 {
     let declaration = configuration.declaration;
     let declared = configuration.references();
@@ -301,6 +307,16 @@ where
         Ok(&declaration.deployment_groups),
         targets.as_ref(),
     )?;
+    // Every relation shares the negotiation profile; none compares it.
+    let hydration = validate_hydration(
+        evaluation,
+        confirmed,
+        Ok(&declaration.deployment_groups),
+        targets.as_ref(),
+        groups.as_ref(),
+        negotiation.as_ref().map(|_| ()).map_err(Causes::clone),
+        invocation.capabilities,
+    )?;
     Ok(SemanticState {
         specifications: SpecificationSet::new(&project_profile, &admitted),
         vocabulary: admitted.vocabulary,
@@ -315,6 +331,7 @@ where
         delivery,
         targets,
         groups,
+        hydration,
     })
 }
 
@@ -345,6 +362,7 @@ mod tests {
     };
     use crate::resolver::exact_resolution;
     use crate::resolver::groups::{self, GroupSubject};
+    use crate::resolver::hydration::{self, HydrationSubject};
     use crate::resolver::limits::{fixture_limits, ResolutionLimits, SECTION};
     use crate::resolver::locales::fixtures::canonical;
     use crate::resolver::locales::{self, LocaleKey, LocaleSubject, Location};
@@ -403,7 +421,7 @@ mod tests {
     const TRUST: usize = 1;
 
     /// The phases the entry runs, in 015's order.
-    const PHASES: [Phase; 10] = [
+    const PHASES: [Phase; 11] = [
         Phase::ResolverBootstrapAdmission,
         Phase::ResourcePolicyAdmission,
         Phase::SpecificationAdmission,
@@ -414,6 +432,7 @@ mod tests {
         Phase::DeliveryResolution,
         Phase::TargetResolution,
         Phase::GroupResolution,
+        Phase::HydrationValidation,
     ];
 
     /// Phase 0's one unit.
@@ -441,6 +460,50 @@ mod tests {
 
         fn admits_common_body(&self, _: &Map<String, Value>) -> bool {
             true
+        }
+    }
+
+    /// 024's answers as a test states them: the Target Profiles, by identity,
+    /// that render server-side and that hydrate in the browser.
+    struct Roles {
+        renders: Vec<&'static str>,
+        hydrates: Vec<&'static str>,
+    }
+
+    fn profile_identity(
+        profile: &crate::resolver::artifact_resolution::AdmittedArtifact<'_>,
+    ) -> String {
+        profile
+            .member
+            .envelope()
+            .unwrap()
+            .tuple()
+            .identity
+            .as_str()
+            .to_owned()
+    }
+
+    impl TargetCapabilities for Roles {
+        fn renders_server_side(
+            &self,
+            profile: &crate::resolver::artifact_resolution::AdmittedArtifact<'_>,
+        ) -> bool {
+            self.renders.contains(&profile_identity(profile).as_str())
+        }
+
+        fn hydrates_in_browser(
+            &self,
+            profile: &crate::resolver::artifact_resolution::AdmittedArtifact<'_>,
+        ) -> bool {
+            self.hydrates.contains(&profile_identity(profile).as_str())
+        }
+
+        fn statically_incompatible(
+            &self,
+            _: &crate::resolver::artifact_resolution::AdmittedArtifact<'_>,
+            _: &crate::resolver::artifact_resolution::AdmittedArtifact<'_>,
+        ) -> bool {
+            false
         }
     }
 
@@ -561,12 +624,15 @@ mod tests {
         members: Vec<Value>,
         specifications: SpecificationInput<Id>,
         capability: ResolutionLimits,
+        roles: Roles,
     }
 
     impl Inputs {
         /// Profile `web`: source `en`, requested `ja` and `en`, default `en`,
         /// every optional field declared, and each reference naming one
-        /// submitted artifact exactly; all eight slots asserted. The selected
+        /// submitted artifact exactly; all eight slots asserted. Both targets
+        /// request `ja` and `en`, and the server's Target Profile renders
+        /// server-side and the browser's hydrates in the browser. The selected
         /// policy is submitted first and the trust policy second.
         fn complete() -> Self {
             let mut config = complete_config();
@@ -577,6 +643,7 @@ mod tests {
             web["defaultSourceLocale"] = json!("en");
             web["localeNegotiation"] = json!({"aliases": {"de": "en"}});
             web["targetProfiles"]["browser"]["requestedLocales"] = json!(["ja", "en"]);
+            web["targetProfiles"]["server"]["requestedLocales"] = json!(["ja", "en"]);
             profiles.insert("web".into(), web);
             let policy = resource_limit_policy(&policy_limits());
             let mut inputs = Self {
@@ -584,6 +651,10 @@ mod tests {
                 members: vec![policy.clone()],
                 specifications: specifications(),
                 capability: capability_limits(),
+                roles: Roles {
+                    renders: vec!["storefront-server"],
+                    hydrates: vec!["storefront-browser"],
+                },
             };
             inputs.select_policy(policy);
             for (slot, kind, identity) in POLICIES {
@@ -633,6 +704,10 @@ mod tests {
                 members,
                 specifications: self.specifications.clone(),
                 capability: self.capability.clone(),
+                roles: Roles {
+                    renders: self.roles.renders.clone(),
+                    hydrates: self.roles.hydrates.clone(),
+                },
             }
         }
 
@@ -640,7 +715,7 @@ mod tests {
         /// invocation's other inputs, for `run`.
         fn prepared<R>(
             &self,
-            run: impl FnOnce(&CompleteConfiguration<'_>, &Invocation<'_, Id, Trusting>) -> R,
+            run: impl FnOnce(&CompleteConfiguration<'_>, &Invocation<'_, Id, Trusting, Roles>) -> R,
         ) -> R {
             let analysis = analyze(&self.config, &self.capability);
             let config = analysis.construct().unwrap().unwrap();
@@ -670,6 +745,7 @@ mod tests {
                     specifications: &self.specifications,
                     capability: &capability,
                     verification: &Trusting,
+                    capabilities: &self.roles,
                     collection: &collection,
                     vocabulary: &vocabulary,
                 },
@@ -764,6 +840,13 @@ mod tests {
                     .as_ref()
                     .map_or(true, |groups| groups.partition().is_err()),
             ),
+            (
+                "hydration",
+                state
+                    .hydration
+                    .as_ref()
+                    .map_or(true, |hydration| hydration.complete().is_err()),
+            ),
         ]
         .into_iter()
         .filter_map(|(name, absent)| absent.then_some(name))
@@ -771,7 +854,7 @@ mod tests {
     }
 
     /// Every name `absent` returns when no policy was confirmed.
-    const EVERY: [&str; 13] = [
+    const EVERY: [&str; 14] = [
         "policy",
         "specifications",
         "vocabulary",
@@ -785,9 +868,10 @@ mod tests {
         "delivery",
         "targets",
         "groups",
+        "hydration",
     ];
 
-    /// Whether every unit of Phases 5 to 12 waits on `key` alone.
+    /// Whether every unit of Phases 5 to 13 waits on `key` alone.
     fn later_phases_wait_on(evaluation: &Evaluation, key: &IssueKey) -> bool {
         evaluation
             .statuses()
@@ -861,7 +945,7 @@ mod tests {
             let targets = state.targets.as_ref().unwrap();
             for (id, requested, default) in [
                 ("browser", vec!["en", "ja"], "en"),
-                ("server", vec!["en"], "en"),
+                ("server", vec!["en", "ja"], "en"),
             ] {
                 let id: crate::model::TargetId = serde_json::from_value(json!(id)).unwrap();
                 let target = targets.get(&id).unwrap().resolved.as_ref().unwrap();
@@ -885,6 +969,17 @@ mod tests {
                 })
                 .collect();
             assert_eq!(members, [("web", vec!["browser", "server"])]);
+            // The server hydrates the browser.
+            let hydration = state.hydration.as_ref().unwrap();
+            let relations: Vec<(&str, &str)> = hydration
+                .get(&serde_json::from_value(json!("web")).unwrap())
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|(server, client)| (server.as_str(), client.as_str()))
+                .collect();
+            assert_eq!(relations, [("server", "browser")]);
             assert_eq!(absent(&state), Vec::<&str>::new());
             assert_eq!(
                 state.policy.selector_length,
@@ -1119,14 +1214,22 @@ mod tests {
                 )
             );
             // The bootstrap checks only the selected policy's candidates. The
-            // targets are checked, but their Target Profiles need the Set.
-            assert_eq!(absent(&state), ["references", "bindings", "targets"]);
-            // No Set: every reference waits on the collection.
+            // targets are checked, but their Target Profiles need the Set, and
+            // so do the relation's roles.
+            assert_eq!(
+                absent(&state),
+                ["references", "bindings", "targets", "hydration"]
+            );
+            // No Set: every reference waits on the collection, and so do the
+            // relation's checks of the two Target Profiles.
             let key = only_issue(&evaluation);
             assert_eq!(
                 suppressed(&evaluation),
                 (
-                    BTreeSet::from([Phase::ArtifactReferenceResolution]),
+                    BTreeSet::from([
+                        Phase::ArtifactReferenceResolution,
+                        Phase::HydrationValidation
+                    ]),
                     BTreeSet::from([key.clone()])
                 )
             );
@@ -1158,7 +1261,10 @@ mod tests {
                     Some(Reason::ConflictingContent)
                 )
             );
-            assert_eq!(absent(&state), ["references", "bindings", "targets"]);
+            assert_eq!(
+                absent(&state),
+                ["references", "bindings", "targets", "hydration"]
+            );
         });
         // Another body of the selected policy is the bootstrap's conflict.
         let mut inputs = Inputs::complete();
@@ -1265,20 +1371,70 @@ mod tests {
     }
 
     #[test]
-    fn a_target_locale_outside_the_project_leaves_only_the_targets_unresolved() {
+    fn a_target_locale_outside_the_project_leaves_the_target_and_its_relation_unresolved() {
         let mut inputs = Inputs::complete();
         inputs.declaration()["targetProfiles"]["server"]["requestedLocales"] = json!(["en", "de"]);
         inputs.resolve(|evaluation, state| {
             let server: crate::model::TargetId = serde_json::from_value(json!("server")).unwrap();
-            let subset = targets::unit(TargetSubject::Target(server), Check::ProjectSubset);
+            let browser: crate::model::TargetId = serde_json::from_value(json!("browser")).unwrap();
+            let subset = targets::unit(TargetSubject::Target(server.clone()), Check::ProjectSubset);
             assert_eq!(
                 issues(&evaluation),
-                [(subset, Code::TargetLocalesNotSubset, None)]
+                [(subset.clone(), Code::TargetLocalesNotSubset, None)]
             );
-            assert!(evaluation
+            // Only the relation's comparison of the two locale sets waits.
+            let compared = hydration::unit(
+                HydrationSubject::Relation(
+                    serde_json::from_value(json!("web")).unwrap(),
+                    server,
+                    browser,
+                ),
+                Check::SameRequestedLocales,
+            );
+            let waiting: Vec<&Unit> = evaluation
                 .statuses()
-                .all(|(_, status)| *status == Status::Evaluated));
-            assert_eq!(absent(&state), ["targets"]);
+                .filter(|(_, status)| **status != Status::Evaluated)
+                .map(|(unit, _)| unit)
+                .collect();
+            assert_eq!(waiting, [&compared]);
+            assert_eq!(absent(&state), ["targets", "hydration"]);
+        });
+    }
+
+    #[test]
+    fn the_relations_share_the_negotiation_profile_and_never_compare_it() {
+        let mut inputs = Inputs::complete();
+        // An alias to a locale the project does not request leaves no
+        // negotiation profile; the relation is checked all the same.
+        inputs.declaration()["localeNegotiation"]["aliases"] = json!({"de": "fr"});
+        inputs.resolve(|evaluation, state| {
+            let key = only_issue(&evaluation);
+            assert_eq!(key.code(), Code::NegotiationAliasDestinationNotRequested);
+            let hydration = state.hydration.as_ref().unwrap();
+            assert_eq!(hydration.complete(), Ok(()));
+            assert_eq!(
+                keys(hydration.negotiation().as_ref().unwrap_err()),
+                BTreeSet::from([key])
+            );
+            assert_eq!(absent(&state), ["negotiation"]);
+        });
+    }
+
+    #[test]
+    fn a_server_without_its_024_role_leaves_only_the_hydration_unresolved() {
+        let mut inputs = Inputs::complete();
+        inputs.roles.renders.clear();
+        inputs.resolve(|evaluation, state| {
+            let [(unit, code, reason)] = issues(&evaluation).try_into().unwrap();
+            assert!(matches!(unit.subject, Subject::Hydration(_)));
+            assert_eq!(
+                (code, reason),
+                (
+                    Code::HydrationRelationInvalid,
+                    Some(Reason::ServerCapabilityMissing)
+                )
+            );
+            assert_eq!(absent(&state), ["hydration"]);
         });
     }
 
