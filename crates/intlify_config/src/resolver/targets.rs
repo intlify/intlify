@@ -68,14 +68,21 @@ pub(crate) struct ResolvedTarget<'s> {
     pub(crate) effective_default: CanonicalLocale,
 }
 
-/// What Phase 11 established of one declared target.
+/// What Phase 11 established of one declared target. A later check reads
+/// only the facts it needs, so one that failed leaves only those checks
+/// unevaluated.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TargetFacts<'s> {
     /// The Target ID within the map's bound and its own: what a later check
     /// that names the target needs, whatever its locales and Target Profile.
     pub(crate) admitted: Admitted<()>,
-    /// The target, once its ID, its locales and their checks, its effective
-    /// default, and its Target Profile were all admitted.
+    /// Its requested locales, once found a subset of the project's.
+    pub(crate) requested: Admitted<LocaleSet>,
+    /// Its effective default, once found one of its requested locales.
+    pub(crate) effective_default: Admitted<CanonicalLocale>,
+    /// The Set's Target Profile its reference names.
+    pub(crate) profile: Admitted<Named<'s>>,
+    /// The target, once every fact above and its repeats check held.
     pub(crate) resolved: Admitted<ResolvedTarget<'s>>,
 }
 
@@ -231,18 +238,26 @@ impl Checks<'_, '_> {
             },
         )?;
         let distinct = own.and_then(|own| own.distinct.clone());
+        let requested = both(requested, subset).map(|(requested, ())| requested);
+        let profile = profile(references, self.id);
         let resolved = both(
-            both(both(requested, distinct), subset),
-            both(default, profile(references, self.id)),
+            both(requested.clone(), distinct),
+            both(default.clone(), profile.clone()),
         )
         .map(
-            |(((requested, ()), ()), (effective_default, profile))| ResolvedTarget {
+            |((requested, ()), (effective_default, profile))| ResolvedTarget {
                 profile,
                 requested,
                 effective_default,
             },
         );
-        Ok(TargetFacts { admitted, resolved })
+        Ok(TargetFacts {
+            admitted,
+            requested,
+            effective_default: default,
+            profile,
+            resolved,
+        })
     }
 }
 
