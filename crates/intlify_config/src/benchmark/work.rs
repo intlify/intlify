@@ -4,9 +4,9 @@
 //! Versioned workload facts for input/structural/selection, single-locale
 //! canonicalization, 015 Phases 7 and 8 locale and locale-policy resolution,
 //! 015 Phase 4 resource policy admission, and 015 Phase 9 collection admission
-//! and exact resolution, and 015 Phases 11 and 12 target and group
-//! resolution. These are not physical metrics, formal Resource Policy
-//! observations, or whole-profile hydration work.
+//! and exact resolution, and 015 Phases 11 to 13 target, group, and
+//! hydration resolution. These are not physical metrics or formal Resource
+//! Policy observations.
 
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +20,7 @@ use super::quantity::Quantity;
 
 mod binding;
 mod collection;
+mod hydration;
 mod policy;
 mod resolution;
 mod target_group;
@@ -99,6 +100,15 @@ pub(super) enum WorkKind {
     TargetAndGroupBlockingIssues,
     TargetAndGroupResolvedTargets,
     TargetAndGroupResolvedGroups,
+    HydrationRelationOccurrences,
+    HydrationDistinctRelations,
+    HydrationMaximumEndpointIdBytes,
+    HydrationRoleTargets,
+    HydrationEvaluationUnits,
+    HydrationNotEvaluatedUnits,
+    HydrationBlockingIssues,
+    HydrationCheckedRelations,
+    HydrationCheckedGroups,
 }
 
 impl WorkKind {
@@ -195,6 +205,18 @@ impl WorkKind {
         Self::TargetAndGroupResolvedGroups,
     ];
 
+    const HYDRATION: [Self; 9] = [
+        Self::HydrationRelationOccurrences,
+        Self::HydrationDistinctRelations,
+        Self::HydrationMaximumEndpointIdBytes,
+        Self::HydrationRoleTargets,
+        Self::HydrationEvaluationUnits,
+        Self::HydrationNotEvaluatedUnits,
+        Self::HydrationBlockingIssues,
+        Self::HydrationCheckedRelations,
+        Self::HydrationCheckedGroups,
+    ];
+
     pub(super) fn for_operation(operation: Operation) -> &'static [Self] {
         match operation {
             Operation::LocaleCanonicalization => &Self::LOCALE,
@@ -203,6 +225,7 @@ impl WorkKind {
             Operation::ArtifactCollectionAdmission => &Self::ARTIFACT_COLLECTION,
             Operation::ResolvedBindingConstruction => &Self::RESOLVED_BINDING,
             Operation::TargetAndGroupResolution => &Self::TARGET_AND_GROUP,
+            Operation::HydrationRelationValidation => &Self::HYDRATION,
             _ => &Self::INPUT,
         }
     }
@@ -218,7 +241,8 @@ impl WorkKind {
             | Self::LocalePolicyResolutionRawIdentifierBytes
             | Self::CanonicalLocaleIdentifierBytes
             | Self::TargetAndGroupMaximumTargetIdBytes
-            | Self::TargetAndGroupMaximumGroupIdBytes => WorkUnit::Utf8Octet,
+            | Self::TargetAndGroupMaximumGroupIdBytes
+            | Self::HydrationMaximumEndpointIdBytes => WorkUnit::Utf8Octet,
             Self::ParserTokensVisited => WorkUnit::ParserToken,
             Self::LogicalValueNodes => WorkUnit::LogicalValue,
             Self::MaximumValueDepth => WorkUnit::ValueLevel,
@@ -232,7 +256,8 @@ impl WorkKind {
             | Self::ResourcePolicyBlockingIssues
             | Self::ArtifactCollectionBlockingIssues
             | Self::ResolvedBindingBlockingIssues
-            | Self::TargetAndGroupBlockingIssues => WorkUnit::RetainedRecord,
+            | Self::TargetAndGroupBlockingIssues
+            | Self::HydrationBlockingIssues => WorkUnit::RetainedRecord,
             Self::LocaleOccurrences
             | Self::LocalePolicyResolutionOccurrences
             | Self::LocalePolicyResolutionCanonicalizedOccurrences
@@ -258,7 +283,9 @@ impl WorkKind {
             | Self::ResolvedBindingEvaluationUnits
             | Self::ResolvedBindingNotEvaluatedUnits
             | Self::TargetAndGroupEvaluationUnits
-            | Self::TargetAndGroupNotEvaluatedUnits => WorkUnit::EvaluationUnit,
+            | Self::TargetAndGroupNotEvaluatedUnits
+            | Self::HydrationEvaluationUnits
+            | Self::HydrationNotEvaluatedUnits => WorkUnit::EvaluationUnit,
             Self::ResourcePolicyArtifactOccurrences
             | Self::ResourcePolicyPolicyArtifacts
             | Self::ResourcePolicyTargetProfileArtifacts
@@ -280,11 +307,15 @@ impl WorkKind {
             Self::LocaleCorrectionSuggestions | Self::LocalePolicyResolutionCorrections => {
                 WorkUnit::CorrectionSuggestion
             }
-            Self::TargetAndGroupTargets | Self::TargetAndGroupResolvedTargets => {
-                WorkUnit::TargetDeclaration
-            }
-            Self::TargetAndGroupGroups | Self::TargetAndGroupResolvedGroups => {
-                WorkUnit::DeploymentGroup
+            Self::TargetAndGroupTargets
+            | Self::TargetAndGroupResolvedTargets
+            | Self::HydrationRoleTargets => WorkUnit::TargetDeclaration,
+            Self::TargetAndGroupGroups
+            | Self::TargetAndGroupResolvedGroups
+            | Self::HydrationCheckedGroups => WorkUnit::DeploymentGroup,
+            Self::HydrationRelationOccurrences => WorkUnit::RelationOccurrence,
+            Self::HydrationDistinctRelations | Self::HydrationCheckedRelations => {
+                WorkUnit::HydrationRelation
             }
             Self::TargetAndGroupMaximumMembersPerGroup
             | Self::TargetAndGroupMembershipOccurrences => WorkUnit::MembershipOccurrence,
@@ -322,6 +353,8 @@ enum WorkUnit {
     TargetDeclaration,
     DeploymentGroup,
     MembershipOccurrence,
+    RelationOccurrence,
+    HydrationRelation,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -405,6 +438,9 @@ impl LogicalWork {
                 Operation::TargetAndGroupResolution => {
                     "intlify-config-target-and-group-resolution-work"
                 }
+                Operation::HydrationRelationValidation => {
+                    "intlify-config-hydration-relation-validation-work"
+                }
                 _ => "intlify-config-minimum-input-work",
             }
             .into(),
@@ -479,6 +515,9 @@ impl LogicalWork {
             }
             (Prepared::TargetAndGroup(prepared), Output::TargetAndGroup(resolved)) => {
                 work.targets(prepared, resolved)?;
+            }
+            (Prepared::Hydration(prepared), Output::Hydration(resolved)) => {
+                work.hydration(prepared, resolved)?;
             }
             _ => return Err(WorkFailure::OperationMismatch),
         }

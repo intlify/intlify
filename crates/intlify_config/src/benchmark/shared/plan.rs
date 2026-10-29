@@ -79,7 +79,7 @@ struct Variant {
 /// Exactly the applicable 026 Case dimensions. No source path, build revision,
 /// clock observation, run/record ID, expected result checksum, or sample value.
 /// Artifact/Target/Release/service-profile and memory-domain fields do not apply
-/// to these ten internal duration boundaries and are absent, not guessed.
+/// to these eleven internal duration boundaries and are absent, not guessed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(in crate::benchmark) struct CaseProjection {

@@ -27,6 +27,7 @@ pub(in crate::benchmark) enum ContextFailure {
     CollectionInputMismatch,
     BindingInputMismatch,
     TargetInputMismatch,
+    HydrationInputMismatch,
 }
 
 pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
@@ -318,6 +319,59 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
             }
             frame.json(
                 &serde_json::to_value(crate::benchmark::target_group::InputFacts::observe(
+                    prepared,
+                ))
+                .map_err(|_| ContextFailure::Encoding)?,
+            );
+        }
+        Prepared::Hydration(prepared) => {
+            // The inputs exist only for a complete root whose configuration
+            // declares the selected profile.
+            if !matches!(candidate.declaration.fixture, Recipe::Hydration(_))
+                || candidate.declaration.selector != super::Selector::App
+                || prepared
+                    .set()
+                    .is_none_or(|set| prepared.inputs(&set).is_none())
+            {
+                return Err(ContextFailure::HydrationInputMismatch);
+            }
+            // As for Phases 11 and 12, with the fixture's answers to what
+            // 015 asks 024.
+            frame.digest(prepared.analysis.benchmark_observation().identity());
+            frame.json(
+                &serde_json::to_value(&prepared.config).map_err(|_| ContextFailure::Encoding)?,
+            );
+            frame.json(
+                &serde_json::to_value(crate::benchmark::locale::InputFacts::observe(
+                    &prepared.canonicalizer,
+                ))
+                .map_err(|_| ContextFailure::Encoding)?,
+            );
+            let members = prepared.collection.members();
+            frame.uint(u64::try_from(members.len()).map_err(|_| ContextFailure::Encoding)?);
+            for member in members {
+                frame.bytes(member.canonical_body());
+            }
+            let read = super::prepare::COLLECTION_LIMITS;
+            for bound in [
+                read.members,
+                read.member_bytes,
+                read.total_bytes,
+                read.depth,
+            ] {
+                frame.uint(bound);
+            }
+            for (id, bound) in prepared.policy.limits().bounds() {
+                frame.text(id.group.path());
+                frame.text(id.name);
+                frame.uint(bound.get());
+            }
+            frame.json(
+                &serde_json::to_value(&prepared.capabilities)
+                    .map_err(|_| ContextFailure::Encoding)?,
+            );
+            frame.json(
+                &serde_json::to_value(crate::benchmark::hydration_relation::InputFacts::observe(
                     prepared,
                 ))
                 .map_err(|_| ContextFailure::Encoding)?,

@@ -60,11 +60,11 @@ fn of_target(id: &str, check: Check) -> Unit {
 #[test]
 fn target_group_cases_keep_the_252_rows_and_append_after_them() {
     let cases = declarations();
-    assert_eq!(cases.len(), 280);
+    assert_eq!(cases.len(), 303);
     assert!(cases[..252]
         .iter()
         .all(|case| case.operation != Operation::TargetAndGroupResolution));
-    assert!(cases[252..].iter().all(|case| {
+    assert!(cases[252..280].iter().all(|case| {
         case.operation == Operation::TargetAndGroupResolution && case.selector == Selector::App
     }));
     // Every recipe once, in its order, and then the twelve edges.
@@ -78,8 +78,8 @@ fn target_group_cases_keep_the_252_rows_and_append_after_them() {
             .map(|recipe| (Recipe::TargetAndGroup(recipe), None))
             .collect::<Vec<_>>()
     );
-    assert!(cases[268..].iter().all(|case| case.limit.is_some()));
-    for declaration in &cases[252..] {
+    assert!(cases[268..280].iter().all(|case| case.limit.is_some()));
+    for declaration in &cases[252..280] {
         // The case's source is the configuration, and the members are what
         // preparation read.
         let Recipe::TargetAndGroup(recipe) = declaration.fixture else {

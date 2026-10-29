@@ -52,19 +52,19 @@ pub(in crate::benchmark) struct TargetAndGroupFixture {
 pub(super) const SCALE: usize = 64;
 
 /// The example's requested locales, which both of its targets request too.
-const STOREFRONT: [&str; 3] = ["en", "fr-FR", "ja"];
+pub(super) const STOREFRONT: [&str; 3] = ["en", "fr-FR", "ja"];
 
 /// One declared target: its ID, the identity of the Target Profile it names,
 /// its requested locales, and its default override.
-struct Target {
-    id: String,
-    profile: &'static str,
-    requested: Vec<&'static str>,
-    default: Option<&'static str>,
+pub(super) struct Target {
+    pub(super) id: String,
+    pub(super) profile: &'static str,
+    pub(super) requested: Vec<&'static str>,
+    pub(super) default: Option<&'static str>,
 }
 
 impl Target {
-    fn new(id: &str, profile: &'static str, requested: &[&'static str]) -> Self {
+    pub(super) fn new(id: &str, profile: &'static str, requested: &[&'static str]) -> Self {
         Self {
             id: id.into(),
             profile,
@@ -74,37 +74,129 @@ impl Target {
     }
 }
 
-/// A declaration's locales, targets, and groups, before they are written.
-struct Declared {
-    requested: Vec<&'static str>,
-    targets: Vec<Target>,
-    groups: Vec<(String, Vec<String>)>,
-    relation: bool,
+/// A declaration's locales, targets, groups, the first group's hydration
+/// relations, and its negotiation aliases, before they are written.
+pub(super) struct Declared {
+    pub(super) requested: Vec<&'static str>,
+    pub(super) targets: Vec<Target>,
+    pub(super) groups: Vec<(String, Vec<String>)>,
+    pub(super) relations: Vec<(String, String)>,
+    pub(super) aliases: Vec<(&'static str, &'static str)>,
 }
 
 impl Declared {
     /// 015's example: `browser`, with its own default, and `ssr`, inheriting
     /// the project's, in the one group `web` with the hydration relation.
-    fn storefront() -> Self {
+    pub(super) fn storefront() -> Self {
         let mut browser = Target::new("browser", "storefront-browser", &STOREFRONT);
         browser.default = Some("en");
         Self {
             requested: STOREFRONT.to_vec(),
             targets: vec![browser, Target::new("ssr", "storefront-ssr", &STOREFRONT)],
             groups: vec![("web".into(), vec!["browser".into(), "ssr".into()])],
-            relation: true,
+            relations: vec![("ssr".into(), "browser".into())],
+            aliases: Vec::new(),
         }
     }
 
-    fn target(&mut self, id: &str) -> &mut Target {
+    pub(super) fn target(&mut self, id: &str) -> &mut Target {
         self.targets
             .iter_mut()
             .find(|target| target.id == id)
             .expect("a target of the example")
     }
 
-    fn members(&mut self) -> &mut Vec<String> {
+    pub(super) fn members(&mut self) -> &mut Vec<String> {
         &mut self.groups[0].1
+    }
+
+    /// The configuration and the members, in submission order. The collection
+    /// submits the policy the confirmed bounds come from, the four other
+    /// required policies, and each named Target Profile once, but those
+    /// `withheld` names. `duplicated` submits the trust policy twice, and
+    /// `reordered` reverses every object's members, each group's members and
+    /// relations, and the collection.
+    pub(super) fn assemble(
+        &self,
+        withheld: &[&str],
+        duplicated: bool,
+        reordered: bool,
+    ) -> TargetAndGroupFixture {
+        let resource_limits = selected_policy(&capacity());
+        let mut config = minimal_config();
+        let declaration = &mut config["profiles"]["app"];
+        declaration["policies"]["resourceLimits"] = reference_value(&tuple_of(&resource_limits));
+        let mut members = vec![resource_limits];
+        for (slot, kind, identity) in REQUIRED {
+            let member = artifact(kind, identity);
+            declaration["policies"][slot] = reference_value(&tuple_of(&member));
+            members.push(member);
+        }
+        declaration["requestedLocales"] = json!(self.requested);
+        let mut targets = Map::new();
+        let mut profiles = Vec::new();
+        for target in &self.targets {
+            let profile = artifact(ArtifactKind::TargetProfile, target.profile);
+            let mut value = json!({
+                "profile": reference_value(&tuple_of(&profile)),
+                "requestedLocales": target.requested,
+            });
+            if let Some(default) = target.default {
+                value["defaultRequestedLocale"] = json!(default);
+            }
+            targets.insert(target.id.clone(), value);
+            if !profiles.contains(&profile) && !withheld.contains(&target.profile) {
+                profiles.push(profile);
+            }
+        }
+        declaration["targetProfiles"] = Value::Object(targets);
+        let mut groups = Map::new();
+        for (id, group) in &self.groups {
+            groups.insert(id.clone(), json!({ "members": group }));
+        }
+        if !self.relations.is_empty() {
+            groups[&self.groups[0].0]["hydrationRelations"] = self
+                .relations
+                .iter()
+                .map(|(server, client)| json!({"server": server, "client": client}))
+                .collect();
+        }
+        declaration["deploymentGroups"] = Value::Object(groups);
+        if !self.aliases.is_empty() {
+            let aliases = self
+                .aliases
+                .iter()
+                .map(|&(key, destination)| (key.to_owned(), json!(destination)))
+                .collect::<Map<_, _>>();
+            declaration["localeNegotiation"] = json!({ "aliases": aliases });
+        }
+        members.extend(profiles);
+        // A second copy of the trust policy leaves the collection without a
+        // Set.
+        if duplicated {
+            members.push(members[1].clone());
+        }
+        if reordered {
+            reverse_objects(&mut config);
+            for group in config["profiles"]["app"]["deploymentGroups"]
+                .as_object_mut()
+                .expect("the declaration's groups")
+                .values_mut()
+            {
+                group["members"]
+                    .as_array_mut()
+                    .expect("a group's members")
+                    .reverse();
+                if let Some(relations) = group.get_mut("hydrationRelations") {
+                    relations
+                        .as_array_mut()
+                        .expect("a group's relations")
+                        .reverse();
+                }
+            }
+            members.reverse();
+        }
+        TargetAndGroupFixture { config, members }
     }
 }
 
@@ -159,7 +251,8 @@ impl TargetAndGroupRecipe {
                     .map(|id| Target::new(id, "storefront-browser", &["en"]))
                     .collect(),
                 groups,
-                relation: false,
+                relations: Vec::new(),
+                aliases: Vec::new(),
             }
         };
         let mut declared = Declared::storefront();
@@ -169,7 +262,8 @@ impl TargetAndGroupRecipe {
                     requested: vec!["en"],
                     targets: vec![Target::new("browser", "storefront-browser", &["en"])],
                     groups: vec![("web".into(), vec!["browser".into()])],
-                    relation: false,
+                    relations: Vec::new(),
+                    aliases: Vec::new(),
                 }
             }
             Self::ManyTargets => return scaled(&|_| "web".into()),
@@ -203,72 +297,18 @@ impl TargetAndGroupRecipe {
         declared
     }
 
-    /// The configuration and the members, in submission order. The collection
-    /// submits the policy the confirmed bounds come from, the four other
-    /// required policies, and each named Target Profile once.
+    /// The configuration and the members, in submission order.
     pub(in crate::benchmark) fn fixture(self) -> TargetAndGroupFixture {
-        let resource_limits = selected_policy(&capacity());
-        let mut config = minimal_config();
-        let declaration = &mut config["profiles"]["app"];
-        declaration["policies"]["resourceLimits"] = reference_value(&tuple_of(&resource_limits));
-        let mut members = vec![resource_limits];
-        for (slot, kind, identity) in REQUIRED {
-            let member = artifact(kind, identity);
-            declaration["policies"][slot] = reference_value(&tuple_of(&member));
-            members.push(member);
-        }
-        let declared = self.declared();
-        declaration["requestedLocales"] = json!(declared.requested);
-        let mut targets = Map::new();
-        let mut profiles = Vec::new();
-        for target in &declared.targets {
-            let profile = artifact(ArtifactKind::TargetProfile, target.profile);
-            let mut value = json!({
-                "profile": reference_value(&tuple_of(&profile)),
-                "requestedLocales": target.requested,
-            });
-            if let Some(default) = target.default {
-                value["defaultRequestedLocale"] = json!(default);
-            }
-            targets.insert(target.id.clone(), value);
-            if !profiles.contains(&profile) {
-                profiles.push(profile);
-            }
-        }
-        declaration["targetProfiles"] = Value::Object(targets);
-        let mut groups = Map::new();
-        for (id, group) in &declared.groups {
-            groups.insert(id.clone(), json!({ "members": group }));
-        }
-        if declared.relation {
-            groups["web"]["hydrationRelations"] = json!([{"server": "ssr", "client": "browser"}]);
-        }
-        declaration["deploymentGroups"] = Value::Object(groups);
-        if self == Self::TargetProfileMissing {
-            let ssr = artifact(ArtifactKind::TargetProfile, "storefront-ssr");
-            profiles.retain(|profile| *profile != ssr);
-        }
-        members.extend(profiles);
-        // A second copy of the trust policy leaves the collection without a
-        // Set.
-        if self == Self::CollectionNotAdmitted {
-            members.push(members[1].clone());
-        }
-        if self == Self::StorefrontReordered {
-            reverse_objects(&mut config);
-            for group in config["profiles"]["app"]["deploymentGroups"]
-                .as_object_mut()
-                .expect("the declaration's groups")
-                .values_mut()
-            {
-                group["members"]
-                    .as_array_mut()
-                    .expect("a group's members")
-                    .reverse();
-            }
-            members.reverse();
-        }
-        TargetAndGroupFixture { config, members }
+        let withheld: &[&str] = if self == Self::TargetProfileMissing {
+            &["storefront-ssr"]
+        } else {
+            &[]
+        };
+        self.declared().assemble(
+            withheld,
+            self == Self::CollectionNotAdmitted,
+            self == Self::StorefrontReordered,
+        )
     }
 }
 

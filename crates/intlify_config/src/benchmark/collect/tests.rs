@@ -112,6 +112,16 @@ fn fixture_observation(prepared: &Prepared) -> (Observation, LogicalWork) {
             assert_eq!((retained.targets.len(), retained.groups.len()), (1, 1));
             assert!(retained.targets[0].resolved.is_ok() && retained.partition.is_ok());
         }
+        Output::Hydration(resolved) => {
+            assert_eq!(resolved.evaluation.issues().count(), 0);
+            let retained = resolved.result.as_ref().unwrap().as_ref().unwrap();
+            assert_eq!(retained.groups.len(), 1);
+            assert_eq!(
+                retained.groups[0].relations,
+                Ok(vec![("ssr".to_owned(), "browser".to_owned())])
+            );
+            assert!(retained.negotiation.is_ok());
+        }
         _ => panic!("fixture preparation did not produce its known result"),
     }
     (

@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Finite owner case declarations for the ten active boundaries.
+//! Finite owner case declarations for the eleven active boundaries.
 //! This is not a common Run Plan, case-identity codec, or a complete 015 suite.
 //! Preparation yields an unadmitted candidate; the separate fixture registry
 //! binds its exact input/result/work before method-bound collection can use it.
@@ -22,6 +22,8 @@ mod binding_inputs;
 pub(super) use binding_inputs::ResolvedBindingRecipe;
 mod target_group_inputs;
 pub(super) use target_group_inputs::TargetAndGroupRecipe;
+mod hydration_inputs;
+pub(super) use hydration_inputs::HydrationRecipe;
 mod context;
 pub(super) mod prepare;
 pub(super) mod registry;
@@ -67,6 +69,8 @@ pub(super) enum LimitKind {
     GroupIdBytes,
     MembersPerGroup,
     MembershipOccurrences,
+    HydrationRelations,
+    HydrationEndpointBytes,
 }
 
 impl LimitKind {
@@ -124,6 +128,8 @@ pub(super) enum ExpectedKind {
     ResolvedBindingBlocked,
     TargetAndGroupResolutionComplete,
     TargetAndGroupResolutionBlocked,
+    HydrationRelationValidationComplete,
+    HydrationRelationValidationBlocked,
 }
 
 #[derive(
@@ -327,7 +333,8 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 | Operation::ResourcePolicyBootstrap
                 | Operation::ArtifactCollectionAdmission
                 | Operation::ResolvedBindingConstruction
-                | Operation::TargetAndGroupResolution => unreachable!(),
+                | Operation::TargetAndGroupResolution
+                | Operation::HydrationRelationValidation => unreachable!(),
             };
             let selector = if operation == Operation::ProfileSelection {
                 Selector::App
@@ -722,6 +729,42 @@ pub(super) fn declarations() -> Vec<Declaration> {
             cases.push(case);
         }
     }
+    // Append 015 Phase 13 without changing any of the 280 rows: every recipe,
+    // then the exact and first-over edges of the relations' bound and of the
+    // Target ID bound on an endpoint.
+    let expected = |completes| {
+        if completes {
+            ExpectedKind::HydrationRelationValidationComplete
+        } else {
+            ExpectedKind::HydrationRelationValidationBlocked
+        }
+    };
+    for recipe in HydrationRecipe::ALL {
+        cases.push(declaration(
+            Operation::HydrationRelationValidation,
+            Recipe::Hydration(recipe),
+            Selector::App,
+            expected(recipe.completes()),
+        ));
+    }
+    for (limit, recipe) in [
+        (LimitKind::HydrationRelations, HydrationRecipe::FanOutFanIn),
+        (
+            LimitKind::HydrationEndpointBytes,
+            HydrationRecipe::Storefront,
+        ),
+    ] {
+        for edge in [LimitEdge::Exact, LimitEdge::FirstOver] {
+            let mut case = declaration(
+                Operation::HydrationRelationValidation,
+                Recipe::Hydration(recipe),
+                Selector::App,
+                expected(edge == LimitEdge::Exact),
+            );
+            case.limit = Some((limit, edge));
+            cases.push(case);
+        }
+    }
     cases
 }
 
@@ -782,3 +825,6 @@ mod binding_tests;
 
 #[cfg(test)]
 mod target_group_tests;
+
+#[cfg(test)]
+mod hydration_tests;

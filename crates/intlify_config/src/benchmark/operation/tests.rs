@@ -37,7 +37,7 @@ fn analysis(value: &Value) -> Analysis {
         .unwrap()
 }
 
-pub(crate) fn operations() -> [Prepared; 10] {
+pub(crate) fn operations() -> [Prepared; 11] {
     let source: Arc<[u8]> = Arc::from(serde_json::to_vec(&minimal_config()).unwrap());
     let doc = Arc::new(
         materialize_file(Arc::clone(&source), crate::materialize_tests::limits()).unwrap(),
@@ -73,6 +73,7 @@ pub(crate) fn operations() -> [Prepared; 10] {
         collection_operation(),
         binding_operation(),
         target_group_operation(),
+        hydration_operation(),
     ]
 }
 
@@ -129,6 +130,21 @@ pub(crate) fn target_group_operation() -> Prepared {
     let declaration = declarations()
         .into_iter()
         .find(|case| case.fixture == Recipe::TargetAndGroup(TargetAndGroupRecipe::Minimal))
+        .unwrap();
+    crate::benchmark::cases::prepare::prepare(&declaration)
+        .unwrap()
+        .prepared
+}
+
+/// Phase 13 over 015's example relation, as its case prepares it.
+pub(crate) fn hydration_operation() -> Prepared {
+    use crate::benchmark::cases::{declarations, HydrationRecipe, Recipe};
+
+    let declaration = declarations()
+        .into_iter()
+        .find(|case| {
+            case.fixture == Recipe::Hydration(HydrationRecipe::Storefront) && case.limit.is_none()
+        })
         .unwrap();
     crate::benchmark::cases::prepare::prepare(&declaration)
         .unwrap()
@@ -222,6 +238,16 @@ fn every_active_pair_calls_its_real_core_operation_between_exact_markers() {
                 let retained = resolved.result.as_ref().unwrap().as_ref().unwrap();
                 assert_eq!((retained.targets.len(), retained.groups.len()), (1, 1));
                 assert!(retained.targets[0].resolved.is_ok() && retained.partition.is_ok());
+            }
+            Output::Hydration(resolved) => {
+                assert_eq!(resolved.evaluation.issues().count(), 0);
+                let retained = resolved.result.as_ref().unwrap().as_ref().unwrap();
+                assert_eq!(retained.groups.len(), 1);
+                assert_eq!(
+                    retained.groups[0].relations,
+                    Ok(vec![("ssr".to_owned(), "browser".to_owned())])
+                );
+                assert!(retained.negotiation.is_ok());
             }
             _ => panic!("unexpected owner operation result"),
         }

@@ -25,8 +25,9 @@ use super::super::operation::{Analysis, Config, Operation, Output, Prepared, Sch
 use super::super::work::LogicalWork;
 use super::policy_inputs::capacity;
 use super::{
-    declarations, Declaration, Engine, ExpectedKind, Icu4xRecipe, LimitEdge, LimitKind,
-    LocalePolicyResolutionRecipe, Recipe, ResourcePolicyRecipe, Selector, TargetAndGroupRecipe,
+    declarations, Declaration, Engine, ExpectedKind, HydrationRecipe, Icu4xRecipe, LimitEdge,
+    LimitKind, LocalePolicyResolutionRecipe, Recipe, ResourcePolicyRecipe, Selector,
+    TargetAndGroupRecipe,
 };
 
 pub(in crate::benchmark) struct Candidate {
@@ -102,6 +103,9 @@ pub(in crate::benchmark) fn prepare(
     if declaration.operation == Operation::TargetAndGroupResolution {
         return prepare_targets(declaration);
     }
+    if declaration.operation == Operation::HydrationRelationValidation {
+        return prepare_hydration(declaration);
+    }
     let source = declaration.fixture.source();
     let (mut input_limits, mut structural_limits) = fixture_capacity();
     if let Some((kind, edge)) = declaration.limit {
@@ -153,7 +157,9 @@ pub(in crate::benchmark) fn prepare(
             | LimitKind::DeploymentGroups
             | LimitKind::GroupIdBytes
             | LimitKind::MembersPerGroup
-            | LimitKind::MembershipOccurrences => {
+            | LimitKind::MembershipOccurrences
+            | LimitKind::HydrationRelations
+            | LimitKind::HydrationEndpointBytes => {
                 return Err(PreparationFailure::UndeclaredCase);
             }
         };
@@ -196,7 +202,9 @@ pub(in crate::benchmark) fn prepare(
             | LimitKind::DeploymentGroups
             | LimitKind::GroupIdBytes
             | LimitKind::MembersPerGroup
-            | LimitKind::MembershipOccurrences => unreachable!(),
+            | LimitKind::MembershipOccurrences
+            | LimitKind::HydrationRelations
+            | LimitKind::HydrationEndpointBytes => unreachable!(),
         }
     }
     let prepared = if declaration.operation == Operation::FileMaterialization {
@@ -239,7 +247,8 @@ pub(in crate::benchmark) fn prepare(
             | Operation::ResourcePolicyBootstrap
             | Operation::ArtifactCollectionAdmission
             | Operation::ResolvedBindingConstruction
-            | Operation::TargetAndGroupResolution => unreachable!(),
+            | Operation::TargetAndGroupResolution
+            | Operation::HydrationRelationValidation => unreachable!(),
         }
     };
     // Only dispatch is repeated here; both reference preparation and timed calls
@@ -262,8 +271,9 @@ pub(in crate::benchmark) fn prepare(
         | Prepared::ResourcePolicy(_)
         | Prepared::ArtifactCollection(_)
         | Prepared::ResolvedBinding(_)
-        | Prepared::TargetAndGroup(_) => {
-            unreachable!("Phases 7, 4, 9, 11, and 12 have their own preparation")
+        | Prepared::TargetAndGroup(_)
+        | Prepared::Hydration(_) => {
+            unreachable!("Phases 7, 4, 9, 11, 12, and 13 have their own preparation")
         }
     };
     let kind = match &output {
@@ -866,17 +876,7 @@ fn prepare_targets(declaration: &Declaration) -> Result<Candidate, PreparationFa
         }
     }
     let policy = ConfirmedPolicy::fixture_owned(limits);
-    let canonicalizer = Arc::new(
-        Canonicalizer::bind(
-            &fixture_pins(),
-            Some(FixtureProvider::new()),
-            policy
-                .limits()
-                .locale_resolution
-                .max_locale_identifier_bytes,
-        )
-        .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?,
-    );
+    let canonicalizer = finite_canonicalizer(&policy)?;
     let fixture = recipe.fixture();
     let SelectedConfig {
         analysis,
@@ -913,6 +913,114 @@ fn prepare_targets(declaration: &Declaration) -> Result<Candidate, PreparationFa
     }
     let output = Output::TargetAndGroup(resolved);
     let prepared = Prepared::TargetAndGroup(Box::new(prepared));
+    let observation = output
+        .observe()
+        .map_err(|_| PreparationFailure::Observation)?;
+    let logical_work =
+        LogicalWork::observe(&prepared, &output).map_err(|_| PreparationFailure::Observation)?;
+    Ok(Candidate {
+        declaration: declaration.clone(),
+        input_limits: Some(fixture_capacity().0),
+        prepared,
+        output,
+        observation,
+        logical_work,
+    })
+}
+
+/// The finite provider Phase 7 canonicalizes through, bound under the
+/// policy's identifier bound, as Phase 5 binds it.
+fn finite_canonicalizer(
+    policy: &ConfirmedPolicy,
+) -> Result<Arc<crate::benchmark::locale::Core>, PreparationFailure> {
+    Canonicalizer::bind(
+        &fixture_pins(),
+        Some(FixtureProvider::new()),
+        policy
+            .limits()
+            .locale_resolution
+            .max_locale_identifier_bytes,
+    )
+    .map(Arc::new)
+    .map_err(|_| PreparationFailure::PrerequisiteUnavailable)
+}
+
+/// The independently specified count of a bound over its fixed recipe; never
+/// derived from the resolver under test.
+fn hydration_edge(kind: LimitKind, recipe: HydrationRecipe) -> Result<u64, PreparationFailure> {
+    use HydrationRecipe as R;
+
+    Ok(match (kind, recipe) {
+        // `ssr -> browser`, `ssr -> app`, and `edge -> browser`.
+        (LimitKind::HydrationRelations, R::FanOutFanIn) => 3,
+        // `browser`, the longer endpoint of `ssr -> browser`.
+        (LimitKind::HydrationEndpointBytes, R::Storefront) => 7,
+        _ => return Err(PreparationFailure::UndeclaredCase),
+    })
+}
+
+/// Phase 13 over a recipe's configuration, selected with `app`, under the
+/// policy whose bound a case's edge replaces, and with the recipe's answers
+/// to what 015 asks 024. Every earlier phase runs in preparation, as for
+/// Phases 11 and 12, with Phase 8's negotiation besides.
+fn prepare_hydration(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
+    use crate::benchmark::hydration_relation::PreparedHydration;
+
+    let Recipe::Hydration(recipe) = declaration.fixture else {
+        return Err(PreparationFailure::UndeclaredCase);
+    };
+    let mut limits = capacity();
+    if let Some((kind, edge)) = declaration.limit {
+        let exact = hydration_edge(kind, recipe)?;
+        let bound = Bound::new(match edge {
+            LimitEdge::Exact => exact,
+            LimitEdge::FirstOver => exact - 1,
+        })
+        .ok_or(PreparationFailure::UnrepresentableCounterEdge)?;
+        let grouping = &mut limits.target_grouping;
+        match kind {
+            LimitKind::HydrationRelations => grouping.max_hydration_relations = bound,
+            // An endpoint's bound is the Target ID bound Phase 11 applies too.
+            LimitKind::HydrationEndpointBytes => grouping.max_target_id_bytes = bound,
+            _ => unreachable!("only a Phase 13 bound reaches here"),
+        }
+    }
+    let policy = ConfirmedPolicy::fixture_owned(limits);
+    let canonicalizer = finite_canonicalizer(&policy)?;
+    let fixture = recipe.fixture();
+    let SelectedConfig {
+        analysis,
+        config,
+        selected,
+        ..
+    } = select_config(&fixture.config, declaration.selector)?;
+    let prepared = PreparedHydration {
+        analysis,
+        config,
+        selected,
+        policy,
+        canonicalizer,
+        collection: submitted(&fixture.members)?,
+        capabilities: recipe.capabilities(),
+    };
+    let resolved = prepared
+        .resolve()
+        .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
+    let kind = match &resolved.result {
+        Ok(Ok(retained))
+            if retained.negotiation.is_ok()
+                && retained.groups.iter().all(|group| group.relations.is_ok()) =>
+        {
+            ExpectedKind::HydrationRelationValidationComplete
+        }
+        Ok(Ok(_)) => ExpectedKind::HydrationRelationValidationBlocked,
+        Ok(Err(_)) | Err(_) => return Err(PreparationFailure::Observation),
+    };
+    if declaration.expected_kind != kind {
+        return Err(PreparationFailure::UnexpectedOutputKind);
+    }
+    let output = Output::Hydration(resolved);
+    let prepared = Prepared::Hydration(Box::new(prepared));
     let observation = output
         .observe()
         .map_err(|_| PreparationFailure::Observation)?;
