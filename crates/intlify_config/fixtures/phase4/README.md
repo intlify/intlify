@@ -2,7 +2,7 @@
 
 # Phase 4 fixtures
 
-Design 015's Phase 4, Target and Compatibility Groups, partitions the Target IDs into Deployment Compatibility Groups exactly, fixes the canonical order of targets, groups, members, and relations, validates the hydration relations, and hands design 020 the Group ID selection vectors. Its resolution phases are 11 to 13: `target-resolution`, `group-resolution`, and `hydration-validation`. Plan 023 implements them as crate-private semantic state on top of Phase 3's. This file maps the phase's coverage to the tests that check it, and names what other phases and designs own.
+Design 015's Phase 4, Target and Compatibility Groups, partitions the Target IDs into Deployment Compatibility Groups exactly, fixes the canonical order of targets, groups, members, and relations, validates the hydration relations, and hands design 020 the Group ID selection vectors. Its resolution phases are 11 to 13: `target-resolution`, `group-resolution`, and `hydration-validation`. Plan 023 implements them as crate-private semantic state on top of Phase 3's, and plan 024 completes them with 024's hydration roles and static compatibility and with 017's directions. This file maps the phase's coverage to the tests that check it, and names what other phases and designs own.
 
 Like Phase 3, Phase 4 produces no public `LocalizationProjectProfile`, outcome, Finding, or Evidence; Phase 5 builds those from this state. Where a row says a check is blocking, the resolver records a blocking result with 015's code and reason on the unit that found it, and the units that need its value are not evaluated, with that result as their cause.
 
@@ -37,7 +37,7 @@ Plan 017 lists five exit criteria for Phase 4.
 | Requirement planning and linking are not implemented on 015's side | `every_vector_has_015s_fields_and_020_verifies_it`, `no_selector_changes_what_the_profile_hands_over`: the vectors leave every relationship to 020, and the resolver admits no selector |
 | The target and group measurement keeps its Target, Group, membership, and relation work and a deterministic checksum in the common projection, with accounting, diagnostics, and order kept as 026 adopts them | `every_declared_case_is_admitted_against_fixed_input_result_and_work_expectations`, `the_work_counts_the_bounds_units_and_what_resolved`, `the_work_counts_relations_roles_units_and_what_was_checked`, `the_profile_declares_exactly_the_execution_states_its_cases_run_in`, and `vp run bench:config:smoke`. Neither operation reuses an index or scratch, so every case runs fresh (plan 023 decision #15) |
 
-Design 024 does not yet define the hydration roles of a Target Profile (the SSR renderer and the Browser hydration client) or its static Target and Locale Service compatibility. Plan 023 takes them through an injected seam (its decision ◆#1), so Phase 4 stays in progress even with every condition checked.
+Design 024 defines the hydration roles a Target Profile declares in its body, `ssr-renderer` and `browser-hydration-client`, and the closed static compatibility of two Target Profiles: equal `mf2Specification`, `execution`, and `locale.services`, never their physical dimensions (plan 024). Phase 13 reads both from the Target Profiles Phase 9 resolved, and Phase 11 checks that each target's Target Profile has a direction for each locale it requests, so Phase 4 is complete.
 
 ## Acceptance examples
 
@@ -45,7 +45,7 @@ Plan 023 fixes thirteen examples.
 
 | Input | Result | Checked by |
 | --- | --- | --- |
-| Two targets with their subsets, one overriding the default, in one group with one SSR-to-Browser relation whose roles the seam answers | Phases 11 to 13 admit it: each target's subset and effective default, the group's members, and the relation | `each_target_resolves_its_subset_effective_default_and_target_profile`, `targets_partitioned_exactly_once_form_their_groups`, `fifteens_example_relation_holds_and_keeps_its_pair`, `every_phase_admits_a_complete_invocation` |
+| Two targets with their subsets, one overriding the default, in one group with one SSR-to-Browser relation whose endpoints' Target Profiles declare its roles | Phases 11 to 13 admit it: each target's subset and effective default, the group's members, and the relation | `each_target_resolves_its_subset_effective_default_and_target_profile`, `targets_partitioned_exactly_once_form_their_groups`, `fifteens_example_relation_holds_and_keeps_its_pair`, `every_phase_admits_a_complete_invocation` |
 | A target subset with a locale the project does not request | `project-profile-target-locales-not-subset`; the other targets are still checked | `a_locale_outside_the_project_is_no_subset_and_the_other_checks_go_on`, `a_target_locale_outside_the_project_leaves_the_target_and_its_relation_unresolved` |
 | An override outside the subset, or no override and a project default outside it | `project-profile-target-default-locale-not-supported` with `explicit-override` or `inherited-project-default`; no locale of the subset is picked instead | `an_effective_default_outside_the_subset_says_where_it_came_from`, `an_inherited_default_waits_on_the_project_default_it_inherits` |
 | A target in no group, or in two | `project-profile-target-unassigned` or `project-profile-target-assigned-to-multiple-groups`; no partial partition | `a_target_in_no_group_or_in_two_is_no_partition` |
@@ -59,6 +59,17 @@ Plan 023 fixes thirteen examples.
 | One group, with the selector omitted or naming it | Vectors in which 020 selects that group | `the_committed_vectors_are_the_resolvers`, `no_selector_changes_what_the_profile_hands_over` |
 | Several groups, with the selector omitted, unknown, repeated, a Target ID, or part of a group | Vectors in which 020 rejects the selection; 020 verifies them | `the_committed_vectors_are_the_resolvers`, `every_vector_has_015s_fields_and_020_verifies_it` |
 
+Plan 024 adds six examples of 024's roles and compatibility and of 017's directions.
+
+| Input | Result | Checked by |
+| --- | --- | --- |
+| 015's example, whose server's Target Profile declares `ssr-renderer` and client's `browser-hydration-client` | The relation holds | `the_roles_come_from_each_target_profiles_body`, `fifteens_example_relation_holds_and_keeps_its_pair` |
+| An endpoint whose Target Profile declares no role, whatever its identity says | `server-capability-missing` or `client-capability-missing` | `the_roles_come_from_each_target_profiles_body`, `a_role_is_read_from_the_body_never_from_a_name` |
+| Endpoints whose Target Profiles name different `mf2Specification`s | `project-profile-hydration-capability-incompatible` | `a_statically_known_incompatibility_blocks_the_relation` |
+| Endpoints whose Target Profiles differ only in mode, adapter, codecs, host, or limits | Compatible | `physical_dimensions_never_make_a_pair_incompatible` |
+| A target requesting a locale its Target Profile has no direction for, or only a non-canonical spelling of | `project-profile-target-locale-direction-missing`; only that target does not resolve | `a_requested_locale_without_a_direction_blocks_only_that_target`, `only_a_target_profiles_canonical_entry_directs_a_locale` |
+| Roles or directions in another order, and the targets' locales reordered | 017 keeps roles and directions as sets in byte order, so another order is no content at all; reordering the locales changes nothing Phase 11 records | `hydration_roles_are_a_closed_set_in_byte_order`, `directions_are_ordered_by_the_bytes_of_their_locales_without_repeats`, `reordering_targets_and_their_locales_changes_nothing_phase_11_records` |
+
 ## The matrix
 
 The rows come from design 015's [Coverage inventory](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#coverage-inventory), grouped by the resolution phase that checks them.
@@ -71,6 +82,7 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 | An override wins over the project default only inside the target's subset; without one, the project default is inherited only when the subset has it, with no first, sole, sorted, or negotiated locale instead | `each_target_resolves_its_subset_effective_default_and_target_profile`, `an_effective_default_outside_the_subset_says_where_it_came_from`, `an_inherited_default_waits_on_the_project_default_it_inherits` |
 | A target excluding a project locale is valid | `each_target_resolves_its_subset_effective_default_and_target_profile` |
 | A target's locales are checked even when its Target Profile does not resolve, and a repeated locale leaves the target unresolved | `a_target_profile_phase_9_could_not_resolve_leaves_only_that_target_unresolved`, `a_repeated_target_locale_is_still_checked_but_leaves_the_target_unresolved`, `invalid_target_locales_leave_the_checks_that_need_them_not_evaluated` |
+| The Target Profile has a direction for each locale the target requests, by an entry spelled as its canonical form, and a missing one is blocking `project-profile-target-locale-direction-missing`. The check waits only on the target's locales and its Target Profile, and entries for other locales are unused | `a_requested_locale_without_a_direction_blocks_only_that_target`, `only_a_target_profiles_canonical_entry_directs_a_locale`, `a_target_profile_phase_9_could_not_resolve_leaves_only_that_target_unresolved`, `invalid_target_locales_leave_the_checks_that_need_them_not_evaluated` |
 | `maxTargetProfiles` and `maxTargetIdBytes` at their exact value and one more | `the_map_holds_at_its_bound_and_one_target_more_leaves_every_target_unchecked`, `each_target_id_holds_at_its_bound_and_one_byte_more_blocks_only_that_target` |
 | Without a confirmed policy, or a map structural admission did not admit, nothing more is checked | `without_a_confirmed_policy_no_target_is_checked`, `a_map_structural_admission_did_not_admit_records_only_its_bound` |
 | Target IDs order by their unsigned bytes | `subjects_order_the_map_first_then_each_target_after_every_phase_10_unit`, `reordering_targets_and_their_locales_changes_nothing_phase_11_records` |
@@ -93,8 +105,9 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 | --- | --- |
 | Hydration is declared only through explicit SSR-to-Browser relations, and a group may have none | `fifteens_example_relation_holds_and_keeps_its_pair` |
 | Fan-out and fan-in are valid; duplicate pairs, equal endpoints, endpoints outside the group, a missing role, and one target in both roles are blocking | `fan_out_and_fan_in_are_valid`, `equal_endpoints_and_a_repeated_pair_are_invalid_relations`, `an_endpoint_naming_no_target_or_another_groups_member_is_invalid`, `the_roles_come_from_each_target_profiles_body`, `a_target_serving_and_hydrating_in_one_group_takes_two_roles` |
+| A role is the one the Target Profile's body declares in 024's `hydration.roles`, never inferred from a name or an identity | `the_roles_come_from_each_target_profiles_body`, `a_role_is_read_from_the_body_never_from_a_name`, `hydration_roles_are_a_closed_set_in_byte_order`, `an_artifact_that_is_no_target_profile_has_no_role_and_no_compatibility` |
 | Both endpoints have equal subsets and effective defaults, and a mismatch is never intersected | `endpoints_with_other_locales_or_defaults_are_incompatible_with_nothing_intersected` |
-| A statically known incompatibility of the two Target Profiles is blocking | `a_statically_known_incompatibility_blocks_the_relation` |
+| A statically known incompatibility of the two Target Profiles, by 024's closed rule, is blocking, and their physical dimensions never are | `a_statically_known_incompatibility_blocks_the_relation`, `physical_dimensions_never_make_a_pair_incompatible` |
 | Both endpoints share the project's negotiation profile by construction, so no endpoint-mismatch reason exists | `the_shared_negotiation_profile_is_kept_but_never_compared`, `the_relations_share_the_negotiation_profile_and_never_compare_it` |
 | Each check waits only on the facts it compares, and a relation with an unresolved target still checks its endpoints | `each_check_waits_only_on_the_facts_it_compares`, `a_relation_with_an_unresolved_target_still_checks_its_endpoints`, `an_endpoint_naming_a_target_waits_on_the_target_map_phase_11_bounds` |
 | `maxHydrationRelations` and the endpoints' `maxTargetIdBytes` at their exact value and one more | `the_relations_hold_at_their_bound_and_one_occurrence_more_leaves_every_relation_unchecked`, `each_endpoint_holds_at_the_target_id_bound_and_one_byte_more_blocks_its_relation` |
@@ -115,7 +128,7 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 | Requirement | Checked by |
 | --- | --- |
 | `profile_target_group_resolve / target_and_group_resolution` covers Phases 11 and 12 over 015's example, two scales, a reordering, each decision, the failures before them, and the six bounds' edges | `a_complete_case_resolves_every_target_and_partitions_them`, `each_blocked_recipe_reports_its_one_decision`, `a_prerequisite_failure_leaves_only_what_waits_on_it`, `each_bound_holds_at_its_count_and_one_less_blocks_its_unit`, `reordering_changes_neither_domain_nor_the_work`, `the_work_counts_the_bounds_units_and_what_resolved` |
-| `profile_target_group_resolve / hydration_relation_validation` covers Phase 13 over 015's relation, fans, a scale, a reordering, each code and reason, the failures before them, and the two bounds' edges | `a_complete_case_keeps_every_declared_relation`, `each_admitted_target_profile_carries_what_its_body_declares`, `the_work_counts_relations_roles_units_and_what_was_checked`, `hydration_relation_descriptor_binds_the_configuration_and_the_collection` |
+| `profile_target_group_resolve / hydration_relation_validation` covers Phase 13 over 015's relation, fans, a scale, a reordering, each code and reason, the failures before them, and the two bounds' edges, with each role declared in a Target Profile's body | `a_complete_case_keeps_every_declared_relation`, `each_admitted_target_profile_carries_what_its_body_declares`, `the_work_counts_relations_roles_units_and_what_was_checked`, `hydration_relation_descriptor_binds_the_configuration_and_the_collection` |
 | The rows before them stay byte for byte | `target_group_cases_keep_the_252_rows_and_append_after_them`, `hydration_cases_keep_the_281_rows_and_append_after_them` |
 
 ## Rows other phases own
@@ -132,5 +145,5 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 
 ## Deliberately not covered in Phase 4
 
-- **024's hydration roles and static compatibility** — the injected `hydration::TargetCapabilities` seam, which only tests implement (plan 023 decision ◆#1). Design 024 defines no SSR-renderer or Browser hydration-client capability yet, and 017's revision-`"0"` Target Profile body has no field for one.
+- **Rejecting role-carrying Target Profiles in 024's minimum export** — a rule of 024's exporter, which does not exist yet (016's Phase 5 and design 028 build it).
 - **Index and scratch reuse in the target and group measurement** — both operations build a fresh evaluation and state for every case, so there is no reuse to compare (plan 023 decision #15).

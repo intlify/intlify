@@ -2,7 +2,7 @@
 
 # Phase 3 fixtures
 
-Design 015's Phase 3, the Semantic Profile Resolver, defines profile scope, named-profile selection, identity, the inline locale-policy inputs, the admission of the Intent Surface-Class Vocabulary Artifact, typed Policy and Target Profile references, the typed Profile Resolution Specification Input, Bootstrap Resource Policy Candidate Admission, the admission of the Submitted Profile Resolution Artifact Collection and its duplicate-free Set, Resolved Profile Artifact Bindings, delivery and placement resolution, and deterministic semantic resolution. Plan 022 implements it as crate-private semantic state. This file maps the phase's coverage to the tests that check it, and names what other phases and designs own.
+Design 015's Phase 3, the Semantic Profile Resolver, defines profile scope, named-profile selection, identity, the inline locale-policy inputs, the admission of the Intent Surface-Class Vocabulary Artifact, typed Policy and Target Profile references, the typed Profile Resolution Specification Input, Bootstrap Resource Policy Candidate Admission, the admission of the Submitted Profile Resolution Artifact Collection and its duplicate-free Set, Resolved Profile Artifact Bindings, delivery and placement resolution, and deterministic semantic resolution. Plan 022 implements it as crate-private semantic state, and plan 024 completes it with 018's bodies and Verification Input. This file maps the phase's coverage to the tests that check it, and names what other phases and designs own.
 
 Phase 3 produces no public `LocalizationProjectProfile`, outcome, Finding, Evidence, or Resolver Construction Identity; Phase 5 builds those from this state. Where a row says a check is blocking, the resolver records a blocking result with 015's code and reason on the unit that found it, and the units that need its value are not evaluated, with that result as their cause.
 
@@ -27,7 +27,7 @@ vp run bench:config:smoke
 
 | File | Contents | Read by |
 | --- | --- | --- |
-| [`fixtures/envelope/vectors.json`](../envelope/vectors.json) | Collection members as 017's envelopes: tuples, canonical submitted bodies, integrity, and the closed content of the five kinds | The envelope, body, and bootstrap tests; `tools/shared-json-vectors` |
+| [`fixtures/envelope/vectors.json`](../envelope/vectors.json) | Collection members as 017's envelopes: tuples, canonical submitted bodies, integrity, and the closed content of the seven kinds that have one | The envelope, body, and bootstrap tests; `tools/shared-json-vectors` |
 | [`fixtures/vocabulary/vectors.json`](../vocabulary/vectors.json) | Intent Surface-Class Vocabulary Artifacts, their digests, and the boundary failures | The vocabulary and coverage tests; `tools/shared-json-vectors` |
 | [`schema/intent-surface-class-vocabulary-v0.schema.json`](../../schema/intent-surface-class-vocabulary-v0.schema.json) | The closed Draft 7 schema of the vocabulary artifact | The vocabulary schema tests |
 | [`src/benchmark/cases/expectations-v0.json`](../../src/benchmark/cases/expectations-v0.json) | The fixed input context, result, and work of every measured case, Phase 3's four operations included | The measurement tests and `bench:config:smoke` |
@@ -44,7 +44,7 @@ Plan 017 lists five exit criteria for Phase 3.
 | The resolver acquires no artifact and makes no network, credential, or Store query | `no_resolver_module_reads_files_the_network_the_environment_or_processes`, `only_a_complete_configuration_with_its_selection_starts_a_resolution` |
 | The locale-policy and artifact measurements record their logical work and semantic checksum reproducibly, project them as 026 adopts them, and keep accounting, diagnostics, order, and the checked or blocked result under reuse | `every_declared_case_is_admitted_against_fixed_input_result_and_work_expectations`, `fresh_and_reused_engines_agree_on_phases_7_and_8_for_every_input`, `planning_work_is_complete_and_checked_before_fixture_preparation`, and `vp run bench:config:smoke` |
 
-Design 018 does not yet define the common Resource Limit Policy body, the Trust Policy body, or the Resource Limit Policy Verification Input. Plan 022 takes them through injected seams (its decision #1), so Phase 3 stays in progress even with every condition checked.
+Design 018 defines the Resource Limit Policy common body, the Trust Policy body, and the exact-pin Resource Limit Policy Verification Input, with 017's shapes (plan 024). The resolver reads both bodies as closed contents and admits the bootstrap candidate only when the input pins its exact reference, so Phase 3 is complete. Tests construct the input until Phase 5 reads it at the pre-invocation boundary.
 
 ## Acceptance examples
 
@@ -61,6 +61,17 @@ Plan 022 fixes nine examples of the integrated path.
 | A policy needing more than `policyComparable` allows | Incompatible with the capability; the selection is not confirmed | `a_policy_needing_more_than_the_capability_leaves_the_selection_unconfirmed` |
 | A `trust` reference without its artifact | Not found; the other references resolve | `a_trust_reference_without_its_artifact_is_not_found_and_the_rest_resolve` |
 | Locale sets, objects, and the collection reordered | An equal semantic state, compared by value; its byte projection is Phase 5's profile projection | `reordering_sets_objects_and_the_collection_changes_no_semantic_state` |
+
+Plan 024 adds six examples of 018's rules.
+
+| Input | Result | Checked by |
+| --- | --- | --- |
+| A Verification Input whose pins include the candidate's exact reference | It is authenticated, and the common body and 015's section are checked next | `the_sole_exact_candidate_is_admitted_with_its_tuple_and_bounds`, `the_verification_input_pins_resource_limit_policies_exactly` |
+| A candidate the pins do not name, one differing only in its digest included | `project-profile-resource-policy-not-admitted` with `body-integrity-invalid`; no other candidate is selected | `the_sole_candidates_body_is_admitted_in_015s_order` |
+| A common body with a member beside `projectProfileResolution` | `body-schema-invalid` | `the_sole_candidates_body_is_admitted_in_015s_order`, `a_resource_limit_policy_carries_only_its_section_as_an_object` |
+| No `projectProfileResolution`, or one that is no object | `project-profile-resolution-missing`, or `body-schema-invalid`, in 015's order | `the_sole_candidates_body_is_admitted_in_015s_order`, `the_envelope_vectors_resource_limit_policies_reach_their_checks` |
+| A Trust Policy content other than `{ "authority": "trusted-local-host" }` | The collection admission's `envelope-invalid`, at Phase 9 | `each_member_failure_has_its_reason_and_leaves_no_set`, `a_trust_policy_names_only_the_trusted_local_host` |
+| No pin, a repeated pin, or a pin of another kind | No Verification Input; the boundary that reads one from 017's shape is Phase 5's | `the_verification_input_pins_resource_limit_policies_exactly` |
 
 ## The matrix
 
@@ -82,7 +93,7 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 | --- | --- |
 | The selected `resourceLimits` reference is checked before any candidate, and one exact candidate is found by 015's five-field and four-field predicates whatever the submission order | `the_reference_is_checked_before_any_candidate`, `the_sole_exact_candidate_is_admitted_with_its_tuple_and_bounds`, `without_an_exact_candidate_the_closest_tier_decides`, `a_member_without_a_tuple_joins_no_group`, `the_decision_does_not_depend_on_submission_order` |
 | Unequal bodies under one name conflict before repeated exact occurrences are duplicates, and both come before any body is admitted | `different_bodies_under_one_name_are_conflicting_content_first`, `repeated_exact_occurrences_are_duplicates_before_any_body_is_admitted` |
-| The sole candidate's body is admitted in 015's order, and the envelope vectors' Resource Limit Policies reach their checks | `the_sole_candidates_body_is_admitted_in_015s_order`, `the_envelope_vectors_resource_limit_policies_reach_their_checks` |
+| The sole candidate's body is admitted in 015's order: its integrity, 018's pin, 018's common body, then 015's section; and the envelope vectors' Resource Limit Policies reach their checks | `the_sole_candidates_body_is_admitted_in_015s_order`, `the_verification_input_pins_resource_limit_policies_exactly`, `the_envelope_vectors_resource_limit_policies_reach_their_checks` |
 | Before the policy is known, the collection and every present reference are counted under the capability, each bound at its exact value and one more | `the_collection_is_counted_as_015_counts_it`, `each_collection_bound_admits_its_exact_value_and_reports_one_more`, `every_present_reference_of_the_declaration_is_counted_once`, `each_reference_is_checked_alone_and_the_selected_ones_bytes_gate_the_decision`, `a_reference_field_structural_admission_did_not_admit_is_counted_only_past_the_bound`, `without_the_selected_reference_only_the_collection_and_the_visible_references_are_checked` |
 | A policy needing more than a `policyComparable` bound is incompatible at the first such bound in canonical order | `a_policy_within_every_capability_bound_is_admitted_and_compatible`, `the_first_bound_in_canonical_order_the_capability_lacks_makes_the_policy_incompatible` |
 | The selection is confirmed only after a compatible policy and a recheck of what Phases 1 to 3 measured, `maxProfiles` and `maxProfileIdBytes` included, with no other profile selected | `a_compatible_policy_every_recheck_holds_under_confirms_the_selection`, `each_configuration_bound_admits_its_exact_value_and_reports_one_more`, `the_selector_is_rechecked_under_the_policy_and_keeps_only_the_first_over_witness`, `phase_4_rechecks_what_phases_1_to_3_measured`, `a_recheck_whose_input_is_unavailable_leaves_the_selection_unconfirmed`, `without_a_compatible_policy_nothing_is_rechecked_and_the_capability_stays_the_projection_authority` |
@@ -156,8 +167,9 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 
 | Requirement | Checked by |
 | --- | --- |
-| Five closed kinds, each establishing its tuple, with another kind or schema revision unsupported | `kinds_are_spelled_governed_and_ordered_as_017_registers_them`, `a_kind_is_declared_only_by_an_object_with_a_string_kind`, `another_kind_or_schema_revision_string_is_unsupported`, `every_admitted_kind_establishes_its_tuple`, `a_missing_or_malformed_envelope_member_establishes_no_tuple` |
+| Eight admitted kinds, each establishing its tuple, with another kind or schema revision unsupported | `kinds_are_spelled_governed_and_ordered_as_017_registers_them`, `a_kind_is_declared_only_by_an_object_with_a_string_kind`, `another_kind_or_schema_revision_string_is_unsupported`, `every_admitted_kind_establishes_its_tuple`, `a_missing_or_malformed_envelope_member_establishes_no_tuple` |
 | A body is admitted in 017's order, integrity, then specification revision `"0"`, then closed content, and a failure keeps its tuple | `body_admission_checks_the_integrity_then_the_specification_revision_then_the_content`, `only_specification_revision_zero_is_admitted_for_every_kind`, `a_failing_integrity_or_content_keeps_the_tuple`, `every_admitted_kind_admits_its_closed_content`, `each_policy_content_admits_exactly_its_closed_values` |
+| 018's bodies are closed: a Resource Limit Policy has only an optional `projectProfileResolution` object, whose interior 015 checks, and a Trust Policy names only `trusted-local-host`. A Glossary Set's content is 022's, so it passes on as the object it is | `a_resource_limit_policy_carries_only_its_section_as_an_object`, `a_trust_policy_names_only_the_trusted_local_host`, `a_glossary_set_passes_on_as_the_object_it_is`, `each_member_failure_has_its_reason_and_leaves_no_set` |
 | The semantic digest pins kind, specification revision, and content, and the canonical body ignores transport spelling | `the_semantic_digest_pins_kind_specification_revision_and_content_only`, `the_integrity_covers_the_member_but_its_own_digest`, `the_canonical_body_ignores_transport_spelling_and_keeps_the_integrity_digest` |
 | A reference names the tuple an envelope establishes, by the canonical bytes of its value | `a_reference_names_the_tuple_an_envelope_establishes`, `a_reference_has_the_canonical_bytes_of_its_value_whatever_its_spelling` |
 | A range or selector in a reference's identity or revision fails structural admission, and a label such as `latest` names only an artifact of exactly that revision | `exact_tokens_have_no_normalization_or_selector_coercion`, `a_revision_label_names_only_an_artifact_of_exactly_that_revision` |
@@ -211,6 +223,7 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 | --- | --- |
 | Target locale subsets, effective defaults, Target and Group IDs, the group partition, and hydration relations | [Phase 4](../phase4/README.md) (Algo 11 to 13). Phase 3 canonicalizes and counts every target locale occurrence |
 | Construction, the Root Package, the capability as a constructed input, origins, tokens, locators, Findings, Evidence, outcomes, profile equality and digests, replay, and reporting bounds | Phase 5 |
+| Reading the Resource Limit Policy Verification Input from 017's shape at the pre-invocation boundary, with its ten boundary reasons | Phase 5. Design 029's lock supplies the input |
 | `bootstrapOnly.artifactBootstrap`'s four bounds on the bootstrap's own work: `maxEnvelopeDepth`, `maxDecodedAllocationBytes`, `maxMetadataScanUnits`, and `maxValidationWorkUnits` | Phase 5, whose Capability Specification closes their units (plan 022 decision #119). Until then the bootstrap counts none of them and reports no `project-profile-bootstrap-limit-exceeded`; the collection's limits still bound every member |
 | The Suite Index, case manifests, and traceability | Phase 6 |
 | Compatibility conversion, the CLI, and product inputs | Phase 7 and design 029 |
@@ -222,5 +235,5 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 
 ## Deliberately not covered in Phase 3
 
-- **018's bodies and Verification Input** — injected seams (plan 022 decision #1). The trust and Resource Limit Policy contents are read as 017's closed content, and their verification waits on 018.
+- **The Verification Input's acquisition** — tests construct the exact-pin input. Its codec and boundary are Phase 5's, and its lock is design 029's (plan 024 interpretation #5).
 - **The Admitted Implementation Capability** — test-owned values. Phase 5 constructs it.
