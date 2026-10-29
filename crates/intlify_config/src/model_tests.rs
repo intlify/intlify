@@ -392,6 +392,29 @@ fn required_collections_and_present_selectors_are_nonempty() {
     }
 }
 
+/// A requested-locale declaration lists identifiers. A wildcard, `all`, or a
+/// query in its place is a dynamic declaration 015 does not admit, refused
+/// before any locale is read; within the list, canonicalization judges each
+/// item as an identifier.
+#[test]
+fn requested_locales_are_listed_never_declared_dynamically() {
+    for pointer in [
+        "/profiles/app/requestedLocales",
+        "/profiles/app/targetProfiles/browser/requestedLocales",
+    ] {
+        for dynamic in [
+            json!("all"),
+            json!("*"),
+            json!({"all": true}),
+            json!({"query": "en-*"}),
+        ] {
+            let mut value = complete_config();
+            *value.pointer_mut(pointer).unwrap() = dynamic;
+            rejected(value);
+        }
+    }
+}
+
 #[test]
 fn empty_optional_objects_keep_authoring_absence_separate_from_semantic_defaults() {
     for key in [

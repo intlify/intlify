@@ -535,6 +535,40 @@ mod tests {
         }
     }
 
+    /// A revision is a label the reference spells exactly, never a selector.
+    /// `latest` names only an artifact of that very revision; the same
+    /// identity's artifact under another revision, however new, is a revision
+    /// mismatch, and with both submitted the reference names its own.
+    #[test]
+    fn a_revision_label_names_only_an_artifact_of_exactly_that_revision() {
+        let trust = |revision| {
+            envelope_of(
+                ArtifactKind::TrustPolicy,
+                "storefront-trust",
+                revision,
+                sample(ArtifactKind::TrustPolicy),
+            )
+        };
+        let mut inputs = Inputs::new();
+        let submitted = tuple_of(&trust("1"));
+        inputs
+            .members
+            .retain(|member| tuple_of(member) != submitted);
+        inputs.members.push(trust("2"));
+        *inputs.reference(&policy(Trust)) = reference_value(&tuple_of(&trust("latest")));
+        let (evaluation, _) = inputs.run();
+        assert_eq!(
+            issues(&evaluation),
+            [(policy(Trust), Reason::RevisionMismatch)]
+        );
+        inputs.members.push(trust("latest"));
+        let (evaluation, resolved) = inputs.run();
+        assert!(evaluation.issues().next().is_none());
+        assert!(resolved
+            .unwrap()
+            .contains(&(policy(Trust), tuple_of(&trust("latest")))));
+    }
+
     #[test]
     fn a_target_profile_reference_is_resolved_like_a_policy() {
         let mut inputs = Inputs::new();
