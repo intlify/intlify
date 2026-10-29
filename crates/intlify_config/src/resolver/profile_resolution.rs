@@ -335,8 +335,9 @@ where
     })
 }
 
+// `handoff`'s tests resolve the same inputs.
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use std::collections::{BTreeMap, BTreeSet};
     use std::sync::Arc;
 
@@ -619,7 +620,7 @@ mod tests {
     }
 
     /// One invocation's inputs, which a test edits before resolving them.
-    struct Inputs {
+    pub(crate) struct Inputs {
         config: Value,
         members: Vec<Value>,
         specifications: SpecificationInput<Id>,
@@ -634,7 +635,7 @@ mod tests {
         /// request `ja` and `en`, and the server's Target Profile renders
         /// server-side and the browser's hydrates in the browser. The selected
         /// policy is submitted first and the trust policy second.
-        fn complete() -> Self {
+        pub(crate) fn complete() -> Self {
             let mut config = complete_config();
             let profiles = config["profiles"].as_object_mut().unwrap();
             let mut web = profiles.remove("app").unwrap();
@@ -671,7 +672,24 @@ mod tests {
             inputs
         }
 
-        fn declaration(&mut self) -> &mut Value {
+        /// `complete`'s profile with a second group, `jobs`: its one member
+        /// `worker` requests only `ja`, overrides the default with it, and
+        /// names a Target Profile of its own, submitted last.
+        pub(crate) fn two_groups() -> Self {
+            let mut inputs = Self::complete();
+            let member = sealed(ArtifactKind::TargetProfile, "storefront-worker");
+            inputs.declaration()["targetProfiles"]["worker"] = json!({
+                "profile": reference_value(&tuple_of(&member)),
+                "requestedLocales": ["ja"],
+                "defaultRequestedLocale": "ja",
+            });
+            inputs.declaration()["deploymentGroups"]["jobs"] =
+                json!({"members": ["worker"], "hydrationRelations": []});
+            inputs.members.push(member);
+            inputs
+        }
+
+        pub(crate) fn declaration(&mut self) -> &mut Value {
             &mut self.config["profiles"]["web"]
         }
 
@@ -683,7 +701,7 @@ mod tests {
 
         /// The same inputs with every set, object, and the collection in
         /// another order.
-        fn reordered(&self) -> Self {
+        pub(crate) fn reordered(&self) -> Self {
             let mut config = self.config.clone();
             let web = &mut config["profiles"]["web"];
             for path in [
@@ -772,7 +790,10 @@ mod tests {
             })
         }
 
-        fn resolve<R>(&self, inspect: impl FnOnce(Evaluation, SemanticState<'_, Id>) -> R) -> R {
+        pub(crate) fn resolve<R>(
+            &self,
+            inspect: impl FnOnce(Evaluation, SemanticState<'_, Id>) -> R,
+        ) -> R {
             self.attempt(|evaluation, state| inspect(evaluation, state.unwrap()))
         }
     }

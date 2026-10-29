@@ -18,6 +18,7 @@ pub(crate) mod evaluation;
 pub(crate) mod exact_resolution;
 pub(crate) mod fallback;
 pub(crate) mod groups;
+pub(crate) mod handoff;
 pub(crate) mod hydration;
 pub(crate) mod identity;
 pub(crate) mod limits;
