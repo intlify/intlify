@@ -28,6 +28,14 @@
 //! ```compile_fail
 //! use intlify_config::locale::Canonicalizer;
 //! ```
+//! 015's record framing is not a public codec:
+//! ```compile_fail
+//! use intlify_config::framing::Record;
+//! ```
+//! Nor is the text of a Resolver Construction Identity:
+//! ```compile_fail
+//! use intlify_config::base64url::parse_construction_identity;
+//! ```
 //! The vocabulary artifact's reader is not a public artifact API:
 //! ```compile_fail
 //! use intlify_config::artifacts::vocabulary::FormalVocabulary;
@@ -82,6 +90,13 @@ mod references;
 // The 017 representations the resolver admits; no artifact API is reserved.
 #[allow(dead_code)]
 mod artifacts;
+
+// 015's typed-record framing and the Resolver Construction Identity's text.
+// Construction and the invocation boundaries will use them; no codec is public.
+#[allow(dead_code)]
+mod base64url;
+#[allow(dead_code)]
+mod framing;
 
 // Separate from the compatibility decoder: strict 015 entry is still internal.
 #[allow(dead_code)]

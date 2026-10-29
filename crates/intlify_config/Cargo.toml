@@ -68,6 +68,10 @@ name = "generate_envelope_vectors"
 required-features = ["vectors"]
 
 [[example]]
+name = "generate_framing_vectors"
+required-features = ["vectors"]
+
+[[example]]
 name = "generate_vocabulary_vectors"
 required-features = ["vectors"]
 

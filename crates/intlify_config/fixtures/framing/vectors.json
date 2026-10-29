@@ -1,0 +1,297 @@
+{
+  "note": "Records, collections, and texts written by intlify_config. An independent implementation frames every record's fields with the tags 0x01, 0x02, and so on, frames every collection's items with its count, and decides for every refused record or collection which failure its strict reader reports first: truncated bytes, then for each frame in order tag 0x00, a tag beyond the record's fields, a repeated tag, or a tag below its predecessor, then a missing tag; and for a collection a count its items do not match. It encodes every byte string as unpadded base64url and decides for every refused text whether it has a character outside the alphabet, a length one past a multiple of four, or an unused bit set, and checks every Resolver Construction Identity text as rci0_ and the 43 characters of its digest. Hexadecimal stands for bytes, and decimal strings for field counts.",
+  "records": [
+    {
+      "id": "three-fields",
+      "fields": ["61", "", "6263"],
+      "bytes": "010000000000000001610200000000000000000300000000000000026263"
+    },
+    {
+      "id": "no-fields",
+      "fields": [],
+      "bytes": ""
+    },
+    {
+      "id": "one-empty-field",
+      "fields": [""],
+      "bytes": "010000000000000000"
+    },
+    {
+      "id": "nested-record",
+      "fields": ["01000000000000000178", "79"],
+      "bytes": "01000000000000000a0100000000000000017802000000000000000179"
+    },
+    {
+      "id": "a-zero-byte-payload",
+      "fields": ["00", "ff00"],
+      "bytes": "01000000000000000100020000000000000002ff00"
+    }
+  ],
+  "collections": [
+    {
+      "id": "three-items",
+      "items": ["6162", "", "63"],
+      "bytes": "0000000000000003000000000000000261620000000000000000000000000000000163"
+    },
+    {
+      "id": "no-items",
+      "items": [],
+      "bytes": "0000000000000000"
+    },
+    {
+      "id": "records-as-items",
+      "items": ["01000000000000000178", "01000000000000000178"],
+      "bytes": "0000000000000002000000000000000a01000000000000000178000000000000000a01000000000000000178"
+    }
+  ],
+  "refusedRecords": [
+    {
+      "id": "zero-tag",
+      "bytes": "0100000000000000010100000000000000000100",
+      "fields": "2",
+      "reason": "zero-tag"
+    },
+    {
+      "id": "unknown-tag",
+      "bytes": "0100000000000000010103000000000000000103",
+      "fields": "2",
+      "reason": "unknown-tag"
+    },
+    {
+      "id": "repeated-tag",
+      "bytes": "0100000000000000010101000000000000000101",
+      "fields": "2",
+      "reason": "repeated-tag"
+    },
+    {
+      "id": "out-of-order",
+      "bytes": "0200000000000000010201000000000000000101",
+      "fields": "2",
+      "reason": "out-of-order"
+    },
+    {
+      "id": "missing-middle-tag",
+      "bytes": "0100000000000000010103000000000000000103",
+      "fields": "3",
+      "reason": "missing-tag"
+    },
+    {
+      "id": "missing-last-tag",
+      "bytes": "01000000000000000101",
+      "fields": "2",
+      "reason": "missing-tag"
+    },
+    {
+      "id": "no-frames-for-a-field",
+      "bytes": "",
+      "fields": "1",
+      "reason": "missing-tag"
+    },
+    {
+      "id": "repeat-below-its-predecessor",
+      "bytes": "010000000000000001010200000000000000010201000000000000000101",
+      "fields": "2",
+      "reason": "repeated-tag"
+    },
+    {
+      "id": "unknown-before-zero",
+      "bytes": "0900000000000000010900000000000000000100",
+      "fields": "2",
+      "reason": "unknown-tag"
+    },
+    {
+      "id": "out-of-order-before-missing",
+      "bytes": "0300000000000000010301000000000000000101",
+      "fields": "4",
+      "reason": "out-of-order"
+    },
+    {
+      "id": "lone-tag",
+      "bytes": "01",
+      "fields": "1",
+      "reason": "truncated"
+    },
+    {
+      "id": "inside-the-length",
+      "bytes": "0100000000",
+      "fields": "1",
+      "reason": "truncated"
+    },
+    {
+      "id": "inside-the-payload",
+      "bytes": "01000000000000000261",
+      "fields": "1",
+      "reason": "truncated"
+    },
+    {
+      "id": "length-past-the-end",
+      "bytes": "01ffffffffffffffff",
+      "fields": "1",
+      "reason": "truncated"
+    }
+  ],
+  "refusedCollections": [
+    {
+      "id": "fewer-items-than-counted",
+      "bytes": "0000000000000003000000000000000161000000000000000162",
+      "reason": "count-mismatch"
+    },
+    {
+      "id": "more-items-than-counted",
+      "bytes": "0000000000000001000000000000000161000000000000000162",
+      "reason": "count-mismatch"
+    },
+    {
+      "id": "an-item-after-none",
+      "bytes": "00000000000000000000000000000000",
+      "reason": "count-mismatch"
+    },
+    {
+      "id": "bytes-after-the-counted-items",
+      "bytes": "0000000000000001000000000000000161010203",
+      "reason": "count-mismatch"
+    },
+    {
+      "id": "inside-the-count",
+      "bytes": "000000",
+      "reason": "truncated"
+    },
+    {
+      "id": "inside-an-item",
+      "bytes": "0000000000000001000000000000000361",
+      "reason": "truncated"
+    }
+  ],
+  "base64url": [
+    {
+      "bytes": "",
+      "text": ""
+    },
+    {
+      "bytes": "66",
+      "text": "Zg"
+    },
+    {
+      "bytes": "666f",
+      "text": "Zm8"
+    },
+    {
+      "bytes": "666f6f",
+      "text": "Zm9v"
+    },
+    {
+      "bytes": "666f6f62",
+      "text": "Zm9vYg"
+    },
+    {
+      "bytes": "666f6f6261",
+      "text": "Zm9vYmE"
+    },
+    {
+      "bytes": "666f6f626172",
+      "text": "Zm9vYmFy"
+    },
+    {
+      "bytes": "fbff",
+      "text": "-_8"
+    },
+    {
+      "bytes": "f80000",
+      "text": "-AAA"
+    },
+    {
+      "bytes": "ffffff",
+      "text": "____"
+    },
+    {
+      "bytes": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+      "text": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0-P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn-AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq-wsbKztLW2t7i5uru8vb6_wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t_g4eLj5OXm5-jp6uvs7e7v8PHy8_T19vf4-fr7_P3-_w"
+    }
+  ],
+  "refusedBase64url": [
+    {
+      "text": "Zg==",
+      "reason": "character"
+    },
+    {
+      "text": "+/8",
+      "reason": "character"
+    },
+    {
+      "text": "Zm 9v",
+      "reason": "character"
+    },
+    {
+      "text": "A",
+      "reason": "length"
+    },
+    {
+      "text": "Zm9vY",
+      "reason": "length"
+    },
+    {
+      "text": "Zm9v=",
+      "reason": "character"
+    },
+    {
+      "text": "Zh",
+      "reason": "unused-bits"
+    },
+    {
+      "text": "Zo",
+      "reason": "unused-bits"
+    },
+    {
+      "text": "Zm9",
+      "reason": "unused-bits"
+    },
+    {
+      "text": "Zm-",
+      "reason": "unused-bits"
+    }
+  ],
+  "constructionIdentities": [
+    {
+      "digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "text": "rci0_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    {
+      "digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "text": "rci0___________________________________________8"
+    },
+    {
+      "digest": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "text": "rci0_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+    }
+  ],
+  "refusedConstructionIdentities": [
+    {
+      "text": "rci1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "reason": "prefix"
+    },
+    {
+      "text": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "reason": "prefix"
+    },
+    {
+      "text": "rci0_",
+      "reason": "length"
+    },
+    {
+      "text": "rci0_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "reason": "length"
+    },
+    {
+      "text": "rci0_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "reason": "length"
+    },
+    {
+      "text": "rci0_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "reason": "character"
+    },
+    {
+      "text": "rci0_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB",
+      "reason": "unused-bits"
+    }
+  ]
+}

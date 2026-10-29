@@ -6,6 +6,7 @@
   "scripts": {
     "check": "node scripts/verify.mjs",
     "check:envelope": "node scripts/verify-envelope.mjs",
+    "check:framing": "node scripts/verify-framing.mjs",
     "check:locale": "node scripts/verify-locale.mjs",
     "check:locale-corpus": "node scripts/verify-locale-corpus.mjs",
     "check:vocabulary": "node scripts/verify-vocabulary.mjs"
