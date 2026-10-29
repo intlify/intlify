@@ -35,14 +35,14 @@
         "identity": "storefront-browser",
         "revision": "1",
         "specificationRevision": "0",
-        "semanticDigest": "sha256:5def4b031574ac812a5d831f66e9405932f4fb544da66ef1c7cc42d7ee8c42ea"
+        "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
       },
       {
         "kind": "target-profile",
         "identity": "storefront-server",
         "revision": "1",
         "specificationRevision": "0",
-        "semanticDigest": "sha256:5def4b031574ac812a5d831f66e9405932f4fb544da66ef1c7cc42d7ee8c42ea"
+        "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
       }
     ],
     "consumerInputs": {
@@ -94,14 +94,14 @@
         "identity": "storefront-browser",
         "revision": "1",
         "specificationRevision": "0",
-        "semanticDigest": "sha256:5def4b031574ac812a5d831f66e9405932f4fb544da66ef1c7cc42d7ee8c42ea"
+        "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
       },
       {
         "kind": "target-profile",
         "identity": "storefront-server",
         "revision": "1",
         "specificationRevision": "0",
-        "semanticDigest": "sha256:5def4b031574ac812a5d831f66e9405932f4fb544da66ef1c7cc42d7ee8c42ea"
+        "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
       }
     ],
     "consumerInputs": {
@@ -353,7 +353,7 @@
         "identity": "storefront-worker",
         "revision": "1",
         "specificationRevision": "0",
-        "semanticDigest": "sha256:5def4b031574ac812a5d831f66e9405932f4fb544da66ef1c7cc42d7ee8c42ea"
+        "semanticDigest": "sha256:e86a606f3b0a3bcd08106fb1654a2452e093ebb7b307be86a5c5b44f52d2e431"
       }
     ],
     "consumerInputs": {

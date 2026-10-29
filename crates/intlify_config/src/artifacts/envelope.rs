@@ -647,15 +647,26 @@ mod tests {
             approval.envelope().unwrap().admit(),
             Ok(Content::Approval(LocalizedApproval::Required))
         );
-        // A content 018 or 022 admits passes on as the submitted object.
+        // A Glossary Set's content, which 022 admits, passes on as the
+        // submitted object; a Trust Policy's is 018's closed body.
+        let glossary = member(envelope_of(
+            ArtifactKind::GlossarySet,
+            "glossary",
+            "1",
+            json!({"roots": ["a"]}),
+        ));
+        let envelope = glossary.envelope().unwrap();
+        assert_eq!(envelope.admit(), Ok(Content::External(envelope.content())));
         let trust = member(envelope_of(
             ArtifactKind::TrustPolicy,
             "trust",
             "1",
             json!({"roots": ["a"]}),
         ));
-        let envelope = trust.envelope().unwrap();
-        assert_eq!(envelope.admit(), Ok(Content::External(envelope.content())));
+        assert_eq!(
+            trust.envelope().unwrap().admit(),
+            Err(BodyFailure::ContentInvalid)
+        );
     }
 
     #[test]

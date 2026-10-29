@@ -124,7 +124,8 @@ impl Recipe {
         }
         if let Self::Hydration(recipe) = self {
             // The configuration whose selected declaration the relations
-            // come from; the input context binds the members and answers.
+            // come from; the input context binds the members, whose Target
+            // Profiles declare the roles.
             return Arc::from(
                 serde_json::to_vec(&recipe.fixture().config)
                     .expect("finite owner hydration fixture"),

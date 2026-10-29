@@ -49,10 +49,11 @@ const MAX_UINT64 = 18446744073709551615n
 
 /**
  * The closed contents of design 017's Policy and Target Profile bodies, as
- * data that `conforms` reads: an object lists its members, `oneOf` its
- * spellings, and `ordered` an array of entries strictly ascending by the
- * UTF-8 bytes of one member. The other three kinds have no entry: 018 and 022
- * admit their contents.
+ * data that `conforms` reads: an object lists its members, `optional` the
+ * members an object may have, `oneOf` its spellings, `ordered` an array of
+ * entries strictly ascending by the UTF-8 bytes of one member, and `set` an
+ * array of spellings strictly ascending by their UTF-8 bytes. The Glossary
+ * Set has no entry: 022 admits its content.
  */
 const token = { type: 'token' }
 const pair = { type: 'object', members: { identity: token, revision: token } }
@@ -62,6 +63,9 @@ const pinned = (identity, revision) => ({
   members: { identity: oneOf(identity), revision: oneOf(revision) }
 })
 const object = members => ({ type: 'object', members })
+const optional = members => ({ type: 'optional', members })
+const set = (...values) => ({ type: 'set', values })
+const anyObject = { type: 'anyObject' }
 const positive = { type: 'positive' }
 const LIMIT_NAMES = [
   'maxMessages',
@@ -76,6 +80,9 @@ const LIMIT_NAMES = [
 const CONTENTS = new Map([
   ['approval-policy', object({ localizedApproval: oneOf('required', 'not-required') })],
   ['selection-policy', object({ mode: oneOf('explicit') })],
+  // 018 reads only that the section is an object; its interior is 015's.
+  ['resource-limit-policy', optional({ projectProfileResolution: anyObject })],
+  ['trust-policy', object({ authority: oneOf('trusted-local-host') })],
   [
     'source-admission-policy',
     object({ sourceApproval: oneOf('required', 'authenticated-sufficient') })
@@ -114,6 +121,7 @@ const CONTENTS = new Map([
         }
       }),
       delivery: object({ unit: oneOf('main'), loading: oneOf('eager') }),
+      hydration: object({ roles: set('browser-hydration-client', 'ssr-renderer') }),
       limits: object(Object.fromEntries(LIMIT_NAMES.map(name => [name, positive])))
     })
   ]
@@ -253,8 +261,31 @@ function conforms(description, value) {
         names.every(name => conforms(description.members[name], value[name]))
       )
     }
+    case 'optional': {
+      return (
+        isObject(value) &&
+        Object.keys(value).every(
+          name =>
+            Object.hasOwn(description.members, name) &&
+            conforms(description.members[name], value[name])
+        )
+      )
+    }
+    case 'anyObject': {
+      return isObject(value)
+    }
     case 'oneOf': {
       return typeof value === 'string' && description.values.includes(value)
+    }
+    case 'set': {
+      if (
+        !Array.isArray(value) ||
+        !value.every(item => typeof item === 'string' && description.values.includes(item))
+      ) {
+        return false
+      }
+      const keys = value.map(item => Buffer.from(item, 'utf8'))
+      return keys.every((key, index) => index === 0 || Buffer.compare(keys[index - 1], key) < 0)
     }
     case 'token': {
       return isToken(value)
@@ -286,8 +317,8 @@ function conforms(description, value) {
  *
  * @param kind - An admitted kind.
  * @param content - A content object.
- * @returns Whether design 017's closed content admits it, or true for a kind
- *   whose content 018 or 022 admits.
+ * @returns Whether design 017's closed content admits it, or true for the
+ *   Glossary Set, whose content 022 admits.
  */
 function contentAdmitted(kind, content) {
   const description = CONTENTS.get(kind)

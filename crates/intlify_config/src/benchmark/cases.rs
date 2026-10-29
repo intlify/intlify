@@ -729,7 +729,7 @@ pub(super) fn declarations() -> Vec<Declaration> {
             cases.push(case);
         }
     }
-    // Append 015 Phase 13 without changing any of the 280 rows: every recipe,
+    // Append 015 Phase 13 without changing any of the 281 rows: every recipe,
     // then the exact and first-over edges of the relations' bound and of the
     // Target ID bound on an endpoint.
     let expected = |completes| {

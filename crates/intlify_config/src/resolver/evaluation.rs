@@ -172,6 +172,9 @@ pub(crate) enum Check {
     ProjectSubset,
     /// The target's effective default is one of its requested locales.
     SupportedDefault,
+    /// The target's Target Profile has a direction for each of its requested
+    /// locales.
+    DirectedLocales,
     /// The member names a declared Target ID.
     KnownMember,
     /// The member occurs once in its group.
@@ -227,6 +230,7 @@ pub(crate) enum Code {
     DefaultRequestedLocaleNotInProject,
     TargetLocalesNotSubset,
     TargetDefaultLocaleNotSupported,
+    TargetLocaleDirectionMissing,
     NegotiationAliasDuplicate,
     NegotiationAliasDestinationNotRequested,
     MessageFallbackSourceNotRequested,
@@ -282,6 +286,7 @@ impl Code {
             Self::TargetDefaultLocaleNotSupported => {
                 "project-profile-target-default-locale-not-supported"
             }
+            Self::TargetLocaleDirectionMissing => "project-profile-target-locale-direction-missing",
             Self::NegotiationAliasDuplicate => "project-profile-negotiation-alias-duplicate",
             Self::NegotiationAliasDestinationNotRequested => {
                 "project-profile-negotiation-alias-destination-not-requested"
@@ -786,6 +791,7 @@ mod tests {
                 Code::DefaultRequestedLocaleNotInProject,
                 Code::TargetLocalesNotSubset,
                 Code::TargetDefaultLocaleNotSupported,
+                Code::TargetLocaleDirectionMissing,
                 Code::NegotiationAliasDuplicate,
                 Code::NegotiationAliasDestinationNotRequested,
                 Code::MessageFallbackSourceNotRequested,
@@ -823,6 +829,7 @@ mod tests {
                 "project-profile-default-requested-locale-not-in-project",
                 "project-profile-target-locales-not-subset",
                 "project-profile-target-default-locale-not-supported",
+                "project-profile-target-locale-direction-missing",
                 "project-profile-negotiation-alias-duplicate",
                 "project-profile-negotiation-alias-destination-not-requested",
                 "project-profile-message-fallback-source-not-requested",

@@ -4,15 +4,16 @@
 //! Finite Phase 13 inputs: 015's storefront example and its relation, a group
 //! without relations, fan-out and fan-in, a scale of relations among few
 //! targets, and one change of the example for each decision Phase 13 reaches
-//! or waits on. The fixture also answers what 015 asks 024 about each Target
-//! Profile, which 024 has not defined yet (plan 023 ◆#1).
-
-use std::collections::BTreeSet;
+//! or waits on. Each Target Profile declares its hydration roles in its body
+//! (024), and the static incompatibility is a client whose Target Profile
+//! names another MF2 specification revision than its server's.
 
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
-use super::super::hydration_relation::FixtureCapabilities;
-use super::target_group_inputs::{Declared, Target, TargetAndGroupFixture, STOREFRONT};
+use super::target_group_inputs::{
+    Declared, Target, TargetAndGroupFixture, BROWSER_HYDRATION_CLIENT, SSR_RENDERER, STOREFRONT,
+};
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
@@ -93,6 +94,8 @@ impl HydrationRecipe {
             Self::FanOutFanIn | Self::FanReordered => {
                 add(&mut declared, "edge", "storefront-edge");
                 add(&mut declared, "app", "storefront-app");
+                declared.declare("storefront-edge", &[SSR_RENDERER]);
+                declared.declare("storefront-app", &[BROWSER_HYDRATION_CLIENT]);
                 declared.relations = vec![
                     pair("ssr", "browser"),
                     pair("ssr", "app"),
@@ -130,9 +133,26 @@ impl HydrationRecipe {
                 declared.relations.push(pair("ssr", "worker"));
             }
             Self::DuplicateRelation => declared.relations.push(pair("ssr", "browser")),
+            // The server's Target Profile declares no role.
+            Self::ServerCapabilityMissing => declared.declare("storefront-ssr", &[]),
+            // The client's Target Profile declares no role.
+            Self::ClientCapabilityMissing => declared.declare("storefront-browser", &[]),
+            // `browser` hydrates from `ssr` and serves `app`, and its Target
+            // Profile declares both roles.
             Self::DualRole => {
                 add(&mut declared, "app", "storefront-app");
+                declared.declare(
+                    "storefront-browser",
+                    &[BROWSER_HYDRATION_CLIENT, SSR_RENDERER],
+                );
+                declared.declare("storefront-app", &[BROWSER_HYDRATION_CLIENT]);
                 declared.relations.push(pair("browser", "app"));
+            }
+            // The client's Target Profile names another MF2 specification
+            // revision than the server's.
+            Self::StaticIncompatibility => {
+                declared.content("storefront-browser")["mf2Specification"]["revision"] =
+                    json!("47");
             }
             // A subset of the project's locales, but not the client's.
             Self::RequestedLocales => declared.target("ssr").requested = vec!["en", "fr-FR"],
@@ -147,43 +167,9 @@ impl HydrationRecipe {
             // Phase 7 rejects the alias's destination, so Phase 8 admits no
             // Locale Negotiation Profile for the relations to share.
             Self::NegotiationUnavailable => declared.aliases = vec![("fr", "en_US")],
-            Self::Storefront
-            | Self::ServerCapabilityMissing
-            | Self::ClientCapabilityMissing
-            | Self::StaticIncompatibility
-            | Self::TargetProfileMissing => {}
+            Self::Storefront | Self::TargetProfileMissing => {}
         }
         declared
-    }
-
-    /// The fixture's answers to what 015 asks 024, by Target Profile
-    /// identity.
-    pub(in crate::benchmark) fn capabilities(self) -> FixtureCapabilities {
-        let names = |names: &[&str]| names.iter().map(|&name| name.to_owned()).collect();
-        let mut capabilities = FixtureCapabilities {
-            renders: names(&["storefront-ssr"]),
-            hydrates: names(&["storefront-browser"]),
-            incompatible: BTreeSet::new(),
-        };
-        match self {
-            Self::FanOutFanIn | Self::FanReordered => {
-                capabilities.renders = names(&["storefront-ssr", "storefront-edge"]);
-                capabilities.hydrates = names(&["storefront-browser", "storefront-app"]);
-            }
-            Self::DualRole => {
-                capabilities.renders = names(&["storefront-ssr", "storefront-browser"]);
-                capabilities.hydrates = names(&["storefront-browser", "storefront-app"]);
-            }
-            Self::ServerCapabilityMissing => capabilities.renders.clear(),
-            Self::ClientCapabilityMissing => capabilities.hydrates.clear(),
-            Self::StaticIncompatibility => {
-                capabilities
-                    .incompatible
-                    .insert(pair("storefront-ssr", "storefront-browser"));
-            }
-            _ => {}
-        }
-        capabilities
     }
 
     /// The configuration and the members, in submission order.
@@ -216,6 +202,21 @@ mod tests {
             .unwrap()
     }
 
+    /// The content of the submitted Target Profile `identity` names.
+    fn content<'a>(fixture: &'a TargetAndGroupFixture, identity: &str) -> &'a Value {
+        &fixture
+            .members
+            .iter()
+            .find(|member| {
+                member["kind"] == "target-profile" && member["body"]["identity"] == identity
+            })
+            .unwrap()["body"]["content"]
+    }
+
+    fn roles(fixture: &TargetAndGroupFixture, identity: &str) -> Value {
+        content(fixture, identity)["hydration"]["roles"].clone()
+    }
+
     #[test]
     fn the_storefront_keeps_fifteens_relation() {
         let fixture = R::Storefront.fixture();
@@ -223,22 +224,18 @@ mod tests {
             relations(&fixture, "web"),
             json!([{"server": "ssr", "client": "browser"}])
         );
-        let capabilities = R::Storefront.capabilities();
+        assert_eq!(roles(&fixture, "storefront-ssr"), json!(["ssr-renderer"]));
         assert_eq!(
-            capabilities.renders.into_iter().collect::<Vec<_>>(),
-            ["storefront-ssr"]
+            roles(&fixture, "storefront-browser"),
+            json!(["browser-hydration-client"])
         );
-        assert_eq!(
-            capabilities.hydrates.into_iter().collect::<Vec<_>>(),
-            ["storefront-browser"]
-        );
-        assert!(capabilities.incompatible.is_empty());
         // Without relations, the group omits the member.
         assert_eq!(relations(&R::NoRelations.fixture(), "web"), Value::Null);
     }
 
     /// Each blocked recipe changes one part of the example: its relations,
-    /// a target, the groups, the collection, or the fixture's answers.
+    /// a target, the groups, the collection, or one endpoint's Target
+    /// Profile.
     #[test]
     fn each_blocked_recipe_changes_only_what_its_name_says() {
         let base = R::Storefront.fixture();
@@ -263,21 +260,52 @@ mod tests {
                 json!([storefront.clone()]);
             assert_eq!(config, base.config, "{recipe:?}");
         }
-        for recipe in [
-            R::ServerCapabilityMissing,
-            R::ClientCapabilityMissing,
-            R::StaticIncompatibility,
+        // A role or the MF2 specification revision of one endpoint's Target
+        // Profile: only its content and the reference naming it change.
+        for (recipe, target, identity, pointer, value) in [
+            (
+                R::ServerCapabilityMissing,
+                "ssr",
+                "storefront-ssr",
+                "/hydration/roles",
+                json!([]),
+            ),
+            (
+                R::ClientCapabilityMissing,
+                "browser",
+                "storefront-browser",
+                "/hydration/roles",
+                json!([]),
+            ),
+            (
+                R::StaticIncompatibility,
+                "browser",
+                "storefront-browser",
+                "/mf2Specification/revision",
+                json!("47"),
+            ),
         ] {
             let fixture = recipe.fixture();
-            assert_eq!(
-                (fixture.config, fixture.members),
-                (base.config.clone(), base.members.clone())
-            );
-            assert_ne!(
-                recipe.capabilities(),
-                R::Storefront.capabilities(),
-                "{recipe:?}"
-            );
+            let (changed, original) = (content(&fixture, identity), content(&base, identity));
+            assert_eq!(changed.pointer(pointer), Some(&value), "{recipe:?}");
+            assert_ne!(changed, original, "{recipe:?}");
+            let mut restored = changed.clone();
+            *restored.pointer_mut(pointer).unwrap() = original.pointer(pointer).unwrap().clone();
+            assert_eq!(&restored, original, "{recipe:?}");
+            let others = |fixture: &TargetAndGroupFixture| {
+                fixture
+                    .members
+                    .iter()
+                    .filter(|member| member["body"]["identity"] != identity)
+                    .cloned()
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(others(&fixture), others(&base), "{recipe:?}");
+            assert_ne!(fixture.config, base.config, "{recipe:?}");
+            let mut config = fixture.config.clone();
+            config["profiles"]["app"]["targetProfiles"][target]["profile"] =
+                targets(&base)[target]["profile"].clone();
+            assert_eq!(config, base.config, "{recipe:?}");
         }
         let target = |recipe: HydrationRecipe, id: &str| targets(&recipe.fixture())[id].clone();
         assert_eq!(
@@ -315,12 +343,16 @@ mod tests {
             relations(&cross, "web"),
             json!([storefront, {"server": "ssr", "client": "worker"}])
         );
-        // `browser` serves `app` and hydrates from `ssr`, and the fixture
-        // answers that it can do both.
-        let dual = R::DualRole.capabilities();
-        assert!(
-            dual.renders.contains("storefront-browser")
-                && dual.hydrates.contains("storefront-browser")
+        // `browser` hydrates from `ssr` and serves `app`, and its Target
+        // Profile declares both roles.
+        let dual = R::DualRole.fixture();
+        assert_eq!(
+            roles(&dual, "storefront-browser"),
+            json!(["browser-hydration-client", "ssr-renderer"])
+        );
+        assert_eq!(
+            roles(&dual, "storefront-app"),
+            json!(["browser-hydration-client"])
         );
     }
 
@@ -334,6 +366,12 @@ mod tests {
                 {"server": "ssr", "client": "app"},
                 {"server": "edge", "client": "browser"}
             ])
+        );
+        // `edge` serves and `app` hydrates, as their Target Profiles declare.
+        assert_eq!(roles(&fan, "storefront-edge"), json!(["ssr-renderer"]));
+        assert_eq!(
+            roles(&fan, "storefront-app"),
+            json!(["browser-hydration-client"])
         );
         // The same declaration with every object's members, the group's
         // members and relations, and the collection reversed.

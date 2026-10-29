@@ -404,7 +404,8 @@ fn targets(prepared: &Prepared) -> Option<super::target_group::InputFacts> {
     }
 }
 
-/// The configuration, collection, and answer facts of a Phase 13 case.
+/// The configuration and collection facts of a Phase 13 case, whose Target
+/// Profiles declare the roles.
 fn hydration(prepared: &Prepared) -> Option<super::hydration_relation::InputFacts> {
     match prepared {
         Prepared::Hydration(prepared) => {

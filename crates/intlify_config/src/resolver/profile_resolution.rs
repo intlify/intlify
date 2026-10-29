@@ -25,14 +25,14 @@ use crate::structural::selection::{ProvisionalSelection, SelectionInvariant, Sel
 use crate::structural::StructuralAnalysis;
 
 use super::artifact_resolution::{admit_collection, ArtifactSet};
-use super::bootstrap::ResourcePolicyVerification;
+use super::bootstrap::VerificationInput;
 use super::coverage::{resolve_coverage, CoveragePolicy};
 use super::delivery::{resolve_delivery, DeliveryPolicy};
 use super::evaluation::{Admitted, Causes, Evaluation, EvaluationInvariant};
 use super::exact_resolution::{resolve_fields, ArtifactBindings, ResolvedReferences};
 use super::fallback::{resolve_fallback, MessageFallbackPolicy};
 use super::groups::{resolve_groups, ResolvedGroups};
-use super::hydration::{validate_hydration, ResolvedHydration, TargetCapabilities};
+use super::hydration::{validate_hydration, ResolvedHydration};
 use super::identity::{resolve_project_identity, ProjectIdentity};
 use super::limits::ImplementationCapability;
 use super::locales::{resolve_locales, LocaleFields, LocaleInvariant, ResolvedLocales};
@@ -119,17 +119,14 @@ impl<'a> CompleteConfiguration<'a> {
 /// One invocation's inputs besides the configuration, as resolver
 /// construction and 015's pre-invocation boundary admitted them: what the
 /// resolver supports, the Profile Resolution Specification Input, the Admitted
-/// Implementation Capability, 018's admission, 024's answers about Target
-/// Profiles, and the formally admitted collection and vocabulary. Until 015's
+/// Implementation Capability, 018's Resource Limit Policy Verification Input,
+/// and the formally admitted collection and vocabulary. Until 015's
 /// Implementation Phase 5 constructs them, only tests do.
-pub(crate) struct Invocation<'a, Id, V, C> {
+pub(crate) struct Invocation<'a, Id> {
     pub(crate) supported: &'a SupportedSpecifications<Id>,
     pub(crate) specifications: &'a SpecificationInput<Id>,
     pub(crate) capability: &'a ImplementationCapability,
-    pub(crate) verification: &'a V,
-    /// The hydration roles and the static compatibility of Target Profiles,
-    /// which only tests answer until 024 defines them (plan 023 ◆#1).
-    pub(crate) capabilities: &'a C,
+    pub(crate) verification: &'a VerificationInput,
     pub(crate) collection: &'a FormalCollection,
     pub(crate) vocabulary: &'a FormalVocabulary,
 }
@@ -209,18 +206,16 @@ impl From<LocaleInvariant> for ResolverInvariant {
 /// order. `data` is the canonicalization data Phase 5 binds. The Profile
 /// Resolution Artifact Set Phase 9 admits is kept in `set`, which the resolved
 /// references and the bindings borrow.
-pub(crate) fn resolve_profile<'s, P, V, C>(
+pub(crate) fn resolve_profile<'s, P>(
     evaluation: &mut Evaluation,
     configuration: &CompleteConfiguration<'_>,
-    invocation: &Invocation<'s, P::Identity, V, C>,
+    invocation: &Invocation<'s, P::Identity>,
     data: P,
     set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
 ) -> Result<SemanticState<'s, P::Identity>, ResolverInvariant>
 where
     P: Provider,
     P::Identity: AsRef<str>,
-    V: ResourcePolicyVerification,
-    C: TargetCapabilities,
 {
     let declaration = configuration.declaration;
     let declared = configuration.references();
@@ -315,7 +310,6 @@ where
         targets.as_ref(),
         groups.as_ref(),
         negotiation.as_ref().map(|_| ()).map_err(Causes::clone),
-        invocation.capabilities,
     )?;
     Ok(SemanticState {
         specifications: SpecificationSet::new(&project_profile, &admitted),
@@ -342,14 +336,12 @@ pub(super) mod tests {
     use std::sync::Arc;
 
     use intlify_shared_json::token::Token;
-    use serde_json::{json, Map, Value};
+    use serde_json::{json, Value};
 
     use super::*;
     use crate::artifacts::collection::{read_collection, CollectionLimits};
     use crate::artifacts::content::sample;
-    use crate::artifacts::envelope::{
-        envelope_of, ArtifactKind, Envelope, ExactTuple, FormalMember,
-    };
+    use crate::artifacts::envelope::{envelope_of, ArtifactKind, ExactTuple, FormalMember};
     use crate::artifacts::vectors::vocabulary::{self as vectors, formal};
     use crate::input_limits::{Bound, InputLimits, RawInputLimits};
     use crate::locale::fixtures::{fixture_pins, FixtureProvider};
@@ -451,61 +443,11 @@ pub(super) mod tests {
         depth: u64::MAX,
     };
 
-    /// 018's admission as a test states it: it admits everything.
-    struct Trusting;
-
-    impl ResourcePolicyVerification for Trusting {
-        fn authenticates(&self, _: &Envelope<'_>) -> bool {
-            true
-        }
-
-        fn admits_common_body(&self, _: &Map<String, Value>) -> bool {
-            true
-        }
-    }
-
-    /// 024's answers as a test states them: the Target Profiles, by identity,
-    /// that render server-side and that hydrate in the browser.
-    struct Roles {
-        renders: Vec<&'static str>,
-        hydrates: Vec<&'static str>,
-    }
-
-    fn profile_identity(
-        profile: &crate::resolver::artifact_resolution::AdmittedArtifact<'_>,
-    ) -> String {
-        profile
-            .member
-            .envelope()
-            .unwrap()
-            .tuple()
-            .identity
-            .as_str()
-            .to_owned()
-    }
-
-    impl TargetCapabilities for Roles {
-        fn renders_server_side(
-            &self,
-            profile: &crate::resolver::artifact_resolution::AdmittedArtifact<'_>,
-        ) -> bool {
-            self.renders.contains(&profile_identity(profile).as_str())
-        }
-
-        fn hydrates_in_browser(
-            &self,
-            profile: &crate::resolver::artifact_resolution::AdmittedArtifact<'_>,
-        ) -> bool {
-            self.hydrates.contains(&profile_identity(profile).as_str())
-        }
-
-        fn statically_incompatible(
-            &self,
-            _: &crate::resolver::artifact_resolution::AdmittedArtifact<'_>,
-            _: &crate::resolver::artifact_resolution::AdmittedArtifact<'_>,
-        ) -> bool {
-            false
-        }
+    /// A sealed Target Profile with the sample content declaring `roles`.
+    fn target_profile(identity: &str, roles: &[&str]) -> Value {
+        let mut content = sample(ArtifactKind::TargetProfile);
+        content["hydration"]["roles"] = json!(roles);
+        envelope_of(ArtifactKind::TargetProfile, identity, "1", content)
     }
 
     fn bound(value: u64) -> Bound {
@@ -625,16 +567,19 @@ pub(super) mod tests {
         members: Vec<Value>,
         specifications: SpecificationInput<Id>,
         capability: ResolutionLimits,
-        roles: Roles,
+        /// What trusted setup pinned in 018's Verification Input: the policy
+        /// the declaration selects, whatever a test then changes.
+        pinned: ExactTuple,
     }
 
     impl Inputs {
         /// Profile `web`: source `en`, requested `ja` and `en`, default `en`,
         /// every optional field declared, and each reference naming one
         /// submitted artifact exactly; all eight slots asserted. Both targets
-        /// request `ja` and `en`, and the server's Target Profile renders
-        /// server-side and the browser's hydrates in the browser. The selected
-        /// policy is submitted first and the trust policy second.
+        /// request `ja` and `en`, and the server's Target Profile declares
+        /// `ssr-renderer` and the browser's `browser-hydration-client`. The
+        /// selected policy is submitted first, pinned by the Verification
+        /// Input, and the trust policy second.
         pub(crate) fn complete() -> Self {
             let mut config = complete_config();
             let profiles = config["profiles"].as_object_mut().unwrap();
@@ -652,10 +597,7 @@ pub(super) mod tests {
                 members: vec![policy.clone()],
                 specifications: specifications(),
                 capability: capability_limits(),
-                roles: Roles {
-                    renders: vec!["storefront-server"],
-                    hydrates: vec!["storefront-browser"],
-                },
+                pinned: tuple_of(&policy),
             };
             inputs.select_policy(policy);
             for (slot, kind, identity) in POLICIES {
@@ -664,7 +606,11 @@ pub(super) mod tests {
                 inputs.members.push(member);
             }
             for (target, identity) in TARGETS {
-                let member = sealed(ArtifactKind::TargetProfile, identity);
+                let role = match target {
+                    "server" => "ssr-renderer",
+                    _ => "browser-hydration-client",
+                };
+                let member = target_profile(identity, &[role]);
                 inputs.declaration()["targetProfiles"][target]["profile"] =
                     reference_value(&tuple_of(&member));
                 inputs.members.push(member);
@@ -672,12 +618,26 @@ pub(super) mod tests {
             inputs
         }
 
+        /// Submits `member` in place of the Target Profile `target` names, and
+        /// makes the target name it.
+        fn replace_target_profile(&mut self, target: &str, member: Value) {
+            let tuple = tuple_of(&member);
+            let named = self.declaration()["targetProfiles"][target]["profile"]["identity"].clone();
+            let index = self
+                .members
+                .iter()
+                .position(|candidate| candidate["body"]["identity"] == named)
+                .unwrap();
+            self.members[index] = member;
+            self.declaration()["targetProfiles"][target]["profile"] = reference_value(&tuple);
+        }
+
         /// `complete`'s profile with a second group, `jobs`: its one member
         /// `worker` requests only `ja`, overrides the default with it, and
         /// names a Target Profile of its own, submitted last.
         pub(crate) fn two_groups() -> Self {
             let mut inputs = Self::complete();
-            let member = sealed(ArtifactKind::TargetProfile, "storefront-worker");
+            let member = target_profile("storefront-worker", &[]);
             inputs.declaration()["targetProfiles"]["worker"] = json!({
                 "profile": reference_value(&tuple_of(&member)),
                 "requestedLocales": ["ja"],
@@ -693,9 +653,11 @@ pub(super) mod tests {
             &mut self.config["profiles"]["web"]
         }
 
-        /// Selects `policy`, submitted first in place of the selected one.
+        /// Selects `policy`, submitted first in place of the selected one,
+        /// and pins it.
         fn select_policy(&mut self, policy: Value) {
-            self.declaration()["policies"]["resourceLimits"] = reference_value(&tuple_of(&policy));
+            self.pinned = tuple_of(&policy);
+            self.declaration()["policies"]["resourceLimits"] = reference_value(&self.pinned);
             self.members[0] = policy;
         }
 
@@ -722,10 +684,7 @@ pub(super) mod tests {
                 members,
                 specifications: self.specifications.clone(),
                 capability: self.capability.clone(),
-                roles: Roles {
-                    renders: self.roles.renders.clone(),
-                    hydrates: self.roles.hydrates.clone(),
-                },
+                pinned: self.pinned.clone(),
             }
         }
 
@@ -733,7 +692,7 @@ pub(super) mod tests {
         /// invocation's other inputs, for `run`.
         fn prepared<R>(
             &self,
-            run: impl FnOnce(&CompleteConfiguration<'_>, &Invocation<'_, Id, Trusting, Roles>) -> R,
+            run: impl FnOnce(&CompleteConfiguration<'_>, &Invocation<'_, Id>) -> R,
         ) -> R {
             let analysis = analyze(&self.config, &self.capability);
             let config = analysis.construct().unwrap().unwrap();
@@ -756,14 +715,14 @@ pub(super) mod tests {
             let capability = ImplementationCapability::fixture_owned(self.capability.clone());
             let collection = collection(&self.members);
             let vocabulary = formal();
+            let verification = VerificationInput::exact_pins([self.pinned.clone()]).unwrap();
             run(
                 &configuration,
                 &Invocation {
                     supported: &supported,
                     specifications: &self.specifications,
                     capability: &capability,
-                    verification: &Trusting,
-                    capabilities: &self.roles,
+                    verification: &verification,
                     collection: &collection,
                     vocabulary: &vocabulary,
                 },
@@ -1236,19 +1195,21 @@ pub(super) mod tests {
             );
             // The bootstrap checks only the selected policy's candidates. The
             // targets are checked, but their Target Profiles need the Set, and
-            // so do the relation's roles.
+            // so do their directions and the relation's roles.
             assert_eq!(
                 absent(&state),
                 ["references", "bindings", "targets", "hydration"]
             );
-            // No Set: every reference waits on the collection, and so do the
-            // relation's checks of the two Target Profiles.
+            // No Set: every reference waits on the collection, and so do each
+            // target's directions and the relation's checks of the two Target
+            // Profiles.
             let key = only_issue(&evaluation);
             assert_eq!(
                 suppressed(&evaluation),
                 (
                     BTreeSet::from([
                         Phase::ArtifactReferenceResolution,
+                        Phase::TargetResolution,
                         Phase::HydrationValidation
                     ]),
                     BTreeSet::from([key.clone()])
@@ -1263,14 +1224,15 @@ pub(super) mod tests {
 
     #[test]
     fn two_bodies_sharing_all_but_the_digest_are_conflicting_content() {
-        // Another trust policy body under the same kind, identity, revision,
-        // and specification revision.
+        // Another approval policy body under the same kind, identity,
+        // revision, and specification revision. A Trust Policy has one valid
+        // body, so it cannot conflict with another valid one.
         let mut inputs = Inputs::complete();
         inputs.members.push(envelope_of(
-            ArtifactKind::TrustPolicy,
-            "storefront-trust",
+            ArtifactKind::ApprovalPolicy,
+            "storefront-approval",
             "1",
-            json!({"note": "another body"}),
+            json!({"localizedApproval": "not-required"}),
         ));
         inputs.resolve(|evaluation, state| {
             let [(unit, code, reason)] = issues(&evaluation).try_into().unwrap();
@@ -1444,7 +1406,7 @@ pub(super) mod tests {
     #[test]
     fn a_server_without_its_024_role_leaves_only_the_hydration_unresolved() {
         let mut inputs = Inputs::complete();
-        inputs.roles.renders.clear();
+        inputs.replace_target_profile("server", target_profile("storefront-server", &[]));
         inputs.resolve(|evaluation, state| {
             let [(unit, code, reason)] = issues(&evaluation).try_into().unwrap();
             assert!(matches!(unit.subject, Subject::Hydration(_)));

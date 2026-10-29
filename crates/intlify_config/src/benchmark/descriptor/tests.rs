@@ -632,7 +632,7 @@ fn target_and_group_descriptor_binds_the_configuration_and_the_collection() {
 }
 
 #[test]
-fn hydration_relation_descriptor_binds_the_configuration_the_collection_and_the_answers() {
+fn hydration_relation_descriptor_binds_the_configuration_and_the_collection() {
     use crate::benchmark::cases::prepare::prepare;
     use crate::benchmark::cases::{declarations, HydrationRecipe, Recipe};
 

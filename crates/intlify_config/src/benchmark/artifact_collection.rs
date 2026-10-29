@@ -196,6 +196,7 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::ResolvedReference
         | Check::ProjectSubset
         | Check::SupportedDefault
+        | Check::DirectedLocales
         | Check::KnownMember
         | Check::UniqueMember
         | Check::SingleGroup

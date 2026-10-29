@@ -2,16 +2,15 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! 015 Phase 13 over the selected declaration's hydration relations, under a
-//! fixture-owned confirmed policy and fixture-owned answers to the role and
-//! compatibility questions 024 has not defined yet (plan 023 ◆#1): each
-//! group's checked relations, and the Locale Negotiation Profile every
-//! relation shares. Phase 7 through the finite fixture provider, Phase 8's
+//! fixture-owned confirmed policy, with the roles each Target Profile
+//! declares in its body and 024's static compatibility rule: each group's
+//! checked relations, and the Locale Negotiation Profile every relation
+//! shares. Phase 7 through the finite fixture provider, Phase 8's
 //! negotiation, the collection admission, Phase 9, and Phases 11 and 12 all
 //! run before the interval, on an evaluation of their own; the interval runs
 //! Phase 13 over a fresh one. Neither the result nor its observation is a
 //! Profile or a shared artifact.
 
-use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -19,16 +18,14 @@ use serde::{Deserialize, Serialize};
 use crate::artifacts::collection::FormalCollection;
 use crate::model::{ProfileDeclaration, ProfileId, TargetId};
 use crate::references::{PolicyReference, TargetProfileReference};
-use crate::resolver::artifact_resolution::{admit_collection, AdmittedArtifact, ArtifactSet};
+use crate::resolver::artifact_resolution::{admit_collection, ArtifactSet};
 use crate::resolver::evaluation::{
     Actual, Admitted, Causes, Check, Evaluation, EvaluationInvariant, IssueKey, LimitExceeded,
     Status, Subject, Unit,
 };
 use crate::resolver::exact_resolution::resolve_fields;
 use crate::resolver::groups::{resolve_groups, ResolvedGroups};
-use crate::resolver::hydration::{
-    validate_hydration, HydrationSubject, ResolvedHydration, TargetCapabilities,
-};
+use crate::resolver::hydration::{validate_hydration, HydrationSubject, ResolvedHydration};
 use crate::resolver::limits::ConfirmedPolicy;
 use crate::resolver::locales::{resolve_locales, LocaleFields};
 use crate::resolver::negotiation::resolve_negotiation;
@@ -43,49 +40,10 @@ use super::{artifact_collection, locale, locale_resolution, resolved_binding, ta
 
 type Declaration = ProfileDeclaration<PolicyReference, TargetProfileReference>;
 
-/// Fixture-owned answers to what 015 asks 024 about Target Profiles, by each
-/// profile's identity: which render server-side, which hydrate in the
-/// browser, and which `(server, client)` pairs are statically incompatible.
-/// They are no 024 capability, which 024 has not defined yet.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
-pub(super) struct FixtureCapabilities {
-    pub(super) renders: BTreeSet<String>,
-    pub(super) hydrates: BTreeSet<String>,
-    pub(super) incompatible: BTreeSet<(String, String)>,
-}
-
-/// The identity of an admitted Target Profile's envelope.
-fn identity(profile: &AdmittedArtifact<'_>) -> Option<String> {
-    profile
-        .member
-        .envelope()
-        .map(|envelope| envelope.tuple().identity.as_str().to_owned())
-}
-
-impl TargetCapabilities for FixtureCapabilities {
-    fn renders_server_side(&self, profile: &AdmittedArtifact<'_>) -> bool {
-        identity(profile).is_some_and(|identity| self.renders.contains(&identity))
-    }
-
-    fn hydrates_in_browser(&self, profile: &AdmittedArtifact<'_>) -> bool {
-        identity(profile).is_some_and(|identity| self.hydrates.contains(&identity))
-    }
-
-    fn statically_incompatible(
-        &self,
-        server: &AdmittedArtifact<'_>,
-        client: &AdmittedArtifact<'_>,
-    ) -> bool {
-        identity(server)
-            .zip(identity(client))
-            .is_some_and(|pair| self.incompatible.contains(&pair))
-    }
-}
-
 /// A case's complete configuration and selected declaration, the confirmed
 /// policy every phase runs under, the finite provider Phase 7 canonicalizes
-/// through, the collection past 015's pre-invocation boundary, and the
-/// fixture's answers to 024's questions.
+/// through, and the collection past 015's pre-invocation boundary, whose
+/// Target Profiles declare their roles.
 pub(super) struct PreparedHydration {
     pub(super) analysis: Analysis,
     pub(super) config: Config,
@@ -93,7 +51,6 @@ pub(super) struct PreparedHydration {
     pub(super) policy: ConfirmedPolicy,
     pub(super) canonicalizer: Arc<locale::Core>,
     pub(super) collection: FormalCollection,
-    pub(super) capabilities: FixtureCapabilities,
 }
 
 /// What the interval borrows, built before it: the selected declaration,
@@ -105,7 +62,6 @@ pub(super) struct HydrationInputs<'a> {
     pub(super) targets: Admitted<ResolvedTargets<'a>>,
     pub(super) groups: Admitted<ResolvedGroups>,
     pub(super) negotiation: Admitted<()>,
-    pub(super) capabilities: &'a FixtureCapabilities,
 }
 
 impl PreparedHydration {
@@ -182,7 +138,6 @@ impl PreparedHydration {
             targets,
             groups,
             negotiation: negotiation.as_ref().map(|_| ()).map_err(Causes::clone),
-            capabilities: &self.capabilities,
         })
     }
 
@@ -211,7 +166,6 @@ pub(super) fn construct(inputs: &HydrationInputs<'_>) -> Construction {
         inputs.targets.as_ref(),
         inputs.groups.as_ref(),
         inputs.negotiation.clone(),
-        inputs.capabilities,
     );
     Construction { evaluation, result }
 }
@@ -290,7 +244,7 @@ impl InputFacts {
             policy: "fixture-owned-confirmed-policy-not-an-admitted-resource-limit-policy".into(),
             canonicalizer: "finite-fixture-provider-bound-under-the-policy-identifier-bound".into(),
             negotiation: "fixture-owned-locale-negotiation-specification-at-revision-0".into(),
-            capabilities: "fixture-owned-role-and-compatibility-answers-not-024-capabilities"
+            capabilities: "roles-declared-in-each-target-profile-body-and-024-static-compatibility"
                 .into(),
             submitted_members: Quantity::new(
                 u64::try_from(prepared.collection.members().len()).unwrap_or(u64::MAX),
@@ -411,6 +365,7 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::ResolvedReference
         | Check::ProjectSubset
         | Check::SupportedDefault
+        | Check::DirectedLocales
         | Check::KnownMember
         | Check::UniqueMember
         | Check::SingleGroup => return defect(),
@@ -568,9 +523,12 @@ pub(super) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure>
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use serde_json::json;
 
     use super::*;
+    use crate::artifacts::content::{Content, HydrationRoles};
     use crate::benchmark::cases::prepare::prepare;
     use crate::benchmark::cases::{
         declarations, HydrationRecipe as R, Recipe, TargetAndGroupRecipe,
@@ -709,30 +667,45 @@ mod tests {
         retained.targets[1].requested.clone().unwrap_err()
     }
 
+    /// The collection admits each Target Profile with what its body
+    /// declares, so a recipe changes a role or the MF2 specification only in
+    /// one profile's body.
     #[test]
-    fn the_answers_are_read_by_each_profile_identity() {
-        let prepared = prepared(R::Storefront);
-        let set = prepared.set().unwrap();
-        let Ok(set) = &set else { unreachable!() };
-        let profile = |identity: &str| {
+    fn each_admitted_target_profile_carries_what_its_body_declares() {
+        let profiles = |recipe: R| {
+            let prepared = prepared(recipe);
+            let set = prepared.set().unwrap();
+            let Ok(set) = &set else { unreachable!() };
             set.iter()
-                .find(|(tuple, _)| tuple.identity.as_str() == identity)
-                .unwrap()
-                .1
+                .filter_map(|(tuple, admitted)| match &admitted.content {
+                    Content::TargetProfile(profile) => Some((
+                        tuple.identity.as_str().to_owned(),
+                        (profile.hydration, profile.mf2_specification.clone()),
+                    )),
+                    _ => None,
+                })
+                .collect::<BTreeMap<_, _>>()
         };
-        let (ssr, browser) = (profile("storefront-ssr"), profile("storefront-browser"));
-        let mut answers = FixtureCapabilities::default();
-        assert!(!answers.renders_server_side(ssr) && !answers.hydrates_in_browser(browser));
-        assert!(!answers.statically_incompatible(ssr, browser));
-        answers.renders.insert("storefront-ssr".into());
-        answers.hydrates.insert("storefront-browser".into());
-        answers
-            .incompatible
-            .insert(("storefront-ssr".into(), "storefront-browser".into()));
-        assert!(answers.renders_server_side(ssr) && !answers.renders_server_side(browser));
-        assert!(answers.hydrates_in_browser(browser) && !answers.hydrates_in_browser(ssr));
-        assert!(answers.statically_incompatible(ssr, browser));
-        assert!(!answers.statically_incompatible(browser, ssr));
+        let storefront = profiles(R::Storefront);
+        let (ssr, browser) = (
+            &storefront["storefront-ssr"],
+            &storefront["storefront-browser"],
+        );
+        assert!(ssr.0.ssr_renderer && !ssr.0.browser_hydration_client);
+        assert!(browser.0.browser_hydration_client && !browser.0.ssr_renderer);
+        assert_eq!(ssr.1, browser.1);
+        let roleless = profiles(R::ServerCapabilityMissing);
+        assert_eq!(roleless["storefront-ssr"].0, HydrationRoles::default());
+        assert_eq!(roleless["storefront-browser"], *browser);
+        let roleless = profiles(R::ClientCapabilityMissing);
+        assert_eq!(roleless["storefront-browser"].0, HydrationRoles::default());
+        assert_eq!(roleless["storefront-ssr"], *ssr);
+        let incompatible = profiles(R::StaticIncompatibility);
+        assert_eq!(incompatible["storefront-ssr"], *ssr);
+        assert_eq!(incompatible["storefront-browser"].0, browser.0);
+        assert_ne!(incompatible["storefront-browser"].1, browser.1);
+        let dual = profiles(R::DualRole)["storefront-browser"].0;
+        assert!(dual.ssr_renderer && dual.browser_hydration_client);
     }
 
     #[test]

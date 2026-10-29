@@ -47,7 +47,7 @@ fn group(rank: usize) -> Unit {
 #[test]
 fn collection_cases_keep_the_186_rows_and_append_after_them() {
     let cases = declarations();
-    assert_eq!(cases.len(), 303);
+    assert_eq!(cases.len(), 304);
     assert!(cases[..186]
         .iter()
         .all(|case| case.operation != Operation::ArtifactCollectionAdmission));
