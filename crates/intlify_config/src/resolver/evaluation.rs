@@ -18,6 +18,7 @@ use crate::input_limits::Bound;
 use super::artifact_resolution::CollectionSubject;
 use super::coverage::CoverageSubject;
 use super::fallback::FallbackSubject;
+use super::groups::GroupSubject;
 use super::identity::DeclarationField;
 use super::limits::BoundId;
 use super::locales::LocaleSubject;
@@ -106,6 +107,9 @@ pub(crate) enum Subject {
     DeliveryPlacement,
     /// The declaration's Target ID map, or one Target ID.
     Target(TargetSubject),
+    /// The declaration's groups and their members, one group or member, or a
+    /// Target ID's place among the groups.
+    Group(GroupSubject),
 }
 
 /// The check a unit runs, declared in rank order within a subject kind.
@@ -164,6 +168,12 @@ pub(crate) enum Check {
     ProjectSubset,
     /// The target's effective default is one of its requested locales.
     SupportedDefault,
+    /// The member names a declared Target ID.
+    KnownMember,
+    /// The member occurs once in its group.
+    UniqueMember,
+    /// The Target ID is a member of exactly one group.
+    SingleGroup,
 }
 
 /// One atomic evaluation unit. Units order as 015 evaluates and commits them:
@@ -202,6 +212,10 @@ pub(crate) enum Code {
     CoverageRuleConflict,
     ArtifactReferenceNotAdmitted,
     ArtifactCollectionNotAdmitted,
+    GroupMemberUnknown,
+    GroupMemberDuplicate,
+    TargetUnassigned,
+    TargetAssignedToMultipleGroups,
     ResourcePolicyNotAdmitted,
     ResourcePolicyCapabilityIncompatible,
     ResourceLimitExceeded,
@@ -257,6 +271,12 @@ impl Code {
             Self::ArtifactReferenceNotAdmitted => "project-profile-artifact-reference-not-admitted",
             Self::ArtifactCollectionNotAdmitted => {
                 "project-profile-artifact-collection-not-admitted"
+            }
+            Self::GroupMemberUnknown => "project-profile-group-member-unknown",
+            Self::GroupMemberDuplicate => "project-profile-group-member-duplicate",
+            Self::TargetUnassigned => "project-profile-target-unassigned",
+            Self::TargetAssignedToMultipleGroups => {
+                "project-profile-target-assigned-to-multiple-groups"
             }
             Self::ResourcePolicyNotAdmitted => "project-profile-resource-policy-not-admitted",
             Self::ResourcePolicyCapabilityIncompatible => {
@@ -723,6 +743,10 @@ mod tests {
                 Code::CoverageRuleConflict,
                 Code::ArtifactReferenceNotAdmitted,
                 Code::ArtifactCollectionNotAdmitted,
+                Code::GroupMemberUnknown,
+                Code::GroupMemberDuplicate,
+                Code::TargetUnassigned,
+                Code::TargetAssignedToMultipleGroups,
                 Code::ResourcePolicyNotAdmitted,
                 Code::ResourcePolicyCapabilityIncompatible,
                 Code::ResourceLimitExceeded,
@@ -753,6 +777,10 @@ mod tests {
                 "project-profile-coverage-rule-conflict",
                 "project-profile-artifact-reference-not-admitted",
                 "project-profile-artifact-collection-not-admitted",
+                "project-profile-group-member-unknown",
+                "project-profile-group-member-duplicate",
+                "project-profile-target-unassigned",
+                "project-profile-target-assigned-to-multiple-groups",
                 "project-profile-resource-policy-not-admitted",
                 "project-profile-resource-policy-capability-incompatible",
                 "project-profile-resource-limit-exceeded",

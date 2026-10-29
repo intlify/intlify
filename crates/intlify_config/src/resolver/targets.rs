@@ -79,23 +79,32 @@ pub(crate) struct TargetFacts<'s> {
     pub(crate) resolved: Admitted<ResolvedTarget<'s>>,
 }
 
-/// Every declared target's facts, in Target ID order.
+/// Every declared target's facts, in Target ID order, and the map's bound,
+/// which a later check over the set of Target IDs needs.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ResolvedTargets<'s>(BTreeMap<TargetId, TargetFacts<'s>>);
+pub(crate) struct ResolvedTargets<'s> {
+    bounded: Admitted<()>,
+    facts: BTreeMap<TargetId, TargetFacts<'s>>,
+}
 
 impl<'s> ResolvedTargets<'s> {
+    /// The map within `maxTargetProfiles`: the set of Target IDs is admitted.
+    pub(crate) const fn bounded(&self) -> &Admitted<()> {
+        &self.bounded
+    }
+
     pub(crate) fn get(&self, id: &TargetId) -> Option<&TargetFacts<'s>> {
-        self.0.get(id)
+        self.facts.get(id)
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = (&TargetId, &TargetFacts<'s>)> {
-        self.0.iter()
+        self.facts.iter()
     }
 
     /// Whether every target resolved, or the causes of each that did not.
     pub(crate) fn complete(&self) -> Admitted<()> {
         let mut holds = Ok(());
-        for facts in self.0.values() {
+        for facts in self.facts.values() {
             let resolved = facts.resolved.as_ref().map(|_| ()).map_err(Causes::clone);
             holds = and(holds, resolved);
         }
@@ -153,7 +162,7 @@ pub(crate) fn resolve_targets<'s, Target>(
             checks.resolve(evaluation, own, locales, references)?,
         );
     }
-    Ok(Ok(ResolvedTargets(facts)))
+    Ok(Ok(ResolvedTargets { bounded, facts }))
 }
 
 /// One target's checks and what they share.
