@@ -400,8 +400,8 @@ type ContentCase = (
     bool,
 );
 
-/// Changes that keep or break each rule of the five closed contents once, and
-/// objects that the contents of 018 and 022 pass on as. The unit tests of the
+/// Changes that keep or break each rule of the seven closed contents once,
+/// and an object the content of 022 passes on as. The unit tests of the
 /// content module try every rule more ways.
 fn content_cases() -> Vec<ContentCase> {
     let of = |kind| {
@@ -416,6 +416,10 @@ fn content_cases() -> Vec<ContentCase> {
         of(ArtifactKind::ProviderRoutingPolicy),
     );
     let target = of(ArtifactKind::TargetProfile);
+    let (limits, trust) = (
+        of(ArtifactKind::ResourceLimitPolicy),
+        of(ArtifactKind::TrustPolicy),
+    );
     let set = |value: Value| Some(value);
     let pair =
         |identity: &str, revision: &str| set(json!({"identity": identity, "revision": revision}));
@@ -572,7 +576,7 @@ fn content_cases() -> Vec<ContentCase> {
         ),
         target(
             "target-unknown-member",
-            "/hydration",
+            "/services",
             set(json!("none")),
             false,
         ),
@@ -642,6 +646,39 @@ fn content_cases() -> Vec<ContentCase> {
             directions(&[entry("en", "ltr")]),
             false,
         ),
+        // Hydration roles: a set of 024's two roles, by the bytes of their
+        // spellings.
+        target(
+            "target-both-roles",
+            "/hydration/roles",
+            set(json!(["browser-hydration-client", "ssr-renderer"])),
+            true,
+        ),
+        target(
+            "target-roles-unsorted",
+            "/hydration/roles",
+            set(json!(["ssr-renderer", "browser-hydration-client"])),
+            false,
+        ),
+        target(
+            "target-roles-repeated",
+            "/hydration/roles",
+            set(json!(["ssr-renderer", "ssr-renderer"])),
+            false,
+        ),
+        target(
+            "target-unknown-role",
+            "/hydration/roles",
+            set(json!(["edge-renderer"])),
+            false,
+        ),
+        target(
+            "target-hydration-unknown-member",
+            "/hydration/mode",
+            set(json!("eager")),
+            false,
+        ),
+        target("target-missing-hydration", "/hydration", None, false),
         // Limits.
         target(
             "target-limit-one",
@@ -674,23 +711,52 @@ fn content_cases() -> Vec<ContentCase> {
             false,
         ),
         target("target-limit-missing", "/limits/maxTextBytes", None, false),
-        // Contents 018 and 022 admit pass on as any object.
+        // 018's Resource Limit Policy common body: only an optional section,
+        // an object whose interior is 015's to check.
+        limits(
+            "resource-limit-without-section",
+            "/projectProfileResolution",
+            None,
+            true,
+        ),
+        limits(
+            "resource-limit-any-section-interior",
+            "/projectProfileResolution",
+            set(json!({"translation": {"maxEntries": "0"}})),
+            true,
+        ),
+        limits(
+            "resource-limit-non-object-section",
+            "/projectProfileResolution",
+            set(json!("default")),
+            false,
+        ),
+        limits(
+            "resource-limit-unknown-member",
+            "/translationPolicy",
+            set(json!({})),
+            false,
+        ),
+        // 018's Trust Policy body names the trusted local host and nothing
+        // else.
+        trust(
+            "trust-other-authority",
+            "/authority",
+            set(json!("signed-publisher")),
+            false,
+        ),
+        trust("trust-missing-authority", "/authority", None, false),
+        trust(
+            "trust-unknown-member",
+            "/roots",
+            set(json!({"publisher": "storefront"})),
+            false,
+        ),
+        // A content 022 admits passes on as any object.
         of(ArtifactKind::GlossarySet)(
             "glossary-any-object",
             "/terms",
             set(json!([{"source": "cart"}])),
-            true,
-        ),
-        of(ArtifactKind::ResourceLimitPolicy)(
-            "resource-limit-any-object",
-            "/projectProfileResolution",
-            set(json!("default")),
-            true,
-        ),
-        of(ArtifactKind::TrustPolicy)(
-            "trust-any-object",
-            "/roots",
-            set(json!({"publisher": "storefront"})),
             true,
         ),
     ]
@@ -906,13 +972,8 @@ mod tests {
                     .iter()
                     .any(|case| case["base"] == kind.spelling() && case["admitted"] == admitted)
             };
-            // A content 018 or 022 admits is any object, so nothing breaks it.
-            let external = matches!(
-                kind,
-                ArtifactKind::GlossarySet
-                    | ArtifactKind::ResourceLimitPolicy
-                    | ArtifactKind::TrustPolicy
-            );
+            // A content 022 admits is any object, so nothing breaks it.
+            let external = kind == ArtifactKind::GlossarySet;
             assert_eq!(side(false), !external, "{kind:?}");
             assert!(side(true) || !external, "{kind:?}");
         }

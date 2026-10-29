@@ -4,18 +4,18 @@
 //! 015 Phase 4 over the selected declaration of a complete configuration and
 //! a formally admitted collection: the capability's pre-policy bounds, the
 //! Bootstrap Resource Policy Candidate Admission, the comparison, and every
-//! recheck under the admitted policy. The capability and 018's admission are
-//! a fixture owner's; the admission admits every candidate. Neither the result
-//! nor its observation is a Profile or a shared artifact.
+//! recheck under the admitted policy. The capability and 018's Verification
+//! Input are a fixture owner's; the input pins the policy the declaration
+//! names, as trusted setup would. Neither the result nor its observation is a
+//! Profile or a shared artifact.
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
 
 use crate::artifacts::collection::FormalCollection;
-use crate::artifacts::envelope::Envelope;
+use crate::artifacts::envelope::ArtifactKind;
 use crate::model::ProfileId;
 use crate::references::PolicyReference;
-use crate::resolver::bootstrap::ResourcePolicyVerification;
+use crate::resolver::bootstrap::VerificationInput;
 use crate::resolver::evaluation::{
     Actual, Admitted, Causes, Check, Evaluation, IssueKey, LimitExceeded, Shortfall, Status,
     Subject, Unit,
@@ -31,20 +31,6 @@ use super::observation::{Frame, Observation};
 use super::operation::{Analysis, Config, OutputFailure};
 use super::quantity::Quantity;
 
-/// 018's admission as the fixture owner states it: every candidate is
-/// authentic, and every content's members are allowed.
-pub(super) struct FixtureVerification;
-
-impl ResourcePolicyVerification for FixtureVerification {
-    fn authenticates(&self, _: &Envelope<'_>) -> bool {
-        true
-    }
-
-    fn admits_common_body(&self, _: &Map<String, Value>) -> bool {
-        true
-    }
-}
-
 /// A case's complete configuration and selected declaration, the selector it
 /// was selected with, the capability, and the collection past 015's
 /// pre-invocation boundary.
@@ -59,11 +45,21 @@ pub(super) struct PreparedPolicy {
     pub(super) profile_ids: Vec<u64>,
 }
 
-/// What Phase 4 borrows from the configuration, built before the interval.
+/// What Phase 4 borrows from the configuration, and the Verification Input
+/// trusted setup supplies, built before the interval.
 pub(super) struct PolicyInputs<'a> {
     pub(super) resource_limits: &'a PolicyReference,
     pub(super) references: DeclarationReferences<'a>,
     pub(super) measures: ConfigurationMeasures<'a>,
+    pub(super) verification: VerificationInput,
+}
+
+/// The fixture owner's exact-pin input: it pins the Resource Limit Policy the
+/// declaration names, under that kind whatever kind the reference states.
+fn pinning(reference: &PolicyReference) -> VerificationInput {
+    let mut pin = reference.tuple();
+    pin.kind = ArtifactKind::ResourceLimitPolicy;
+    VerificationInput::exact_pins([pin]).expect("one Resource Limit Policy pin")
 }
 
 impl PreparedPolicy {
@@ -76,6 +72,7 @@ impl PreparedPolicy {
         let declaration = self.config.profiles().get(&self.selected)?;
         let structural_units = self.analysis.benchmark_structural_units()?;
         Some(PolicyInputs {
+            verification: pinning(&declaration.policies.resource_limits),
             resource_limits: &declaration.policies.resource_limits,
             references: DeclarationReferences {
                 policies: Ok(&declaration.policies),
@@ -113,7 +110,7 @@ pub(super) fn resolve(
         Ok(inputs.resource_limits),
         &inputs.references,
         &inputs.measures,
-        &FixtureVerification,
+        &inputs.verification,
     );
     Resolved { evaluation, result }
 }
@@ -141,7 +138,7 @@ impl InputFacts {
             scope: "selected-declaration-references-and-complete-submitted-collection".into(),
             selected_profile: prepared.selected.as_str().into(),
             capability: "fixture-owned-policy-comparable-bounds-not-an-admitted-capability".into(),
-            verification: "fixture-owned-admission-admitting-every-candidate".into(),
+            verification: "fixture-owned-exact-pin-input-pinning-the-declared-policy".into(),
             submitted_members: Quantity::new(
                 u64::try_from(prepared.collection.members().len()).unwrap_or(u64::MAX),
             ),
@@ -254,6 +251,7 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::ResolvedReference
         | Check::ProjectSubset
         | Check::SupportedDefault
+        | Check::DirectedLocales
         | Check::KnownMember
         | Check::UniqueMember
         | Check::SingleGroup
@@ -501,7 +499,8 @@ mod tests {
         use crate::model::TargetId;
         use crate::resolver::resource_policy::PolicySlot;
 
-        let target = |id: &str| -> TargetId { serde_json::from_value(Value::from(id)).unwrap() };
+        let target =
+            |id: &str| -> TargetId { serde_json::from_value(serde_json::Value::from(id)).unwrap() };
         let subjects = [
             PolicySubject::Nodes,
             PolicySubject::Depth,

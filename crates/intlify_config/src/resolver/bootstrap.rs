@@ -12,14 +12,16 @@
 //! compares the admitted policy with the capability and rechecks the earlier
 //! phases under it. The `bootstrapOnly.artifactBootstrap` work bounds wait for
 //! the Capability Specification that closes their units; the scan and the
-//! verification below are the work they will bound.
+//! verification below are the work they will bound, one unit for the pin
+//! lookup and one for the common body (018).
 //!
-//! 018 defines neither the Resource Limit Policy's common body nor its
-//! Verification Input, so the resolver takes 018's admission of the candidate
-//! as a seam that only tests implement.
+//! 018 authenticates the candidate by membership in its exact-pin
+//! Verification Input, and closes its common body to the optional
+//! `projectProfileResolution` section.
 
-use serde_json::{Map, Value};
+use std::collections::BTreeSet;
 
+use crate::artifacts::content;
 use crate::artifacts::envelope::{
     ArtifactKind, Envelope, ExactTuple, FormalMember, SPECIFICATION_REVISION,
 };
@@ -27,14 +29,34 @@ use crate::artifacts::envelope::{
 use super::evaluation::{Blocking, Code, Reason};
 use super::limits::{ResolutionLimits, SECTION};
 
-/// 018's admission of the Resource Limit Policy candidate under the explicit
-/// Resource Limit Policy Verification Input.
-pub(crate) trait ResourcePolicyVerification {
-    /// Whether 018's trust and signature admission accepts the candidate.
-    fn authenticates(&self, candidate: &Envelope<'_>) -> bool;
+/// 018's exact-pin Resource Limit Policy Verification Input: the exact
+/// references that trusted setup pinned, never derived from the configuration
+/// or the collection, so a policy can never pin itself. 015's pre-invocation
+/// boundary reads it from 017's shape in Implementation Phase 5; until then
+/// only tests construct one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct VerificationInput {
+    pins: BTreeSet<ExactTuple>,
+}
 
-    /// Whether 018's common body schema allows the content's members.
-    fn admits_common_body(&self, content: &Map<String, Value>) -> bool;
+impl VerificationInput {
+    /// The input pinning `pins`, or `None` when 018 admits no such input:
+    /// without a pin, with a pin of another kind, or with a pin repeated.
+    pub(crate) fn exact_pins(pins: impl IntoIterator<Item = ExactTuple>) -> Option<Self> {
+        let mut admitted = BTreeSet::new();
+        for pin in pins {
+            if pin.kind != ArtifactKind::ResourceLimitPolicy || !admitted.insert(pin) {
+                return None;
+            }
+        }
+        (!admitted.is_empty()).then_some(Self { pins: admitted })
+    }
+
+    /// Whether the candidate's computed exact reference is one of the pins.
+    /// A partial match authenticates nothing.
+    pub(crate) fn authenticates(&self, candidate: &Envelope<'_>) -> bool {
+        self.pins.contains(candidate.tuple())
+    }
 }
 
 /// The admitted Resource Limit Policy: its exact reference and every bound of
@@ -72,7 +94,7 @@ const fn issue(code: Code, reason: Reason) -> Blocking {
 pub(crate) fn admit_candidate(
     reference: &ExactTuple,
     members: &[FormalMember],
-    verification: &impl ResourcePolicyVerification,
+    verification: &VerificationInput,
 ) -> Result<AdmittedResourcePolicy, Blocking> {
     let not_admitted = |reason| issue(Code::ArtifactReferenceNotAdmitted, reason);
     reference_checks(reference, ArtifactKind::ResourceLimitPolicy).map_err(not_admitted)?;
@@ -120,26 +142,24 @@ pub(crate) fn admit_candidate(
 }
 
 /// The body admission of the sole exact candidate. Its specification revision
-/// is the reference's, which was found supported, and 018 admits its content,
-/// so 017's body admission comes down to the integrity.
+/// is the reference's, which was found supported, so 017's body admission
+/// comes down to the integrity and 018's admission: the pin, then the common
+/// body.
 fn admit_body(
     candidate: &Envelope<'_>,
-    verification: &impl ResourcePolicyVerification,
+    verification: &VerificationInput,
 ) -> Result<AdmittedResourcePolicy, Blocking> {
     let not_admitted = |reason| issue(Code::ResourcePolicyNotAdmitted, reason);
     if !candidate.integrity_holds() || !verification.authenticates(candidate) {
         return Err(not_admitted(Reason::BodyIntegrityInvalid));
     }
     let content = candidate.content();
-    let section = content.get(SECTION);
-    // 017 records that 018's common body schema requires a present section to
-    // be an object; which other members a content may have is 018's.
-    if section.is_some_and(|section| !section.is_object())
-        || !verification.admits_common_body(content)
-    {
+    if !content::resource_limit_policy(content) {
         return Err(not_admitted(Reason::BodySchemaInvalid));
     }
-    let section = section.ok_or_else(|| not_admitted(Reason::ProjectProfileResolutionMissing))?;
+    let section = content
+        .get(SECTION)
+        .ok_or_else(|| not_admitted(Reason::ProjectProfileResolutionMissing))?;
     let limits = ResolutionLimits::read(section)
         .ok_or_else(|| not_admitted(Reason::ProjectProfileResolutionInvalid))?;
     Ok(AdmittedResourcePolicy {
@@ -189,32 +209,11 @@ pub(crate) fn mismatch(reference: &ExactTuple, tuples: &[&ExactTuple]) -> Reason
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
+    use serde_json::{json, Value};
 
     use super::*;
     use crate::artifacts::envelope::{envelope_of, sealed};
     use crate::resolver::limits::fixture_limits;
-
-    /// 018's admission as a test states it.
-    struct Verifier {
-        authentic: bool,
-        common_body: bool,
-    }
-
-    impl ResourcePolicyVerification for Verifier {
-        fn authenticates(&self, _: &Envelope<'_>) -> bool {
-            self.authentic
-        }
-
-        fn admits_common_body(&self, _: &Map<String, Value>) -> bool {
-            self.common_body
-        }
-    }
-
-    const TRUSTED: Verifier = Verifier {
-        authentic: true,
-        common_body: true,
-    };
 
     /// A sealed Resource Limit Policy whose section sets the fixture bounds
     /// counting up from `first`.
@@ -257,11 +256,32 @@ mod tests {
             .clone()
     }
 
-    /// The decision, as the admitted tuple or the code and reason.
-    fn decide(
+    /// 018's exact-pin input as trusted setup supplies it.
+    fn pinning(pins: &[&Value]) -> VerificationInput {
+        VerificationInput::exact_pins(pins.iter().map(|value| tuple_of(value))).unwrap()
+    }
+
+    /// The input that pins `reference` itself, or another policy when the
+    /// reference names no Resource Limit Policy.
+    fn trusting(reference: &ExactTuple) -> VerificationInput {
+        let pin = if reference.kind == ArtifactKind::ResourceLimitPolicy {
+            reference.clone()
+        } else {
+            tuple_of(&policy("pinned-limits", "1", 1))
+        };
+        VerificationInput::exact_pins([pin]).unwrap()
+    }
+
+    /// The decision under an input pinning the reference, as the admitted
+    /// tuple or the code and reason.
+    fn decide(reference: &ExactTuple, values: &[Value]) -> Result<ExactTuple, (Code, Reason)> {
+        decide_with(reference, values, &trusting(reference))
+    }
+
+    fn decide_with(
         reference: &ExactTuple,
         values: &[Value],
-        verification: &Verifier,
+        verification: &VerificationInput,
     ) -> Result<ExactTuple, (Code, Reason)> {
         let members: Vec<FormalMember> = values
             .iter()
@@ -294,13 +314,13 @@ mod tests {
                 ArtifactKind::TrustPolicy,
                 "storefront-limits",
                 "1",
-                json!({}),
+                json!({"authority": "trusted-local-host"}),
             ),
             json!({"kind": "resource-limit-policy"}),
             chosen.clone(),
         ];
         let verified = members.map(|value| FormalMember::new(value).unwrap());
-        let admitted = admit_candidate(&reference, &verified, &TRUSTED).unwrap();
+        let admitted = admit_candidate(&reference, &verified, &trusting(&reference)).unwrap();
         assert_eq!(admitted.tuple(), &reference);
         assert_eq!(admitted.limits().bounds(), fixture_limits(10).bounds());
     }
@@ -311,7 +331,7 @@ mod tests {
         // even with its exact artifact submitted.
         let trust = envelope_of(ArtifactKind::TrustPolicy, "trust", "1", json!({}));
         assert_eq!(
-            decide(&tuple_of(&trust), &[trust], &TRUSTED),
+            decide(&tuple_of(&trust), &[trust]),
             Err(reference_issue(Reason::RoleKindMismatch))
         );
         // A requested specification revision other than "0" is unsupported,
@@ -322,7 +342,7 @@ mod tests {
             Some(json!("1")),
         ));
         assert_eq!(
-            decide(&tuple_of(&revised), &[revised], &TRUSTED),
+            decide(&tuple_of(&revised), &[revised]),
             Err(reference_issue(Reason::SpecificationRevisionUnsupported))
         );
         // The role comes first.
@@ -332,7 +352,7 @@ mod tests {
             Some(json!("1")),
         ));
         assert_eq!(
-            decide(&tuple_of(&both), &[], &TRUSTED),
+            decide(&tuple_of(&both), &[]),
             Err(reference_issue(Reason::RoleKindMismatch))
         );
     }
@@ -346,37 +366,29 @@ mod tests {
         let other_content = policy("storefront-limits", "1", 11);
         assert_ne!(tuple_of(&other_content), reference);
         assert_eq!(
-            decide(
-                &reference,
-                &[chosen.clone(), other_content.clone()],
-                &TRUSTED
-            ),
+            decide(&reference, &[chosen.clone(), other_content.clone()]),
             conflicting
         );
         // The same content, and so the same tuple, with another body.
         let other_body = tampered(&chosen);
         assert_eq!(tuple_of(&other_body), reference);
         assert_eq!(
-            decide(&reference, &[chosen.clone(), other_body.clone()], &TRUSTED),
+            decide(&reference, &[chosen.clone(), other_body.clone()]),
             conflicting
         );
         // Before duplicates, and before any body is admitted.
         assert_eq!(
             decide(
                 &reference,
-                &[chosen.clone(), chosen.clone(), other_content.clone()],
-                &TRUSTED
+                &[chosen.clone(), chosen.clone(), other_content.clone()]
             ),
             conflicting
         );
         assert_eq!(
-            decide(
+            decide_with(
                 &reference,
                 &[tampered(&other_content), other_body],
-                &Verifier {
-                    authentic: false,
-                    common_body: false,
-                }
+                &pinning(&[&policy("pinned-limits", "1", 1)])
             ),
             conflicting
         );
@@ -384,8 +396,7 @@ mod tests {
         assert_eq!(
             decide(
                 &reference,
-                &[other_content.clone(), tampered(&other_content)],
-                &TRUSTED
+                &[other_content.clone(), tampered(&other_content)]
             ),
             conflicting
         );
@@ -397,14 +408,14 @@ mod tests {
         let reference = tuple_of(&chosen);
         let duplicate = Err(collection_issue(Reason::DuplicateEnvelope));
         assert_eq!(
-            decide(&reference, &[chosen.clone(), chosen.clone()], &TRUSTED),
+            decide(&reference, &[chosen.clone(), chosen.clone()]),
             duplicate
         );
         // Bodies that would fail their integrity or section are still
         // duplicates.
         let stale = tampered(&chosen);
         assert_eq!(
-            decide(&reference, &[stale.clone(), stale.clone(), stale], &TRUSTED),
+            decide(&reference, &[stale.clone(), stale.clone(), stale]),
             duplicate
         );
         let unsectioned = envelope_of(
@@ -414,11 +425,7 @@ mod tests {
             json!({}),
         );
         assert_eq!(
-            decide(
-                &tuple_of(&unsectioned),
-                &[unsectioned.clone(), unsectioned],
-                &TRUSTED
-            ),
+            decide(&tuple_of(&unsectioned), &[unsectioned.clone(), unsectioned]),
             duplicate
         );
     }
@@ -427,68 +434,84 @@ mod tests {
     fn the_sole_candidates_body_is_admitted_in_015s_order() {
         let chosen = policy("storefront-limits", "1", 10);
         let reference = tuple_of(&chosen);
-        let verifier = |authentic, common_body| Verifier {
-            authentic,
-            common_body,
-        };
         let with_content = |content: Value| sealed(edited(&chosen, "/body/content", Some(content)));
-        let decide_alone = |value: &Value, verification: &Verifier| {
-            decide(&tuple_of(value), std::slice::from_ref(value), verification)
-        };
+        let decide_alone = |value: &Value| decide(&tuple_of(value), std::slice::from_ref(value));
         let integrity = Err(policy_issue(Reason::BodyIntegrityInvalid));
         let schema = Err(policy_issue(Reason::BodySchemaInvalid));
         let missing = Err(policy_issue(Reason::ProjectProfileResolutionMissing));
         let invalid = Err(policy_issue(Reason::ProjectProfileResolutionInvalid));
-        // 017's integrity, then 018's trust and signature.
-        assert_eq!(
-            decide(&reference, &[tampered(&chosen)], &TRUSTED),
-            integrity
-        );
-        assert_eq!(
-            decide(
-                &reference,
-                std::slice::from_ref(&chosen),
-                &verifier(false, true)
-            ),
-            integrity
-        );
-        let no_section = with_content(json!({}));
-        assert_eq!(
-            decide_alone(&tampered(&no_section), &verifier(true, false)),
-            integrity
-        );
-        // 018's common body schema, which keeps a present section an object.
-        assert_eq!(
-            decide(
-                &reference,
-                std::slice::from_ref(&chosen),
-                &verifier(true, false)
-            ),
-            schema
-        );
-        assert_eq!(
-            decide_alone(&with_content(json!({ SECTION: "default" })), &TRUSTED),
-            schema
-        );
-        assert_eq!(decide_alone(&no_section, &verifier(true, false)), schema);
-        // Then 015's section: present, and then valid.
-        assert_eq!(decide_alone(&no_section, &TRUSTED), missing);
-        assert_eq!(
-            decide_alone(&with_content(json!({ SECTION: {} })), &TRUSTED),
-            invalid
-        );
-        let mut section = fixture_limits(10).section();
-        section["configurationInput"]["maxNodes"] = json!("0");
-        assert_eq!(
-            decide_alone(&with_content(json!({ SECTION: section })), &TRUSTED),
-            invalid
-        );
-        // Other members of the content are 018's to allow.
+        // 017's integrity, then 018's pin: another policy's, or one that
+        // differs only in its digest, authenticates nothing.
+        assert_eq!(decide(&reference, &[tampered(&chosen)]), integrity);
+        for pin in [
+            policy("other-limits", "1", 10),
+            policy("storefront-limits", "1", 11),
+        ] {
+            assert_eq!(
+                decide_with(&reference, std::slice::from_ref(&chosen), &pinning(&[&pin])),
+                integrity
+            );
+        }
         let extra = with_content(json!({
             SECTION: fixture_limits(10).section(),
             "translationProvider": {"maxRequests": "8"},
         }));
-        assert_eq!(decide_alone(&extra, &TRUSTED), Ok(tuple_of(&extra)));
+        assert_eq!(decide_alone(&tampered(&extra)), integrity);
+        // 018's common body: nothing but the section, an object.
+        assert_eq!(decide_alone(&extra), schema);
+        assert_eq!(
+            decide_alone(&with_content(json!({"translationProvider": {}}))),
+            schema
+        );
+        assert_eq!(
+            decide_alone(&with_content(json!({ SECTION: "default" }))),
+            schema
+        );
+        // Then 015's section: present, and then valid.
+        assert_eq!(decide_alone(&with_content(json!({}))), missing);
+        assert_eq!(decide_alone(&with_content(json!({ SECTION: {} }))), invalid);
+        let mut section = fixture_limits(10).section();
+        section["configurationInput"]["maxNodes"] = json!("0");
+        assert_eq!(
+            decide_alone(&with_content(json!({ SECTION: section }))),
+            invalid
+        );
+    }
+
+    #[test]
+    fn the_verification_input_pins_resource_limit_policies_exactly() {
+        let chosen = policy("storefront-limits", "1", 10);
+        // No pin, a pin of another kind, or a repeated pin is no input 018
+        // admits.
+        assert_eq!(VerificationInput::exact_pins([]), None);
+        let trust = envelope_of(
+            ArtifactKind::TrustPolicy,
+            "storefront-trust",
+            "1",
+            json!({"authority": "trusted-local-host"}),
+        );
+        assert_eq!(
+            VerificationInput::exact_pins([tuple_of(&chosen), tuple_of(&trust)]),
+            None
+        );
+        assert_eq!(
+            VerificationInput::exact_pins([tuple_of(&trust), tuple_of(&chosen)]),
+            None
+        );
+        assert_eq!(
+            VerificationInput::exact_pins([tuple_of(&chosen), tuple_of(&chosen)]),
+            None
+        );
+        // Several pins authenticate each, in whatever order they come.
+        let other = policy("other-limits", "1", 20);
+        assert_eq!(pinning(&[&chosen, &other]), pinning(&[&other, &chosen]));
+        let both = pinning(&[&other, &chosen]);
+        for value in [&chosen, &other] {
+            let member = FormalMember::new(value.clone()).unwrap();
+            assert!(both.authenticates(&member.envelope().unwrap()));
+        }
+        let unpinned = FormalMember::new(policy("storefront-limits", "2", 10)).unwrap();
+        assert!(!both.authenticates(&unpinned.envelope().unwrap()));
     }
 
     /// One candidate for each mismatch tier against the reference
@@ -515,7 +538,7 @@ mod tests {
                     ArtifactKind::TrustPolicy,
                     "storefront-limits",
                     "1",
-                    json!({}),
+                    json!({"authority": "trusted-local-host"}),
                 ),
             ),
             (Reason::IdentityMismatch, policy("other-limits", "1", 10)),
@@ -533,7 +556,7 @@ mod tests {
                 .map(|(_, candidate)| candidate.clone())
                 .collect();
             assert_eq!(
-                decide(&reference, &candidates, &TRUSTED),
+                decide(&reference, &candidates),
                 Err(reference_issue(tiers[index].0)),
                 "{:?}",
                 tiers[index].0
@@ -542,11 +565,11 @@ mod tests {
         // Nothing related at all.
         let unrelated = envelope_of(ArtifactKind::GlossarySet, "glossary", "1", json!({}));
         assert_eq!(
-            decide(&reference, &[unrelated], &TRUSTED),
+            decide(&reference, &[unrelated]),
             Err(reference_issue(Reason::NotFound))
         );
         assert_eq!(
-            decide(&reference, &[], &TRUSTED),
+            decide(&reference, &[]),
             Err(reference_issue(Reason::NotFound))
         );
         // Several candidates in one tier still select that one reason.
@@ -556,20 +579,16 @@ mod tests {
                 &[
                     policy("storefront-limits", "2", 10),
                     policy("storefront-limits", "3", 12),
-                ],
-                &TRUSTED
+                ]
             ),
             Err(reference_issue(Reason::RevisionMismatch))
         );
         // A digest mismatch is decided whatever the other candidate's body.
         assert_eq!(
-            decide(
+            decide_with(
                 &reference,
                 &[tampered(&policy("storefront-limits", "1", 11))],
-                &Verifier {
-                    authentic: false,
-                    common_body: false,
-                }
+                &pinning(&[&policy("pinned-limits", "1", 1)])
             ),
             Err(reference_issue(Reason::DigestMismatch))
         );
@@ -592,13 +611,10 @@ mod tests {
             edited(&chosen, "/body/content", Some(json!([]))),
             json!(["resource-limit-policy", "storefront-limits"]),
         ] {
-            assert_eq!(
-                decide(&reference, std::slice::from_ref(&member), &TRUSTED),
-                not_found
-            );
+            assert_eq!(decide(&reference, std::slice::from_ref(&member)), not_found);
             // Nor does it stop the exact candidate from being admitted alone.
             assert_eq!(
-                decide(&reference, &[member, chosen.clone()], &TRUSTED),
+                decide(&reference, &[member, chosen.clone()]),
                 Ok(reference.clone())
             );
         }
@@ -654,9 +670,9 @@ mod tests {
             vec![tiers[3].clone(), tiers[4].clone(), tiers[2].clone()],
         ];
         for scenario in scenarios {
-            let expected = decide(&reference, &scenario, &TRUSTED);
+            let expected = decide(&reference, &scenario);
             for ordering in permutations(&scenario) {
-                assert_eq!(decide(&reference, &ordering, &TRUSTED), expected);
+                assert_eq!(decide(&reference, &ordering), expected);
             }
         }
     }
@@ -695,7 +711,7 @@ mod tests {
         ] {
             let value = member(id);
             assert_eq!(
-                decide(&tuple_of(&value), &[value], &TRUSTED),
+                decide(&tuple_of(&value), &[value]),
                 Err(policy_issue(reason)),
                 "{id}"
             );

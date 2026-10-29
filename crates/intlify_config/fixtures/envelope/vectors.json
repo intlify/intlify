@@ -299,7 +299,15 @@
               "services": "absent",
               "directions": [
                 {
+                  "locale": "de",
+                  "direction": "LTR"
+                },
+                {
                   "locale": "en",
+                  "direction": "LTR"
+                },
+                {
+                  "locale": "fr-FR",
                   "direction": "LTR"
                 },
                 {
@@ -311,6 +319,9 @@
             "delivery": {
               "unit": "main",
               "loading": "eager"
+            },
+            "hydration": {
+              "roles": []
             },
             "limits": {
               "maxMessages": "1000",
@@ -324,7 +335,7 @@
             }
           }
         },
-        "integrityDigest": "sha256:23b178d1ec9e44427833b6f3adda0450cd9a358abfc4f90963ee152957e6bf96"
+        "integrityDigest": "sha256:59a1fa011eb4fd24d9b7087685e6e4e42da8bdf474e7373b924057b509af7d07"
       },
       "declaration": "target-profile",
       "tuple": {
@@ -332,11 +343,11 @@
         "identity": "storefront-web",
         "revision": "1",
         "specificationRevision": "0",
-        "semanticDigest": "sha256:5def4b031574ac812a5d831f66e9405932f4fb544da66ef1c7cc42d7ee8c42ea"
+        "semanticDigest": "sha256:e86a606f3b0a3bcd08106fb1654a2452e093ebb7b307be86a5c5b44f52d2e431"
       },
       "integrityHolds": true,
       "admission": "admitted",
-      "canonicalBytes": 2382
+      "canonicalBytes": 2597
     },
     {
       "id": "trust-policy",
@@ -350,9 +361,11 @@
         "body": {
           "identity": "storefront-trust",
           "revision": "1",
-          "content": {}
+          "content": {
+            "authority": "trusted-local-host"
+          }
         },
-        "integrityDigest": "sha256:e0ccb2ae455bb0752040e80b7a14903de30293b5602ea7d45957a10a0aaa18a5"
+        "integrityDigest": "sha256:a2a600cbaa1b89d38253c69c61988bfd5f6d724ceb9294565f3f0681dacb1be0"
       },
       "declaration": "trust-policy",
       "tuple": {
@@ -360,11 +373,11 @@
         "identity": "storefront-trust",
         "revision": "1",
         "specificationRevision": "0",
-        "semanticDigest": "sha256:3d5bc246bf3129fcb7a2063aacf9326e1088c21470daf06d6a4b2fcd5785c064"
+        "semanticDigest": "sha256:84cbcd61a2d9b3a5e4b346ccc884ec36524dc7b7b927d0d752fdc1d103a57d4c"
       },
       "integrityHolds": true,
       "admission": "admitted",
-      "canonicalBytes": 430
+      "canonicalBytes": 475
     },
     {
       "id": "resource-limit-policy-without-section",
@@ -421,7 +434,7 @@
         "semanticDigest": "sha256:a7fd10edff091dbd221fc81ee953016004a19f0a0080f4f2521972ab9e313f8b"
       },
       "integrityHolds": true,
-      "admission": "admitted",
+      "admission": "content-invalid",
       "canonicalBytes": 489
     },
     {
@@ -852,7 +865,15 @@
               "services": "absent",
               "directions": [
                 {
+                  "locale": "de",
+                  "direction": "LTR"
+                },
+                {
                   "locale": "en",
+                  "direction": "LTR"
+                },
+                {
+                  "locale": "fr-FR",
                   "direction": "LTR"
                 },
                 {
@@ -864,6 +885,9 @@
             "delivery": {
               "unit": "main",
               "loading": "eager"
+            },
+            "hydration": {
+              "roles": []
             },
             "limits": {
               "maxMessages": "1000",
@@ -877,7 +901,7 @@
             }
           }
         },
-        "integrityDigest": "sha256:e69df91731ea73e101abbebdb2f37e5a97a882c9bcb69a68d11967fc9438d8c6"
+        "integrityDigest": "sha256:01fd0171d40a9c423f5bebb07950e0f7022b2c5e1a8e541ba418652611ed6497"
       },
       "declaration": "target-profile",
       "tuple": {
@@ -885,11 +909,11 @@
         "identity": "storefront-web",
         "revision": "1",
         "specificationRevision": "0",
-        "semanticDigest": "sha256:55aa0b705f80fa357d51f1f9ac78ac314ec292d29e1f54de397cd896f9be1994"
+        "semanticDigest": "sha256:b94758568eb701b101eed67e8e4bbfc5dd90c00b0bb399d445afd24a6d3312b4"
       },
       "integrityHolds": true,
       "admission": "content-invalid",
-      "canonicalBytes": 2371
+      "canonicalBytes": 2586
     },
     {
       "id": "missing-body",
@@ -1568,7 +1592,7 @@
     {
       "id": "target-unknown-member",
       "base": "target-profile",
-      "pointer": "/hydration",
+      "pointer": "/services",
       "admitted": false,
       "value": "none"
     },
@@ -1717,6 +1741,47 @@
       ]
     },
     {
+      "id": "target-both-roles",
+      "base": "target-profile",
+      "pointer": "/hydration/roles",
+      "admitted": true,
+      "value": ["browser-hydration-client", "ssr-renderer"]
+    },
+    {
+      "id": "target-roles-unsorted",
+      "base": "target-profile",
+      "pointer": "/hydration/roles",
+      "admitted": false,
+      "value": ["ssr-renderer", "browser-hydration-client"]
+    },
+    {
+      "id": "target-roles-repeated",
+      "base": "target-profile",
+      "pointer": "/hydration/roles",
+      "admitted": false,
+      "value": ["ssr-renderer", "ssr-renderer"]
+    },
+    {
+      "id": "target-unknown-role",
+      "base": "target-profile",
+      "pointer": "/hydration/roles",
+      "admitted": false,
+      "value": ["edge-renderer"]
+    },
+    {
+      "id": "target-hydration-unknown-member",
+      "base": "target-profile",
+      "pointer": "/hydration/mode",
+      "admitted": false,
+      "value": "eager"
+    },
+    {
+      "id": "target-missing-hydration",
+      "base": "target-profile",
+      "pointer": "/hydration",
+      "admitted": false
+    },
+    {
       "id": "target-limit-one",
       "base": "target-profile",
       "pointer": "/limits/maxLocales",
@@ -1758,6 +1823,59 @@
       "admitted": false
     },
     {
+      "id": "resource-limit-without-section",
+      "base": "resource-limit-policy",
+      "pointer": "/projectProfileResolution",
+      "admitted": true
+    },
+    {
+      "id": "resource-limit-any-section-interior",
+      "base": "resource-limit-policy",
+      "pointer": "/projectProfileResolution",
+      "admitted": true,
+      "value": {
+        "translation": {
+          "maxEntries": "0"
+        }
+      }
+    },
+    {
+      "id": "resource-limit-non-object-section",
+      "base": "resource-limit-policy",
+      "pointer": "/projectProfileResolution",
+      "admitted": false,
+      "value": "default"
+    },
+    {
+      "id": "resource-limit-unknown-member",
+      "base": "resource-limit-policy",
+      "pointer": "/translationPolicy",
+      "admitted": false,
+      "value": {}
+    },
+    {
+      "id": "trust-other-authority",
+      "base": "trust-policy",
+      "pointer": "/authority",
+      "admitted": false,
+      "value": "signed-publisher"
+    },
+    {
+      "id": "trust-missing-authority",
+      "base": "trust-policy",
+      "pointer": "/authority",
+      "admitted": false
+    },
+    {
+      "id": "trust-unknown-member",
+      "base": "trust-policy",
+      "pointer": "/roots",
+      "admitted": false,
+      "value": {
+        "publisher": "storefront"
+      }
+    },
+    {
       "id": "glossary-any-object",
       "base": "glossary-set",
       "pointer": "/terms",
@@ -1767,22 +1885,6 @@
           "source": "cart"
         }
       ]
-    },
-    {
-      "id": "resource-limit-any-object",
-      "base": "resource-limit-policy",
-      "pointer": "/projectProfileResolution",
-      "admitted": true,
-      "value": "default"
-    },
-    {
-      "id": "trust-any-object",
-      "base": "trust-policy",
-      "pointer": "/roots",
-      "admitted": true,
-      "value": {
-        "publisher": "storefront"
-      }
     }
   ],
   "references": [
@@ -1859,7 +1961,7 @@
         "identity": "storefront-web",
         "revision": "1",
         "specificationRevision": "0",
-        "semanticDigest": "sha256:5def4b031574ac812a5d831f66e9405932f4fb544da66ef1c7cc42d7ee8c42ea"
+        "semanticDigest": "sha256:e86a606f3b0a3bcd08106fb1654a2452e093ebb7b307be86a5c5b44f52d2e431"
       },
       "canonicalBytes": 263
     },
@@ -1870,7 +1972,7 @@
         "identity": "storefront-trust",
         "revision": "1",
         "specificationRevision": "0",
-        "semanticDigest": "sha256:3d5bc246bf3129fcb7a2063aacf9326e1088c21470daf06d6a4b2fcd5785c064"
+        "semanticDigest": "sha256:84cbcd61a2d9b3a5e4b346ccc884ec36524dc7b7b927d0d752fdc1d103a57d4c"
       },
       "canonicalBytes": 263
     }

@@ -6,12 +6,16 @@
 //! wait on. The selected declaration names fixture-owned artifacts, and a
 //! reference's semantic digest is computed from the envelope it names, never
 //! written by hand. The finite fixture provider has no `ja-JP`, so the
-//! example's third locale is its `ja`.
+//! example's third locale is its `ja`. The example's two Target Profiles
+//! declare the hydration roles its relation needs (024).
+
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
-use crate::artifacts::envelope::ArtifactKind;
+use crate::artifacts::content::sample;
+use crate::artifacts::envelope::{envelope_of, ArtifactKind};
 use crate::profile_fixtures::minimal_config;
 
 use super::binding_inputs::{artifact, REQUIRED};
@@ -31,6 +35,7 @@ pub(in crate::benchmark) enum TargetAndGroupRecipe {
     LocalesNotSubset,
     ExplicitDefaultNotRequested,
     InheritedDefaultNotRequested,
+    TargetLocaleDirectionMissing,
     TargetLocaleInvalid,
     TargetLocaleRepeated,
     TargetProfileMissing,
@@ -54,6 +59,12 @@ pub(super) const SCALE: usize = 64;
 /// The example's requested locales, which both of its targets request too.
 pub(super) const STOREFRONT: [&str; 3] = ["en", "fr-FR", "ja"];
 
+/// The role a Target Profile declares to be a relation's server (024).
+pub(super) const SSR_RENDERER: &str = "ssr-renderer";
+
+/// The role a Target Profile declares to be a relation's client (024).
+pub(super) const BROWSER_HYDRATION_CLIENT: &str = "browser-hydration-client";
+
 /// One declared target: its ID, the identity of the Target Profile it names,
 /// its requested locales, and its default override.
 pub(super) struct Target {
@@ -75,28 +86,58 @@ impl Target {
 }
 
 /// A declaration's locales, targets, groups, the first group's hydration
-/// relations, and its negotiation aliases, before they are written.
+/// relations, and its negotiation aliases, before they are written, and the
+/// content each Target Profile a recipe changes is sealed with, by identity.
 pub(super) struct Declared {
     pub(super) requested: Vec<&'static str>,
     pub(super) targets: Vec<Target>,
     pub(super) groups: Vec<(String, Vec<String>)>,
     pub(super) relations: Vec<(String, String)>,
     pub(super) aliases: Vec<(&'static str, &'static str)>,
+    pub(super) contents: BTreeMap<&'static str, Value>,
 }
 
 impl Declared {
     /// 015's example: `browser`, with its own default, and `ssr`, inheriting
-    /// the project's, in the one group `web` with the hydration relation.
+    /// the project's, in the one group `web` with the hydration relation,
+    /// whose endpoints' Target Profiles declare the roles it needs.
     pub(super) fn storefront() -> Self {
         let mut browser = Target::new("browser", "storefront-browser", &STOREFRONT);
         browser.default = Some("en");
-        Self {
+        let mut declared = Self {
             requested: STOREFRONT.to_vec(),
             targets: vec![browser, Target::new("ssr", "storefront-ssr", &STOREFRONT)],
             groups: vec![("web".into(), vec!["browser".into(), "ssr".into()])],
             relations: vec![("ssr".into(), "browser".into())],
             aliases: Vec::new(),
-        }
+            contents: BTreeMap::new(),
+        };
+        declared.declare("storefront-ssr", &[SSR_RENDERER]);
+        declared.declare("storefront-browser", &[BROWSER_HYDRATION_CLIENT]);
+        declared
+    }
+
+    /// The content the Target Profile `identity` names is sealed with: the
+    /// sample, until a recipe changes it.
+    pub(super) fn content(&mut self, identity: &'static str) -> &mut Value {
+        self.contents
+            .entry(identity)
+            .or_insert_with(|| sample(ArtifactKind::TargetProfile))
+    }
+
+    /// The Target Profile `identity` names declares `roles`, and no other.
+    pub(super) fn declare(&mut self, identity: &'static str, roles: &[&str]) {
+        self.content(identity)["hydration"]["roles"] = json!(roles);
+    }
+
+    /// The sealed Target Profile `identity` names.
+    pub(super) fn target_profile(&self, identity: &str) -> Value {
+        let content = self
+            .contents
+            .get(identity)
+            .cloned()
+            .unwrap_or_else(|| sample(ArtifactKind::TargetProfile));
+        envelope_of(ArtifactKind::TargetProfile, identity, "1", content)
     }
 
     pub(super) fn target(&mut self, id: &str) -> &mut Target {
@@ -136,7 +177,7 @@ impl Declared {
         let mut targets = Map::new();
         let mut profiles = Vec::new();
         for target in &self.targets {
-            let profile = artifact(ArtifactKind::TargetProfile, target.profile);
+            let profile = self.target_profile(target.profile);
             let mut value = json!({
                 "profile": reference_value(&tuple_of(&profile)),
                 "requestedLocales": target.requested,
@@ -201,7 +242,7 @@ impl Declared {
 }
 
 impl TargetAndGroupRecipe {
-    pub(super) const ALL: [Self; 16] = [
+    pub(super) const ALL: [Self; 17] = [
         Self::Minimal,
         Self::Storefront,
         Self::StorefrontReordered,
@@ -210,6 +251,7 @@ impl TargetAndGroupRecipe {
         Self::LocalesNotSubset,
         Self::ExplicitDefaultNotRequested,
         Self::InheritedDefaultNotRequested,
+        Self::TargetLocaleDirectionMissing,
         Self::TargetLocaleInvalid,
         Self::TargetLocaleRepeated,
         Self::TargetProfileMissing,
@@ -253,6 +295,7 @@ impl TargetAndGroupRecipe {
                 groups,
                 relations: Vec::new(),
                 aliases: Vec::new(),
+                contents: BTreeMap::new(),
             }
         };
         let mut declared = Declared::storefront();
@@ -264,6 +307,7 @@ impl TargetAndGroupRecipe {
                     groups: vec![("web".into(), vec!["browser".into()])],
                     relations: Vec::new(),
                     aliases: Vec::new(),
+                    contents: BTreeMap::new(),
                 }
             }
             Self::ManyTargets => return scaled(&|_| "web".into()),
@@ -278,6 +322,13 @@ impl TargetAndGroupRecipe {
             Self::InheritedDefaultNotRequested => {
                 declared.target("ssr").requested = vec!["fr-FR", "ja"];
             }
+            // The target requests `fr-FR`, but its Target Profile has no
+            // direction for it.
+            Self::TargetLocaleDirectionMissing => declared.content("storefront-ssr")["locale"]
+                ["directions"]
+                .as_array_mut()
+                .expect("the sample's directions")
+                .retain(|entry| entry["locale"] != "fr-FR"),
             // Phase 7 rejects the spelling, so the target's locales are
             // unavailable.
             Self::TargetLocaleInvalid => declared.target("ssr").requested[2] = "en_US",
@@ -382,12 +433,28 @@ mod tests {
                 "hydrationRelations": [{"server": "ssr", "client": "browser"}]
             }})
         );
-        // The five policies, and each target's own Target Profile.
+        // The five policies, and each target's own Target Profile, which
+        // declares the role the relation needs of it.
         assert_eq!(fixture.members.len(), 7);
+        let roles = |identity: &str| {
+            let profile = fixture
+                .members
+                .iter()
+                .find(|member| member["body"]["identity"] == identity)
+                .unwrap();
+            assert_eq!(profile["kind"], "target-profile");
+            profile["body"]["content"]["hydration"]["roles"].clone()
+        };
+        assert_eq!(roles("storefront-ssr"), json!(["ssr-renderer"]));
+        assert_eq!(
+            roles("storefront-browser"),
+            json!(["browser-hydration-client"])
+        );
     }
 
     /// Each blocked recipe changes one part of the example: a target's
-    /// locales, the web group's members, the groups, or the collection.
+    /// locales, the web group's members, the groups, the collection, or a
+    /// target's Target Profile.
     #[test]
     fn each_blocked_recipe_changes_only_what_its_name_says() {
         let base = R::Storefront.fixture();
@@ -461,7 +528,7 @@ mod tests {
             }
             assert_eq!(config, base.config, "{recipe:?}");
         }
-        let ssr = artifact(ArtifactKind::TargetProfile, "storefront-ssr");
+        let ssr = Declared::storefront().target_profile("storefront-ssr");
         let missing = R::TargetProfileMissing.fixture();
         assert_eq!(missing.config, base.config);
         assert_eq!(
@@ -479,6 +546,48 @@ mod tests {
             duplicated.members[base.members.len()..],
             [artifact(ArtifactKind::TrustPolicy, "storefront-trust")]
         );
+        // The server's Target Profile without its direction for `fr-FR`:
+        // only that member and the reference naming it change.
+        let directionless = R::TargetLocaleDirectionMissing.fixture();
+        let content = |fixture: &TargetAndGroupFixture| {
+            fixture
+                .members
+                .iter()
+                .find(|member| member["body"]["identity"] == "storefront-ssr")
+                .unwrap()["body"]["content"]
+                .clone()
+        };
+        let (changed, original) = (content(&directionless), content(&base));
+        let locales = |content: &Value| {
+            content["locale"]["directions"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|entry| entry["locale"].clone())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(locales(&changed), [json!("de"), json!("en"), json!("ja")]);
+        assert_eq!(
+            locales(&original),
+            [json!("de"), json!("en"), json!("fr-FR"), json!("ja")]
+        );
+        let mut restored = changed.clone();
+        restored["locale"]["directions"] = original["locale"]["directions"].clone();
+        assert_eq!(restored, original);
+        let others = |fixture: &TargetAndGroupFixture| {
+            fixture
+                .members
+                .iter()
+                .filter(|member| member["body"]["identity"] != "storefront-ssr")
+                .cloned()
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(others(&directionless), others(&base));
+        assert_ne!(directionless.config, base.config);
+        let mut config = directionless.config.clone();
+        config["profiles"]["app"]["targetProfiles"]["ssr"]["profile"] =
+            targets(&base)["ssr"]["profile"].clone();
+        assert_eq!(config, base.config);
     }
 
     fn base_part(base: &TargetAndGroupFixture, path: &[&str]) -> Option<Value> {

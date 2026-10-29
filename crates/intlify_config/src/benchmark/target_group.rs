@@ -352,7 +352,7 @@ fn group_subject(frame: &mut Frame, subject: &GroupSubject) {
 }
 
 /// Only Phase 11's and Phase 12's own units run in the interval: a target's
-/// or a group's subject under one of their six checks.
+/// or a group's subject under one of their seven checks.
 fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
     frame.text(unit.phase.id());
     match &unit.subject {
@@ -385,6 +385,7 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         Check::KnownMember => 3,
         Check::UniqueMember => 4,
         Check::SingleGroup => 5,
+        Check::DirectedLocales => 6,
         Check::CanonicalLocale
         | Check::UniqueLocale
         | Check::RequestedMember
@@ -826,10 +827,11 @@ mod tests {
             })
         };
         let limit = || Some(Details::Limit(exceeded(6, Actual::Exact(7))));
-        // The controls: a complete case, a default's reason, and a bound's
-        // details are observed.
+        // The controls: a complete case, a default's reason, a direction
+        // missing without one, and a bound's details are observed.
         assert!(observe(&resolved(R::Storefront)).is_ok());
         assert!(observe(&resolved(R::ExplicitDefaultNotRequested)).is_ok());
+        assert!(observe(&resolved(R::TargetLocaleDirectionMissing)).is_ok());
         assert!(observed(blocked(
             of_browser(Check::WithinBound),
             Code::ResourceLimitExceeded,
@@ -1009,6 +1011,7 @@ mod tests {
             Check::KnownMember,
             Check::UniqueMember,
             Check::SingleGroup,
+            Check::DirectedLocales,
         ]
         .map(|check| {
             digest(|frame| unit(frame, &target_unit(TargetSubject::Targets, check)).unwrap())
@@ -1149,6 +1152,7 @@ mod tests {
                 Some(Reason::InheritedProjectDefault),
             ),
             key(Code::TargetLocalesNotSubset, None),
+            key(Code::TargetLocaleDirectionMissing, None),
         ]
         .map(|recorded| digest(|frame| issue(frame, &recorded).unwrap()));
         assert!(apart(&issues));

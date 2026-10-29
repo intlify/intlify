@@ -335,8 +335,8 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
             {
                 return Err(ContextFailure::HydrationInputMismatch);
             }
-            // As for Phases 11 and 12, with the fixture's answers to what
-            // 015 asks 024.
+            // As for Phases 11 and 12. Each Target Profile's roles are in
+            // its member's body.
             frame.digest(prepared.analysis.benchmark_observation().identity());
             frame.json(
                 &serde_json::to_value(&prepared.config).map_err(|_| ContextFailure::Encoding)?,
@@ -366,10 +366,6 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
                 frame.text(id.name);
                 frame.uint(bound.get());
             }
-            frame.json(
-                &serde_json::to_value(&prepared.capabilities)
-                    .map_err(|_| ContextFailure::Encoding)?,
-            );
             frame.json(
                 &serde_json::to_value(crate::benchmark::hydration_relation::InputFacts::observe(
                     prepared,

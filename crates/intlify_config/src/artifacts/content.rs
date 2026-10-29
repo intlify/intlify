@@ -2,17 +2,20 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! The closed contents design 017 defines: the minimum behavior of the four
-//! Policy kinds that 021, 018, and 022 fix, and the dimensions of the Target
-//! Profile that 024 fixes for the minimum Web text profile. 017 adds no
-//! expression language, so a content is a closed object of fixed spellings,
-//! exact tokens, and positive quantities.
+//! Policy kinds that 021, 018, and 022 fix, the Resource Limit Policy common
+//! body and the Trust Policy body whose meaning 018 defines, and the dimensions
+//! of the Target Profile that 024 fixes for the minimum Web text profile,
+//! including the hydration roles it declares. 017 adds no expression language,
+//! so a content is a closed object of fixed spellings, exact tokens, and
+//! positive quantities.
 //!
 //! A content is read only after its envelope's integrity holds and its
-//! specification revision is supported. The contents of a Resource Limit
-//! Policy, a Trust Policy, and a Glossary Set are 018's and 022's to admit, so
-//! they pass on as the objects they are. Whether the directions of a Target
-//! Profile cover every requested locale depends on the targets that reference
-//! it, so it is not decided here.
+//! specification revision is supported. A Glossary Set's content is 022's to
+//! admit, so it passes on as the object it is, and only 015 checks the
+//! interior of a Resource Limit Policy's `projectProfileResolution` section.
+//! Whether the directions of a Target Profile cover every requested locale
+//! depends on the targets that reference it, so 015's target resolution
+//! decides it.
 
 use std::num::NonZeroU64;
 
@@ -28,12 +31,13 @@ use super::{closed, exactly, token, SemanticDigest};
 const VERSIONED: [&str; 2] = ["identity", "revision"];
 const PROVIDER_ROUTING: [&str; 2] = ["adapter", "configuration"];
 const CONFIGURATION: [&str; 2] = ["identity", "semanticDigest"];
-const TARGET_PROFILE: [&str; 9] = [
+const TARGET_PROFILE: [&str; 10] = [
     "adapter",
     "codecs",
     "delivery",
     "execution",
     "host",
+    "hydration",
     "limits",
     "locale",
     "mf2Specification",
@@ -45,6 +49,7 @@ const CODECS: [&str; 4] = ["bindingTable", "descriptor", "localePayload", "sourc
 const LOCALE: [&str; 3] = ["directions", "selection", "services"];
 const DIRECTION: [&str; 2] = ["direction", "locale"];
 const DELIVERY: [&str; 2] = ["loading", "unit"];
+const HYDRATION: [&str; 1] = ["roles"];
 const LIMITS: [&str; 8] = [
     "maxFileBytes",
     "maxFiles",
@@ -62,6 +67,11 @@ const EXECUTION_SPECIFICATION: (&str, &str) = ("intlify-design-023", "0");
 const EXECUTION_PROFILE: (&str, &str) = ("intlify-text-interpolation-minimum", "0");
 const SOURCE_MAP: (&str, &str) = ("ecma-426-source-map", "3");
 
+/// The one section a revision-`"0"` Resource Limit Policy may carry (018).
+const PROJECT_PROFILE_RESOLUTION: &str = "projectProfileResolution";
+/// The one authority a revision-`"0"` Trust Policy names (018).
+const TRUSTED_LOCAL_HOST: &str = "trusted-local-host";
+
 /// An admitted content, typed by its kind. The values 017 fixes are not
 /// kept, since every admitted content has them.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,8 +82,13 @@ pub(crate) enum Content<'a> {
     SourceAdmission(SourceApproval),
     ProviderRouting(ProviderRouting),
     TargetProfile(Box<TargetProfile>),
-    /// The content of a Resource Limit Policy, a Trust Policy, or a Glossary
-    /// Set, for 018 and 022 to admit.
+    /// 018's common body: the `projectProfileResolution` section when the
+    /// content has one, an object whose interior only 015 checks.
+    ResourceLimitPolicy(Option<&'a Map<String, Value>>),
+    /// 018's one Trust Policy, which leaves every trust decision to the Local
+    /// Authority Context it names, `trusted-local-host`.
+    TrustPolicy,
+    /// The content of a Glossary Set, for 022 to admit.
     External(&'a Map<String, Value>),
 }
 
@@ -114,7 +129,18 @@ pub(crate) struct TargetProfile {
     pub(crate) descriptor: VersionedIdentity,
     /// Ordered by the unsigned bytes of the locales, one per locale.
     pub(crate) directions: Vec<LocaleDirection>,
+    pub(crate) hydration: HydrationRoles,
     pub(crate) limits: TargetLimits,
+}
+
+/// The hydration roles a Target Profile declares (024). 015's hydration
+/// validation checks them; the minimum export accepts only none.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct HydrationRoles {
+    /// `ssr-renderer`: it may be the server endpoint of a hydration relation.
+    pub(crate) ssr_renderer: bool,
+    /// `browser-hydration-client`: it may be the client endpoint.
+    pub(crate) browser_hydration_client: bool,
 }
 
 /// The two execution modes of the minimum Web text profile.
@@ -168,10 +194,32 @@ pub(crate) fn read(kind: ArtifactKind, content: &Map<String, Value>) -> Option<C
         ArtifactKind::TargetProfile => {
             target_profile(content).map(|profile| Content::TargetProfile(Box::new(profile)))
         }
-        ArtifactKind::GlossarySet
-        | ArtifactKind::ResourceLimitPolicy
-        | ArtifactKind::TrustPolicy => Some(Content::External(content)),
+        ArtifactKind::ResourceLimitPolicy => resource_limit_policy(content).then(|| {
+            Content::ResourceLimitPolicy(
+                content
+                    .get(PROJECT_PROFILE_RESOLUTION)
+                    .and_then(Value::as_object),
+            )
+        }),
+        ArtifactKind::TrustPolicy => trust_policy(content).then_some(Content::TrustPolicy),
+        ArtifactKind::GlossarySet => Some(Content::External(content)),
     }
+}
+
+/// Whether `content` is 018's common body of a revision-`"0"` Resource Limit
+/// Policy: nothing but an optional `projectProfileResolution` section, which
+/// must be an object. The section's interior is 015's to check, so it is not
+/// read here.
+pub(crate) fn resource_limit_policy(content: &Map<String, Value>) -> bool {
+    match content.get(PROJECT_PROFILE_RESOLUTION) {
+        None => content.is_empty(),
+        Some(section) => exactly(content, &[PROJECT_PROFILE_RESOLUTION]) && section.is_object(),
+    }
+}
+
+/// 018's one Trust Policy body, `{ "authority": "trusted-local-host" }`.
+fn trust_policy(content: &Map<String, Value>) -> bool {
+    only(content, "authority") == Some(TRUSTED_LOCAL_HOST)
 }
 
 /// The string value of `content`'s one member, when `name` is all it has.
@@ -252,8 +300,36 @@ fn target_profile(content: &Map<String, Value>) -> Option<TargetProfile> {
         locale_payload: versioned(&codecs["localePayload"])?,
         descriptor: versioned(&codecs["descriptor"])?,
         directions: directions(&locale["directions"])?,
+        hydration: hydration(&content["hydration"])?,
         limits: limits(&content["limits"])?,
     })
+}
+
+/// The declared roles, strictly ascending by their bytes, each one 024
+/// names. The empty set declares no role.
+fn hydration(value: &Value) -> Option<HydrationRoles> {
+    let hydration = closed(value, &HYDRATION)?;
+    let roles = hydration["roles"]
+        .as_array()?
+        .iter()
+        .map(Value::as_str)
+        .collect::<Option<Vec<_>>>()?;
+    // Strictly ascending bytes are both the order and the absence of repeats.
+    if !roles
+        .windows(2)
+        .all(|pair| pair[0].as_bytes() < pair[1].as_bytes())
+    {
+        return None;
+    }
+    let mut declared = HydrationRoles::default();
+    for role in roles {
+        match role {
+            "browser-hydration-client" => declared.browser_hydration_client = true,
+            "ssr-renderer" => declared.ssr_renderer = true,
+            _ => return None,
+        }
+    }
+    Some(declared)
 }
 
 /// The closed `{ identity, revision }` pair `value` is.
@@ -325,7 +401,8 @@ pub(crate) fn sample(kind: ArtifactKind) -> Value {
         |identity: &str, revision: &str| json!({"identity": identity, "revision": revision});
     match kind {
         ArtifactKind::ApprovalPolicy => json!({"localizedApproval": "required"}),
-        ArtifactKind::GlossarySet | ArtifactKind::TrustPolicy => json!({}),
+        ArtifactKind::GlossarySet => json!({}),
+        ArtifactKind::TrustPolicy => json!({"authority": TRUSTED_LOCAL_HOST}),
         ArtifactKind::ProviderRoutingPolicy => json!({
             "adapter": versioned("intlify-provider-fixture", "0"),
             "configuration": {
@@ -363,11 +440,14 @@ pub(crate) fn sample(kind: ArtifactKind) -> Value {
                 "selection": "direct-only",
                 "services": "absent",
                 "directions": [
+                    {"locale": "de", "direction": "LTR"},
                     {"locale": "en", "direction": "LTR"},
+                    {"locale": "fr-FR", "direction": "LTR"},
                     {"locale": "ja", "direction": "LTR"},
                 ],
             },
             "delivery": {"unit": "main", "loading": "eager"},
+            "hydration": {"roles": []},
             "limits": {
                 "maxMessages": "1000",
                 "maxUses": "10000",
@@ -577,7 +657,11 @@ mod tests {
             locale: locale.into(),
             direction: Direction::Ltr,
         };
-        assert_eq!(profile.directions, [entry("en"), entry("ja")]);
+        assert_eq!(
+            profile.directions,
+            [entry("de"), entry("en"), entry("fr-FR"), entry("ja")]
+        );
+        assert_eq!(profile.hydration, HydrationRoles::default());
         assert_eq!(
             profile.limits,
             TargetLimits {
@@ -593,6 +677,37 @@ mod tests {
         );
         let aot = profile_of(&edited(&sample, "/mode", Some(json!("aot")))).unwrap();
         assert_eq!(aot.mode, TargetMode::Aot);
+    }
+
+    #[test]
+    fn hydration_roles_are_a_closed_set_in_byte_order() {
+        let sample = sample(ArtifactKind::TargetProfile);
+        let roles = |roles: Value| profile_of(&edited(&sample, "/hydration/roles", Some(roles)));
+        let declared = |ssr_renderer, browser_hydration_client| HydrationRoles {
+            ssr_renderer,
+            browser_hydration_client,
+        };
+        for (value, expected) in [
+            (json!([]), declared(false, false)),
+            (json!(["ssr-renderer"]), declared(true, false)),
+            (json!(["browser-hydration-client"]), declared(false, true)),
+            (
+                json!(["browser-hydration-client", "ssr-renderer"]),
+                declared(true, true),
+            ),
+        ] {
+            assert_eq!(roles(value.clone()).unwrap().hydration, expected, "{value}");
+        }
+        // Out of order, repeated, unknown, and not a string.
+        for value in [
+            json!(["ssr-renderer", "browser-hydration-client"]),
+            json!(["ssr-renderer", "ssr-renderer"]),
+            json!(["edge-renderer"]),
+            json!([true]),
+            json!("ssr-renderer"),
+        ] {
+            assert!(roles(value.clone()).is_none(), "{value}");
+        }
     }
 
     #[test]
@@ -673,13 +788,14 @@ mod tests {
     #[test]
     fn every_object_of_the_target_profile_is_closed() {
         let sample = sample(ArtifactKind::TargetProfile);
-        let objects: [(&str, &[&str]); 7] = [
+        let objects: [(&str, &[&str]); 8] = [
             ("", &TARGET_PROFILE),
             ("/host", &HOST),
             ("/execution", &EXECUTION),
             ("/codecs", &CODECS),
             ("/locale", &LOCALE),
             ("/delivery", &DELIVERY),
+            ("/hydration", &HYDRATION),
             ("/limits", &LIMITS),
         ];
         for (object, members) in objects {
@@ -781,34 +897,74 @@ mod tests {
     }
 
     #[test]
-    fn the_contents_of_018_and_022_pass_on_as_the_objects_they_are() {
-        let external = [
-            ArtifactKind::GlossarySet,
-            ArtifactKind::ResourceLimitPolicy,
-            ArtifactKind::TrustPolicy,
-        ];
-        for kind in external {
-            for content in [
-                json!({}),
-                json!({"projectProfileResolution": "default"}),
-                json!({"localizedApproval": "sometimes"}),
-            ] {
-                let Some(Content::External(object)) = read_value(kind, &content) else {
-                    panic!("{kind:?} {content}");
-                };
-                assert!(std::ptr::eq(object, content.as_object().unwrap()));
-            }
+    fn a_resource_limit_policy_carries_only_its_section_as_an_object() {
+        let read = |content: Value| match read_value(ArtifactKind::ResourceLimitPolicy, &content) {
+            Some(Content::ResourceLimitPolicy(section)) => Some(section.cloned()),
+            None => None,
+            Some(other) => panic!("{other:?}"),
+        };
+        // The section is optional, and its interior is 015's to check.
+        assert_eq!(read(json!({})), Some(None));
+        let interior = json!({"configurationInput": "not 015's shape"});
+        assert_eq!(
+            read(json!({"projectProfileResolution": interior})),
+            Some(Some(interior.as_object().unwrap().clone()))
+        );
+        // A section that is no object, and any other member, fail 018's body.
+        for content in [
+            json!({"projectProfileResolution": "default"}),
+            json!({"projectProfileResolution": []}),
+            json!({"projectProfileResolution": {}, "translationProvider": {}}),
+            json!({"translationProvider": {}}),
+        ] {
+            assert_eq!(read(content.clone()), None, "{content}");
         }
-        // The other five read only their own content.
+    }
+
+    #[test]
+    fn a_trust_policy_names_only_the_trusted_local_host() {
+        let read = |content: Value| read_value(ArtifactKind::TrustPolicy, &content).is_some();
+        assert!(read(json!({"authority": "trusted-local-host"})));
+        for content in [
+            json!({}),
+            json!({"authority": "trusted-remote-host"}),
+            json!({"authority": "trusted-local-host", "signers": []}),
+            json!({"signers": []}),
+        ] {
+            assert!(!read(content.clone()), "{content}");
+        }
+    }
+
+    #[test]
+    fn a_glossary_set_passes_on_as_the_object_it_is() {
+        for content in [
+            json!({}),
+            json!({"projectProfileResolution": "default"}),
+            json!({"localizedApproval": "sometimes"}),
+        ] {
+            let Some(Content::External(object)) = read_value(ArtifactKind::GlossarySet, &content)
+            else {
+                panic!("{content}");
+            };
+            assert!(std::ptr::eq(object, content.as_object().unwrap()));
+        }
+        // The other seven read only their own content. An empty Resource
+        // Limit Policy content is admitted, and so is a Glossary Set's.
         for kind in ArtifactKind::ALL {
-            if external.contains(&kind) {
+            if kind == ArtifactKind::GlossarySet {
                 continue;
             }
             assert!(read_value(kind, &sample(kind)).is_some(), "{kind:?}");
-            assert!(read_value(kind, &json!({})).is_none(), "{kind:?}");
+            assert_eq!(
+                read_value(kind, &json!({})).is_some(),
+                kind == ArtifactKind::ResourceLimitPolicy,
+                "{kind:?}"
+            );
             for other in ArtifactKind::ALL.into_iter().filter(|other| *other != kind) {
-                assert!(
-                    read_value(kind, &sample(other)).is_none(),
+                let empty = other == ArtifactKind::GlossarySet;
+                assert_eq!(
+                    read_value(kind, &sample(other)).is_some(),
+                    empty && kind == ArtifactKind::ResourceLimitPolicy,
                     "{kind:?} {other:?}"
                 );
             }

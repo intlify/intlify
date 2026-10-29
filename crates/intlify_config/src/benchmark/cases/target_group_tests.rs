@@ -60,16 +60,16 @@ fn of_target(id: &str, check: Check) -> Unit {
 #[test]
 fn target_group_cases_keep_the_252_rows_and_append_after_them() {
     let cases = declarations();
-    assert_eq!(cases.len(), 303);
+    assert_eq!(cases.len(), 304);
     assert!(cases[..252]
         .iter()
         .all(|case| case.operation != Operation::TargetAndGroupResolution));
-    assert!(cases[252..280].iter().all(|case| {
+    assert!(cases[252..281].iter().all(|case| {
         case.operation == Operation::TargetAndGroupResolution && case.selector == Selector::App
     }));
     // Every recipe once, in its order, and then the twelve edges.
     assert_eq!(
-        cases[252..268]
+        cases[252..269]
             .iter()
             .map(|case| (case.fixture, case.limit))
             .collect::<Vec<_>>(),
@@ -78,8 +78,8 @@ fn target_group_cases_keep_the_252_rows_and_append_after_them() {
             .map(|recipe| (Recipe::TargetAndGroup(recipe), None))
             .collect::<Vec<_>>()
     );
-    assert!(cases[268..280].iter().all(|case| case.limit.is_some()));
-    for declaration in &cases[252..280] {
+    assert!(cases[269..281].iter().all(|case| case.limit.is_some()));
+    for declaration in &cases[252..281] {
         // The case's source is the configuration, and the members are what
         // preparation read.
         let Recipe::TargetAndGroup(recipe) = declaration.fixture else {
@@ -229,6 +229,14 @@ fn each_blocked_recipe_reports_its_one_decision() {
             ),
         ),
         (
+            R::TargetLocaleDirectionMissing,
+            (
+                of_target("ssr", Check::DirectedLocales),
+                Code::TargetLocaleDirectionMissing,
+                None,
+            ),
+        ),
+        (
             R::MemberUnknown,
             (
                 group_unit(member("tablet"), Check::KnownMember),
@@ -298,8 +306,8 @@ fn a_prerequisite_failure_leaves_only_what_waits_on_it() {
             .map(|key| key.unit().subject.clone())
             .collect::<Vec<_>>()
     };
-    // Phase 7 rejects one spelling, so neither of the target's locale checks
-    // runs.
+    // Phase 7 rejects one spelling, so none of the target's three locale
+    // checks runs.
     let (evaluation, invalid) = ssr(R::TargetLocaleInvalid);
     let waiting = evaluation
         .statuses()
@@ -308,12 +316,14 @@ fn a_prerequisite_failure_leaves_only_what_waits_on_it() {
             Status::Evaluated => None,
         })
         .collect::<Vec<_>>();
-    assert_eq!(waiting.len(), 2);
+    assert_eq!(waiting.len(), 3);
     assert!(waiting.iter().all(|(check, subjects)| {
-        matches!(check, Check::ProjectSubset | Check::SupportedDefault)
-            && subjects
-                .iter()
-                .all(|subject| matches!(subject, Subject::Locale(_)))
+        matches!(
+            check,
+            Check::ProjectSubset | Check::SupportedDefault | Check::DirectedLocales
+        ) && subjects
+            .iter()
+            .all(|subject| matches!(subject, Subject::Locale(_)))
     }));
     assert!(invalid.requested.is_err() && invalid.resolved.is_err());
     // Phase 7 records the repeat, which only the resolved target needs.
@@ -334,12 +344,21 @@ fn a_prerequisite_failure_leaves_only_what_waits_on_it() {
         [Check::UniqueLocale]
     );
     // Phase 9 finds no Target Profile for `ssr`: the Set holds only
-    // `browser`'s, another identity of the kind.
+    // `browser`'s, another identity of the kind. Only its directions wait.
     let (evaluation, missing) = ssr(R::TargetProfileMissing);
+    let directed = of_target("ssr", Check::DirectedLocales);
     assert!(evaluation
         .statuses()
-        .all(|(_, status)| *status == Status::Evaluated));
+        .all(|(unit, status)| (*status == Status::Evaluated) == (*unit != directed)));
     let causes = missing.profile.unwrap_err();
+    assert_eq!(
+        evaluation
+            .statuses()
+            .find(|(unit, _)| **unit == directed)
+            .unwrap()
+            .1,
+        &Status::NotEvaluated(causes.clone())
+    );
     assert!(subjects(&causes)
         .iter()
         .all(|subject| matches!(subject, Subject::ArtifactReference(_))));
@@ -348,9 +367,13 @@ fn a_prerequisite_failure_leaves_only_what_waits_on_it() {
         [Some(Reason::IdentityMismatch)]
     );
     assert_eq!(missing.resolved, Err(causes));
-    // Without a Set, no target's Target Profile is resolved.
+    // Without a Set, no target's Target Profile is resolved, and no target's
+    // directions are checked.
     let resolved = resolved(&case(R::CollectionNotAdmitted));
     assert!(resolved.evaluation.issues().next().is_none());
+    assert!(resolved.evaluation.statuses().all(|(unit, status)| {
+        (*status == Status::Evaluated) == (unit.check != Check::DirectedLocales)
+    }));
     let retained = resolved.result.unwrap().unwrap();
     for target in &retained.targets {
         let causes = target.profile.clone().unwrap_err();
@@ -476,7 +499,7 @@ fn every_other_case_has_its_own_shared_domain() {
         );
         seen.push(observation.shared);
     }
-    assert_eq!(seen.len(), 15 + 6);
+    assert_eq!(seen.len(), 16 + 6);
 }
 
 #[test]
@@ -513,36 +536,36 @@ fn the_work_counts_the_bounds_units_and_what_resolved() {
     for (declaration, expected) in [
         (
             case(R::Minimal),
-            ["1", "7", "1", "3", "1", "1", "11", "0", "0", "1", "1"],
+            ["1", "7", "1", "3", "1", "1", "12", "0", "0", "1", "1"],
         ),
         (
             case(R::Storefront),
-            ["2", "7", "1", "3", "2", "2", "17", "0", "0", "2", "1"],
+            ["2", "7", "1", "3", "2", "2", "19", "0", "0", "2", "1"],
         ),
         // 64 targets in one group, and 64 groups of one.
         (
             case(R::ManyTargets),
-            ["64", "9", "1", "3", "64", "64", "389", "0", "0", "64", "1"],
+            ["64", "9", "1", "3", "64", "64", "453", "0", "0", "64", "1"],
         ),
         (
             case(R::ManyGroups),
-            ["64", "9", "64", "8", "1", "64", "515", "0", "0", "64", "64"],
+            ["64", "9", "64", "8", "1", "64", "579", "0", "0", "64", "64"],
         ),
         // `tablet` is one more distinct member, which blocks the group.
         (
             case(R::MemberUnknown),
-            ["2", "7", "1", "3", "3", "3", "19", "0", "1", "2", "0"],
+            ["2", "7", "1", "3", "3", "3", "21", "0", "1", "2", "0"],
         ),
         // A repeated member is one more occurrence, but no more units.
         (
             case(R::MemberDuplicate),
-            ["2", "7", "1", "3", "3", "3", "17", "0", "1", "2", "0"],
+            ["2", "7", "1", "3", "3", "3", "19", "0", "1", "2", "0"],
         ),
-        // Each target's three checks wait on the map's bound, and so do the
+        // Each target's four checks wait on the map's bound, and so do the
         // group's two member checks and each target's place.
         (
             edge(LimitKind::TargetProfiles, LimitEdge::FirstOver),
-            ["2", "7", "1", "3", "2", "2", "17", "10", "1", "0", "0"],
+            ["2", "7", "1", "3", "2", "2", "19", "12", "1", "0", "0"],
         ),
     ] {
         let work = work(&declaration);

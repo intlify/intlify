@@ -4,10 +4,12 @@
 //! 015's Phase 11 (`target-resolution`) over the selected declaration's
 //! targets: the Target ID map under `maxTargetProfiles`, each Target ID under
 //! `maxTargetIdBytes`, each target's requested locales as a subset of the
-//! project's, and its effective default, which is its own override or else the
-//! project's default and must be one of its requested locales. No default is
+//! project's, its effective default, which is its own override or else the
+//! project's default and must be one of its requested locales, and the
+//! directions its Target Profile has for its requested locales. No default is
 //! inferred: a target without an override takes the project's default, never
-//! the first, only, or smallest of its own locales.
+//! the first, only, or smallest of its own locales. No direction is inferred
+//! either: only an entry spelled as the canonical locale covers it.
 //!
 //! Not the canonicalization of a target's locales or the repeats among them,
 //! which Phase 7 did; not the exact resolution of its Target Profile reference,
@@ -17,9 +19,11 @@
 
 use std::collections::BTreeMap;
 
+use crate::artifacts::content::Content;
 use crate::locale::CanonicalLocale;
 use crate::model::{NonEmptyMap, TargetDeclaration, TargetId};
 
+use super::artifact_resolution::AdmittedArtifact;
 use super::evaluation::{
     and, both, within, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant,
     Phase, Reason, Subject, Unit,
@@ -46,7 +50,7 @@ pub(crate) enum TargetSubject {
     /// The submitted Target ID map, under `maxTargetProfiles`.
     Targets,
     /// One Target ID: its bytes under `maxTargetIdBytes`, then its requested
-    /// locales and its effective default.
+    /// locales, its effective default, and its Target Profile's directions.
     Target(TargetId),
 }
 
@@ -122,8 +126,9 @@ impl<'s> ResolvedTargets<'s> {
 /// Phase 11 under the confirmed policy, over the declared targets, the locales
 /// Phase 7 resolved, and the references Phase 9 resolved. Every target waits
 /// on the map's bound, and each check of a target on its ID's bound. The
-/// subset and the effective default are checked independently of each other
-/// and of the Target Profile, which only the resolved target needs.
+/// subset, the effective default, and the directions are checked
+/// independently of each other; only the directions wait on the Target
+/// Profile, and the resolved target needs every one.
 pub(crate) fn resolve_targets<'s, Target>(
     evaluation: &mut Evaluation,
     policy: Result<&ConfirmedPolicy, &Causes>,
@@ -184,8 +189,8 @@ impl Checks<'_, '_> {
         unit(TargetSubject::Target(self.id.clone()), check)
     }
 
-    /// The ID's bound, then the subset and the effective default, then the
-    /// target when everything it needs was admitted.
+    /// The ID's bound, then the subset, the effective default, and the
+    /// directions, then the target when everything it needs was admitted.
     fn resolve<'s>(
         &self,
         evaluation: &mut Evaluation,
@@ -237,15 +242,26 @@ impl Checks<'_, '_> {
                 }
             },
         )?;
+        let profile = profile(references, self.id);
+        let directed = evaluation.check(
+            self.unit(Check::DirectedLocales),
+            both(both(admitted.clone(), requested.clone()), profile.clone()),
+            |(((), requested), (_, artifact))| {
+                if directs(artifact, &requested) {
+                    Ok(())
+                } else {
+                    Err(issue(Code::TargetLocaleDirectionMissing, None))
+                }
+            },
+        )?;
         let distinct = own.and_then(|own| own.distinct.clone());
         let requested = both(requested, subset).map(|(requested, ())| requested);
-        let profile = profile(references, self.id);
         let resolved = both(
             both(requested.clone(), distinct),
-            both(default.clone(), profile.clone()),
+            both(default.clone(), both(profile.clone(), directed)),
         )
         .map(
-            |((requested, ()), (effective_default, profile))| ResolvedTarget {
+            |((requested, ()), (effective_default, (profile, ())))| ResolvedTarget {
                 profile,
                 requested,
                 effective_default,
@@ -274,6 +290,22 @@ fn effective_default(
             .clone()
             .map(|locale| (locale, Reason::InheritedProjectDefault)),
         Err(causes) => Err(causes.clone()),
+    })
+}
+
+/// Whether the Target Profile has a direction for each of `requested`: an
+/// entry whose locale is the canonical spelling, byte for byte. An entry for
+/// another locale is unused, and an artifact that is no Target Profile has
+/// none.
+fn directs(artifact: &AdmittedArtifact<'_>, requested: &LocaleSet) -> bool {
+    let Content::TargetProfile(profile) = &artifact.content else {
+        return false;
+    };
+    requested.as_slice().iter().all(|locale| {
+        profile
+            .directions
+            .iter()
+            .any(|direction| direction.locale == locale.as_str())
     })
 }
 
@@ -316,7 +348,7 @@ mod tests {
     use crate::resolver::exact_resolution::{self, resolve_fields};
     use crate::resolver::limits::{fixture_limits, ResolutionLimits};
     use crate::resolver::locales::fixtures::{
-        canonicalizer, content, key, stand_in, target, waits_on,
+        canonical, canonicalizer, content, key, stand_in, target, waits_on,
     };
     use crate::resolver::locales::{self, resolve_locales, LocaleFields, LocaleSubject};
     use crate::resolver::resource_policy::DeclarationReferences;
@@ -414,6 +446,26 @@ mod tests {
             &mut self.app["targetProfiles"][id]
         }
 
+        /// Submits, in place of the Target Profile the target `id` names, one
+        /// with `directions`, and names it.
+        fn direct(&mut self, id: &str, directions: Value) {
+            let mut content = sample(ArtifactKind::TargetProfile);
+            content["locale"]["directions"] = directions;
+            let member = envelope_of(
+                ArtifactKind::TargetProfile,
+                &format!("storefront-{id}"),
+                "1",
+                content,
+            );
+            let replaced = profile_of(id);
+            for submitted in &mut self.members {
+                if *submitted == replaced {
+                    *submitted = member.clone();
+                }
+            }
+            self.target(id)["profile"] = reference_value(&tuple_of(&member));
+        }
+
         /// Phase 7, Phase 9's exact resolution of the targets' references,
         /// and Phase 11, into one evaluation; `inspect` reads it and what
         /// Phase 11 returned.
@@ -474,6 +526,7 @@ mod tests {
                 Check::WithinBound,
                 Check::ProjectSubset,
                 Check::SupportedDefault,
+                Check::DirectedLocales,
             ] {
                 units.push(target_unit(id, check));
             }
@@ -517,6 +570,7 @@ mod tests {
             target_unit("browser", Check::WithinBound),
             target_unit("browser", Check::ProjectSubset),
             target_unit("browser", Check::SupportedDefault),
+            target_unit("browser", Check::DirectedLocales),
             target_unit("server", Check::WithinBound),
         ];
         assert!(ordered.windows(2).all(|pair| pair[0] < pair[1]));
@@ -563,6 +617,97 @@ mod tests {
         });
     }
 
+    /// The sample Target Profile directs `de`, `en`, `fr-FR`, and `ja`, more
+    /// than either target requests: an entry for another locale is unused.
+    #[test]
+    fn a_requested_locale_without_a_direction_blocks_only_that_target() {
+        let mut inputs = Inputs::new();
+        // `JA` is no canonical spelling, so it directs nothing, and `fr` is
+        // no locale the browser requests.
+        inputs.direct(
+            "browser",
+            json!([
+                {"locale": "JA", "direction": "LTR"},
+                {"locale": "en", "direction": "LTR"},
+                {"locale": "fr", "direction": "LTR"},
+            ]),
+        );
+        inputs.resolve(|evaluation, targets| {
+            assert_eq!(
+                issues(&evaluation),
+                [(
+                    target_unit("browser", Check::DirectedLocales),
+                    Code::TargetLocaleDirectionMissing,
+                    None
+                )]
+            );
+            assert!(statuses(&evaluation)
+                .iter()
+                .all(|(_, status)| *status == Status::Evaluated));
+            let key = evaluation.issues().next().unwrap().clone();
+            let targets = targets.unwrap();
+            // What a later phase reads of the browser holds all the same.
+            let browser = facts(&targets, "browser");
+            assert_eq!(browser.admitted, Ok(()));
+            assert_eq!(spellings(browser.requested.as_ref().unwrap()), ["en", "ja"]);
+            assert_eq!(browser.effective_default.as_ref().unwrap().as_str(), "ja");
+            assert!(browser.profile.is_ok());
+            assert_eq!(
+                keys(browser.resolved.as_ref().unwrap_err()),
+                BTreeSet::from([key.clone()])
+            );
+            assert!(facts(&targets, "server").resolved.is_ok());
+            assert_eq!(
+                keys(&targets.complete().unwrap_err()),
+                BTreeSet::from([key])
+            );
+        });
+        // Exactly the browser's two locales are enough.
+        let mut exact = Inputs::new();
+        exact.direct(
+            "browser",
+            json!([
+                {"locale": "en", "direction": "LTR"},
+                {"locale": "ja", "direction": "RTL"},
+            ]),
+        );
+        exact.resolve(|evaluation, targets| {
+            assert_eq!(issues(&evaluation), []);
+            assert_eq!(targets.unwrap().complete(), Ok(()));
+        });
+    }
+
+    /// Only an entry spelled as the canonical locale directs it, and an
+    /// artifact that is no Target Profile directs nothing.
+    #[test]
+    fn only_a_target_profiles_canonical_entry_directs_a_locale() {
+        let set = |spellings: &[&str]| {
+            LocaleSet::new(
+                spellings
+                    .iter()
+                    .map(|spelling| canonical(spelling))
+                    .collect(),
+            )
+        };
+        let profile = FormalMember::new(profile_of("browser")).unwrap();
+        let trust = FormalMember::new(envelope_of(
+            ArtifactKind::TrustPolicy,
+            "storefront-trust",
+            "1",
+            sample(ArtifactKind::TrustPolicy),
+        ))
+        .unwrap();
+        let admitted = |member| AdmittedArtifact {
+            member,
+            content: member.envelope().unwrap().admit().unwrap(),
+        };
+        let (profile, trust) = (admitted(&profile), admitted(&trust));
+        assert!(directs(&profile, &set(&["en"])));
+        assert!(directs(&profile, &set(&["de", "en", "fr-FR", "ja"])));
+        assert!(!directs(&profile, &set(&["en", "fr"])));
+        assert!(!directs(&trust, &set(&["en"])));
+    }
+
     #[test]
     fn a_locale_outside_the_project_is_no_subset_and_the_other_checks_go_on() {
         let mut inputs = Inputs::new();
@@ -573,14 +718,11 @@ mod tests {
                 issues(&evaluation),
                 [(subset.clone(), Code::TargetLocalesNotSubset, None)]
             );
-            // The browser's default is still checked, against its own locales.
-            assert_eq!(
-                waits_on(
-                    &evaluation,
-                    &target_unit("browser", Check::SupportedDefault)
-                ),
-                None
-            );
+            // The browser's default and directions are still checked, against
+            // its own locales.
+            for check in [Check::SupportedDefault, Check::DirectedLocales] {
+                assert_eq!(waits_on(&evaluation, &target_unit("browser", check)), None);
+            }
             let targets = targets.unwrap();
             let key = evaluation.issues().next().unwrap().clone();
             assert_eq!(
@@ -692,7 +834,11 @@ mod tests {
                         actual: Actual::Exact(7),
                     })
                 );
-                for check in [Check::ProjectSubset, Check::SupportedDefault] {
+                for check in [
+                    Check::ProjectSubset,
+                    Check::SupportedDefault,
+                    Check::DirectedLocales,
+                ] {
                     assert_eq!(
                         waits_on(&evaluation, &target_unit("browser", check)),
                         Some(vec![id.clone()])
@@ -718,9 +864,16 @@ mod tests {
                 (unit, code),
                 (reference.clone(), Code::ArtifactReferenceNotAdmitted)
             );
-            // Phase 11 checks the server all the same.
+            // Phase 11 checks the server all the same, but for the
+            // directions, which wait on its Target Profile.
+            let directed = target_unit("server", Check::DirectedLocales);
+            assert_eq!(
+                waits_on(&evaluation, &directed),
+                Some(vec![reference.clone()])
+            );
             assert!(statuses(&evaluation)
                 .iter()
+                .filter(|(unit, _)| *unit != directed)
                 .all(|(_, status)| *status == Status::Evaluated));
             let targets = targets.unwrap();
             let key = evaluation.issues().next().unwrap().clone();
@@ -746,10 +899,12 @@ mod tests {
                 LocaleSubject::TargetDefaultRequestedLocale(target("browser"), content("en_US")),
                 Check::CanonicalLocale,
             );
-            assert_eq!(
-                waits_on(&evaluation, &target_unit("browser", Check::ProjectSubset)),
-                Some(vec![member.clone()])
-            );
+            for check in [Check::ProjectSubset, Check::DirectedLocales] {
+                assert_eq!(
+                    waits_on(&evaluation, &target_unit("browser", check)),
+                    Some(vec![member.clone()])
+                );
+            }
             assert_eq!(
                 waits_on(
                     &evaluation,
@@ -860,6 +1015,7 @@ mod tests {
         let mut blocked = Inputs::new();
         blocked.target("browser")["requestedLocales"] = json!(["ja", "de", "en"]);
         blocked.target("browser")["defaultRequestedLocale"] = json!("fr");
+        blocked.direct("server", json!([{"locale": "ja", "direction": "LTR"}]));
         for authored in [complete, blocked] {
             let mut reordered = Inputs::new();
             reordered.limits = authored.limits.clone();

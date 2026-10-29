@@ -4297,6 +4297,7 @@
         "locales-not-subset",
         "explicit-default-not-requested",
         "inherited-default-not-requested",
+        "target-locale-direction-missing",
         "target-locale-invalid",
         "target-locale-repeated",
         "target-profile-missing",

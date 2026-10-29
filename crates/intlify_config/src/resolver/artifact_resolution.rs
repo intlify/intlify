@@ -385,6 +385,35 @@ mod tests {
                 invalid,
                 true,
             ),
+            // 018's closed bodies and 024's roles the same way: a Trust
+            // Policy naming another authority, a Resource Limit Policy with
+            // a member beside its section, and a role 024 does not name.
+            (
+                edited(
+                    valid(ArtifactKind::TrustPolicy, "storefront-trust"),
+                    |value| value["body"]["content"] = json!({"authority": "signed-publisher"}),
+                ),
+                invalid,
+                true,
+            ),
+            (
+                edited(
+                    valid(ArtifactKind::ResourceLimitPolicy, "storefront-limits"),
+                    |value| value["body"]["content"]["translationProvider"] = json!({}),
+                ),
+                invalid,
+                true,
+            ),
+            (
+                edited(
+                    valid(ArtifactKind::TargetProfile, "storefront-web"),
+                    |value| {
+                        value["body"]["content"]["hydration"]["roles"] = json!(["edge-renderer"]);
+                    },
+                ),
+                invalid,
+                true,
+            ),
         ] {
             let (evaluation, set) = admit(std::slice::from_ref(&member));
             assert_eq!(
@@ -583,15 +612,13 @@ mod tests {
             Content::Approval(LocalizedApproval::Required)
         );
         assert_eq!(admitted.member.value(), &approval);
-        // The content of a Resource Limit Policy passes on as its object.
+        // A Resource Limit Policy's content is 018's common body: its
+        // section, whose interior only 015 reads.
         let (_, admitted) = set.get(&tuple_of(&limits)).unwrap();
+        let sample = sample(ArtifactKind::ResourceLimitPolicy);
         assert_eq!(
             admitted.content,
-            Content::External(
-                sample(ArtifactKind::ResourceLimitPolicy)
-                    .as_object()
-                    .unwrap()
-            )
+            Content::ResourceLimitPolicy(sample["projectProfileResolution"].as_object())
         );
         assert_eq!(
             set.get(&tuple_of(&valid(ArtifactKind::TrustPolicy, "x"))),

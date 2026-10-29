@@ -85,18 +85,18 @@ fn waiting(resolved: &Resolved) -> Vec<(Unit, Vec<Subject>)> {
 }
 
 #[test]
-fn hydration_cases_keep_the_280_rows_and_append_after_them() {
+fn hydration_cases_keep_the_281_rows_and_append_after_them() {
     let cases = declarations();
-    assert_eq!(cases.len(), 303);
-    assert!(cases[..280]
+    assert_eq!(cases.len(), 304);
+    assert!(cases[..281]
         .iter()
         .all(|case| case.operation != Operation::HydrationRelationValidation));
-    assert!(cases[280..].iter().all(|case| {
+    assert!(cases[281..].iter().all(|case| {
         case.operation == Operation::HydrationRelationValidation && case.selector == Selector::App
     }));
     // Every recipe once, in its order, and then the four edges.
     assert_eq!(
-        cases[280..299]
+        cases[281..300]
             .iter()
             .map(|case| (case.fixture, case.limit))
             .collect::<Vec<_>>(),
@@ -105,10 +105,10 @@ fn hydration_cases_keep_the_280_rows_and_append_after_them() {
             .map(|recipe| (Recipe::Hydration(recipe), None))
             .collect::<Vec<_>>()
     );
-    assert!(cases[299..].iter().all(|case| case.limit.is_some()));
-    for declaration in &cases[280..] {
-        // The case's source is the configuration, the members are what
-        // preparation read, and the answers are the recipe's.
+    assert!(cases[300..].iter().all(|case| case.limit.is_some()));
+    for declaration in &cases[281..] {
+        // The case's source is the configuration, and the members, whose
+        // Target Profiles declare the roles, are what preparation read.
         let Recipe::Hydration(recipe) = declaration.fixture else {
             unreachable!()
         };
@@ -132,7 +132,6 @@ fn hydration_cases_keep_the_280_rows_and_append_after_them() {
             fixture.members,
             "{declaration:?}"
         );
-        assert_eq!(prepared.capabilities, recipe.capabilities());
         assert_eq!(prepared.selected.as_str(), "app");
         assert!(candidate.input_limits.is_some());
         assert!(candidate.prepared.prerequisites_admitted());
@@ -587,15 +586,17 @@ fn the_input_context_refuses_a_candidate_bound_to_another_input() {
             "change {change}"
         );
     }
-    // The answers are the case's input too.
+    // A role is the case's input too, in the body of the member declaring
+    // it.
     let storefront = prepare(&case(R::Storefront)).unwrap();
-    let mut answered = prepare(&case(R::Storefront)).unwrap();
-    let Prepared::Hydration(prepared) = &mut answered.prepared else {
+    let mut roleless = prepare(&case(R::Storefront)).unwrap();
+    let Prepared::Hydration(missing) = prepare(&case(R::ServerCapabilityMissing)).unwrap().prepared
+    else {
         unreachable!()
     };
-    prepared
-        .capabilities
-        .renders
-        .insert("storefront-browser".into());
-    assert_ne!(observe(&storefront).unwrap(), observe(&answered).unwrap());
+    let Prepared::Hydration(prepared) = &mut roleless.prepared else {
+        unreachable!()
+    };
+    prepared.collection = missing.collection;
+    assert_ne!(observe(&storefront).unwrap(), observe(&roleless).unwrap());
 }

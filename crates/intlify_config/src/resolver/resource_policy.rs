@@ -22,7 +22,7 @@ use crate::model::{NonEmptyMap, Policies, RequiredNullable, TargetDeclaration, T
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::selection::{SelectionInvariant, SelectorInput, StringLengthFact};
 
-use super::bootstrap::{admit_candidate, AdmittedResourcePolicy, ResourcePolicyVerification};
+use super::bootstrap::{admit_candidate, AdmittedResourcePolicy, VerificationInput};
 use super::evaluation::{
     and, both, Actual, Admitted, Blocking, Causes, Check, Evaluation, EvaluationInvariant, Phase,
     Shortfall, Subject, Unit,
@@ -286,7 +286,7 @@ pub(crate) fn admit_resource_policy(
     resource_limits: Result<&PolicyReference, &Causes>,
     references: &DeclarationReferences<'_>,
     measures: &ConfigurationMeasures<'_>,
-    verification: &impl ResourcePolicyVerification,
+    verification: &VerificationInput,
 ) -> Result<PolicyOutcome, PolicyInvariant> {
     let compatible = admit_and_compare(
         evaluation,
@@ -349,7 +349,7 @@ fn admit_and_compare(
     collection: &FormalCollection,
     resource_limits: Result<&PolicyReference, &Causes>,
     references: &DeclarationReferences<'_>,
-    verification: &impl ResourcePolicyVerification,
+    verification: &VerificationInput,
 ) -> Result<Admitted<AdmittedResourcePolicy>, EvaluationInvariant> {
     let limits: Result<_, &Causes> = Ok(&capability.policy_comparable().artifact_admission);
     let members = collection.members();
@@ -723,7 +723,7 @@ mod tests {
 
     use super::*;
     use crate::artifacts::collection::{read_collection, CollectionLimits};
-    use crate::artifacts::envelope::{envelope_of, ArtifactKind, Envelope, ExactTuple};
+    use crate::artifacts::envelope::{envelope_of, ArtifactKind, ExactTuple};
     use crate::resolver::evaluation::{Code, IssueKey, LimitExceeded, Reason, Status};
     use crate::resolver::limits::{fixture_limits, SECTION};
     use crate::resolver::locales::fixtures::stand_in;
@@ -737,19 +737,6 @@ mod tests {
         total_bytes: u64::MAX,
         depth: u64::MAX,
     };
-
-    /// 018's admission as a test states it: it admits everything.
-    struct Trusting;
-
-    impl ResourcePolicyVerification for Trusting {
-        fn authenticates(&self, _: &Envelope<'_>) -> bool {
-            true
-        }
-
-        fn admits_common_body(&self, _: &serde_json::Map<String, Value>) -> bool {
-            true
-        }
-    }
 
     fn bound(value: u64) -> Bound {
         Bound::new(value).unwrap()
@@ -981,6 +968,26 @@ mod tests {
             }
         }
 
+        /// 018's input as trusted setup supplies it: it pins the selected
+        /// reference, or another policy when there is none to pin.
+        fn verification(&self) -> VerificationInput {
+            let pin = self
+                .resource_limits
+                .as_ref()
+                .ok()
+                .map(PolicyReference::tuple)
+                .filter(|tuple| tuple.kind == ArtifactKind::ResourceLimitPolicy)
+                .unwrap_or_else(|| {
+                    tuple_of(&envelope_of(
+                        ArtifactKind::ResourceLimitPolicy,
+                        "pinned-limits",
+                        "1",
+                        json!({}),
+                    ))
+                });
+            VerificationInput::exact_pins([pin]).unwrap()
+        }
+
         /// Phase 4 up to the comparison.
         fn run(&self) -> (Evaluation, Admitted<AdmittedResourcePolicy>) {
             let mut evaluation = Evaluation::default();
@@ -990,7 +997,7 @@ mod tests {
                 &collection(&self.members),
                 self.resource_limits.as_ref(),
                 &self.references(),
-                &Trusting,
+                &self.verification(),
             )
             .unwrap();
             (evaluation, admitted)
@@ -1012,7 +1019,7 @@ mod tests {
                 self.resource_limits.as_ref(),
                 &self.references(),
                 &measures,
-                &Trusting,
+                &self.verification(),
             );
             (evaluation, outcome)
         }

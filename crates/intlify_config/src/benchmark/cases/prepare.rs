@@ -960,9 +960,10 @@ fn hydration_edge(kind: LimitKind, recipe: HydrationRecipe) -> Result<u64, Prepa
 }
 
 /// Phase 13 over a recipe's configuration, selected with `app`, under the
-/// policy whose bound a case's edge replaces, and with the recipe's answers
-/// to what 015 asks 024. Every earlier phase runs in preparation, as for
-/// Phases 11 and 12, with Phase 8's negotiation besides.
+/// policy whose bound a case's edge replaces, and over the recipe's
+/// collection, whose Target Profiles declare the roles. Every earlier phase
+/// runs in preparation, as for Phases 11 and 12, with Phase 8's negotiation
+/// besides.
 fn prepare_hydration(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
     use crate::benchmark::hydration_relation::PreparedHydration;
 
@@ -1001,7 +1002,6 @@ fn prepare_hydration(declaration: &Declaration) -> Result<Candidate, Preparation
         policy,
         canonicalizer,
         collection: submitted(&fixture.members)?,
-        capabilities: recipe.capabilities(),
     };
     let resolved = prepared
         .resolve()

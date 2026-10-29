@@ -12,15 +12,19 @@
 //! group, no Target ID takes both roles. A relation is never inferred, and a
 //! mismatch is never narrowed to the locales both endpoints share.
 //!
-//! The roles and the static compatibility are 024's to define, and 024 defines
-//! none yet: the resolver asks `TargetCapabilities`, which only tests implement
-//! (plan 023 ◆#1). The project's Locale Negotiation Profile is a dependency
+//! The roles and the static compatibility are 024's: a Target Profile declares
+//! `ssr-renderer` and `browser-hydration-client` in its closed body, and two
+//! profiles are statically compatible when their `mf2Specification`,
+//! `execution`, and `locale.services` are equal, whatever their physical
+//! dimensions. A role is never inferred from a name, a mode, or a group.
+//! The project's Locale Negotiation Profile is a dependency
 //! every relation shares, never compared between endpoints. Not the render
 //! equivalence of the two outputs (026, 030), the selection of a group (020),
 //! or the Release both outputs join (025).
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::artifacts::content::{Content, HydrationRoles, TargetProfile};
 use crate::model::{DeploymentGroup, DeploymentGroupId, HydrationRelation, NonEmptyMap, TargetId};
 
 use super::artifact_resolution::AdmittedArtifact;
@@ -42,25 +46,31 @@ const MAX_TARGET_ID_BYTES: BoundId = BoundId {
     name: "maxTargetIdBytes",
 };
 
-/// 024's answers about Target Profiles that 015 asks for: whether one renders
-/// server-side or hydrates in the browser, and whether two are statically
-/// known to be incompatible. 024 defines none of them yet, so only tests
-/// implement this (plan 023 ◆#1).
-pub(crate) trait TargetCapabilities {
-    /// Whether the Target Profile exposes 024's checked SSR-renderer
-    /// capability.
-    fn renders_server_side(&self, profile: &AdmittedArtifact<'_>) -> bool;
+/// The 024 body of the Target Profile an endpoint's reference names. The Set
+/// admits a Target Profile only with that body, and Phase 9 resolves a Target
+/// Profile reference only to a Target Profile.
+fn target_profile<'p>(profile: &'p AdmittedArtifact<'_>) -> Option<&'p TargetProfile> {
+    match &profile.content {
+        Content::TargetProfile(profile) => Some(profile),
+        _ => None,
+    }
+}
 
-    /// Whether it exposes 024's checked Browser hydration-client capability.
-    fn hydrates_in_browser(&self, profile: &AdmittedArtifact<'_>) -> bool;
+/// The roles the Target Profile declares; none when it is no Target Profile.
+fn roles(profile: &AdmittedArtifact<'_>) -> HydrationRoles {
+    target_profile(profile).map_or_else(HydrationRoles::default, |profile| profile.hydration)
+}
 
-    /// Whether the server's and the client's Target Profiles are statically
-    /// known to be incompatible, as Targets or as Locale Service profiles.
-    fn statically_incompatible(
-        &self,
-        server: &AdmittedArtifact<'_>,
-        client: &AdmittedArtifact<'_>,
-    ) -> bool;
+/// 024's closed static compatibility: equal `mf2Specification`, `execution`,
+/// and `locale.services`. The reader admits only the one `execution` and the
+/// one `locale.services` 017 fixes in revision `"0"`, so two admitted profiles
+/// can differ only in their `mf2Specification`. Physical dimensions are never
+/// compared.
+fn statically_compatible(server: &AdmittedArtifact<'_>, client: &AdmittedArtifact<'_>) -> bool {
+    match (target_profile(server), target_profile(client)) {
+        (Some(server), Some(client)) => server.mf2_specification == client.mf2_specification,
+        _ => false,
+    }
 }
 
 /// What one Phase 13 unit checks. The bound, which every relation waits on,
@@ -130,14 +140,13 @@ impl ResolvedHydration {
 /// waits on the relations' bound. A relation's endpoint checks come first;
 /// its roles, locales, and compatibility are checked only between valid
 /// endpoints, and each waits on just the facts it compares.
-pub(crate) fn validate_hydration<C: TargetCapabilities>(
+pub(crate) fn validate_hydration(
     evaluation: &mut Evaluation,
     policy: Result<&ConfirmedPolicy, &Causes>,
     declared: Admitted<&NonEmptyMap<DeploymentGroupId, DeploymentGroup>>,
     targets: Result<&ResolvedTargets<'_>, &Causes>,
     groups: Result<&ResolvedGroups, &Causes>,
     negotiation: Admitted<()>,
-    capabilities: &C,
 ) -> Result<Admitted<ResolvedHydration>, EvaluationInvariant> {
     let policy = policy.map_err(Causes::clone);
     let bounded = evaluation.check(
@@ -163,7 +172,6 @@ pub(crate) fn validate_hydration<C: TargetCapabilities>(
         bounded: &bounded,
         targets: targets.map_err(Causes::clone),
         groups: groups.map_err(Causes::clone),
-        capabilities,
     };
     let mut relations = BTreeMap::new();
     for (id, group) in declared.iter() {
@@ -184,15 +192,14 @@ fn relations_of(group: &DeploymentGroup) -> &[HydrationRelation] {
 }
 
 /// What every relation's checks share.
-struct Shared<'a, 'p, 't, 's, C> {
+struct Shared<'a, 'p, 't, 's> {
     policy: &'a Admitted<&'p ConfirmedPolicy>,
     bounded: &'a Admitted<()>,
     targets: Admitted<&'t ResolvedTargets<'s>>,
     groups: Admitted<&'t ResolvedGroups>,
-    capabilities: &'a C,
 }
 
-impl<'t, 's, C: TargetCapabilities> Shared<'_, '_, 't, 's, C> {
+impl<'t, 's> Shared<'_, '_, 't, 's> {
     /// One group's relations, each pair once however often submitted, and
     /// the roles of each Target ID among them.
     fn group(
@@ -305,10 +312,10 @@ impl Relation<'_> {
 
     /// The endpoints' bytes, which the roles also need, and whether every
     /// check of the relation held.
-    fn check<C: TargetCapabilities>(
+    fn check(
         &self,
         evaluation: &mut Evaluation,
-        shared: &Shared<'_, '_, '_, '_, C>,
+        shared: &Shared<'_, '_, '_, '_>,
         members: &Admitted<&BTreeSet<TargetId>>,
         count: usize,
     ) -> Result<(Admitted<()>, Admitted<()>), EvaluationInvariant> {
@@ -370,12 +377,11 @@ impl Relation<'_> {
         let profiles = facts
             .clone()
             .and_then(|(server, client)| both(server.profile.clone(), client.profile.clone()));
-        let capabilities = shared.capabilities;
         let serves = evaluation.check(
             self.unit(Check::ServerRole),
             profiles.clone().map(|(server, _)| server),
             |(_, profile)| {
-                if capabilities.renders_server_side(profile) {
+                if roles(profile).ssr_renderer {
                     Ok(())
                 } else {
                     Err(invalid(Reason::ServerCapabilityMissing))
@@ -386,7 +392,7 @@ impl Relation<'_> {
             self.unit(Check::ClientRole),
             profiles.clone().map(|(_, client)| client),
             |(_, profile)| {
-                if capabilities.hydrates_in_browser(profile) {
+                if roles(profile).browser_hydration_client {
                     Ok(())
                 } else {
                     Err(invalid(Reason::ClientCapabilityMissing))
@@ -426,14 +432,14 @@ impl Relation<'_> {
             self.unit(Check::StaticCompatibility),
             both(and(serves.clone(), hydrates.clone()), profiles),
             |((), ((_, server), (_, client)))| {
-                if capabilities.statically_incompatible(server, client) {
+                if statically_compatible(server, client) {
+                    Ok(())
+                } else {
                     Err(Blocking {
                         code: Code::HydrationCapabilityIncompatible,
                         reason: None,
                         details: None,
                     })
-                } else {
-                    Ok(())
                 }
             },
         )?;
@@ -463,7 +469,7 @@ const fn locale_policy(reason: Reason) -> Blocking {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
+    use std::collections::{BTreeMap, BTreeSet};
 
     use serde_json::{json, Map, Value};
 
@@ -501,15 +507,6 @@ mod tests {
         format!("storefront-{id}")
     }
 
-    fn profile_of(id: &str) -> Value {
-        envelope_of(
-            ArtifactKind::TargetProfile,
-            &profile_identity(id),
-            "1",
-            sample(ArtifactKind::TargetProfile),
-        )
-    }
-
     fn tuple_of(member: &Value) -> ExactTuple {
         FormalMember::new(member.clone())
             .unwrap()
@@ -534,50 +531,42 @@ mod tests {
         serde_json::from_value(json!(id)).unwrap()
     }
 
-    /// 024's answers as a test states them, by Target Profile identity.
-    #[derive(Default)]
+    /// What each Target Profile's 024 body declares, by its identity: the
+    /// profiles that render server-side and hydrate in the browser, and other
+    /// edits of the sample content, each a JSON pointer and its new value.
+    #[derive(Default, Clone)]
     struct Roles {
         renders: BTreeSet<String>,
         hydrates: BTreeSet<String>,
-        incompatible: BTreeSet<(String, String)>,
+        edits: BTreeMap<String, Vec<(&'static str, Value)>>,
     }
 
     impl Roles {
-        fn identity(profile: &AdmittedArtifact<'_>) -> String {
-            profile
-                .member
-                .envelope()
-                .unwrap()
-                .tuple()
-                .identity
-                .as_str()
-                .to_owned()
-        }
-    }
-
-    impl TargetCapabilities for Roles {
-        fn renders_server_side(&self, profile: &AdmittedArtifact<'_>) -> bool {
-            self.renders.contains(&Self::identity(profile))
-        }
-
-        fn hydrates_in_browser(&self, profile: &AdmittedArtifact<'_>) -> bool {
-            self.hydrates.contains(&Self::identity(profile))
-        }
-
-        fn statically_incompatible(
-            &self,
-            server: &AdmittedArtifact<'_>,
-            client: &AdmittedArtifact<'_>,
-        ) -> bool {
-            self.incompatible
-                .contains(&(Self::identity(server), Self::identity(client)))
+        /// The sealed Target Profile the target `id` names, with the roles
+        /// and `mf2Specification` its identity is given here.
+        fn profile_of(&self, id: &str) -> Value {
+            let identity = profile_identity(id);
+            let mut content = sample(ArtifactKind::TargetProfile);
+            let mut declared = Vec::new();
+            if self.hydrates.contains(&identity) {
+                declared.push("browser-hydration-client");
+            }
+            if self.renders.contains(&identity) {
+                declared.push("ssr-renderer");
+            }
+            content["hydration"]["roles"] = json!(declared);
+            for (pointer, value) in self.edits.get(&identity).into_iter().flatten() {
+                *content.pointer_mut(pointer).unwrap() = value.clone();
+            }
+            envelope_of(ArtifactKind::TargetProfile, &identity, "1", content)
         }
     }
 
     /// What Phase 13 reads, which a test edits: the declaration, the Target
-    /// Profiles submitted, 024's answers, the policy's bounds, and whether a
-    /// policy was confirmed, structural admission admitted the groups, and
-    /// Phase 8 admitted the Locale Negotiation Profile.
+    /// Profiles submitted with the roles and other contents they declare, the
+    /// policy's bounds, and whether a policy was confirmed, structural
+    /// admission admitted the groups, and Phase 8 admitted the Locale
+    /// Negotiation Profile.
     struct Inputs {
         app: Value,
         missing_profiles: BTreeSet<String>,
@@ -623,10 +612,10 @@ mod tests {
         }
 
         /// Declares the target `id` requesting `requested` and naming its own
-        /// Target Profile.
+        /// Target Profile, whose reference `resolve` computes from the roles.
         fn declare(&mut self, id: &str, requested: &Value) {
             self.app["targetProfiles"][id] = json!({
-                "profile": reference_value(&tuple_of(&profile_of(id))),
+                "profile": reference_value(&tuple_of(&self.roles.profile_of(id))),
                 "requestedLocales": requested,
             });
         }
@@ -650,7 +639,12 @@ mod tests {
             &self,
             inspect: impl FnOnce(Evaluation, Admitted<ResolvedHydration>) -> R,
         ) -> R {
-            let declaration: Declaration = serde_json::from_value(self.app.clone()).unwrap();
+            // Each reference names its Target Profile as the roles now declare it.
+            let mut app = self.app.clone();
+            for (id, entry) in app["targetProfiles"].as_object_mut().unwrap() {
+                entry["profile"] = reference_value(&tuple_of(&self.roles.profile_of(id)));
+            }
+            let declaration: Declaration = serde_json::from_value(app).unwrap();
             let confirmed = ConfirmedPolicy::fixture_owned(self.limits.clone());
             let mut evaluation = Evaluation::default();
             let locales = resolve_locales(
@@ -664,7 +658,7 @@ mod tests {
                 .target_profiles
                 .iter()
                 .filter(|(id, _)| !self.missing_profiles.contains(id.as_str()))
-                .map(|(id, _)| profile_of(id.as_str()).to_string())
+                .map(|(id, _)| self.roles.profile_of(id.as_str()).to_string())
                 .collect();
             let bytes: Vec<&[u8]> = members.iter().map(String::as_bytes).collect();
             let collection = read_collection(Some(&bytes), &ROOM).unwrap();
@@ -706,7 +700,6 @@ mod tests {
                 targets.as_ref(),
                 groups.as_ref(),
                 self.negotiation.clone(),
-                &self.roles,
             )
             .unwrap();
             inspect(evaluation, hydration)
@@ -977,7 +970,7 @@ mod tests {
     }
 
     #[test]
-    fn the_roles_come_from_024_through_the_seam() {
+    fn the_roles_come_from_each_target_profiles_body() {
         let mut inputs = Inputs::new();
         inputs.roles = Roles::default();
         inputs.resolve(|evaluation, _| {
@@ -1012,11 +1005,12 @@ mod tests {
 
     #[test]
     fn a_statically_known_incompatibility_blocks_the_relation() {
+        // The client's profile follows another MF2 specification revision.
         let mut inputs = Inputs::new();
-        inputs
-            .roles
-            .incompatible
-            .insert((profile_identity("ssr"), profile_identity("browser")));
+        inputs.roles.edits.insert(
+            profile_identity("browser"),
+            vec![("/mf2Specification/revision", json!("47"))],
+        );
         inputs.resolve(|evaluation, hydration| {
             assert_eq!(
                 issues(&evaluation),
@@ -1027,6 +1021,93 @@ mod tests {
                 )]
             );
             assert!(hydration.unwrap().complete().is_err());
+        });
+    }
+
+    #[test]
+    fn a_role_is_read_from_the_body_never_from_a_name() {
+        // `ssr`'s profile declares only the client's role, and `browser`'s
+        // only the server's.
+        let mut inputs = Inputs::new();
+        inputs.roles.renders = BTreeSet::from([profile_identity("browser")]);
+        inputs.roles.hydrates = BTreeSet::from([profile_identity("ssr")]);
+        inputs.resolve(|evaluation, _| {
+            assert_eq!(
+                issues(&evaluation),
+                [
+                    (
+                        relation("web", "ssr", "browser", Check::ServerRole),
+                        "project-profile-hydration-relation-invalid",
+                        Some("server-capability-missing")
+                    ),
+                    (
+                        relation("web", "ssr", "browser", Check::ClientRole),
+                        "project-profile-hydration-relation-invalid",
+                        Some("client-capability-missing")
+                    ),
+                ]
+            );
+        });
+    }
+
+    /// An artifact that is no Target Profile declares no role and is
+    /// compatible with nothing. Phase 9 never resolves a Target Profile
+    /// reference to one, so only these helpers can meet it.
+    #[test]
+    fn an_artifact_that_is_no_target_profile_has_no_role_and_no_compatibility() {
+        let mut content = sample(ArtifactKind::TargetProfile);
+        content["hydration"]["roles"] = json!(["browser-hydration-client", "ssr-renderer"]);
+        let profile = FormalMember::new(envelope_of(
+            ArtifactKind::TargetProfile,
+            "storefront-app",
+            "1",
+            content,
+        ))
+        .unwrap();
+        let trust = FormalMember::new(envelope_of(
+            ArtifactKind::TrustPolicy,
+            "storefront-trust",
+            "1",
+            sample(ArtifactKind::TrustPolicy),
+        ))
+        .unwrap();
+        let admitted = |member| AdmittedArtifact {
+            member,
+            content: member.envelope().unwrap().admit().unwrap(),
+        };
+        let (profile, trust) = (admitted(&profile), admitted(&trust));
+        assert_eq!(
+            super::roles(&profile),
+            HydrationRoles {
+                ssr_renderer: true,
+                browser_hydration_client: true,
+            }
+        );
+        assert_eq!(super::roles(&trust), HydrationRoles::default());
+        assert!(statically_compatible(&profile, &profile));
+        for (server, client) in [(&profile, &trust), (&trust, &profile), (&trust, &trust)] {
+            assert!(!statically_compatible(server, client));
+        }
+    }
+
+    #[test]
+    fn physical_dimensions_never_make_a_pair_incompatible() {
+        // The client's profile is another mode, adapter, host grammar, codec,
+        // and limit; its MF2 specification, execution, and services agree.
+        let mut inputs = Inputs::new();
+        inputs.roles.edits.insert(
+            profile_identity("browser"),
+            vec![
+                ("/mode", json!("aot")),
+                ("/adapter/revision", json!("1")),
+                ("/host/grammar/revision", json!("2024")),
+                ("/codecs/bindingTable/revision", json!("1")),
+                ("/limits/maxFiles", json!("32")),
+            ],
+        );
+        inputs.resolve(|evaluation, hydration| {
+            assert_eq!(issues(&evaluation), []);
+            assert_eq!(hydration.unwrap().complete(), Ok(()));
         });
     }
 
