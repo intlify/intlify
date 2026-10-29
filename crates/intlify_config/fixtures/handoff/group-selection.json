@@ -1,0 +1,556 @@
+[
+  {
+    "suiteRevision": "0",
+    "manifestKind": "handoff-vector",
+    "vectorId": "group-selection/one-group/omitted",
+    "producerProfileFacts": {
+      "deploymentGroups": [
+        {
+          "groupId": "web",
+          "members": [
+            {
+              "targetId": "browser",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            },
+            {
+              "targetId": "server",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            }
+          ]
+        }
+      ]
+    },
+    "producerArtifactBindings": [
+      {
+        "kind": "resource-limit-policy",
+        "identity": "storefront-limits",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:d936878c915106944846a89340f2c89fa7472cbc1089c5b1260f47603d71efc6"
+      },
+      {
+        "kind": "target-profile",
+        "identity": "storefront-browser",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:5def4b031574ac812a5d831f66e9405932f4fb544da66ef1c7cc42d7ee8c42ea"
+      },
+      {
+        "kind": "target-profile",
+        "identity": "storefront-server",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:5def4b031574ac812a5d831f66e9405932f4fb544da66ef1c7cc42d7ee8c42ea"
+      }
+    ],
+    "consumerInputs": {
+      "groupIdSelectors": [],
+      "targetIdSelectors": null
+    },
+    "expectedRelationship": {
+      "outcome": "selected-group",
+      "groupId": "web",
+      "plannedTargetIds": ["browser", "server"]
+    },
+    "verificationOwner": "020",
+    "relatedDecisionIds": ["015-034", "015-044", "015-049"],
+    "relatedRuleIds": []
+  },
+  {
+    "suiteRevision": "0",
+    "manifestKind": "handoff-vector",
+    "vectorId": "group-selection/one-group/group-id",
+    "producerProfileFacts": {
+      "deploymentGroups": [
+        {
+          "groupId": "web",
+          "members": [
+            {
+              "targetId": "browser",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            },
+            {
+              "targetId": "server",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            }
+          ]
+        }
+      ]
+    },
+    "producerArtifactBindings": [
+      {
+        "kind": "resource-limit-policy",
+        "identity": "storefront-limits",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:d936878c915106944846a89340f2c89fa7472cbc1089c5b1260f47603d71efc6"
+      },
+      {
+        "kind": "target-profile",
+        "identity": "storefront-browser",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:5def4b031574ac812a5d831f66e9405932f4fb544da66ef1c7cc42d7ee8c42ea"
+      },
+      {
+        "kind": "target-profile",
+        "identity": "storefront-server",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:5def4b031574ac812a5d831f66e9405932f4fb544da66ef1c7cc42d7ee8c42ea"
+      }
+    ],
+    "consumerInputs": {
+      "groupIdSelectors": ["web"],
+      "targetIdSelectors": null
+    },
+    "expectedRelationship": {
+      "outcome": "selected-group",
+      "groupId": "web",
+      "plannedTargetIds": ["browser", "server"]
+    },
+    "verificationOwner": "020",
+    "relatedDecisionIds": ["015-034", "015-044", "015-049"],
+    "relatedRuleIds": []
+  },
+  {
+    "suiteRevision": "0",
+    "manifestKind": "handoff-vector",
+    "vectorId": "group-selection/one-group/unknown-group-id",
+    "producerProfileFacts": {
+      "deploymentGroups": [
+        {
+          "groupId": "web",
+          "members": [
+            {
+              "targetId": "browser",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            },
+            {
+              "targetId": "server",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            }
+          ]
+        }
+      ]
+    },
+    "producerArtifactBindings": null,
+    "consumerInputs": {
+      "groupIdSelectors": ["edge"],
+      "targetIdSelectors": null
+    },
+    "expectedRelationship": {
+      "outcome": "rejected",
+      "rule": "unknown-group-id"
+    },
+    "verificationOwner": "020",
+    "relatedDecisionIds": ["015-034", "015-044", "015-049"],
+    "relatedRuleIds": []
+  },
+  {
+    "suiteRevision": "0",
+    "manifestKind": "handoff-vector",
+    "vectorId": "group-selection/one-group/repeated-group-id",
+    "producerProfileFacts": {
+      "deploymentGroups": [
+        {
+          "groupId": "web",
+          "members": [
+            {
+              "targetId": "browser",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            },
+            {
+              "targetId": "server",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            }
+          ]
+        }
+      ]
+    },
+    "producerArtifactBindings": null,
+    "consumerInputs": {
+      "groupIdSelectors": ["web", "web"],
+      "targetIdSelectors": null
+    },
+    "expectedRelationship": {
+      "outcome": "rejected",
+      "rule": "multiple-selectors"
+    },
+    "verificationOwner": "020",
+    "relatedDecisionIds": ["015-034", "015-044", "015-049"],
+    "relatedRuleIds": []
+  },
+  {
+    "suiteRevision": "0",
+    "manifestKind": "handoff-vector",
+    "vectorId": "group-selection/one-group/target-id",
+    "producerProfileFacts": {
+      "deploymentGroups": [
+        {
+          "groupId": "web",
+          "members": [
+            {
+              "targetId": "browser",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            },
+            {
+              "targetId": "server",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            }
+          ]
+        }
+      ]
+    },
+    "producerArtifactBindings": null,
+    "consumerInputs": {
+      "groupIdSelectors": ["browser"],
+      "targetIdSelectors": null
+    },
+    "expectedRelationship": {
+      "outcome": "rejected",
+      "rule": "target-id-selector"
+    },
+    "verificationOwner": "020",
+    "relatedDecisionIds": ["015-034", "015-044", "015-049"],
+    "relatedRuleIds": []
+  },
+  {
+    "suiteRevision": "0",
+    "manifestKind": "handoff-vector",
+    "vectorId": "group-selection/one-group/group-subset",
+    "producerProfileFacts": {
+      "deploymentGroups": [
+        {
+          "groupId": "web",
+          "members": [
+            {
+              "targetId": "browser",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            },
+            {
+              "targetId": "server",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            }
+          ]
+        }
+      ]
+    },
+    "producerArtifactBindings": null,
+    "consumerInputs": {
+      "groupIdSelectors": ["web"],
+      "targetIdSelectors": ["browser"]
+    },
+    "expectedRelationship": {
+      "outcome": "rejected",
+      "rule": "group-subset"
+    },
+    "verificationOwner": "020",
+    "relatedDecisionIds": ["015-034", "015-044", "015-049"],
+    "relatedRuleIds": []
+  },
+  {
+    "suiteRevision": "0",
+    "manifestKind": "handoff-vector",
+    "vectorId": "group-selection/two-groups/omitted",
+    "producerProfileFacts": {
+      "deploymentGroups": [
+        {
+          "groupId": "jobs",
+          "members": [
+            {
+              "targetId": "worker",
+              "requestedLocales": ["ja"],
+              "effectiveDefaultRequestedLocale": "ja"
+            }
+          ]
+        },
+        {
+          "groupId": "web",
+          "members": [
+            {
+              "targetId": "browser",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            },
+            {
+              "targetId": "server",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            }
+          ]
+        }
+      ]
+    },
+    "producerArtifactBindings": null,
+    "consumerInputs": {
+      "groupIdSelectors": [],
+      "targetIdSelectors": null
+    },
+    "expectedRelationship": {
+      "outcome": "rejected",
+      "rule": "selector-required"
+    },
+    "verificationOwner": "020",
+    "relatedDecisionIds": ["015-034", "015-044", "015-049"],
+    "relatedRuleIds": []
+  },
+  {
+    "suiteRevision": "0",
+    "manifestKind": "handoff-vector",
+    "vectorId": "group-selection/two-groups/group-id",
+    "producerProfileFacts": {
+      "deploymentGroups": [
+        {
+          "groupId": "jobs",
+          "members": [
+            {
+              "targetId": "worker",
+              "requestedLocales": ["ja"],
+              "effectiveDefaultRequestedLocale": "ja"
+            }
+          ]
+        },
+        {
+          "groupId": "web",
+          "members": [
+            {
+              "targetId": "browser",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            },
+            {
+              "targetId": "server",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            }
+          ]
+        }
+      ]
+    },
+    "producerArtifactBindings": [
+      {
+        "kind": "resource-limit-policy",
+        "identity": "storefront-limits",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:d936878c915106944846a89340f2c89fa7472cbc1089c5b1260f47603d71efc6"
+      },
+      {
+        "kind": "target-profile",
+        "identity": "storefront-worker",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:5def4b031574ac812a5d831f66e9405932f4fb544da66ef1c7cc42d7ee8c42ea"
+      }
+    ],
+    "consumerInputs": {
+      "groupIdSelectors": ["jobs"],
+      "targetIdSelectors": null
+    },
+    "expectedRelationship": {
+      "outcome": "selected-group",
+      "groupId": "jobs",
+      "plannedTargetIds": ["worker"]
+    },
+    "verificationOwner": "020",
+    "relatedDecisionIds": ["015-034", "015-044", "015-049"],
+    "relatedRuleIds": []
+  },
+  {
+    "suiteRevision": "0",
+    "manifestKind": "handoff-vector",
+    "vectorId": "group-selection/two-groups/unknown-group-id",
+    "producerProfileFacts": {
+      "deploymentGroups": [
+        {
+          "groupId": "jobs",
+          "members": [
+            {
+              "targetId": "worker",
+              "requestedLocales": ["ja"],
+              "effectiveDefaultRequestedLocale": "ja"
+            }
+          ]
+        },
+        {
+          "groupId": "web",
+          "members": [
+            {
+              "targetId": "browser",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            },
+            {
+              "targetId": "server",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            }
+          ]
+        }
+      ]
+    },
+    "producerArtifactBindings": null,
+    "consumerInputs": {
+      "groupIdSelectors": ["edge"],
+      "targetIdSelectors": null
+    },
+    "expectedRelationship": {
+      "outcome": "rejected",
+      "rule": "unknown-group-id"
+    },
+    "verificationOwner": "020",
+    "relatedDecisionIds": ["015-034", "015-044", "015-049"],
+    "relatedRuleIds": []
+  },
+  {
+    "suiteRevision": "0",
+    "manifestKind": "handoff-vector",
+    "vectorId": "group-selection/two-groups/two-group-ids",
+    "producerProfileFacts": {
+      "deploymentGroups": [
+        {
+          "groupId": "jobs",
+          "members": [
+            {
+              "targetId": "worker",
+              "requestedLocales": ["ja"],
+              "effectiveDefaultRequestedLocale": "ja"
+            }
+          ]
+        },
+        {
+          "groupId": "web",
+          "members": [
+            {
+              "targetId": "browser",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            },
+            {
+              "targetId": "server",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            }
+          ]
+        }
+      ]
+    },
+    "producerArtifactBindings": null,
+    "consumerInputs": {
+      "groupIdSelectors": ["web", "jobs"],
+      "targetIdSelectors": null
+    },
+    "expectedRelationship": {
+      "outcome": "rejected",
+      "rule": "multiple-selectors"
+    },
+    "verificationOwner": "020",
+    "relatedDecisionIds": ["015-034", "015-044", "015-049"],
+    "relatedRuleIds": []
+  },
+  {
+    "suiteRevision": "0",
+    "manifestKind": "handoff-vector",
+    "vectorId": "group-selection/two-groups/target-id",
+    "producerProfileFacts": {
+      "deploymentGroups": [
+        {
+          "groupId": "jobs",
+          "members": [
+            {
+              "targetId": "worker",
+              "requestedLocales": ["ja"],
+              "effectiveDefaultRequestedLocale": "ja"
+            }
+          ]
+        },
+        {
+          "groupId": "web",
+          "members": [
+            {
+              "targetId": "browser",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            },
+            {
+              "targetId": "server",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            }
+          ]
+        }
+      ]
+    },
+    "producerArtifactBindings": null,
+    "consumerInputs": {
+      "groupIdSelectors": ["worker"],
+      "targetIdSelectors": null
+    },
+    "expectedRelationship": {
+      "outcome": "rejected",
+      "rule": "target-id-selector"
+    },
+    "verificationOwner": "020",
+    "relatedDecisionIds": ["015-034", "015-044", "015-049"],
+    "relatedRuleIds": []
+  },
+  {
+    "suiteRevision": "0",
+    "manifestKind": "handoff-vector",
+    "vectorId": "group-selection/two-groups/group-subset",
+    "producerProfileFacts": {
+      "deploymentGroups": [
+        {
+          "groupId": "jobs",
+          "members": [
+            {
+              "targetId": "worker",
+              "requestedLocales": ["ja"],
+              "effectiveDefaultRequestedLocale": "ja"
+            }
+          ]
+        },
+        {
+          "groupId": "web",
+          "members": [
+            {
+              "targetId": "browser",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            },
+            {
+              "targetId": "server",
+              "requestedLocales": ["en", "ja"],
+              "effectiveDefaultRequestedLocale": "en"
+            }
+          ]
+        }
+      ]
+    },
+    "producerArtifactBindings": null,
+    "consumerInputs": {
+      "groupIdSelectors": ["web"],
+      "targetIdSelectors": ["server"]
+    },
+    "expectedRelationship": {
+      "outcome": "rejected",
+      "rule": "group-subset"
+    },
+    "verificationOwner": "020",
+    "relatedDecisionIds": ["015-034", "015-044", "015-049"],
+    "relatedRuleIds": []
+  }
+]
