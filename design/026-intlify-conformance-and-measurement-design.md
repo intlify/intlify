@@ -2812,7 +2812,7 @@ The initial implementation MAY also expose non-default timing spans aligned with
 | `profile_resolve_e2e` costs          | `toolchain`     | `workflow`      | `product_workflow`  |
 | `profile_resolve_peak_memory` costs  | `memory`        | `peak_live`     | `core`              |
 
-This table does not define the owner pair meanings. It only fixes their common grouping. Each `profile_resolve_peak_memory` case additionally references the 015-owned Memory Observation Domain for resolver construction or invocation.
+This table does not define the owner pair meanings. It only fixes their common grouping. Each `profile_resolve_peak_memory` case additionally references the 015-owned Memory Observation Domain for resolver construction or invocation, `profile-resolver-construction` or `profile-resolver-invocation`, which [015's measurement records](./015-intlify-project-profile-and-locale-policy-design.md#measurement-records-and-common-projection) define.
 
 ### Avoided reimplementation
 

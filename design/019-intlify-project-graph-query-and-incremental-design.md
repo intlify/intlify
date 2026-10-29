@@ -36,14 +36,14 @@ The initial deliverable is an in-process, finite, single-application graph and q
 - Requirement Plans, final reachability, requested-locale work, message-locale fallback, Delivery Unit Graphs, Store selection, or Release assembly.
 - Registry initialization, ID allocation, reconciliation acceptance, filesystem persistence, or automatic translation/governance operations.
 - A persistent/distributed cache, database, background daemon, fine-grained self-adjusting computation engine, or cross-process graph format.
-- Completing 015's configuration-entry revision/re-resolution protocols, all common diagnostic adapters, or the later artifact families owned by 017.
+- Defining 015's source revision algorithms, dependency record kinds, or Finding, Evidence, and accounting encodings, which 015 owns; completing all common diagnostic adapters or the later artifact families owned by 017.
 - Store-wide audit, historical candidate queries, automatic edits, suppression configuration, or production telemetry transport.
 
 ## Ownership and Dependencies
 
 | Owner | Responsibility in this subset |
 | --- | --- |
-| 015 | Checked Profile facts, applicable binding projections, construction identity, and retained resolution inputs/evidence |
+| 015 | Checked Profile facts, applicable binding projections, construction identity, retained resolution inputs/evidence, source revision algorithms, closed dependency record kinds, and Finding and Evidence encodings |
 | 016 | Source recognition, semantic facts, continuity and identity validity, complete/partial authoring outcomes, and component diagnostics |
 | 017 | Existing source/inventory/Intent/reference/registry representations and exact identity, integrity, ordering, and replay rules |
 | 018 | Input-origin admission, current caller/read authority, safe disclosure, and separation from write capabilities |
@@ -317,10 +317,11 @@ The implementing plan can deliver admitted retained records/indexes, complete/pa
 | 019-007 | Define a minimal common Diagnostic projection while preserving owner meaning | Gives local consumers shared facts without a competing code registry, wire envelope, or authority |
 | 019-008 | Keep caches optional, bounded, and outside trust/currentness decisions | Cache loss changes cost, not semantic results, permissions, or publication state |
 | 019-009 | Require real owner integration and scoped 026 equivalence/measurement | A fast graph or successful mock does not prove authoring correctness or complete Web localization |
+| 019-010 | Leave 015's source revision algorithms, dependency record kinds, and Finding, Evidence, and accounting encodings to 015, and keep their scheduling, slicing, caching, and presentation here | 015 assigned them here while this design deferred them back, so neither design defined them |
 
 ## Deferred Follow-Up Notes
 
-- Full configuration-entry/programmatic/call-site source revision algorithms, disclosure-safe entry dependencies, resolver re-resolution queries, and complete 015 evidence projections.
+- Resolver re-resolution queries and the complete common Diagnostic projection of 015 Findings and Evidence; 015 owns the source revision algorithms, dependency record kinds, and evidence encodings that they consume.
 - Portable graph/query/diagnostic schemas and the necessary 017 artifact families; all component diagnostic adapters, suppression, edit proposals, localization of presentation, and CLI/LSP/agent transports.
 - Cross-owner/library/module composition, complete host applicability, conditional reference extensions, and broader graph services under the adopting 016/020/034 profiles.
 - Complete planning, Store/approval/Provider dependency slices, Store-wide audit, selected-versus-historical diagnostic scope, target/export/Release invalidation, and wider 028/030/031 workflows.
