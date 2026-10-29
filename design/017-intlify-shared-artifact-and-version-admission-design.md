@@ -37,7 +37,7 @@ The existing 015 adoption scope remains Phase 1 plus only the finite, test-owned
 
 ## Non-Goals
 
-- Defining Trust Policy, Resource Limit Policy, or Glossary Set content beyond the place of 015's section, artifact acquisition, bootstrap trust, signatures, or authorization.
+- Defining the meaning of Trust Policy or Resource Limit Policy content, any Glossary Set content, artifact acquisition, bootstrap trust, signatures, or authorization; this design encodes only the shapes whose meaning 018 defines.
 - Encoding the full `LocalizationProjectProfile`, its binding sidecar, Resolver Construction Root Package, Programmatic Entry Snapshot, or Finding/Evidence model.
 - Defining locale canonicalization semantics, the conformance layer, or the rules for generating canonicalization data, which remain with 015.
 - Redefining 016's recognition, semantic-revision, identity-continuity, or automatic-update rules.
@@ -488,7 +488,7 @@ Schema round trips alone do not prove these semantics. JSON examples with invent
 
 ## Minimum Web Localization Representation
 
-This additive subset encodes the artifacts that [020](./020-intlify-requirement-planning-and-linking-design.md) through [025](./025-intlify-release-assembly-and-deployment-design.md) require for 016 Phase 4–5 and the [028](./028-intlify-javascript-web-vertical-slice-design.md) Web integration. It is limited to one local application, one Selection Scope and Store lineage, direct-required coverage, hydration-free Web targets, and the 023 minimum text-interpolation profile. It does not encode cross-owner or library references, Locale Capsules, Runtime Manifests, multi-unit delivery, hydration relations, remote publication, or portable diagnostics.
+This additive subset encodes the artifacts that [020](./020-intlify-requirement-planning-and-linking-design.md) through [025](./025-intlify-release-assembly-and-deployment-design.md) require for 016 Phase 4–5 and the [028](./028-intlify-javascript-web-vertical-slice-design.md) Web integration. It is limited to one local application, one Selection Scope and Store lineage, direct-required coverage, Web targets with hydration-free output, and the 023 minimum text-interpolation profile. It does not encode cross-owner or library references, Locale Capsules, Runtime Manifests, multi-unit delivery, hydration relations or hydration-coupled output, remote publication, or portable diagnostics; a Target Profile only declares the hydration roles that 015 checks.
 
 The notation follows the authoring subset: closed JSON objects, required members unless marked `?`, arrays present even when empty, `Text`/`NonemptyText`, and `UInt64` strings for every quantity. All collections are subject to explicit caller-supplied finite limits. `MessageIntentId`, `Occurrence`, `AuthoringArtifactReference`, `ExactInputBinding`, `OwnerIdentity`, and `Opaque128` are the authoring definitions above; `RecordIdentity` is defined under Record and run identities. Unknown members and variants are not extension points.
 
@@ -614,6 +614,7 @@ TargetProfileArtifactBody {
       directions: { locale: NonemptyText, direction: "LTR" | "RTL" | "unknown" }[]
     }
     delivery: { unit: "main", loading: "eager" }
+    hydration: { roles: ("browser-hydration-client" | "ssr-renderer")[] }
     limits: {
       maxMessages: PositiveUInt64, maxUses: PositiveUInt64, maxLocales: PositiveUInt64,
       maxFiles: PositiveUInt64, maxFileBytes: PositiveUInt64, maxOutputBytes: PositiveUInt64,
@@ -625,9 +626,9 @@ TargetProfileArtifactBody {
 
 A configuration `PolicyReference` or `TargetProfileReference` resolves to one of these artifacts when the kinds are equal, `identity` and `revision` equal the body's, `specificationRevision` equals the artifact's `specification.revision`, and `semanticDigest` equals `H("policy-semantic-digest", { kind, specificationRevision, content })` or `H("target-profile-semantic-digest", { kind: "target-profile", specificationRevision, content })`. The semantic digest excludes `identity` and `revision`, so it pins content rather than naming. Resolution is a 015 semantic step; the existing structural admission of the reference is unchanged.
 
-The four Policy contents carry only the closed minimum behavior that 021, 018, and 022 define; they add no expression language. The `resource-limit-policy`, `trust-policy`, and `glossary-set` contents remain undefined by this subset; [Resource Limit, Trust, and Glossary Set envelopes](#resource-limit-trust-and-glossary-set-envelopes) registers their envelopes and digest for 015's profile resolution. On the Web localization path, the 018 authority context and 015 bounds supply the corresponding constraints, and 028 requires `glossarySet` to be `null`.
+The four Policy contents carry only the closed minimum behavior that 021, 018, and 022 define; they add no expression language. [Resource Limit, Trust, and Glossary Set envelopes](#resource-limit-trust-and-glossary-set-envelopes) registers the `resource-limit-policy`, `trust-policy`, and `glossary-set` envelopes and digest for 015's profile resolution and encodes the closed Resource Limit Policy and Trust Policy contents whose meaning 018 defines; the `glossary-set` content remains undefined by this subset. On the Web localization path, the 018 authority context and 015 bounds supply the corresponding constraints, and 028 requires `glossarySet` to be `null`.
 
-The Target Profile content pins the dimensions that 024 fixes for the minimum Web text profile. `execution.specification` is `intlify-design-023` `"0"` and `execution.profile` is `intlify-text-interpolation-minimum` `"0"` in this revision; `codecs.sourceMap` is `ecma-426-source-map` `"3"`. `directions` is sorted by locale, duplicate-free, and must cover every requested locale of each 015 target entry that references the profile; direction is a message-context input, not a text-based inference. Supported requested locales, effective defaults, and group membership remain 015 target-entry facts and are not repeated in the body.
+The Target Profile content pins the dimensions that 024 fixes for the minimum Web text profile. `execution.specification` is `intlify-design-023` `"0"` and `execution.profile` is `intlify-text-interpolation-minimum` `"0"` in this revision; `codecs.sourceMap` is `ecma-426-source-map` `"3"`. `directions` is sorted by locale, duplicate-free, and must cover every requested locale of each 015 target entry that references the profile, spelled as its canonical locale; 015's target resolution checks that coverage. Direction is a message-context input, not a text-based inference. `hydration.roles` is sorted, duplicate-free, and empty when the profile declares no role; 024 defines each role, and 015's hydration validation reads them. Supported requested locales, effective defaults, and group membership remain 015 target-entry facts and are not repeated in the body.
 
 ### Supply records
 
@@ -1087,7 +1088,7 @@ Digest and framing expectations come from an independent implementation rather t
 
 ## Profile Resolution Input Representation
 
-This additive subset encodes the resolver inputs that 015 Implementation Phase 3 admits besides configuration and canonicalization data: the Intent Surface-Class Vocabulary Artifact and the members of the [Submitted Profile Resolution Artifact Collection](./015-intlify-project-profile-and-locale-policy-design.md#provider-governance-and-glossary-references). 015 owns the specification slots, the resolver phases, each check and its precedence, and every resulting Finding. 017 owns these representations, their digests, and how a submitted member establishes the exact reference it names. 018 owns the Resource Limit Policy common structure and the Trust Policy body, 022 owns the Glossary Set body, and 029 owns acquisition. A digest establishes content identity, not who published the content.
+This additive subset encodes the resolver inputs that 015 Implementation Phase 3 admits besides configuration and canonicalization data: the Intent Surface-Class Vocabulary Artifact, the Resource Limit Policy Verification Input, and the members of the [Submitted Profile Resolution Artifact Collection](./015-intlify-project-profile-and-locale-policy-design.md#provider-governance-and-glossary-references). 015 owns the specification slots, the resolver phases, each check and its precedence, and every resulting Finding. 017 owns these representations, their digests, and how a submitted member establishes the exact reference it names. 018 owns the meaning of the Resource Limit Policy common body, the Trust Policy body, and the Verification Input, 022 owns the Glossary Set body, and 029 owns acquisition. A digest establishes content identity, not who published the content.
 
 The notation follows the authoring subset. Every collection is subject to explicit caller-supplied finite limits.
 
@@ -1120,20 +1121,40 @@ The reader follows the common order and fetches nothing:
 
 Steps 1 and 2 are the formal checks behind 015's pre-invocation boundary for this input. Steps 3 through 6 produce distinct typed failures, which 015 reports in that order. 015 then compares the identity, revision, and semantic digest with the slot's assertion. Reading a vocabulary never appends, removes, renames, or infers a member.
 
+### Resource Limit Policy Verification Input
+
+```text
+ResourceLimitPolicyVerificationInput {
+  kind: "resource-limit-policy-verification-input"
+  schemaRevision: "0"
+  identity: IdentityToken
+  revision: RevisionToken
+  mode: "exact-pin"
+  pins: PolicyReference[]
+  integrityDigest: IntegrityDigest
+}
+```
+
+`pins` is the non-empty set of exact references that 018's [exact-pin mode](./018-intlify-security-trust-and-provenance-design.md#resource-limit-policy-verification-input) authenticates. Every pin is a five-member `PolicyReference` of kind `resource-limit-policy`, the pins are sorted by the unsigned bytes of `C(pin)`, and none occurs twice. The input carries no signature, key, credential, or locator.
+
+Integrity is `H("resource-limit-policy-verification-input-integrity", input-with-only-top-level-integrityDigest-omitted)`. The semantic digest is `H("resource-limit-policy-verification-input-semantic-digest", { kind, schemaRevision, mode, pins })`; like the vocabulary's, it excludes `identity` and `revision`, so it pins the authority rather than its name.
+
+The reader follows the vocabulary's order and fetches nothing: apply the caller's finite limits, strictly decode the closed shape, verify `integrityDigest`, check the mode and that every pin is a sorted, duplicate-free `resource-limit-policy` reference, and compute the semantic digest. A member outside the shape is either one of 018's reserved secret-bearing or ambient-authority members or an unknown member. 018 maps each failure to 015's boundary reasons, and the trusted setup path's assertion supplies the identity, revision, and semantic digest that the boundary compares.
+
 ### Resource Limit, Trust, and Glossary Set envelopes
 
-[Envelope and references](#envelope-and-references) registers `resource-limit-policy`, `trust-policy`, and `glossary-set` alongside the other Policy kinds, so that every reference in a 015 configuration can name a submitted envelope. Their bodies use `PolicyArtifactBody`, and their semantic digest is `H("policy-semantic-digest", { kind, specificationRevision, content })` over the complete content, as for every Policy kind. Each content is an object whose members this subset does not otherwise define: 018 owns the Resource Limit Policy common structure and the Trust Policy body, and 022 owns the Glossary Set body.
-
-This subset fixes one member of a Resource Limit Policy content:
+[Envelope and references](#envelope-and-references) registers `resource-limit-policy`, `trust-policy`, and `glossary-set` alongside the other Policy kinds, so that every reference in a 015 configuration can name a submitted envelope. Their bodies use `PolicyArtifactBody`, and their semantic digest is `H("policy-semantic-digest", { kind, specificationRevision, content })` over the complete content, as for every Policy kind. 018 defines the meaning of the Resource Limit Policy common body and the Trust Policy body encoded below; 022 owns the Glossary Set body, whose content this subset leaves an object without defined members.
 
 ```text
 ResourceLimitPolicyContent {
   projectProfileResolution?: object
-  ... members that 018, 020, 022, and 023 define
+}
+TrustPolicyContent {
+  authority: "trusted-local-host"
 }
 ```
 
-`projectProfileResolution` is 015's [project-profile resolution limits](./015-intlify-project-profile-and-locale-policy-design.md#project-profile-resolution-resource-limits) section, written as 015 shows it: the five group objects, `entry` and `shared` inside `diagnostics`, and each bound as its decimal string. 018's common body schema decides which members a content may have and requires a present section to be an object, but it never validates a section's interior. Only 015 checks whether `projectProfileResolution` is present and then its groups and bounds. Authentication material, such as a signature, is never a member of a content, so it cannot change a semantic digest.
+`projectProfileResolution` is 015's [project-profile resolution limits](./015-intlify-project-profile-and-locale-policy-design.md#project-profile-resolution-resource-limits) section, written as 015 shows it: the five group objects, `entry` and `shared` inside `diagnostics`, and each bound as its decimal string. Revision `"0"` admits no other Resource Limit Policy member; a section that 020, 022, or 023 defines is added here and in 018 when that owner defines it. 018's common body requires a present section to be an object, but it never validates a section's interior. Only 015 checks whether `projectProfileResolution` is present and then its groups and bounds. Authentication material, such as a signature, is never a member of a content, so it cannot change a semantic digest.
 
 ### Profile resolution artifact admission
 
@@ -1151,7 +1172,7 @@ specificationRevision = specification.revision
 semanticDigest        = H(the kind's semantic-digest domain, { kind, specificationRevision, content })
 ```
 
-No envelope declares its own semantic digest; the digest that 015 groups and compares is this computed value. Establishing a tuple checks neither `integrityDigest` nor the content's schema, so an envelope whose integrity or content later fails keeps its tuple. Any other member that does not establish a tuple, including one that declares no kind, is an invalid envelope. Body admission then verifies `integrityDigest` and, only after that, validates `content` against the kind's closed content schema where this design defines one; 018 and 022 admit the content of the other three kinds.
+No envelope declares its own semantic digest; the digest that 015 groups and compares is this computed value. Establishing a tuple checks neither `integrityDigest` nor the content's schema, so an envelope whose integrity or content later fails keeps its tuple. Any other member that does not establish a tuple, including one that declares no kind, is an invalid envelope. Body admission then verifies `integrityDigest` and, only after that, validates `content` against the kind's closed content schema where this design defines one, which includes the Resource Limit Policy and Trust Policy contents above; 022 admits the Glossary Set content.
 
 A member's canonical submitted body is `C(member)`: the canonical value framing of the complete member, including `integrityDigest`. Two members have equal canonical submitted bodies exactly when these bytes are equal, which needs neither a digest nor integrity success. Members that share one exact tuple are ordered by these bytes. A member without a tuple has `C(member)` as its content-derived admission key, ordered by unsigned bytes with a shorter equal prefix first. Neither order makes a member referenceable or enters profile semantics.
 
@@ -1164,7 +1185,8 @@ The adopting implementation materializes a closed Draft 7 schema for the vocabul
 | Area | Required independent expectations |
 | --- | --- |
 | Vocabulary | Frozen integrity and semantic-digest preimages and digests; a new identity or revision keeping the semantic digest while one changed member alters it; an empty vocabulary; each reader step's failure, including a member that is not an `IdentityToken`, a repeated member that is not adjacent, and unsorted unique members; exact-bound and first-over cases for each limit |
-| Policy envelopes | Semantic digests of a Resource Limit Policy, Trust Policy, and Glossary Set content; a Resource Limit Policy content without `projectProfileResolution`, with a non-object section, and with an invalid section interior, each reaching its owning check |
+| Verification input | Frozen integrity and semantic-digest preimages and digests; a new identity or revision keeping the semantic digest while one changed pin alters it; each reader step's failure, including empty, unsorted, repeated, and non-`resource-limit-policy` pins, another mode, a reserved member, and an unknown member; exact-bound and first-over cases for each limit |
+| Policy envelopes | Semantic digests of a Resource Limit Policy, Trust Policy, and Glossary Set content; a Resource Limit Policy content without `projectProfileResolution`, with a non-object section, with an invalid section interior, and with another member, each reaching its owning check; a Trust Policy content with another `authority` value or another member |
 | Tuple establishment | The computed tuple of every admitted kind; no tuple for each missing or malformed envelope member, a wrong governing specification, and a body without an object content; unsupported kinds and schema revisions; an envelope whose integrity or content fails keeping its tuple; a JSON number making a member unrepresentable |
 | Canonical submitted body | Whitespace and member-order variants of one member equal; members differing only in `integrityDigest` or only in content unequal |
 | Keys and bytes | The order of members within one tuple and of members without a tuple; canonical byte counts of a member and a reference that ignore transport whitespace |
@@ -1408,6 +1430,8 @@ This minimum registers these uses:
 | `locale-canonicalization-dataset` | The complete `LocaleCanonicalizationDataset` defined under Locale Canonicalization Data Representation |
 | `intent-surface-class-vocabulary-integrity` | The complete `IntentSurfaceClassVocabularyArtifact` with only its top-level `integrityDigest` omitted |
 | `intent-surface-class-vocabulary-semantic-digest` | `{ kind, schemaRevision, members }` of that artifact |
+| `resource-limit-policy-verification-input-integrity` | The complete `ResourceLimitPolicyVerificationInput` with only its top-level `integrityDigest` omitted |
+| `resource-limit-policy-verification-input-semantic-digest` | `{ kind, schemaRevision, mode, pins }` of that input |
 
 A Measurement Case identity is presented as `mc0_` followed by the 64 lowercase hexadecimal digits of the second digest. Its projection is a closed type fixed by the adopted measurement schema. It excludes sample values, creation time, record/run instance identities, branch/path/worker identities, and the implementation revision being compared. Expected semantic observations and native owner case bindings are retained separately rather than substituted for that projection.
 
@@ -1509,7 +1533,8 @@ This document introduces no new implementation Phase or separate prerequisite to
 | Initial measurement for Phase 1 | Materialize the four adopted common record schemas, the registered native-result adapter and projection, exact quantities, identities, canonical framing, and end-to-end admission/report fixtures |
 | Limited Phase 2/3 canonicalization and locale core | Reuse that same measurement path with the active owner dimensions and finite provider/data bindings; do not introduce a second record format |
 | 015 Phase 2 — Locale Canonicalization Boundary | Implement the manifest, dataset, and payload codecs and the reader order of [Locale Canonicalization Data Representation](#locale-canonicalization-data-representation); generate the artifact from the pinned inputs and check its semantic digest against an independent implementation |
-| 015 Phase 3 — Semantic Profile Resolver | Implement the vocabulary codec and reader order and the Policy and Target Profile envelope codecs of [Profile Resolution Input Representation](#profile-resolution-input-representation), with tuple establishment, canonical submitted bodies, admission keys, and canonical byte counts checked against an independent implementation |
+| 015 Phase 3 — Semantic Profile Resolver | Implement the vocabulary codec and reader order and the Policy and Target Profile envelope codecs of [Profile Resolution Input Representation](#profile-resolution-input-representation), with tuple establishment, canonical submitted bodies, admission keys, and canonical byte counts checked against an independent implementation; read the closed Resource Limit Policy and Trust Policy contents and the Verification Input |
+| 015 Phase 4 — Target and Compatibility Groups | Read the Target Profile's `directions` and `hydration.roles` for 015's target resolution and hydration validation |
 
 The reference-schema definition and record framing remove those specific design dependencies. They do not by themselves finish schema generation, owner projection, harness/CI integration, or any 015 Phase. Complete checked-profile artifacts, Policy/Target body admission, and full revision-`"0"` resolver conformance remain outside the minimum implementation claim. The locale canonicalization data representation likewise removes Phase 2's encoding dependency without completing Phase 2 by itself, and the profile resolution input representation removes Phase 3's encoding dependencies without completing Phase 3 or supplying 018's bodies and verification input.
 
@@ -1568,6 +1593,8 @@ Existing configuration, measurement, and authoring implementations need not adop
 | 017-022 | Encode the Intent Surface-Class Vocabulary Artifact as one closed artifact with sorted, duplicate-free `IdentityToken` members, its own integrity domain, and a semantic digest that excludes its identity and revision | 015's coverage and 016's authoring pin one exact vocabulary, and an assertion must pin the member set rather than its name |
 | 017-023 | Refine 017-014: register `resource-limit-policy`, `trust-policy`, and `glossary-set` envelopes with a semantic digest over the complete content, and fix only that a Resource Limit Policy content carries 015's section as `projectProfileResolution` | 015 cannot admit a collection or resolve its required trust and resource-limit references without these envelopes, while 018 and 022 keep their contents |
 | 017-024 | Establish a collection member's exact-reference tuple from its envelope and a semantic digest computed from its content; use the member's canonical value framing as its canonical submitted body, as its admission key when it has no tuple, and for its counted canonical bytes | 015's duplicate, conflict, ordering, and resource rules need one injective, transport-independent value per member that trusts neither a declared digest nor integrity |
+| 017-025 | Refine 017-014 and 017-023: encode the closed revision-`"0"` Resource Limit Policy and Trust Policy contents and the exact-pin Resource Limit Policy Verification Input, with its own integrity and semantic-digest domains, under 018's meaning | 018 now defines what the resolver admits, and a closed shape keeps an unread member from passing into a semantic digest |
+| 017-026 | Add a sorted, duplicate-free `hydration.roles` declaration to the Target Profile body without encoding hydration-coupled output | 015's hydration validation reads checked roles, while 020, 024, and 025 keep the minimum output hydration-free |
 
 ## Deferred Follow-Up Notes
 
@@ -1576,7 +1603,7 @@ These subjects remain assigned to 017 but are not prerequisites for the scoped c
 - cross-owner/library reference, candidate ranking, dependency, library, Locale Capsule, Runtime Manifest, multi-unit, hydration-coupled, and remote publication schemas beyond the Web localization minimum;
 - full Profile, construction-authority, Snapshot, binding, and Finding/Evidence representations;
 - locale canonicalization payload formats other than the ICU4X 2.2 blob, such as baked data;
-- Trust Policy, Resource Limit Policy, and Glossary Set content schemas and their trust/admission integration;
+- the Glossary Set content schema, Resource Limit Policy sections beyond `projectProfileResolution`, and signed or allowlist-based Trust Policy content;
 - measurement capabilities not adopted by the minimum, including comparison/budget, qualification, profiling, campaigns, and cross-platform reports;
 - extended semantic-context/constraint projections, general semantic-result identity, alternate physical encodings, transport containers, registry distribution/compaction, and cross-version migrations.
 
@@ -1589,7 +1616,7 @@ Any future extension must state its owning semantics and schema-version impact. 
 | [000 — Intlify overview](./000-intlify-overview-design.md) | Assigns 017's wider artifact and version-admission responsibilities; only the minimum subset is specified here |
 | [015 — Project profile and locale policy](./015-intlify-project-profile-and-locale-policy-design.md) | Owns the reference tuples, configuration use sites, minimal implementation boundaries, resolver semantics, the Locale Canonicalization Specification and conformance layer, and the checks over the vocabulary and the submitted collection, implemented using these encodings |
 | [016 — Source authoring and Intent identity](./016-intlify-source-authoring-and-intent-identity-design.md) | Owns recognition, message/revision meaning, source facts, continuity, and registry-transition validity; this document fixes the minimum shared representations without completing its later integrations |
-| [018 — Security, trust, and provenance](./018-intlify-security-trust-and-provenance-design.md) | Owns trust/authentication, the Resource Limit Policy common structure, and the Trust Policy body; digest and schema success supply neither |
+| [018 — Security, trust, and provenance](./018-intlify-security-trust-and-provenance-design.md) | Owns trust/authentication and the meaning of the Resource Limit Policy common body, the Trust Policy body, and the Resource Limit Policy Verification Input; digest and schema success supply neither |
 | [020 — Requirement planning and linking](./020-intlify-requirement-planning-and-linking-design.md) | Owns demand, reachability, and selection semantics for the plan and bundle records encoded here |
 | [021 — Translation Store and governance](./021-intlify-translation-store-and-governance-design.md) | Owns candidate validity, governance, and Store transition semantics for the message, evidence, and snapshot records encoded here |
 | [022 — Provider and localization sync](./022-intlify-provider-and-localization-sync-design.md) | Owns work derivation, request/response, and provenance semantics for the acquisition record and routing body encoded here, and the Glossary Set body |

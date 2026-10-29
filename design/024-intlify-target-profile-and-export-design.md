@@ -33,7 +33,7 @@ This is the initial application-only export slice for 016 Phase 5, not the compl
 
 - Source discovery, Intent allocation/reconciliation, reachability inference, requirement construction, Store/governance changes, or translation selection.
 - Public package names, CLI commands, bundler plugins, application installation conventions, or stable application-facing Runtime APIs.
-- General JavaScript module transformation, TypeScript-specific syntax, JSX/Vue, SSR/hydration, mobile/native output, or source-first library distribution.
+- General JavaScript module transformation, TypeScript-specific syntax, JSX/Vue, SSR or hydration-coupled output, mobile/native output, or source-first library distribution. A Target Profile may still declare the [hydration roles](#hydration-roles-and-static-compatibility) that 015 checks.
 - MF2 declarations, selectors, explicit functions, markup/parts, number/date/plural formatting, or broader value and locale-service profiles.
 - Lazy delivery, multiple Delivery Units per target, module graphs, partial locale installation, automatic negotiation, or runtime message-locale fallback.
 - A portable binary execution IR, mandatory WASM engine, full Locale Capsule, cross-process handle serialization, or changes to existing ESM `0.1`.
@@ -74,6 +74,7 @@ The minimum Web text profile has exactly two execution modes: `runtime-backed` a
 | Locale | Supplied supported requested locales and direct-only selection; retain the definition locale separately |
 | Direction/services | Explicit message direction; unknown-direction Text with 023 isolation; explicit absence of locale services and data |
 | Delivery | One supplied logical `["main"]` unit per target, no delivery edges, and eager preparation of all supported locales |
+| Hydration roles | A declared, possibly empty set that 015's hydration validation reads; the minimum export accepts only the empty set |
 | Output | External JavaScript ESM modules, data-only JSON where used, target metadata, and required retained source maps |
 | Limits | Finite source, message, reference, map, file, byte, preparation, argument, output, and retained-state capacities |
 | Integration | Exact group/target/profile and selected-message associations; 025 admission before application construction/execution |
@@ -81,6 +82,21 @@ The minimum Web text profile has exactly two execution modes: `runtime-backed` a
 028 supplies `en` and `ja`, direct coverage, and `LTR` for both selected definition contexts. These are scenario inputs, not new configuration defaults or inferred locale directions. The complete 020 bundle carries six selected logical definitions and twelve placements across the two targets. Each export consumes its six target/unit placements while retaining that common selection basis. A target cannot select different wording to fit its backend.
 
 The first emitter uses ECMAScript 2022-compatible external module syntax. Source support is bounded by the admitted host grammar and module rules, not a claim to lower every ECMAScript feature. Unknown or unimplemented profile/schema/ABI revisions fail explicitly; there is no version-range guess or fallback to the current exporter.
+
+## Hydration Roles and Static Compatibility
+
+015's [hydration validation](./015-intlify-project-profile-and-locale-policy-design.md#target-profiles-and-deployment-compatibility-groups) needs two facts from each endpoint's Target Profile: whether it may serve the SSR side of a relation, and whether it may hydrate in the browser. A Target Profile declares them in `hydration.roles`, which 017 encodes as a sorted, duplicate-free set:
+
+| Role | Meaning |
+| --- | --- |
+| `ssr-renderer` | The profile may be the server endpoint of a 015 hydration relation: its target renders the initial output that a client hydrates |
+| `browser-hydration-client` | The profile may be the client endpoint: its target hydrates output that a server endpoint rendered |
+
+A role is a declaration that 015 checks, not an output capability of this exporter. The server endpoint's profile must declare `ssr-renderer` and the client endpoint's `browser-hydration-client`; a missing role is 015's `server-capability-missing` or `client-capability-missing`. A role is never inferred from the host kind, mode, adapter, Target ID, or group membership. An empty set declares no role.
+
+Two endpoint profiles are statically compatible exactly when their `mf2Specification`, `execution`, and `locale.services` are equal. The physical dimensions `mode`, `adapter`, `host`, `codecs`, `delivery`, and `limits` are not compared, because 015 lets them differ without changing logical text. In this revision `execution` and `locale.services` each have one admitted value, so only a different `mf2Specification` makes a pair incompatible, which 015 reports as `project-profile-hydration-capability-incompatible`. Static compatibility is necessary, not sufficient: render equivalence still needs [026's evidence](./026-intlify-conformance-and-measurement-design.md#logical-render-equivalence) and 030's hydration fixtures.
+
+The minimum export produces hydration-free output only. It refuses a Target Profile that declares any role, as a capability failure before generation, so a profile can pass 015's relation checks without becoming an exported target. 020 still admits no hydration relation in its initial profile, and 025 still assembles no group with one.
 
 ## Terminology
 
@@ -133,7 +149,7 @@ An exporter operation handles one target while retaining the complete group-scop
 2. Reuse compatible actual 012 parse/semantic results or run its parse → construct → validate gates. A source string, supplied name list, or parse-success flag is not an admitted semantic result.
 3. Apply 023's closed allowlist to every node, including nodes an optimizer might otherwise erase. This admits one pattern of decoded literal runs and unannotated external variables only.
 4. Derive the exact required canonical name set and Text requirements, compare them with the source and localized facts, and establish ordered occurrences and 023 logical work/output metadata.
-5. Verify exact requested/definition locale equality, supplied direction, service absence, output mode, and supported physical adapter profile.
+5. Verify exact requested/definition locale equality, supplied direction, service absence, an empty hydration role set, output mode, and supported physical adapter profile.
 6. Preserve the complete derivation from the selected artifact and semantic/profile inputs to each generated record/function. Freeze only after all rows and required evidence succeed.
 
 Valid MF2 with explicit `:string`, another function, declaration, selector, literal-operand expression, attribute, option, or markup remains unsupported by this target. Report capability failure, not an invented parser error. No stripping, guessed constant folding, host coercion, or alternate candidate selection makes it supported.
@@ -386,7 +402,8 @@ Use actual shared MF2 analysis, emitted bytes, generated modules, and the real R
 | Case family | Required independent observations |
 | --- | --- |
 | Selection and scope | Complete versus partial bundle; missing/extra locale/slot; changed Intent revision/artifact; same text at separate identities; no reselection |
-| Capability | Supported literal/interpolation; valid but unsupported MF2 features; malformed MF2 keeps parser ownership; no unsupported-node removal |
+| Capability | Supported literal/interpolation; valid but unsupported MF2 features; malformed MF2 keeps parser ownership; no unsupported-node removal; a profile declaring a hydration role refused before generation |
+| Hydration roles | Each role alone, both, and none; equal and different `mf2Specification` under the static rule; physical dimensions that differ without making a pair incompatible |
 | Binding and identity | Three message slots and four use slots for 028; shared greeting handles with separate occurrences; deterministic reordered-input output; wrong-table/use/context rejection |
 | Host evaluation | Original receiver/property/argument order, once-only values, unexecuted branches, thrown host expressions/setters, null receivers, local declaration initialization and temporal dead zones |
 | Authoring/lowering | Imported aliases and shadowing, fresh-name hygiene, descriptor escape, unsupported module effects, exclusion value identity, no remaining unhandled intrinsic |
@@ -405,7 +422,7 @@ Run `Ada` and `Kai` through both locale-bound instances and both physical paths.
 
 The AOT path must be observable without importing/calling a Runtime MF2 evaluator. Its code must consume the actual changed arguments. The Runtime path must consume actual selected MF2 and perform its real preparation. Shared argument/limit helpers do not excuse a shared incorrect expected result.
 
-Completion of this minimum requires one admitted [026 Logical Render Equivalence](./026-intlify-conformance-and-measurement-design.md#logical-render-equivalence) relation and the applicable real-browser checks in 028. Pure export tests can complete their own scope earlier, but cannot mark 016 Phase 5 complete before Release admission and Runtime/browser execution exist. Broader MF2, library, native, and hydration cases remain explicitly unclaimed.
+Completion of this minimum requires one admitted [026 Logical Render Equivalence](./026-intlify-conformance-and-measurement-design.md#logical-render-equivalence) relation and the applicable real-browser checks in 028. Pure export tests can complete their own scope earlier, but cannot mark 016 Phase 5 complete before Release admission and Runtime/browser execution exist. Broader MF2, library, native, and hydration-coupled output cases remain explicitly unclaimed.
 
 ## Adoption with 016 and 028
 
@@ -433,6 +450,8 @@ These are adoption dependencies, not a claim that their implementations or the b
 | 024-008 | Admit generated executable bytes before import and keep message content inert | A checksum or an ESM export inspection alone does not establish trusted execution |
 | 024-009 | Require source/evaluation maps and independent host/semantic observations | Output text equality cannot prove a correct source transform |
 | 024-010 | Apply bounded generation and whole-output 026 evidence from the first slice | Avoids hiding preparation, helper, transfer, or loading costs behind one smaller file |
+| 024-011 | Declare hydration roles in the Target Profile body as a closed set that 015 checks, while the minimum export refuses any role | 015's hydration validation needs checked roles without making this exporter produce SSR or hydration-coupled output |
+| 024-012 | Decide static compatibility by equal `mf2Specification`, `execution`, and `locale.services`, never by physical dimensions | Logical text depends on those three, while engines, outputs, and delivery may differ by design |
 
 ## Deferred Follow-Up Notes
 
@@ -448,7 +467,7 @@ These are adoption dependencies, not a claim that their implementations or the b
 
 - A compiled Locale Capsule, binary/prepared representations, additional physical engines, or an explicit current-ESM bridge with its own compatibility specification.
 - General module/TypeScript/framework lowering, source-first library composition, conditional descriptor selection, bundlers, hot reload, and public APIs.
-- Rich values, functions, selectors, markup/parts, locale-service data, fallback-materialized definitions, SSR/hydration, and other platform targets.
+- Rich values, functions, selectors, markup/parts, locale-service data, fallback-materialized definitions, SSR/hydration output and its hosts, and other platform targets.
 - Lazy and multi-unit delivery, independently reusable locale packages, localization-only releases, production remote trust, and deployment packaging.
 - Measured minification, specialized escaping/copying, persistent incremental caches, bounded parallel emitters, and additional performance budgets under 026.
 
