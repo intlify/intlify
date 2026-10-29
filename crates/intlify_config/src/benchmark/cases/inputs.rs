@@ -55,6 +55,7 @@ pub(in crate::benchmark) enum Recipe {
     ResourcePolicy(super::ResourcePolicyRecipe),
     ArtifactCollection(super::ArtifactCollectionRecipe),
     ResolvedBinding(super::ResolvedBindingRecipe),
+    TargetAndGroup(super::TargetAndGroupRecipe),
 }
 
 impl Recipe {
@@ -110,6 +111,14 @@ impl Recipe {
             return Arc::from(
                 serde_json::to_vec(&recipe.fixture().config)
                     .expect("finite owner resolved-binding fixture"),
+            );
+        }
+        if let Self::TargetAndGroup(recipe) = self {
+            // The configuration whose selected declaration the targets and
+            // groups come from; the input context binds the members.
+            return Arc::from(
+                serde_json::to_vec(&recipe.fixture().config)
+                    .expect("finite owner target-and-group fixture"),
             );
         }
         let raw: Option<&[u8]> = match self {

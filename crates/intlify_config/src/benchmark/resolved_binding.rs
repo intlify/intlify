@@ -241,8 +241,9 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
 }
 
 /// A blocking result of a reference: its unit, code, and reason. Each reason
-/// is a decision's, so one without a reason is a defect.
-fn issue(frame: &mut Frame, key: &IssueKey) -> Result<(), OutputFailure> {
+/// is a decision's, so one without a reason is a defect. Phase 11 frames the
+/// causes an unresolved Target Profile reference leaves it with it.
+pub(super) fn issue(frame: &mut Frame, key: &IssueKey) -> Result<(), OutputFailure> {
     unit(frame, key.unit())?;
     frame.text(key.code().as_str());
     let reason = key

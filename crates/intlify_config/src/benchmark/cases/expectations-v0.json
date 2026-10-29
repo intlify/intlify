@@ -34479,6 +34479,3478 @@
           }
         ]
       }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "minimal"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-complete"
+      },
+      "inputContext": "f7d5b9511e111799e31f33f9b5f7d196b897ea1624dd18dbca6118d6c34d11c7",
+      "result": {
+        "shared": "1d1e97c84394c2fe465b091b412d58343dcc7f7f6b53fd65d162ca66da705c26",
+        "entry": null
+      },
+      "logicalWork": "71f3600b8c8258871fcae6fa37fcb1e545e9d3c8d82a6b518cf7b18892e608e6",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "11"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-complete"
+      },
+      "inputContext": "d6746724a5309d551b61bd7649414def36719c62ffaad57642cdf45761c9f94d",
+      "result": {
+        "shared": "ecf665898d4851c9092088e6cce2e41996a66416b41590a518b1b2538c837b1b",
+        "entry": null
+      },
+      "logicalWork": "7b48409b010d2bbe4c958eff8e7eb7059f91e2823e8c7de77c4da3725870da24",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "storefront-reordered"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-complete"
+      },
+      "inputContext": "672b2281c4b6c8963781719a738aa95575489d9fe79838b7eaac16debb30d6d7",
+      "result": {
+        "shared": "ecf665898d4851c9092088e6cce2e41996a66416b41590a518b1b2538c837b1b",
+        "entry": null
+      },
+      "logicalWork": "7b48409b010d2bbe4c958eff8e7eb7059f91e2823e8c7de77c4da3725870da24",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "many-targets"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-complete"
+      },
+      "inputContext": "44ec96bc9df656228277f081296eb5c6f1786bbd2b487d4f5d9de9c5bbd6c953",
+      "result": {
+        "shared": "a843eb7d1dd5cd1b7216d37bd695b8dabe1082f4fc8e85402c19bc944932955a",
+        "entry": null
+      },
+      "logicalWork": "2ef458308235f6ffdaf152643cdbb4e5931f4d4273fd69b9ce067ac35fde82de",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "389"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "many-groups"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-complete"
+      },
+      "inputContext": "6539fb96e5361b3b8cfea2f0f6b8a3889aeee76864850cbbaf16b37e3ceff03e",
+      "result": {
+        "shared": "fdc40b303fb44f4a1aa012c71e561980e8e99b9f4f74eb593a8f226cd9344066",
+        "entry": null
+      },
+      "logicalWork": "f2f4d93f4716b4bb3f2febd82c4ced441d9859b75785173a26f9791b733a551f",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "515"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "locales-not-subset"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-blocked"
+      },
+      "inputContext": "0d49290befd5ea1926c07c7e883b27d957db4593e5a34337663eea8e3777afa8",
+      "result": {
+        "shared": "f0175cd1c5a77ecefa4c0a4cc85542f91db1f6992b04cf2c46065ac4420da42a",
+        "entry": null
+      },
+      "logicalWork": "dbd1b35d32fb73b940dff40a5fd8d55811e3af6320f9375a7aab67b49213f32d",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "explicit-default-not-requested"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-blocked"
+      },
+      "inputContext": "380c2bf721d8630e1a002ad546d9ce4d17810569e5038a0976d90af592aa206f",
+      "result": {
+        "shared": "abd5e0e63bc75398f3d40c98af16d926391b5908a1f7539e6cf61139900b8105",
+        "entry": null
+      },
+      "logicalWork": "dbd1b35d32fb73b940dff40a5fd8d55811e3af6320f9375a7aab67b49213f32d",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "inherited-default-not-requested"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-blocked"
+      },
+      "inputContext": "e92162bd75b2d5d857d70bf862d4086825bc86453c53a91dbab0ce4565aabb4c",
+      "result": {
+        "shared": "e1c7f3f68e1141912534dfafba3e045f334883ca927040fca317bdb740345b03",
+        "entry": null
+      },
+      "logicalWork": "dbd1b35d32fb73b940dff40a5fd8d55811e3af6320f9375a7aab67b49213f32d",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "target-locale-invalid"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-blocked"
+      },
+      "inputContext": "4ac8648c401cfa2e01662f86085936ca6aab345d1e66c665c0a147a48b56668d",
+      "result": {
+        "shared": "15640ab953749e0604569b6b8ae0a452e0928466f1464ef5fe4cb0b5aaf35606",
+        "entry": null
+      },
+      "logicalWork": "8856cf082ace792ef400e516f993b0f956c95f0c31f9760e996a12044386f478",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "target-locale-repeated"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-blocked"
+      },
+      "inputContext": "722265360d165ba2f721361d36e310c82298d099c74ff7e7139f0496ce4bbaff",
+      "result": {
+        "shared": "9c5fb2dd7b52d9fad79e74b8d7d2bcdf66382e011b1cc52020053aadeb9b4a00",
+        "entry": null
+      },
+      "logicalWork": "6a869a3c19ce8b5b8109a05b082312847d32ba9f2a2c5c9caec0f2b3df0a75f6",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "target-profile-missing"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-blocked"
+      },
+      "inputContext": "f75b99d2cc20af591dc791226d92da4f90affffcebd691fb1ea24e656b98da62",
+      "result": {
+        "shared": "020e359b12ee499347195343e41098053e760b7dd7879cbd4063ace53ef22d13",
+        "entry": null
+      },
+      "logicalWork": "6a869a3c19ce8b5b8109a05b082312847d32ba9f2a2c5c9caec0f2b3df0a75f6",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "collection-not-admitted"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-blocked"
+      },
+      "inputContext": "e29af462135d3d54cf09ca0a3e5ff31d8d5e5dfc0075872378f7c05dd6510cb6",
+      "result": {
+        "shared": "a77b609559bf2d324e5c6b51d0f8377974cd30f61c76b726b4c6935c3dedc807",
+        "entry": null
+      },
+      "logicalWork": "12a6985c40749e8499850a6bf8f4c286229540ecbb23fe4d1fe3cacd04847a7c",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "member-unknown"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-blocked"
+      },
+      "inputContext": "84b4fc00842d3614c0985c32aebe3edf20487234e72a39925649d7ff3f548364",
+      "result": {
+        "shared": "47181bcc50692a97e7b99726fb62cb044650d19c4358ae6bf8f99deac1a58686",
+        "entry": null
+      },
+      "logicalWork": "d5c30278db00c3992249143ce30ed59474c2a9ab0ecd771c14d7741ecd0dc216",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "19"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "member-duplicate"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-blocked"
+      },
+      "inputContext": "4db191a8affa0d49fad3f47b20c542bba01e281f3623baf70540fbff9acec757",
+      "result": {
+        "shared": "312f1b585254034fffbfdc652491ed97eb152dbe0729e39e15c1e75c498ec1e0",
+        "entry": null
+      },
+      "logicalWork": "6f9bf31773beec9134b8dc45fc5189826b046d1d31a8e029970a63f7f42e949f",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "target-unassigned"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-blocked"
+      },
+      "inputContext": "006088c08fae30a57ff9c84add948da299938fea950a520decc0ccc38773b161",
+      "result": {
+        "shared": "e708ea257db9685defae7e1800b4e05ac9b42da7987ecbbf9c8b9b2c2bd5b5e5",
+        "entry": null
+      },
+      "logicalWork": "ec370b2e1427885eb6c07f05b15abe88d158d24ce450832b927c7e829abf2305",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "15"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "target-in-two-groups"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-blocked"
+      },
+      "inputContext": "cd8f33aac6d67872788f39ee3f56026f3270399d7406011ac422885bdc877e92",
+      "result": {
+        "shared": "edba841723a82cc361df483ace4c6afe68dc4ba0bd78e34d0fbd866ff500a0f1",
+        "entry": null
+      },
+      "logicalWork": "5ef375b492c4bcbae985d84254933742688651735ae5c1ce6d1fafc07dc722ff",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "21"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["target-profiles", "exact"],
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-complete"
+      },
+      "inputContext": "0ae9aa232c707efa2f939afe310d882e470d55fe9bad683a1a2344acd8a68228",
+      "result": {
+        "shared": "ecf665898d4851c9092088e6cce2e41996a66416b41590a518b1b2538c837b1b",
+        "entry": null
+      },
+      "logicalWork": "7b48409b010d2bbe4c958eff8e7eb7059f91e2823e8c7de77c4da3725870da24",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["target-profiles", "first-over"],
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-blocked"
+      },
+      "inputContext": "4a2c321178a99fd24406b09830203196d358fd59946c215bd6170ca5d778b07c",
+      "result": {
+        "shared": "65168e411e19b833167b950e68ed2d66ed867b5887418a4252296e98e6554615",
+        "entry": null
+      },
+      "logicalWork": "b21e7fa2dd61e20cf83b40132a337a61d22fcd2bd031dedd59e173a193bc00fc",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "10"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["target-id-bytes", "exact"],
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-complete"
+      },
+      "inputContext": "a952c6182e7337daa2c9be1ed69776b83bd24081c6f343963a23cf152f759404",
+      "result": {
+        "shared": "ecf665898d4851c9092088e6cce2e41996a66416b41590a518b1b2538c837b1b",
+        "entry": null
+      },
+      "logicalWork": "7b48409b010d2bbe4c958eff8e7eb7059f91e2823e8c7de77c4da3725870da24",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["target-id-bytes", "first-over"],
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-blocked"
+      },
+      "inputContext": "b132ed30c01e01120c0d0191c2399848e73b26d16001750d76a18e8dbf18147f",
+      "result": {
+        "shared": "fb1a576561f1078e97e620810346ac5507f01604cf286e3d37c7a28d67b5e1ae",
+        "entry": null
+      },
+      "logicalWork": "1c11e62eee150a71b77113e4778f10ca7d7268036064c1b06ff7b2ebffe8d9a7",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "many-groups"
+        },
+        "fixtureRevision": "0",
+        "limit": ["deployment-groups", "exact"],
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-complete"
+      },
+      "inputContext": "ff3784bbee2c80d3c2445c2d77a082bd41d04ff18c3ad54332e192ade894c59d",
+      "result": {
+        "shared": "fdc40b303fb44f4a1aa012c71e561980e8e99b9f4f74eb593a8f226cd9344066",
+        "entry": null
+      },
+      "logicalWork": "f2f4d93f4716b4bb3f2febd82c4ced441d9859b75785173a26f9791b733a551f",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "515"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "many-groups"
+        },
+        "fixtureRevision": "0",
+        "limit": ["deployment-groups", "first-over"],
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-blocked"
+      },
+      "inputContext": "4114797deb0c3cd5bedd0ed58443ef090a1afa171a1772199c7eee2165c681ae",
+      "result": {
+        "shared": "3cde0747d12122c5fcfaa657ba8b90021269b1e403d13c79d32e9f945ca57e19",
+        "entry": null
+      },
+      "logicalWork": "32b1a2d6a5b4301db99445941ac697571a309a5061e5bfcddbb54cbbf994f8c4",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "515"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "320"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["group-id-bytes", "exact"],
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-complete"
+      },
+      "inputContext": "b12c3bb4f8993081f691c82b0e75e227dc3abe212be62b83255b8dee66e511a5",
+      "result": {
+        "shared": "ecf665898d4851c9092088e6cce2e41996a66416b41590a518b1b2538c837b1b",
+        "entry": null
+      },
+      "logicalWork": "7b48409b010d2bbe4c958eff8e7eb7059f91e2823e8c7de77c4da3725870da24",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["group-id-bytes", "first-over"],
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-blocked"
+      },
+      "inputContext": "18a82a1c32b3d12aea750d3d7c86e83966d59a45a8f6a994e108cba7a3a12163",
+      "result": {
+        "shared": "76e52787499ae4ccc54bc82fc01c64bcdcf5a593911168e303eac144c678772d",
+        "entry": null
+      },
+      "logicalWork": "5b0635eedfe6f2c6b28c0d7d2a6c6478422fac627f9eebf5f80485c38fc8d8d9",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["members-per-group", "exact"],
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-complete"
+      },
+      "inputContext": "13c7c91316a00724c9284813a89850b51dfe57bd979b963530ec185b0edcd98b",
+      "result": {
+        "shared": "ecf665898d4851c9092088e6cce2e41996a66416b41590a518b1b2538c837b1b",
+        "entry": null
+      },
+      "logicalWork": "7b48409b010d2bbe4c958eff8e7eb7059f91e2823e8c7de77c4da3725870da24",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["members-per-group", "first-over"],
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-blocked"
+      },
+      "inputContext": "d01239df4d34ca9eb2213a42044b9bc643c1e5c47fb5b70197772f806c20ff9f",
+      "result": {
+        "shared": "2ee2d0d02c6c8dc20467d083ab546770b2a93ac4eb74b11f2888d7edb2f54033",
+        "entry": null
+      },
+      "logicalWork": "5b0635eedfe6f2c6b28c0d7d2a6c6478422fac627f9eebf5f80485c38fc8d8d9",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["membership-occurrences", "exact"],
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-complete"
+      },
+      "inputContext": "a5f1089baeb51307ab4d34266841a756d06f797607eec60fe0383f5499fe6232",
+      "result": {
+        "shared": "ecf665898d4851c9092088e6cce2e41996a66416b41590a518b1b2538c837b1b",
+        "entry": null
+      },
+      "logicalWork": "7b48409b010d2bbe4c958eff8e7eb7059f91e2823e8c7de77c4da3725870da24",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "target-and-group-resolution",
+        "fixture": {
+          "target-and-group": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["membership-occurrences", "first-over"],
+        "selector": "app",
+        "expectedKind": "target-and-group-resolution-blocked"
+      },
+      "inputContext": "c5696c32be5b0a7ce3b1c5edbac70bae08ef6a211888c1f540bdeefe7ee757f2",
+      "result": {
+        "shared": "59caaa7ba3ce4cd2729f82e308c74f412ce87f5cba6d17d17a4f1bbf153b1eba",
+        "entry": null
+      },
+      "logicalWork": "5b0635eedfe6f2c6b28c0d7d2a6c6478422fac627f9eebf5f80485c38fc8d8d9",
+      "work": {
+        "profileIdentity": "intlify-config-target-and-group-resolution-work",
+        "profileRevision": "0",
+        "operation": "target-and-group-resolution",
+        "facts": [
+          {
+            "kind": "target-and-group-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-target-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "target-and-group-groups",
+            "unit": "deployment-group",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-group-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "target-and-group-maximum-members-per-group",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-membership-occurrences",
+            "unit": "membership-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "target-and-group-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "target-and-group-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-targets",
+            "unit": "target-declaration",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "target-and-group-resolved-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
     }
   ]
 }

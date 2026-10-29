@@ -4,8 +4,9 @@
 //! Versioned workload facts for input/structural/selection, single-locale
 //! canonicalization, 015 Phases 7 and 8 locale and locale-policy resolution,
 //! 015 Phase 4 resource policy admission, and 015 Phase 9 collection admission
-//! and exact resolution. These are not physical metrics, formal Resource
-//! Policy observations, or whole-profile target work.
+//! and exact resolution, and 015 Phases 11 and 12 target and group
+//! resolution. These are not physical metrics, formal Resource Policy
+//! observations, or whole-profile hydration work.
 
 use serde::{Deserialize, Serialize};
 
@@ -21,6 +22,7 @@ mod binding;
 mod collection;
 mod policy;
 mod resolution;
+mod target_group;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
@@ -86,6 +88,17 @@ pub(super) enum WorkKind {
     ResolvedBindingNotEvaluatedUnits,
     ResolvedBindingBlockingIssues,
     ResolvedBindingBindings,
+    TargetAndGroupTargets,
+    TargetAndGroupMaximumTargetIdBytes,
+    TargetAndGroupGroups,
+    TargetAndGroupMaximumGroupIdBytes,
+    TargetAndGroupMaximumMembersPerGroup,
+    TargetAndGroupMembershipOccurrences,
+    TargetAndGroupEvaluationUnits,
+    TargetAndGroupNotEvaluatedUnits,
+    TargetAndGroupBlockingIssues,
+    TargetAndGroupResolvedTargets,
+    TargetAndGroupResolvedGroups,
 }
 
 impl WorkKind {
@@ -168,6 +181,20 @@ impl WorkKind {
         Self::ResolvedBindingBindings,
     ];
 
+    const TARGET_AND_GROUP: [Self; 11] = [
+        Self::TargetAndGroupTargets,
+        Self::TargetAndGroupMaximumTargetIdBytes,
+        Self::TargetAndGroupGroups,
+        Self::TargetAndGroupMaximumGroupIdBytes,
+        Self::TargetAndGroupMaximumMembersPerGroup,
+        Self::TargetAndGroupMembershipOccurrences,
+        Self::TargetAndGroupEvaluationUnits,
+        Self::TargetAndGroupNotEvaluatedUnits,
+        Self::TargetAndGroupBlockingIssues,
+        Self::TargetAndGroupResolvedTargets,
+        Self::TargetAndGroupResolvedGroups,
+    ];
+
     pub(super) fn for_operation(operation: Operation) -> &'static [Self] {
         match operation {
             Operation::LocaleCanonicalization => &Self::LOCALE,
@@ -175,6 +202,7 @@ impl WorkKind {
             Operation::ResourcePolicyBootstrap => &Self::RESOURCE_POLICY,
             Operation::ArtifactCollectionAdmission => &Self::ARTIFACT_COLLECTION,
             Operation::ResolvedBindingConstruction => &Self::RESOLVED_BINDING,
+            Operation::TargetAndGroupResolution => &Self::TARGET_AND_GROUP,
             _ => &Self::INPUT,
         }
     }
@@ -188,7 +216,9 @@ impl WorkKind {
             | Self::SelectorIdBytes
             | Self::RawLocaleIdentifierBytes
             | Self::LocalePolicyResolutionRawIdentifierBytes
-            | Self::CanonicalLocaleIdentifierBytes => WorkUnit::Utf8Octet,
+            | Self::CanonicalLocaleIdentifierBytes
+            | Self::TargetAndGroupMaximumTargetIdBytes
+            | Self::TargetAndGroupMaximumGroupIdBytes => WorkUnit::Utf8Octet,
             Self::ParserTokensVisited => WorkUnit::ParserToken,
             Self::LogicalValueNodes => WorkUnit::LogicalValue,
             Self::MaximumValueDepth => WorkUnit::ValueLevel,
@@ -201,7 +231,8 @@ impl WorkKind {
             | Self::LocalePolicyResolutionBlockingIssues
             | Self::ResourcePolicyBlockingIssues
             | Self::ArtifactCollectionBlockingIssues
-            | Self::ResolvedBindingBlockingIssues => WorkUnit::RetainedRecord,
+            | Self::ResolvedBindingBlockingIssues
+            | Self::TargetAndGroupBlockingIssues => WorkUnit::RetainedRecord,
             Self::LocaleOccurrences
             | Self::LocalePolicyResolutionOccurrences
             | Self::LocalePolicyResolutionCanonicalizedOccurrences
@@ -225,7 +256,9 @@ impl WorkKind {
             | Self::ResourcePolicyNotEvaluatedUnits
             | Self::ArtifactCollectionEvaluationUnits
             | Self::ResolvedBindingEvaluationUnits
-            | Self::ResolvedBindingNotEvaluatedUnits => WorkUnit::EvaluationUnit,
+            | Self::ResolvedBindingNotEvaluatedUnits
+            | Self::TargetAndGroupEvaluationUnits
+            | Self::TargetAndGroupNotEvaluatedUnits => WorkUnit::EvaluationUnit,
             Self::ResourcePolicyArtifactOccurrences
             | Self::ResourcePolicyPolicyArtifacts
             | Self::ResourcePolicyTargetProfileArtifacts
@@ -247,6 +280,14 @@ impl WorkKind {
             Self::LocaleCorrectionSuggestions | Self::LocalePolicyResolutionCorrections => {
                 WorkUnit::CorrectionSuggestion
             }
+            Self::TargetAndGroupTargets | Self::TargetAndGroupResolvedTargets => {
+                WorkUnit::TargetDeclaration
+            }
+            Self::TargetAndGroupGroups | Self::TargetAndGroupResolvedGroups => {
+                WorkUnit::DeploymentGroup
+            }
+            Self::TargetAndGroupMaximumMembersPerGroup
+            | Self::TargetAndGroupMembershipOccurrences => WorkUnit::MembershipOccurrence,
         }
     }
 }
@@ -278,6 +319,9 @@ enum WorkUnit {
     SurfaceClassOccurrence,
     DecisionCell,
     RuleCellComparison,
+    TargetDeclaration,
+    DeploymentGroup,
+    MembershipOccurrence,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -358,6 +402,9 @@ impl LogicalWork {
                 Operation::ResolvedBindingConstruction => {
                     "intlify-config-resolved-binding-construction-work"
                 }
+                Operation::TargetAndGroupResolution => {
+                    "intlify-config-target-and-group-resolution-work"
+                }
                 _ => "intlify-config-minimum-input-work",
             }
             .into(),
@@ -429,6 +476,9 @@ impl LogicalWork {
             }
             (Prepared::ResolvedBinding(prepared), Output::ResolvedBinding(resolved)) => {
                 work.bindings(prepared, resolved)?;
+            }
+            (Prepared::TargetAndGroup(prepared), Output::TargetAndGroup(resolved)) => {
+                work.targets(prepared, resolved)?;
             }
             _ => return Err(WorkFailure::OperationMismatch),
         }

@@ -26,7 +26,7 @@ use super::super::work::LogicalWork;
 use super::policy_inputs::capacity;
 use super::{
     declarations, Declaration, Engine, ExpectedKind, Icu4xRecipe, LimitEdge, LimitKind,
-    LocalePolicyResolutionRecipe, Recipe, ResourcePolicyRecipe, Selector,
+    LocalePolicyResolutionRecipe, Recipe, ResourcePolicyRecipe, Selector, TargetAndGroupRecipe,
 };
 
 pub(in crate::benchmark) struct Candidate {
@@ -99,6 +99,9 @@ pub(in crate::benchmark) fn prepare(
     if declaration.operation == Operation::ResolvedBindingConstruction {
         return prepare_bindings(declaration);
     }
+    if declaration.operation == Operation::TargetAndGroupResolution {
+        return prepare_targets(declaration);
+    }
     let source = declaration.fixture.source();
     let (mut input_limits, mut structural_limits) = fixture_capacity();
     if let Some((kind, edge)) = declaration.limit {
@@ -144,7 +147,13 @@ pub(in crate::benchmark) fn prepare(
             | LimitKind::ResolutionCoverageRuleCellComparisons
             | LimitKind::BootstrapArtifacts
             | LimitKind::RecheckArtifacts
-            | LimitKind::RecheckProfileIdBytes => {
+            | LimitKind::RecheckProfileIdBytes
+            | LimitKind::TargetProfiles
+            | LimitKind::TargetIdBytes
+            | LimitKind::DeploymentGroups
+            | LimitKind::GroupIdBytes
+            | LimitKind::MembersPerGroup
+            | LimitKind::MembershipOccurrences => {
                 return Err(PreparationFailure::UndeclaredCase);
             }
         };
@@ -181,7 +190,13 @@ pub(in crate::benchmark) fn prepare(
             | LimitKind::ResolutionCoverageRuleCellComparisons
             | LimitKind::BootstrapArtifacts
             | LimitKind::RecheckArtifacts
-            | LimitKind::RecheckProfileIdBytes => unreachable!(),
+            | LimitKind::RecheckProfileIdBytes
+            | LimitKind::TargetProfiles
+            | LimitKind::TargetIdBytes
+            | LimitKind::DeploymentGroups
+            | LimitKind::GroupIdBytes
+            | LimitKind::MembersPerGroup
+            | LimitKind::MembershipOccurrences => unreachable!(),
         }
     }
     let prepared = if declaration.operation == Operation::FileMaterialization {
@@ -223,7 +238,8 @@ pub(in crate::benchmark) fn prepare(
             | Operation::LocalePolicyResolution
             | Operation::ResourcePolicyBootstrap
             | Operation::ArtifactCollectionAdmission
-            | Operation::ResolvedBindingConstruction => unreachable!(),
+            | Operation::ResolvedBindingConstruction
+            | Operation::TargetAndGroupResolution => unreachable!(),
         }
     };
     // Only dispatch is repeated here; both reference preparation and timed calls
@@ -245,8 +261,9 @@ pub(in crate::benchmark) fn prepare(
         Prepared::LocalePolicyResolution(_)
         | Prepared::ResourcePolicy(_)
         | Prepared::ArtifactCollection(_)
-        | Prepared::ResolvedBinding(_) => {
-            unreachable!("Phases 7, 4, and 9 have their own preparation")
+        | Prepared::ResolvedBinding(_)
+        | Prepared::TargetAndGroup(_) => {
+            unreachable!("Phases 7, 4, 9, 11, and 12 have their own preparation")
         }
     };
     let kind = match &output {
@@ -777,6 +794,125 @@ fn prepare_bindings(declaration: &Declaration) -> Result<Candidate, PreparationF
     }
     let output = Output::ResolvedBinding(resolved);
     let prepared = Prepared::ResolvedBinding(Box::new(prepared));
+    let observation = output
+        .observe()
+        .map_err(|_| PreparationFailure::Observation)?;
+    let logical_work =
+        LogicalWork::observe(&prepared, &output).map_err(|_| PreparationFailure::Observation)?;
+    Ok(Candidate {
+        declaration: declaration.clone(),
+        input_limits: Some(fixture_capacity().0),
+        prepared,
+        output,
+        observation,
+        logical_work,
+    })
+}
+
+/// The independently specified count of a bound over its fixed recipe; never
+/// derived from the resolver under test.
+fn target_group_edge(
+    kind: LimitKind,
+    recipe: TargetAndGroupRecipe,
+) -> Result<u64, PreparationFailure> {
+    use TargetAndGroupRecipe as R;
+
+    Ok(match (kind, recipe) {
+        // `browser` and `ssr`, both members of `web`, the one group.
+        (
+            LimitKind::TargetProfiles
+            | LimitKind::MembersPerGroup
+            | LimitKind::MembershipOccurrences,
+            R::Storefront,
+        ) => 2,
+        // `browser`, the longer Target ID, and `web`.
+        (LimitKind::TargetIdBytes, R::Storefront) => 7,
+        (LimitKind::GroupIdBytes, R::Storefront) => 3,
+        // One group for each of the scale's 64 targets.
+        (LimitKind::DeploymentGroups, R::ManyGroups) => 64,
+        _ => return Err(PreparationFailure::UndeclaredCase),
+    })
+}
+
+/// Phases 11 and 12 over a recipe's configuration, selected with `app`, under
+/// the policy whose bound a case's edge replaces. Phase 7 canonicalizes
+/// through the finite provider bound under the policy's identifier bound, as
+/// Phase 5 binds it, and the collection, read at 015's pre-invocation
+/// boundary, is admitted into the Set that Phase 9 resolves against, all
+/// before the interval.
+fn prepare_targets(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
+    use crate::benchmark::target_group::PreparedTargets;
+
+    let Recipe::TargetAndGroup(recipe) = declaration.fixture else {
+        return Err(PreparationFailure::UndeclaredCase);
+    };
+    let mut limits = capacity();
+    if let Some((kind, edge)) = declaration.limit {
+        let exact = target_group_edge(kind, recipe)?;
+        let bound = Bound::new(match edge {
+            LimitEdge::Exact => exact,
+            LimitEdge::FirstOver => exact - 1,
+        })
+        .ok_or(PreparationFailure::UnrepresentableCounterEdge)?;
+        let grouping = &mut limits.target_grouping;
+        match kind {
+            LimitKind::TargetProfiles => grouping.max_target_profiles = bound,
+            LimitKind::TargetIdBytes => grouping.max_target_id_bytes = bound,
+            LimitKind::DeploymentGroups => grouping.max_deployment_groups = bound,
+            LimitKind::GroupIdBytes => grouping.max_group_id_bytes = bound,
+            LimitKind::MembersPerGroup => grouping.max_members_per_group = bound,
+            LimitKind::MembershipOccurrences => grouping.max_membership_occurrences = bound,
+            _ => unreachable!("only a Phase 11 or 12 bound reaches here"),
+        }
+    }
+    let policy = ConfirmedPolicy::fixture_owned(limits);
+    let canonicalizer = Arc::new(
+        Canonicalizer::bind(
+            &fixture_pins(),
+            Some(FixtureProvider::new()),
+            policy
+                .limits()
+                .locale_resolution
+                .max_locale_identifier_bytes,
+        )
+        .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?,
+    );
+    let fixture = recipe.fixture();
+    let SelectedConfig {
+        analysis,
+        config,
+        selected,
+        ..
+    } = select_config(&fixture.config, declaration.selector)?;
+    let prepared = PreparedTargets {
+        analysis,
+        config,
+        selected,
+        policy,
+        canonicalizer,
+        collection: submitted(&fixture.members)?,
+    };
+    let resolved = prepared
+        .resolve()
+        .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
+    let kind = match &resolved.result {
+        Ok(Ok(retained))
+            if retained.partition.is_ok()
+                && retained
+                    .targets
+                    .iter()
+                    .all(|target| target.resolved.is_ok()) =>
+        {
+            ExpectedKind::TargetAndGroupResolutionComplete
+        }
+        Ok(Ok(_)) => ExpectedKind::TargetAndGroupResolutionBlocked,
+        Ok(Err(_)) | Err(_) => return Err(PreparationFailure::Observation),
+    };
+    if declaration.expected_kind != kind {
+        return Err(PreparationFailure::UnexpectedOutputKind);
+    }
+    let output = Output::TargetAndGroup(resolved);
+    let prepared = Prepared::TargetAndGroup(Box::new(prepared));
     let observation = output
         .observe()
         .map_err(|_| PreparationFailure::Observation)?;

@@ -24,7 +24,7 @@ fn limits() -> StructuralLimits {
 #[test]
 fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
     let cases = declarations();
-    assert_eq!(cases.len(), 252);
+    assert_eq!(cases.len(), 280);
     assert_eq!(cases, declarations());
     let mut identities = BTreeSet::new();
     for case in &cases {
@@ -41,6 +41,7 @@ fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
                 | Operation::LocalePolicyResolution
                 | Operation::ResourcePolicyBootstrap
                 | Operation::ResolvedBindingConstruction
+                | Operation::TargetAndGroupResolution
         ) {
             assert_eq!(case.selector, Selector::Absent);
         }
@@ -61,6 +62,12 @@ fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
             LimitKind::BootstrapArtifacts,
             LimitKind::RecheckArtifacts,
             LimitKind::RecheckProfileIdBytes,
+            LimitKind::TargetProfiles,
+            LimitKind::TargetIdBytes,
+            LimitKind::DeploymentGroups,
+            LimitKind::GroupIdBytes,
+            LimitKind::MembersPerGroup,
+            LimitKind::MembershipOccurrences,
         ])
     {
         // Phase 7 counts its occurrences over two recipes: the project's
@@ -100,6 +107,7 @@ fn declared_unbounded_case_kinds_agree_with_independently_checked_fixture_semant
                     | Operation::ResourcePolicyBootstrap
                     | Operation::ArtifactCollectionAdmission
                     | Operation::ResolvedBindingConstruction
+                    | Operation::TargetAndGroupResolution
             )
     }) {
         let source = case.fixture.source();
@@ -164,7 +172,8 @@ fn declared_unbounded_case_kinds_agree_with_independently_checked_fixture_semant
             | Operation::LocalePolicyResolution
             | Operation::ResourcePolicyBootstrap
             | Operation::ArtifactCollectionAdmission
-            | Operation::ResolvedBindingConstruction => unreachable!(),
+            | Operation::ResolvedBindingConstruction
+            | Operation::TargetAndGroupResolution => unreachable!(),
         }
     }
 }
@@ -258,6 +267,17 @@ fn every_finite_case_prepares_its_exact_result_and_work_including_all_limit_edge
                             );
                         }
                     }
+                    Output::TargetAndGroup(resolved) => {
+                        // Only the bound itself, one past its value.
+                        let evaluation = &resolved.evaluation;
+                        assert_eq!(evaluation.issues().count(), 1);
+                        let issue = evaluation.issues().next().unwrap();
+                        let exceeded = evaluation.limit(issue).unwrap();
+                        assert_eq!(
+                            exceeded.actual,
+                            crate::resolver::evaluation::Actual::Exact(exceeded.limit.get() + 1)
+                        );
+                    }
                     Output::ResourcePolicy(resolved) => {
                         // Only the bound itself, one past its value; the
                         // selector keeps only that smallest witness.
@@ -279,7 +299,7 @@ fn every_finite_case_prepares_its_exact_result_and_work_including_all_limit_edge
             }
         }
     }
-    assert_eq!(edges, 56);
+    assert_eq!(edges, 68);
 }
 
 #[test]
@@ -353,5 +373,5 @@ fn every_declared_case_is_admitted_against_fixed_input_result_and_work_expectati
                 .matches_expected(fixture.expected_work())
         );
     }
-    assert_eq!(contexts.len(), 252);
+    assert_eq!(contexts.len(), 280);
 }

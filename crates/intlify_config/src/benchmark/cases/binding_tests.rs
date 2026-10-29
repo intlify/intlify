@@ -87,7 +87,7 @@ fn named(recipe: ResolvedBindingRecipe) -> Vec<ExactTuple> {
 #[test]
 fn binding_cases_keep_the_198_rows_and_append_after_them() {
     let cases = declarations();
-    assert_eq!(cases.len(), 252);
+    assert_eq!(cases.len(), 280);
     assert!(cases[..198]
         .iter()
         .all(|case| case.operation != Operation::ResolvedBindingConstruction));

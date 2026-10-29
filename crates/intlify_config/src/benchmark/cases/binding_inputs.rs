@@ -55,7 +55,7 @@ const SCALE: usize = 63;
 
 /// Each required policy slot besides `resourceLimits`: its configuration
 /// name, the kind its role takes, and the identity of the artifact it names.
-const REQUIRED: [(&str, ArtifactKind, &str); 4] = [
+pub(super) const REQUIRED: [(&str, ArtifactKind, &str); 4] = [
     ("trust", ArtifactKind::TrustPolicy, "storefront-trust"),
     (
         "sourceAdmission",
@@ -228,7 +228,7 @@ impl ResolvedBindingRecipe {
     }
 }
 
-fn artifact(kind: ArtifactKind, identity: &str) -> Value {
+pub(super) fn artifact(kind: ArtifactKind, identity: &str) -> Value {
     envelope_of(kind, identity, "1", sample(kind))
 }
 

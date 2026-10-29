@@ -52,6 +52,8 @@ mod sample;
 #[cfg(feature = "benchmark")]
 mod shared;
 #[cfg(feature = "benchmark")]
+mod target_group;
+#[cfg(feature = "benchmark")]
 mod work;
 
 #[cfg(feature = "benchmark")]
