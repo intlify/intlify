@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! 015's Semantic Profile Resolver over one invocation: Phase 0 and Phases 4
-//! to 11 of the Deterministic Resolution Algorithm, in 015's order, over one
+//! to 12 of the Deterministic Resolution Algorithm, in 015's order, over one
 //! evaluation. Each phase takes the values the earlier ones admitted, or the
 //! causes of their absence, and evaluates every check whose prerequisites were
 //! admitted, so a blocking result leaves only the checks that depend on it not
@@ -12,9 +12,9 @@
 //! results: a configuration structural admission admitted whole, and the
 //! declaration Phase 3 provisionally selected in it. What the entry returns is
 //! crate-private semantic state, not a `LocalizationProjectProfile`, a checked
-//! or blocked outcome, or Resolution Evidence. Group and hydration resolution
-//! come with the rest of 015's Implementation Phase 4, and the profile
-//! projection with its Implementation Phase 5.
+//! or blocked outcome, or Resolution Evidence. Hydration validation comes with
+//! the rest of 015's Implementation Phase 4, and the profile projection with
+//! its Implementation Phase 5.
 
 use crate::artifacts::collection::FormalCollection;
 use crate::artifacts::vocabulary::FormalVocabulary;
@@ -32,6 +32,7 @@ use super::delivery::{resolve_delivery, DeliveryPolicy};
 use super::evaluation::{Admitted, Causes, Evaluation, EvaluationInvariant};
 use super::exact_resolution::{resolve_fields, ArtifactBindings, ResolvedReferences};
 use super::fallback::{resolve_fallback, MessageFallbackPolicy};
+use super::groups::{resolve_groups, ResolvedGroups};
 use super::identity::{resolve_project_identity, ProjectIdentity};
 use super::limits::ImplementationCapability;
 use super::locales::{resolve_locales, LocaleFields, LocaleInvariant, ResolvedLocales};
@@ -159,6 +160,9 @@ pub(crate) struct SemanticState<'s, Id> {
     /// Phase 11: each declared target's subset, effective default, and
     /// Target Profile.
     pub(crate) targets: Admitted<ResolvedTargets<'s>>,
+    /// Phase 12: each group's members, and whether the groups partition the
+    /// targets.
+    pub(crate) groups: Admitted<ResolvedGroups>,
 }
 
 /// A resolver defect some phase found, which no input can cause.
@@ -196,7 +200,7 @@ impl From<LocaleInvariant> for ResolverInvariant {
     }
 }
 
-/// Phase 0 and Phases 4 to 11 of one invocation over `evaluation`, in 015's
+/// Phase 0 and Phases 4 to 12 of one invocation over `evaluation`, in 015's
 /// order. `data` is the canonicalization data Phase 5 binds. The Profile
 /// Resolution Artifact Set Phase 9 admits is kept in `set`, which the resolved
 /// references and the bindings borrow.
@@ -291,6 +295,12 @@ where
         &locales,
         &results,
     )?;
+    let groups = resolve_groups(
+        evaluation,
+        confirmed,
+        Ok(&declaration.deployment_groups),
+        targets.as_ref(),
+    )?;
     Ok(SemanticState {
         specifications: SpecificationSet::new(&project_profile, &admitted),
         vocabulary: admitted.vocabulary,
@@ -304,6 +314,7 @@ where
         bindings,
         delivery,
         targets,
+        groups,
     })
 }
 
@@ -333,6 +344,7 @@ mod tests {
         Check, Code, IssueKey, Phase, Reason, Status, Subject, Unit,
     };
     use crate::resolver::exact_resolution;
+    use crate::resolver::groups::{self, GroupSubject};
     use crate::resolver::limits::{fixture_limits, ResolutionLimits, SECTION};
     use crate::resolver::locales::fixtures::canonical;
     use crate::resolver::locales::{self, LocaleKey, LocaleSubject, Location};
@@ -391,7 +403,7 @@ mod tests {
     const TRUST: usize = 1;
 
     /// The phases the entry runs, in 015's order.
-    const PHASES: [Phase; 9] = [
+    const PHASES: [Phase; 10] = [
         Phase::ResolverBootstrapAdmission,
         Phase::ResourcePolicyAdmission,
         Phase::SpecificationAdmission,
@@ -401,6 +413,7 @@ mod tests {
         Phase::ArtifactReferenceResolution,
         Phase::DeliveryResolution,
         Phase::TargetResolution,
+        Phase::GroupResolution,
     ];
 
     /// Phase 0's one unit.
@@ -744,6 +757,13 @@ mod tests {
                     .as_ref()
                     .map_or(true, |targets| targets.complete().is_err()),
             ),
+            (
+                "groups",
+                state
+                    .groups
+                    .as_ref()
+                    .map_or(true, |groups| groups.partition().is_err()),
+            ),
         ]
         .into_iter()
         .filter_map(|(name, absent)| absent.then_some(name))
@@ -751,7 +771,7 @@ mod tests {
     }
 
     /// Every name `absent` returns when no policy was confirmed.
-    const EVERY: [&str; 12] = [
+    const EVERY: [&str; 13] = [
         "policy",
         "specifications",
         "vocabulary",
@@ -764,9 +784,10 @@ mod tests {
         "bindings",
         "delivery",
         "targets",
+        "groups",
     ];
 
-    /// Whether every unit of Phases 5 to 11 waits on `key` alone.
+    /// Whether every unit of Phases 5 to 12 waits on `key` alone.
     fn later_phases_wait_on(evaluation: &Evaluation, key: &IssueKey) -> bool {
         evaluation
             .statuses()
@@ -853,6 +874,17 @@ mod tests {
                     .unwrap();
                 assert_eq!(target.profile.0, named.1);
             }
+            // One group holds both targets.
+            let groups = state.groups.as_ref().unwrap();
+            let members: Vec<(&str, Vec<&str>)> = groups
+                .iter()
+                .map(|(id, members)| {
+                    let members = members.as_ref().unwrap();
+                    let members = members.iter().map(crate::model::TargetId::as_str);
+                    (id.as_str(), members.collect())
+                })
+                .collect();
+            assert_eq!(members, [("web", vec!["browser", "server"])]);
             assert_eq!(absent(&state), Vec::<&str>::new());
             assert_eq!(
                 state.policy.selector_length,
@@ -1247,6 +1279,22 @@ mod tests {
                 .statuses()
                 .all(|(_, status)| *status == Status::Evaluated));
             assert_eq!(absent(&state), ["targets"]);
+        });
+    }
+
+    #[test]
+    fn a_target_in_no_group_leaves_only_the_groups_unresolved() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["deploymentGroups"]["web"]["members"] = json!(["browser"]);
+        inputs.declaration()["deploymentGroups"]["web"]["hydrationRelations"] = json!([]);
+        inputs.resolve(|evaluation, state| {
+            let server: crate::model::TargetId = serde_json::from_value(json!("server")).unwrap();
+            let placed = groups::unit(GroupSubject::Assignment(server), Check::SingleGroup);
+            assert_eq!(
+                issues(&evaluation),
+                [(placed, Code::TargetUnassigned, None)]
+            );
+            assert_eq!(absent(&state), ["groups"]);
         });
     }
 
