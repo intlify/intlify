@@ -221,9 +221,9 @@ In revision `"0"` a Trust Policy content has exactly one member, `authority`, wh
 
 The revision-`"0"` Verification Input has one explicit unsigned mode, `exact-pin`. It holds a finite non-empty set of exact Resource Limit Policy references, each a 017 `PolicyReference` of kind `resource-limit-policy`. Authentication of the selected candidate is set membership: the candidate is authenticated exactly when its computed exact reference is one of the pins. There is no floating, identity-only, or revision-only pin, and a partial match authenticates nothing. An unauthenticated candidate is 015's `body-integrity-invalid`, the reason it keeps for trust, signature, and integrity failures in revision `"0"`. The pins never select a candidate; 015's candidate selection runs first and is unchanged.
 
-The pins come only from the trusted setup path that establishes the invocation, such as 029's toolchain lock, together with the expected identity, revision, and semantic digest of the Verification Input itself. The input is never derived from the analyzed configuration, the submitted collection, or a candidate's content, so a Resource Limit Policy cannot authenticate itself. This is the explicit local verification mode that 015 permits once 018 defines it; it is not an unsigned default, and omitting the input fails before invocation. Authenticity rests on that setup path and on the exact semantic digest, under this subset's trusted-host assumption; a policy changed in any member needs a new pin.
+The pins come only from the trusted setup path that establishes the invocation, such as 029's toolchain lock, together with the expected identity, revision, and semantic digest of the Verification Input itself, which 015's boundary takes as a parameter beside the input rather than as an invocation input. The input is never derived from the analyzed configuration, the submitted collection, or a candidate's content, so a Resource Limit Policy cannot authenticate itself. This is the explicit local verification mode that 015 permits once 018 defines it; it is not an unsigned default, and omitting the input fails before invocation. Authenticity rests on that setup path and on the exact semantic digest, under this subset's trusted-host assumption; a policy changed in any member needs a new pin.
 
-The input contains only public, non-secret data: its identity, revision, mode, and pins. Its admission boundary, which 015 implements before invocation, maps to 015's closed failure reasons as follows:
+The input contains only public, non-secret data: its identity, revision, mode, and pins. Its admission boundary, which 015 implements before invocation in 015's boundary order, maps to 015's closed failure reasons as follows; that order refuses a reserved member before integrity hashes the input:
 
 | Reason | When |
 | --- | --- |
@@ -231,7 +231,7 @@ The input contains only public, non-secret data: its identity, revision, mode, a
 | `malformed-input` | The value is not a strictly decodable instance of 017's shape, its integrity fails, its mode is not `exact-pin`, or its pins are empty, unsorted, repeated, or not all `resource-limit-policy` references |
 | `duplicate-member` | A raw object repeats a member name |
 | `unknown-member` | A member is outside 017's shape and is not one of the reserved members below |
-| `over-bound-input` | The input exceeds the finite byte, depth, or pin-count limits of the active implementation profile |
+| `over-bound-input` | The input exceeds the byte, depth, or pin-count bound of 015's `bootstrapOnly.inputBoundary` group in the Admitted Implementation Capability |
 | `secret-bearing-input` | The input carries a reserved secret-bearing member: `privateKey`, `credential`, or `secretLocator` |
 | `ambient-authority` | The input carries a reserved ambient-authority member: `trustStore`, `networkSource`, or `hostTrust` |
 | `verification-identity-mismatch`, `verification-revision-mismatch`, `verification-digest-mismatch` | The admitted identity, revision, or semantic digest differs from the setup path's assertion |
@@ -240,7 +240,7 @@ The reserved members exist only to be refused; no revision gives them a meaning.
 
 ### Bootstrap work
 
-Authenticating the selected candidate, one pin lookup, is one unit of 015's `bootstrapOnly.artifactBootstrap.maxValidationWorkUnits`, and so is evaluating that candidate's common body; the decoded bytes they allocate count toward `maxDecodedAllocationBytes`. Admitting a Trust Policy content or another Resource Limit Policy content is ordinary collection admission under 015's `artifactAdmission` bounds. 015's Capability Specification implements this accounting.
+Authenticating the selected candidate, one pin lookup, is one unit of 015's `bootstrapOnly.artifactBootstrap.maxValidationWorkUnits`, and so are checking its integrity and evaluating its common body; `maxDecodedAllocationBytes` counts the UTF-8 bytes of the strings and keys decoded from the candidate's content. Admitting a Trust Policy content or another Resource Limit Policy content is ordinary collection admission under 015's `artifactAdmission` bounds. 015's Capability Specification implements this accounting.
 
 ## Minimum Web Localization Extension
 
@@ -402,6 +402,7 @@ This is a shared specification adopted within those phases, not another product 
 | 018-014 | Close the revision-`"0"` Resource Limit Policy content to the optional `projectProfileResolution` section, adding other owners' sections in place when they are defined | A closed member set cannot silently drop a misspelled section and keeps 015's missing-section check reachable |
 | 018-015 | Define the Trust Policy body as `trusted-local-host`, which leaves every trust decision to the Local Authority Context | States what the Web extension already does, without a policy language, keys, or signatures |
 | 018-016 | Authenticate the selected Resource Limit Policy by membership in an exact-pin Verification Input that only trusted setup supplies, with reserved members that make secret-bearing and ambient-authority inputs refusable | Checkable offline without secrets or signatures, and a policy can never pin itself |
+| 018-017 | Bound the Verification Input with 015's `bootstrapOnly.inputBoundary` group, pass the setup path's assertion to 015's boundary as a parameter, and refuse a reserved member before integrity hashes the input | "The active implementation profile" named no source for the limits, an assertion kept beside the input stays outside the analyzed invocation, and a secret must never be hashed |
 
 ## Deferred Follow-Up Notes
 

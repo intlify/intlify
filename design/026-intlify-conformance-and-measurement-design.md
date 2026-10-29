@@ -85,7 +85,7 @@ This separation lets the 015 minimum implementation record projection-ready meas
 | Component and target designs | Own semantic operations, fixture meaning, phase/cost vocabulary, interval boundaries, workload dimensions, required cases, checksum observations, concrete data structures and memory lifetimes, component fast paths, and target-specific budget values |
 | 017 shared artifacts | Owns the eventual wire encoding, version admission, canonical identity, and migration of shared conformance and measurement artifacts defined semantically here |
 | 018 security and provenance | Owns trust, signatures, actor authority, sensitive-data policy, and whether evidence is authenticated for Release use |
-| 019 project graph and Findings | Owns the common Finding envelope, dependency causes, evidence indexing, invalidation, queries, and scheduling |
+| 019 project graph and Findings | Owns the common Diagnostic projection of owner Findings, dependency causes, evidence indexing, invalidation, queries, and scheduling |
 | 020 planning and linking | Owns reachability, selected definitions, delivery placement, and pruning semantics used by output-size and finite-delivery fixtures |
 | 023 execution specification | Owns logical message evaluation, values, functions, parts, locale services, diagnostics, failure behavior, and resource limits tested here |
 | 024 target and export specification | Owns Target Profiles, capabilities, generated output semantics, artifact relationships, Runtime/native paths, and target-output identity |
@@ -2812,7 +2812,7 @@ The initial implementation MAY also expose non-default timing spans aligned with
 | `profile_resolve_e2e` costs          | `toolchain`     | `workflow`      | `product_workflow`  |
 | `profile_resolve_peak_memory` costs  | `memory`        | `peak_live`     | `core`              |
 
-This table does not define the owner pair meanings. It only fixes their common grouping. Each `profile_resolve_peak_memory` case additionally references the 015-owned Memory Observation Domain for resolver construction or invocation.
+This table does not define the owner pair meanings. It only fixes their common grouping. Each `profile_resolve_peak_memory` case additionally references the 015-owned Memory Observation Domain for resolver construction or invocation, `profile-resolver-construction` or `profile-resolver-invocation`, which [015's measurement records](./015-intlify-project-profile-and-locale-policy-design.md#measurement-records-and-common-projection) define.
 
 ### Avoided reimplementation
 

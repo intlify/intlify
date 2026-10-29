@@ -38,7 +38,7 @@ The existing 015 adoption scope remains Phase 1 plus only the finite, test-owned
 ## Non-Goals
 
 - Defining the meaning of Trust Policy or Resource Limit Policy content, any Glossary Set content, artifact acquisition, bootstrap trust, signatures, or authorization; this design encodes only the shapes whose meaning 018 defines.
-- Encoding the full `LocalizationProjectProfile`, its binding sidecar, Resolver Construction Root Package, Programmatic Entry Snapshot, or Finding/Evidence model.
+- Encoding a public `LocalizationProjectProfile` artifact or its binding sidecar. 015 owns its construction-authority shapes, Programmatic Entry Snapshot framing, and Finding, Evidence, dependency, and accounting encodings on this design's value framing; this design registers only the two semantic digest domains they use.
 - Defining locale canonicalization semantics, the conformance layer, or the rules for generating canonicalization data, which remain with 015.
 - Redefining 016's recognition, semantic-revision, identity-continuity, or automatic-update rules.
 - Completing `LibraryManifest`, cross-owner references, Locale Capsules, Runtime Manifests, multi-unit or hydration-coupled target output, remote publication records, or Runtime ABI.
@@ -51,7 +51,7 @@ The existing 015 adoption scope remains Phase 1 plus only the finite, test-owned
 
 | Owner | Responsibility in this subset |
 | --- | --- |
-| 015 | Configuration members and presence, field-role expectations, structural versus semantic admission, selection, locale behavior, resource limits, and the active owner measurement boundaries |
+| 015 | Configuration members and presence, field-role expectations, structural versus semantic admission, selection, locale behavior, resource limits, the active owner measurement boundaries, and its construction-authority, Snapshot, Finding, Evidence, dependency, and accounting representations |
 | 016 | Source recognition and extraction, MF2/context projection meaning, parameter requirements, continuity/newness/absence checks, and valid identity decisions |
 | 017 | Shared reference JSON, verification, authoring, Web localization, locale canonicalization data, and profile resolution input representations, identity domains, canonical framing, integrity coverage, and exact-version selection |
 | 018 | Artifact authentication, provenance, trust, and authorized evidence use; an integrity digest never supplies these decisions |
@@ -351,7 +351,7 @@ AuthoringInventory {
 
 Ranges are half-open UTF-8 byte ranges, bounded by the named source or extracted MF2 byte length and aligned to scalar boundaries wherever text is addressed. Empty insertion ranges and EOF are representable; actual declaration/reference ranges must identify the asserted syntax occurrence. Extraction segments are ordered by extracted start, non-overlapping, and cover the emitted MF2 bytes. Source ranges may repeat or cover several emitted bytes for escapes, and generated literal delimiters may use an explicit zero-width source position. A mapping never claims byte-for-byte correspondence merely from equal lengths.
 
-`AuthoringBasis` retains exact dependency pins, not full Profile, vocabulary, or locale-data bodies. For `application-profile`, `context.identity` is the checked `projectId`, `context.revision` is its governing 015 Profile Specification revision, and `context.semanticDigest` is the complete checked profile's semantic digest. The vocabulary uses its exact artifact identity/revision/digest; canonicalization uses its specification identity/revision and the separate dataset identity/digest as defined by 015. No extra dataset revision or canonicalization-specification digest is invented here. Library/test contexts use their explicitly pinned owning input identity/revision/digest and corresponding validators, not an application default.
+`AuthoringBasis` retains exact dependency pins, not full Profile, vocabulary, or locale-data bodies. For `application-profile`, `context.identity` is the checked `projectId`, `context.revision` is its governing 015 Profile Specification revision, and `context.semanticDigest` is the complete checked profile's semantic digest, `H("localization-project-profile-semantic-digest", view)` over 015's profile view. The vocabulary uses its exact artifact identity/revision/digest; canonicalization uses its specification identity/revision and the separate dataset identity/digest as defined by 015. No extra dataset revision or canonicalization-specification digest is invented here. Library/test contexts use their explicitly pinned owning input identity/revision/digest and corresponding validators, not an application default.
 
 The caller supplies and validates the actual applicable inputs under 015/016 and checks each pin against those inputs. There is no new default Profile, configuration member, independent vocabulary resolver, or schema for the complete `LocalizationProjectProfile` here. `context-default` requires the corresponding present canonical default; a library never uses the consuming application's default. A `test-context` is admitted only by an explicitly test-only invocation and cannot satisfy production Profile or library admission. Changing that string does not turn a test input into checked production evidence.
 
@@ -1362,7 +1362,7 @@ These orders refine 026's stage/code/affected/related/detail priority; counts co
 
 Canonical encoding here operates on the **complete schema-admitted JSON value**, not source bytes, debug output, hash-table iteration, or a host serializer's incidental order. All quantities have already become exact decimal strings. Allowed values are `null`, booleans, Unicode-scalar strings, arrays, and objects; JSON numbers are not part of this encoding. The existing verification-record domains and the explicitly added authoring, Web localization, locale canonicalization data, and profile resolution input domains use the same unchanged value framing. The profile resolution input path also frames a formally representable collection member that its schema may later reject, so that 015 can compare and count it.
 
-This is not a new canonicalization of `intlify.config.json`, native owner results, or every Intlify artifact. In particular, 015's existing Resolver Construction Identity, Snapshot, disclosure, and ResourceBoundValue framing are unchanged. A Policy/Target `semanticDigest` is computed from the complete content for every Policy kind and the Target Profile kind; for the three Policy kinds whose content 018 and 022 own, the digest is fixed even though the content schema is not.
+This is not a new canonicalization of `intlify.config.json`, native owner results, or every Intlify artifact. In particular, 015's Resolver Construction Identity, Snapshot, disclosure-token, source-revision, and ResourceBoundValue framing are 015-owned and unchanged, and 015's record views use `C` without changing it. A Policy/Target `semanticDigest` is computed from the complete content for every Policy kind and the Target Profile kind; for the three Policy kinds whose content 018 and 022 own, the digest is fixed even though the content schema is not.
 
 ### Value framing revision `"0"`
 
@@ -1432,6 +1432,8 @@ This minimum registers these uses:
 | `intent-surface-class-vocabulary-semantic-digest` | `{ kind, schemaRevision, members }` of that artifact |
 | `resource-limit-policy-verification-input-integrity` | The complete `ResourceLimitPolicyVerificationInput` with only its top-level `integrityDigest` omitted |
 | `resource-limit-policy-verification-input-semantic-digest` | `{ kind, schemaRevision, mode, pins }` of that input |
+| `project-profile-specification-semantic-digest` | The complete number-free body of 015's Localization Project Profile Specification |
+| `localization-project-profile-semantic-digest` | 015's closed profile view of one checked `LocalizationProjectProfile` |
 
 A Measurement Case identity is presented as `mc0_` followed by the 64 lowercase hexadecimal digits of the second digest. Its projection is a closed type fixed by the adopted measurement schema. It excludes sample values, creation time, record/run instance identities, branch/path/worker identities, and the implementation revision being compared. Expected semantic observations and native owner case bindings are retained separately rather than substituted for that projection.
 
@@ -1535,7 +1537,7 @@ This document introduces no new implementation Phase or separate prerequisite to
 | 015 Phase 2 — Locale Canonicalization Boundary | Implement the manifest, dataset, and payload codecs and the reader order of [Locale Canonicalization Data Representation](#locale-canonicalization-data-representation); generate the artifact from the pinned inputs and check its semantic digest against an independent implementation |
 | 015 Phase 3 — Semantic Profile Resolver | Implement the vocabulary codec and reader order and the Policy and Target Profile envelope codecs of [Profile Resolution Input Representation](#profile-resolution-input-representation), with tuple establishment, canonical submitted bodies, admission keys, and canonical byte counts checked against an independent implementation; read the closed Resource Limit Policy and Trust Policy contents, and authenticate against an exact-pin Verification Input value |
 | 015 Phase 4 — Target and Compatibility Groups | Read the Target Profile's `directions` and `hydration.roles` for 015's target resolution and hydration validation |
-| 015 Phase 5 — Resolver Construction, Invocation, and Evidence | Implement the Verification Input codec and reader order of [Profile Resolution Input Representation](#profile-resolution-input-representation), with its integrity and semantic digest checked against an independent implementation, behind 015's pre-invocation boundary |
+| 015 Phase 5 — Resolver Construction, Invocation, and Evidence | Implement the Verification Input codec and reader order of [Profile Resolution Input Representation](#profile-resolution-input-representation), with its integrity and semantic digest checked against an independent implementation, behind 015's pre-invocation boundary; compute the Profile Specification and profile semantic digests under their registered domains, checked against an independent implementation |
 
 The reference-schema definition and record framing remove those specific design dependencies. They do not by themselves finish schema generation, owner projection, harness/CI integration, or any 015 Phase. Complete checked-profile artifacts, Policy/Target body admission, and full revision-`"0"` resolver conformance remain outside the minimum implementation claim. The locale canonicalization data representation likewise removes Phase 2's encoding dependency without completing Phase 2 by itself, and the profile resolution input representation removes Phase 3's encoding dependencies without completing Phase 3 or supplying 018's bodies and verification input.
 
@@ -1596,13 +1598,14 @@ Existing configuration, measurement, and authoring implementations need not adop
 | 017-024 | Establish a collection member's exact-reference tuple from its envelope and a semantic digest computed from its content; use the member's canonical value framing as its canonical submitted body, as its admission key when it has no tuple, and for its counted canonical bytes | 015's duplicate, conflict, ordering, and resource rules need one injective, transport-independent value per member that trusts neither a declared digest nor integrity |
 | 017-025 | Refine 017-014 and 017-023: encode the closed revision-`"0"` Resource Limit Policy and Trust Policy contents and the exact-pin Resource Limit Policy Verification Input, with its own integrity and semantic-digest domains, under 018's meaning | 018 now defines what the resolver admits, and a closed shape keeps an unread member from passing into a semantic digest |
 | 017-026 | Add a sorted, duplicate-free `hydration.roles` declaration to the Target Profile body without encoding hydration-coupled output | 015's hydration validation reads checked roles, while 020, 024, and 025 keep the minimum output hydration-free |
+| 017-027 | Register the `project-profile-specification-semantic-digest` and `localization-project-profile-semantic-digest` domains, and leave 015's construction-authority, Snapshot, Finding, Evidence, dependency, and accounting representations to 015 on this design's value framing | 015 assigned these representations here while this design deferred them back; 015 now owns them, and 016's `AuthoringBasis` needs the profile semantic digest |
 
 ## Deferred Follow-Up Notes
 
 These subjects remain assigned to 017 but are not prerequisites for the scoped configuration, observational measurement, or initial local authoring/identity paths:
 
 - cross-owner/library reference, candidate ranking, dependency, library, Locale Capsule, Runtime Manifest, multi-unit, hydration-coupled, and remote publication schemas beyond the Web localization minimum;
-- full Profile, construction-authority, Snapshot, binding, and Finding/Evidence representations;
+- a public checked-profile artifact and binding-sidecar representation; 015 owns the construction-authority, Snapshot, Finding, and Evidence representations;
 - locale canonicalization payload formats other than the ICU4X 2.2 blob, such as baked data;
 - the Glossary Set content schema, Resource Limit Policy sections beyond `projectProfileResolution`, and signed or allowlist-based Trust Policy content;
 - measurement capabilities not adopted by the minimum, including comparison/budget, qualification, profiling, campaigns, and cross-platform reports;
@@ -1615,7 +1618,7 @@ Any future extension must state its owning semantics and schema-version impact. 
 | Document | Relationship |
 | --- | --- |
 | [000 — Intlify overview](./000-intlify-overview-design.md) | Assigns 017's wider artifact and version-admission responsibilities; only the minimum subset is specified here |
-| [015 — Project profile and locale policy](./015-intlify-project-profile-and-locale-policy-design.md) | Owns the reference tuples, configuration use sites, minimal implementation boundaries, resolver semantics, the Locale Canonicalization Specification and conformance layer, and the checks over the vocabulary and the submitted collection, implemented using these encodings |
+| [015 — Project profile and locale policy](./015-intlify-project-profile-and-locale-policy-design.md) | Owns the reference tuples, configuration use sites, minimal implementation boundaries, resolver semantics, the Locale Canonicalization Specification and conformance layer, the checks over the vocabulary and the submitted collection, and its construction-authority, Snapshot, Finding, and Evidence representations, implemented using these encodings |
 | [016 — Source authoring and Intent identity](./016-intlify-source-authoring-and-intent-identity-design.md) | Owns recognition, message/revision meaning, source facts, continuity, and registry-transition validity; this document fixes the minimum shared representations without completing its later integrations |
 | [018 — Security, trust, and provenance](./018-intlify-security-trust-and-provenance-design.md) | Owns trust/authentication and the meaning of the Resource Limit Policy common body, the Trust Policy body, and the Resource Limit Policy Verification Input; digest and schema success supply neither |
 | [020 — Requirement planning and linking](./020-intlify-requirement-planning-and-linking-design.md) | Owns demand, reachability, and selection semantics for the plan and bundle records encoded here |
