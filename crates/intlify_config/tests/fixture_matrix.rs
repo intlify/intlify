@@ -1,14 +1,14 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! The Phase 2 and Phase 3 fixture matrices point at tests that exist.
+//! The Phase 2, 3, and 4 fixture matrices point at tests that exist.
 //!
 //! `fixtures/phase2/README.md` maps design 015's Phase 2 coverage to the tests
 //! that check it, in this crate and in the reference adapter, whose tests it
-//! marks. `fixtures/phase3/README.md` does the same for Phase 3, whose tests
-//! are all in this crate. A test that was renamed or removed would leave a row
-//! pointing at nothing, so every name a matrix gives is looked up where its row
-//! says.
+//! marks. `fixtures/phase3/README.md` and `fixtures/phase4/README.md` do the
+//! same for Phases 3 and 4, whose tests are all in this crate. A test that was
+//! renamed or removed would leave a row pointing at nothing, so every name a
+//! matrix gives is looked up where its row says.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -128,6 +128,30 @@ fn every_test_the_phase_3_matrix_names_is_a_test_in_this_crate() {
     }
     assert!(
         named.len() > 200,
+        "the matrix was read: {} names",
+        named.len()
+    );
+}
+
+#[test]
+fn every_test_the_phase_4_matrix_names_is_a_test_in_this_crate() {
+    let here = test_names(Path::new(env!("CARGO_MANIFEST_DIR")));
+    // Phase 3's file names only tests here too, so make sure this is Phase 4's.
+    let file = matrix("phase4");
+    assert!(
+        file.contains("\n# Phase 4 fixtures\n"),
+        "the Phase 4 matrix"
+    );
+    let named = named_tests(&file);
+    for (name, in_adapter) in &named {
+        assert!(!in_adapter, "Phase 4 names no adapter test: `{name}`");
+        assert!(
+            here.contains(name),
+            "the matrix names `{name}`, which is no test in intlify_config"
+        );
+    }
+    assert!(
+        named.len() > 100,
         "the matrix was read: {} names",
         named.len()
     );

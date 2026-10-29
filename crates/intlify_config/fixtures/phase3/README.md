@@ -209,7 +209,7 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 
 | Requirement | Owner |
 | --- | --- |
-| Target locale subsets, effective defaults, Target and Group IDs, the group partition, and hydration relations | Phase 4 (Algo 11 to 13). Phase 3 canonicalizes and counts every target locale occurrence |
+| Target locale subsets, effective defaults, Target and Group IDs, the group partition, and hydration relations | [Phase 4](../phase4/README.md) (Algo 11 to 13). Phase 3 canonicalizes and counts every target locale occurrence |
 | Construction, the Root Package, the capability as a constructed input, origins, tokens, locators, Findings, Evidence, outcomes, profile equality and digests, replay, and reporting bounds | Phase 5 |
 | `bootstrapOnly.artifactBootstrap`'s four bounds on the bootstrap's own work: `maxEnvelopeDepth`, `maxDecodedAllocationBytes`, `maxMetadataScanUnits`, and `maxValidationWorkUnits` | Phase 5, whose Capability Specification closes their units (plan 022 decision #119). Until then the bootstrap counts none of them and reports no `project-profile-bootstrap-limit-exceeded`; the collection's limits still bound every member |
 | The Suite Index, case manifests, and traceability | Phase 6 |
