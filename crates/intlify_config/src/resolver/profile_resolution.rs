@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! 015's Semantic Profile Resolver over one invocation: Phase 0 and Phases 4
-//! to 10 of the Deterministic Resolution Algorithm, in 015's order, over one
+//! to 11 of the Deterministic Resolution Algorithm, in 015's order, over one
 //! evaluation. Each phase takes the values the earlier ones admitted, or the
 //! causes of their absence, and evaluates every check whose prerequisites were
 //! admitted, so a blocking result leaves only the checks that depend on it not
@@ -12,9 +12,9 @@
 //! results: a configuration structural admission admitted whole, and the
 //! declaration Phase 3 provisionally selected in it. What the entry returns is
 //! crate-private semantic state, not a `LocalizationProjectProfile`, a checked
-//! or blocked outcome, or Resolution Evidence. Target, group, and hydration
-//! resolution and the profile projection are 015's Implementation Phases 4
-//! and 5.
+//! or blocked outcome, or Resolution Evidence. Group and hydration resolution
+//! come with the rest of 015's Implementation Phase 4, and the profile
+//! projection with its Implementation Phase 5.
 
 use crate::artifacts::collection::FormalCollection;
 use crate::artifacts::vocabulary::FormalVocabulary;
@@ -30,7 +30,7 @@ use super::bootstrap::ResourcePolicyVerification;
 use super::coverage::{resolve_coverage, CoveragePolicy};
 use super::delivery::{resolve_delivery, DeliveryPolicy};
 use super::evaluation::{Admitted, Causes, Evaluation, EvaluationInvariant};
-use super::exact_resolution::{resolve_references, ArtifactBindings, ResolvedReferences};
+use super::exact_resolution::{resolve_fields, ArtifactBindings, ResolvedReferences};
 use super::fallback::{resolve_fallback, MessageFallbackPolicy};
 use super::identity::{resolve_project_identity, ProjectIdentity};
 use super::limits::ImplementationCapability;
@@ -44,6 +44,7 @@ use super::specification::{
     admit_project_profile, admit_specifications, SpecificationInput, SpecificationSet,
     SupportedSpecifications,
 };
+use super::targets::{resolve_targets, ResolvedTargets};
 use super::vocabulary::SurfaceVocabulary;
 
 type Analysis = StructuralAnalysis<PolicyReference, TargetProfileReference>;
@@ -71,7 +72,7 @@ impl<'a> CompleteConfiguration<'a> {
     /// provisionally selected one of its declarations with `selector`; none
     /// otherwise. A configuration admitted only in part enters 015's
     /// resolution with fragment admission statuses, which come with
-    /// Implementation Phase 4.
+    /// Implementation Phase 5.
     pub(crate) fn new(
         analysis: &Analysis,
         config: &'a Config,
@@ -155,6 +156,9 @@ pub(crate) struct SemanticState<'s, Id> {
     pub(crate) bindings: Admitted<ArtifactBindings<'s>>,
     /// Phase 10.
     pub(crate) delivery: Admitted<DeliveryPolicy<Id>>,
+    /// Phase 11: each declared target's subset, effective default, and
+    /// Target Profile.
+    pub(crate) targets: Admitted<ResolvedTargets<'s>>,
 }
 
 /// A resolver defect some phase found, which no input can cause.
@@ -192,7 +196,7 @@ impl From<LocaleInvariant> for ResolverInvariant {
     }
 }
 
-/// Phase 0 and Phases 4 to 10 of one invocation over `evaluation`, in 015's
+/// Phase 0 and Phases 4 to 11 of one invocation over `evaluation`, in 015's
 /// order. `data` is the canonicalization data Phase 5 binds. The Profile
 /// Resolution Artifact Set Phase 9 admits is kept in `set`, which the resolved
 /// references and the bindings borrow.
@@ -266,7 +270,10 @@ where
         confirmed,
         invocation.collection,
     )?);
-    let references = resolve_references(evaluation, set.as_ref(), &declared)?;
+    // Each reference keeps its own result, which a target reads; the
+    // bindings need every one.
+    let results = resolve_fields(evaluation, set.as_ref(), &declared)?;
+    let references = results.all();
     let bindings = references
         .as_ref()
         .map(ArtifactBindings::bind)
@@ -276,6 +283,13 @@ where
         &admitted.delivery_graph,
         &admitted.delivery_placement,
         Ok(declaration.delivery.as_option()),
+    )?;
+    let targets = resolve_targets(
+        evaluation,
+        confirmed,
+        Ok(&declaration.target_profiles),
+        &locales,
+        &results,
     )?;
     Ok(SemanticState {
         specifications: SpecificationSet::new(&project_profile, &admitted),
@@ -289,6 +303,7 @@ where
         references,
         bindings,
         delivery,
+        targets,
     })
 }
 
@@ -323,6 +338,7 @@ mod tests {
     use crate::resolver::locales::{self, LocaleKey, LocaleSubject, Location};
     use crate::resolver::resource_policy::{self, PolicySlot, PolicySubject, ReferenceField};
     use crate::resolver::specification::{Slot, VocabularyAssertion};
+    use crate::resolver::targets::{self, TargetSubject};
     use crate::structural::selection::{Selection, StringLengthFact};
     use crate::structural::AuthoringSchema;
 
@@ -375,7 +391,7 @@ mod tests {
     const TRUST: usize = 1;
 
     /// The phases the entry runs, in 015's order.
-    const PHASES: [Phase; 8] = [
+    const PHASES: [Phase; 9] = [
         Phase::ResolverBootstrapAdmission,
         Phase::ResourcePolicyAdmission,
         Phase::SpecificationAdmission,
@@ -384,6 +400,7 @@ mod tests {
         Phase::LocalePolicyResolution,
         Phase::ArtifactReferenceResolution,
         Phase::DeliveryResolution,
+        Phase::TargetResolution,
     ];
 
     /// Phase 0's one unit.
@@ -720,6 +737,13 @@ mod tests {
             ("references", state.references.is_err()),
             ("bindings", state.bindings.is_err()),
             ("delivery", state.delivery.is_err()),
+            (
+                "targets",
+                state
+                    .targets
+                    .as_ref()
+                    .map_or(true, |targets| targets.complete().is_err()),
+            ),
         ]
         .into_iter()
         .filter_map(|(name, absent)| absent.then_some(name))
@@ -727,7 +751,7 @@ mod tests {
     }
 
     /// Every name `absent` returns when no policy was confirmed.
-    const EVERY: [&str; 11] = [
+    const EVERY: [&str; 12] = [
         "policy",
         "specifications",
         "vocabulary",
@@ -739,9 +763,10 @@ mod tests {
         "references",
         "bindings",
         "delivery",
+        "targets",
     ];
 
-    /// Whether every unit of Phases 5 to 10 waits on `key` alone.
+    /// Whether every unit of Phases 5 to 11 waits on `key` alone.
     fn later_phases_wait_on(evaluation: &Evaluation, key: &IssueKey) -> bool {
         evaluation
             .statuses()
@@ -810,6 +835,24 @@ mod tests {
                 .map(|(tuple, _)| tuple.clone())
                 .collect();
             assert_eq!(bound, submitted);
+            // The browser's own default and the server's inherited one, each
+            // target with the Target Profile its reference names.
+            let targets = state.targets.as_ref().unwrap();
+            for (id, requested, default) in [
+                ("browser", vec!["en", "ja"], "en"),
+                ("server", vec!["en"], "en"),
+            ] {
+                let id: crate::model::TargetId = serde_json::from_value(json!(id)).unwrap();
+                let target = targets.get(&id).unwrap().resolved.as_ref().unwrap();
+                assert_eq!(spellings(target.requested.as_slice()), requested);
+                assert_eq!(target.effective_default.as_str(), default);
+                let field = ReferenceField::TargetProfile(id);
+                let named = references
+                    .iter()
+                    .find(|(own, _, _)| **own == field)
+                    .unwrap();
+                assert_eq!(target.profile.0, named.1);
+            }
             assert_eq!(absent(&state), Vec::<&str>::new());
             assert_eq!(
                 state.policy.selector_length,
@@ -1043,8 +1086,9 @@ mod tests {
                     Some(Reason::DuplicateEnvelope)
                 )
             );
-            // The bootstrap checks only the selected policy's candidates.
-            assert_eq!(absent(&state), ["references", "bindings"]);
+            // The bootstrap checks only the selected policy's candidates. The
+            // targets are checked, but their Target Profiles need the Set.
+            assert_eq!(absent(&state), ["references", "bindings", "targets"]);
             // No Set: every reference waits on the collection.
             let key = only_issue(&evaluation);
             assert_eq!(
@@ -1082,7 +1126,7 @@ mod tests {
                     Some(Reason::ConflictingContent)
                 )
             );
-            assert_eq!(absent(&state), ["references", "bindings"]);
+            assert_eq!(absent(&state), ["references", "bindings", "targets"]);
         });
         // Another body of the selected policy is the bootstrap's conflict.
         let mut inputs = Inputs::complete();
@@ -1170,8 +1214,8 @@ mod tests {
                     Some(Reason::NotFound)
                 )]
             );
-            // Every other reference was resolved; only the bindings, which
-            // need every reference, are missing.
+            // Every other reference was resolved, the targets' among them;
+            // only the bindings, which need every reference, are missing.
             assert!(evaluation
                 .statuses()
                 .all(|(_, status)| *status == Status::Evaluated));
@@ -1185,6 +1229,24 @@ mod tests {
                 BTreeSet::from([key])
             );
             assert_eq!(absent(&state), ["references", "bindings"]);
+        });
+    }
+
+    #[test]
+    fn a_target_locale_outside_the_project_leaves_only_the_targets_unresolved() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["targetProfiles"]["server"]["requestedLocales"] = json!(["en", "de"]);
+        inputs.resolve(|evaluation, state| {
+            let server: crate::model::TargetId = serde_json::from_value(json!("server")).unwrap();
+            let subset = targets::unit(TargetSubject::Target(server), Check::ProjectSubset);
+            assert_eq!(
+                issues(&evaluation),
+                [(subset, Code::TargetLocalesNotSubset, None)]
+            );
+            assert!(evaluation
+                .statuses()
+                .all(|(_, status)| *status == Status::Evaluated));
+            assert_eq!(absent(&state), ["targets"]);
         });
     }
 

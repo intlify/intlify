@@ -251,7 +251,9 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::AdmissibleMember
         | Check::SingleOccurrence
         | Check::ConsistentContent
-        | Check::ResolvedReference => return Err(OutputFailure::ResourcePolicyInvariant),
+        | Check::ResolvedReference
+        | Check::ProjectSubset
+        | Check::SupportedDefault => return Err(OutputFailure::ResourcePolicyInvariant),
     });
     Ok(())
 }

@@ -212,12 +212,14 @@ pub(crate) struct FallbackLocales {
 }
 
 /// One target's locales as Phase 7 left them. The set holds the canonical
-/// identities even when a member repeats; Phase 11 checks the set and the
-/// default against the project's.
+/// identities even when a member repeats, which only `distinct` records;
+/// Phase 11 checks the set and the default against the project's.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TargetLocales {
     pub(crate) id: TargetId,
     pub(crate) requested: Admitted<LocaleSet>,
+    /// Whether no requested locale repeats.
+    pub(crate) distinct: Admitted<()>,
     pub(crate) default: Admitted<Option<CanonicalLocale>>,
 }
 
@@ -256,6 +258,10 @@ pub(crate) struct ResolvedLocales {
     /// The project's canonical requested locales, even when one repeats or
     /// there are too many: membership needs only their identities.
     pub(crate) requested_set: Admitted<LocaleSet>,
+    /// The project's canonical default requested locale, even when it is not
+    /// one of the requested locales: a target that inherits it needs only its
+    /// identity.
+    pub(crate) requested_default: Admitted<CanonicalLocale>,
     pub(crate) project: Admitted<ProjectLocales>,
     pub(crate) negotiation_aliases: Admitted<Vec<AliasLocales>>,
     pub(crate) message_fallback: Admitted<Vec<FallbackLocales>>,
@@ -292,7 +298,11 @@ pub(crate) fn resolve_locales<P: Provider, Target>(
         both(canonicalizer.map_err(Causes::clone), bounded.clone())
             .map(|(canonicalizer, ())| canonicalizer),
     );
-    let (requested_set, project) = project(&mut pass, policy, fields)?;
+    let ProjectResolution {
+        requested_set,
+        requested_default,
+        project,
+    } = project(&mut pass, policy, fields)?;
     let negotiation_aliases = match fields.locale_negotiation {
         Ok(negotiation) => Ok(pass.aliases(negotiation.and_then(|n| n.aliases.as_option()))?),
         Err(ref causes) => Err(causes.clone()),
@@ -310,6 +320,7 @@ pub(crate) fn resolve_locales<P: Provider, Target>(
         occurrence_bound: bounded,
         occurrences: pass.into_occurrences(),
         requested_set,
+        requested_default,
         project,
         negotiation_aliases,
         message_fallback,
@@ -317,14 +328,22 @@ pub(crate) fn resolve_locales<P: Provider, Target>(
     })
 }
 
-/// The project's requested set, checked for repeats and size, the default's
-/// membership in it, and the source default, with every independent check
-/// run.
+/// The project's requested set and canonical default as Phase 7 resolved
+/// them, and the project's locales once every check over them passed.
+struct ProjectResolution {
+    requested_set: Admitted<LocaleSet>,
+    requested_default: Admitted<CanonicalLocale>,
+    project: Admitted<ProjectLocales>,
+}
+
+/// The project's requested set, checked for repeats and size, the default and
+/// its membership in that set, and the source default, with every independent
+/// check run.
 fn project<P: Provider, Target>(
     pass: &mut Pass<'_, '_, P>,
     policy: Result<&ConfirmedPolicy, &Causes>,
     fields: &LocaleFields<'_, Target>,
-) -> Result<(Admitted<LocaleSet>, Admitted<ProjectLocales>), LocaleInvariant> {
+) -> Result<ProjectResolution, LocaleInvariant> {
     let requested = match fields.requested_locales {
         Ok(requested) => Ok(pass.spell(
             requested
@@ -371,10 +390,11 @@ fn project<P: Provider, Target>(
         Ok(None) => Ok(None),
         Err(ref causes) => Err(causes.clone()),
     };
+    let requested_default = default.and_then(|spelled| spelled.locale);
     let project = both(
         both(source, requested_set.clone()),
         both(
-            both(default.and_then(|spelled| spelled.locale), member),
+            both(requested_default.clone(), member),
             both(distinct, size),
         ),
     )
@@ -385,7 +405,11 @@ fn project<P: Provider, Target>(
             requested_default,
         },
     );
-    Ok((requested_set, project))
+    Ok(ProjectResolution {
+        requested_set,
+        requested_default,
+        project,
+    })
 }
 
 /// The default's unit: its canonical locale must be one of the project's
@@ -792,11 +816,13 @@ mod tests {
                 TargetLocales {
                     id: target("browser"),
                     requested: Ok(set(&["en"])),
+                    distinct: Ok(()),
                     default: Ok(Some(canonical("en"))),
                 },
                 TargetLocales {
                     id: target("server"),
                     requested: Ok(set(&["en"])),
+                    distinct: Ok(()),
                     default: Ok(None),
                 },
             ])
@@ -880,8 +906,10 @@ mod tests {
                 ))
             );
             // Repeats and the size block the project's locales, never the
-            // canonical set membership is checked against.
+            // canonical set membership is checked against, nor the default's
+            // identity a target inheriting it compares.
             assert_eq!(resolved.requested_set, Ok(set(&["de", "en", "he-IL"])));
+            assert_eq!(resolved.requested_default, Ok(canonical("fr")));
             assert_eq!(
                 units(&resolved.project.unwrap_err()),
                 expected

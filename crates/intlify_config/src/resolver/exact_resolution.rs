@@ -44,9 +44,7 @@ pub(crate) const fn unit(field: ReferenceField) -> Unit {
 /// `null` has no field here, and references repeating one exact tuple name the
 /// same artifact.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ResolvedReferences<'s>(
-    BTreeMap<ReferenceField, (&'s ExactTuple, &'s AdmittedArtifact<'s>)>,
-);
+pub(crate) struct ResolvedReferences<'s>(BTreeMap<ReferenceField, Named<'s>>);
 
 impl<'s> ResolvedReferences<'s> {
     pub(crate) fn iter(
@@ -88,6 +86,50 @@ impl<'s> ArtifactBindings<'s> {
     }
 }
 
+/// The Set's artifact one reference names, under that reference's tuple.
+pub(crate) type Named<'s> = (&'s ExactTuple, &'s AdmittedArtifact<'s>);
+
+/// Phase 9's ordinary exact resolution reference by reference: what each
+/// present reference names or why it names nothing, and the causes of the
+/// reference fields structural admission did not admit. A later phase that
+/// needs one reference reads its result alone, so a reference that failed
+/// leaves only what needs it unavailable.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ReferenceResults<'s> {
+    found: BTreeMap<ReferenceField, Admitted<Named<'s>>>,
+    unavailable: Option<Causes>,
+}
+
+impl<'s> ReferenceResults<'s> {
+    /// The result of the present reference at `field`, or `None` when the
+    /// declaration has none there: an explicit `null`, or a field structural
+    /// admission did not admit.
+    pub(crate) fn get(&self, field: &ReferenceField) -> Option<&Admitted<Named<'s>>> {
+        self.found.get(field)
+    }
+
+    /// The causes of the reference fields structural admission did not admit.
+    pub(crate) const fn unavailable(&self) -> Option<&Causes> {
+        self.unavailable.as_ref()
+    }
+
+    /// Every present reference's artifact, when each one resolved and no
+    /// reference field was unavailable: what the bindings need.
+    pub(crate) fn all(&self) -> Admitted<ResolvedReferences<'s>> {
+        let mut holds: Admitted<()> = self.unavailable.clone().map_or(Ok(()), Err);
+        let mut resolved = BTreeMap::new();
+        for (field, found) in &self.found {
+            match found {
+                Ok(found) => {
+                    resolved.insert(field.clone(), *found);
+                }
+                Err(causes) => holds = and(holds, Err(causes.clone())),
+            }
+        }
+        holds.map(|()| ResolvedReferences(resolved))
+    }
+}
+
 /// Phase 9's ordinary exact resolution. Each present reference is one unit
 /// under the Set. A field structural admission did not admit has no
 /// references to resolve, and its causes leave the resolution unavailable.
@@ -96,24 +138,27 @@ pub(crate) fn resolve_references<'s>(
     set: Result<&'s ArtifactSet<'s>, &Causes>,
     references: &DeclarationReferences<'_>,
 ) -> Result<Admitted<ResolvedReferences<'s>>, EvaluationInvariant> {
+    Ok(resolve_fields(evaluation, set, references)?.all())
+}
+
+/// The same resolution, with each reference's result kept apart.
+pub(crate) fn resolve_fields<'s>(
+    evaluation: &mut Evaluation,
+    set: Result<&'s ArtifactSet<'s>, &Causes>,
+    references: &DeclarationReferences<'_>,
+) -> Result<ReferenceResults<'s>, EvaluationInvariant> {
     let (present, unavailable) =
         references.visible(PolicyReference::tuple, TargetProfileReference::tuple);
     let prerequisite = set.map_err(Causes::clone);
-    let mut holds: Admitted<()> = unavailable.map_or(Ok(()), Err);
-    let mut resolved = BTreeMap::new();
+    let mut found = BTreeMap::new();
     for (field, reference) in present {
         let role = field.role_kind();
-        let found = evaluation.check(unit(field.clone()), prerequisite.clone(), |set| {
+        let result = evaluation.check(unit(field.clone()), prerequisite.clone(), |set| {
             resolve(set, &reference, role)
         })?;
-        match found {
-            Ok(found) => {
-                resolved.insert(field, found);
-            }
-            Err(causes) => holds = and(holds, Err(causes)),
-        }
+        found.insert(field, result);
     }
-    Ok(holds.map(|()| ResolvedReferences(resolved)))
+    Ok(ReferenceResults { found, unavailable })
 }
 
 /// One reference's decision: its own two checks, then the Set's artifact with
@@ -123,7 +168,7 @@ fn resolve<'s>(
     set: &'s ArtifactSet<'s>,
     reference: &ExactTuple,
     role: ArtifactKind,
-) -> Result<(&'s ExactTuple, &'s AdmittedArtifact<'s>), Blocking> {
+) -> Result<Named<'s>, Blocking> {
     let not_admitted = |reason| Blocking {
         code: Code::ArtifactReferenceNotAdmitted,
         reason: Some(reason),
