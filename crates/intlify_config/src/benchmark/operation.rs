@@ -27,8 +27,8 @@ use super::locale_resolution::Canonicalizers;
 use super::measure::{measure, Measured, MeasurementFailure};
 use super::observation::{self, Frame, Observation};
 use super::{
-    artifact_collection, locale, locale_icu4x, locale_resolution, resolved_binding,
-    resource_policy, target_group,
+    artifact_collection, hydration_relation, locale, locale_icu4x, locale_resolution,
+    resolved_binding, resource_policy, target_group,
 };
 
 pub(super) type Config = IntlifyConfig<PolicyReference, TargetProfileReference>;
@@ -50,10 +50,11 @@ pub(super) enum Operation {
     ArtifactCollectionAdmission,
     ResolvedBindingConstruction,
     TargetAndGroupResolution,
+    HydrationRelationValidation,
 }
 
 impl Operation {
-    pub(super) const ALL: [Self; 10] = [
+    pub(super) const ALL: [Self; 11] = [
         Self::FileMaterialization,
         Self::StructuralAnalysis,
         Self::AuthoringConstruction,
@@ -64,6 +65,7 @@ impl Operation {
         Self::ArtifactCollectionAdmission,
         Self::ResolvedBindingConstruction,
         Self::TargetAndGroupResolution,
+        Self::HydrationRelationValidation,
     ];
     pub(super) const fn phase(self) -> &'static str {
         match self {
@@ -74,7 +76,9 @@ impl Operation {
             Self::ResourcePolicyBootstrap
             | Self::ArtifactCollectionAdmission
             | Self::ResolvedBindingConstruction => "profile_artifact_admit",
-            Self::TargetAndGroupResolution => "profile_target_group_resolve",
+            Self::TargetAndGroupResolution | Self::HydrationRelationValidation => {
+                "profile_target_group_resolve"
+            }
         }
     }
     pub(super) const fn cost(self) -> &'static str {
@@ -89,6 +93,7 @@ impl Operation {
             Self::ArtifactCollectionAdmission => "complete_artifact_collection_admission",
             Self::ResolvedBindingConstruction => "resolved_binding_construction",
             Self::TargetAndGroupResolution => "target_and_group_resolution",
+            Self::HydrationRelationValidation => "hydration_relation_validation",
         }
     }
     pub(super) const fn boundary(self) -> &'static str {
@@ -103,6 +108,7 @@ impl Operation {
             Self::ArtifactCollectionAdmission => "artifact-collection-admission/0",
             Self::ResolvedBindingConstruction => "resolved-binding-construction/0",
             Self::TargetAndGroupResolution => "target-and-group-resolution/0",
+            Self::HydrationRelationValidation => "hydration-relation-validation/0",
         }
     }
 }
@@ -131,6 +137,7 @@ pub(super) enum Prepared {
     ArtifactCollection(Box<artifact_collection::PreparedCollection>),
     ResolvedBinding(Box<resolved_binding::PreparedBindings>),
     TargetAndGroup(Box<target_group::PreparedTargets>),
+    Hydration(Box<hydration_relation::PreparedHydration>),
     Icu4xLocale {
         engine: locale_icu4x::PreparedEngine,
         input: Arc<str>,
@@ -148,6 +155,7 @@ pub(super) enum Output {
     ArtifactCollection(artifact_collection::Resolved),
     ResolvedBinding(resolved_binding::Resolved),
     TargetAndGroup(target_group::Resolved),
+    Hydration(hydration_relation::Resolved),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -164,6 +172,7 @@ pub(super) enum OutputFailure {
     ArtifactCollectionInvariant,
     ResolvedBindingInvariant,
     TargetAndGroupResolutionInvariant,
+    HydrationRelationValidationInvariant,
 }
 
 impl Prepared {
@@ -179,6 +188,7 @@ impl Prepared {
             Self::ArtifactCollection(_) => Operation::ArtifactCollectionAdmission,
             Self::ResolvedBinding(_) => Operation::ResolvedBindingConstruction,
             Self::TargetAndGroup(_) => Operation::TargetAndGroupResolution,
+            Self::Hydration(_) => Operation::HydrationRelationValidation,
         }
     }
 
@@ -343,6 +353,23 @@ impl Prepared {
                     output: Output::TargetAndGroup(target_group::Resolved::retain(measured.output)),
                 })
             }
+            Self::Hydration(prepared) => {
+                // Every earlier phase runs before the start read; Phase 13's
+                // result owns its values.
+                let set = prepared
+                    .set()
+                    .ok_or(MeasurementFailure::PrerequisiteUnavailable)?;
+                let inputs = prepared
+                    .inputs(&set)
+                    .ok_or(MeasurementFailure::PrerequisiteUnavailable)?;
+                let measured = measure(clock, &inputs, hydration_relation::construct)?;
+                Ok(Measured {
+                    duration: measured.duration,
+                    output: Output::Hydration(hydration_relation::Resolved::retain(
+                        measured.output,
+                    )),
+                })
+            }
             Self::Icu4xLocale { engine, input } => {
                 // A fresh engine is admitted and bound before the start read
                 // and released after the end read.
@@ -368,6 +395,9 @@ impl Prepared {
             Self::ResourcePolicy(prepared) => prepared.inputs().is_some(),
             Self::ResolvedBinding(prepared) => prepared.inputs().is_some(),
             Self::TargetAndGroup(prepared) => prepared
+                .set()
+                .is_some_and(|set| prepared.inputs(&set).is_some()),
+            Self::Hydration(prepared) => prepared
                 .set()
                 .is_some_and(|set| prepared.inputs(&set).is_some()),
             _ => true,
@@ -403,6 +433,7 @@ impl Output {
             Self::ArtifactCollection(resolved) => artifact_collection::observe(resolved),
             Self::ResolvedBinding(resolved) => resolved_binding::observe(resolved),
             Self::TargetAndGroup(resolved) => target_group::observe(resolved),
+            Self::Hydration(resolved) => hydration_relation::observe(resolved),
         }
     }
 }

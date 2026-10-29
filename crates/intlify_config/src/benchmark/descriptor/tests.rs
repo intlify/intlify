@@ -62,8 +62,8 @@ fn all_active_pairs_keep_distinct_owner_boundaries_and_exact_method_meaning() {
         );
         assert!(!decoded.method.estimated_overhead_subtraction);
     }
-    assert_eq!(pairs.len(), 10);
-    assert_eq!(identities.len(), 10);
+    assert_eq!(pairs.len(), 11);
+    assert_eq!(identities.len(), 11);
 }
 
 #[test]
@@ -415,6 +415,7 @@ fn resource_policy_descriptor_binds_the_capability_and_the_collection() {
         "artifactCollectionInput",
         "resolvedBindingInput",
         "targetAndGroupInput",
+        "hydrationRelationInput",
     ] {
         assert_eq!(encoded[field], Value::Null, "{field}");
     }
@@ -469,6 +470,7 @@ fn artifact_collection_descriptor_binds_the_policy_and_the_collection() {
         "resourcePolicyInput",
         "resolvedBindingInput",
         "targetAndGroupInput",
+        "hydrationRelationInput",
     ] {
         assert_eq!(encoded[field], Value::Null, "{field}");
     }
@@ -524,6 +526,7 @@ fn resolved_binding_descriptor_binds_the_configuration_and_the_collection() {
         "resourcePolicyInput",
         "artifactCollectionInput",
         "targetAndGroupInput",
+        "hydrationRelationInput",
     ] {
         assert_eq!(encoded[field], Value::Null, "{field}");
     }
@@ -587,6 +590,7 @@ fn target_and_group_descriptor_binds_the_configuration_and_the_collection() {
         "resourcePolicyInput",
         "artifactCollectionInput",
         "resolvedBindingInput",
+        "hydrationRelationInput",
     ] {
         assert_eq!(encoded[field], Value::Null, "{field}");
     }
@@ -623,6 +627,71 @@ fn target_and_group_descriptor_binds_the_configuration_and_the_collection() {
                 .target_and_group_input
                 .is_some(),
             operation.operation() == Operation::TargetAndGroupResolution
+        );
+    }
+}
+
+#[test]
+fn hydration_relation_descriptor_binds_the_configuration_the_collection_and_the_answers() {
+    use crate::benchmark::cases::prepare::prepare;
+    use crate::benchmark::cases::{declarations, HydrationRecipe, Recipe};
+
+    let mut operation = prepared(Operation::HydrationRelationValidation);
+    let descriptors = Descriptors::for_acquisition(&operation, clock(1));
+    // Each invocation builds its own evaluation and state.
+    assert_eq!(descriptors.execution.scratch_reuse_state, "fresh");
+    let encoded = serde_json::to_value(&descriptors).unwrap();
+    // 015's second pair of the target and group resolution.
+    let boundary = &encoded["boundary"];
+    assert_eq!(boundary["identity"], "hydration-relation-validation/0");
+    assert_eq!(boundary["phase"], "profile_target_group_resolve");
+    assert_eq!(boundary["cost"], "hydration_relation_validation");
+    let input = &encoded["hydrationRelationInput"];
+    assert_eq!(input["selectedProfile"], "app");
+    assert_eq!(input["submittedMembers"], "7");
+    for field in [
+        "localeInput",
+        "localePolicyResolutionInput",
+        "admittedLocaleInput",
+        "resourcePolicyInput",
+        "artifactCollectionInput",
+        "resolvedBindingInput",
+        "targetAndGroupInput",
+    ] {
+        assert_eq!(encoded[field], Value::Null, "{field}");
+    }
+    // Another collection is another input.
+    let fan = declarations()
+        .into_iter()
+        .find(|case| {
+            case.fixture == Recipe::Hydration(HydrationRecipe::FanOutFanIn) && case.limit.is_none()
+        })
+        .unwrap();
+    let Prepared::Hydration(other) = prepare(&fan).unwrap().prepared else {
+        unreachable!()
+    };
+    let Prepared::Hydration(hydration) = &mut operation else {
+        unreachable!()
+    };
+    hydration.collection = other.collection;
+    assert_eq!(
+        descriptors.validate(&operation, clock(1)),
+        [DescriptorIssue::HydrationRelationInputBindingMismatch]
+    );
+    let original = prepared(Operation::HydrationRelationValidation);
+    let mut missing = encoded;
+    missing["hydrationRelationInput"] = Value::Null;
+    let decoded: Descriptors = serde_json::from_value(missing).unwrap();
+    assert_eq!(
+        decoded.validate(&original, clock(1)),
+        [DescriptorIssue::HydrationRelationInputBindingMismatch]
+    );
+    for operation in &operations() {
+        assert_eq!(
+            Descriptors::for_acquisition(operation, clock(1))
+                .hydration_relation_input
+                .is_some(),
+            operation.operation() == Operation::HydrationRelationValidation
         );
     }
 }

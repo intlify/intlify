@@ -420,8 +420,9 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
     Ok(())
 }
 
-/// A blocking result of Phase 11 or 12: its unit, code, and reason.
-fn issue(frame: &mut Frame, key: &IssueKey) -> Result<(), OutputFailure> {
+/// A blocking result of Phase 11 or 12: its unit, code, and reason. Phase 13
+/// frames the causes Phases 11 and 12 leave it with it.
+pub(super) fn issue(frame: &mut Frame, key: &IssueKey) -> Result<(), OutputFailure> {
     unit(frame, key.unit())?;
     frame.text(key.code().as_str());
     frame.flag(key.reason().is_some());

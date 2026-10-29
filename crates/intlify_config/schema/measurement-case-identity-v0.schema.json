@@ -97,7 +97,7 @@
     },
     "CaseProjection": {
       "additionalProperties": false,
-      "description": "Exactly the applicable 026 Case dimensions. No source path, build revision,\nclock observation, run/record ID, expected result checksum, or sample value.\nArtifact/Target/Release/service-profile and memory-domain fields do not apply\nto these ten internal duration boundaries and are absent, not guessed.",
+      "description": "Exactly the applicable 026 Case dimensions. No source path, build revision,\nclock observation, run/record ID, expected result checksum, or sample value.\nArtifact/Target/Release/service-profile and memory-domain fields do not apply\nto these eleven internal duration boundaries and are absent, not guessed.",
       "properties": {
         "category": {
           "$ref": "#/definitions/Category"
@@ -246,6 +246,30 @@
       "enum": ["same-process-synchronous-ordinary-core"],
       "type": "string"
     },
+    "HydrationRecipe": {
+      "enum": [
+        "no-relations",
+        "storefront",
+        "fan-out-fan-in",
+        "fan-reordered",
+        "many-relations",
+        "equal-endpoint",
+        "unknown-endpoint",
+        "cross-group",
+        "duplicate-relation",
+        "server-capability-missing",
+        "client-capability-missing",
+        "dual-role",
+        "requested-locales",
+        "effective-default",
+        "static-incompatibility",
+        "endpoint-locales-unresolved",
+        "group-members-unresolved",
+        "target-profile-missing",
+        "negotiation-unavailable"
+      ],
+      "type": "string"
+    },
     "Icu4xRecipe": {
       "description": "Inputs canonicalized through the ICU4X provider over revision \"0\"'s\nartifact: small, scaled to a long identifier, and invalid at its first and\nits last subtag.",
       "enum": [
@@ -297,7 +321,9 @@
         "deployment-groups",
         "group-id-bytes",
         "members-per-group",
-        "membership-occurrences"
+        "membership-occurrences",
+        "hydration-relations",
+        "hydration-endpoint-bytes"
       ],
       "type": "string"
     },
@@ -505,7 +531,8 @@
         "resource-policy-bootstrap",
         "artifact-collection-admission",
         "resolved-binding-construction",
-        "target-and-group-resolution"
+        "target-and-group-resolution",
+        "hydration-relation-validation"
       ],
       "type": "string"
     },
@@ -732,6 +759,16 @@
             }
           },
           "required": ["target-and-group"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "hydration": {
+              "$ref": "#/definitions/HydrationRecipe"
+            }
+          },
+          "required": ["hydration"],
           "type": "object"
         }
       ]
@@ -998,7 +1035,16 @@
         "target-and-group-not-evaluated-units",
         "target-and-group-blocking-issues",
         "target-and-group-resolved-targets",
-        "target-and-group-resolved-groups"
+        "target-and-group-resolved-groups",
+        "hydration-relation-occurrences",
+        "hydration-distinct-relations",
+        "hydration-maximum-endpoint-id-bytes",
+        "hydration-role-targets",
+        "hydration-evaluation-units",
+        "hydration-not-evaluated-units",
+        "hydration-blocking-issues",
+        "hydration-checked-relations",
+        "hydration-checked-groups"
       ],
       "type": "string"
     },
@@ -1034,7 +1080,9 @@
         "rule-cell-comparison",
         "target-declaration",
         "deployment-group",
-        "membership-occurrence"
+        "membership-occurrence",
+        "relation-occurrence",
+        "hydration-relation"
       ],
       "type": "string"
     },

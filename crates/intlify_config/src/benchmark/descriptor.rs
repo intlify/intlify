@@ -232,6 +232,8 @@ pub(super) struct Descriptors {
     pub(super) resolved_binding_input: Option<super::resolved_binding::InputFacts>,
     #[serde(deserialize_with = "Option::deserialize")]
     pub(super) target_and_group_input: Option<super::target_group::InputFacts>,
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub(super) hydration_relation_input: Option<super::hydration_relation::InputFacts>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -248,6 +250,7 @@ pub(super) enum DescriptorIssue {
     ArtifactCollectionInputBindingMismatch,
     ResolvedBindingInputBindingMismatch,
     TargetAndGroupInputBindingMismatch,
+    HydrationRelationInputBindingMismatch,
 }
 
 impl Descriptors {
@@ -272,6 +275,7 @@ impl Descriptors {
             artifact_collection_input: collection(prepared),
             resolved_binding_input: binding(prepared),
             target_and_group_input: targets(prepared),
+            hydration_relation_input: hydration(prepared),
         }
     }
 
@@ -329,6 +333,9 @@ impl Descriptors {
         }
         if self.target_and_group_input != targets(prepared) {
             issues.push(DescriptorIssue::TargetAndGroupInputBindingMismatch);
+        }
+        if self.hydration_relation_input != hydration(prepared) {
+            issues.push(DescriptorIssue::HydrationRelationInputBindingMismatch);
         }
         issues
     }
@@ -392,6 +399,16 @@ fn targets(prepared: &Prepared) -> Option<super::target_group::InputFacts> {
     match prepared {
         Prepared::TargetAndGroup(prepared) => {
             Some(super::target_group::InputFacts::observe(prepared))
+        }
+        _ => None,
+    }
+}
+
+/// The configuration, collection, and answer facts of a Phase 13 case.
+fn hydration(prepared: &Prepared) -> Option<super::hydration_relation::InputFacts> {
+    match prepared {
+        Prepared::Hydration(prepared) => {
+            Some(super::hydration_relation::InputFacts::observe(prepared))
         }
         _ => None,
     }

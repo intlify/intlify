@@ -9,7 +9,7 @@ use crate::locale::{CanonicalizationFailure, ProviderFailure};
 #[test]
 fn canonicalization_cases_extend_the_catalog_without_changing_the_original_inventory() {
     let cases = declarations();
-    assert_eq!(cases.len(), 280);
+    assert_eq!(cases.len(), 303);
     assert!(cases[..77]
         .iter()
         .all(|case| case.operation != Operation::LocaleCanonicalization));

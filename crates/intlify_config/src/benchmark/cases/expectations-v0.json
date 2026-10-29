@@ -37951,6 +37951,2444 @@
           }
         ]
       }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "no-relations"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-complete"
+      },
+      "inputContext": "823d1d70236fa07e8cf4df0170822e11ff32ddc8c558bc5a59fa7edb1c283906",
+      "result": {
+        "shared": "2bc9a55cf3c895beb8fb9a98893c7c54b84ff4ec17caac789fe37866ecce4c7d",
+        "entry": null
+      },
+      "logicalWork": "f8c960211fd728dfabbd2d87de5efd46f3065ac3ea15e5d019d33662fb9838bb",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-complete"
+      },
+      "inputContext": "8b21df32caa15f69dca2fdcf5aa494a700028d24f71494426b8ae3dfa254a125",
+      "result": {
+        "shared": "d7271d1ebab678c7803390fee8b55f191b9d447211b3049ed85b63ef147dcfc3",
+        "entry": null
+      },
+      "logicalWork": "a9a032ade6f8e1e6c309d30443534b800c46df8f44016eae576e9fce2df47f69",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "fan-out-fan-in"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-complete"
+      },
+      "inputContext": "163992ca88bcbcab12f0f47c12ac0e98e2f7754516ca7657e82ff90ed794a409",
+      "result": {
+        "shared": "2ad207c91029f8964177c8649077df2ba29a77342b1dbb6825e387c0f1dfa352",
+        "entry": null
+      },
+      "logicalWork": "099b62c6afbd7a596c7f5c5045d34f59310fbb4b6f42ee829f798b4b92fa48d3",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "35"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "fan-reordered"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-complete"
+      },
+      "inputContext": "2343949da816626b051b3d16f8cfc961b0b5d7052f7211e2e077e1f80b798ee9",
+      "result": {
+        "shared": "2ad207c91029f8964177c8649077df2ba29a77342b1dbb6825e387c0f1dfa352",
+        "entry": null
+      },
+      "logicalWork": "099b62c6afbd7a596c7f5c5045d34f59310fbb4b6f42ee829f798b4b92fa48d3",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "35"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "many-relations"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-complete"
+      },
+      "inputContext": "1aba1df80cb238cc72a5b043722ada582f43097483bf12d68fb2a3307d4c875a",
+      "result": {
+        "shared": "d5c2f274cec2b7fb4e8ce40d98276ab95007a4e2baa66c41c2cc83284f0caa77",
+        "entry": null
+      },
+      "logicalWork": "07e1ab2e1676b55e71e697df4a5125d8e12397227b5557a52d0ee279dc637628",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "16"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "657"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "equal-endpoint"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-blocked"
+      },
+      "inputContext": "85867edde668e27ea3803862347441aba9161924484024bf9a2c7977367329e1",
+      "result": {
+        "shared": "d5b85f7cc9196e1db76b96a041ce9b80dbe9afdba5d244da0a9a50f60efb7924",
+        "entry": null
+      },
+      "logicalWork": "4ad2b60358edb00becdde2acfae2dc74ee67818358222dabffee9a25b2fc3712",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "23"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "unknown-endpoint"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-blocked"
+      },
+      "inputContext": "dc51b09f81e7ed4bbac093037c32cafb9c641e93d1caf2bb8b67f8a7a87947dc",
+      "result": {
+        "shared": "bc28144611e1446b7c524e5b52677b87493d5d8e532611c4d20fcd90f2a677fb",
+        "entry": null
+      },
+      "logicalWork": "435f4a65f299a1a3abbd8c38c288d7225254dc29e82ad9ea109ec5b5705dd212",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "24"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "cross-group"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-blocked"
+      },
+      "inputContext": "ec2137d9f8a42345ad7f3b48701617dd8fe91b7371fa3b72a124c24abc924c11",
+      "result": {
+        "shared": "9ad900e92edf3869ecc1768ca4c2339430dafd789ca5b3225f8efb5a3ecb6f81",
+        "entry": null
+      },
+      "logicalWork": "123ec02e2d1a802ac5d13bd172c62ff74dbe0c201630118af1215b5b44587b87",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "24"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "duplicate-relation"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-blocked"
+      },
+      "inputContext": "94ddc49f796a83ef065475e1d6c1079439c2ced5d0737774c9749a09e9c79740",
+      "result": {
+        "shared": "e5f95a951ae88c56af646063089318ab5c9b75fbd81edf677abf933156a5ea44",
+        "entry": null
+      },
+      "logicalWork": "f7788f7ed256223ad53b764e7df2aa20baa886376e72b7d338e03ec52b9d91f6",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "server-capability-missing"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-blocked"
+      },
+      "inputContext": "e9ff2254206801f07e1f39eb73d3e6760e106688cee6fc6a69aa25789b00d46d",
+      "result": {
+        "shared": "f77ab0326caad5d0a9923ca76abc017d07b27a93a738ff9f224694513c864fe4",
+        "entry": null
+      },
+      "logicalWork": "af4f0117a332a760cd9b6cc6a97ace15a2dd8f2939aa475c6de64c50c48327a9",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "client-capability-missing"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-blocked"
+      },
+      "inputContext": "3a40ece79481c99bafb5037b2c46ad0e7f2b4e2a07f8ed52354753db861b4f41",
+      "result": {
+        "shared": "ebffb46b9e8153e56cfb532d1fcc77940287f40518fa3304b0b428bd0c04e7c0",
+        "entry": null
+      },
+      "logicalWork": "af4f0117a332a760cd9b6cc6a97ace15a2dd8f2939aa475c6de64c50c48327a9",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "dual-role"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-blocked"
+      },
+      "inputContext": "3a500f4aa2964d175dc3c067750fee7b60ba16fbb20cb064452b270ed0e0348a",
+      "result": {
+        "shared": "f41c2bc2c136cb58ccc9a512e5e13074e2bb95391faf48f33879bf869607aa45",
+        "entry": null
+      },
+      "logicalWork": "2976416e99ab65206210a77e405be74c959873adec4f5bdd8bfa9d8da234a3ad",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "24"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "requested-locales"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-blocked"
+      },
+      "inputContext": "4000879e1828db9c952369034fb2ace1c9c4ab0feab028a99cfb393ae6dd14a3",
+      "result": {
+        "shared": "a1e7d05703dc92cf783919e77b627e8bc13a40938f7dcdb05faf5e3c7261cdc8",
+        "entry": null
+      },
+      "logicalWork": "1ade8877dac70f543fbc4f331eb830c26eb31ad441f49e7a517b48c70113fc56",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "effective-default"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-blocked"
+      },
+      "inputContext": "353f74d773b95c1d1d9e1aab1bc17922750f60e154a40e779295dde87048e3db",
+      "result": {
+        "shared": "d6ab583ae10f3df6cc8d9dc59f9809bf95c0b8689617da1c10e66cbf4fe08351",
+        "entry": null
+      },
+      "logicalWork": "1ade8877dac70f543fbc4f331eb830c26eb31ad441f49e7a517b48c70113fc56",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "static-incompatibility"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-blocked"
+      },
+      "inputContext": "2cfcbbcf47f0023b5f83af6ef789fdce3e4b07c338f04ede90a017b054a0ee55",
+      "result": {
+        "shared": "524444cd9a5834c88d29c053e86c0b16aad48367886602b409e645ae2a9928b2",
+        "entry": null
+      },
+      "logicalWork": "1ade8877dac70f543fbc4f331eb830c26eb31ad441f49e7a517b48c70113fc56",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "endpoint-locales-unresolved"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-blocked"
+      },
+      "inputContext": "3b15257d3873cb5054c3a741815f7957d41ad7eb21a6f8557c196edf8020d119",
+      "result": {
+        "shared": "3ae5c9b0bc4263b6fd0fc0d3377a38aadfc219c67eaef6cad10cd3c93f2b04cf",
+        "entry": null
+      },
+      "logicalWork": "1c13c699447492193404d823e7d162a81f7d88c9a9490d74112379491b9fb980",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "group-members-unresolved"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-blocked"
+      },
+      "inputContext": "3c611f120d05fe59e7fbc4aff6271c2ac79c5f01efa5730bdc907245d8041fdc",
+      "result": {
+        "shared": "57cac0d97caa512dee2b2d9a764c9552b267e05e732ed90dcf772d90a6f841f0",
+        "entry": null
+      },
+      "logicalWork": "35d60d5c54b9e1e5ab46396087908023fd6fcb1953ffb7624ab82fea0b0208d1",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "target-profile-missing"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-blocked"
+      },
+      "inputContext": "4ba7feab195416b636597a76969fce2719df76f9010e42481f1f42b4be07fce5",
+      "result": {
+        "shared": "a4ab3ebf7deaf5cae5cd178c8fc6a9fbd02c4144e36e16d746ac441725eca4bf",
+        "entry": null
+      },
+      "logicalWork": "69fde90591fd2d2649a947ab418842fd5fd52aa03cd75472c3d779483ab84f1c",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "negotiation-unavailable"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-blocked"
+      },
+      "inputContext": "dbebaf6b19fd631a6234bc2acd9aaccf37e9fb42ebe8a433f3123c0900c94042",
+      "result": {
+        "shared": "75354d500e514275ee5c4e0e3c4910bac26371c0a6e7f9fdd9fb09395eabfbb7",
+        "entry": null
+      },
+      "logicalWork": "a9a032ade6f8e1e6c309d30443534b800c46df8f44016eae576e9fce2df47f69",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "fan-out-fan-in"
+        },
+        "fixtureRevision": "0",
+        "limit": ["hydration-relations", "exact"],
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-complete"
+      },
+      "inputContext": "dba58ef9578ab85d0038690640c7ea98a523197b08e8cd10beb5ce6a719a528a",
+      "result": {
+        "shared": "2ad207c91029f8964177c8649077df2ba29a77342b1dbb6825e387c0f1dfa352",
+        "entry": null
+      },
+      "logicalWork": "099b62c6afbd7a596c7f5c5045d34f59310fbb4b6f42ee829f798b4b92fa48d3",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "35"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "fan-out-fan-in"
+        },
+        "fixtureRevision": "0",
+        "limit": ["hydration-relations", "first-over"],
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-blocked"
+      },
+      "inputContext": "96588975775e6666cb1df0e64bc505e387deec5b3f44e67b9d9dd462522eaba5",
+      "result": {
+        "shared": "005808411e6d880828e660e4b2e310e5943993b240b1ac848382179bc571b511",
+        "entry": null
+      },
+      "logicalWork": "21b17cededdc371963b74150f3485da0774c01840672a5656e864a63e4fe0d9a",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "35"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "34"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["hydration-endpoint-bytes", "exact"],
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-complete"
+      },
+      "inputContext": "cbbbfbce8b851d419edacbe612e0e0416997cfee03ac6eaa92d4203c1ebe0e22",
+      "result": {
+        "shared": "d7271d1ebab678c7803390fee8b55f191b9d447211b3049ed85b63ef147dcfc3",
+        "entry": null
+      },
+      "logicalWork": "a9a032ade6f8e1e6c309d30443534b800c46df8f44016eae576e9fce2df47f69",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "hydration-relation-validation",
+        "fixture": {
+          "hydration": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["hydration-endpoint-bytes", "first-over"],
+        "selector": "app",
+        "expectedKind": "hydration-relation-validation-blocked"
+      },
+      "inputContext": "623fe8bfe8cd7bc5eaea4321b6a34f5a981981d068f6014cb24b778f11be2667",
+      "result": {
+        "shared": "471086656a21c33dc2c7402f67bd161b179d50ce4cbd55b4e362740a3ec0dee1",
+        "entry": null
+      },
+      "logicalWork": "182d86204997aeca17fe62ee213b24fea3fb4f6786d19b469a0559402b9c1f0e",
+      "work": {
+        "profileIdentity": "intlify-config-hydration-relation-validation-work",
+        "profileRevision": "0",
+        "operation": "hydration-relation-validation",
+        "facts": [
+          {
+            "kind": "hydration-relation-occurrences",
+            "unit": "relation-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-distinct-relations",
+            "unit": "hydration-relation",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-maximum-endpoint-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "hydration-role-targets",
+            "unit": "target-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "hydration-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "hydration-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "11"
+            }
+          },
+          {
+            "kind": "hydration-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "hydration-checked-relations",
+            "unit": "hydration-relation",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "hydration-checked-groups",
+            "unit": "deployment-group",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
     }
   ]
 }
