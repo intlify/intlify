@@ -37,7 +37,7 @@ fn analysis(value: &Value) -> Analysis {
         .unwrap()
 }
 
-pub(crate) fn operations() -> [Prepared; 9] {
+pub(crate) fn operations() -> [Prepared; 10] {
     let source: Arc<[u8]> = Arc::from(serde_json::to_vec(&minimal_config()).unwrap());
     let doc = Arc::new(
         materialize_file(Arc::clone(&source), crate::materialize_tests::limits()).unwrap(),
@@ -72,6 +72,7 @@ pub(crate) fn operations() -> [Prepared; 9] {
         policy_operation(),
         collection_operation(),
         binding_operation(),
+        target_group_operation(),
     ]
 }
 
@@ -114,6 +115,20 @@ pub(crate) fn binding_operation() -> Prepared {
     let declaration = declarations()
         .into_iter()
         .find(|case| case.fixture == Recipe::ResolvedBinding(ResolvedBindingRecipe::RequiredOnly))
+        .unwrap();
+    crate::benchmark::cases::prepare::prepare(&declaration)
+        .unwrap()
+        .prepared
+}
+
+/// Phases 11 and 12 over the minimal declaration's one target in one group,
+/// as its case prepares it.
+pub(crate) fn target_group_operation() -> Prepared {
+    use crate::benchmark::cases::{declarations, Recipe, TargetAndGroupRecipe};
+
+    let declaration = declarations()
+        .into_iter()
+        .find(|case| case.fixture == Recipe::TargetAndGroup(TargetAndGroupRecipe::Minimal))
         .unwrap();
     crate::benchmark::cases::prepare::prepare(&declaration)
         .unwrap()
@@ -201,6 +216,12 @@ fn every_active_pair_calls_its_real_core_operation_between_exact_markers() {
                 assert_eq!(resolved.evaluation.issues().count(), 0);
                 let retained = resolved.result.as_ref().unwrap().as_ref().unwrap();
                 assert_eq!(retained.bindings.len(), 6);
+            }
+            Output::TargetAndGroup(resolved) => {
+                assert_eq!(resolved.evaluation.issues().count(), 0);
+                let retained = resolved.result.as_ref().unwrap().as_ref().unwrap();
+                assert_eq!((retained.targets.len(), retained.groups.len()), (1, 1));
+                assert!(retained.targets[0].resolved.is_ok() && retained.partition.is_ok());
             }
             _ => panic!("unexpected owner operation result"),
         }

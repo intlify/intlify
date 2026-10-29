@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Finite owner case declarations for the nine active boundaries.
+//! Finite owner case declarations for the ten active boundaries.
 //! This is not a common Run Plan, case-identity codec, or a complete 015 suite.
 //! Preparation yields an unadmitted candidate; the separate fixture registry
 //! binds its exact input/result/work before method-bound collection can use it.
@@ -20,6 +20,8 @@ mod collection_inputs;
 pub(super) use collection_inputs::ArtifactCollectionRecipe;
 mod binding_inputs;
 pub(super) use binding_inputs::ResolvedBindingRecipe;
+mod target_group_inputs;
+pub(super) use target_group_inputs::TargetAndGroupRecipe;
 mod context;
 pub(super) mod prepare;
 pub(super) mod registry;
@@ -59,6 +61,12 @@ pub(super) enum LimitKind {
     BootstrapArtifacts,
     RecheckArtifacts,
     RecheckProfileIdBytes,
+    TargetProfiles,
+    TargetIdBytes,
+    DeploymentGroups,
+    GroupIdBytes,
+    MembersPerGroup,
+    MembershipOccurrences,
 }
 
 impl LimitKind {
@@ -114,6 +122,8 @@ pub(super) enum ExpectedKind {
     ArtifactCollectionBlocked,
     ResolvedBindingConstructed,
     ResolvedBindingBlocked,
+    TargetAndGroupResolutionComplete,
+    TargetAndGroupResolutionBlocked,
 }
 
 #[derive(
@@ -316,7 +326,8 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 | Operation::LocalePolicyResolution
                 | Operation::ResourcePolicyBootstrap
                 | Operation::ArtifactCollectionAdmission
-                | Operation::ResolvedBindingConstruction => unreachable!(),
+                | Operation::ResolvedBindingConstruction
+                | Operation::TargetAndGroupResolution => unreachable!(),
             };
             let selector = if operation == Operation::ProfileSelection {
                 Selector::App
@@ -669,6 +680,48 @@ pub(super) fn declarations() -> Vec<Declaration> {
             ));
         }
     }
+    // Append 015 Phases 11 and 12 without changing any of the 252 rows: every
+    // recipe, then the exact and first-over edges of their six bounds.
+    let expected = |completes| {
+        if completes {
+            ExpectedKind::TargetAndGroupResolutionComplete
+        } else {
+            ExpectedKind::TargetAndGroupResolutionBlocked
+        }
+    };
+    for recipe in TargetAndGroupRecipe::ALL {
+        cases.push(declaration(
+            Operation::TargetAndGroupResolution,
+            Recipe::TargetAndGroup(recipe),
+            Selector::App,
+            expected(recipe.completes()),
+        ));
+    }
+    for (limit, recipe) in [
+        (LimitKind::TargetProfiles, TargetAndGroupRecipe::Storefront),
+        (LimitKind::TargetIdBytes, TargetAndGroupRecipe::Storefront),
+        (
+            LimitKind::DeploymentGroups,
+            TargetAndGroupRecipe::ManyGroups,
+        ),
+        (LimitKind::GroupIdBytes, TargetAndGroupRecipe::Storefront),
+        (LimitKind::MembersPerGroup, TargetAndGroupRecipe::Storefront),
+        (
+            LimitKind::MembershipOccurrences,
+            TargetAndGroupRecipe::Storefront,
+        ),
+    ] {
+        for edge in [LimitEdge::Exact, LimitEdge::FirstOver] {
+            let mut case = declaration(
+                Operation::TargetAndGroupResolution,
+                Recipe::TargetAndGroup(recipe),
+                Selector::App,
+                expected(edge == LimitEdge::Exact),
+            );
+            case.limit = Some((limit, edge));
+            cases.push(case);
+        }
+    }
     cases
 }
 
@@ -726,3 +779,6 @@ mod collection_tests;
 
 #[cfg(test)]
 mod binding_tests;
+
+#[cfg(test)]
+mod target_group_tests;

@@ -230,6 +230,8 @@ pub(super) struct Descriptors {
     pub(super) artifact_collection_input: Option<super::artifact_collection::InputFacts>,
     #[serde(deserialize_with = "Option::deserialize")]
     pub(super) resolved_binding_input: Option<super::resolved_binding::InputFacts>,
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub(super) target_and_group_input: Option<super::target_group::InputFacts>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -245,6 +247,7 @@ pub(super) enum DescriptorIssue {
     ResourcePolicyInputBindingMismatch,
     ArtifactCollectionInputBindingMismatch,
     ResolvedBindingInputBindingMismatch,
+    TargetAndGroupInputBindingMismatch,
 }
 
 impl Descriptors {
@@ -268,6 +271,7 @@ impl Descriptors {
             resource_policy_input: policy(prepared),
             artifact_collection_input: collection(prepared),
             resolved_binding_input: binding(prepared),
+            target_and_group_input: targets(prepared),
         }
     }
 
@@ -323,6 +327,9 @@ impl Descriptors {
         if self.resolved_binding_input != binding(prepared) {
             issues.push(DescriptorIssue::ResolvedBindingInputBindingMismatch);
         }
+        if self.target_and_group_input != targets(prepared) {
+            issues.push(DescriptorIssue::TargetAndGroupInputBindingMismatch);
+        }
         issues
     }
 }
@@ -375,6 +382,16 @@ fn binding(prepared: &Prepared) -> Option<super::resolved_binding::InputFacts> {
     match prepared {
         Prepared::ResolvedBinding(prepared) => {
             Some(super::resolved_binding::InputFacts::observe(prepared))
+        }
+        _ => None,
+    }
+}
+
+/// The configuration and collection facts of a Phase 11 and 12 case.
+fn targets(prepared: &Prepared) -> Option<super::target_group::InputFacts> {
+    match prepared {
+        Prepared::TargetAndGroup(prepared) => {
+            Some(super::target_group::InputFacts::observe(prepared))
         }
         _ => None,
     }

@@ -100,7 +100,7 @@ fn issues(resolved: &Resolved) -> Vec<(String, Code)> {
 #[test]
 fn resolution_cases_keep_their_rows_and_append_after_the_icu4x_rows() {
     let cases = declarations();
-    assert_eq!(cases.len(), 252);
+    assert_eq!(cases.len(), 280);
     let resolution = |cases: &[Declaration]| {
         cases
             .iter()
@@ -119,8 +119,8 @@ fn resolution_cases_keep_their_rows_and_append_after_the_icu4x_rows() {
         .all(|case| case.operation != Operation::LocalePolicyResolution));
     // Phase 8's workloads follow the Phase 9 rows: the finite recipes, the
     // eight bounds' edges on every role, and the ICU4X scales.
-    assert!(resolution(&cases[213..]));
-    assert!(cases[244..].iter().all(|case| matches!(
+    assert!(resolution(&cases[213..252]));
+    assert!(cases[244..252].iter().all(|case| matches!(
         case.fixture,
         Recipe::Icu4xLocalePolicyResolution { input, .. }
             if R::POLICY_ICU4X.contains(&input)
@@ -131,7 +131,7 @@ fn resolution_cases_keep_their_rows_and_append_after_the_icu4x_rows() {
         (&cases[150..160], 0),
         (&cases[213..228], 0),
         (&cases[228..244], 16),
-        (&cases[244..], 0),
+        (&cases[244..252], 0),
     ] {
         assert_eq!(
             rows.iter().filter(|case| case.limit.is_some()).count(),

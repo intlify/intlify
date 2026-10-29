@@ -62,8 +62,8 @@ fn all_active_pairs_keep_distinct_owner_boundaries_and_exact_method_meaning() {
         );
         assert!(!decoded.method.estimated_overhead_subtraction);
     }
-    assert_eq!(pairs.len(), 9);
-    assert_eq!(identities.len(), 9);
+    assert_eq!(pairs.len(), 10);
+    assert_eq!(identities.len(), 10);
 }
 
 #[test]
@@ -414,6 +414,7 @@ fn resource_policy_descriptor_binds_the_capability_and_the_collection() {
         "admittedLocaleInput",
         "artifactCollectionInput",
         "resolvedBindingInput",
+        "targetAndGroupInput",
     ] {
         assert_eq!(encoded[field], Value::Null, "{field}");
     }
@@ -467,6 +468,7 @@ fn artifact_collection_descriptor_binds_the_policy_and_the_collection() {
         "admittedLocaleInput",
         "resourcePolicyInput",
         "resolvedBindingInput",
+        "targetAndGroupInput",
     ] {
         assert_eq!(encoded[field], Value::Null, "{field}");
     }
@@ -521,6 +523,7 @@ fn resolved_binding_descriptor_binds_the_configuration_and_the_collection() {
         "admittedLocaleInput",
         "resourcePolicyInput",
         "artifactCollectionInput",
+        "targetAndGroupInput",
     ] {
         assert_eq!(encoded[field], Value::Null, "{field}");
     }
@@ -554,6 +557,72 @@ fn resolved_binding_descriptor_binds_the_configuration_and_the_collection() {
                 .resolved_binding_input
                 .is_some(),
             operation.operation() == Operation::ResolvedBindingConstruction
+        );
+    }
+}
+
+#[test]
+fn target_and_group_descriptor_binds_the_configuration_and_the_collection() {
+    use crate::benchmark::cases::prepare::prepare;
+    use crate::benchmark::cases::{declarations, Recipe, TargetAndGroupRecipe};
+
+    let mut operation = prepared(Operation::TargetAndGroupResolution);
+    let descriptors = Descriptors::for_acquisition(&operation, clock(1));
+    // Each invocation builds its own evaluation and state: nothing of one is
+    // reused by the next.
+    assert_eq!(descriptors.execution.scratch_reuse_state, "fresh");
+    let encoded = serde_json::to_value(&descriptors).unwrap();
+    // 015's first pair of the target and group resolution.
+    let boundary = &encoded["boundary"];
+    assert_eq!(boundary["identity"], "target-and-group-resolution/0");
+    assert_eq!(boundary["phase"], "profile_target_group_resolve");
+    assert_eq!(boundary["cost"], "target_and_group_resolution");
+    let input = &encoded["targetAndGroupInput"];
+    assert_eq!(input["selectedProfile"], "app");
+    assert_eq!(input["submittedMembers"], "6");
+    for field in [
+        "localeInput",
+        "localePolicyResolutionInput",
+        "admittedLocaleInput",
+        "resourcePolicyInput",
+        "artifactCollectionInput",
+        "resolvedBindingInput",
+    ] {
+        assert_eq!(encoded[field], Value::Null, "{field}");
+    }
+    // Another collection is another input.
+    let storefront = declarations()
+        .into_iter()
+        .find(|case| {
+            case.fixture == Recipe::TargetAndGroup(TargetAndGroupRecipe::Storefront)
+                && case.limit.is_none()
+        })
+        .unwrap();
+    let Prepared::TargetAndGroup(other) = prepare(&storefront).unwrap().prepared else {
+        unreachable!()
+    };
+    let Prepared::TargetAndGroup(targets) = &mut operation else {
+        unreachable!()
+    };
+    targets.collection = other.collection;
+    assert_eq!(
+        descriptors.validate(&operation, clock(1)),
+        [DescriptorIssue::TargetAndGroupInputBindingMismatch]
+    );
+    let original = prepared(Operation::TargetAndGroupResolution);
+    let mut missing = encoded;
+    missing["targetAndGroupInput"] = Value::Null;
+    let decoded: Descriptors = serde_json::from_value(missing).unwrap();
+    assert_eq!(
+        decoded.validate(&original, clock(1)),
+        [DescriptorIssue::TargetAndGroupInputBindingMismatch]
+    );
+    for operation in &operations() {
+        assert_eq!(
+            Descriptors::for_acquisition(operation, clock(1))
+                .target_and_group_input
+                .is_some(),
+            operation.operation() == Operation::TargetAndGroupResolution
         );
     }
 }

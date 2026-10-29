@@ -26,6 +26,7 @@ pub(in crate::benchmark) enum ContextFailure {
     PolicyInputMismatch,
     CollectionInputMismatch,
     BindingInputMismatch,
+    TargetInputMismatch,
 }
 
 pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
@@ -265,6 +266,58 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
             }
             frame.json(
                 &serde_json::to_value(crate::benchmark::resolved_binding::InputFacts::observe(
+                    prepared,
+                ))
+                .map_err(|_| ContextFailure::Encoding)?,
+            );
+        }
+        Prepared::TargetAndGroup(prepared) => {
+            // The inputs exist only for a complete root whose configuration
+            // declares the selected profile.
+            if !matches!(candidate.declaration.fixture, Recipe::TargetAndGroup(_))
+                || candidate.declaration.selector != super::Selector::App
+                || prepared
+                    .set()
+                    .is_none_or(|set| prepared.inputs(&set).is_none())
+            {
+                return Err(ContextFailure::TargetInputMismatch);
+            }
+            // The complete configuration, whose selected declaration the
+            // targets and groups come from; the finite provider's complete
+            // table and binding; every member in submission order; the
+            // limits the collection was read under; and every bound of the
+            // confirmed policy.
+            frame.digest(prepared.analysis.benchmark_observation().identity());
+            frame.json(
+                &serde_json::to_value(&prepared.config).map_err(|_| ContextFailure::Encoding)?,
+            );
+            frame.json(
+                &serde_json::to_value(crate::benchmark::locale::InputFacts::observe(
+                    &prepared.canonicalizer,
+                ))
+                .map_err(|_| ContextFailure::Encoding)?,
+            );
+            let members = prepared.collection.members();
+            frame.uint(u64::try_from(members.len()).map_err(|_| ContextFailure::Encoding)?);
+            for member in members {
+                frame.bytes(member.canonical_body());
+            }
+            let read = super::prepare::COLLECTION_LIMITS;
+            for bound in [
+                read.members,
+                read.member_bytes,
+                read.total_bytes,
+                read.depth,
+            ] {
+                frame.uint(bound);
+            }
+            for (id, bound) in prepared.policy.limits().bounds() {
+                frame.text(id.group.path());
+                frame.text(id.name);
+                frame.uint(bound.get());
+            }
+            frame.json(
+                &serde_json::to_value(crate::benchmark::target_group::InputFacts::observe(
                     prepared,
                 ))
                 .map_err(|_| ContextFailure::Encoding)?,
