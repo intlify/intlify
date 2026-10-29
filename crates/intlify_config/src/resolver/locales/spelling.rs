@@ -268,7 +268,7 @@ impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
             )?;
             // A repeated member is an issue of its own; the set still holds
             // the canonical identities Phase 11 compares.
-            let _ = unique(self.evaluation, &requested, |key| {
+            let distinct = unique(self.evaluation, &requested, |key| {
                 LocaleSubject::TargetRequestedLocale(id.clone(), key)
             })?;
             let default = match target.default_requested_locale.as_option() {
@@ -285,6 +285,7 @@ impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
             resolved.push(TargetLocales {
                 id: id.clone(),
                 requested: set(&requested),
+                distinct,
                 default,
             });
         }
@@ -808,19 +809,35 @@ mod tests {
         let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer));
         let resolved = pass.targets(&targets).unwrap();
         drop(pass);
+        let duplicate = unit(
+            LocaleSubject::TargetRequestedLocale(target("browser"), key("en")),
+            Check::UniqueLocale,
+        );
+        // The browser's set still holds `en` once; the repeat leaves only the
+        // set's distinctness unavailable.
         assert_eq!(
-            resolved,
+            resolved
+                .iter()
+                .map(|target| (
+                    target.id.clone(),
+                    target.requested.clone(),
+                    target.distinct.as_ref().map_err(units).copied(),
+                    target.default.clone(),
+                ))
+                .collect::<Vec<_>>(),
             [
-                TargetLocales {
-                    id: target("browser"),
-                    requested: Ok(LocaleSet::new(vec![canonical("de"), canonical("en")])),
-                    default: Ok(Some(canonical("de"))),
-                },
-                TargetLocales {
-                    id: target("server"),
-                    requested: Ok(LocaleSet::new(vec![canonical("de")])),
-                    default: Ok(None),
-                },
+                (
+                    target("browser"),
+                    Ok(LocaleSet::new(vec![canonical("de"), canonical("en")])),
+                    Err(vec![duplicate]),
+                    Ok(Some(canonical("de"))),
+                ),
+                (
+                    target("server"),
+                    Ok(LocaleSet::new(vec![canonical("de")])),
+                    Ok(()),
+                    Ok(None),
+                ),
             ]
         );
         assert_eq!(

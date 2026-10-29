@@ -506,7 +506,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Subject::DeclarationField(_)
         | Subject::ArtifactCollection(_)
         | Subject::ArtifactReference(_)
-        | Subject::DeliveryPlacement => return Err(OutputFailure::LocalePolicyResolutionInvariant),
+        | Subject::DeliveryPlacement
+        | Subject::Target(_) => return Err(OutputFailure::LocalePolicyResolutionInvariant),
     }
     frame.uint(match unit.check {
         Check::WithinBound => 0,
@@ -530,7 +531,9 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::AdmissibleMember
         | Check::SingleOccurrence
         | Check::ConsistentContent
-        | Check::ResolvedReference => return Err(OutputFailure::LocalePolicyResolutionInvariant),
+        | Check::ResolvedReference
+        | Check::ProjectSubset
+        | Check::SupportedDefault => return Err(OutputFailure::LocalePolicyResolutionInvariant),
     });
     Ok(())
 }

@@ -24,6 +24,7 @@ use super::locales::LocaleSubject;
 use super::negotiation::NegotiationSubject;
 use super::resource_policy::{PolicySubject, ReferenceField};
 use super::specification::Slot;
+use super::targets::TargetSubject;
 
 /// 015's resolution phases, declared in rank order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -103,6 +104,8 @@ pub(crate) enum Subject {
     ArtifactReference(ReferenceField),
     /// The declaration's delivery placement, a singleton.
     DeliveryPlacement,
+    /// The declaration's Target ID map, or one Target ID.
+    Target(TargetSubject),
 }
 
 /// The check a unit runs, declared in rank order within a subject kind.
@@ -157,6 +160,10 @@ pub(crate) enum Check {
     /// The reference is of its role's kind and a supported specification
     /// revision, and names an artifact of the Set.
     ResolvedReference,
+    /// Every requested locale of the target is one of the project's.
+    ProjectSubset,
+    /// The target's effective default is one of its requested locales.
+    SupportedDefault,
 }
 
 /// One atomic evaluation unit. Units order as 015 evaluates and commits them:
@@ -184,6 +191,8 @@ pub(crate) enum Code {
     LocaleNonCanonical,
     LocaleDuplicate,
     DefaultRequestedLocaleNotInProject,
+    TargetLocalesNotSubset,
+    TargetDefaultLocaleNotSupported,
     NegotiationAliasDuplicate,
     NegotiationAliasDestinationNotRequested,
     MessageFallbackSourceNotRequested,
@@ -227,6 +236,10 @@ impl Code {
             Self::LocaleDuplicate => "project-profile-locale-duplicate",
             Self::DefaultRequestedLocaleNotInProject => {
                 "project-profile-default-requested-locale-not-in-project"
+            }
+            Self::TargetLocalesNotSubset => "project-profile-target-locales-not-subset",
+            Self::TargetDefaultLocaleNotSupported => {
+                "project-profile-target-default-locale-not-supported"
             }
             Self::NegotiationAliasDuplicate => "project-profile-negotiation-alias-duplicate",
             Self::NegotiationAliasDestinationNotRequested => {
@@ -287,6 +300,8 @@ pub(crate) enum Reason {
     ProjectProfileResolutionInvalid,
     EnvelopeInvalid,
     KindUnsupported,
+    ExplicitOverride,
+    InheritedProjectDefault,
 }
 
 impl Reason {
@@ -322,6 +337,8 @@ impl Reason {
             Self::ProjectProfileResolutionInvalid => "project-profile-resolution-invalid",
             Self::EnvelopeInvalid => "envelope-invalid",
             Self::KindUnsupported => "kind-unsupported",
+            Self::ExplicitOverride => "explicit-override",
+            Self::InheritedProjectDefault => "inherited-project-default",
         }
     }
 }
@@ -695,6 +712,8 @@ mod tests {
                 Code::LocaleNonCanonical,
                 Code::LocaleDuplicate,
                 Code::DefaultRequestedLocaleNotInProject,
+                Code::TargetLocalesNotSubset,
+                Code::TargetDefaultLocaleNotSupported,
                 Code::NegotiationAliasDuplicate,
                 Code::NegotiationAliasDestinationNotRequested,
                 Code::MessageFallbackSourceNotRequested,
@@ -723,6 +742,8 @@ mod tests {
                 "project-profile-locale-non-canonical",
                 "project-profile-locale-duplicate",
                 "project-profile-default-requested-locale-not-in-project",
+                "project-profile-target-locales-not-subset",
+                "project-profile-target-default-locale-not-supported",
                 "project-profile-negotiation-alias-duplicate",
                 "project-profile-negotiation-alias-destination-not-requested",
                 "project-profile-message-fallback-source-not-requested",
@@ -769,6 +790,8 @@ mod tests {
                 Reason::ProjectProfileResolutionInvalid,
                 Reason::EnvelopeInvalid,
                 Reason::KindUnsupported,
+                Reason::ExplicitOverride,
+                Reason::InheritedProjectDefault,
             ]
             .map(Reason::as_str),
             [
@@ -802,6 +825,8 @@ mod tests {
                 "project-profile-resolution-invalid",
                 "envelope-invalid",
                 "kind-unsupported",
+                "explicit-override",
+                "inherited-project-default",
             ]
         );
     }

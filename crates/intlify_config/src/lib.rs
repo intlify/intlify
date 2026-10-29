@@ -95,7 +95,7 @@ mod structural;
 #[allow(dead_code)]
 mod locale;
 
-// 015 Phase 3's crate-private semantic state and entry; no Profile.
+// 015 Phases 3 and 4's crate-private semantic state and entry; no Profile.
 #[allow(dead_code)]
 mod resolver;
 

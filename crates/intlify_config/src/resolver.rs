@@ -1,11 +1,11 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Crate-private state of 015's Semantic Profile Resolver (015 Phase 3). Not a
-//! `LocalizationProjectProfile`, a checked or blocked outcome, Resolution
-//! Evidence, or a registry: each resolution phase records which of its checks it
-//! evaluated and why the others were not, and hands later phases the values it
-//! admitted. Phases that need construction authority or a confirmed Resource
+//! Crate-private state of 015's Semantic Profile Resolver and of its targets
+//! and groups (015 Phases 3 and 4). Not a `LocalizationProjectProfile`, a
+//! checked or blocked outcome, Resolution Evidence, or a registry: each
+//! resolution phase records which of its checks it evaluated and why the others
+//! were not, and hands later phases the values it admitted. Phases that need construction authority or a confirmed Resource
 //! Limit Policy take them as values. Phase 4 confirms the policy, and
 //! `profile_resolution` runs the phases in 015's order; a test of one phase
 //! builds both.
@@ -25,6 +25,7 @@ pub(crate) mod profile_resolution;
 pub(crate) mod resource_policy;
 pub(crate) mod specification;
 pub(crate) mod tally;
+pub(crate) mod targets;
 pub(crate) mod vocabulary;
 
 #[cfg(test)]

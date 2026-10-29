@@ -193,7 +193,9 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::UniqueDomain
         | Check::BootstrapCandidate
         | Check::CompatiblePolicy
-        | Check::ResolvedReference => return Err(OutputFailure::ArtifactCollectionInvariant),
+        | Check::ResolvedReference
+        | Check::ProjectSubset
+        | Check::SupportedDefault => return Err(OutputFailure::ArtifactCollectionInvariant),
     });
     Ok(())
 }
