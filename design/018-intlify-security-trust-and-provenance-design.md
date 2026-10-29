@@ -18,7 +18,7 @@ For example, a compiler can validate a proposed change from registry `R1` to `R2
 
 These results remain separate even when one local process produces all three. Ordinary compilation stays read-only. Source admission for analysis is not source-locale approval for localization or Release use.
 
-The initial scope is one explicitly selected local application owner and its single registry chain. It supports 016 Phases 1–3; it does not complete the broader security responsibilities assigned to 018 by [000](./000-intlify-overview-design.md#security-trust-and-reproducibility), or all the security dependencies of [028](./028-intlify-javascript-web-vertical-slice-design.md#ownership-and-dependencies). The [Minimum Web Localization Extension](#minimum-web-localization-extension) below adds the Store, supply, Release, and execution powers that 028 needs for 016 Phases 4–5 under the same local authority mode; remote and production trust remain unspecified.
+The initial scope is one explicitly selected local application owner and its single registry chain. It supports 016 Phases 1–3; it does not complete the broader security responsibilities assigned to 018 by [000](./000-intlify-overview-design.md#security-trust-and-reproducibility), or all the security dependencies of [028](./028-intlify-javascript-web-vertical-slice-design.md#ownership-and-dependencies). The [Minimum Web Localization Extension](#minimum-web-localization-extension) below adds the Store, supply, Release, and execution powers that 028 needs for 016 Phases 4–5 under the same local authority mode; remote and production trust remain unspecified. [Profile Resolution Policies](#profile-resolution-policies) defines the Resource Limit Policy common body, the Trust Policy body, and the Resource Limit Policy Verification Input that [015](./015-intlify-project-profile-and-locale-policy-design.md)'s resolver admits.
 
 ## Goals
 
@@ -36,7 +36,7 @@ The initial scope is one explicitly selected local application owner and its sin
 - Remote authentication, multi-tenant services, transitive trust delegation, certificate/key formats, signatures, or distributed revocation.
 - Library/package publisher trust, cross-owner updates, or one invocation managing multiple application owners.
 - Remote or multi-tenant Store and Release services, reviewer quorum and role expressions, production deployment credentials, or Runtime-held credentials of any kind.
-- Completing 015's Trust Policy or Resource Limit Policy artifact bodies, or its bootstrap Resource Limit Policy Verification Input representation; the minimum Source Admission Policy body is defined below.
+- Resource Limit Policy sections that 020, 022, or 023 own, Trust Policy allowlists or delegation, and signed Resource Limit Policies; only the minimum bodies, the exact-pin verification mode, and the minimum Source Admission Policy body are defined below.
 - Replacing 015 checked-profile construction, 016 identity semantics, or 017 schemas and digest rules.
 - Implementing registry recovery/rollback installation, history compaction, or migration. Validating retained history is supported; making recovered history current requires a separately adopted workflow.
 - Defining a general security-record wire protocol, public authorization API, CLI syntax, configuration members, or a new crate.
@@ -47,8 +47,8 @@ The initial scope is one explicitly selected local application owner and its sin
 | --- | --- |
 | 015 | Checked project identity and applicable source/trust/resource inputs, exact binding projections, configuration bootstrap, and disclosure rules for its results |
 | 016 | Supported authoring, source completeness, continuity/newness/absence verification, explicit identity choices, and update validity |
-| 017 | Existing source/inventory/Intent/registry representations, exact identity and reference domains, bounded decoding, integrity, and replay encoding |
-| 018 | Local authority establishment requirements, permitted input origins, action separation, exact authorization scope, and provenance requirements for those decisions |
+| 017 | Existing source/inventory/Intent/registry representations, exact identity and reference domains, bounded decoding, integrity, and replay encoding, including the wire shapes of the profile resolution policies below |
+| 018 | Local authority establishment requirements, permitted input origins, action separation, exact authorization scope, and provenance requirements for those decisions; the meaning of the Resource Limit Policy common body, the Trust Policy body, and the Resource Limit Policy Verification Input |
 | 019 | Shared diagnostic projection, queries, and incremental orchestration; not required to run the local admission checks |
 | 020/021/022 | Planning, Store/governance, and supply semantics; 018 supplies the powers, disclosure rules, and provenance verification those operations consume |
 | 024/025/027 | Target output, Release, and execution semantics; 018 supplies publication/activation powers and the code-origin admission profile |
@@ -57,7 +57,7 @@ The initial scope is one explicitly selected local application owner and its sin
 
 The 018 rules are defined here rather than delegated to an arbitrary host callback returning `true`. The 029 adapter must provide the concrete trusted observations and conditional-publication guarantees those rules require. Specifying the rules does not implement that adapter.
 
-Production use still requires the applicable actual checked 015 inputs. A test context may exercise a finite subset under 016/017, but neither a test grant nor PR #205's configuration/locale core becomes a complete production `LocalizationProjectProfile`. This document does not introduce a shortcut around the unfinished policy-body or bootstrap formats.
+Production use still requires the applicable actual checked 015 inputs. A test context may exercise a finite subset under 016/017, but neither a test grant nor PR #205's configuration/locale core becomes a complete production `LocalizationProjectProfile`. The policy bodies and the bootstrap verification input below are minimum formats; this document introduces no shortcut around them.
 
 ## Terminology
 
@@ -201,6 +201,47 @@ This is the minimum provenance content, not a new portable artifact envelope. Ex
 
 Successful publication must make the state/provenance relationship consistent at the host's declared publication point. If storage fails or cancellation occurs before it, no new current state is exposed. If acknowledgement is lost after a possible commit, the outcome is indeterminate until the host checks that exact transition; it must not report a guaranteed rollback or blindly publish the request again. The 029 design must define its crash-consistency and outcome-recovery mechanism before an implementation claims durable publication.
 
+## Profile Resolution Policies
+
+015's resolver admits three 018-owned inputs: the common body of a Resource Limit Policy, the body of a Trust Policy, and the Resource Limit Policy Verification Input that authenticates the selected Resource Limit Policy before its bounds are used. This section defines their meaning. 017 encodes their wire shapes under [Profile Resolution Input Representation](./017-intlify-shared-artifact-and-version-admission-design.md#profile-resolution-input-representation), and 015 owns where each check runs, its precedence, and every resulting Finding. None of these inputs is a credential, a signature, or a Local Authority Context, and none can enlarge the authority or capacity used to admit itself.
+
+### Resource Limit Policy common body
+
+In revision `"0"` a Resource Limit Policy content has exactly one permitted member, `projectProfileResolution`. It is optional, and when present it must be an object. The common body never validates the section's interior: 015 checks whether the section is present and then its groups and bounds. Any other member fails the common body. The selected bootstrap candidate is then `body-schema-invalid`, and any other Resource Limit Policy in 015's collection is not admitted. Sections for 020, 022, and 023 are added to this member set, in place at revision `"0"`, when those owners define them; until then a content naming one fails rather than passing unread.
+
+Availability fails closed. There is no default Resource Limit Policy. A missing `resourceLimits` reference, a candidate the Verification Input does not authenticate, and a content that fails the common body all leave the resolver without policy bounds; the capability remains the only authority and no selection is confirmed, as 015's bootstrap requires. A host context may lower the capacities a policy grants, never raise them.
+
+### Trust Policy body
+
+In revision `"0"` a Trust Policy content has exactly one member, `authority`, whose only value is `trusted-local-host`. It means that every trust decision for the project's ordinary artifacts and operations is made under the [Minimum Local Authority](#minimum-local-authority) and, on the Web path, the [Minimum Web Localization Extension](#minimum-web-localization-extension): acquisition provenance through permitted routes, registered adapters, and destination bindings. It carries no signature, key, delegation, or library or publisher trust. It never authorizes the Resource Limit Policy bootstrap, which uses only the Verification Input.
+
+015 admits a Trust Policy content against this closed body and binds it like any other referenced policy; the resolver performs no further trust evaluation. A consumer that acts on the project's artifacts, such as 016, 021, 022, or 025, proceeds only when its active Local Authority Context is the trusted-local-host mode that the bound Trust Policy names. Any other mode, or a content that fails the closed body, blocks the operation rather than falling back to a permissive default.
+
+### Resource Limit Policy Verification Input
+
+The revision-`"0"` Verification Input has one explicit unsigned mode, `exact-pin`. It holds a finite non-empty set of exact Resource Limit Policy references, each a 017 `PolicyReference` of kind `resource-limit-policy`. Authentication of the selected candidate is set membership: the candidate is authenticated exactly when its computed exact reference is one of the pins. There is no floating, identity-only, or revision-only pin, and a partial match authenticates nothing. An unauthenticated candidate is 015's `body-integrity-invalid`, the reason it keeps for trust, signature, and integrity failures in revision `"0"`. The pins never select a candidate; 015's candidate selection runs first and is unchanged.
+
+The pins come only from the trusted setup path that establishes the invocation, such as 029's toolchain lock, together with the expected identity, revision, and semantic digest of the Verification Input itself. The input is never derived from the analyzed configuration, the submitted collection, or a candidate's content, so a Resource Limit Policy cannot authenticate itself. This is the explicit local verification mode that 015 permits once 018 defines it; it is not an unsigned default, and omitting the input fails before invocation. Authenticity rests on that setup path and on the exact semantic digest, under this subset's trusted-host assumption; a policy changed in any member needs a new pin.
+
+The input contains only public, non-secret data: its identity, revision, mode, and pins. Its admission boundary, which 015 implements before invocation, maps to 015's closed failure reasons as follows:
+
+| Reason | When |
+| --- | --- |
+| `missing-input` | No input is supplied |
+| `malformed-input` | The value is not a strictly decodable instance of 017's shape, its integrity fails, its mode is not `exact-pin`, or its pins are empty, unsorted, repeated, or not all `resource-limit-policy` references |
+| `duplicate-member` | A raw object repeats a member name |
+| `unknown-member` | A member is outside 017's shape and is not one of the reserved members below |
+| `over-bound-input` | The input exceeds the finite byte, depth, or pin-count limits of the active implementation profile |
+| `secret-bearing-input` | The input carries a reserved secret-bearing member: `privateKey`, `credential`, or `secretLocator` |
+| `ambient-authority` | The input carries a reserved ambient-authority member: `trustStore`, `networkSource`, or `hostTrust` |
+| `verification-identity-mismatch`, `verification-revision-mismatch`, `verification-digest-mismatch` | The admitted identity, revision, or semantic digest differs from the setup path's assertion |
+
+The reserved members exist only to be refused; no revision gives them a meaning. The public verification-authority components that 015's `resource-limit-policy-verification` origin may name in one `fixed-role` segment are `mode` and `pins`.
+
+### Bootstrap work
+
+Authenticating the selected candidate, one pin lookup, is one unit of 015's `bootstrapOnly.artifactBootstrap.maxValidationWorkUnits`, and so is evaluating that candidate's common body; the decoded bytes they allocate count toward `maxDecodedAllocationBytes`. Admitting a Trust Policy content or another Resource Limit Policy content is ordinary collection admission under 015's `artifactAdmission` bounds. 015's Capability Specification implements this accounting.
+
 ## Minimum Web Localization Extension
 
 028 needs the local host to hold, separately, the powers that [021](./021-intlify-translation-store-and-governance-design.md#exact-base-atomic-publication), [022](./022-intlify-provider-and-localization-sync-design.md#requests-responses-and-acquisition-provenance), and [025](./025-intlify-release-assembly-and-deployment-design.md#release-publication) require: reading and publishing one Store lineage, making governance decisions, disclosing source context to one registered Provider adapter, publishing and activating one Release, and admitting generated code before execution. This extension adds those powers to the same trusted-local-host mode, authority context, request binding, permit, and provenance rules defined above. It adds no remote authentication, signature, delegation, or multi-tenant capability, and it does not change 016/017/021/022/025 semantics.
@@ -252,7 +293,7 @@ The Source Admission Policy body defined by 017 has one member, `sourceApproval`
 
 Authentication here means the 016/029 acquisition provenance retained by the host, not a signature. An unavailable inventory, a derivation reference to another artifact, or a route outside the context blocks admission under either value. The localized approval mode never waives a required source approval, and a source artifact never receives a selection decision.
 
-Trust Policy and Resource Limit Policy bodies remain undefined by this extension. The authority context supplies the permitted routes, adapter registrations, destination bindings, and finite capacities that those policies would otherwise carry; a configuration reference to either kind remains a structurally admitted pin.
+The Trust Policy body and the Resource Limit Policy common body are defined under [Profile Resolution Policies](#profile-resolution-policies). The authority context supplies the permitted routes, adapter registrations, destination bindings, and finite capacities; a bound Trust Policy names that context's mode rather than repeating them.
 
 ### Release publication, activation, and origin admission
 
@@ -297,7 +338,7 @@ Intlify must not attach private keys, bearer credentials, authentication handles
 Apply [026's performance architecture](./026-intlify-conformance-and-measurement-design.md#performance-implementation-architecture) alongside 016's [Security and Resource Limits](./016-intlify-source-authoring-and-intent-identity-design.md#security-and-resource-limits) and [Performance and Measurement](./016-intlify-source-authoring-and-intent-identity-design.md#performance-and-measurement).
 
 - Bound authority/grant/origin entries, input bytes/depth/counts, history resolution/replay, confirmation/action comparisons, and retained diagnostics/provenance before or during protected work. The active implementation profile must supply finite typed limits; no unknown or missing limit means unlimited work. Existing 015/016/017 limits keep their owner-defined accounting.
-- Inputs cannot enlarge the authority or capacity used to admit themselves. This subset does not redefine 015's bootstrap Resource Limit Policy Verification Input or authorize substituting its local invocation context for that input.
+- Inputs cannot enlarge the authority or capacity used to admit themselves. The Resource Limit Policy Verification Input is defined under [Profile Resolution Policies](#profile-resolution-policies), and a local invocation context never substitutes for it.
 - Index exact owner, grant, origin, and artifact bindings; avoid all-pairs history search or repeated decoding per declaration. Account for duplicate submissions before any safe internal reuse.
 - Reuse immutable integrity/semantic facts only for identical content and validator/specification inputs. Admission caches also bind the applicable context/origin/policy; content-only cache hits do not establish authority. Never reuse a publication permit solely because the plan digest matches: grants, session, destination, and currentness require their live checks.
 - Keep immutable source/authority/history storage, invocation Scratch Workspace, returned checked results, and host commit state in separate lifetimes. Reset scratch after success, denial, cancellation, and failure without retaining prior grants or confirmations in the next invocation.
@@ -324,13 +365,16 @@ Fixtures must invoke actual evaluators, semantic validators, and host condition 
 | Storage and reporting | Exact/first-over limits, repeated hostile inputs, cancellation/failure followed by workspace reuse, and secret-bearing reasons/labels preserve fail-closed behavior and safe reporting |
 | Store, supply, and Release powers | Each Store, governance, disclosure, Provider, publication, and activation power denied independently; a decision without publication power and the converse; an automatic policy actor only with independently held powers; source admission under both policy values |
 | Origin admission | Verified bytes imported; substituted, mutable-URL, cached-outside-namespace, and unverified bytes rejected before import; admission evidence carries no write power |
+| Profile resolution policies | A pinned candidate authenticated; an unpinned candidate, one differing only in its digest, and a pin derived from the configuration or collection not authenticated; a Resource Limit Policy content with another member and a Trust Policy content other than `trusted-local-host` refused; every Verification Input boundary reason, including each reserved member and each mismatch; a consumer refused under another authority mode |
 
 Required observations include exact owner references, accepted versus denied operation, unchanged current state after proven pre-commit failure, required provenance after success, and zero Provider/network/source-execution calls. Tests must vary the actual grants, inputs, confirmations, and host state rather than dispatching solely on test names. Conformance covers only the adopted local profile; it establishes neither signature verification nor distributed trust.
 
-## Adoption with 016
+## Adoption with 015 and 016
 
 | Adopting work | Use of this design | Remaining prerequisites |
 | --- | --- | --- |
+| 015 Phase 3 | Evaluate the closed Resource Limit Policy and Trust Policy bodies and authenticate the selected candidate against a Verification Input that tests construct | None beyond 017's shapes; the input's acquisition is not needed to evaluate it |
+| 015 Phase 5 | Admit the Verification Input at the pre-invocation boundary with the reasons above, and count the bootstrap work | 015's Capability Specification and 029's acquisition and lock of the input |
 | Phases 1–2 | Finite input/provenance checks and strict test-context separation; ordinary analysis receives no write capability | Existing 016/017 analysis representations and active 026 checks; no need to complete production authentication or all Policy bodies for a declared test-only slice |
 | Phase 3, pure core | Evaluate scoped permissions and exact explicit choices with actual 016/017 history checks; keep proposed results separate from publication | Concrete supported continuity verifiers and independently established test authority; correct codecs alone do not prove authorization |
 | Phase 3, local publication | Explicit local authority, empty-genesis/update authorization, protected current-base/authority checks, and retained provenance | Applicable checked 015 inputs/policies, a real 029 establishment/acquisition/publication adapter, and its persistence/failure tests |
@@ -354,10 +398,14 @@ This is a shared specification adopted within those phases, not another product 
 | 018-010 | Define the minimum Source Admission Policy as authenticated-sufficient or required, with authentication meaning retained acquisition provenance | Makes source use checkable locally without signatures or a policy language |
 | 018-011 | Restrict Provider disclosure to a closed request projection and treat responses as inert | Keeps occurrences, values, history, and credentials out of supply requests |
 | 018-012 | Require verify-then-import from a host-owned immutable namespace before generated code runs | A checksum, filename, or successful import cannot establish code origin |
+| 018-013 | Own the meaning of the Resource Limit Policy common body, the Trust Policy body, and the Resource Limit Policy Verification Input; 017 encodes their shapes | 015 and 017 assigned them here while this design deferred them back, so no design defined what 015's resolver admits |
+| 018-014 | Close the revision-`"0"` Resource Limit Policy content to the optional `projectProfileResolution` section, adding other owners' sections in place when they are defined | A closed member set cannot silently drop a misspelled section and keeps 015's missing-section check reachable |
+| 018-015 | Define the Trust Policy body as `trusted-local-host`, which leaves every trust decision to the Local Authority Context | States what the Web extension already does, without a policy language, keys, or signatures |
+| 018-016 | Authenticate the selected Resource Limit Policy by membership in an exact-pin Verification Input that only trusted setup supplies, with reserved members that make secret-bearing and ambient-authority inputs refusable | Checkable offline without secrets or signatures, and a policy can never pin itself |
 
 ## Deferred Follow-Up Notes
 
-- Complete common Trust/Source Admission/Resource Limit Policy bodies, resource-bootstrap verification input representation/admission, exact shared policy/provenance encodings, and their 015/017 adoption. The local authority context above is not one of those artifacts.
+- Add the Resource Limit Policy sections of 020, 022, and 023, broader Source Admission policies, signed or allowlist-based Trust and Resource Limit Policies, exact shared provenance encodings, and their 015/017 adoption. The local authority context above is not one of those artifacts.
 - Add cryptographic authentication/signatures, external identities, scoped delegation, key rotation, durable/cross-process authorization, remote publication, and stronger hostile-host/storage models only with explicit profiles.
 - Specify authenticated recovery/current-anchor installation, rollback, source-control conflict UX, history retention/compaction, and migrations with 016/017/029 rather than treating initialization as recovery.
 - Add library/publisher trust, reviewer roles and quorum, remote Store/Release services, production deployment credentials, and their exact provenance under the owning integration designs; the local Web extension covers only the 028 minimum.
