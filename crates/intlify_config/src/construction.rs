@@ -15,6 +15,7 @@ pub(crate) mod failure;
 pub(crate) mod meta_schema;
 pub(crate) mod root;
 pub(crate) mod rules;
+pub(crate) mod validator;
 
 #[cfg(any(test, feature = "vectors"))]
 pub mod generate;

@@ -41,6 +41,7 @@
     "vectors:framing:check": "cargo run -q -p intlify_config --features vectors --example generate_framing_vectors -- --check && vp run shared-json-vectors#check:framing",
     "vectors:bounds:check": "cargo run -q -p intlify_config --features vectors --example generate_bound_vectors -- --check && vp run shared-json-vectors#check:bounds",
     "construction:check": "cargo run -q -p intlify_config --features vectors --example generate_construction_artifacts -- --check && vp run shared-json-vectors#check:construction",
+    "vectors:pattern:check": "cargo run -q -p intlify_config --features vectors --example generate_pattern_vectors -- --check && vp run shared-json-vectors#check:pattern",
     "bench:config:smoke": "cargo bench -p intlify_config --bench profile_resolver --features benchmark -- --profile smoke --validate",
     "bench:authoring:smoke": "cargo bench -p intlify_authoring --bench authoring_semantics --features benchmark -- --profile smoke --validate",
     "bench:authoring-js:smoke": "cargo bench -p intlify_authoring_js --bench authoring_js_discovery --features benchmark -- --profile smoke --validate",
