@@ -20,6 +20,11 @@ acquisition = ["dep:rustix"]
 # the adapter onto the common pipeline, and the smoke runner. It reads a clock,
 # so it needs acquisition, and it frames native checksums with blake3.
 owner-run = ["acquisition", "dep:blake3"]
+# The allocator observer for peak live memory. The crate it uses installs its
+# own global allocator in every binary that links it, so only a memory
+# measurement's own binary enables this; a duration run and a product binary
+# never do.
+allocation-counter = ["acquisition", "dep:allocation-counter"]
 
 [dependencies]
 # 017 token grammars, exact quantities, canonical framing, domain-separated
@@ -38,6 +43,9 @@ getrandom = { version = "=0.4.3" }
 # under its own label, so one algorithm does not make two owners' checksums
 # comparable.
 blake3 = { version = "=1.8.7", optional = true }
+# Thread-local counts of the bytes requested through the global allocator, by
+# `Layout`. Reachable only through the non-default allocation-counter feature.
+allocation-counter = { version = "=0.8.1", optional = true }
 
 [target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
 # Locked safe clock and kernel-view APIs, for acquisition only.

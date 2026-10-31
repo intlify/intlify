@@ -20,6 +20,7 @@
 //! reading a clock is not part of reading a record.
 
 pub mod host;
+pub mod memory;
 pub mod toolchain;
 
 use std::hint::black_box;

@@ -95,6 +95,13 @@ pub(super) fn evaluate<O: OwnerRun>(
                     ),
                     diagnostic_partial_observations: vec![diagnostic],
                 },
+                // Nothing was observed, so there is no partial observation to
+                // keep: the measurement is absent, not zero.
+                CaseOutcome::Unsupported => CaseResult::Unavailable {
+                    unavailable_kind: UnavailableKind::Unsupported,
+                    reasons: reason(C::UnsupportedMeasurement, Detail::UnsupportedTuple {}),
+                    diagnostic_partial_observations: Vec::new(),
+                },
                 CaseOutcome::SemanticMismatch => CaseResult::Invalid {
                     reasons: reason(
                         C::SemanticObservationMismatch,

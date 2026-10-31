@@ -503,11 +503,14 @@ fn outcome<O: Owner>(attempts: &[AttemptOf<O>]) -> OwnerOutcome {
         .iter()
         .map(|attempt| match &attempt.result {
             AttemptResult::Measured(_) => OwnerOutcome::Complete,
-            // A failure to read the clock or to sum an interval leaves the run
-            // incomplete. A wrong result, or a fixture that will not prepare,
-            // invalidates it: neither is a missing measurement.
+            // A failure to read the clock or to sum an interval, or a
+            // measurement this run cannot observe, leaves the run incomplete.
+            // A wrong result, or a fixture that will not prepare, invalidates
+            // it: neither is a missing measurement.
             AttemptResult::CaptureFailed(
-                CaptureFailure::Measurement(_) | CaptureFailure::Overflow,
+                CaptureFailure::Measurement(_)
+                | CaptureFailure::Overflow
+                | CaptureFailure::Unsupported,
             ) => OwnerOutcome::Incomplete,
             AttemptResult::CaptureFailed(_) | AttemptResult::PreparationFailed(_) => {
                 OwnerOutcome::Invalid
@@ -550,6 +553,7 @@ mod tests {
             CaptureFailure::Overflow,
             CaptureFailure::Measurement(MeasurementFailure::InvocationPanicked),
             CaptureFailure::Measurement(MeasurementFailure::Clock(ClockFailure::ReversedClock)),
+            CaptureFailure::Unsupported,
         ] {
             assert_eq!(
                 outcome::<Sound>(&[failed(missing)]),
