@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "check": "node scripts/verify.mjs",
+    "check:bounds": "node scripts/verify-bounds.mjs",
     "check:envelope": "node scripts/verify-envelope.mjs",
     "check:framing": "node scripts/verify-framing.mjs",
     "check:locale": "node scripts/verify-locale.mjs",

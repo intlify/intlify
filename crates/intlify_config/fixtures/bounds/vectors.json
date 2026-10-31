@@ -1,0 +1,599 @@
+{
+  "note": "Bounds written by intlify_config. An independent implementation reads every value's decimal string as a count from 1 through 18446744073709551614 and encodes it as eight bytes, big-endian. For every refused string it decides the reason the capability boundary gives: non-canonical-bound for any spelling other than a count's shortest decimal digits, then non-positive-bound for zero, then unrepresentable-bound for 18446744073709551615 or more. It refuses the two byte forms whose count is zero or 18446744073709551615, and lists every capability bound path, policyComparable mirroring the projectProfileResolution tables and then bootstrapOnly, with its minimum as a decimal string. Hexadecimal stands for bytes.",
+  "values": [
+    {
+      "text": "1",
+      "semantic": "0000000000000001"
+    },
+    {
+      "text": "2",
+      "semantic": "0000000000000002"
+    },
+    {
+      "text": "9",
+      "semantic": "0000000000000009"
+    },
+    {
+      "text": "10",
+      "semantic": "000000000000000a"
+    },
+    {
+      "text": "255",
+      "semantic": "00000000000000ff"
+    },
+    {
+      "text": "256",
+      "semantic": "0000000000000100"
+    },
+    {
+      "text": "1024",
+      "semantic": "0000000000000400"
+    },
+    {
+      "text": "4096",
+      "semantic": "0000000000001000"
+    },
+    {
+      "text": "65536",
+      "semantic": "0000000000010000"
+    },
+    {
+      "text": "4294967295",
+      "semantic": "00000000ffffffff"
+    },
+    {
+      "text": "4294967296",
+      "semantic": "0000000100000000"
+    },
+    {
+      "text": "9007199254740991",
+      "semantic": "001fffffffffffff"
+    },
+    {
+      "text": "9007199254740993",
+      "semantic": "0020000000000001"
+    },
+    {
+      "text": "18446744073709551614",
+      "semantic": "fffffffffffffffe"
+    }
+  ],
+  "refusedTexts": [
+    {
+      "id": "empty",
+      "text": "",
+      "reason": "non-canonical-bound"
+    },
+    {
+      "id": "zero",
+      "text": "0",
+      "reason": "non-positive-bound"
+    },
+    {
+      "id": "two-zeros",
+      "text": "00",
+      "reason": "non-canonical-bound"
+    },
+    {
+      "id": "leading-zero",
+      "text": "01",
+      "reason": "non-canonical-bound"
+    },
+    {
+      "id": "leading-zeros",
+      "text": "007",
+      "reason": "non-canonical-bound"
+    },
+    {
+      "id": "plus-sign",
+      "text": "+1",
+      "reason": "non-canonical-bound"
+    },
+    {
+      "id": "minus-sign",
+      "text": "-1",
+      "reason": "non-canonical-bound"
+    },
+    {
+      "id": "negative-zero",
+      "text": "-0",
+      "reason": "non-canonical-bound"
+    },
+    {
+      "id": "leading-space",
+      "text": " 1",
+      "reason": "non-canonical-bound"
+    },
+    {
+      "id": "trailing-space",
+      "text": "1 ",
+      "reason": "non-canonical-bound"
+    },
+    {
+      "id": "decimal-point",
+      "text": "1.0",
+      "reason": "non-canonical-bound"
+    },
+    {
+      "id": "exponent",
+      "text": "1e3",
+      "reason": "non-canonical-bound"
+    },
+    {
+      "id": "hexadecimal",
+      "text": "0x10",
+      "reason": "non-canonical-bound"
+    },
+    {
+      "id": "digit-separator",
+      "text": "1_000",
+      "reason": "non-canonical-bound"
+    },
+    {
+      "id": "fullwidth-digit",
+      "text": "１",
+      "reason": "non-canonical-bound"
+    },
+    {
+      "id": "u64-max",
+      "text": "18446744073709551615",
+      "reason": "unrepresentable-bound"
+    },
+    {
+      "id": "past-u64-max",
+      "text": "18446744073709551616",
+      "reason": "unrepresentable-bound"
+    },
+    {
+      "id": "twenty-nines",
+      "text": "99999999999999999999",
+      "reason": "unrepresentable-bound"
+    },
+    {
+      "id": "twenty-one-digits",
+      "text": "100000000000000000000",
+      "reason": "unrepresentable-bound"
+    },
+    {
+      "id": "leading-zero-before-u64-max",
+      "text": "018446744073709551615",
+      "reason": "non-canonical-bound"
+    }
+  ],
+  "refusedSemantics": [
+    {
+      "semantic": "0000000000000000",
+      "reason": "non-positive-bound"
+    },
+    {
+      "semantic": "ffffffffffffffff",
+      "reason": "unrepresentable-bound"
+    }
+  ],
+  "capabilityBounds": [
+    {
+      "path": "policyComparable.configurationInput.maxNodes",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.configurationInput.maxDepth",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.configurationInput.maxCollectionEntries",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.configurationInput.maxTotalStringBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.configurationInput.maxSingleStringBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.configurationInput.maxProfiles",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.configurationInput.maxProfileIdBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.configurationInput.maxStructuralAnalysisUnits",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.localeResolution.maxLocaleIdentifierBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.localeResolution.maxLocaleOccurrences",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.localeResolution.maxRequestedLocales",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.localeResolution.maxNegotiationAliases",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.localeResolution.maxFallbackSources",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.localeResolution.maxFallbackCandidatesPerSource",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.localeResolution.maxCoverageRules",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.localeResolution.maxCoverageLocaleSelectorOccurrences",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.localeResolution.maxCoverageSurfaceSelectorOccurrences",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.localeResolution.maxCoverageDecisionCells",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.localeResolution.maxCoverageRuleCellComparisons",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.artifactAdmission.maxArtifacts",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.artifactAdmission.maxPolicyArtifacts",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.artifactAdmission.maxTargetProfileArtifacts",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.artifactAdmission.maxArtifactReferences",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.artifactAdmission.maxSingleArtifactCanonicalBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.artifactAdmission.maxTotalArtifactCanonicalBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.artifactAdmission.maxSingleReferenceCanonicalBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.artifactAdmission.maxTotalReferenceCanonicalBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.targetGrouping.maxTargetProfiles",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.targetGrouping.maxTargetIdBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.targetGrouping.maxDeploymentGroups",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.targetGrouping.maxGroupIdBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.targetGrouping.maxMembersPerGroup",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.targetGrouping.maxMembershipOccurrences",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.targetGrouping.maxHydrationRelations",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.diagnostics.entry.maxFindingOccurrences",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.diagnostics.entry.maxFindings",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.diagnostics.entry.maxRelatedEvidencePerOccurrenceGroup",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.diagnostics.entry.maxRelatedEvidenceOccurrences",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.diagnostics.entry.maxSingleEvidenceBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.diagnostics.entry.maxTotalEvidenceBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.diagnostics.entry.maxEvaluationStatusEntries",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.diagnostics.entry.maxSuppressionCausesPerStatus",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.diagnostics.entry.maxSuppressionCauseOccurrences",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.diagnostics.entry.maxRecords",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.diagnostics.entry.maxTotalCanonicalBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.diagnostics.shared.maxFindingOccurrences",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.diagnostics.shared.maxFindings",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.diagnostics.shared.maxEvaluationStatusEntries",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.diagnostics.shared.maxSuppressionCausesPerStatus",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.diagnostics.shared.maxSuppressionCauseOccurrences",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.diagnostics.shared.maxRecords",
+      "minimum": "1"
+    },
+    {
+      "path": "policyComparable.diagnostics.shared.maxTotalCanonicalBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.rawInput.maxFileBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.rawInput.maxParserTokens",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.snapshot.maxNodes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.snapshot.maxDepth",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.snapshot.maxCollectionEntries",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.snapshot.maxTotalStringBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.snapshot.maxSingleStringBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.snapshot.maxRejectedMarkers",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.snapshot.maxEnvelopeCanonicalBytes",
+      "minimum": "4096"
+    },
+    {
+      "path": "bootstrapOnly.snapshot.maxSingleMarkerCanonicalBytes",
+      "minimum": "1024"
+    },
+    {
+      "path": "bootstrapOnly.snapshot.maxTraversalUnits",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.inputBoundary.maxDepth",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.inputBoundary.maxSpecificationInputBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.inputBoundary.maxVocabularyBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.inputBoundary.maxVocabularyMembers",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.inputBoundary.maxVocabularyMemberBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.inputBoundary.maxVocabularyTotalMemberBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.inputBoundary.maxLocaleDataManifestBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.inputBoundary.maxCollectionMemberBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.inputBoundary.maxCollectionTotalBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.inputBoundary.maxVerificationInputBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.inputBoundary.maxVerificationPins",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.artifactBootstrap.maxEnvelopeDepth",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.artifactBootstrap.maxDecodedAllocationBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.artifactBootstrap.maxMetadataScanUnits",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.artifactBootstrap.maxValidationWorkUnits",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.localeData.maxPayloads",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.localeData.maxPayloadBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.localeData.maxMarkerBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.localeData.maxValidityGroups",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.localeData.maxCodes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.localeData.maxExtensionKeys",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.localeData.maxTypes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.localeData.maxCorrections",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.localeData.maxValidationWorkUnits",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.evidenceMetadata.maxSourceIdentityBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.evidenceMetadata.maxSourceRevisionBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.evidenceMetadata.maxLocatorBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.evidenceMetadata.maxCallSiteSourceBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.evidenceMetadata.maxCallSiteMappings",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.evidenceMetadata.maxLogicalPathSegments",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.evidenceMetadata.maxLogicalPathCanonicalBytes",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.evidenceMetadata.maxSubjectOccurrences",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.evidenceMetadata.maxTokenInputs",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.evidenceMetadata.maxCollisionComparisons",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.evidenceMetadata.maxMetadataWorkUnits",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.mandatoryReserve.maxOutcomeEnvelopeSlots",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.mandatoryReserve.maxConstructionIdentitySlots",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.mandatoryReserve.maxEntryTerminalFindingSlots",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.mandatoryReserve.maxEntryTerminalStatusSlots",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.mandatoryReserve.maxSharedTerminalFindingSlots",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.mandatoryReserve.maxSharedTerminalStatusSlots",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.mandatoryReserve.maxSharedUnavailableCauseSlots",
+      "minimum": "1"
+    },
+    {
+      "path": "bootstrapOnly.mandatoryReserve.maxCanonicalBytes",
+      "minimum": "65536"
+    }
+  ]
+}

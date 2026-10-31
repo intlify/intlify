@@ -212,7 +212,9 @@ pub(crate) struct Unit {
     pub(crate) check: Check,
 }
 
-/// The 015 Finding codes these checks can report.
+/// The 015 Finding codes of the resolver's checks: all of 015's registry but
+/// the entry, schema, and selection codes, which structural admission reports
+/// in its own terms until the Findings are built.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Code {
     SpecificationInputIncomplete,
@@ -249,7 +251,9 @@ pub(crate) enum Code {
     HydrationCapabilityIncompatible,
     ResourcePolicyNotAdmitted,
     ResourcePolicyCapabilityIncompatible,
+    BootstrapLimitExceeded,
     ResourceLimitExceeded,
+    ReportingLimitExceeded,
 }
 
 impl Code {
@@ -321,7 +325,9 @@ impl Code {
             Self::ResourcePolicyCapabilityIncompatible => {
                 "project-profile-resource-policy-capability-incompatible"
             }
+            Self::BootstrapLimitExceeded => "project-profile-bootstrap-limit-exceeded",
             Self::ResourceLimitExceeded => "project-profile-resource-limit-exceeded",
+            Self::ReportingLimitExceeded => "project-profile-reporting-limit-exceeded",
         }
     }
 }
@@ -370,6 +376,8 @@ pub(crate) enum Reason {
     DualRole,
     RequestedLocales,
     EffectiveDefault,
+    Entry,
+    Shared,
 }
 
 impl Reason {
@@ -416,6 +424,8 @@ impl Reason {
             Self::DualRole => "dual-role",
             Self::RequestedLocales => "requested-locales",
             Self::EffectiveDefault => "effective-default",
+            Self::Entry => "entry",
+            Self::Shared => "shared",
         }
     }
 }
@@ -810,7 +820,9 @@ mod tests {
                 Code::HydrationCapabilityIncompatible,
                 Code::ResourcePolicyNotAdmitted,
                 Code::ResourcePolicyCapabilityIncompatible,
+                Code::BootstrapLimitExceeded,
                 Code::ResourceLimitExceeded,
+                Code::ReportingLimitExceeded,
             ]
             .map(Code::as_str),
             [
@@ -848,7 +860,9 @@ mod tests {
                 "project-profile-hydration-capability-incompatible",
                 "project-profile-resource-policy-not-admitted",
                 "project-profile-resource-policy-capability-incompatible",
+                "project-profile-bootstrap-limit-exceeded",
                 "project-profile-resource-limit-exceeded",
+                "project-profile-reporting-limit-exceeded",
             ]
         );
         assert_eq!(
@@ -894,6 +908,8 @@ mod tests {
                 Reason::DualRole,
                 Reason::RequestedLocales,
                 Reason::EffectiveDefault,
+                Reason::Entry,
+                Reason::Shared,
             ]
             .map(Reason::as_str),
             [
@@ -938,6 +954,8 @@ mod tests {
                 "dual-role",
                 "requested-locales",
                 "effective-default",
+                "entry",
+                "shared",
             ]
         );
     }
