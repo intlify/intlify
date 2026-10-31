@@ -149,6 +149,10 @@ jobs:
         if: runner.os == 'Linux'
         run: vp run vectors:framing:check
 
+      - name: Validate the 015 bound independent vectors
+        if: runner.os == 'Linux'
+        run: vp run vectors:bounds:check
+
   cli-validation:
     runs-on: ${{ matrix.os }}
     name: CLI validation (${{ matrix.os }})

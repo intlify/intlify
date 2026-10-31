@@ -44,6 +44,10 @@
 //! ```compile_fail
 //! use intlify_config::resolver::locales::ResolvedLocales;
 //! ```
+//! The capability bound inventory is not a public capability API:
+//! ```compile_fail
+//! use intlify_config::resolver::capability::BootstrapLimits;
+//! ```
 //! The vertical-slice harness is test-only, not a production resolver entry:
 //! ```compile_fail
 //! use intlify_config::minimum_tests::harness::FixtureRunner;
