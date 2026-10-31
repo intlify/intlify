@@ -142,6 +142,9 @@ impl<O: Owner> OwnerRun for RecordedRun<O> {
                 AttemptResult::CaptureFailed(CaptureFailure::Overflow) => {
                     CaseOutcome::Failed(InvocationFailure::MeasurementOverflow)
                 }
+                AttemptResult::CaptureFailed(CaptureFailure::Unsupported) => {
+                    CaseOutcome::Unsupported
+                }
                 // A different result is not a lost sample: it invalidates the
                 // run, because the expectation it was compared against held.
                 AttemptResult::CaptureFailed(CaptureFailure::SemanticMismatch) => {

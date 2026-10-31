@@ -92,6 +92,9 @@ pub enum CaptureFailure {
     Overflow,
     /// A measured invocation produced a different result than the expectation.
     SemanticMismatch,
+    /// What the case measures cannot be observed in this run, so nothing was
+    /// invoked.
+    Unsupported,
 }
 
 /// Where one case's samples are taken: its clock, its policy, and its binding.

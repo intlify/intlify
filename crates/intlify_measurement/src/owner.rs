@@ -73,6 +73,10 @@ pub enum CaseOutcome {
     Measured,
     /// The invocation failed for a named reason; the run is incomplete.
     Failed(InvocationFailure),
+    /// What the case measures cannot be observed where it ran, such as peak
+    /// memory without an allocator observer. It is absent, not zero, and the
+    /// run is incomplete.
+    Unsupported,
     /// The output did not match the case's independently established
     /// expectation, which invalidates the run rather than losing a sample.
     SemanticMismatch,

@@ -15,11 +15,14 @@
 //! invents an absent observation, or turns a submitted record into its own
 //! input authority.
 //!
-//! Two non-default features add what every observing owner would otherwise
+//! Non-default features add what every observing owner would otherwise
 //! duplicate. `acquisition` reads the clock and the host and toolchain views,
-//! once, the same way for every owner. `owner-run` adds the run those owners
-//! share: capture, the sealed owner record and its admission, and the smoke
-//! runner, driven through `owner_run::Owner`. Reading a record needs neither.
+//! once, the same way for every owner, and holds the seam a memory observer is
+//! plugged into. `owner-run` adds the run those owners share: capture, the
+//! sealed owner record and its admission, and the smoke runner, driven through
+//! `owner_run::Owner`. `allocation-counter` adds the one allocator observer;
+//! the crate behind it installs its own global allocator, so only a memory
+//! measurement's own binary enables it. Reading a record needs none of them.
 //!
 //! Producing a record is not admission. Integrity, binding, inventory, and
 //! projection eligibility remain separate checks, and a failed or absent case

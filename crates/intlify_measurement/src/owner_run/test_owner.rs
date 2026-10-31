@@ -245,6 +245,8 @@ pub(super) const MEMORY: u8 = 6;
 pub(super) const OUTSIDE_MATRIX: u8 = 7;
 /// Every case is a memory case that declares no Memory Observation Domain.
 pub(super) const NO_MEMORY_DOMAIN: u8 = 8;
+/// Every case is a memory case, and the run has no allocator observer.
+pub(super) const UNSUPPORTED: u8 = 9;
 
 /// The domain the memory modes declare.
 fn memory_domain() -> MemoryObservationDomain {
@@ -315,7 +317,7 @@ impl<const MODE: u8> Owner for TestOwner<MODE> {
 
     fn project(prepared: &Prepared) -> Projection {
         let (category, operation_class, metric, aggregation) = match MODE {
-            MEMORY | NO_MEMORY_DOMAIN => (
+            MEMORY | NO_MEMORY_DOMAIN | UNSUPPORTED => (
                 Category::Memory,
                 OperationClass::PeakLive,
                 Metric::PeakLiveBytes,
@@ -340,7 +342,8 @@ impl<const MODE: u8> Owner for TestOwner<MODE> {
             cost: "character_count".into(),
             category,
             operation_class,
-            memory_domain: matches!(MODE, MEMORY | OUTSIDE_MATRIX).then(memory_domain),
+            memory_domain: matches!(MODE, MEMORY | OUTSIDE_MATRIX | UNSUPPORTED)
+                .then(memory_domain),
             fixture: prepared.fixture.name.into(),
             path: prepared.fixture.path,
             workload: prepared.expected.work.clone(),
@@ -369,6 +372,9 @@ impl<const MODE: u8> Owner for TestOwner<MODE> {
         capturing: &Capturing<'_, C>,
         prepared: &Prepared,
     ) -> Result<Capture<Work>, CaptureFailure> {
+        if MODE == UNSUPPORTED {
+            return Err(CaptureFailure::Unsupported);
+        }
         let operation = match MODE {
             DRIFTING => drifting,
             FAILING => failing,
@@ -761,5 +767,47 @@ mod tests {
     #[test]
     fn a_memory_case_without_its_domain_is_kept_as_projection_ineligible() {
         every_case_is_projection_ineligible::<TestOwner<NO_MEMORY_DOMAIN>>();
+    }
+
+    #[test]
+    fn a_case_this_run_cannot_observe_is_unsupported_rather_than_zero() {
+        let run = recorded::<TestOwner<UNSUPPORTED>>();
+        let admitted = OwnerRun::admit(&run, &run.encode().unwrap()).unwrap();
+        assert_eq!(
+            run.outcomes(&admitted),
+            vec![CaseOutcome::Unsupported; FIXTURES.len()]
+        );
+        assert_eq!(
+            admitted.document().result().outcome,
+            OwnerOutcome::Incomplete
+        );
+        let observation = observe_smoke::<TestOwner<UNSUPPORTED>>().unwrap();
+        let summary = observation.verify_saved(&saved(&observation)).unwrap();
+        assert_eq!(summary.outcome, ObservationOutcome::Incomplete);
+        assert_eq!(summary.measured_cases, 0);
+        assert_eq!(summary.non_measured_cases, FIXTURES.len());
+        // Nothing was measured, so there is no Evidence Set and no row.
+        assert_eq!(record(&observation, "measurement-evidence.json"), None);
+        let evaluation = record(&observation, "run-evaluation.json").unwrap();
+        let cases = evaluation["body"]["cases"].as_array().unwrap();
+        assert_eq!(cases.len(), FIXTURES.len());
+        for case in cases {
+            assert_eq!(case["result"]["kind"], "unavailable");
+            assert_eq!(case["result"]["unavailableKind"], "unsupported");
+            assert_eq!(
+                case["result"]["diagnosticPartialObservations"],
+                serde_json::json!([])
+            );
+            let reason = &case["result"]["reasons"][0];
+            assert_eq!(reason["code"]["code"], "unsupported-measurement");
+            assert_eq!(reason["detail"]["kind"], "unsupported-tuple");
+        }
+        let report = record(&observation, "report.json").unwrap();
+        let section = &report["body"]["sections"][0];
+        assert_eq!(section["rows"], serde_json::json!([]));
+        assert_eq!(
+            section["missingCaseInventory"].as_array().unwrap().len(),
+            FIXTURES.len()
+        );
     }
 }
