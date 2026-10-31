@@ -518,3 +518,25 @@ fn new_record_instances_preserve_semantics_without_retiming_or_copying_issuer_by
         validate(&run, &first).unwrap()
     );
 }
+
+#[test]
+fn a_projection_outside_the_common_vocabulary_is_never_projected() {
+    // Eligibility is decided by the common records: this owner only keeps an
+    // ineligible case out of its Evidence Set, and the evaluation keeps the
+    // case as projection-ineligible.
+    let run = capture();
+    let admitted = OwnerRun::admit(&run, &run.encode().unwrap()).unwrap();
+    let source = admitted.projection_source();
+    let attempt = &source.document().result().attempts[0];
+    let planned = &run.plan_record().body.case_inventory[0];
+    let projection = &run.common_plan().projections()[0];
+    let project = |projection: &CaseProjection| {
+        measurement::project_case(&source, attempt, &planned.case_identity, projection).unwrap()
+    };
+    assert!(project(projection).is_some());
+    // A duration aggregated as a peak is outside 026's matrix.
+    let mut value = serde_json::to_value(projection).unwrap();
+    value["sampleAggregation"] = json!("peak_over_batch");
+    let outside: CaseProjection = serde_json::from_value(value).unwrap();
+    assert!(project(&outside).is_none());
+}

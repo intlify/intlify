@@ -11,10 +11,9 @@ use intlify_shared_json::quantity::Quantity;
 
 use crate::identity::Token;
 use crate::measurement::{
-    Aggregation, CaseEvaluation, CaseResult, Category, Evaluation, EvaluationBody, Evidence,
-    InputState, Metric, MissingCase, ObservationalOnly, OperationClass, Outcome, ReportBody,
-    ReportSample, Requirement, Row, RunBinding, Section, Surface, Truncation, UnavailableKind,
-    Unit,
+    CaseEvaluation, CaseResult, Evaluation, EvaluationBody, Evidence, InputState, MissingCase,
+    ObservationalOnly, Outcome, ReportBody, ReportSample, Requirement, Row, RunBinding, Section,
+    Truncation, UnavailableKind,
 };
 use crate::owner::{CaseOutcome, ObservedDescriptors, OwnerRun};
 use crate::plan::CaseProjection;
@@ -223,6 +222,8 @@ pub(super) fn report<O: OwnerRun>(
                 })
             })
             .collect::<Result<_, Failure>>()?;
+        // A row presents what its case declared; the metric fixes the unit.
+        let common = observation.identity_projection.common();
         rows.push(Row {
             local_record_identity: local(&format!("measurement-row-{index}"))?,
             case_identity: case.case_identity.clone(),
@@ -230,13 +231,13 @@ pub(super) fn report<O: OwnerRun>(
             evidence: case_reference.clone(),
             owner_phase: observation.identity_projection.phase().into(),
             owner_cost: observation.identity_projection.cost().into(),
-            category: Category::Value,
-            operation_class: OperationClass::Value,
-            performance_surface: Surface::Value,
+            category: common.category,
+            operation_class: common.operation_class,
+            performance_surface: common.surface,
             execution_state: observation.observed_descriptors.execution().clone(),
-            metric: Metric::Value,
-            unit: Unit::Value,
-            sample_aggregation: Aggregation::Value,
+            metric: common.metric,
+            unit: common.metric.unit(),
+            sample_aggregation: common.aggregation,
             samples,
         });
     }

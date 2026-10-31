@@ -275,6 +275,43 @@ pub(super) enum Engine {
     Fresh,
 }
 
+/// The entry a case's input arrived through, on the cases whose work depends
+/// on it: acquired file bytes, or an inert Programmatic Entry Snapshot.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum EntryKind {
+    File,
+    Programmatic,
+}
+
+/// The resolver a case invokes: constructed outside the interval before each
+/// repetition, constructed once and reused, or reused right after it produced
+/// a blocked outcome.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum ResolverState {
+    Fresh,
+    Reused,
+    ReusedAfterBlocked,
+}
+
+impl ResolverState {
+    /// The engine state of 026's Execution State this resolver runs in.
+    ///
+    /// A resolver reused after a blocked outcome is still a reused one: what
+    /// sets it apart is the outcome before, which its variant names.
+    pub(super) const fn engine_state(self) -> &'static str {
+        match self {
+            Self::Fresh => "fresh",
+            Self::Reused | Self::ReusedAfterBlocked => "reused",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Declaration {

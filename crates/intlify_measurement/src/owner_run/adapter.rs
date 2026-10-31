@@ -22,7 +22,8 @@ use crate::identity::{
 };
 use crate::measurement::{
     owner_attempt_reference, CaseEvidence, ChecksumMethod, ExpectedOwner, MeasuredCase,
-    OwnerBinding, OwnerResultFacts, RunBinding, SampleDomains, SampleFacts, SamplingFacts,
+    OwnerBinding, OwnerResultFacts, ProjectionFailure, RunBinding, SampleDomains, SampleFacts,
+    SamplingFacts,
 };
 use crate::owner::{CaseOutcome, OwnerEvidenceBody, OwnerFailure, OwnerRun, Rejection};
 use crate::plan::RunPlanRecord;
@@ -172,49 +173,53 @@ impl<O: Owner> OwnerRun for RecordedRun<O> {
                 continue;
             };
             let sampling = &result.context.sampling;
-            cases.push(
-                CaseEvidence::project(
-                    &method::<O>(),
-                    &domains(),
-                    &result.record_identity,
-                    &planned.case_identity,
-                    projection.clone(),
-                    MeasuredCase {
-                        ordinal: attempt.ordinal,
-                        descriptors: measured.descriptors.clone(),
-                        sampling: SamplingFacts {
-                            warmup_strategy: Token::literal(
-                                "fixed-invocations-before-measured-samples-per-case",
-                            ),
-                            warmup_repetitions: sampling.warmup_repetitions,
-                            warmup_completed: measured.capture.warmup_completed,
-                            measured_samples: sampling.measured_samples,
-                            repetitions_per_sample: sampling.repetitions_per_sample,
-                        },
-                        samples: measured
-                            .capture
-                            .samples
-                            .iter()
-                            .map(|sample| SampleFacts {
-                                ordinal: sample.ordinal,
-                                repetition_count: sample.repetition_count,
-                                aggregate_quantity: sample.aggregate_nanoseconds,
-                                semantic_observation: sample.semantic_observation,
-                                semantic_identity: NativeChecksum::from_bytes(
-                                    sample.semantic_observation.identity(labels.framing).bytes(),
-                                ),
-                                execution_identity: NativeChecksum::from_bytes(
-                                    sample.execution_identity.bytes(),
-                                ),
-                                local_identity: NativeChecksum::from_bytes(
-                                    sample.local_identity.bytes(),
-                                ),
-                            })
-                            .collect(),
+            let projected = CaseEvidence::project(
+                &method::<O>(),
+                &domains(),
+                &result.record_identity,
+                &planned.case_identity,
+                projection.clone(),
+                MeasuredCase {
+                    ordinal: attempt.ordinal,
+                    descriptors: measured.descriptors.clone(),
+                    sampling: SamplingFacts {
+                        warmup_strategy: Token::literal(
+                            "fixed-invocations-before-measured-samples-per-case",
+                        ),
+                        warmup_repetitions: sampling.warmup_repetitions,
+                        warmup_completed: measured.capture.warmup_completed,
+                        measured_samples: sampling.measured_samples,
+                        repetitions_per_sample: sampling.repetitions_per_sample,
                     },
-                )
-                .map_err(|_| OwnerFailure)?,
+                    samples: measured
+                        .capture
+                        .samples
+                        .iter()
+                        .map(|sample| SampleFacts {
+                            ordinal: sample.ordinal,
+                            repetition_count: sample.repetition_count,
+                            aggregate_quantity: sample.aggregate_nanoseconds,
+                            semantic_observation: sample.semantic_observation,
+                            semantic_identity: NativeChecksum::from_bytes(
+                                sample.semantic_observation.identity(labels.framing).bytes(),
+                            ),
+                            execution_identity: NativeChecksum::from_bytes(
+                                sample.execution_identity.bytes(),
+                            ),
+                            local_identity: NativeChecksum::from_bytes(
+                                sample.local_identity.bytes(),
+                            ),
+                        })
+                        .collect(),
+                },
             );
+            match projected {
+                Ok(case) => cases.push(case),
+                // A case outside the common vocabulary is not projected, and
+                // the evaluation keeps it as projection-ineligible.
+                Err(ProjectionFailure::Ineligible(_)) => {}
+                Err(ProjectionFailure::Identity(_)) => return Err(OwnerFailure),
+            }
         }
         if cases.is_empty() {
             return Ok(None);

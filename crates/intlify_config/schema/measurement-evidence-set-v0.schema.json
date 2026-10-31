@@ -138,12 +138,8 @@
       "type": "object"
     },
     "Aggregation": {
-      "enum": ["batch_total"],
-      "type": "string"
-    },
-    "Aggregation2": {
-      "description": "Samples aggregate as a batch total.",
-      "enum": ["batch_total"],
+      "description": "How each sample aggregates its repetition batch.",
+      "enum": ["batch_total", "peak_over_batch"],
       "type": "string"
     },
     "AnyIdentity": {
@@ -401,7 +397,7 @@
     },
     "CaseProjection": {
       "additionalProperties": false,
-      "description": "Exactly the applicable 026 Case dimensions. No source path, build revision,\nclock observation, run/record ID, expected result checksum, or sample value.\nArtifact/Target/Release/service-profile and memory-domain fields do not apply\nto these eleven internal duration boundaries and are absent, not guessed.",
+      "description": "Exactly the applicable 026 Case dimensions. No source path, build revision,\nclock observation, run/record ID, expected result checksum, or sample value.\nArtifact/Target/Release/service-profile fields do not apply to these internal\nboundaries and are absent, not guessed. The Memory Observation Domain applies\nonly to a memory case, so a duration case has none.",
       "properties": {
         "category": {
           "$ref": "#/definitions/Category"
@@ -426,6 +422,9 @@
         },
         "measurementProfileRevision": {
           "$ref": "#/definitions/Token"
+        },
+        "memoryObservationDomain": {
+          "$ref": "#/definitions/MemoryObservationDomain"
         },
         "metric": {
           "$ref": "#/definitions/Metric"
@@ -493,7 +492,8 @@
       "type": "object"
     },
     "Category": {
-      "enum": ["toolchain"],
+      "description": "The measured category.",
+      "enum": ["toolchain", "memory"],
       "type": "string"
     },
     "ClockObservation": {
@@ -579,6 +579,29 @@
       "description": "The two instance domains 026 itself registers.",
       "enum": ["intlify-verification-record-v0", "intlify-measurement-run-v0"],
       "type": "string"
+    },
+    "Components": {
+      "additionalProperties": false,
+      "description": "The parts of a process design 026 asks every memory observation to place.",
+      "properties": {
+        "harness": {
+          "$ref": "#/definitions/Inclusion"
+        },
+        "jit": {
+          "$ref": "#/definitions/Inclusion"
+        },
+        "languageRuntime": {
+          "$ref": "#/definitions/Inclusion"
+        },
+        "localeData": {
+          "$ref": "#/definitions/Inclusion"
+        },
+        "sharedLibraries": {
+          "$ref": "#/definitions/Inclusion"
+        }
+      },
+      "required": ["harness", "languageRuntime", "jit", "sharedLibraries", "localeData"],
+      "type": "object"
     },
     "Concurrency": {
       "additionalProperties": false,
@@ -773,6 +796,26 @@
           "type": "object"
         }
       ]
+    },
+    "Coverage": {
+      "additionalProperties": false,
+      "description": "Which process and threads an observation covers, and whether it counts\nworkers and child processes.",
+      "properties": {
+        "childProcesses": {
+          "$ref": "#/definitions/Inclusion"
+        },
+        "process": {
+          "$ref": "#/definitions/Token"
+        },
+        "thread": {
+          "$ref": "#/definitions/Token"
+        },
+        "workers": {
+          "$ref": "#/definitions/Inclusion"
+        }
+      },
+      "required": ["process", "thread", "workers", "childProcesses"],
+      "type": "object"
     },
     "CreationContext": {
       "additionalProperties": false,
@@ -1479,6 +1522,11 @@
       },
       "required": ["localRecordIdentity", "observation"],
       "type": "object"
+    },
+    "EntryKind": {
+      "description": "The entry a case's input arrived through, on the cases whose work depends\non it: acquired file bytes, or an inert Programmatic Entry Snapshot.",
+      "enum": ["file", "programmatic"],
+      "type": "string"
     },
     "Envelope": {
       "additionalProperties": false,
@@ -2276,6 +2324,11 @@
       ],
       "type": "string"
     },
+    "Inclusion": {
+      "description": "Whether an observation counts the storage of one part of the process.",
+      "enum": ["included", "excluded", "not-applicable"],
+      "type": "string"
+    },
     "InputFacts": {
       "additionalProperties": false,
       "properties": {
@@ -2879,6 +2932,32 @@
       "required": ["profileIdentity", "profileRevision", "operation", "facts"],
       "type": "object"
     },
+    "MemoryObservationDomain": {
+      "additionalProperties": false,
+      "description": "The versioned descriptor of what one memory measurement observed.",
+      "properties": {
+        "components": {
+          "$ref": "#/definitions/Components"
+        },
+        "coverage": {
+          "$ref": "#/definitions/Coverage"
+        },
+        "identity": {
+          "$ref": "#/definitions/VersionedIdentity"
+        },
+        "observer": {
+          "$ref": "#/definitions/Token"
+        },
+        "reuse": {
+          "$ref": "#/definitions/Reuse"
+        },
+        "storage": {
+          "$ref": "#/definitions/StorageClasses"
+        }
+      },
+      "required": ["identity", "observer", "storage", "components", "coverage", "reuse"],
+      "type": "object"
+    },
     "Method": {
       "additionalProperties": false,
       "properties": {
@@ -2971,7 +3050,8 @@
       "type": "object"
     },
     "Metric": {
-      "enum": ["wall_duration"],
+      "description": "The measured metric.",
+      "enum": ["wall_duration", "peak_live_bytes"],
       "type": "string"
     },
     "MissingObservation": {
@@ -3459,7 +3539,8 @@
       "type": "string"
     },
     "OperationClass": {
-      "enum": ["component"],
+      "description": "The measured operation class.",
+      "enum": ["component", "peak_live"],
       "type": "string"
     },
     "OptimizationBarrier": {
@@ -3943,6 +4024,11 @@
       ],
       "type": "string"
     },
+    "ResolverState": {
+      "description": "The resolver a case invokes: constructed outside the interval before each\nrepetition, constructed once and reused, or reused right after it produced\na blocked outcome.",
+      "enum": ["fresh", "reused", "reused-after-blocked"],
+      "type": "string"
+    },
     "ResourcePolicyRecipe": {
       "enum": [
         "policy-only",
@@ -3967,6 +4053,20 @@
         "capability-incompatible"
       ],
       "type": "string"
+    },
+    "Reuse": {
+      "additionalProperties": false,
+      "description": "Which allocations an observation attributes to the case, and the reuse\nstate it starts from.",
+      "properties": {
+        "ownership": {
+          "$ref": "#/definitions/Token"
+        },
+        "state": {
+          "$ref": "#/definitions/Token"
+        }
+      },
+      "required": ["ownership", "state"],
+      "type": "object"
     },
     "RevisionZero": {
       "enum": ["0"],
@@ -4067,7 +4167,7 @@
       "description": "The sampling policy a measured case was captured under.",
       "properties": {
         "aggregation": {
-          "$ref": "#/definitions/Aggregation2"
+          "$ref": "#/definitions/Aggregation"
         },
         "calibration": {
           "$ref": "#/definitions/NoCalibration"
@@ -4259,6 +4359,27 @@
       ],
       "type": "string"
     },
+    "StorageClasses": {
+      "additionalProperties": false,
+      "description": "The storage classes an observation counts, and those it leaves out.",
+      "properties": {
+        "excluded": {
+          "items": {
+            "$ref": "#/definitions/Token"
+          },
+          "type": "array"
+        },
+        "included": {
+          "items": {
+            "$ref": "#/definitions/Token"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": ["included", "excluded"],
+      "type": "object"
+    },
     "Subject": {
       "additionalProperties": false,
       "description": "What exactly was measured.",
@@ -4279,6 +4400,7 @@
       "type": "string"
     },
     "Surface": {
+      "description": "The measured performance surface.",
       "enum": ["core"],
       "type": "string"
     },
@@ -4355,8 +4477,11 @@
     },
     "Variant": {
       "additionalProperties": false,
-      "description": "A typed native-owner fragment. Recipe/limit/selector tags retain their owner\nspelling and revision; they are not a new generic common selector language.",
+      "description": "A typed native-owner fragment. Recipe/limit/selector tags retain their owner\nspelling and revision; they are not a new generic common selector language.\nThe entry kind and the resolver state appear only on the cases they apply to.",
       "properties": {
+        "entryKind": {
+          "$ref": "#/definitions/EntryKind"
+        },
         "limit": {
           "items": [
             {
@@ -4372,6 +4497,9 @@
         },
         "recipe": {
           "$ref": "#/definitions/Recipe"
+        },
+        "resolver": {
+          "$ref": "#/definitions/ResolverState"
         },
         "selector": {
           "$ref": "#/definitions/Selector2"

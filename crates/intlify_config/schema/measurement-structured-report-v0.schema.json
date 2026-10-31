@@ -3,8 +3,8 @@
   "additionalProperties": false,
   "definitions": {
     "Aggregation": {
-      "description": "Samples aggregate as a batch total.",
-      "enum": ["batch_total"],
+      "description": "How each sample aggregates its repetition batch.",
+      "enum": ["batch_total", "peak_over_batch"],
       "type": "string"
     },
     "AnyIdentity": {
@@ -115,7 +115,7 @@
     },
     "Category": {
       "description": "The measured category.",
-      "enum": ["toolchain"],
+      "enum": ["toolchain", "memory"],
       "type": "string"
     },
     "Code": {
@@ -484,7 +484,7 @@
     },
     "Metric": {
       "description": "The measured metric.",
-      "enum": ["wall_duration"],
+      "enum": ["wall_duration", "peak_live_bytes"],
       "type": "string"
     },
     "MissingCase": {
@@ -545,7 +545,7 @@
     },
     "OperationClass": {
       "description": "The measured operation class.",
-      "enum": ["component"],
+      "enum": ["component", "peak_live"],
       "type": "string"
     },
     "Outcome": {
@@ -998,7 +998,7 @@
     },
     "Unit": {
       "description": "The canonical unit of the metric.",
-      "enum": ["nanosecond"],
+      "enum": ["nanosecond", "octet"],
       "type": "string"
     },
     "VersionedIdentity": {

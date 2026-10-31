@@ -17,6 +17,13 @@ use super::{Case, Labels, Owner, Package, Versioned};
 use crate::acquisition::Clock;
 use crate::environment::ClockObservation;
 use crate::execution::{Execution, OutputBuffer};
+use crate::identity::{Token, VersionedIdentity};
+use crate::measurement::{
+    Aggregation, Category, CommonDimensions, Metric, OperationClass, Surface,
+};
+use crate::memory::{
+    Components, Coverage, Inclusion, MemoryObservationDomain, Reuse, StorageClasses,
+};
 use crate::owner::ObservedDescriptors;
 use crate::plan::CaseProjection;
 
@@ -123,9 +130,14 @@ pub(super) struct Projection {
     owner: String,
     phase: String,
     cost: String,
+    category: Category,
+    operation_class: OperationClass,
+    memory_domain: Option<MemoryObservationDomain>,
     fixture: String,
     path: Expected,
     workload: Work,
+    metric: Metric,
+    aggregation: Aggregation,
 }
 
 impl CaseProjection for Projection {
@@ -134,6 +146,16 @@ impl CaseProjection for Projection {
     }
     fn cost(&self) -> &str {
         &self.cost
+    }
+    fn common(&self) -> CommonDimensions<'_> {
+        CommonDimensions {
+            category: self.category,
+            operation_class: self.operation_class,
+            surface: Surface::Value,
+            memory_domain: self.memory_domain.as_ref(),
+            metric: self.metric,
+            aggregation: self.aggregation,
+        }
     }
 }
 
@@ -214,6 +236,44 @@ pub(super) const FAILING: u8 = 3;
 pub(super) const MISDECLARED: u8 = 4;
 /// A fixture declares an operational failure where it reports why it cannot.
 pub(super) const MISDECLARED_FAILURE: u8 = 5;
+/// Every case is declared a memory case, with its Memory Observation Domain.
+/// The quantities are still durations: this shows the vocabulary a memory
+/// case is recorded under, not a memory observation.
+pub(super) const MEMORY: u8 = 6;
+/// Every case is a memory case aggregated as a batch total, which 026's
+/// matrix does not admit.
+pub(super) const OUTSIDE_MATRIX: u8 = 7;
+/// Every case is a memory case that declares no Memory Observation Domain.
+pub(super) const NO_MEMORY_DOMAIN: u8 = 8;
+
+/// The domain the memory modes declare.
+fn memory_domain() -> MemoryObservationDomain {
+    MemoryObservationDomain {
+        identity: VersionedIdentity::literal("intlify-measurement-test-memory", "0"),
+        observer: Token::literal("test-allocator"),
+        storage: StorageClasses {
+            included: vec![Token::literal("invocation-scratch")],
+            excluded: vec![Token::literal("caller-acquired-inputs")],
+        },
+        components: Components {
+            harness: Inclusion::Excluded,
+            language_runtime: Inclusion::Included,
+            jit: Inclusion::NotApplicable,
+            shared_libraries: Inclusion::Excluded,
+            locale_data: Inclusion::NotApplicable,
+        },
+        coverage: Coverage {
+            process: Token::literal("calling-process"),
+            thread: Token::literal("calling-thread-only"),
+            workers: Inclusion::NotApplicable,
+            child_processes: Inclusion::NotApplicable,
+        },
+        reuse: Reuse {
+            ownership: Token::literal("allocated-in-interval"),
+            state: Token::literal("reused"),
+        },
+    }
+}
 
 pub(super) struct TestOwner<const MODE: u8>;
 
@@ -254,13 +314,38 @@ impl<const MODE: u8> Owner for TestOwner<MODE> {
     }
 
     fn project(prepared: &Prepared) -> Projection {
+        let (category, operation_class, metric, aggregation) = match MODE {
+            MEMORY | NO_MEMORY_DOMAIN => (
+                Category::Memory,
+                OperationClass::PeakLive,
+                Metric::PeakLiveBytes,
+                Aggregation::PeakOverBatch,
+            ),
+            OUTSIDE_MATRIX => (
+                Category::Memory,
+                OperationClass::PeakLive,
+                Metric::PeakLiveBytes,
+                Aggregation::BatchTotal,
+            ),
+            _ => (
+                Category::Toolchain,
+                OperationClass::Component,
+                Metric::WallDuration,
+                Aggregation::BatchTotal,
+            ),
+        };
         Projection {
             owner: LABELS.owner.into(),
             phase: "test_phase".into(),
             cost: "character_count".into(),
+            category,
+            operation_class,
+            memory_domain: matches!(MODE, MEMORY | OUTSIDE_MATRIX).then(memory_domain),
             fixture: prepared.fixture.name.into(),
             path: prepared.fixture.path,
             workload: prepared.expected.work.clone(),
+            metric,
+            aggregation,
         }
     }
 
@@ -603,5 +688,78 @@ mod tests {
                 .clone()
         };
         assert_ne!(runs(&first), runs(&second));
+    }
+
+    /// One record a smoke observation saved, by its file name.
+    fn record<O: Owner>(observation: &Observation<O>, name: &str) -> Option<serde_json::Value> {
+        observation
+            .records()
+            .into_iter()
+            .find(|(saved, _)| *saved == name)
+            .map(|(_, bytes)| serde_json::from_slice(bytes).unwrap())
+    }
+
+    #[test]
+    fn a_memory_case_is_recorded_under_the_memory_vocabulary_throughout() {
+        let observation = observe_smoke::<TestOwner<MEMORY>>().unwrap();
+        let summary = observation.verify_saved(&saved(&observation)).unwrap();
+        assert_eq!(summary.outcome, ObservationOutcome::Complete);
+        assert_eq!(summary.measured_cases, FIXTURES.len());
+        let evidence = record(&observation, "measurement-evidence.json").unwrap();
+        let cases = evidence["body"]["cases"].as_array().unwrap();
+        assert_eq!(cases.len(), FIXTURES.len());
+        for case in cases {
+            // The domain is one of the case's dimensions.
+            assert_eq!(
+                case["identityProjection"]["memoryDomain"],
+                serde_json::to_value(memory_domain()).unwrap()
+            );
+            assert_eq!(case["samplingPolicy"]["aggregation"], "peak_over_batch");
+        }
+        let report = record(&observation, "report.json").unwrap();
+        let rows = report["body"]["sections"][0]["rows"].as_array().unwrap();
+        assert_eq!(rows.len(), FIXTURES.len());
+        for row in rows {
+            assert_eq!(row["category"], "memory");
+            assert_eq!(row["operationClass"], "peak_live");
+            // Memory is not a surface: the case keeps the one it encloses.
+            assert_eq!(row["performanceSurface"], "core");
+            assert_eq!(row["metric"], "peak_live_bytes");
+            assert_eq!(row["unit"], "octet");
+            assert_eq!(row["sampleAggregation"], "peak_over_batch");
+        }
+    }
+
+    /// Check that every case of a run was kept as projection-ineligible.
+    fn every_case_is_projection_ineligible<O: Owner>() {
+        let observation = observe_smoke::<O>().unwrap();
+        let summary = observation.verify_saved(&saved(&observation)).unwrap();
+        assert_eq!(summary.outcome, ObservationOutcome::Incomplete);
+        assert_eq!(summary.measured_cases, 0);
+        assert_eq!(summary.non_measured_cases, FIXTURES.len());
+        // No case could be projected, so there is no Evidence Set at all
+        // rather than one that claims nothing.
+        assert_eq!(record(&observation, "measurement-evidence.json"), None);
+        let evaluation = record(&observation, "run-evaluation.json").unwrap();
+        let cases = evaluation["body"]["cases"].as_array().unwrap();
+        assert_eq!(cases.len(), FIXTURES.len());
+        for case in cases {
+            assert_eq!(case["result"]["kind"], "unavailable");
+            assert_eq!(case["result"]["unavailableKind"], "projection-ineligible");
+            assert_eq!(
+                case["result"]["reasons"][0]["code"]["code"],
+                "projection-ineligible"
+            );
+        }
+    }
+
+    #[test]
+    fn a_memory_case_outside_026s_matrix_is_kept_as_projection_ineligible() {
+        every_case_is_projection_ineligible::<TestOwner<OUTSIDE_MATRIX>>();
+    }
+
+    #[test]
+    fn a_memory_case_without_its_domain_is_kept_as_projection_ineligible() {
+        every_case_is_projection_ineligible::<TestOwner<NO_MEMORY_DOMAIN>>();
     }
 }
