@@ -48,6 +48,10 @@
 //! ```compile_fail
 //! use intlify_config::resolver::capability::BootstrapLimits;
 //! ```
+//! Nor is the built-in Resolver Construction Root Package:
+//! ```compile_fail
+//! use intlify_config::construction::root::RootPackage;
+//! ```
 //! The vertical-slice harness is test-only, not a production resolver entry:
 //! ```compile_fail
 //! use intlify_config::minimum_tests::harness::FixtureRunner;
@@ -80,6 +84,12 @@ pub use structural::example as example_support;
 #[doc(hidden)]
 pub use artifacts::vectors as vector_support;
 
+// Developer-only generation of the committed construction artifacts. The
+// package's verification and its members' readers stay internal.
+#[cfg(feature = "vectors")]
+#[doc(hidden)]
+pub use construction::generate as construction_support;
+
 /// Non-default developer measurements only; no configuration resolver or Profile API.
 #[cfg(feature = "benchmark")]
 pub use benchmark::facade as measurement;
@@ -94,6 +104,10 @@ mod references;
 // The 017 representations the resolver admits; no artifact API is reserved.
 #[allow(dead_code)]
 mod artifacts;
+
+// 015's built-in Resolver Construction Root Package; construction will read it.
+#[allow(dead_code)]
+mod construction;
 
 // 015's typed-record framing and the Resolver Construction Identity's text.
 // Construction and the invocation boundaries will use them; no codec is public.

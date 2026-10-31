@@ -1,0 +1,20 @@
+{
+  "rules": [
+    {
+      "id": "profile-association",
+      "relationship": "The Configuration Schema Authority Set's profileSpecification equals the admitted Profile Specification's identity, revision, and semantic digest."
+    },
+    {
+      "id": "profile-authorities",
+      "relationship": "The Profile Specification's authorities name the admitted Profile Specification Schema, Configuration Schema Authority Set, Capability Specification, and Registry Package."
+    },
+    {
+      "id": "capability-bound-mirror",
+      "relationship": "The Capability Specification's policyComparable paths equal the Profile Specification's resourceBounds, in order."
+    },
+    {
+      "id": "registry-phases",
+      "relationship": "Every phase ID in the Check Registry is one of the Profile Specification's phases."
+    }
+  ]
+}
