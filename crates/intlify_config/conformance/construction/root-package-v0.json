@@ -1,0 +1,19 @@
+{
+  "members": {
+    "construction-admission-specification": {
+      "digest": "sha256:3579306e8eb43ce1ec2215beedf17f0a96722273f9bc5e0df6ed116f886c440a"
+    },
+    "construction-admission-schema": {
+      "digest": "sha256:7d347ac9d98ee7cc1c3a6941b0cf97114cf09ff3b3772e2a22dfeaaec37b22dd"
+    },
+    "authority-envelope-schema-package": {
+      "digest": "sha256:7fade49e55597b3a04831db99afaa269eb959b5061bfd713a179e6b153b51a42"
+    },
+    "json-schema-meta-schema-package": {
+      "digest": "sha256:979f909428df30f41d9d3b5ce62be38173868caa752d619651d062273fdf131c"
+    },
+    "cross-authority-rules": {
+      "digest": "sha256:580838f75ef86e23ef0a4f8d042fe36786e73a8186d960c718a5d09ae8ab5cd9"
+    }
+  }
+}

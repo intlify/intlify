@@ -1,0 +1,413 @@
+{
+  "bounds": [
+    {
+      "id": "input.maxTotalArtifactBytes",
+      "value": "16777216",
+      "unit": "artifact-byte"
+    },
+    {
+      "id": "input.maxSingleArtifactBytes",
+      "value": "4194304",
+      "unit": "artifact-byte"
+    },
+    {
+      "id": "input.maxDepth",
+      "value": "64",
+      "unit": "json-level"
+    },
+    {
+      "id": "input.maxNodes",
+      "value": "1048576",
+      "unit": "json-node"
+    },
+    {
+      "id": "input.maxCollectionEntries",
+      "value": "1048576",
+      "unit": "json-collection-entry"
+    },
+    {
+      "id": "input.maxTotalStringBytes",
+      "value": "16777216",
+      "unit": "string-byte"
+    },
+    {
+      "id": "input.maxSingleStringBytes",
+      "value": "65536",
+      "unit": "string-byte"
+    },
+    {
+      "id": "schema.maxConfigurationSchemas",
+      "value": "64",
+      "unit": "configuration-schema"
+    },
+    {
+      "id": "schema.maxSingleArtifactBytes",
+      "value": "1048576",
+      "unit": "artifact-byte"
+    },
+    {
+      "id": "schema.maxTotalArtifactBytes",
+      "value": "8388608",
+      "unit": "artifact-byte"
+    },
+    {
+      "id": "schema.maxNodes",
+      "value": "262144",
+      "unit": "schema-node"
+    },
+    {
+      "id": "schema.maxReferences",
+      "value": "65536",
+      "unit": "schema-reference"
+    },
+    {
+      "id": "schema.maxValidationWorkUnits",
+      "value": "268435456",
+      "unit": "validation-pair"
+    },
+    {
+      "id": "registry.maxRows",
+      "value": "65536",
+      "unit": "registry-row"
+    },
+    {
+      "id": "registry.maxSingleMemberArtifactBytes",
+      "value": "4194304",
+      "unit": "artifact-byte"
+    },
+    {
+      "id": "registry.maxTotalArtifactBytes",
+      "value": "16777216",
+      "unit": "artifact-byte"
+    },
+    {
+      "id": "registry.maxValidationWorkUnits",
+      "value": "1073741824",
+      "unit": "validation-pair"
+    },
+    {
+      "id": "crossAuthority.maxChecks",
+      "value": "65536",
+      "unit": "cross-authority-check"
+    }
+  ],
+  "components": {
+    "profileSpecificationSchema": {
+      "identity": "intlify-project-profile-specification-schema",
+      "revisions": [
+        "0"
+      ],
+      "envelopeSchemas": [
+        "component-tuple"
+      ]
+    },
+    "profileSpecification": {
+      "identity": "intlify-project-profile",
+      "revisions": [
+        "0"
+      ],
+      "envelopeSchemas": [
+        "profile-specification-tuple"
+      ]
+    },
+    "configurationSchemaAuthoritySet": {
+      "identity": "intlify-configuration-schema-authority-set",
+      "revisions": [
+        "0"
+      ],
+      "envelopeSchemas": [
+        "component-tuple",
+        "configuration-schema-authority-set"
+      ]
+    },
+    "resolverCapabilitySpecification": {
+      "identity": "intlify-project-profile-resolver-capability",
+      "revisions": [
+        "0"
+      ],
+      "envelopeSchemas": [
+        "component-tuple"
+      ]
+    },
+    "registryPackage": {
+      "identity": "intlify-project-profile-resolver-registry-package",
+      "revisions": [
+        "0"
+      ],
+      "envelopeSchemas": [
+        "component-tuple",
+        "registry-package"
+      ]
+    }
+  },
+  "configurationSchemas": {
+    "identity": "intlify-configuration-schema",
+    "revisions": [
+      "0"
+    ],
+    "dialects": [
+      "http://json-schema.org/draft-07/schema#"
+    ]
+  },
+  "registryMembers": {
+    "safe-origin-kind-registry-schema": {
+      "identity": "intlify-project-profile-safe-origin-kind-registry-schema",
+      "revisions": [
+        "0"
+      ]
+    },
+    "check-registry-schema": {
+      "identity": "intlify-project-profile-check-registry-schema",
+      "revisions": [
+        "0"
+      ]
+    },
+    "finding-registry-schema": {
+      "identity": "intlify-project-profile-finding-registry-schema",
+      "revisions": [
+        "0"
+      ]
+    },
+    "safe-origin-kind-registry": {
+      "identity": "intlify-project-profile-safe-origin-kind-registry",
+      "revisions": [
+        "0"
+      ]
+    },
+    "check-registry": {
+      "identity": "intlify-project-profile-check-registry",
+      "revisions": [
+        "0"
+      ]
+    },
+    "finding-registry": {
+      "identity": "intlify-project-profile-finding-registry",
+      "revisions": [
+        "0"
+      ]
+    }
+  },
+  "failurePrecedence": [
+    {
+      "component": "all",
+      "check": "construction-bounds",
+      "reason": "construction-input-limit-exceeded"
+    },
+    {
+      "component": "profileSpecificationSchema",
+      "check": "presence",
+      "reason": "profile-specification-schema-missing"
+    },
+    {
+      "component": "profileSpecificationSchema",
+      "check": "envelope",
+      "reason": "profile-specification-schema-invalid"
+    },
+    {
+      "component": "profileSpecificationSchema",
+      "check": "identity",
+      "reason": "profile-specification-schema-identity-mismatch"
+    },
+    {
+      "component": "profileSpecificationSchema",
+      "check": "revision",
+      "reason": "profile-specification-schema-revision-unsupported"
+    },
+    {
+      "component": "profileSpecificationSchema",
+      "check": "file-digest",
+      "reason": "profile-specification-schema-digest-mismatch"
+    },
+    {
+      "component": "profileSpecificationSchema",
+      "check": "meta-schema",
+      "reason": "profile-specification-schema-invalid"
+    },
+    {
+      "component": "profileSpecification",
+      "check": "presence",
+      "reason": "profile-specification-missing"
+    },
+    {
+      "component": "profileSpecification",
+      "check": "envelope",
+      "reason": "profile-specification-body-schema-invalid"
+    },
+    {
+      "component": "profileSpecification",
+      "check": "identity",
+      "reason": "profile-specification-identity-mismatch"
+    },
+    {
+      "component": "profileSpecification",
+      "check": "revision",
+      "reason": "profile-specification-revision-unsupported"
+    },
+    {
+      "component": "profileSpecification",
+      "check": "file-digest",
+      "reason": "profile-specification-digest-mismatch"
+    },
+    {
+      "component": "profileSpecification",
+      "check": "body-schema",
+      "reason": "profile-specification-body-schema-invalid"
+    },
+    {
+      "component": "profileSpecification",
+      "check": "semantic-digest",
+      "reason": "profile-specification-digest-mismatch"
+    },
+    {
+      "component": "configurationSchemaAuthoritySet",
+      "check": "presence",
+      "reason": "configuration-schema-authority-set-missing"
+    },
+    {
+      "component": "configurationSchemaAuthoritySet",
+      "check": "envelope",
+      "reason": "configuration-schema-authority-set-schema-invalid"
+    },
+    {
+      "component": "configurationSchemaAuthoritySet",
+      "check": "identity",
+      "reason": "configuration-schema-authority-set-identity-mismatch"
+    },
+    {
+      "component": "configurationSchemaAuthoritySet",
+      "check": "revision",
+      "reason": "configuration-schema-authority-set-revision-unsupported"
+    },
+    {
+      "component": "configurationSchemaAuthoritySet",
+      "check": "file-digest",
+      "reason": "configuration-schema-authority-set-digest-mismatch"
+    },
+    {
+      "component": "configurationSchemaMember",
+      "check": "identity",
+      "reason": "configuration-schema-member-identity-mismatch"
+    },
+    {
+      "component": "configurationSchemaMember",
+      "check": "revision",
+      "reason": "configuration-schema-member-revision-unsupported"
+    },
+    {
+      "component": "configurationSchemaMember",
+      "check": "dialect",
+      "reason": "configuration-schema-member-dialect-unsupported"
+    },
+    {
+      "component": "configurationSchemaMember",
+      "check": "file-digest",
+      "reason": "configuration-schema-member-digest-mismatch"
+    },
+    {
+      "component": "configurationSchemaMember",
+      "check": "meta-schema",
+      "reason": "configuration-schema-member-schema-invalid"
+    },
+    {
+      "component": "resolverCapabilitySpecification",
+      "check": "presence",
+      "reason": "resolver-capability-specification-missing"
+    },
+    {
+      "component": "resolverCapabilitySpecification",
+      "check": "envelope",
+      "reason": "resolver-capability-specification-schema-invalid"
+    },
+    {
+      "component": "resolverCapabilitySpecification",
+      "check": "identity",
+      "reason": "resolver-capability-specification-identity-mismatch"
+    },
+    {
+      "component": "resolverCapabilitySpecification",
+      "check": "revision",
+      "reason": "resolver-capability-specification-revision-unsupported"
+    },
+    {
+      "component": "resolverCapabilitySpecification",
+      "check": "file-digest",
+      "reason": "resolver-capability-specification-digest-mismatch"
+    },
+    {
+      "component": "resolverCapabilitySpecification",
+      "check": "body-schema",
+      "reason": "resolver-capability-specification-schema-invalid"
+    },
+    {
+      "component": "registryPackage",
+      "check": "presence",
+      "reason": "registry-package-incomplete"
+    },
+    {
+      "component": "registryPackage",
+      "check": "envelope",
+      "reason": "registry-package-schema-invalid"
+    },
+    {
+      "component": "registryPackage",
+      "check": "identity",
+      "reason": "registry-package-identity-mismatch"
+    },
+    {
+      "component": "registryPackage",
+      "check": "revision",
+      "reason": "registry-package-revision-unsupported"
+    },
+    {
+      "component": "registryPackage",
+      "check": "file-digest",
+      "reason": "registry-package-digest-mismatch"
+    },
+    {
+      "component": "registryMember",
+      "check": "presence",
+      "reason": "registry-package-incomplete"
+    },
+    {
+      "component": "registryMember",
+      "check": "identity",
+      "reason": "registry-member-identity-mismatch"
+    },
+    {
+      "component": "registryMember",
+      "check": "revision",
+      "reason": "registry-member-revision-unsupported"
+    },
+    {
+      "component": "registryMember",
+      "check": "file-digest",
+      "reason": "registry-member-digest-mismatch"
+    },
+    {
+      "component": "registryMember",
+      "check": "member-schema",
+      "reason": "registry-member-schema-invalid"
+    },
+    {
+      "component": "registryPackage",
+      "check": "cross-references",
+      "reason": "registry-cross-reference-invalid"
+    },
+    {
+      "component": "all",
+      "check": "cross-authority-rules",
+      "reason": "construction-cross-authority-reference-invalid"
+    },
+    {
+      "component": "all",
+      "check": "implemented-authority",
+      "reason": "construction-authority-not-implemented"
+    }
+  ],
+  "crossAuthorityRules": [
+    "profile-association",
+    "profile-authorities",
+    "capability-bound-mirror",
+    "registry-phases"
+  ]
+}

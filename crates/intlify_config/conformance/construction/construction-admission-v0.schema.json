@@ -1,0 +1,370 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ConstructionAdmission",
+  "description": "The construction-admission body.",
+  "type": "object",
+  "properties": {
+    "bounds": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/BoundRecord"
+      },
+      "minItems": 18,
+      "maxItems": 18
+    },
+    "components": {
+      "$ref": "#/definitions/Components"
+    },
+    "configurationSchemas": {
+      "$ref": "#/definitions/ConfigurationSchemaAdmission"
+    },
+    "registryMembers": {
+      "$ref": "#/definitions/RegistryMembers"
+    },
+    "failurePrecedence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/PrecedenceRow"
+      },
+      "minItems": 43,
+      "maxItems": 43
+    },
+    "crossAuthorityRules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CrossAuthorityRule"
+      },
+      "minItems": 4,
+      "maxItems": 4
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "bounds",
+    "components",
+    "configurationSchemas",
+    "registryMembers",
+    "failurePrecedence",
+    "crossAuthorityRules"
+  ],
+  "definitions": {
+    "BoundRecord": {
+      "description": "One bound's record: its ID, its value as a decimal string, and its unit.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/ConstructionBoundId"
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,19}$"
+        },
+        "unit": {
+          "$ref": "#/definitions/ConstructionUnit"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "value",
+        "unit"
+      ]
+    },
+    "ConstructionBoundId": {
+      "description": "One construction-root bound, in the canonical order.",
+      "type": "string",
+      "enum": [
+        "input.maxTotalArtifactBytes",
+        "input.maxSingleArtifactBytes",
+        "input.maxDepth",
+        "input.maxNodes",
+        "input.maxCollectionEntries",
+        "input.maxTotalStringBytes",
+        "input.maxSingleStringBytes",
+        "schema.maxConfigurationSchemas",
+        "schema.maxSingleArtifactBytes",
+        "schema.maxTotalArtifactBytes",
+        "schema.maxNodes",
+        "schema.maxReferences",
+        "schema.maxValidationWorkUnits",
+        "registry.maxRows",
+        "registry.maxSingleMemberArtifactBytes",
+        "registry.maxTotalArtifactBytes",
+        "registry.maxValidationWorkUnits",
+        "crossAuthority.maxChecks"
+      ]
+    },
+    "ConstructionUnit": {
+      "description": "What one unit of a construction bound counts.",
+      "type": "string",
+      "enum": [
+        "artifact-byte",
+        "json-level",
+        "json-node",
+        "json-collection-entry",
+        "string-byte",
+        "configuration-schema",
+        "schema-node",
+        "schema-reference",
+        "validation-pair",
+        "registry-row",
+        "cross-authority-check"
+      ]
+    },
+    "Components": {
+      "description": "The five construction components, in their fixed order.",
+      "type": "object",
+      "properties": {
+        "profileSpecificationSchema": {
+          "$ref": "#/definitions/ComponentAdmission"
+        },
+        "profileSpecification": {
+          "$ref": "#/definitions/ComponentAdmission"
+        },
+        "configurationSchemaAuthoritySet": {
+          "$ref": "#/definitions/ComponentAdmission"
+        },
+        "resolverCapabilitySpecification": {
+          "$ref": "#/definitions/ComponentAdmission"
+        },
+        "registryPackage": {
+          "$ref": "#/definitions/ComponentAdmission"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "profileSpecificationSchema",
+        "profileSpecification",
+        "configurationSchemaAuthoritySet",
+        "resolverCapabilitySpecification",
+        "registryPackage"
+      ]
+    },
+    "ComponentAdmission": {
+      "description": "What one component admits, and the envelope schemas its form is checked\nagainst.",
+      "type": "object",
+      "properties": {
+        "identity": {
+          "type": "string"
+        },
+        "revisions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "envelopeSchemas": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EnvelopeSchema"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "revisions",
+        "envelopeSchemas"
+      ]
+    },
+    "EnvelopeSchema": {
+      "description": "An envelope schema in the authority-envelope schema package.",
+      "type": "string",
+      "enum": [
+        "component-tuple",
+        "profile-specification-tuple",
+        "configuration-schema-authority-set",
+        "registry-package"
+      ]
+    },
+    "ConfigurationSchemaAdmission": {
+      "description": "What a mapped configuration schema admits.",
+      "type": "object",
+      "properties": {
+        "identity": {
+          "type": "string"
+        },
+        "revisions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dialects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "revisions",
+        "dialects"
+      ]
+    },
+    "RegistryMembers": {
+      "description": "The six Registry Package members, in their fixed order.",
+      "type": "object",
+      "properties": {
+        "safe-origin-kind-registry-schema": {
+          "$ref": "#/definitions/Admitted"
+        },
+        "check-registry-schema": {
+          "$ref": "#/definitions/Admitted"
+        },
+        "finding-registry-schema": {
+          "$ref": "#/definitions/Admitted"
+        },
+        "safe-origin-kind-registry": {
+          "$ref": "#/definitions/Admitted"
+        },
+        "check-registry": {
+          "$ref": "#/definitions/Admitted"
+        },
+        "finding-registry": {
+          "$ref": "#/definitions/Admitted"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "safe-origin-kind-registry-schema",
+        "check-registry-schema",
+        "finding-registry-schema",
+        "safe-origin-kind-registry",
+        "check-registry",
+        "finding-registry"
+      ]
+    },
+    "Admitted": {
+      "description": "The identity and revisions one construction slot admits.",
+      "type": "object",
+      "properties": {
+        "identity": {
+          "type": "string"
+        },
+        "revisions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "revisions"
+      ]
+    },
+    "PrecedenceRow": {
+      "description": "One row of the construction-failure precedence.",
+      "type": "object",
+      "properties": {
+        "component": {
+          "$ref": "#/definitions/Component"
+        },
+        "check": {
+          "$ref": "#/definitions/Check"
+        },
+        "reason": {
+          "$ref": "#/definitions/ConstructionFailure"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "component",
+        "check",
+        "reason"
+      ]
+    },
+    "Component": {
+      "description": "What a precedence row checks: every input at once, one of the five\ncomponents, or each member of a container in its order.",
+      "type": "string",
+      "enum": [
+        "all",
+        "profileSpecificationSchema",
+        "profileSpecification",
+        "configurationSchemaAuthoritySet",
+        "configurationSchemaMember",
+        "resolverCapabilitySpecification",
+        "registryPackage",
+        "registryMember"
+      ]
+    },
+    "Check": {
+      "description": "One check cell of design 015's construction-failure table.",
+      "type": "string",
+      "enum": [
+        "construction-bounds",
+        "presence",
+        "envelope",
+        "identity",
+        "revision",
+        "file-digest",
+        "meta-schema",
+        "body-schema",
+        "semantic-digest",
+        "dialect",
+        "member-schema",
+        "cross-references",
+        "cross-authority-rules",
+        "implemented-authority"
+      ]
+    },
+    "ConstructionFailure": {
+      "description": "Why construction refuses its input.",
+      "type": "string",
+      "enum": [
+        "construction-input-limit-exceeded",
+        "profile-specification-schema-missing",
+        "profile-specification-schema-invalid",
+        "profile-specification-schema-identity-mismatch",
+        "profile-specification-schema-revision-unsupported",
+        "profile-specification-schema-digest-mismatch",
+        "profile-specification-missing",
+        "profile-specification-body-schema-invalid",
+        "profile-specification-identity-mismatch",
+        "profile-specification-revision-unsupported",
+        "profile-specification-digest-mismatch",
+        "configuration-schema-authority-set-missing",
+        "configuration-schema-authority-set-schema-invalid",
+        "configuration-schema-authority-set-identity-mismatch",
+        "configuration-schema-authority-set-revision-unsupported",
+        "configuration-schema-authority-set-digest-mismatch",
+        "configuration-schema-member-identity-mismatch",
+        "configuration-schema-member-revision-unsupported",
+        "configuration-schema-member-dialect-unsupported",
+        "configuration-schema-member-digest-mismatch",
+        "configuration-schema-member-schema-invalid",
+        "resolver-capability-specification-missing",
+        "resolver-capability-specification-schema-invalid",
+        "resolver-capability-specification-identity-mismatch",
+        "resolver-capability-specification-revision-unsupported",
+        "resolver-capability-specification-digest-mismatch",
+        "registry-package-incomplete",
+        "registry-package-schema-invalid",
+        "registry-package-identity-mismatch",
+        "registry-package-revision-unsupported",
+        "registry-package-digest-mismatch",
+        "registry-member-identity-mismatch",
+        "registry-member-revision-unsupported",
+        "registry-member-digest-mismatch",
+        "registry-member-schema-invalid",
+        "registry-cross-reference-invalid",
+        "construction-cross-authority-reference-invalid",
+        "construction-authority-not-implemented"
+      ]
+    },
+    "CrossAuthorityRule": {
+      "description": "One cross-authority rule.",
+      "type": "string",
+      "enum": [
+        "profile-association",
+        "profile-authorities",
+        "capability-bound-mirror",
+        "registry-phases"
+      ]
+    }
+  }
+}

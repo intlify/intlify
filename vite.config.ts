@@ -27,7 +27,10 @@ export default defineConfig({
       'crates/intlify_locale_icu4x/fixtures/artifact/**',
       'crates/intlify_locale_icu4x/data/**',
       // The corpus gate's registry is compared byte for byte with a fresh run.
-      'crates/intlify_locale_icu4x/evidence/**'
+      'crates/intlify_locale_icu4x/evidence/**',
+      // Construction artifacts and the meta-schema are pinned by their exact bytes.
+      'crates/intlify_config/conformance/**',
+      'crates/intlify_config/data/**'
     ]
   }),
   lint: defineLintConfig({
