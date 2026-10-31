@@ -19,6 +19,7 @@ use crate::identity::{
     CaseIdentity, CommonDomain, IdentityFailure, NativeChecksum, OwnerLabel, OwnerRecordIdentity,
     RecordIdentity, Token, VersionedIdentity,
 };
+use crate::measurement::CommonDimensions;
 use crate::record::{Record, RunPlanKind};
 
 /// Private reader capacity for one Plan document, not a project-wide limit.
@@ -37,6 +38,12 @@ pub trait CaseProjection:
     fn phase(&self) -> &str;
     /// Return the owner cost this case measures.
     fn cost(&self) -> &str;
+    /// Return the dimensions this case declares in 026's common vocabulary.
+    ///
+    /// They decide whether a measured case is projected at all, so an owner
+    /// states each one from its own projection rather than leaving a default
+    /// to stand in for it.
+    fn common(&self) -> CommonDimensions<'_>;
 }
 
 macro_rules! literal_type {
@@ -275,6 +282,7 @@ impl<P: CaseProjection> IssuedRunPlan<P> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::measurement::{Aggregation, Category, Metric, OperationClass, Surface};
     use serde_json::json;
 
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -290,6 +298,16 @@ mod tests {
         }
         fn cost(&self) -> &str {
             &self.owner_cost
+        }
+        fn common(&self) -> CommonDimensions<'_> {
+            CommonDimensions {
+                category: Category::Toolchain,
+                operation_class: OperationClass::Component,
+                surface: Surface::Value,
+                memory_domain: None,
+                metric: Metric::WallDuration,
+                aggregation: Aggregation::BatchTotal,
+            }
         }
     }
 

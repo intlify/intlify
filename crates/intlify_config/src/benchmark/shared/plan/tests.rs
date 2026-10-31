@@ -305,3 +305,102 @@ fn case_identity_preserves_canonical_object_order_and_rejects_unlisted_dimension
         );
     }
 }
+
+#[test]
+fn every_projection_declares_the_common_dimensions_it_serializes() {
+    let plan = issue();
+    for projection in plan.projections() {
+        let common = CommonProjection::common(projection);
+        assert_eq!(common.eligibility(), Ok(()));
+        let value = serde_json::to_value(projection).unwrap();
+        for (field, declared) in [
+            ("category", serde_json::to_value(common.category)),
+            (
+                "operationClass",
+                serde_json::to_value(common.operation_class),
+            ),
+            ("performanceSurface", serde_json::to_value(common.surface)),
+            ("metric", serde_json::to_value(common.metric)),
+            (
+                "sampleAggregation",
+                serde_json::to_value(common.aggregation),
+            ),
+        ] {
+            assert_eq!(value[field], declared.unwrap(), "{field}");
+        }
+        // A dimension that does not apply to a duration case is absent.
+        assert_eq!(common.memory_domain, None);
+        assert!(value.get("memoryObservationDomain").is_none());
+        assert!(value["variant"].get("entryKind").is_none());
+        assert!(value["variant"].get("resolver").is_none());
+    }
+}
+
+/// A memory case of a reused resolver, made from one actual projection.
+fn memory_case(mut projection: CaseProjection) -> CaseProjection {
+    projection.category = Category::Memory;
+    projection.operation_class = OperationClass::PeakLive;
+    projection.memory_observation_domain = Some(crate::benchmark::memory_domain::invocation(
+        ResolverState::Reused,
+    ));
+    projection.variant.entry_kind = Some(EntryKind::File);
+    projection.variant.resolver = Some(ResolverState::Reused);
+    projection.metric = Metric::PeakLiveBytes;
+    projection.sample_aggregation = Aggregation::PeakOverBatch;
+    projection
+}
+
+#[test]
+fn a_dimension_that_applies_is_present_and_one_that_does_not_is_never_null() {
+    let plan = issue();
+    let duration = plan.projections()[0].clone();
+    let memory = memory_case(duration.clone());
+    let common = CommonProjection::common(&memory);
+    assert_eq!(common.eligibility(), Ok(()));
+    // 015's domain states the reuse state the case's Execution State has.
+    assert!(crate::benchmark::memory_domain::agrees(
+        common.memory_domain.unwrap(),
+        &memory.execution_state
+    ));
+    let value = serde_json::to_value(&memory).unwrap();
+    assert_eq!(value["variant"]["entryKind"], "file");
+    assert_eq!(value["variant"]["resolver"], "reused");
+    assert_eq!(
+        value["memoryObservationDomain"]["identity"],
+        json!({"identity": "profile-resolver-invocation", "revision": "0"})
+    );
+    assert_eq!(
+        serde_json::from_value::<CaseProjection>(value.clone()).unwrap(),
+        memory
+    );
+    // The committed case schema admits the memory case too.
+    let schema: Value = serde_json::from_str(include_str!(
+        "../../../../schema/measurement-case-identity-v0.schema.json"
+    ))
+    .unwrap();
+    let validator = jsonschema::draft7::new(&schema).unwrap();
+    let input = case_identity_input(&memory).unwrap();
+    assert!(
+        validator.is_valid(&input),
+        "{:?}",
+        validator.iter_errors(&input).collect::<Vec<_>>()
+    );
+    // An explicit null is refused by the decoder and by the schema alike.
+    for pointer in [
+        "/memoryObservationDomain",
+        "/variant/entryKind",
+        "/variant/resolver",
+    ] {
+        let mut nulled = value.clone();
+        *nulled.pointer_mut(pointer).unwrap() = Value::Null;
+        assert!(
+            serde_json::from_value::<CaseProjection>(nulled.clone()).is_err(),
+            "{pointer}"
+        );
+        let mut input = input.clone();
+        input["projection"] = nulled;
+        assert!(!validator.is_valid(&input), "{pointer}");
+    }
+    // The memory case is another case than the duration case it came from.
+    assert_ne!(memory.identity().unwrap(), duration.identity().unwrap());
+}

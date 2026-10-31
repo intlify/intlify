@@ -5,8 +5,9 @@
 //!
 //! This crate owns the common representation an observing owner produces: the
 //! record envelope and its references, the registered instance-identity and
-//! digest domains, the reason vocabulary, and the Run Plan, Evidence, Run
-//! Evaluation, and structured report bodies.
+//! digest domains, the reason vocabulary, the Run Plan, Evidence, Run
+//! Evaluation, and structured report bodies, and the shape of the Memory
+//! Observation Domain a memory case declares.
 //!
 //! It owns no fixtures, no workload, and no owner vocabulary. An owner supplies
 //! its own case projection, descriptors, and native checksum framing through
@@ -33,6 +34,7 @@ pub mod environment;
 pub mod execution;
 pub mod identity;
 pub mod measurement;
+pub mod memory;
 pub mod owner;
 #[cfg(feature = "owner-run")]
 pub mod owner_run;

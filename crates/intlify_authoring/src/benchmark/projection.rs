@@ -14,7 +14,9 @@
 //! than guessed.
 
 use intlify_measurement::execution::Execution;
-use intlify_measurement::measurement::{Aggregation, Category, Metric, OperationClass, Surface};
+use intlify_measurement::measurement::{
+    Aggregation, Category, CommonDimensions, Metric, OperationClass, Surface,
+};
 use intlify_measurement::owner_run::run::{subject, Expected};
 use intlify_measurement::plan::{CaseProjection as CommonProjection, Subject};
 use intlify_shared_json::token::{Token, VersionedIdentity};
@@ -107,6 +109,17 @@ impl CommonProjection for CaseProjection {
     fn cost(&self) -> &str {
         &self.owner_cost
     }
+    fn common(&self) -> CommonDimensions<'_> {
+        CommonDimensions {
+            category: self.category,
+            operation_class: self.operation_class,
+            surface: self.performance_surface,
+            // These are duration cases: no memory domain applies.
+            memory_domain: None,
+            metric: self.metric,
+            aggregation: self.sample_aggregation,
+        }
+    }
 }
 
 impl CaseProjection {
@@ -122,8 +135,8 @@ impl CaseProjection {
             owner_benchmark_profile_revision: Token::literal("0"),
             owner_phase: operation.phase().into(),
             owner_cost: operation.cost().into(),
-            category: Category::Value,
-            operation_class: OperationClass::Value,
+            category: Category::Toolchain,
+            operation_class: OperationClass::Component,
             performance_surface: Surface::Value,
             interval_boundary: Boundary::for_operation(operation),
             fixture: VersionedIdentity::literal("intlify-authoring-minimum-fixtures", "0"),
@@ -137,9 +150,9 @@ impl CaseProjection {
             execution_state: execution_state(operation),
             concurrency: Concurrency::Value,
             workload: prepared.expected().work.clone(),
-            metric: Metric::Value,
+            metric: Metric::WallDuration,
             measurement_method: Method::monotonic_invocation(),
-            sample_aggregation: Aggregation::Value,
+            sample_aggregation: Aggregation::BatchTotal,
             measurement_profile_revision: Token::literal("0"),
         }
     }

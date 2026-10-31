@@ -38,6 +38,8 @@ mod locale_resolution;
 #[cfg(feature = "benchmark")]
 mod measure;
 #[cfg(feature = "benchmark")]
+mod memory_domain;
+#[cfg(feature = "benchmark")]
 pub(crate) mod observation;
 #[cfg(feature = "benchmark")]
 mod operation;

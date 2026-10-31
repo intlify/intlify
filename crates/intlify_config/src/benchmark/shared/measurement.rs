@@ -9,8 +9,8 @@
 //! samples. A non-measured attempt is reported as such rather than omitted.
 
 use intlify_measurement::measurement::{
-    self as common, ChecksumMethod, MeasuredCase, OwnerResultFacts, SampleDomains, SampleFacts,
-    SamplingFacts,
+    self as common, ChecksumMethod, MeasuredCase, OwnerResultFacts, ProjectionFailure,
+    SampleDomains, SampleFacts, SamplingFacts,
 };
 
 pub(in crate::benchmark) use intlify_measurement::measurement::{
@@ -125,7 +125,8 @@ fn sample_facts(sample: &CapturedSample) -> SampleFacts<Observation> {
     }
 }
 
-/// Project one attempt, or report that it produced no measurement.
+/// Project one attempt, or report that it produced no measurement or that the
+/// measurement is outside what the common records admit.
 pub(super) fn project_case(
     source: &ProjectionSource<'_>,
     attempt: &CaseAttempt,
@@ -138,7 +139,7 @@ pub(super) fn project_case(
     let owner = source.document();
     let operation = &measured.operation.operation;
     let policy = owner.result().context.profile.sampling_policy();
-    CaseEvidence::project(
+    let projected = CaseEvidence::project(
         &method(),
         &domains(),
         &owner.result().record_identity,
@@ -158,8 +159,13 @@ pub(super) fn project_case(
             },
             samples: operation.capture.samples.iter().map(sample_facts).collect(),
         },
-    )
-    .map(Some)
+    );
+    match projected {
+        Ok(case) => Ok(Some(case)),
+        // The evaluation keeps an ineligible case as projection-ineligible.
+        Err(ProjectionFailure::Ineligible(_)) => Ok(None),
+        Err(ProjectionFailure::Identity(failure)) => Err(failure),
+    }
 }
 
 /// Assemble the complete Evidence Set body for one admitted owner result.

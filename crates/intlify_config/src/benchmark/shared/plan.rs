@@ -9,8 +9,12 @@
 //! case this owner's rather than another's.
 
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
+use intlify_measurement::measurement::{
+    Aggregation, Category, CommonDimensions, Metric, OperationClass, Surface,
+};
+use intlify_measurement::memory::MemoryObservationDomain;
 use intlify_measurement::plan::{self, CaseProjection as CommonProjection, Issuance, SubjectKind};
 
 pub(super) use intlify_measurement::plan::{BuildIdentity, Subject};
@@ -20,7 +24,7 @@ pub(in crate::benchmark) use intlify_measurement::plan::{
 };
 
 use crate::benchmark::cases::registry::Registry;
-use crate::benchmark::cases::{LimitEdge, LimitKind, Recipe, Selector};
+use crate::benchmark::cases::{EntryKind, LimitEdge, LimitKind, Recipe, ResolverState, Selector};
 use crate::benchmark::context::CaptureContext;
 use crate::benchmark::descriptor::{prepared_core, Boundary, Execution, Method};
 
@@ -49,11 +53,6 @@ macro_rules! literal_type {
     };
 }
 
-literal_type!(Category, "toolchain");
-literal_type!(OperationClass, "component");
-literal_type!(Surface, "core");
-literal_type!(Metric, "wall_duration");
-literal_type!(Aggregation, "batch_total");
 literal_type!(Scale, "fixed-owner-recipe");
 literal_type!(ExecutionModel, "same-process-synchronous-ordinary-core");
 literal_type!(Concurrency, "sequential-cases-calling-thread-no-workers");
@@ -65,8 +64,18 @@ fn subject() -> Subject {
     }
 }
 
+// A dimension that applies to only some cases is absent from the others, not
+// null: an explicit null is refused, and the cases it does not apply to keep
+// exactly the bytes, and so the identities, they had before it existed.
+fn present<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
+    decoder: D,
+) -> Result<Option<T>, D::Error> {
+    T::deserialize(decoder).map(Some)
+}
+
 /// A typed native-owner fragment. Recipe/limit/selector tags retain their owner
 /// spelling and revision; they are not a new generic common selector language.
+/// The entry kind and the resolver state appear only on the cases they apply to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Variant {
@@ -74,12 +83,27 @@ struct Variant {
     #[serde(deserialize_with = "Option::deserialize")]
     limit: Option<(LimitKind, LimitEdge)>,
     selector: Selector,
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(with = "EntryKind")]
+    entry_kind: Option<EntryKind>,
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(with = "ResolverState")]
+    resolver: Option<ResolverState>,
 }
 
 /// Exactly the applicable 026 Case dimensions. No source path, build revision,
 /// clock observation, run/record ID, expected result checksum, or sample value.
-/// Artifact/Target/Release/service-profile and memory-domain fields do not apply
-/// to these eleven internal duration boundaries and are absent, not guessed.
+/// Artifact/Target/Release/service-profile fields do not apply to these internal
+/// boundaries and are absent, not guessed. The Memory Observation Domain applies
+/// only to a memory case, so a duration case has none.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(in crate::benchmark) struct CaseProjection {
@@ -91,6 +115,13 @@ pub(in crate::benchmark) struct CaseProjection {
     category: Category,
     operation_class: OperationClass,
     performance_surface: Surface,
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(with = "MemoryObservationDomain")]
+    memory_observation_domain: Option<MemoryObservationDomain>,
     interval_boundary: Boundary,
     fixture: VersionedIdentity,
     variant: Variant,
@@ -113,6 +144,16 @@ impl CommonProjection for CaseProjection {
     }
     fn cost(&self) -> &str {
         &self.owner_cost
+    }
+    fn common(&self) -> CommonDimensions<'_> {
+        CommonDimensions {
+            category: self.category,
+            operation_class: self.operation_class,
+            surface: self.performance_surface,
+            memory_domain: self.memory_observation_domain.as_ref(),
+            metric: self.metric,
+            aggregation: self.sample_aggregation,
+        }
     }
 }
 
@@ -138,9 +179,10 @@ impl CaseProjection {
                     owner_benchmark_profile_revision: Token::new(profile_revision)?,
                     owner_phase: operation.phase().into(),
                     owner_cost: operation.cost().into(),
-                    category: Category::Value,
-                    operation_class: OperationClass::Value,
+                    category: Category::Toolchain,
+                    operation_class: OperationClass::Component,
                     performance_surface: Surface::Value,
+                    memory_observation_domain: None,
                     interval_boundary: Boundary::for_operation(operation),
                     fixture: VersionedIdentity::new(
                         "intlify-config-minimum-fixtures",
@@ -150,6 +192,8 @@ impl CaseProjection {
                         recipe: declaration.fixture,
                         limit: declaration.limit,
                         selector: declaration.selector,
+                        entry_kind: None,
+                        resolver: None,
                     },
                     scale: Scale::Value,
                     verification_subject: subject(),
@@ -157,9 +201,9 @@ impl CaseProjection {
                     execution_state: prepared_core(operation, declaration.fixture.icu4x_engine()),
                     concurrency: Concurrency::Value,
                     workload: expected.work().clone(),
-                    metric: Metric::Value,
+                    metric: Metric::WallDuration,
                     measurement_method: Method::monotonic_invocation(),
-                    sample_aggregation: Aggregation::Value,
+                    sample_aggregation: Aggregation::BatchTotal,
                     measurement_profile_revision: Token::new(profile_revision)?,
                 })
             })
