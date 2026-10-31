@@ -153,6 +153,10 @@ jobs:
         if: runner.os == 'Linux'
         run: vp run vectors:bounds:check
 
+      - name: Validate the 015 construction root artifacts
+        if: runner.os == 'Linux'
+        run: vp run construction:check
+
   cli-validation:
     runs-on: ${{ matrix.os }}
     name: CLI validation (${{ matrix.os }})

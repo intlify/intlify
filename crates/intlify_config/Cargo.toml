@@ -23,8 +23,8 @@ icu4x = ["dep:intlify_locale_icu4x"]
 # measures canonicalization through the ICU4X provider as well, so it compiles
 # in the adapter's committed artifact as a measurement fixture.
 benchmark = ["dep:blake3", "dep:getrandom", "dep:intlify_measurement", "dep:serde_json", "icu4x"]
-# Developer-only generation of the committed 017 vectors. No codec, reader, or
-# admission becomes public.
+# Developer-only generation of the committed 017 vectors and 015 construction
+# artifacts. No codec, reader, or admission becomes public.
 vectors = []
 
 [dependencies]
@@ -65,6 +65,10 @@ required-features = ["benchmark"]
 
 [[example]]
 name = "generate_bound_vectors"
+required-features = ["vectors"]
+
+[[example]]
+name = "generate_construction_artifacts"
 required-features = ["vectors"]
 
 [[example]]
