@@ -1,0 +1,1006 @@
+{
+  "defaultBase": "json-schema:///",
+  "documents": [
+    {
+      "name": "meta-schema",
+      "text": "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"$id\":\"http://json-schema.org/draft-07/schema#\",\"title\":\"Core schema meta-schema\",\"definitions\":{\"schemaArray\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"$ref\":\"#\"}},\"nonNegativeInteger\":{\"type\":\"integer\",\"minimum\":0},\"nonNegativeIntegerDefault0\":{\"allOf\":[{\"$ref\":\"#/definitions/nonNegativeInteger\"},{\"default\":0}]},\"simpleTypes\":{\"enum\":[\"array\",\"boolean\",\"integer\",\"null\",\"number\",\"object\",\"string\"]},\"stringArray\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"uniqueItems\":true,\"default\":[]}},\"type\":[\"object\",\"boolean\"],\"properties\":{\"$id\":{\"type\":\"string\",\"format\":\"uri-reference\"},\"$schema\":{\"type\":\"string\",\"format\":\"uri\"},\"$ref\":{\"type\":\"string\",\"format\":\"uri-reference\"},\"$comment\":{\"type\":\"string\"},\"title\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"},\"default\":true,\"readOnly\":{\"type\":\"boolean\",\"default\":false},\"writeOnly\":{\"type\":\"boolean\",\"default\":false},\"examples\":{\"type\":\"array\",\"items\":true},\"multipleOf\":{\"type\":\"number\",\"exclusiveMinimum\":0},\"maximum\":{\"type\":\"number\"},\"exclusiveMaximum\":{\"type\":\"number\"},\"minimum\":{\"type\":\"number\"},\"exclusiveMinimum\":{\"type\":\"number\"},\"maxLength\":{\"$ref\":\"#/definitions/nonNegativeInteger\"},\"minLength\":{\"$ref\":\"#/definitions/nonNegativeIntegerDefault0\"},\"pattern\":{\"type\":\"string\",\"format\":\"regex\"},\"additionalItems\":{\"$ref\":\"#\"},\"items\":{\"anyOf\":[{\"$ref\":\"#\"},{\"$ref\":\"#/definitions/schemaArray\"}],\"default\":true},\"maxItems\":{\"$ref\":\"#/definitions/nonNegativeInteger\"},\"minItems\":{\"$ref\":\"#/definitions/nonNegativeIntegerDefault0\"},\"uniqueItems\":{\"type\":\"boolean\",\"default\":false},\"contains\":{\"$ref\":\"#\"},\"maxProperties\":{\"$ref\":\"#/definitions/nonNegativeInteger\"},\"minProperties\":{\"$ref\":\"#/definitions/nonNegativeIntegerDefault0\"},\"required\":{\"$ref\":\"#/definitions/stringArray\"},\"additionalProperties\":{\"$ref\":\"#\"},\"definitions\":{\"type\":\"object\",\"additionalProperties\":{\"$ref\":\"#\"},\"default\":{}},\"properties\":{\"type\":\"object\",\"additionalProperties\":{\"$ref\":\"#\"},\"default\":{}},\"patternProperties\":{\"type\":\"object\",\"additionalProperties\":{\"$ref\":\"#\"},\"propertyNames\":{\"format\":\"regex\"},\"default\":{}},\"dependencies\":{\"type\":\"object\",\"additionalProperties\":{\"anyOf\":[{\"$ref\":\"#\"},{\"$ref\":\"#/definitions/stringArray\"}]}},\"propertyNames\":{\"$ref\":\"#\"},\"const\":true,\"enum\":{\"type\":\"array\",\"items\":true},\"type\":{\"anyOf\":[{\"$ref\":\"#/definitions/simpleTypes\"},{\"type\":\"array\",\"items\":{\"$ref\":\"#/definitions/simpleTypes\"},\"minItems\":1,\"uniqueItems\":true}]},\"format\":{\"type\":\"string\"},\"contentMediaType\":{\"type\":\"string\"},\"contentEncoding\":{\"type\":\"string\"},\"if\":{\"$ref\":\"#\"},\"then\":{\"$ref\":\"#\"},\"else\":{\"$ref\":\"#\"},\"allOf\":{\"$ref\":\"#/definitions/schemaArray\"},\"anyOf\":{\"$ref\":\"#/definitions/schemaArray\"},\"oneOf\":{\"$ref\":\"#/definitions/schemaArray\"},\"not\":{\"$ref\":\"#\"}},\"default\":true}",
+      "census": {
+        "nodes": 70,
+        "references": 29
+      },
+      "failure": null,
+      "reading": {
+        "nodes": [
+          "",
+          "/definitions/schemaArray",
+          "/definitions/schemaArray/items",
+          "/definitions/nonNegativeInteger",
+          "/definitions/nonNegativeIntegerDefault0",
+          "/definitions/nonNegativeIntegerDefault0/allOf/0",
+          "/definitions/nonNegativeIntegerDefault0/allOf/1",
+          "/definitions/simpleTypes",
+          "/definitions/stringArray",
+          "/definitions/stringArray/items",
+          "/properties/$id",
+          "/properties/$schema",
+          "/properties/$ref",
+          "/properties/$comment",
+          "/properties/title",
+          "/properties/description",
+          "/properties/default",
+          "/properties/readOnly",
+          "/properties/writeOnly",
+          "/properties/examples",
+          "/properties/examples/items",
+          "/properties/multipleOf",
+          "/properties/maximum",
+          "/properties/exclusiveMaximum",
+          "/properties/minimum",
+          "/properties/exclusiveMinimum",
+          "/properties/maxLength",
+          "/properties/minLength",
+          "/properties/pattern",
+          "/properties/additionalItems",
+          "/properties/items",
+          "/properties/items/anyOf/0",
+          "/properties/items/anyOf/1",
+          "/properties/maxItems",
+          "/properties/minItems",
+          "/properties/uniqueItems",
+          "/properties/contains",
+          "/properties/maxProperties",
+          "/properties/minProperties",
+          "/properties/required",
+          "/properties/additionalProperties",
+          "/properties/definitions",
+          "/properties/definitions/additionalProperties",
+          "/properties/properties",
+          "/properties/properties/additionalProperties",
+          "/properties/patternProperties",
+          "/properties/patternProperties/additionalProperties",
+          "/properties/patternProperties/propertyNames",
+          "/properties/dependencies",
+          "/properties/dependencies/additionalProperties",
+          "/properties/dependencies/additionalProperties/anyOf/0",
+          "/properties/dependencies/additionalProperties/anyOf/1",
+          "/properties/propertyNames",
+          "/properties/const",
+          "/properties/enum",
+          "/properties/enum/items",
+          "/properties/type",
+          "/properties/type/anyOf/0",
+          "/properties/type/anyOf/1",
+          "/properties/type/anyOf/1/items",
+          "/properties/format",
+          "/properties/contentMediaType",
+          "/properties/contentEncoding",
+          "/properties/if",
+          "/properties/then",
+          "/properties/else",
+          "/properties/allOf",
+          "/properties/anyOf",
+          "/properties/oneOf",
+          "/properties/not"
+        ],
+        "resources": [
+          {
+            "uri": "http://json-schema.org/draft-07/schema",
+            "node": ""
+          }
+        ],
+        "anchors": [],
+        "references": [
+          {
+            "from": "/definitions/schemaArray/items",
+            "to": ""
+          },
+          {
+            "from": "/definitions/nonNegativeIntegerDefault0/allOf/0",
+            "to": "/definitions/nonNegativeInteger"
+          },
+          {
+            "from": "/properties/maxLength",
+            "to": "/definitions/nonNegativeInteger"
+          },
+          {
+            "from": "/properties/minLength",
+            "to": "/definitions/nonNegativeIntegerDefault0"
+          },
+          {
+            "from": "/properties/additionalItems",
+            "to": ""
+          },
+          {
+            "from": "/properties/items/anyOf/0",
+            "to": ""
+          },
+          {
+            "from": "/properties/items/anyOf/1",
+            "to": "/definitions/schemaArray"
+          },
+          {
+            "from": "/properties/maxItems",
+            "to": "/definitions/nonNegativeInteger"
+          },
+          {
+            "from": "/properties/minItems",
+            "to": "/definitions/nonNegativeIntegerDefault0"
+          },
+          {
+            "from": "/properties/contains",
+            "to": ""
+          },
+          {
+            "from": "/properties/maxProperties",
+            "to": "/definitions/nonNegativeInteger"
+          },
+          {
+            "from": "/properties/minProperties",
+            "to": "/definitions/nonNegativeIntegerDefault0"
+          },
+          {
+            "from": "/properties/required",
+            "to": "/definitions/stringArray"
+          },
+          {
+            "from": "/properties/additionalProperties",
+            "to": ""
+          },
+          {
+            "from": "/properties/definitions/additionalProperties",
+            "to": ""
+          },
+          {
+            "from": "/properties/properties/additionalProperties",
+            "to": ""
+          },
+          {
+            "from": "/properties/patternProperties/additionalProperties",
+            "to": ""
+          },
+          {
+            "from": "/properties/dependencies/additionalProperties/anyOf/0",
+            "to": ""
+          },
+          {
+            "from": "/properties/dependencies/additionalProperties/anyOf/1",
+            "to": "/definitions/stringArray"
+          },
+          {
+            "from": "/properties/propertyNames",
+            "to": ""
+          },
+          {
+            "from": "/properties/type/anyOf/0",
+            "to": "/definitions/simpleTypes"
+          },
+          {
+            "from": "/properties/type/anyOf/1/items",
+            "to": "/definitions/simpleTypes"
+          },
+          {
+            "from": "/properties/if",
+            "to": ""
+          },
+          {
+            "from": "/properties/then",
+            "to": ""
+          },
+          {
+            "from": "/properties/else",
+            "to": ""
+          },
+          {
+            "from": "/properties/allOf",
+            "to": "/definitions/schemaArray"
+          },
+          {
+            "from": "/properties/anyOf",
+            "to": "/definitions/schemaArray"
+          },
+          {
+            "from": "/properties/oneOf",
+            "to": "/definitions/schemaArray"
+          },
+          {
+            "from": "/properties/not",
+            "to": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "identification-example",
+      "text": "{\"$id\":\"http://example.com/root.json\",\"definitions\":{\"A\":{\"$id\":\"#foo\"},\"B\":{\"$id\":\"other.json\",\"definitions\":{\"X\":{\"$id\":\"#bar\"},\"Y\":{\"$id\":\"t/inner.json\"}}},\"C\":{\"$id\":\"urn:uuid:ee564b8a-7a87-4125-8c96-e9f123d6766f\"},\"references\":{\"allOf\":[{\"$ref\":\"http://example.com/root.json\"},{\"$ref\":\"http://example.com/root.json#\"},{\"$ref\":\"http://example.com/root.json#foo\"},{\"$ref\":\"http://example.com/root.json#/definitions/A\"},{\"$ref\":\"http://example.com/other.json\"},{\"$ref\":\"http://example.com/other.json#\"},{\"$ref\":\"http://example.com/root.json#/definitions/B\"},{\"$ref\":\"http://example.com/other.json#bar\"},{\"$ref\":\"http://example.com/other.json#/definitions/X\"},{\"$ref\":\"http://example.com/root.json#/definitions/B/definitions/X\"},{\"$ref\":\"http://example.com/t/inner.json\"},{\"$ref\":\"http://example.com/t/inner.json#\"},{\"$ref\":\"http://example.com/other.json#/definitions/Y\"},{\"$ref\":\"http://example.com/root.json#/definitions/B/definitions/Y\"},{\"$ref\":\"urn:uuid:ee564b8a-7a87-4125-8c96-e9f123d6766f\"},{\"$ref\":\"urn:uuid:ee564b8a-7a87-4125-8c96-e9f123d6766f#\"},{\"$ref\":\"http://example.com/root.json#/definitions/C\"}]}}}",
+      "census": {
+        "nodes": 24,
+        "references": 17
+      },
+      "failure": null,
+      "reading": {
+        "nodes": [
+          "",
+          "/definitions/A",
+          "/definitions/B",
+          "/definitions/B/definitions/X",
+          "/definitions/B/definitions/Y",
+          "/definitions/C",
+          "/definitions/references",
+          "/definitions/references/allOf/0",
+          "/definitions/references/allOf/1",
+          "/definitions/references/allOf/2",
+          "/definitions/references/allOf/3",
+          "/definitions/references/allOf/4",
+          "/definitions/references/allOf/5",
+          "/definitions/references/allOf/6",
+          "/definitions/references/allOf/7",
+          "/definitions/references/allOf/8",
+          "/definitions/references/allOf/9",
+          "/definitions/references/allOf/10",
+          "/definitions/references/allOf/11",
+          "/definitions/references/allOf/12",
+          "/definitions/references/allOf/13",
+          "/definitions/references/allOf/14",
+          "/definitions/references/allOf/15",
+          "/definitions/references/allOf/16"
+        ],
+        "resources": [
+          {
+            "uri": "http://example.com/root.json",
+            "node": ""
+          },
+          {
+            "uri": "http://example.com/other.json",
+            "node": "/definitions/B"
+          },
+          {
+            "uri": "http://example.com/t/inner.json",
+            "node": "/definitions/B/definitions/Y"
+          },
+          {
+            "uri": "urn:uuid:ee564b8a-7a87-4125-8c96-e9f123d6766f",
+            "node": "/definitions/C"
+          }
+        ],
+        "anchors": [
+          {
+            "resource": "http://example.com/root.json",
+            "name": "foo",
+            "node": "/definitions/A"
+          },
+          {
+            "resource": "http://example.com/other.json",
+            "name": "bar",
+            "node": "/definitions/B/definitions/X"
+          }
+        ],
+        "references": [
+          {
+            "from": "/definitions/references/allOf/0",
+            "to": ""
+          },
+          {
+            "from": "/definitions/references/allOf/1",
+            "to": ""
+          },
+          {
+            "from": "/definitions/references/allOf/2",
+            "to": "/definitions/A"
+          },
+          {
+            "from": "/definitions/references/allOf/3",
+            "to": "/definitions/A"
+          },
+          {
+            "from": "/definitions/references/allOf/4",
+            "to": "/definitions/B"
+          },
+          {
+            "from": "/definitions/references/allOf/5",
+            "to": "/definitions/B"
+          },
+          {
+            "from": "/definitions/references/allOf/6",
+            "to": "/definitions/B"
+          },
+          {
+            "from": "/definitions/references/allOf/7",
+            "to": "/definitions/B/definitions/X"
+          },
+          {
+            "from": "/definitions/references/allOf/8",
+            "to": "/definitions/B/definitions/X"
+          },
+          {
+            "from": "/definitions/references/allOf/9",
+            "to": "/definitions/B/definitions/X"
+          },
+          {
+            "from": "/definitions/references/allOf/10",
+            "to": "/definitions/B/definitions/Y"
+          },
+          {
+            "from": "/definitions/references/allOf/11",
+            "to": "/definitions/B/definitions/Y"
+          },
+          {
+            "from": "/definitions/references/allOf/12",
+            "to": "/definitions/B/definitions/Y"
+          },
+          {
+            "from": "/definitions/references/allOf/13",
+            "to": "/definitions/B/definitions/Y"
+          },
+          {
+            "from": "/definitions/references/allOf/14",
+            "to": "/definitions/C"
+          },
+          {
+            "from": "/definitions/references/allOf/15",
+            "to": "/definitions/C"
+          },
+          {
+            "from": "/definitions/references/allOf/16",
+            "to": "/definitions/C"
+          }
+        ]
+      }
+    },
+    {
+      "name": "references",
+      "text": "{\"$id\":\"http://example.com/schemas/root.json\",\"definitions\":{\"a/b\":{\"type\":\"string\"},\"c%d\":{\"type\":\"number\"},\"e~f\":{\"type\":\"null\"},\"yes\":true,\"tuple\":{\"items\":[{\"type\":\"null\"},false]},\"nested\":{\"$id\":\"nested/item.json\",\"definitions\":{\"inner\":{\"$id\":\"#Inner\"},\"sibling\":{\"$ref\":\"#Inner\"}}},\"relative\":{\"$ref\":\"nested/item.json#/definitions/inner\"},\"parent\":{\"$ref\":\"../schemas/root.json#/definitions/yes\"},\"escaped\":{\"$ref\":\"#/definitions/a~1b\"},\"percent\":{\"$ref\":\"#/definitions/c%25d\"},\"tilde\":{\"$ref\":\"#/definitions/e~0f\"},\"boolean\":{\"$ref\":\"#/definitions/yes\"},\"item\":{\"$ref\":\"#/definitions/tuple/items/1\"},\"anchor\":{\"$ref\":\"nested/item.json#Inner\"},\"spelled\":{\"$ref\":\"HTTP://Example.COM/schemas/nested/item.json#%49nner\"},\"dots\":{\"$ref\":\"./nested/../root.json#/definitions/yes\"},\"root\":{\"$ref\":\"#\"}}}",
+      "census": {
+        "nodes": 22,
+        "references": 12
+      },
+      "failure": null,
+      "reading": {
+        "nodes": [
+          "",
+          "/definitions/a~1b",
+          "/definitions/c%d",
+          "/definitions/e~0f",
+          "/definitions/yes",
+          "/definitions/tuple",
+          "/definitions/tuple/items/0",
+          "/definitions/tuple/items/1",
+          "/definitions/nested",
+          "/definitions/nested/definitions/inner",
+          "/definitions/nested/definitions/sibling",
+          "/definitions/relative",
+          "/definitions/parent",
+          "/definitions/escaped",
+          "/definitions/percent",
+          "/definitions/tilde",
+          "/definitions/boolean",
+          "/definitions/item",
+          "/definitions/anchor",
+          "/definitions/spelled",
+          "/definitions/dots",
+          "/definitions/root"
+        ],
+        "resources": [
+          {
+            "uri": "http://example.com/schemas/root.json",
+            "node": ""
+          },
+          {
+            "uri": "http://example.com/schemas/nested/item.json",
+            "node": "/definitions/nested"
+          }
+        ],
+        "anchors": [
+          {
+            "resource": "http://example.com/schemas/nested/item.json",
+            "name": "Inner",
+            "node": "/definitions/nested/definitions/inner"
+          }
+        ],
+        "references": [
+          {
+            "from": "/definitions/nested/definitions/sibling",
+            "to": "/definitions/nested/definitions/inner"
+          },
+          {
+            "from": "/definitions/relative",
+            "to": "/definitions/nested/definitions/inner"
+          },
+          {
+            "from": "/definitions/parent",
+            "to": "/definitions/yes"
+          },
+          {
+            "from": "/definitions/escaped",
+            "to": "/definitions/a~1b"
+          },
+          {
+            "from": "/definitions/percent",
+            "to": "/definitions/c%d"
+          },
+          {
+            "from": "/definitions/tilde",
+            "to": "/definitions/e~0f"
+          },
+          {
+            "from": "/definitions/boolean",
+            "to": "/definitions/yes"
+          },
+          {
+            "from": "/definitions/item",
+            "to": "/definitions/tuple/items/1"
+          },
+          {
+            "from": "/definitions/anchor",
+            "to": "/definitions/nested/definitions/inner"
+          },
+          {
+            "from": "/definitions/spelled",
+            "to": "/definitions/nested/definitions/inner"
+          },
+          {
+            "from": "/definitions/dots",
+            "to": "/definitions/yes"
+          },
+          {
+            "from": "/definitions/root",
+            "to": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "reference-siblings",
+      "text": "{\"$id\":\"http://example.com/root.json\",\"definitions\":{\"a\":{\"$ref\":\"#/definitions/b\",\"$id\":\"other.json\",\"$schema\":\"http://json-schema.org/draft-04/schema#\",\"type\":5,\"definitions\":{\"c\":{\"$ref\":\"#/definitions/b\"}}},\"b\":{}}}",
+      "census": {
+        "nodes": 4,
+        "references": 2
+      },
+      "failure": null,
+      "reading": {
+        "nodes": ["", "/definitions/a", "/definitions/a/definitions/c", "/definitions/b"],
+        "resources": [
+          {
+            "uri": "http://example.com/root.json",
+            "node": ""
+          }
+        ],
+        "anchors": [],
+        "references": [
+          {
+            "from": "/definitions/a",
+            "to": "/definitions/b"
+          },
+          {
+            "from": "/definitions/a/definitions/c",
+            "to": "/definitions/b"
+          }
+        ]
+      }
+    },
+    {
+      "name": "default-base",
+      "text": "{\"$id\":\"#top\",\"definitions\":{\"a\":{\"$ref\":\"#top\"},\"b\":{\"$ref\":\"json-schema:///#/definitions/a\"},\"c\":{\"$id\":\"item.json\",\"definitions\":{\"d\":{\"$ref\":\"json-schema:///item.json\"}}}}}",
+      "census": {
+        "nodes": 5,
+        "references": 3
+      },
+      "failure": null,
+      "reading": {
+        "nodes": [
+          "",
+          "/definitions/a",
+          "/definitions/b",
+          "/definitions/c",
+          "/definitions/c/definitions/d"
+        ],
+        "resources": [
+          {
+            "uri": "json-schema:///",
+            "node": ""
+          },
+          {
+            "uri": "json-schema:///item.json",
+            "node": "/definitions/c"
+          }
+        ],
+        "anchors": [
+          {
+            "resource": "json-schema:///",
+            "name": "top",
+            "node": ""
+          }
+        ],
+        "references": [
+          {
+            "from": "/definitions/a",
+            "to": ""
+          },
+          {
+            "from": "/definitions/b",
+            "to": "/definitions/a"
+          },
+          {
+            "from": "/definitions/c/definitions/d",
+            "to": "/definitions/c"
+          }
+        ]
+      }
+    },
+    {
+      "name": "document-order",
+      "text": "{\"properties\":{\"a/b\":{\"items\":[true,{}]},\"c~d\":false},\"not\":{},\"definitions\":{\"e\":{\"if\":{}}}}",
+      "census": {
+        "nodes": 8,
+        "references": 0
+      },
+      "failure": null,
+      "reading": {
+        "nodes": [
+          "",
+          "/properties/a~1b",
+          "/properties/a~1b/items/0",
+          "/properties/a~1b/items/1",
+          "/properties/c~0d",
+          "/not",
+          "/definitions/e",
+          "/definitions/e/if"
+        ],
+        "resources": [
+          {
+            "uri": "json-schema:///",
+            "node": ""
+          }
+        ],
+        "anchors": [],
+        "references": []
+      }
+    },
+    {
+      "name": "every-position",
+      "text": "{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"additionalItems\":{},\"additionalProperties\":{},\"contains\":{},\"else\":{},\"if\":{},\"not\":{},\"propertyNames\":{},\"then\":{},\"allOf\":[{},true],\"anyOf\":[{}],\"oneOf\":[false],\"definitions\":{\"a\":{}},\"patternProperties\":{\"^b\":{}},\"properties\":{\"c\":{}},\"items\":[{\"items\":{}}],\"dependencies\":{\"d\":[\"e\"],\"f\":{},\"g\":true},\"enum\":[{}],\"const\":{},\"default\":{},\"examples\":[{}],\"x-unknown\":{\"$ref\":\"#\"},\"format\":\"uri\"}",
+      "census": {
+        "nodes": 20,
+        "references": 0
+      },
+      "failure": null,
+      "reading": {
+        "nodes": [
+          "",
+          "/additionalItems",
+          "/additionalProperties",
+          "/contains",
+          "/else",
+          "/if",
+          "/not",
+          "/propertyNames",
+          "/then",
+          "/allOf/0",
+          "/allOf/1",
+          "/anyOf/0",
+          "/oneOf/0",
+          "/definitions/a",
+          "/patternProperties/^b",
+          "/properties/c",
+          "/items/0",
+          "/items/0/items",
+          "/dependencies/f",
+          "/dependencies/g"
+        ],
+        "resources": [
+          {
+            "uri": "json-schema:///",
+            "node": ""
+          }
+        ],
+        "anchors": [],
+        "references": []
+      }
+    },
+    {
+      "name": "in-place",
+      "text": "{\"allOf\":[{\"$ref\":\"#/definitions/a\"},{\"anyOf\":[{\"not\":{\"$ref\":\"#/definitions/b\"}}]}],\"if\":{\"$ref\":\"#/definitions/b\"},\"then\":{},\"else\":{\"oneOf\":[true]},\"dependencies\":{\"x\":{\"$ref\":\"#/definitions/a\"},\"y\":[\"z\"]},\"definitions\":{\"a\":{\"allOf\":[{\"$ref\":\"#/definitions/b\"}]},\"b\":{}}}",
+      "census": {
+        "nodes": 13,
+        "references": 5
+      },
+      "failure": null,
+      "reading": {
+        "nodes": [
+          "",
+          "/allOf/0",
+          "/allOf/1",
+          "/allOf/1/anyOf/0",
+          "/allOf/1/anyOf/0/not",
+          "/if",
+          "/then",
+          "/else",
+          "/else/oneOf/0",
+          "/dependencies/x",
+          "/definitions/a",
+          "/definitions/a/allOf/0",
+          "/definitions/b"
+        ],
+        "resources": [
+          {
+            "uri": "json-schema:///",
+            "node": ""
+          }
+        ],
+        "anchors": [],
+        "references": [
+          {
+            "from": "/allOf/0",
+            "to": "/definitions/a"
+          },
+          {
+            "from": "/allOf/1/anyOf/0/not",
+            "to": "/definitions/b"
+          },
+          {
+            "from": "/if",
+            "to": "/definitions/b"
+          },
+          {
+            "from": "/dependencies/x",
+            "to": "/definitions/a"
+          },
+          {
+            "from": "/definitions/a/allOf/0",
+            "to": "/definitions/b"
+          }
+        ]
+      }
+    },
+    {
+      "name": "moving-applicators",
+      "text": "{\"properties\":{\"a\":{\"$ref\":\"#\"}},\"items\":[{\"$ref\":\"#\"}],\"additionalItems\":{\"$ref\":\"#\"},\"contains\":{\"$ref\":\"#\"},\"additionalProperties\":{\"$ref\":\"#\"},\"patternProperties\":{\"^p\":{\"$ref\":\"#\"}},\"propertyNames\":{\"$ref\":\"#\"},\"then\":{\"$ref\":\"#\"},\"else\":{\"$ref\":\"#\"}}",
+      "census": {
+        "nodes": 10,
+        "references": 9
+      },
+      "failure": null,
+      "reading": {
+        "nodes": [
+          "",
+          "/properties/a",
+          "/items/0",
+          "/additionalItems",
+          "/contains",
+          "/additionalProperties",
+          "/patternProperties/^p",
+          "/propertyNames",
+          "/then",
+          "/else"
+        ],
+        "resources": [
+          {
+            "uri": "json-schema:///",
+            "node": ""
+          }
+        ],
+        "anchors": [],
+        "references": [
+          {
+            "from": "/properties/a",
+            "to": ""
+          },
+          {
+            "from": "/items/0",
+            "to": ""
+          },
+          {
+            "from": "/additionalItems",
+            "to": ""
+          },
+          {
+            "from": "/contains",
+            "to": ""
+          },
+          {
+            "from": "/additionalProperties",
+            "to": ""
+          },
+          {
+            "from": "/patternProperties/^p",
+            "to": ""
+          },
+          {
+            "from": "/propertyNames",
+            "to": ""
+          },
+          {
+            "from": "/then",
+            "to": ""
+          },
+          {
+            "from": "/else",
+            "to": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "true",
+      "text": "true",
+      "census": {
+        "nodes": 1,
+        "references": 0
+      },
+      "failure": null,
+      "reading": {
+        "nodes": [""],
+        "resources": [
+          {
+            "uri": "json-schema:///",
+            "node": ""
+          }
+        ],
+        "anchors": [],
+        "references": []
+      }
+    },
+    {
+      "name": "false",
+      "text": "false",
+      "census": {
+        "nodes": 1,
+        "references": 0
+      },
+      "failure": null,
+      "reading": {
+        "nodes": [""],
+        "resources": [
+          {
+            "uri": "json-schema:///",
+            "node": ""
+          }
+        ],
+        "anchors": [],
+        "references": []
+      }
+    },
+    {
+      "name": "not-an-object",
+      "text": "5",
+      "census": {
+        "nodes": 0,
+        "references": 0
+      },
+      "failure": "notASchema"
+    },
+    {
+      "name": "an-array",
+      "text": "[{}]",
+      "census": {
+        "nodes": 0,
+        "references": 0
+      },
+      "failure": "notASchema"
+    },
+    {
+      "name": "other-dialect",
+      "text": "{\"$schema\":\"http://json-schema.org/draft-04/schema#\"}",
+      "census": {
+        "nodes": 1,
+        "references": 0
+      },
+      "failure": "dialect"
+    },
+    {
+      "name": "subschema-dialect",
+      "text": "{\"definitions\":{\"a\":{\"$schema\":\"http://json-schema.org/draft-07/schema#\"}}}",
+      "census": {
+        "nodes": 2,
+        "references": 0
+      },
+      "failure": "dialect"
+    },
+    {
+      "name": "anchor-grammar",
+      "text": "{\"definitions\":{\"a\":{\"$id\":\"#1a\"}}}",
+      "census": {
+        "nodes": 2,
+        "references": 0
+      },
+      "failure": "identifier"
+    },
+    {
+      "name": "identifier-fragment",
+      "text": "{\"$id\":\"http://example.com/a.json#frag\"}",
+      "census": {
+        "nodes": 1,
+        "references": 0
+      },
+      "failure": "identifier"
+    },
+    {
+      "name": "identifier-grammar",
+      "text": "{\"$id\":\"a b\"}",
+      "census": {
+        "nodes": 1,
+        "references": 0
+      },
+      "failure": "identifier"
+    },
+    {
+      "name": "duplicate-anchor",
+      "text": "{\"definitions\":{\"a\":{\"$id\":\"#x\"},\"b\":{\"$id\":\"#x\"}}}",
+      "census": {
+        "nodes": 3,
+        "references": 0
+      },
+      "failure": "duplicateIdentifier"
+    },
+    {
+      "name": "duplicate-resource",
+      "text": "{\"definitions\":{\"a\":{\"$id\":\"HTTP://Example.com/x\"},\"b\":{\"$id\":\"http://example.com/%78\"}}}",
+      "census": {
+        "nodes": 3,
+        "references": 0
+      },
+      "failure": "duplicateIdentifier"
+    },
+    {
+      "name": "type-name",
+      "text": "{\"type\":\"integer-ish\"}",
+      "census": {
+        "nodes": 1,
+        "references": 0
+      },
+      "failure": "keyword"
+    },
+    {
+      "name": "required-names",
+      "text": "{\"required\":[\"a\",1]}",
+      "census": {
+        "nodes": 1,
+        "references": 0
+      },
+      "failure": "keyword"
+    },
+    {
+      "name": "length-fraction",
+      "text": "{\"minLength\":1.5}",
+      "census": {
+        "nodes": 1,
+        "references": 0
+      },
+      "failure": "keyword"
+    },
+    {
+      "name": "property-schema",
+      "text": "{\"properties\":{\"a\":1}}",
+      "census": {
+        "nodes": 1,
+        "references": 0
+      },
+      "failure": "keyword"
+    },
+    {
+      "name": "pattern-syntax",
+      "text": "{\"pattern\":\"(\"}",
+      "census": {
+        "nodes": 1,
+        "references": 0
+      },
+      "failure": "pattern"
+    },
+    {
+      "name": "divisor-zero",
+      "text": "{\"multipleOf\":0}",
+      "census": {
+        "nodes": 1,
+        "references": 0
+      },
+      "failure": "divisor"
+    },
+    {
+      "name": "divisor-digits",
+      "text": "{\"multipleOf\":1.2345678901234567891}",
+      "census": {
+        "nodes": 1,
+        "references": 0
+      },
+      "failure": "divisor"
+    },
+    {
+      "name": "missing-pointer",
+      "text": "{\"definitions\":{\"a\":{\"$ref\":\"#/definitions/missing\"}}}",
+      "census": {
+        "nodes": 2,
+        "references": 1
+      },
+      "failure": "reference"
+    },
+    {
+      "name": "not-a-node",
+      "text": "{\"enum\":[{}],\"definitions\":{\"a\":{\"$ref\":\"#/enum/0\"}}}",
+      "census": {
+        "nodes": 2,
+        "references": 1
+      },
+      "failure": "reference"
+    },
+    {
+      "name": "missing-resource",
+      "text": "{\"definitions\":{\"a\":{\"$ref\":\"other.json\"}}}",
+      "census": {
+        "nodes": 2,
+        "references": 1
+      },
+      "failure": "reference"
+    },
+    {
+      "name": "missing-anchor",
+      "text": "{\"definitions\":{\"a\":{\"$ref\":\"#nope\"}}}",
+      "census": {
+        "nodes": 2,
+        "references": 1
+      },
+      "failure": "reference"
+    },
+    {
+      "name": "not-utf-8",
+      "text": "{\"definitions\":{\"a\":{\"$ref\":\"#/definitions/%FF\"}}}",
+      "census": {
+        "nodes": 2,
+        "references": 1
+      },
+      "failure": "reference"
+    },
+    {
+      "name": "meta-schema-uri",
+      "text": "{\"definitions\":{\"a\":{\"$ref\":\"http://json-schema.org/draft-07/schema#\"}}}",
+      "census": {
+        "nodes": 2,
+        "references": 1
+      },
+      "failure": "reference"
+    },
+    {
+      "name": "reference-syntax",
+      "text": "{\"definitions\":{\"a\":{\"$ref\":\"a b\"}}}",
+      "census": {
+        "nodes": 2,
+        "references": 1
+      },
+      "failure": "reference"
+    },
+    {
+      "name": "self-reference",
+      "text": "{\"$ref\":\"#\"}",
+      "census": {
+        "nodes": 1,
+        "references": 1
+      },
+      "failure": "cycle"
+    },
+    {
+      "name": "dependency-cycle",
+      "text": "{\"dependencies\":{\"a\":{\"$ref\":\"#\"}}}",
+      "census": {
+        "nodes": 2,
+        "references": 1
+      },
+      "failure": "cycle"
+    },
+    {
+      "name": "two-node-cycle",
+      "text": "{\"definitions\":{\"a\":{\"$ref\":\"#/definitions/b\"},\"b\":{\"allOf\":[{\"$ref\":\"#/definitions/a\"}]}}}",
+      "census": {
+        "nodes": 4,
+        "references": 2
+      },
+      "failure": "cycle"
+    },
+    {
+      "name": "condition-cycle",
+      "text": "{\"if\":{},\"then\":{\"$ref\":\"#\"}}",
+      "census": {
+        "nodes": 3,
+        "references": 1
+      },
+      "failure": "cycle"
+    }
+  ]
+}
