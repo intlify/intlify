@@ -84,6 +84,10 @@ name = "generate_pattern_vectors"
 required-features = ["vectors"]
 
 [[example]]
+name = "generate_validator_value_vectors"
+required-features = ["vectors"]
+
+[[example]]
 name = "generate_vocabulary_vectors"
 required-features = ["vectors"]
 

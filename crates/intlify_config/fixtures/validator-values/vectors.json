@@ -1,0 +1,1981 @@
+{
+  "numbers": {
+    "parsed": [
+      {
+        "text": "0",
+        "decimal": "0"
+      },
+      {
+        "text": "-0",
+        "decimal": "0"
+      },
+      {
+        "text": "-0.0e-5",
+        "decimal": "0"
+      },
+      {
+        "text": "1",
+        "decimal": "1"
+      },
+      {
+        "text": "-7",
+        "decimal": "-7"
+      },
+      {
+        "text": "10",
+        "decimal": "1e1"
+      },
+      {
+        "text": "1.50",
+        "decimal": "15e-1"
+      },
+      {
+        "text": "0.001",
+        "decimal": "1e-3"
+      },
+      {
+        "text": "-12.3400e-2",
+        "decimal": "-1234e-4"
+      },
+      {
+        "text": "1E+2",
+        "decimal": "1e2"
+      },
+      {
+        "text": "1e-0",
+        "decimal": "1"
+      },
+      {
+        "text": "100e-2",
+        "decimal": "1"
+      },
+      {
+        "text": "2.5E-3",
+        "decimal": "25e-4"
+      },
+      {
+        "text": "1e00000000000000000000000000001",
+        "decimal": "1e1"
+      },
+      {
+        "text": "7e99999999999999999999999",
+        "decimal": "7e99999999999999999999999"
+      },
+      {
+        "text": "1.5e99999999999999999999999",
+        "decimal": "15e99999999999999999999998"
+      },
+      {
+        "text": "25e-99999999999999999999999",
+        "decimal": "25e-99999999999999999999999"
+      },
+      {
+        "text": "123456789012345678901234567890",
+        "decimal": "12345678901234567890123456789e1"
+      },
+      {
+        "text": "",
+        "decimal": null
+      },
+      {
+        "text": "-",
+        "decimal": null
+      },
+      {
+        "text": "+1",
+        "decimal": null
+      },
+      {
+        "text": "01",
+        "decimal": null
+      },
+      {
+        "text": "00",
+        "decimal": null
+      },
+      {
+        "text": "-01",
+        "decimal": null
+      },
+      {
+        "text": "1.",
+        "decimal": null
+      },
+      {
+        "text": ".1",
+        "decimal": null
+      },
+      {
+        "text": "1.e1",
+        "decimal": null
+      },
+      {
+        "text": "1e",
+        "decimal": null
+      },
+      {
+        "text": "1e+",
+        "decimal": null
+      },
+      {
+        "text": "1ee1",
+        "decimal": null
+      },
+      {
+        "text": "1e1.5",
+        "decimal": null
+      },
+      {
+        "text": "0x1",
+        "decimal": null
+      },
+      {
+        "text": "1 ",
+        "decimal": null
+      },
+      {
+        "text": " 1",
+        "decimal": null
+      },
+      {
+        "text": "NaN",
+        "decimal": null
+      },
+      {
+        "text": "Infinity",
+        "decimal": null
+      },
+      {
+        "text": "--1",
+        "decimal": null
+      },
+      {
+        "text": "1_000",
+        "decimal": null
+      },
+      {
+        "text": "١",
+        "decimal": null
+      }
+    ],
+    "values": [
+      "0",
+      "-0",
+      "0.0",
+      "-0e5",
+      "1",
+      "1.0",
+      "10e-1",
+      "-1",
+      "0.1",
+      "1e-1",
+      "0.10",
+      "0.15",
+      "0.2",
+      "0.3",
+      "3e-1",
+      "1.5",
+      "-1.5",
+      "2.5",
+      "-2.5",
+      "3",
+      "7",
+      "10",
+      "99",
+      "100",
+      "1e2",
+      "1024",
+      "0.0075",
+      "0.0001",
+      "75e-4",
+      "1e-5",
+      "123456789012345678901234567890",
+      "1.2345678901234567890123456789e29",
+      "9223372036854775808",
+      "7450580596923828125",
+      "18446744073709551615",
+      "18446744073709551616",
+      "1e19",
+      "1e20",
+      "1e400",
+      "-1e400",
+      "1e-400",
+      "1e99999999999999999999",
+      "2e99999999999999999999",
+      "-1e99999999999999999999",
+      "1e-99999999999999999999",
+      "1e100000000000000000000"
+    ],
+    "order": "====<<<><<<<<<<<><><<<<<<<<<<<<<<<<<<<<><<<><<====<<<><<<<<<<<><><<<<<<<<<<<<<<<<<<<<><<<><<====<<<><<<<<<<<><><<<<<<<<<<<<<<<<<<<<><<<><<====<<<><<<<<<<<><><<<<<<<<<<<<<<<<<<<<><<<><<>>>>===>>>>>>>><><><<<<<<<>>>><<<<<<<<<>><<>><>>>>===>>>>>>>><><><<<<<<<>>>><<<<<<<<<>><<>><>>>>===>>>>>>>><><><<<<<<<>>>><<<<<<<<<>><<>><<<<<<<<=<<<<<<<<><><<<<<<<<<<<<<<<<<<<<><<<><<>>>><<<>===<<<<<><><<<<<<<>>>><<<<<<<<<>><<>><>>>><<<>===<<<<<><><<<<<<<>>>><<<<<<<<<>><<>><>>>><<<>===<<<<<><><<<<<<<>>>><<<<<<<<<>><<>><>>>><<<>>>>=<<<<><><<<<<<<>>>><<<<<<<<<>><<>><>>>><<<>>>>>=<<<><><<<<<<<>>>><<<<<<<<<>><<>><>>>><<<>>>>>>==<><><<<<<<<>>>><<<<<<<<<>><<>><>>>><<<>>>>>>==<><><<<<<<<>>>><<<<<<<<<>><<>><>>>>>>>>>>>>>>>=><><<<<<<<>>>><<<<<<<<<>><<>><<<<<<<<<<<<<<<<<=<><<<<<<<<<<<<<<<<<<<<><<<><<>>>>>>>>>>>>>>>>>=><<<<<<<>>>><<<<<<<<<>><<>><<<<<<<<<<<<<<<<<<<=<<<<<<<<<<<<<<<<<<<<><<<><<>>>>>>>>>>>>>>>>>>>=<<<<<<>>>><<<<<<<<<>><<>><>>>>>>>>>>>>>>>>>>>>=<<<<<>>>><<<<<<<<<>><<>><>>>>>>>>>>>>>>>>>>>>>=<<<<>>>><<<<<<<<<>><<>><>>>>>>>>>>>>>>>>>>>>>>=<<<>>>><<<<<<<<<>><<>><>>>>>>>>>>>>>>>>>>>>>>>==<>>>><<<<<<<<<>><<>><>>>>>>>>>>>>>>>>>>>>>>>==<>>>><<<<<<<<<>><<>><>>>>>>>>>>>>>>>>>>>>>>>>>=>>>><<<<<<<<<>><<>><>>>><<<><<<<<<<<><><<<<<<<=>=><<<<<<<<<>><<>><>>>><<<><<<<<<<<><><<<<<<<<=<><<<<<<<<<>><<>><>>>><<<><<<<<<<<><><<<<<<<=>=><<<<<<<<<>><<>><>>>><<<><<<<<<<<><><<<<<<<<<<=<<<<<<<<<>><<>><>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>==>>>>>><>><<>><>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>==>>>>>><>><<>><>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<=><<<<<>><<>><>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<=<<<<<>><<>><>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<>>=<><<>><<>><>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<>>>=><<>><<>><>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<>><<=<<>><<>><>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<>>>>>=<>><<>><>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>=>><<>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<=<<<><<>>>><<<><<<<<<<<><><<<<<<<<<<<<<<<<<<<<>=<<>><>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>=<>><>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>=>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<=<<>>>><<<><<<<<<<<><><<<<<<<<<<<<<<<<<<<<><<<>=<>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>=",
+    "integers": "1111111100000000000111111100001111111111011101",
+    "counts": [
+      "0",
+      "0",
+      "0",
+      "0",
+      "1",
+      "1",
+      "1",
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      "3",
+      "7",
+      "10",
+      "99",
+      "100",
+      "100",
+      "1024",
+      null,
+      null,
+      null,
+      null,
+      "18446744073709551615",
+      "18446744073709551615",
+      "9223372036854775808",
+      "7450580596923828125",
+      "18446744073709551615",
+      "18446744073709551615",
+      "10000000000000000000",
+      "18446744073709551615",
+      "18446744073709551615",
+      null,
+      null,
+      "18446744073709551615",
+      "18446744073709551615",
+      null,
+      null,
+      "18446744073709551615"
+    ],
+    "divisors": [
+      {
+        "text": "1",
+        "failure": null
+      },
+      {
+        "text": "0.1",
+        "failure": null
+      },
+      {
+        "text": "0.0001",
+        "failure": null
+      },
+      {
+        "text": "1.5",
+        "failure": null
+      },
+      {
+        "text": "3",
+        "failure": null
+      },
+      {
+        "text": "7",
+        "failure": null
+      },
+      {
+        "text": "1024",
+        "failure": null
+      },
+      {
+        "text": "9223372036854775808",
+        "failure": null
+      },
+      {
+        "text": "7450580596923828125",
+        "failure": null
+      },
+      {
+        "text": "9999999999999999999",
+        "failure": null
+      },
+      {
+        "text": "1e-400",
+        "failure": null
+      },
+      {
+        "text": "1e-99999999999999999999",
+        "failure": null
+      },
+      {
+        "text": "0",
+        "failure": "notPositive"
+      },
+      {
+        "text": "-0",
+        "failure": "notPositive"
+      },
+      {
+        "text": "-1",
+        "failure": "notPositive"
+      },
+      {
+        "text": "-0.5",
+        "failure": "notPositive"
+      },
+      {
+        "text": "12345678901234567891",
+        "failure": "digits"
+      },
+      {
+        "text": "1.0000000000000000001",
+        "failure": "digits"
+      }
+    ],
+    "multiples": "111111111111111111111111111111111111111111111111111000000011111000000011111000000011111000000011011000000011011000000011011000000011001000000011011000000011011000000011011000000011011100000011011100000011011000000011011000000011111110000011111001000011111000000011111110000011111000000011111000000011111000100011001000000011001000000011001000000011000000000011111111000011111111000011111000110011111000001011111110000011111000110011111000100011111000100011111000111011111000111011000000000011111000111011111000111011111000111011000000000001111000111011"
+  },
+  "equality": {
+    "classes": [
+      ["1", "1.0", "1e0", "10e-1", "0.1e1", "100E-2"],
+      ["0", "-0", "0.0", "-0e5"],
+      ["-1", "-1.00"],
+      ["0.1", "1e-1"],
+      ["1e400", "10e399"],
+      ["1e-400"],
+      ["123456789012345678901234567890", "1.2345678901234567890123456789e29"],
+      ["null"],
+      ["true"],
+      ["false"],
+      ["\"\""],
+      ["\"a\""],
+      ["\"1\""],
+      ["\"null\""],
+      ["\"\\u00e9\"", "\"é\""],
+      ["\"e\\u0301\""],
+      ["\"ab\""],
+      ["[]"],
+      ["[[]]"],
+      ["[{}]"],
+      ["[null]"],
+      ["[null,null]"],
+      ["[[null],null]"],
+      ["[[null,null]]"],
+      ["[1,2]", "[1.0,2e0]"],
+      ["[2,1]"],
+      ["[\"ab\"]"],
+      ["[\"a\",\"b\"]"],
+      ["[1,[2,{\"x\":null}]]", "[1.0,[2e0,{\"x\":null}]]"],
+      ["{}"],
+      ["{\"\":null}"],
+      ["{\"a\":null}"],
+      ["{\"a\":{}}"],
+      ["{\"a\":[]}"],
+      ["{\"a\":1}"],
+      ["{\"a\":1,\"b\":1}"],
+      ["{\"a\":1,\"b\":[true]}", "{\"b\":[true],\"a\":1.00}"],
+      ["{\"a\":\"b\"}"],
+      ["{\"b\":\"a\"}"],
+      ["{\"ab\":null}"],
+      ["{\"a\":{\"b\":null}}"],
+      ["{\"0\":1,\"1\":2}", "{\"1\":2,\"0\":1.0}"]
+    ],
+    "uniqueItems": [
+      {
+        "items": "[]",
+        "unique": true
+      },
+      {
+        "items": "[1]",
+        "unique": true
+      },
+      {
+        "items": "[1,1.0]",
+        "unique": false
+      },
+      {
+        "items": "[1,\"1\"]",
+        "unique": true
+      },
+      {
+        "items": "[0,-0.0]",
+        "unique": false
+      },
+      {
+        "items": "[{\"a\":1,\"b\":2},{\"b\":2,\"a\":1}]",
+        "unique": false
+      },
+      {
+        "items": "[[1],[1.0]]",
+        "unique": false
+      },
+      {
+        "items": "[[1,2],[2,1]]",
+        "unique": true
+      },
+      {
+        "items": "[null,false,0,\"\",[],{}]",
+        "unique": true
+      },
+      {
+        "items": "[1,2,3,1]",
+        "unique": false
+      },
+      {
+        "items": "[3,1,2,2e0]",
+        "unique": false
+      },
+      {
+        "items": "[true,true]",
+        "unique": false
+      },
+      {
+        "items": "[\"a\",\"b\",\"c\"]",
+        "unique": true
+      },
+      {
+        "items": "[1e400,10e399]",
+        "unique": false
+      },
+      {
+        "items": "[1e400,1e401]",
+        "unique": true
+      }
+    ]
+  },
+  "references": {
+    "parsed": [
+      {
+        "text": "http://a/b/c/d;p?q",
+        "components": {
+          "scheme": "http",
+          "authority": "a",
+          "path": "/b/c/d;p",
+          "query": "q",
+          "fragment": null
+        }
+      },
+      {
+        "text": "",
+        "components": {
+          "scheme": null,
+          "authority": null,
+          "path": "",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "#",
+        "components": {
+          "scheme": null,
+          "authority": null,
+          "path": "",
+          "query": null,
+          "fragment": ""
+        }
+      },
+      {
+        "text": "?",
+        "components": {
+          "scheme": null,
+          "authority": null,
+          "path": "",
+          "query": "",
+          "fragment": null
+        }
+      },
+      {
+        "text": "?#",
+        "components": {
+          "scheme": null,
+          "authority": null,
+          "path": "",
+          "query": "",
+          "fragment": ""
+        }
+      },
+      {
+        "text": "#?",
+        "components": {
+          "scheme": null,
+          "authority": null,
+          "path": "",
+          "query": null,
+          "fragment": "?"
+        }
+      },
+      {
+        "text": "a?b?c",
+        "components": {
+          "scheme": null,
+          "authority": null,
+          "path": "a",
+          "query": "b?c",
+          "fragment": null
+        }
+      },
+      {
+        "text": "http://a",
+        "components": {
+          "scheme": "http",
+          "authority": "a",
+          "path": "",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "http://",
+        "components": {
+          "scheme": "http",
+          "authority": "",
+          "path": "",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "//g",
+        "components": {
+          "scheme": null,
+          "authority": "g",
+          "path": "",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "///g",
+        "components": {
+          "scheme": null,
+          "authority": "",
+          "path": "/g",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "urn:uuid:ee564b8a-7a87-4125-8c96-e9f123d6766f",
+        "components": {
+          "scheme": "urn",
+          "authority": null,
+          "path": "uuid:ee564b8a-7a87-4125-8c96-e9f123d6766f",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "a:b/c:d",
+        "components": {
+          "scheme": "a",
+          "authority": null,
+          "path": "b/c:d",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "./a:b",
+        "components": {
+          "scheme": null,
+          "authority": null,
+          "path": "./a:b",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "/a:b",
+        "components": {
+          "scheme": null,
+          "authority": null,
+          "path": "/a:b",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "a/:b?:",
+        "components": {
+          "scheme": null,
+          "authority": null,
+          "path": "a/:b",
+          "query": ":",
+          "fragment": null
+        }
+      },
+      {
+        "text": "g?y/./x",
+        "components": {
+          "scheme": null,
+          "authority": null,
+          "path": "g",
+          "query": "y/./x",
+          "fragment": null
+        }
+      },
+      {
+        "text": "g#s/../x",
+        "components": {
+          "scheme": null,
+          "authority": null,
+          "path": "g",
+          "query": null,
+          "fragment": "s/../x"
+        }
+      },
+      {
+        "text": "#/definitions/a%20b",
+        "components": {
+          "scheme": null,
+          "authority": null,
+          "path": "",
+          "query": null,
+          "fragment": "/definitions/a%20b"
+        }
+      },
+      {
+        "text": "foo://u:p@[::1]:80/a?b#c",
+        "components": {
+          "scheme": "foo",
+          "authority": "u:p@[::1]:80",
+          "path": "/a",
+          "query": "b",
+          "fragment": "c"
+        }
+      },
+      {
+        "text": "mailto:a@b",
+        "components": {
+          "scheme": "mailto",
+          "authority": null,
+          "path": "a@b",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "http://a!$&'()*+,;=b:8/",
+        "components": {
+          "scheme": "http",
+          "authority": "a!$&'()*+,;=b:8",
+          "path": "/",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "A+1-.b:",
+        "components": {
+          "scheme": "A+1-.b",
+          "authority": null,
+          "path": "",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "http://a:/?!$&'()*+,;=:@/?#!$&'()*+,;=:@/?",
+        "components": {
+          "scheme": "http",
+          "authority": "a:",
+          "path": "/",
+          "query": "!$&'()*+,;=:@/?",
+          "fragment": "!$&'()*+,;=:@/?"
+        }
+      },
+      {
+        "text": "%41%7e",
+        "components": {
+          "scheme": null,
+          "authority": null,
+          "path": "%41%7e",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "http://[::]/",
+        "components": {
+          "scheme": "http",
+          "authority": "[::]",
+          "path": "/",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "http://[1:2:3:4:5:6:7:8]/",
+        "components": {
+          "scheme": "http",
+          "authority": "[1:2:3:4:5:6:7:8]",
+          "path": "/",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "http://[1:2:3:4:5:6:7::]/",
+        "components": {
+          "scheme": "http",
+          "authority": "[1:2:3:4:5:6:7::]",
+          "path": "/",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "http://[::2:3:4:5:6:7:8]/",
+        "components": {
+          "scheme": "http",
+          "authority": "[::2:3:4:5:6:7:8]",
+          "path": "/",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "http://[::1.2.3.4]/",
+        "components": {
+          "scheme": "http",
+          "authority": "[::1.2.3.4]",
+          "path": "/",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "http://[1:2:3:4:5:6:1.2.3.4]/",
+        "components": {
+          "scheme": "http",
+          "authority": "[1:2:3:4:5:6:1.2.3.4]",
+          "path": "/",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "http://[1:2:3:4:5::1.2.3.4]/",
+        "components": {
+          "scheme": "http",
+          "authority": "[1:2:3:4:5::1.2.3.4]",
+          "path": "/",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "http://[FFFF::abcd]/",
+        "components": {
+          "scheme": "http",
+          "authority": "[FFFF::abcd]",
+          "path": "/",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "http://[v1.a]/",
+        "components": {
+          "scheme": "http",
+          "authority": "[v1.a]",
+          "path": "/",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "http://[V1F.a:b!]/",
+        "components": {
+          "scheme": "http",
+          "authority": "[V1F.a:b!]",
+          "path": "/",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "http://u@[::1]:8080/",
+        "components": {
+          "scheme": "http",
+          "authority": "u@[::1]:8080",
+          "path": "/",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "http://127.0.0.1:80/",
+        "components": {
+          "scheme": "http",
+          "authority": "127.0.0.1:80",
+          "path": "/",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": "http://999.1.1.1/",
+        "components": {
+          "scheme": "http",
+          "authority": "999.1.1.1",
+          "path": "/",
+          "query": null,
+          "fragment": null
+        }
+      },
+      {
+        "text": " ",
+        "components": null
+      },
+      {
+        "text": "a b",
+        "components": null
+      },
+      {
+        "text": "#a b",
+        "components": null
+      },
+      {
+        "text": "?a b",
+        "components": null
+      },
+      {
+        "text": "\"",
+        "components": null
+      },
+      {
+        "text": "<a>",
+        "components": null
+      },
+      {
+        "text": "a{b}",
+        "components": null
+      },
+      {
+        "text": "a|b",
+        "components": null
+      },
+      {
+        "text": "a\\b",
+        "components": null
+      },
+      {
+        "text": "a^b",
+        "components": null
+      },
+      {
+        "text": "a`b",
+        "components": null
+      },
+      {
+        "text": "[",
+        "components": null
+      },
+      {
+        "text": "a]",
+        "components": null
+      },
+      {
+        "text": "%",
+        "components": null
+      },
+      {
+        "text": "%4",
+        "components": null
+      },
+      {
+        "text": "%4g",
+        "components": null
+      },
+      {
+        "text": "#%2",
+        "components": null
+      },
+      {
+        "text": "é",
+        "components": null
+      },
+      {
+        "text": "#é",
+        "components": null
+      },
+      {
+        "text": "1a:b",
+        "components": null
+      },
+      {
+        "text": "+a:b",
+        "components": null
+      },
+      {
+        "text": "a_b:c",
+        "components": null
+      },
+      {
+        "text": ":a",
+        "components": null
+      },
+      {
+        "text": "a#b#c",
+        "components": null
+      },
+      {
+        "text": "http://a b/",
+        "components": null
+      },
+      {
+        "text": "http://a^b",
+        "components": null
+      },
+      {
+        "text": "http://a^b:80/",
+        "components": null
+      },
+      {
+        "text": "http://u%zz@a",
+        "components": null
+      },
+      {
+        "text": "http://a@b@c",
+        "components": null
+      },
+      {
+        "text": "http://a:b:c",
+        "components": null
+      },
+      {
+        "text": "http://a:8a",
+        "components": null
+      },
+      {
+        "text": "http://[::1",
+        "components": null
+      },
+      {
+        "text": "http://[::1]x",
+        "components": null
+      },
+      {
+        "text": "http://[::1]::80",
+        "components": null
+      },
+      {
+        "text": "http://[]",
+        "components": null
+      },
+      {
+        "text": "http://[1:2:3:4:5:6:7:8:9]/",
+        "components": null
+      },
+      {
+        "text": "http://[1:2:3:4:5:6:7]/",
+        "components": null
+      },
+      {
+        "text": "http://[1::2::3]/",
+        "components": null
+      },
+      {
+        "text": "http://[:::]/",
+        "components": null
+      },
+      {
+        "text": "http://[1.2.3.4::]/",
+        "components": null
+      },
+      {
+        "text": "http://[1:2:3:4:5:6::1.2.3.4]/",
+        "components": null
+      },
+      {
+        "text": "http://[::ffff:256.1.1.1]/",
+        "components": null
+      },
+      {
+        "text": "http://[::ffff:01.1.1.1]/",
+        "components": null
+      },
+      {
+        "text": "http://[::1.1.1.+1]/",
+        "components": null
+      },
+      {
+        "text": "http://[12345::]/",
+        "components": null
+      },
+      {
+        "text": "http://[fe80::1%25eth0]/",
+        "components": null
+      },
+      {
+        "text": "http://[v1]/",
+        "components": null
+      },
+      {
+        "text": "http://[vg.a]/",
+        "components": null
+      },
+      {
+        "text": "http://[v1.a%20]/",
+        "components": null
+      }
+    ],
+    "exampleBase": "http://a/b/c/d;p?q",
+    "examples": [
+      {
+        "reference": "g:h",
+        "target": "g:h"
+      },
+      {
+        "reference": "g",
+        "target": "http://a/b/c/g"
+      },
+      {
+        "reference": "./g",
+        "target": "http://a/b/c/g"
+      },
+      {
+        "reference": "g/",
+        "target": "http://a/b/c/g/"
+      },
+      {
+        "reference": "/g",
+        "target": "http://a/g"
+      },
+      {
+        "reference": "//g",
+        "target": "http://g"
+      },
+      {
+        "reference": "?y",
+        "target": "http://a/b/c/d;p?y"
+      },
+      {
+        "reference": "g?y",
+        "target": "http://a/b/c/g?y"
+      },
+      {
+        "reference": "#s",
+        "target": "http://a/b/c/d;p?q#s"
+      },
+      {
+        "reference": "g#s",
+        "target": "http://a/b/c/g#s"
+      },
+      {
+        "reference": "g?y#s",
+        "target": "http://a/b/c/g?y#s"
+      },
+      {
+        "reference": ";x",
+        "target": "http://a/b/c/;x"
+      },
+      {
+        "reference": "g;x",
+        "target": "http://a/b/c/g;x"
+      },
+      {
+        "reference": "g;x?y#s",
+        "target": "http://a/b/c/g;x?y#s"
+      },
+      {
+        "reference": "",
+        "target": "http://a/b/c/d;p?q"
+      },
+      {
+        "reference": ".",
+        "target": "http://a/b/c/"
+      },
+      {
+        "reference": "./",
+        "target": "http://a/b/c/"
+      },
+      {
+        "reference": "..",
+        "target": "http://a/b/"
+      },
+      {
+        "reference": "../",
+        "target": "http://a/b/"
+      },
+      {
+        "reference": "../g",
+        "target": "http://a/b/g"
+      },
+      {
+        "reference": "../..",
+        "target": "http://a/"
+      },
+      {
+        "reference": "../../",
+        "target": "http://a/"
+      },
+      {
+        "reference": "../../g",
+        "target": "http://a/g"
+      },
+      {
+        "reference": "../../../g",
+        "target": "http://a/g"
+      },
+      {
+        "reference": "../../../../g",
+        "target": "http://a/g"
+      },
+      {
+        "reference": "/./g",
+        "target": "http://a/g"
+      },
+      {
+        "reference": "/../g",
+        "target": "http://a/g"
+      },
+      {
+        "reference": "g.",
+        "target": "http://a/b/c/g."
+      },
+      {
+        "reference": ".g",
+        "target": "http://a/b/c/.g"
+      },
+      {
+        "reference": "g..",
+        "target": "http://a/b/c/g.."
+      },
+      {
+        "reference": "..g",
+        "target": "http://a/b/c/..g"
+      },
+      {
+        "reference": "./../g",
+        "target": "http://a/b/g"
+      },
+      {
+        "reference": "./g/.",
+        "target": "http://a/b/c/g/"
+      },
+      {
+        "reference": "g/./h",
+        "target": "http://a/b/c/g/h"
+      },
+      {
+        "reference": "g/../h",
+        "target": "http://a/b/c/h"
+      },
+      {
+        "reference": "g;x=1/./y",
+        "target": "http://a/b/c/g;x=1/y"
+      },
+      {
+        "reference": "g;x=1/../y",
+        "target": "http://a/b/c/y"
+      },
+      {
+        "reference": "g?y/./x",
+        "target": "http://a/b/c/g?y/./x"
+      },
+      {
+        "reference": "g?y/../x",
+        "target": "http://a/b/c/g?y/../x"
+      },
+      {
+        "reference": "g#s/./x",
+        "target": "http://a/b/c/g#s/./x"
+      },
+      {
+        "reference": "g#s/../x",
+        "target": "http://a/b/c/g#s/../x"
+      },
+      {
+        "reference": "http:g",
+        "target": "http:g"
+      }
+    ],
+    "bases": [
+      "http://a/b/c/d;p?q",
+      "http://a",
+      "http://a/",
+      "http://a/b?q#f",
+      "foo:",
+      "foo:bar",
+      "foo:bar/baz",
+      "foo:/a/b",
+      "urn:uuid:ee564b8a-7a87-4125-8c96-e9f123d6766f",
+      "json-schema:///",
+      "http://example.com/root.json",
+      "http://u@[::1]:8080/b/c/?q"
+    ],
+    "references": [
+      "",
+      "#",
+      "#f",
+      "#/definitions/A",
+      "?",
+      "?y",
+      "?y#s",
+      "g",
+      "g/",
+      "./g",
+      "../g",
+      "../../../g",
+      "/g",
+      "/./g",
+      "//g",
+      "//g/./h/../i",
+      ".",
+      "..",
+      "./",
+      "../",
+      "g/.",
+      "g/..",
+      "g/./h",
+      "g/../h",
+      ";x",
+      "g;x?y#s",
+      "other.json",
+      "t/inner.json",
+      "urn:x",
+      "http:g",
+      "g:h",
+      ".//a",
+      "%2E%2E/g"
+    ],
+    "targets": [
+      [
+        "http://a/b/c/d;p?q",
+        "http://a/b/c/d;p?q#",
+        "http://a/b/c/d;p?q#f",
+        "http://a/b/c/d;p?q#/definitions/A",
+        "http://a/b/c/d;p?",
+        "http://a/b/c/d;p?y",
+        "http://a/b/c/d;p?y#s",
+        "http://a/b/c/g",
+        "http://a/b/c/g/",
+        "http://a/b/c/g",
+        "http://a/b/g",
+        "http://a/g",
+        "http://a/g",
+        "http://a/g",
+        "http://g",
+        "http://g/i",
+        "http://a/b/c/",
+        "http://a/b/",
+        "http://a/b/c/",
+        "http://a/b/",
+        "http://a/b/c/g/",
+        "http://a/b/c/",
+        "http://a/b/c/g/h",
+        "http://a/b/c/h",
+        "http://a/b/c/;x",
+        "http://a/b/c/g;x?y#s",
+        "http://a/b/c/other.json",
+        "http://a/b/c/t/inner.json",
+        "urn:x",
+        "http:g",
+        "g:h",
+        "http://a/b/c//a",
+        "http://a/b/c/%2E%2E/g"
+      ],
+      [
+        "http://a",
+        "http://a#",
+        "http://a#f",
+        "http://a#/definitions/A",
+        "http://a?",
+        "http://a?y",
+        "http://a?y#s",
+        "http://a/g",
+        "http://a/g/",
+        "http://a/g",
+        "http://a/g",
+        "http://a/g",
+        "http://a/g",
+        "http://a/g",
+        "http://g",
+        "http://g/i",
+        "http://a/",
+        "http://a/",
+        "http://a/",
+        "http://a/",
+        "http://a/g/",
+        "http://a/",
+        "http://a/g/h",
+        "http://a/h",
+        "http://a/;x",
+        "http://a/g;x?y#s",
+        "http://a/other.json",
+        "http://a/t/inner.json",
+        "urn:x",
+        "http:g",
+        "g:h",
+        "http://a//a",
+        "http://a/%2E%2E/g"
+      ],
+      [
+        "http://a/",
+        "http://a/#",
+        "http://a/#f",
+        "http://a/#/definitions/A",
+        "http://a/?",
+        "http://a/?y",
+        "http://a/?y#s",
+        "http://a/g",
+        "http://a/g/",
+        "http://a/g",
+        "http://a/g",
+        "http://a/g",
+        "http://a/g",
+        "http://a/g",
+        "http://g",
+        "http://g/i",
+        "http://a/",
+        "http://a/",
+        "http://a/",
+        "http://a/",
+        "http://a/g/",
+        "http://a/",
+        "http://a/g/h",
+        "http://a/h",
+        "http://a/;x",
+        "http://a/g;x?y#s",
+        "http://a/other.json",
+        "http://a/t/inner.json",
+        "urn:x",
+        "http:g",
+        "g:h",
+        "http://a//a",
+        "http://a/%2E%2E/g"
+      ],
+      [
+        "http://a/b?q",
+        "http://a/b?q#",
+        "http://a/b?q#f",
+        "http://a/b?q#/definitions/A",
+        "http://a/b?",
+        "http://a/b?y",
+        "http://a/b?y#s",
+        "http://a/g",
+        "http://a/g/",
+        "http://a/g",
+        "http://a/g",
+        "http://a/g",
+        "http://a/g",
+        "http://a/g",
+        "http://g",
+        "http://g/i",
+        "http://a/",
+        "http://a/",
+        "http://a/",
+        "http://a/",
+        "http://a/g/",
+        "http://a/",
+        "http://a/g/h",
+        "http://a/h",
+        "http://a/;x",
+        "http://a/g;x?y#s",
+        "http://a/other.json",
+        "http://a/t/inner.json",
+        "urn:x",
+        "http:g",
+        "g:h",
+        "http://a//a",
+        "http://a/%2E%2E/g"
+      ],
+      [
+        "foo:",
+        "foo:#",
+        "foo:#f",
+        "foo:#/definitions/A",
+        "foo:?",
+        "foo:?y",
+        "foo:?y#s",
+        "foo:g",
+        "foo:g/",
+        "foo:g",
+        "foo:g",
+        "foo:g",
+        "foo:/g",
+        "foo:/g",
+        "foo://g",
+        "foo://g/i",
+        "foo:",
+        "foo:",
+        "foo:",
+        "foo:",
+        "foo:g/",
+        "foo:/",
+        "foo:g/h",
+        "foo:/h",
+        "foo:;x",
+        "foo:g;x?y#s",
+        "foo:other.json",
+        "foo:t/inner.json",
+        "urn:x",
+        "http:g",
+        "g:h",
+        "foo:/a",
+        "foo:%2E%2E/g"
+      ],
+      [
+        "foo:bar",
+        "foo:bar#",
+        "foo:bar#f",
+        "foo:bar#/definitions/A",
+        "foo:bar?",
+        "foo:bar?y",
+        "foo:bar?y#s",
+        "foo:g",
+        "foo:g/",
+        "foo:g",
+        "foo:g",
+        "foo:g",
+        "foo:/g",
+        "foo:/g",
+        "foo://g",
+        "foo://g/i",
+        "foo:",
+        "foo:",
+        "foo:",
+        "foo:",
+        "foo:g/",
+        "foo:/",
+        "foo:g/h",
+        "foo:/h",
+        "foo:;x",
+        "foo:g;x?y#s",
+        "foo:other.json",
+        "foo:t/inner.json",
+        "urn:x",
+        "http:g",
+        "g:h",
+        "foo:/a",
+        "foo:%2E%2E/g"
+      ],
+      [
+        "foo:bar/baz",
+        "foo:bar/baz#",
+        "foo:bar/baz#f",
+        "foo:bar/baz#/definitions/A",
+        "foo:bar/baz?",
+        "foo:bar/baz?y",
+        "foo:bar/baz?y#s",
+        "foo:bar/g",
+        "foo:bar/g/",
+        "foo:bar/g",
+        "foo:/g",
+        "foo:/g",
+        "foo:/g",
+        "foo:/g",
+        "foo://g",
+        "foo://g/i",
+        "foo:bar/",
+        "foo:/",
+        "foo:bar/",
+        "foo:/",
+        "foo:bar/g/",
+        "foo:bar/",
+        "foo:bar/g/h",
+        "foo:bar/h",
+        "foo:bar/;x",
+        "foo:bar/g;x?y#s",
+        "foo:bar/other.json",
+        "foo:bar/t/inner.json",
+        "urn:x",
+        "http:g",
+        "g:h",
+        "foo:bar//a",
+        "foo:bar/%2E%2E/g"
+      ],
+      [
+        "foo:/a/b",
+        "foo:/a/b#",
+        "foo:/a/b#f",
+        "foo:/a/b#/definitions/A",
+        "foo:/a/b?",
+        "foo:/a/b?y",
+        "foo:/a/b?y#s",
+        "foo:/a/g",
+        "foo:/a/g/",
+        "foo:/a/g",
+        "foo:/g",
+        "foo:/g",
+        "foo:/g",
+        "foo:/g",
+        "foo://g",
+        "foo://g/i",
+        "foo:/a/",
+        "foo:/",
+        "foo:/a/",
+        "foo:/",
+        "foo:/a/g/",
+        "foo:/a/",
+        "foo:/a/g/h",
+        "foo:/a/h",
+        "foo:/a/;x",
+        "foo:/a/g;x?y#s",
+        "foo:/a/other.json",
+        "foo:/a/t/inner.json",
+        "urn:x",
+        "http:g",
+        "g:h",
+        "foo:/a//a",
+        "foo:/a/%2E%2E/g"
+      ],
+      [
+        "urn:uuid:ee564b8a-7a87-4125-8c96-e9f123d6766f",
+        "urn:uuid:ee564b8a-7a87-4125-8c96-e9f123d6766f#",
+        "urn:uuid:ee564b8a-7a87-4125-8c96-e9f123d6766f#f",
+        "urn:uuid:ee564b8a-7a87-4125-8c96-e9f123d6766f#/definitions/A",
+        "urn:uuid:ee564b8a-7a87-4125-8c96-e9f123d6766f?",
+        "urn:uuid:ee564b8a-7a87-4125-8c96-e9f123d6766f?y",
+        "urn:uuid:ee564b8a-7a87-4125-8c96-e9f123d6766f?y#s",
+        "urn:g",
+        "urn:g/",
+        "urn:g",
+        "urn:g",
+        "urn:g",
+        "urn:/g",
+        "urn:/g",
+        "urn://g",
+        "urn://g/i",
+        "urn:",
+        "urn:",
+        "urn:",
+        "urn:",
+        "urn:g/",
+        "urn:/",
+        "urn:g/h",
+        "urn:/h",
+        "urn:;x",
+        "urn:g;x?y#s",
+        "urn:other.json",
+        "urn:t/inner.json",
+        "urn:x",
+        "http:g",
+        "g:h",
+        "urn:/a",
+        "urn:%2E%2E/g"
+      ],
+      [
+        "json-schema:///",
+        "json-schema:///#",
+        "json-schema:///#f",
+        "json-schema:///#/definitions/A",
+        "json-schema:///?",
+        "json-schema:///?y",
+        "json-schema:///?y#s",
+        "json-schema:///g",
+        "json-schema:///g/",
+        "json-schema:///g",
+        "json-schema:///g",
+        "json-schema:///g",
+        "json-schema:///g",
+        "json-schema:///g",
+        "json-schema://g",
+        "json-schema://g/i",
+        "json-schema:///",
+        "json-schema:///",
+        "json-schema:///",
+        "json-schema:///",
+        "json-schema:///g/",
+        "json-schema:///",
+        "json-schema:///g/h",
+        "json-schema:///h",
+        "json-schema:///;x",
+        "json-schema:///g;x?y#s",
+        "json-schema:///other.json",
+        "json-schema:///t/inner.json",
+        "urn:x",
+        "http:g",
+        "g:h",
+        "json-schema:////a",
+        "json-schema:///%2E%2E/g"
+      ],
+      [
+        "http://example.com/root.json",
+        "http://example.com/root.json#",
+        "http://example.com/root.json#f",
+        "http://example.com/root.json#/definitions/A",
+        "http://example.com/root.json?",
+        "http://example.com/root.json?y",
+        "http://example.com/root.json?y#s",
+        "http://example.com/g",
+        "http://example.com/g/",
+        "http://example.com/g",
+        "http://example.com/g",
+        "http://example.com/g",
+        "http://example.com/g",
+        "http://example.com/g",
+        "http://g",
+        "http://g/i",
+        "http://example.com/",
+        "http://example.com/",
+        "http://example.com/",
+        "http://example.com/",
+        "http://example.com/g/",
+        "http://example.com/",
+        "http://example.com/g/h",
+        "http://example.com/h",
+        "http://example.com/;x",
+        "http://example.com/g;x?y#s",
+        "http://example.com/other.json",
+        "http://example.com/t/inner.json",
+        "urn:x",
+        "http:g",
+        "g:h",
+        "http://example.com//a",
+        "http://example.com/%2E%2E/g"
+      ],
+      [
+        "http://u@[::1]:8080/b/c/?q",
+        "http://u@[::1]:8080/b/c/?q#",
+        "http://u@[::1]:8080/b/c/?q#f",
+        "http://u@[::1]:8080/b/c/?q#/definitions/A",
+        "http://u@[::1]:8080/b/c/?",
+        "http://u@[::1]:8080/b/c/?y",
+        "http://u@[::1]:8080/b/c/?y#s",
+        "http://u@[::1]:8080/b/c/g",
+        "http://u@[::1]:8080/b/c/g/",
+        "http://u@[::1]:8080/b/c/g",
+        "http://u@[::1]:8080/b/g",
+        "http://u@[::1]:8080/g",
+        "http://u@[::1]:8080/g",
+        "http://u@[::1]:8080/g",
+        "http://g",
+        "http://g/i",
+        "http://u@[::1]:8080/b/c/",
+        "http://u@[::1]:8080/b/",
+        "http://u@[::1]:8080/b/c/",
+        "http://u@[::1]:8080/b/",
+        "http://u@[::1]:8080/b/c/g/",
+        "http://u@[::1]:8080/b/c/",
+        "http://u@[::1]:8080/b/c/g/h",
+        "http://u@[::1]:8080/b/c/h",
+        "http://u@[::1]:8080/b/c/;x",
+        "http://u@[::1]:8080/b/c/g;x?y#s",
+        "http://u@[::1]:8080/b/c/other.json",
+        "http://u@[::1]:8080/b/c/t/inner.json",
+        "urn:x",
+        "http:g",
+        "g:h",
+        "http://u@[::1]:8080/b/c//a",
+        "http://u@[::1]:8080/b/c/%2E%2E/g"
+      ]
+    ],
+    "normalized": [
+      {
+        "text": "HTTP://Example.COM/%7Euser/%7e%2f?%41#%61%3a",
+        "normalized": "http://example.com/~user/~%2F?A#a%3A"
+      },
+      {
+        "text": "http://%41%42.com",
+        "normalized": "http://ab.com"
+      },
+      {
+        "text": "http://U%40%3a@A",
+        "normalized": "http://U%40%3A@a"
+      },
+      {
+        "text": "http://User@Host:80/Path",
+        "normalized": "http://User@host:80/Path"
+      },
+      {
+        "text": "http://[FE80::1]:80/",
+        "normalized": "http://[fe80::1]:80/"
+      },
+      {
+        "text": "foo:/a/%2E%2E/b",
+        "normalized": "foo:/b"
+      },
+      {
+        "text": "foo:/a/.%2e/b",
+        "normalized": "foo:/b"
+      },
+      {
+        "text": "foo:/a/%2e/b",
+        "normalized": "foo:/a/b"
+      },
+      {
+        "text": "foo:a/%2E%2E/b",
+        "normalized": "foo:/b"
+      },
+      {
+        "text": "%2E%2E/a",
+        "normalized": "../a"
+      },
+      {
+        "text": "./%2e/a",
+        "normalized": "././a"
+      },
+      {
+        "text": "http://a/b?%7E%20",
+        "normalized": "http://a/b?~%20"
+      },
+      {
+        "text": "URN:Uuid:ABC",
+        "normalized": "urn:Uuid:ABC"
+      },
+      {
+        "text": "#%2f%41",
+        "normalized": "#%2FA"
+      },
+      {
+        "text": "http://a/%e9",
+        "normalized": "http://a/%E9"
+      },
+      {
+        "text": "",
+        "normalized": ""
+      }
+    ]
+  },
+  "pointers": {
+    "document": {
+      "foo": ["bar", "baz"],
+      "": 0,
+      "a/b": 1,
+      "c%d": 2,
+      "e^f": 3,
+      "g|h": 4,
+      "i\\j": 5,
+      "k\"l": 6,
+      " ": 7,
+      "m~n": 8,
+      "0": "zero",
+      "01": "one",
+      "-": "dash",
+      "é": "accent",
+      "nested": {
+        "": {
+          "": "empty"
+        },
+        "list": [
+          [1, 2],
+          {
+            "x": null
+          }
+        ]
+      }
+    },
+    "fragments": [
+      {
+        "fragment": "",
+        "tokens": [],
+        "found": true,
+        "value": {
+          "foo": ["bar", "baz"],
+          "": 0,
+          "a/b": 1,
+          "c%d": 2,
+          "e^f": 3,
+          "g|h": 4,
+          "i\\j": 5,
+          "k\"l": 6,
+          " ": 7,
+          "m~n": 8,
+          "0": "zero",
+          "01": "one",
+          "-": "dash",
+          "é": "accent",
+          "nested": {
+            "": {
+              "": "empty"
+            },
+            "list": [
+              [1, 2],
+              {
+                "x": null
+              }
+            ]
+          }
+        }
+      },
+      {
+        "fragment": "/foo",
+        "tokens": ["foo"],
+        "found": true,
+        "value": ["bar", "baz"]
+      },
+      {
+        "fragment": "/foo/0",
+        "tokens": ["foo", "0"],
+        "found": true,
+        "value": "bar"
+      },
+      {
+        "fragment": "/",
+        "tokens": [""],
+        "found": true,
+        "value": 0
+      },
+      {
+        "fragment": "/a~1b",
+        "tokens": ["a/b"],
+        "found": true,
+        "value": 1
+      },
+      {
+        "fragment": "/c%25d",
+        "tokens": ["c%d"],
+        "found": true,
+        "value": 2
+      },
+      {
+        "fragment": "/e%5Ef",
+        "tokens": ["e^f"],
+        "found": true,
+        "value": 3
+      },
+      {
+        "fragment": "/g%7Ch",
+        "tokens": ["g|h"],
+        "found": true,
+        "value": 4
+      },
+      {
+        "fragment": "/i%5Cj",
+        "tokens": ["i\\j"],
+        "found": true,
+        "value": 5
+      },
+      {
+        "fragment": "/k%22l",
+        "tokens": ["k\"l"],
+        "found": true,
+        "value": 6
+      },
+      {
+        "fragment": "/%20",
+        "tokens": [" "],
+        "found": true,
+        "value": 7
+      },
+      {
+        "fragment": "/m~0n",
+        "tokens": ["m~n"],
+        "found": true,
+        "value": 8
+      },
+      {
+        "fragment": "/foo/1",
+        "tokens": ["foo", "1"],
+        "found": true,
+        "value": "baz"
+      },
+      {
+        "fragment": "/foo/2",
+        "tokens": ["foo", "2"],
+        "found": false
+      },
+      {
+        "fragment": "/foo/01",
+        "tokens": ["foo", "01"],
+        "found": false
+      },
+      {
+        "fragment": "/foo/-",
+        "tokens": ["foo", "-"],
+        "found": false
+      },
+      {
+        "fragment": "/foo/+1",
+        "tokens": ["foo", "+1"],
+        "found": false
+      },
+      {
+        "fragment": "/foo/0/x",
+        "tokens": ["foo", "0", "x"],
+        "found": false
+      },
+      {
+        "fragment": "/0",
+        "tokens": ["0"],
+        "found": true,
+        "value": "zero"
+      },
+      {
+        "fragment": "/01",
+        "tokens": ["01"],
+        "found": true,
+        "value": "one"
+      },
+      {
+        "fragment": "/-",
+        "tokens": ["-"],
+        "found": true,
+        "value": "dash"
+      },
+      {
+        "fragment": "/%C3%A9",
+        "tokens": ["é"],
+        "found": true,
+        "value": "accent"
+      },
+      {
+        "fragment": "/nested//",
+        "tokens": ["nested", "", ""],
+        "found": true,
+        "value": "empty"
+      },
+      {
+        "fragment": "/nested/list/0/1",
+        "tokens": ["nested", "list", "0", "1"],
+        "found": true,
+        "value": 2
+      },
+      {
+        "fragment": "/nested/list/1/x",
+        "tokens": ["nested", "list", "1", "x"],
+        "found": true,
+        "value": null
+      },
+      {
+        "fragment": "/nested/list/1/y",
+        "tokens": ["nested", "list", "1", "y"],
+        "found": false
+      },
+      {
+        "fragment": "/m%7E0n",
+        "tokens": ["m~n"],
+        "found": true,
+        "value": 8
+      },
+      {
+        "fragment": "/a%2Fb",
+        "tokens": ["a", "b"],
+        "found": false
+      },
+      {
+        "fragment": "/~",
+        "tokens": null
+      },
+      {
+        "fragment": "/~2",
+        "tokens": null
+      },
+      {
+        "fragment": "/%7E2",
+        "tokens": null
+      },
+      {
+        "fragment": "/%FF",
+        "tokens": null
+      },
+      {
+        "fragment": "/%C3",
+        "tokens": null
+      },
+      {
+        "fragment": "/c%d",
+        "tokens": null
+      },
+      {
+        "fragment": "a",
+        "tokens": null
+      },
+      {
+        "fragment": "%2Fa",
+        "tokens": null
+      }
+    ]
+  }
+}
