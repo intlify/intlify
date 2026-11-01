@@ -161,6 +161,10 @@ jobs:
         if: runner.os == 'Linux'
         run: vp run vectors:pattern:check
 
+      - name: Validate the Draft 7 validator value independent vectors
+        if: runner.os == 'Linux'
+        run: vp run vectors:validator-values:check
+
   cli-validation:
     runs-on: ${{ matrix.os }}
     name: CLI validation (${{ matrix.os }})
