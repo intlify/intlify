@@ -13,10 +13,14 @@
 //! of `pattern` and `patternProperties` from ECMA-262, which [`pattern`] reads
 //! and matches. Schemas name one another by URI references, which [`uri`]
 //! resolves and compares, and a reference's fragment may be a JSON Pointer,
-//! which [`pointer`] reads and follows.
+//! which [`pointer`] reads and follows. [`schema`] reads a schema document
+//! with these parts: it counts its nodes and references on any JSON, names
+//! its resources and anchors, resolves every `$ref` to a node of the document,
+//! refuses cycles of in-place applicators, and reads every keyword.
 
 pub(crate) mod equal;
 pub(crate) mod number;
 pub(crate) mod pattern;
 pub(crate) mod pointer;
+pub(crate) mod schema;
 pub(crate) mod uri;
