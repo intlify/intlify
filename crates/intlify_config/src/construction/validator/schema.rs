@@ -33,7 +33,7 @@
 //! and keywords of the wrong shape, patterns, and divisors), its references,
 //! and its cycles. The first failure is reported.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use serde_json::{Map, Value};
 
@@ -174,7 +174,7 @@ pub(crate) struct Keywords {
     pub(crate) max_properties: Option<u64>,
     pub(crate) min_properties: Option<u64>,
     pub(crate) required: Vec<String>,
-    pub(crate) properties: Vec<(String, NodeId)>,
+    pub(crate) properties: BTreeMap<String, NodeId>,
     pub(crate) pattern_properties: Vec<(Pattern, NodeId)>,
     pub(crate) additional_properties: Option<NodeId>,
     pub(crate) dependencies: Vec<(String, Dependency)>,
@@ -205,6 +205,7 @@ pub(crate) struct Schema {
     resources: Vec<(Reference, NodeId)>,
     anchors: Vec<(Reference, String, NodeId)>,
     order: Vec<NodeId>,
+    rank: Vec<usize>,
 }
 
 impl Schema {
@@ -222,12 +223,17 @@ impl Schema {
             }
         }
         let order = in_place_order(&nodes)?;
+        let mut rank = vec![0; order.len()];
+        for (place, &id) in order.iter().enumerate() {
+            rank[id] = place;
+        }
         Ok(Self {
             nodes,
             locations: walk.locations,
             resources: walk.resources,
             anchors: walk.anchors,
             order,
+            rank,
         })
     }
 
@@ -260,6 +266,11 @@ impl Schema {
     /// Every node, each after every node it applies to the same instance.
     pub(crate) fn order(&self) -> &[NodeId] {
         &self.order
+    }
+
+    /// A node's place in [`Schema::order`].
+    pub(crate) fn rank(&self, id: NodeId) -> usize {
+        self.rank[id]
     }
 }
 
@@ -679,8 +690,10 @@ fn pattern(value: &Value) -> Result<Pattern, SchemaFailure> {
     Pattern::compile(value.as_str().ok_or(SchemaFailure::Keyword)?).map_err(SchemaFailure::Pattern)
 }
 
-/// The nodes a node applies to the same instance.
-fn in_place(node: &Node) -> Vec<NodeId> {
+/// The nodes a node applies to the same instance. The schema of a dependency
+/// applies only to an object that has its name, which `has` answers; for a
+/// schema, which meets every instance, the answer is yes.
+pub(crate) fn in_place(node: &Node, has: impl Fn(&str) -> bool) -> Vec<NodeId> {
     match node {
         Node::Boolean(_) => Vec::new(),
         Node::Reference(target) => vec![*target],
@@ -695,9 +708,11 @@ fn in_place(node: &Node) -> Vec<NodeId> {
                 edges.extend(condition.then);
                 edges.extend(condition.otherwise);
             }
-            for (_, dependency) in &keywords.dependencies {
+            for (name, dependency) in &keywords.dependencies {
                 if let Dependency::Schema(id) = dependency {
-                    edges.push(*id);
+                    if has(name) {
+                        edges.push(*id);
+                    }
                 }
             }
             edges
@@ -717,7 +732,7 @@ fn in_place_order(nodes: &[Node]) -> Result<Vec<NodeId>, SchemaFailure> {
             continue;
         }
         state[start] = OPEN;
-        let mut stack = vec![(start, in_place(&nodes[start]), 0_usize)];
+        let mut stack = vec![(start, in_place(&nodes[start], |_| true), 0_usize)];
         while let Some((node, edges, next)) = stack.last_mut() {
             let Some(&successor) = edges.get(*next) else {
                 state[*node] = DONE;
@@ -729,7 +744,7 @@ fn in_place_order(nodes: &[Node]) -> Result<Vec<NodeId>, SchemaFailure> {
             match state[successor] {
                 UNSEEN => {
                     state[successor] = OPEN;
-                    let edges = in_place(&nodes[successor]);
+                    let edges = in_place(&nodes[successor], |_| true);
                     stack.push((successor, edges, 0));
                 }
                 OPEN => return Err(SchemaFailure::Cycle),
@@ -1402,16 +1417,15 @@ mod tests {
         let mut sorted = order.to_vec();
         sorted.sort_unstable();
         assert_eq!(sorted, (0..schema.node_count()).collect::<Vec<_>>());
-        let mut place = vec![0; order.len()];
-        for (index, id) in order.iter().enumerate() {
-            place[*id] = index;
+        for (place, &id) in order.iter().enumerate() {
+            assert_eq!(schema.rank(id), place);
         }
         let mut edges = 0;
         for id in 0..schema.node_count() {
-            for successor in in_place(schema.node(id)) {
+            for successor in in_place(schema.node(id), |_| true) {
                 edges += 1;
                 assert!(
-                    place[successor] < place[id],
+                    schema.rank(successor) < schema.rank(id),
                     "{} before {}",
                     schema.location(successor),
                     schema.location(id)
@@ -1420,6 +1434,12 @@ mod tests {
         }
         // The root's six, and one from each of nine more nodes.
         assert_eq!(edges, 15);
+        // A dependency's schema applies only to an object with its name, and
+        // a dependency's names apply no node.
+        let root = schema.node(0);
+        assert_eq!(in_place(root, |name| name == "x").len(), 6);
+        assert_eq!(in_place(root, |name| name == "y").len(), 5);
+        assert_eq!(in_place(root, |_| false).len(), 5);
     }
 
     #[test]
@@ -1547,10 +1567,10 @@ mod tests {
         assert_eq!(keywords.required, ["a", "b"]);
         assert_eq!(
             keywords.properties,
-            [
+            BTreeMap::from([
                 ("a".to_owned(), at("/properties/a")),
                 ("b".to_owned(), at("/properties/b"))
-            ]
+            ])
         );
         assert_eq!(
             keywords.pattern_properties,
