@@ -119,6 +119,12 @@ Check how Draft 7 schema documents are read, counted, and resolved against an in
 vp run vectors:validator-schemas:check
 ```
 
+Validating an instance against a read schema is checked by the library's unit tests, against the JSON Schema Test Suite's Draft 7 tests and the `jsonschema` crate:
+
+```sh
+cargo test -p intlify_config --lib construction::validator
+```
+
 On Linux or macOS, run the measurement smoke check:
 
 ```sh
@@ -127,7 +133,7 @@ vp run bench:config:smoke
 
 The smoke check exercises the implemented operations, saves measurement records to a new temporary directory, and validates the saved records. It prints the output location. It checks the measurement workflow, not whether the crate meets a performance budget. Measurement support is disabled in normal library builds. When enabled, it also enables the `icu4x` feature and compiles in the adapter's committed locale canonicalization data as measurement input.
 
-For configuration test scenarios, see the [minimum fixture index](./fixtures/minimum/README.md). For locale canonicalization, see the [Phase 2 fixtures](./fixtures/phase2/README.md). For the vocabulary artifact, see the [vocabulary fixtures](./fixtures/vocabulary/README.md). For the members of the artifact collection, see the [envelope fixtures](./fixtures/envelope/README.md). For 015's record framing, see the [framing fixtures](./fixtures/framing/README.md). For 015's bound values and capability bounds, see the [bound fixtures](./fixtures/bounds/README.md). For the built-in Resolver Construction Root Package, see the [construction artifacts](./conformance/construction/README.md). For the regular expressions of Draft 7's `pattern`, see the [pattern fixtures](./fixtures/pattern/README.md). For the numbers, JSON values, URI references, and JSON Pointers Draft 7's keywords read, see the [validator value fixtures](./fixtures/validator-values/README.md). For how Draft 7 schema documents are read, see the [validator schema fixtures](./fixtures/validator-schemas/README.md). For the Group ID selection vectors handed to design 020, see the [handoff vectors](./fixtures/handoff/README.md).
+For configuration test scenarios, see the [minimum fixture index](./fixtures/minimum/README.md). For locale canonicalization, see the [Phase 2 fixtures](./fixtures/phase2/README.md). For the vocabulary artifact, see the [vocabulary fixtures](./fixtures/vocabulary/README.md). For the members of the artifact collection, see the [envelope fixtures](./fixtures/envelope/README.md). For 015's record framing, see the [framing fixtures](./fixtures/framing/README.md). For 015's bound values and capability bounds, see the [bound fixtures](./fixtures/bounds/README.md). For the built-in Resolver Construction Root Package, see the [construction artifacts](./conformance/construction/README.md). For the regular expressions of Draft 7's `pattern`, see the [pattern fixtures](./fixtures/pattern/README.md). For the numbers, JSON values, URI references, and JSON Pointers Draft 7's keywords read, see the [validator value fixtures](./fixtures/validator-values/README.md). For how Draft 7 schema documents are read, see the [validator schema fixtures](./fixtures/validator-schemas/README.md), and for how an instance is validated against them, the [validation fixtures](./fixtures/json-schema-test-suite/README.md). For the Group ID selection vectors handed to design 020, see the [handoff vectors](./fixtures/handoff/README.md).
 
 ## Further reading
 
