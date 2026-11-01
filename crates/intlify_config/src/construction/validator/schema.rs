@@ -23,6 +23,11 @@
 //! schema with one is refused whatever instance it would meet. Every other
 //! applicator moves to a member, an item, or a name, so it ends.
 //!
+//! A keyword the validator reads has the shape the meta-schema gives it: an
+//! array of subschemas or of types is not empty, and `type`, `required`, and a
+//! dependency's names repeat nothing. Annotations, such as `title`, are not
+//! read, and are left to the meta-schema.
+//!
 //! A document is checked in this order, each step over its nodes in document
 //! order: its dialect and identifiers, its nodes (a root that is not a schema,
 //! and keywords of the wrong shape, patterns, and divisors), its references,
@@ -66,7 +71,7 @@ pub(crate) enum SchemaFailure {
     Identifier,
     /// Two `$id`s name one resource, or one anchor within a resource.
     DuplicateIdentifier,
-    /// A keyword's value is not of the keyword's shape.
+    /// A keyword's value is not of the shape the meta-schema gives it.
     Keyword,
     /// A `pattern`, or a name of `patternProperties`, does not compile.
     Pattern(PatternFailure),
@@ -567,7 +572,12 @@ impl<'a> Walk<'a> {
         Ok(keywords)
     }
 
+    /// The nodes of an array of subschemas, which the meta-schema requires
+    /// not to be empty.
     fn ids_of(&self, values: &[Value]) -> Result<Vec<NodeId>, SchemaFailure> {
+        if values.is_empty() {
+            return Err(SchemaFailure::Keyword);
+        }
         values.iter().map(|value| self.id_of(value)).collect()
     }
 
@@ -618,13 +628,15 @@ fn members(value: &Value) -> Result<Vec<(&String, &Value)>, SchemaFailure> {
         .ok_or(SchemaFailure::Keyword)
 }
 
+/// An array of names, none repeated, as `required` and a dependency's
+/// names are.
 fn names(value: &Value) -> Result<Vec<String>, SchemaFailure> {
+    let mut seen = BTreeSet::new();
     array(value)?
         .iter()
-        .map(|item| {
-            item.as_str()
-                .map(str::to_owned)
-                .ok_or(SchemaFailure::Keyword)
+        .map(|item| match item.as_str() {
+            Some(name) if seen.insert(name) => Ok(name.to_owned()),
+            _ => Err(SchemaFailure::Keyword),
         })
         .collect()
 }
@@ -637,9 +649,17 @@ fn types(value: &Value) -> Result<Types, SchemaFailure> {
             .ok_or(SchemaFailure::Keyword)
     };
     match value {
-        Value::Array(items) => items
-            .iter()
-            .try_fold(Types::default(), |types, item| Ok(types.with(one(item)?))),
+        // An array of types is not empty, and names no type twice.
+        Value::Array(items) if !items.is_empty() => {
+            items.iter().try_fold(Types::default(), |types, item| {
+                let kind = one(item)?;
+                if types.contains(kind) {
+                    return Err(SchemaFailure::Keyword);
+                }
+                Ok(types.with(kind))
+            })
+        }
+        Value::Array(_) => Err(SchemaFailure::Keyword),
         _ => Ok(Types::default().with(one(value)?)),
     }
 }
@@ -1239,9 +1259,39 @@ mod tests {
             json!({"not": null}),
             json!({"definitions": []}),
             json!({"definitions": {"a": 1}}),
+            // The meta-schema's arrays: not empty, and nothing repeated.
+            json!({"type": []}),
+            json!({"type": ["string", "null", "string"]}),
+            json!({"allOf": []}),
+            json!({"anyOf": []}),
+            json!({"oneOf": []}),
+            json!({"items": []}),
+            json!({"required": ["a", "b", "a"]}),
+            json!({"dependencies": {"a": ["b", "b"]}}),
         ] {
             assert_eq!(failure(&document), SchemaFailure::Keyword, "{document}");
         }
+        // The meta-schema lets these be empty, and `enum` repeat.
+        let schema = compiled(&json!({
+            "required": [],
+            "dependencies": {"a": []},
+            "enum": [],
+            "items": {"enum": [1, 1.0, 1]}
+        }));
+        let keywords = keywords_at(&schema, "");
+        assert!(keywords.required.is_empty());
+        assert_eq!(
+            keywords.dependencies,
+            [("a".to_owned(), Dependency::Names(Vec::new()))]
+        );
+        assert_eq!(keywords.enumeration.as_ref().map(BTreeSet::len), Some(0));
+        assert_eq!(
+            keywords_at(&schema, "/items")
+                .enumeration
+                .as_ref()
+                .map(BTreeSet::len),
+            Some(1)
+        );
         // Annotations and unknown keywords take any value.
         assert!(Schema::compile(&json!({
             "title": 1, "description": [], "default": {}, "examples": 5, "format": 1,

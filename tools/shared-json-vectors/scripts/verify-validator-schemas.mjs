@@ -177,13 +177,18 @@ function isCount(value) {
 }
 
 /**
- * Whether a value is an array of strings.
+ * Whether a value is an array of strings, none repeated, as the meta-schema's
+ * `stringArray` is.
  *
  * @param value - A parsed value.
  * @returns Whether it is one.
  */
 function isNames(value) {
-  return Array.isArray(value) && value.every(item => typeof item === 'string')
+  return (
+    Array.isArray(value) &&
+    value.every(item => typeof item === 'string') &&
+    new Set(value).size === value.length
+  )
 }
 
 /**
@@ -285,8 +290,14 @@ function resourceKey(reference) {
  */
 function keywordProblem(keyword, value) {
   if (keyword === 'type') {
+    // An array of types is not empty and names no type twice.
     const names = typeof value === 'string' ? [value] : value
-    return Array.isArray(names) && names.every(name => TYPES.has(name)) ? null : 'keyword'
+    return Array.isArray(names) &&
+      names.length > 0 &&
+      names.every(name => TYPES.has(name)) &&
+      new Set(names).size === names.length
+      ? null
+      : 'keyword'
   }
   if (keyword === 'multipleOf') {
     if (!(value instanceof JsonNumber)) {
@@ -317,13 +328,13 @@ function keywordProblem(keyword, value) {
     return isNames(value) ? null : 'keyword'
   }
   if (keyword === 'items' && Array.isArray(value)) {
-    return value.every(isSchema) ? null : 'keyword'
+    return value.length > 0 && value.every(isSchema) ? null : 'keyword'
   }
   if (SINGLE.has(keyword) || keyword === 'items') {
     return isSchema(value) ? null : 'keyword'
   }
   if (LISTS.has(keyword)) {
-    return Array.isArray(value) && value.every(isSchema) ? null : 'keyword'
+    return Array.isArray(value) && value.length > 0 && value.every(isSchema) ? null : 'keyword'
   }
   if (MAPS.has(keyword)) {
     if (!isObject(value)) {

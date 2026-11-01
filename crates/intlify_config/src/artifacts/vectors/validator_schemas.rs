@@ -157,6 +157,10 @@ const DOCUMENTS: &[(&str, &str)] = &[
             "else": {"$ref": "#"}
         }"##,
     ),
+    (
+        "permitted-empty-arrays",
+        r#"{"required": [], "dependencies": {"a": []}, "enum": [], "items": {"enum": [1, 1.0, 1]}}"#,
+    ),
     ("true", "true"),
     ("false", "false"),
     ("not-an-object", "5"),
@@ -190,6 +194,15 @@ const DOCUMENTS: &[(&str, &str)] = &[
     ("required-names", r#"{"required": ["a", 1]}"#),
     ("length-fraction", r#"{"minLength": 1.5}"#),
     ("property-schema", r#"{"properties": {"a": 1}}"#),
+    ("type-empty", r#"{"type": []}"#),
+    ("type-repeated", r#"{"type": ["string", "null", "string"]}"#),
+    ("all-of-empty", r#"{"allOf": []}"#),
+    ("items-empty", r#"{"items": []}"#),
+    ("required-repeated", r#"{"required": ["a", "b", "a"]}"#),
+    (
+        "dependency-repeated",
+        r#"{"dependencies": {"a": ["b", "b"]}}"#,
+    ),
     ("pattern-syntax", r#"{"pattern": "("}"#),
     ("divisor-zero", r#"{"multipleOf": 0}"#),
     ("divisor-digits", r#"{"multipleOf": 1.2345678901234567891}"#),

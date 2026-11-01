@@ -720,6 +720,26 @@
       }
     },
     {
+      "name": "permitted-empty-arrays",
+      "text": "{\"required\":[],\"dependencies\":{\"a\":[]},\"enum\":[],\"items\":{\"enum\":[1,1.0,1]}}",
+      "census": {
+        "nodes": 2,
+        "references": 0
+      },
+      "failure": null,
+      "reading": {
+        "nodes": ["", "/items"],
+        "resources": [
+          {
+            "uri": "json-schema:///",
+            "node": ""
+          }
+        ],
+        "anchors": [],
+        "references": []
+      }
+    },
+    {
       "name": "true",
       "text": "true",
       "census": {
@@ -870,6 +890,60 @@
     {
       "name": "property-schema",
       "text": "{\"properties\":{\"a\":1}}",
+      "census": {
+        "nodes": 1,
+        "references": 0
+      },
+      "failure": "keyword"
+    },
+    {
+      "name": "type-empty",
+      "text": "{\"type\":[]}",
+      "census": {
+        "nodes": 1,
+        "references": 0
+      },
+      "failure": "keyword"
+    },
+    {
+      "name": "type-repeated",
+      "text": "{\"type\":[\"string\",\"null\",\"string\"]}",
+      "census": {
+        "nodes": 1,
+        "references": 0
+      },
+      "failure": "keyword"
+    },
+    {
+      "name": "all-of-empty",
+      "text": "{\"allOf\":[]}",
+      "census": {
+        "nodes": 1,
+        "references": 0
+      },
+      "failure": "keyword"
+    },
+    {
+      "name": "items-empty",
+      "text": "{\"items\":[]}",
+      "census": {
+        "nodes": 1,
+        "references": 0
+      },
+      "failure": "keyword"
+    },
+    {
+      "name": "required-repeated",
+      "text": "{\"required\":[\"a\",\"b\",\"a\"]}",
+      "census": {
+        "nodes": 1,
+        "references": 0
+      },
+      "failure": "keyword"
+    },
+    {
+      "name": "dependency-repeated",
+      "text": "{\"dependencies\":{\"a\":[\"b\",\"b\"]}}",
       "census": {
         "nodes": 1,
         "references": 0
