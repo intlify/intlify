@@ -11,6 +11,7 @@
     "check:framing": "node scripts/verify-framing.mjs",
     "check:locale": "node scripts/verify-locale.mjs",
     "check:locale-corpus": "node scripts/verify-locale-corpus.mjs",
+    "check:pattern": "node scripts/verify-pattern.mjs",
     "check:vocabulary": "node scripts/verify-vocabulary.mjs"
   },
   "devDependencies": {
