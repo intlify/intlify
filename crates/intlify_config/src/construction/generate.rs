@@ -1,13 +1,20 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! The Root Package's artifacts, written from this crate's values.
+//! The Root Package's artifacts and the construction authorities, written from
+//! this crate's values.
 //!
 //! Every member is written first, and the Root Package artifact then lists each
 //! member's file digest. A file digest covers whitespace, member order, and
 //! line endings, so the bytes are fixed here: two-space indentation, members in
 //! the order the values hold them, and one final newline. The checked-in
 //! artifacts are kept out of repository formatting and line-ending conversion.
+//!
+//! The authorities follow the same form, except the schema mapped to
+//! `schemaVersion` `"0"`, whose bytes are the configuration schema as this
+//! crate publishes it. The Profile Specification's semantic digest goes into
+//! the Configuration Schema Authority Set, and so does the mapped schema's
+//! file digest.
 
 use serde_json::{json, Map, Value};
 
@@ -15,6 +22,8 @@ use intlify_shared_json::encoding::digest_bytes;
 use intlify_shared_json::token::IntegrityDigest;
 
 use super::admission::ConstructionAdmission;
+use super::authority_set::{self, ConfigurationSchemaAuthoritySet};
+use super::profile::{self, ProjectProfileSpecification};
 use super::root::{canonical_digest, RootRole, PATH};
 use super::rules::CrossAuthorityRules;
 use super::{envelope, meta_schema};
@@ -33,10 +42,24 @@ pub struct Pinned {
     pub canonical_digest: String,
 }
 
+/// The authorities' digests the implementation compiles in: the Profile
+/// Specification's semantic digest, and the file digests of the other three.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthorityPins {
+    pub profile_specification_schema: String,
+    pub profile_specification_semantic: String,
+    pub configuration_schema_authority_set: String,
+    pub configuration_schema: String,
+}
+
 fn write(value: &Value) -> Result<Vec<u8>, serde_json::Error> {
     let mut text = serde_json::to_string_pretty(value)?;
     text.push('\n');
     Ok(text.into_bytes())
+}
+
+fn file_digest(bytes: &[u8]) -> IntegrityDigest {
+    IntegrityDigest::from_hash(digest_bytes(bytes))
 }
 
 fn member(role: RootRole) -> Result<Value, serde_json::Error> {
@@ -66,7 +89,7 @@ pub fn artifacts() -> Result<Vec<Artifact>, serde_json::Error> {
         let bytes = write(&member(role)?)?;
         listed.insert(
             role.name().to_owned(),
-            json!({ "digest": IntegrityDigest::from_hash(digest_bytes(&bytes)).as_str() }),
+            json!({ "digest": file_digest(&bytes).as_str() }),
         );
         artifacts.push(Artifact {
             path: role.path(),
@@ -78,6 +101,74 @@ pub fn artifacts() -> Result<Vec<Artifact>, serde_json::Error> {
         bytes: write(&json!({ "members": listed }))?,
     });
     Ok(artifacts)
+}
+
+/// Write the construction authorities: the Profile Specification Schema, the
+/// Profile Specification, the Configuration Schema Authority Set, and the
+/// schema it maps to `schemaVersion` `"0"`.
+///
+/// # Errors
+///
+/// Returns the serialization failure of an authority, which the values rule
+/// out.
+///
+/// # Panics
+///
+/// Panics when the Profile Specification has no semantic digest, which its
+/// number-free body rules out.
+pub fn authorities() -> Result<Vec<Artifact>, serde_json::Error> {
+    let body = serde_json::to_value(ProjectProfileSpecification::revision_zero())?;
+    let semantic_digest =
+        profile::semantic_digest(&body).expect("the Profile Specification is number-free");
+    let member = authority_set::member_bytes()?;
+    let set = ConfigurationSchemaAuthoritySet::revision_zero(
+        semantic_digest.as_str(),
+        file_digest(&member).as_str(),
+    );
+    Ok(vec![
+        Artifact {
+            path: profile::SCHEMA_PATH,
+            bytes: write(&profile::schema()?)?,
+        },
+        Artifact {
+            path: profile::PATH,
+            bytes: write(&body)?,
+        },
+        Artifact {
+            path: authority_set::PATH,
+            bytes: write(&serde_json::to_value(set)?)?,
+        },
+        Artifact {
+            path: authority_set::MEMBER_PATH,
+            bytes: member,
+        },
+    ])
+}
+
+/// The authorities' digests the implementation compiles in.
+///
+/// # Errors
+///
+/// Returns the serialization failure of an authority, which the values rule
+/// out.
+///
+/// # Panics
+///
+/// Panics when the written Profile Specification is not JSON or has no
+/// semantic digest, which [`authorities`] rules out.
+pub fn authority_pins() -> Result<AuthorityPins, serde_json::Error> {
+    let [schema, body, set, member] = <[Artifact; 4]>::try_from(authorities()?)
+        .unwrap_or_else(|_| unreachable!("four authorities are written"));
+    let body: Value = serde_json::from_slice(&body.bytes)?;
+    Ok(AuthorityPins {
+        profile_specification_schema: file_digest(&schema.bytes).as_str().to_owned(),
+        profile_specification_semantic: profile::semantic_digest(&body)
+            .expect("the Profile Specification is number-free")
+            .as_str()
+            .to_owned(),
+        configuration_schema_authority_set: file_digest(&set.bytes).as_str().to_owned(),
+        configuration_schema: file_digest(&member.bytes).as_str().to_owned(),
+    })
 }
 
 /// The two digests of the Root Package these artifacts make.
@@ -108,6 +199,31 @@ pub fn pinned() -> Result<Pinned, serde_json::Error> {
 mod tests {
     use super::*;
     use crate::construction::root::{RootPackage, CANONICAL_DIGEST, DIGEST};
+    use crate::construction::validator::schema::Schema;
+
+    /// The committed authorities, at their paths.
+    const COMMITTED: [(&str, &[u8]); 4] = [
+        (
+            profile::SCHEMA_PATH,
+            include_bytes!(
+                "../../conformance/authorities/project-profile-specification-v0.schema.json"
+            ),
+        ),
+        (
+            profile::PATH,
+            include_bytes!("../../conformance/authorities/project-profile-specification-v0.json"),
+        ),
+        (
+            authority_set::PATH,
+            include_bytes!(
+                "../../conformance/authorities/configuration-schema-authority-set-v0.json"
+            ),
+        ),
+        (
+            authority_set::MEMBER_PATH,
+            include_bytes!("../../conformance/authorities/configuration-v0.schema.json"),
+        ),
+    ];
 
     #[test]
     fn the_committed_artifacts_are_the_ones_this_crate_writes() {
@@ -138,8 +254,76 @@ mod tests {
     }
 
     #[test]
+    fn the_committed_authorities_are_the_ones_this_crate_writes() {
+        let authorities = authorities().unwrap();
+        assert_eq!(authorities.len(), 4);
+        for (artifact, (path, bytes)) in authorities.iter().zip(COMMITTED) {
+            assert_eq!(artifact.path, path);
+            assert_eq!(
+                artifact.bytes, bytes,
+                "{path} is stale; regenerate it with the generate_construction_artifacts example"
+            );
+        }
+    }
+
+    #[test]
+    fn the_pinned_authority_digests_are_the_ones_the_authorities_make() {
+        assert_eq!(
+            authority_pins().unwrap(),
+            AuthorityPins {
+                profile_specification_schema: profile::SCHEMA_DIGEST.to_owned(),
+                profile_specification_semantic: profile::SEMANTIC_DIGEST.to_owned(),
+                configuration_schema_authority_set: authority_set::DIGEST.to_owned(),
+                configuration_schema: authority_set::MEMBER_DIGEST.to_owned(),
+            },
+            "the pinned digests in construction/profile.rs and construction/authority_set.rs \
+             are stale"
+        );
+    }
+
+    #[test]
+    fn the_set_belongs_to_the_written_profile_specification_and_maps_the_written_schema() {
+        let authorities = authorities().unwrap();
+        let [schema, body, set, member] = [0, 1, 2, 3].map(|index| &authorities[index].bytes);
+        let body: Value = serde_json::from_slice(body).unwrap();
+        let set: Value = serde_json::from_slice(set).unwrap();
+        assert_eq!(
+            set["profileSpecification"],
+            json!({
+                "identity": profile::IDENTITY,
+                "revision": profile::REVISION,
+                "semanticDigest": profile::semantic_digest(&body).unwrap().as_str(),
+            })
+        );
+        assert_eq!(set["members"]["0"]["digest"], file_digest(member).as_str());
+        // Each artifact is at its path: the schema and the body are the ones
+        // their module writes, and the mapped schema is the published one.
+        let schema: Value = serde_json::from_slice(schema).unwrap();
+        assert_eq!(schema, profile::schema().unwrap());
+        assert_eq!(
+            body,
+            serde_json::to_value(ProjectProfileSpecification::revision_zero()).unwrap()
+        );
+        assert_eq!(*member, authority_set::member_bytes().unwrap());
+        // The written body is valid against the written schema, which closes
+        // it.
+        let read = Schema::compile(&schema).unwrap();
+        let oracle = jsonschema::draft7::new(&schema).unwrap();
+        assert!(read.validate(&body).valid);
+        assert!(oracle.is_valid(&body));
+        let mut unknown = body;
+        unknown["unknown"] = json!("unknown");
+        assert!(!read.validate(&unknown).valid);
+        assert!(!oracle.is_valid(&unknown));
+    }
+
+    #[test]
     fn every_artifact_ends_with_one_newline_and_has_no_carriage_return() {
-        for artifact in artifacts().unwrap() {
+        for artifact in artifacts()
+            .unwrap()
+            .into_iter()
+            .chain(authorities().unwrap())
+        {
             assert!(artifact.bytes.ends_with(b"}\n"), "{}", artifact.path);
             assert!(!artifact.bytes.ends_with(b"\n\n"), "{}", artifact.path);
             assert!(!artifact.bytes.contains(&b'\r'), "{}", artifact.path);

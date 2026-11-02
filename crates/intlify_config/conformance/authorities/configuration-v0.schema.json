@@ -1,0 +1,430 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "ConfigurationVersion": {
+      "enum": ["0"],
+      "type": "string"
+    },
+    "Coverage": {
+      "additionalProperties": false,
+      "properties": {
+        "defaultMode": {
+          "$ref": "#/definitions/Present_CoverageMode"
+        },
+        "rules": {
+          "$ref": "#/definitions/Present_Array_of_CoverageRule"
+        }
+      },
+      "type": "object"
+    },
+    "CoverageMode": {
+      "enum": ["direct-required", "fallback-allowed"],
+      "type": "string"
+    },
+    "CoverageRule": {
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": ["requestedLocales"]
+        },
+        {
+          "required": ["intentSurfaceClasses"]
+        }
+      ],
+      "properties": {
+        "intentSurfaceClasses": {
+          "$ref": "#/definitions/Present_NonEmptyArray_string"
+        },
+        "mode": {
+          "$ref": "#/definitions/CoverageMode"
+        },
+        "requestedLocales": {
+          "$ref": "#/definitions/Present_NonEmptyArray_string"
+        }
+      },
+      "required": ["mode"],
+      "type": "object"
+    },
+    "Delivery": {
+      "additionalProperties": false,
+      "properties": {
+        "placement": {
+          "$ref": "#/definitions/Present_DeliveryPlacement"
+        }
+      },
+      "type": "object"
+    },
+    "DeliveryPlacement": {
+      "enum": ["duplicate"],
+      "type": "string"
+    },
+    "DeploymentGroup": {
+      "additionalProperties": false,
+      "properties": {
+        "hydrationRelations": {
+          "$ref": "#/definitions/Present_Array_of_HydrationRelation"
+        },
+        "members": {
+          "$ref": "#/definitions/NonEmptyArray_TargetId"
+        }
+      },
+      "required": ["members"],
+      "type": "object"
+    },
+    "FallbackCandidate": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/definitions/IntentSourceCandidate"
+        }
+      ]
+    },
+    "HydrationRelation": {
+      "additionalProperties": false,
+      "properties": {
+        "client": {
+          "$ref": "#/definitions/TargetId"
+        },
+        "server": {
+          "$ref": "#/definitions/TargetId"
+        }
+      },
+      "required": ["server", "client"],
+      "type": "object"
+    },
+    "IntentSourceCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/IntentSourceKind"
+        }
+      },
+      "required": ["kind"],
+      "type": "object"
+    },
+    "IntentSourceKind": {
+      "enum": ["intent-source-locale"],
+      "type": "string"
+    },
+    "LocaleNegotiation": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "$ref": "#/definitions/Present_Map_of_string"
+        }
+      },
+      "type": "object"
+    },
+    "NonEmptyArray_FallbackCandidate": {
+      "items": {
+        "$ref": "#/definitions/FallbackCandidate"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "NonEmptyArray_TargetId": {
+      "items": {
+        "$ref": "#/definitions/TargetId"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "NonEmptyArray_string": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "NonEmptyMap_DeploymentGroupId_DeploymentGroup": {
+      "additionalProperties": false,
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$": {
+          "$ref": "#/definitions/DeploymentGroup"
+        }
+      },
+      "type": "object"
+    },
+    "NonEmptyMap_ProfileId_ProfileDeclaration": {
+      "additionalProperties": false,
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$": {
+          "$ref": "#/definitions/ProfileDeclaration"
+        }
+      },
+      "type": "object"
+    },
+    "NonEmptyMap_TargetId_TargetDeclaration": {
+      "additionalProperties": false,
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$": {
+          "$ref": "#/definitions/TargetDeclaration"
+        }
+      },
+      "type": "object"
+    },
+    "Policies": {
+      "additionalProperties": false,
+      "properties": {
+        "approval": {
+          "$ref": "#/definitions/PolicyReference"
+        },
+        "glossarySet": {
+          "$ref": "#/definitions/RequiredNullable"
+        },
+        "providerRouting": {
+          "$ref": "#/definitions/RequiredNullable"
+        },
+        "resourceLimits": {
+          "$ref": "#/definitions/PolicyReference"
+        },
+        "selection": {
+          "$ref": "#/definitions/PolicyReference"
+        },
+        "sourceAdmission": {
+          "$ref": "#/definitions/PolicyReference"
+        },
+        "trust": {
+          "$ref": "#/definitions/PolicyReference"
+        }
+      },
+      "required": [
+        "resourceLimits",
+        "trust",
+        "sourceAdmission",
+        "approval",
+        "selection",
+        "providerRouting",
+        "glossarySet"
+      ],
+      "type": "object"
+    },
+    "PolicyKind": {
+      "enum": [
+        "resource-limit-policy",
+        "trust-policy",
+        "source-admission-policy",
+        "approval-policy",
+        "selection-policy",
+        "provider-routing-policy",
+        "glossary-set"
+      ],
+      "type": "string"
+    },
+    "PolicyReference": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/ReferenceIdentity"
+        },
+        "kind": {
+          "$ref": "#/definitions/PolicyKind"
+        },
+        "revision": {
+          "$ref": "#/definitions/ReferenceRevision"
+        },
+        "semanticDigest": {
+          "$ref": "#/definitions/SemanticDigest"
+        },
+        "specificationRevision": {
+          "$ref": "#/definitions/ReferenceRevision"
+        }
+      },
+      "required": ["kind", "identity", "revision", "specificationRevision", "semanticDigest"],
+      "type": "object"
+    },
+    "Present_Array_of_CoverageRule": {
+      "items": {
+        "$ref": "#/definitions/CoverageRule"
+      },
+      "type": "array"
+    },
+    "Present_Array_of_HydrationRelation": {
+      "items": {
+        "$ref": "#/definitions/HydrationRelation"
+      },
+      "type": "array"
+    },
+    "Present_Coverage": {
+      "$ref": "#/definitions/Coverage"
+    },
+    "Present_CoverageMode": {
+      "$ref": "#/definitions/CoverageMode"
+    },
+    "Present_Delivery": {
+      "$ref": "#/definitions/Delivery"
+    },
+    "Present_DeliveryPlacement": {
+      "$ref": "#/definitions/DeliveryPlacement"
+    },
+    "Present_LocaleNegotiation": {
+      "$ref": "#/definitions/LocaleNegotiation"
+    },
+    "Present_Map_of_NonEmptyArray_FallbackCandidate": {
+      "additionalProperties": {
+        "$ref": "#/definitions/NonEmptyArray_FallbackCandidate"
+      },
+      "type": "object"
+    },
+    "Present_Map_of_string": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "Present_NonEmptyArray_string": {
+      "$ref": "#/definitions/NonEmptyArray_string"
+    },
+    "Present_string": {
+      "type": "string"
+    },
+    "ProfileDeclaration": {
+      "additionalProperties": false,
+      "properties": {
+        "coverage": {
+          "$ref": "#/definitions/Present_Coverage"
+        },
+        "defaultRequestedLocale": {
+          "type": "string"
+        },
+        "defaultSourceLocale": {
+          "$ref": "#/definitions/Present_string"
+        },
+        "delivery": {
+          "$ref": "#/definitions/Present_Delivery"
+        },
+        "deploymentGroups": {
+          "$ref": "#/definitions/NonEmptyMap_DeploymentGroupId_DeploymentGroup"
+        },
+        "localeNegotiation": {
+          "$ref": "#/definitions/Present_LocaleNegotiation"
+        },
+        "messageFallback": {
+          "$ref": "#/definitions/Present_Map_of_NonEmptyArray_FallbackCandidate"
+        },
+        "policies": {
+          "$ref": "#/definitions/Policies"
+        },
+        "projectId": {
+          "$ref": "#/definitions/ProjectId"
+        },
+        "requestedLocales": {
+          "$ref": "#/definitions/NonEmptyArray_string"
+        },
+        "selectionScope": {
+          "$ref": "#/definitions/SelectionScope"
+        },
+        "targetProfiles": {
+          "$ref": "#/definitions/NonEmptyMap_TargetId_TargetDeclaration"
+        }
+      },
+      "required": [
+        "projectId",
+        "selectionScope",
+        "requestedLocales",
+        "defaultRequestedLocale",
+        "policies",
+        "targetProfiles",
+        "deploymentGroups"
+      ],
+      "type": "object"
+    },
+    "ProjectId": {
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
+      "type": "string"
+    },
+    "ReferenceIdentity": {
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
+      "type": "string"
+    },
+    "ReferenceRevision": {
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
+      "type": "string"
+    },
+    "RequiredNullable": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PolicyReference"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A required field that permits null. This is intentionally not Option<T>."
+    },
+    "SelectionScope": {
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
+      "type": "string"
+    },
+    "SemanticDigest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "TargetDeclaration": {
+      "additionalProperties": false,
+      "properties": {
+        "defaultRequestedLocale": {
+          "$ref": "#/definitions/Present_string"
+        },
+        "profile": {
+          "$ref": "#/definitions/TargetProfileReference"
+        },
+        "requestedLocales": {
+          "$ref": "#/definitions/NonEmptyArray_string"
+        }
+      },
+      "required": ["profile", "requestedLocales"],
+      "type": "object"
+    },
+    "TargetId": {
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$",
+      "type": "string"
+    },
+    "TargetKind": {
+      "enum": ["target-profile"],
+      "type": "string"
+    },
+    "TargetProfileReference": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/definitions/ReferenceIdentity"
+        },
+        "kind": {
+          "$ref": "#/definitions/TargetKind"
+        },
+        "revision": {
+          "$ref": "#/definitions/ReferenceRevision"
+        },
+        "semanticDigest": {
+          "$ref": "#/definitions/SemanticDigest"
+        },
+        "specificationRevision": {
+          "$ref": "#/definitions/ReferenceRevision"
+        }
+      },
+      "required": ["kind", "identity", "revision", "specificationRevision", "semanticDigest"],
+      "type": "object"
+    }
+  },
+  "properties": {
+    "$schema": {
+      "$ref": "#/definitions/Present_string"
+    },
+    "profiles": {
+      "$ref": "#/definitions/NonEmptyMap_ProfileId_ProfileDeclaration"
+    },
+    "schemaVersion": {
+      "$ref": "#/definitions/ConfigurationVersion"
+    }
+  },
+  "required": ["schemaVersion", "profiles"],
+  "title": "IntlifyConfig",
+  "type": "object"
+}

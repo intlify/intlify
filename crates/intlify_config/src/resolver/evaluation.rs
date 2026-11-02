@@ -50,6 +50,26 @@ pub(crate) enum Phase {
 }
 
 impl Phase {
+    /// Every phase, in rank order.
+    pub(crate) const ALL: [Self; 16] = [
+        Self::ResolverBootstrapAdmission,
+        Self::EntryAdmission,
+        Self::StructuralAdmission,
+        Self::ProfileSelection,
+        Self::ResourcePolicyAdmission,
+        Self::SpecificationAdmission,
+        Self::ProjectIdentityResolution,
+        Self::LocaleResolution,
+        Self::LocalePolicyResolution,
+        Self::ArtifactReferenceResolution,
+        Self::DeliveryResolution,
+        Self::TargetResolution,
+        Self::GroupResolution,
+        Self::HydrationValidation,
+        Self::ProfileProjection,
+        Self::ReportingFinalization,
+    ];
+
     /// 015's stable phase ID.
     pub(crate) const fn id(self) -> &'static str {
         match self {
@@ -740,24 +760,7 @@ mod tests {
 
     #[test]
     fn phases_keep_015s_ids_in_rank_order() {
-        let phases = [
-            Phase::ResolverBootstrapAdmission,
-            Phase::EntryAdmission,
-            Phase::StructuralAdmission,
-            Phase::ProfileSelection,
-            Phase::ResourcePolicyAdmission,
-            Phase::SpecificationAdmission,
-            Phase::ProjectIdentityResolution,
-            Phase::LocaleResolution,
-            Phase::LocalePolicyResolution,
-            Phase::ArtifactReferenceResolution,
-            Phase::DeliveryResolution,
-            Phase::TargetResolution,
-            Phase::GroupResolution,
-            Phase::HydrationValidation,
-            Phase::ProfileProjection,
-            Phase::ReportingFinalization,
-        ];
+        let phases = Phase::ALL;
         assert_eq!(
             phases.map(Phase::id),
             [

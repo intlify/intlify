@@ -1,13 +1,16 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Write the built-in Resolver Construction Root Package's artifacts.
+//! Write the built-in Resolver Construction Root Package's artifacts and the
+//! construction authorities.
 //!
-//! The five members and the Root Package artifact are written from this
-//! crate's values. A file digest covers every byte, so `--check` compares the
-//! exact bytes, not decoded values, and the artifacts are kept out of the
-//! repository formatter. `--write` also prints the two digests the crate pins,
-//! which belong in `src/construction/root.rs`.
+//! The five members, the Root Package artifact, and the four authorities are
+//! written from this crate's values. A file digest covers every byte, so
+//! `--check` compares the exact bytes, not decoded values, and the artifacts
+//! are kept out of the repository formatter. `--write` also prints the digests
+//! the crate pins: the Root Package's two belong in
+//! `src/construction/root.rs`, and the authorities' in
+//! `src/construction/profile.rs` and `src/construction/authority_set.rs`.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -23,9 +26,13 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let support = intlify_config::construction_support::artifacts()
-        .and_then(|artifacts| Ok((artifacts, intlify_config::construction_support::pinned()?)));
-    let (artifacts, pinned) = match support {
+    let support = (|| {
+        use intlify_config::construction_support as support;
+        let mut artifacts = support::artifacts()?;
+        artifacts.extend(support::authorities()?);
+        Ok::<_, serde_json::Error>((artifacts, support::pinned()?, support::authority_pins()?))
+    })();
+    let (artifacts, pinned, authority_pins) = match support {
         Ok(support) => support,
         Err(error) => {
             eprintln!("the artifacts could not be written: {error}");
@@ -58,6 +65,22 @@ fn main() -> ExitCode {
     if write {
         println!("pinned digest: {}", pinned.digest);
         println!("pinned canonical digest: {}", pinned.canonical_digest);
+        println!(
+            "pinned Profile Specification Schema digest: {}",
+            authority_pins.profile_specification_schema
+        );
+        println!(
+            "pinned Profile Specification semantic digest: {}",
+            authority_pins.profile_specification_semantic
+        );
+        println!(
+            "pinned Configuration Schema Authority Set digest: {}",
+            authority_pins.configuration_schema_authority_set
+        );
+        println!(
+            "pinned configuration schema digest: {}",
+            authority_pins.configuration_schema
+        );
     }
     if stale {
         ExitCode::FAILURE

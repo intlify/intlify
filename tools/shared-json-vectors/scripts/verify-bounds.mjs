@@ -14,6 +14,8 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { POLICY_GROUPS } from './resolution-bounds.mjs'
+
 const here = dirname(fileURLToPath(import.meta.url))
 const vectorsPath = resolve(here, '../../../crates/intlify_config/fixtures/bounds/vectors.json')
 
@@ -22,98 +24,6 @@ const LARGEST = 2n ** 64n - 2n
 
 /** A count's shortest decimal spelling: zero alone, or no leading zero. */
 const CANONICAL = /^(?:0|[1-9]\d*)$/
-
-/**
- * Design 015's `projectProfileResolution` tables, in the canonical order:
- * each group's path and its bounds in table order. `policyComparable` mirrors
- * them, each with the minimum one.
- *
- * @type {[string, string[]][]}
- */
-const POLICY_GROUPS = [
-  [
-    'configurationInput',
-    [
-      'maxNodes',
-      'maxDepth',
-      'maxCollectionEntries',
-      'maxTotalStringBytes',
-      'maxSingleStringBytes',
-      'maxProfiles',
-      'maxProfileIdBytes',
-      'maxStructuralAnalysisUnits'
-    ]
-  ],
-  [
-    'localeResolution',
-    [
-      'maxLocaleIdentifierBytes',
-      'maxLocaleOccurrences',
-      'maxRequestedLocales',
-      'maxNegotiationAliases',
-      'maxFallbackSources',
-      'maxFallbackCandidatesPerSource',
-      'maxCoverageRules',
-      'maxCoverageLocaleSelectorOccurrences',
-      'maxCoverageSurfaceSelectorOccurrences',
-      'maxCoverageDecisionCells',
-      'maxCoverageRuleCellComparisons'
-    ]
-  ],
-  [
-    'artifactAdmission',
-    [
-      'maxArtifacts',
-      'maxPolicyArtifacts',
-      'maxTargetProfileArtifacts',
-      'maxArtifactReferences',
-      'maxSingleArtifactCanonicalBytes',
-      'maxTotalArtifactCanonicalBytes',
-      'maxSingleReferenceCanonicalBytes',
-      'maxTotalReferenceCanonicalBytes'
-    ]
-  ],
-  [
-    'targetGrouping',
-    [
-      'maxTargetProfiles',
-      'maxTargetIdBytes',
-      'maxDeploymentGroups',
-      'maxGroupIdBytes',
-      'maxMembersPerGroup',
-      'maxMembershipOccurrences',
-      'maxHydrationRelations'
-    ]
-  ],
-  [
-    'diagnostics.entry',
-    [
-      'maxFindingOccurrences',
-      'maxFindings',
-      'maxRelatedEvidencePerOccurrenceGroup',
-      'maxRelatedEvidenceOccurrences',
-      'maxSingleEvidenceBytes',
-      'maxTotalEvidenceBytes',
-      'maxEvaluationStatusEntries',
-      'maxSuppressionCausesPerStatus',
-      'maxSuppressionCauseOccurrences',
-      'maxRecords',
-      'maxTotalCanonicalBytes'
-    ]
-  ],
-  [
-    'diagnostics.shared',
-    [
-      'maxFindingOccurrences',
-      'maxFindings',
-      'maxEvaluationStatusEntries',
-      'maxSuppressionCausesPerStatus',
-      'maxSuppressionCauseOccurrences',
-      'maxRecords',
-      'maxTotalCanonicalBytes'
-    ]
-  ]
-]
 
 /**
  * Design 015's `bootstrapOnly` table: each group and its bounds in table order.

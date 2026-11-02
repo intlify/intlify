@@ -1,0 +1,251 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ProjectProfileSpecification",
+  "description": "The Profile Specification's body.",
+  "type": "object",
+  "properties": {
+    "specificationSlots": {
+      "$ref": "#/definitions/SpecificationSlots"
+    },
+    "localeCanonicalizationDataset": {
+      "$ref": "#/definitions/Dataset"
+    },
+    "phases": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "semanticGroups": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][A-Za-z0-9]*$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "resourceBounds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][A-Za-z0-9]*(?:\\.[a-z][A-Za-z0-9]*)+$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "authorities": {
+      "$ref": "#/definitions/Authorities"
+    },
+    "tokenDomains": {
+      "$ref": "#/definitions/TokenDomains"
+    },
+    "revisionDomains": {
+      "$ref": "#/definitions/RevisionDomains"
+    },
+    "snapshot": {
+      "$ref": "#/definitions/Snapshot"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "specificationSlots",
+    "localeCanonicalizationDataset",
+    "phases",
+    "semanticGroups",
+    "resourceBounds",
+    "authorities",
+    "tokenDomains",
+    "revisionDomains",
+    "snapshot"
+  ],
+  "definitions": {
+    "SpecificationSlots": {
+      "description": "The eight specification slots, in the canonical order.",
+      "type": "object",
+      "properties": {
+        "project-profile": {
+          "$ref": "#/definitions/SlotValue"
+        },
+        "locale-canonicalization": {
+          "$ref": "#/definitions/SlotValue"
+        },
+        "locale-negotiation": {
+          "$ref": "#/definitions/SlotValue"
+        },
+        "message-locale-fallback": {
+          "$ref": "#/definitions/SlotValue"
+        },
+        "coverage": {
+          "$ref": "#/definitions/SlotValue"
+        },
+        "intent-surface-class-vocabulary": {
+          "$ref": "#/definitions/SlotValue"
+        },
+        "delivery-graph": {
+          "$ref": "#/definitions/SlotValue"
+        },
+        "delivery-placement": {
+          "$ref": "#/definitions/SlotValue"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "project-profile",
+        "locale-canonicalization",
+        "locale-negotiation",
+        "message-locale-fallback",
+        "coverage",
+        "intent-surface-class-vocabulary",
+        "delivery-graph",
+        "delivery-placement"
+      ]
+    },
+    "SlotValue": {
+      "description": "What one specification slot supports: one specification, or `\"asserted\"`.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Pin"
+        },
+        {
+          "$ref": "#/definitions/Asserted"
+        }
+      ]
+    },
+    "Pin": {
+      "description": "A specification or an authority, by its identity and revision.",
+      "type": "object",
+      "properties": {
+        "identity": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "revision"
+      ]
+    },
+    "Asserted": {
+      "description": "The value of a slot with no fixed value: the invocation asserts an\nartifact, which is admitted against the assertion.",
+      "type": "string",
+      "enum": [
+        "asserted"
+      ]
+    },
+    "Dataset": {
+      "description": "The locale canonicalization dataset the canonicalization specification\nadmits.",
+      "type": "object",
+      "properties": {
+        "identity": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "semanticDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "semanticDigest"
+      ]
+    },
+    "Authorities": {
+      "description": "The four other construction authorities.",
+      "type": "object",
+      "properties": {
+        "profileSpecificationSchema": {
+          "$ref": "#/definitions/Pin"
+        },
+        "configurationSchemaAuthoritySet": {
+          "$ref": "#/definitions/Pin"
+        },
+        "resolverCapabilitySpecification": {
+          "$ref": "#/definitions/Pin"
+        },
+        "registryPackage": {
+          "$ref": "#/definitions/Pin"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "profileSpecificationSchema",
+        "configurationSchemaAuthoritySet",
+        "resolverCapabilitySpecification",
+        "registryPackage"
+      ]
+    },
+    "TokenDomains": {
+      "description": "The domain separators of the Redacted subject and evidence tokens.",
+      "type": "object",
+      "properties": {
+        "subject": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "evidence": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "subject",
+        "evidence"
+      ]
+    },
+    "RevisionDomains": {
+      "description": "The domain separators of the Source-content and Call-Site Source\nrevisions.",
+      "type": "object",
+      "properties": {
+        "fileSource": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "callSiteSource": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "fileSource",
+        "callSiteSource"
+      ]
+    },
+    "Snapshot": {
+      "description": "The Programmatic Entry Snapshot's digest domain separator and its marker\nreasons.",
+      "type": "object",
+      "properties": {
+        "domain": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "markerReasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "domain",
+        "markerReasons"
+      ]
+    }
+  }
+}
