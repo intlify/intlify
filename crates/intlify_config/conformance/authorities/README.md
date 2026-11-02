@@ -45,6 +45,24 @@ The set names the Profile Specification it belongs to, which construction compar
 
 The Node checker shares no code with this crate. It builds the Profile Specification from its own copy of 015's tables and the locale data's manifest, computes the semantic digest with its own framing of 017's values, hashes every artifact, compares the mapped schema with the published configuration schema, checks that every position of the schema names a type other than a number, and reads the four pinned digests out of the crate's source. It does not read the design document.
 
+## Construction's checks
+
+Construction checks the authorities it is given in the order of 015's construction-failure precedence, and refuses with the first row that fails. Rows 2 to 24 are these authorities':
+
+| Rows | Component | Checks, in order |
+| --- | --- | --- |
+| 2–7 | Profile Specification Schema | Presence; the declared tuple against its envelope schema, the bytes as strict UTF-8 JSON, and a root `$schema` naming Draft 7; identity; revision; file digest; the Draft 7 meta-schema |
+| 8–14 | Profile Specification | Presence; the declared tuple, with its semantic digest, and strict UTF-8 JSON; identity; revision; file digest; the body against the admitted Profile Specification Schema; the semantic digest the tuple declares |
+| 15–19 | Configuration Schema Authority Set | Presence; the declared tuple, strict UTF-8 JSON, the container's envelope schema, its `schemaVersion` keys in ascending unsigned UTF-8 order, and bytes for every mapped schema; identity; revision; file digest |
+| 20–24 | Each mapped schema, in `schemaVersion` order | Identity; revision; dialect; file digest; strict UTF-8 JSON, a root `$schema` naming Draft 7, and the Draft 7 meta-schema |
+
+The identities, revisions, and dialect each row admits, the envelope schemas, and the meta-schema are read from the built-in Root Package.
+
+- **Strict UTF-8 JSON.** Bytes are read as 017 has every decoder read them: malformed UTF-8, a byte-order mark, trailing data, a duplicate member, and an unpaired surrogate escape are refused. Numbers are read; whether a body may hold one is its schema's to say. Construction applies the construction-root bounds to the whole input first, so reading applies no capacity of its own.
+- **The meta-schema.** A schema the meta-schema admits but the validator cannot read is refused with the meta-schema's row: one that names another document, nests a `$schema`, applies itself in place in a cycle, or holds a pattern outside the validator's subset.
+- **What the rows compare.** The rows compare each component with what its tuple declares. Comparing with the digests compiled in is construction's last row, so a body this crate does not implement passes these rows when it is declared as itself. A body with a number, which another schema may admit, has no semantic digest to declare.
+- **Mapped schemas.** Each mapped schema passes all of its rows before the next is checked. Bytes for a `schemaVersion` the set does not map are read by no check.
+
 ## The matrix
 
 The unit tests are at the end of each source file below `src/construction/`, named here by their function.
@@ -63,6 +81,12 @@ The unit tests are at the end of each source file below `src/construction/`, nam
 | Its `schemaVersion` keys are in ascending unsigned UTF-8 order | `authority_set.rs`: `schema_versions_are_keyed_in_ascending_unsigned_utf_8_order` |
 | The set is an instance of its envelope schema, and reads back as its type | `authority_set.rs`: `the_set_is_an_instance_of_its_envelope_schema`, `the_set_reads_back_as_its_type` |
 | The mapped schema is the published configuration schema, a Draft 7 schema the validator reads | `authority_set.rs`: `the_member_is_the_configuration_schema_this_crate_publishes`. Node: the mapped bytes |
+| Construction admits the committed authorities | `profile.rs`: `construction_admits_the_committed_schema_and_profile_specification`. `authority_set.rs`: `construction_admits_the_committed_set_and_its_schema` |
+| The Profile Specification Schema's rows 2 to 7, each refusing with its row, in their order | `profile.rs`: `each_schema_check_refuses_with_its_row`, `the_schema_s_rows_keep_their_order` |
+| The Profile Specification's rows 8 to 14, each refusing with its row, in their order, against what the tuple declares | `profile.rs`: `each_body_check_refuses_with_its_row`, `the_body_s_rows_keep_their_order`, `a_body_with_a_number_has_no_semantic_digest_to_declare`, `these_rows_compare_the_declared_tuple_and_not_the_compiled_digests` |
+| The set's rows 15 to 19, each refusing with its row, in their order | `authority_set.rs`: `each_set_check_refuses_with_its_row`, `schema_versions_are_checked_in_ascending_unsigned_utf_8_order`, `the_set_s_rows_keep_their_order` |
+| Each mapped schema's rows 20 to 24, all of one schema's before the next's | `authority_set.rs`: `each_mapped_schema_check_refuses_with_its_row`, `each_mapped_schema_passes_all_its_rows_before_the_next`, `bytes_for_a_schema_version_the_set_does_not_map_are_read_by_no_check` |
+| The checks every component starts with, strict UTF-8 JSON, the Draft 7 checks, and each check's row | `component.rs`: `strict_json_reads_017s_json_with_its_numbers`, `strict_json_refuses_what_017_has_every_decoder_refuse`, `strict_json_applies_no_reader_capacity_of_its_own`, `every_row_is_the_only_one_of_its_component_and_check`, `every_component_starts_with_its_own_five_rows`, `each_check_refuses_with_its_row`, `the_first_failing_row_is_the_one_reported`, `a_container_is_checked_against_its_second_envelope_schema`, `a_schema_declares_draft_7_by_its_root_s_own_uri`, `an_admitted_schema_is_one_the_meta_schema_admits_and_the_validator_reads` |
+| The members of the built-in root construction checks against | `root.rs`: `the_built_in_root_reads_the_admission_body_and_the_schemas`, `the_admission_body_reads_only_as_its_closed_type`, `every_envelope_schema_must_be_held_and_read`, `the_meta_schema_is_the_one_listed_for_draft_7` |
 | The committed bytes are the ones this crate writes, and the pinned digests are theirs | `generate.rs`: `the_committed_authorities_are_the_ones_this_crate_writes`, `the_pinned_authority_digests_are_the_ones_the_authorities_make`, `every_artifact_ends_with_one_newline_and_has_no_carriage_return`. Node: every digest |
 
-The checks construction makes of the authorities it is given, row by row of the precedence, come with the next stage.

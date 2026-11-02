@@ -121,17 +121,8 @@ pub(crate) fn schema(envelope: EnvelopeSchema) -> Value {
 /// The package's body: every envelope schema under its name.
 pub(crate) fn package() -> Value {
     let mut schemas = Map::new();
-    for envelope in [
-        EnvelopeSchema::ComponentTuple,
-        EnvelopeSchema::ProfileSpecificationTuple,
-        EnvelopeSchema::ConfigurationSchemaAuthoritySet,
-        EnvelopeSchema::RegistryPackage,
-    ] {
-        let name = serde_json::to_value(envelope)
-            .ok()
-            .and_then(|name| name.as_str().map(str::to_owned))
-            .expect("an envelope schema is named by a string");
-        schemas.insert(name, schema(envelope));
+    for envelope in EnvelopeSchema::ALL {
+        schemas.insert(envelope.name().to_owned(), schema(envelope));
     }
     json!({ "schemas": schemas })
 }

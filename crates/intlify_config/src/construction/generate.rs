@@ -23,6 +23,7 @@ use intlify_shared_json::token::IntegrityDigest;
 
 use super::admission::ConstructionAdmission;
 use super::authority_set::{self, ConfigurationSchemaAuthoritySet};
+use super::component::file_digest;
 use super::profile::{self, ProjectProfileSpecification};
 use super::root::{canonical_digest, RootRole, PATH};
 use super::rules::CrossAuthorityRules;
@@ -56,10 +57,6 @@ fn write(value: &Value) -> Result<Vec<u8>, serde_json::Error> {
     let mut text = serde_json::to_string_pretty(value)?;
     text.push('\n');
     Ok(text.into_bytes())
-}
-
-fn file_digest(bytes: &[u8]) -> IntegrityDigest {
-    IntegrityDigest::from_hash(digest_bytes(bytes))
 }
 
 fn member(role: RootRole) -> Result<Value, serde_json::Error> {

@@ -19,6 +19,10 @@
 //! body, which neither the body's formatting nor its member order enters.
 //! Construction compares that digest, not the file digest, with the one the
 //! resolver was compiled from.
+//!
+//! Construction checks the Profile Specification Schema it is given, rows 2 to
+//! 7 of the construction-failure precedence, and then the Profile
+//! Specification, rows 8 to 14, against the schema it admitted.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -33,7 +37,11 @@ use crate::resolver::evaluation::Phase;
 use crate::resolver::limits::ResolutionLimits;
 
 use super::admission::{ComponentAdmission, ConstructionAdmission};
+use super::component::{self, Declared, Refusal, Rows, Submitted};
 use super::envelope::DIGEST_PATTERN;
+use super::failure::{Check, Component};
+use super::root::ConstructionRoot;
+use super::validator::schema::Schema;
 
 /// The Profile Specification's identity.
 pub(crate) const IDENTITY: &str = "intlify-project-profile";
@@ -369,14 +377,92 @@ pub(crate) fn schema() -> Result<Value, serde_json::Error> {
     crate::schema::draft7_schema::<ProjectProfileSpecification>()
 }
 
+const SCHEMA_ROWS: Rows = Rows::of(Component::ProfileSpecificationSchema);
+const SCHEMA_META_SCHEMA_ROW: Refusal =
+    Refusal::at(Component::ProfileSpecificationSchema, Check::MetaSchema);
+const ROWS: Rows = Rows::of(Component::ProfileSpecification);
+const BODY_SCHEMA_ROW: Refusal = Refusal::at(Component::ProfileSpecification, Check::BodySchema);
+const SEMANTIC_DIGEST_ROW: Refusal =
+    Refusal::at(Component::ProfileSpecification, Check::SemanticDigest);
+
+/// A Profile Specification Schema construction admitted.
+#[derive(Debug)]
+pub(crate) struct AdmittedSchema {
+    /// What its tuple declares.
+    pub(crate) declared: Declared,
+    /// The schema, read by the validator.
+    pub(crate) schema: Schema,
+}
+
+/// Check the Profile Specification Schema construction is given: rows 2 to 7
+/// of the construction-failure precedence.
+///
+/// The envelope row adds that the schema declares Draft 7, and the last row
+/// that it is valid against the Draft 7 meta-schema and read by the validator.
+pub(crate) fn admit_schema(
+    root: &ConstructionRoot,
+    submitted: Option<&Submitted>,
+) -> Result<AdmittedSchema, Refusal> {
+    let admission = &root.admission().components.profile_specification_schema;
+    let checked = component::check(root, SCHEMA_ROWS, admission, submitted, |document| {
+        component::declares_draft_7(document).then_some(())
+    })?;
+    let schema = component::draft_7_schema(root, checked.value).ok_or(SCHEMA_META_SCHEMA_ROW)?;
+    Ok(AdmittedSchema {
+        declared: checked.declared,
+        schema,
+    })
+}
+
+/// A Profile Specification construction admitted.
+#[derive(Debug)]
+pub(crate) struct AdmittedProfileSpecification {
+    /// What its tuple declares.
+    pub(crate) declared: Declared,
+    /// The body.
+    pub(crate) body: Value,
+    /// The body's semantic digest, the one its tuple declares.
+    pub(crate) semantic_digest: IntegrityDigest,
+}
+
+/// Check the Profile Specification construction is given: rows 8 to 14 of the
+/// construction-failure precedence, against the Profile Specification Schema
+/// construction admitted.
+///
+/// The body must be valid against that schema, and have the semantic digest
+/// its tuple declares. Another schema may admit a number, but a body with one
+/// is outside 017's value domain and has no semantic digest, so it has none
+/// its tuple could declare.
+pub(crate) fn admit(
+    root: &ConstructionRoot,
+    schema: &AdmittedSchema,
+    submitted: Option<&Submitted>,
+) -> Result<AdmittedProfileSpecification, Refusal> {
+    let admission = &root.admission().components.profile_specification;
+    let checked = component::check(root, ROWS, admission, submitted, |_| Some(()))?;
+    if !schema.schema.validate(checked.value).valid {
+        return Err(BODY_SCHEMA_ROW);
+    }
+    let semantic_digest = semantic_digest(checked.value)
+        .ok()
+        .filter(|digest| checked.declared.semantic_digest.as_deref() == Some(digest.as_str()))
+        .ok_or(SEMANTIC_DIGEST_ROW)?;
+    Ok(AdmittedProfileSpecification {
+        declared: checked.declared,
+        body: checked.value.clone(),
+        semantic_digest,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
 
     use super::*;
     use crate::construction::admission::DRAFT_7;
+    use crate::construction::component::testing::{row, submitted};
+    use crate::construction::component::Artifact;
     use crate::construction::meta_schema::DRAFT_7_META_SCHEMA;
-    use crate::construction::validator::schema::Schema;
     use crate::resolver::capability::CapabilityBound;
     use crate::resolver::specification::Slot;
 
@@ -802,5 +888,256 @@ mod tests {
         }
         // Every node: 18 objects, 4 arrays, and 120 strings.
         assert_eq!(pointers.len(), 142);
+    }
+
+    const COMMITTED_SCHEMA: &[u8] = include_bytes!(
+        "../../conformance/authorities/project-profile-specification-v0.schema.json"
+    );
+    const COMMITTED_BODY: &[u8] =
+        include_bytes!("../../conformance/authorities/project-profile-specification-v0.json");
+    const DRAFT_6: &str = "http://json-schema.org/draft-06/schema#";
+
+    fn root() -> &'static ConstructionRoot {
+        ConstructionRoot::built_in().unwrap()
+    }
+
+    fn bytes(value: &Value) -> Vec<u8> {
+        serde_json::to_vec_pretty(value).unwrap()
+    }
+
+    /// The bytes of `value` after `change`.
+    fn changed(value: &Value, change: impl FnOnce(&mut Value)) -> Vec<u8> {
+        let mut value = value.clone();
+        change(&mut value);
+        bytes(&value)
+    }
+
+    /// A Profile Specification Schema that declares the identity and revision
+    /// construction admits, and the file digest of `bytes`.
+    fn schema_submitted(bytes: &[u8]) -> Submitted {
+        submitted(SCHEMA_IDENTITY, REVISION, bytes)
+    }
+
+    /// A Profile Specification that declares `identity`, `revision`, the file
+    /// digest of `bytes`, and the semantic digest of their value, or a digest
+    /// of nothing when they have none.
+    fn body_submitted_as(identity: &str, revision: &str, bytes: &[u8]) -> Submitted {
+        let mut submitted = submitted(identity, revision, bytes);
+        let semantic = component::strict_json(bytes)
+            .and_then(|value| semantic_digest(&value).ok())
+            .map_or_else(
+                || format!("sha256:{}", "0".repeat(64)),
+                |digest| digest.as_str().to_owned(),
+            );
+        submitted.tuple["semanticDigest"] = json!(semantic);
+        submitted
+    }
+
+    fn body_submitted(bytes: &[u8]) -> Submitted {
+        body_submitted_as(IDENTITY, REVISION, bytes)
+    }
+
+    fn committed_schema() -> AdmittedSchema {
+        admit_schema(root(), Some(&schema_submitted(COMMITTED_SCHEMA))).unwrap()
+    }
+
+    #[test]
+    fn construction_admits_the_committed_schema_and_profile_specification() {
+        let schema = committed_schema();
+        assert_eq!(
+            schema.declared,
+            Declared {
+                identity: SCHEMA_IDENTITY.to_owned(),
+                revision: REVISION.to_owned(),
+                digest: SCHEMA_DIGEST.to_owned(),
+                semantic_digest: None,
+            }
+        );
+        // The schema read is the one this crate writes.
+        assert!(schema.schema.validate(&body()).valid);
+        assert!(!schema.schema.validate(&json!({})).valid);
+        let admitted = admit(root(), &schema, Some(&body_submitted(COMMITTED_BODY))).unwrap();
+        assert_eq!(admitted.body, body());
+        assert_eq!(admitted.semantic_digest.as_str(), SEMANTIC_DIGEST);
+        assert_eq!(admitted.declared.identity, IDENTITY);
+        assert_eq!(
+            admitted.declared.semantic_digest.as_deref(),
+            Some(SEMANTIC_DIGEST)
+        );
+    }
+
+    #[test]
+    fn each_schema_check_refuses_with_its_row() {
+        let committed: Value = serde_json::from_slice(COMMITTED_SCHEMA).unwrap();
+        assert_eq!(row(admit_schema(root(), None)), Some(2));
+        let mut semantic = schema_submitted(COMMITTED_SCHEMA);
+        semantic.tuple["semanticDigest"] = json!(SEMANTIC_DIGEST);
+        let mut reformatted = schema_submitted(COMMITTED_SCHEMA);
+        reformatted.artifact = Artifact::read(serde_json::to_vec(&committed).unwrap());
+        let cases = [
+            // A component tuple declares no semantic digest.
+            (semantic, 3),
+            (schema_submitted(b"{\"$schema\": "), 3),
+            (schema_submitted(b"true"), 3),
+            (
+                schema_submitted(&changed(&committed, |document| {
+                    document.as_object_mut().unwrap().remove("$schema");
+                })),
+                3,
+            ),
+            (
+                schema_submitted(&changed(&committed, |document| {
+                    document["$schema"] = json!(DRAFT_6);
+                })),
+                3,
+            ),
+            (submitted(IDENTITY, REVISION, COMMITTED_SCHEMA), 4),
+            (submitted(SCHEMA_IDENTITY, "1", COMMITTED_SCHEMA), 5),
+            // The same schema in other bytes than the declared ones.
+            (reformatted, 6),
+            // The meta-schema refuses a title that is not a string; the
+            // validator, a nested `$schema` and a reference to another document.
+            (
+                schema_submitted(&changed(&committed, |document| {
+                    document["title"] = json!(1);
+                })),
+                7,
+            ),
+            (
+                schema_submitted(&changed(&committed, |document| {
+                    document["definitions"]["Pin"]["$schema"] = json!(DRAFT_7);
+                })),
+                7,
+            ),
+            (
+                schema_submitted(&changed(&committed, |document| {
+                    document["properties"]["phases"] = json!({ "$ref": "other.json" });
+                })),
+                7,
+            ),
+        ];
+        for (submitted, expected) in cases {
+            assert_eq!(
+                row(admit_schema(root(), Some(&submitted))),
+                Some(expected),
+                "{}",
+                submitted.tuple
+            );
+        }
+    }
+
+    #[test]
+    fn the_schema_s_rows_keep_their_order() {
+        let committed: Value = serde_json::from_slice(COMMITTED_SCHEMA).unwrap();
+        let undeclared = changed(&committed, |document| {
+            document.as_object_mut().unwrap().remove("$schema");
+        });
+        let untitled = changed(&committed, |document| document["title"] = json!(1));
+        let first = |submitted: Submitted| row(admit_schema(root(), Some(&submitted)));
+        assert_eq!(first(submitted(IDENTITY, REVISION, &undeclared)), Some(3));
+        // The meta-schema's row comes after every other.
+        assert_eq!(first(submitted(IDENTITY, REVISION, &untitled)), Some(4));
+        assert_eq!(first(submitted(SCHEMA_IDENTITY, "1", &untitled)), Some(5));
+        let mut digest = schema_submitted(&untitled);
+        digest.tuple["digest"] = json!(SCHEMA_DIGEST);
+        assert_eq!(first(digest), Some(6));
+        assert_eq!(first(schema_submitted(&untitled)), Some(7));
+    }
+
+    #[test]
+    fn each_body_check_refuses_with_its_row() {
+        let schema = committed_schema();
+        let body = body();
+        assert_eq!(row(admit(root(), &schema, None)), Some(8));
+        let mut reformatted = body_submitted(COMMITTED_BODY);
+        reformatted.artifact = Artifact::read(serde_json::to_vec(&body).unwrap());
+        let mut semantic = body_submitted(COMMITTED_BODY);
+        semantic.tuple["semanticDigest"] = json!(format!("sha256:{}", "0".repeat(64)));
+        let cases = [
+            // The tuple must declare a semantic digest.
+            (submitted(IDENTITY, REVISION, COMMITTED_BODY), 9),
+            (body_submitted(b"{\"phases\": []"), 9),
+            (
+                body_submitted_as(SCHEMA_IDENTITY, REVISION, COMMITTED_BODY),
+                10,
+            ),
+            (body_submitted_as(IDENTITY, "1", COMMITTED_BODY), 11),
+            (reformatted, 12),
+            (
+                body_submitted(&changed(&body, |body| body["phases"] = json!([]))),
+                13,
+            ),
+            // The schema admits no number.
+            (
+                body_submitted(&changed(&body, |body| body["phases"][0] = json!(1))),
+                13,
+            ),
+            (semantic, 14),
+        ];
+        for (submitted, expected) in cases {
+            assert_eq!(
+                row(admit(root(), &schema, Some(&submitted))),
+                Some(expected),
+                "{}",
+                submitted.tuple
+            );
+        }
+    }
+
+    #[test]
+    fn the_body_s_rows_keep_their_order() {
+        let schema = committed_schema();
+        let first = |submitted: Submitted| row(admit(root(), &schema, Some(&submitted)));
+        assert_eq!(
+            first(body_submitted_as(SCHEMA_IDENTITY, "1", b"{")),
+            Some(9)
+        );
+        let empty = changed(&body(), |body| body["phases"] = json!([]));
+        let mut digest = body_submitted(&empty);
+        digest.tuple["digest"] = json!(component::file_digest(COMMITTED_BODY).as_str());
+        assert_eq!(first(digest), Some(12));
+        let mut semantic = body_submitted(&empty);
+        semantic.tuple["semanticDigest"] = json!(SEMANTIC_DIGEST);
+        assert_eq!(first(semantic), Some(13));
+    }
+
+    #[test]
+    fn a_body_with_a_number_has_no_semantic_digest_to_declare() {
+        // A schema that admits every body.
+        let permissive = bytes(&json!({ "$schema": DRAFT_7 }));
+        let schema = admit_schema(root(), Some(&schema_submitted(&permissive))).unwrap();
+        let numbered = changed(&body(), |body| body["phases"][0] = json!(1));
+        let mut submitted = body_submitted(&numbered);
+        for declared in [
+            format!("sha256:{}", "0".repeat(64)),
+            SEMANTIC_DIGEST.to_owned(),
+        ] {
+            submitted.tuple["semanticDigest"] = json!(declared);
+            assert_eq!(row(admit(root(), &schema, Some(&submitted))), Some(14));
+        }
+        // The same schema admits the body without the number.
+        let admitted = admit(root(), &schema, Some(&body_submitted(COMMITTED_BODY))).unwrap();
+        assert_eq!(admitted.semantic_digest.as_str(), SEMANTIC_DIGEST);
+    }
+
+    #[test]
+    fn these_rows_compare_the_declared_tuple_and_not_the_compiled_digests() {
+        let schema = committed_schema();
+        // A body this crate does not implement passes, declared as itself:
+        // comparing with the compiled digest is construction's last row.
+        let mut other = body();
+        other["phases"].as_array_mut().unwrap().reverse();
+        let admitted = admit(root(), &schema, Some(&body_submitted(&bytes(&other)))).unwrap();
+        assert_ne!(admitted.semantic_digest.as_str(), SEMANTIC_DIGEST);
+        assert_eq!(admitted.body, other);
+        // The body in other bytes, its members in another order, is the same
+        // Profile Specification.
+        let reordered = serde_json::to_vec(&reversed(&body())).unwrap();
+        let admitted = admit(root(), &schema, Some(&body_submitted(&reordered))).unwrap();
+        assert_eq!(admitted.semantic_digest.as_str(), SEMANTIC_DIGEST);
+        assert_ne!(
+            admitted.declared.digest,
+            component::file_digest(COMMITTED_BODY).as_str()
+        );
     }
 }
