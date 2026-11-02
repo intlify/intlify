@@ -19,7 +19,10 @@ extend-exclude = [
   # gate's registry: language, region, and subdivision codes rather than words.
   "crates/intlify_locale_icu4x/cldr/**",
   "crates/intlify_locale_icu4x/data/**",
-  "crates/intlify_locale_icu4x/evidence/**"
+  "crates/intlify_locale_icu4x/evidence/**",
+  # The JSON Schema Test Suite's vendored tests, which spell test data such
+  # as `fo` and `IDed` on purpose.
+  "crates/intlify_config/fixtures/json-schema-test-suite/tests/**"
 ]
 
 [default]

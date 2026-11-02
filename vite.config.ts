@@ -30,7 +30,9 @@ export default defineConfig({
       'crates/intlify_locale_icu4x/evidence/**',
       // Construction artifacts and the meta-schema are pinned by their exact bytes.
       'crates/intlify_config/conformance/**',
-      'crates/intlify_config/data/**'
+      'crates/intlify_config/data/**',
+      // The JSON Schema Test Suite's files stay as the suite publishes them.
+      'crates/intlify_config/fixtures/json-schema-test-suite/tests/**'
     ]
   }),
   lint: defineLintConfig({

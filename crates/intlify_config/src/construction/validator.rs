@@ -17,6 +17,8 @@
 //! with these parts: it counts its nodes and references on any JSON, names
 //! its resources and anchors, resolves every `$ref` to a node of the document,
 //! refuses cycles of in-place applicators, and reads every keyword.
+//! [`validation`] validates an instance against a read schema, visiting each
+//! instance node once, and counts the pairs it decides.
 
 pub(crate) mod equal;
 pub(crate) mod number;
@@ -24,3 +26,9 @@ pub(crate) mod pattern;
 pub(crate) mod pointer;
 pub(crate) mod schema;
 pub(crate) mod uri;
+pub(crate) mod validation;
+
+#[cfg(test)]
+mod differential_tests;
+#[cfg(test)]
+mod suite_tests;
