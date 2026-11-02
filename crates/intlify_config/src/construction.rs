@@ -8,11 +8,20 @@
 //! values in these modules and checked in below `conformance/construction/`;
 //! the implementation compiles them in and checks, on first use, that they are
 //! the package whose two digests it pins.
+//!
+//! The authorities a construction is given are checked in below
+//! `conformance/authorities/`, written from the values in these modules too:
+//! the Profile Specification Schema and the Profile Specification
+//! ([`profile`]), and the Configuration Schema Authority Set with its mapped
+//! schema ([`authority_set`]). The implementation compiles in only their
+//! digests, which construction compares with the authorities it is given.
 
 pub(crate) mod admission;
+pub(crate) mod authority_set;
 pub(crate) mod envelope;
 pub(crate) mod failure;
 pub(crate) mod meta_schema;
+pub(crate) mod profile;
 pub(crate) mod root;
 pub(crate) mod rules;
 pub(crate) mod validator;

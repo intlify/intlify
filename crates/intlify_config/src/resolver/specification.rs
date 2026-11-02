@@ -37,6 +37,18 @@ pub(crate) enum Slot {
 }
 
 impl Slot {
+    /// Every slot, in the canonical order.
+    pub(crate) const ALL: [Self; 8] = [
+        Self::ProjectProfile,
+        Self::LocaleCanonicalization,
+        Self::LocaleNegotiation,
+        Self::MessageLocaleFallback,
+        Self::Coverage,
+        Self::IntentSurfaceClassVocabulary,
+        Self::DeliveryGraph,
+        Self::DeliveryPlacement,
+    ];
+
     /// The slot's name, which `details.slot` carries.
     pub(crate) const fn name(self) -> &'static str {
         match self {
@@ -577,16 +589,7 @@ mod tests {
 
     #[test]
     fn slots_are_named_and_ordered_as_015_lists_them() {
-        let slots = [
-            Slot::ProjectProfile,
-            Slot::LocaleCanonicalization,
-            Slot::LocaleNegotiation,
-            Slot::MessageLocaleFallback,
-            Slot::Coverage,
-            Slot::IntentSurfaceClassVocabulary,
-            Slot::DeliveryGraph,
-            Slot::DeliveryPlacement,
-        ];
+        let slots = Slot::ALL;
         assert_eq!(
             slots.map(Slot::name),
             [
@@ -617,6 +620,67 @@ mod tests {
             ]
         );
         assert!(PHASE_5.windows(2).all(|pair| pair[0] < pair[1]));
+    }
+
+    #[test]
+    fn the_supported_values_are_the_profile_specifications_slots() {
+        use crate::construction::profile::{
+            Asserted, ProjectProfileSpecification, SlotValue, IDENTITY, REVISION,
+        };
+        let slots = ProjectProfileSpecification::revision_zero().specification_slots;
+        let pinned = |value: &SlotValue| match value {
+            SlotValue::Pinned(pin) => VersionedIdentity {
+                identity: pin.identity.clone(),
+                revision: pin.revision.clone(),
+            },
+            SlotValue::Asserted(_) => panic!("the slot has a value of its own"),
+        };
+        let owned = |held: &VersionedIdentity<Id>| VersionedIdentity {
+            identity: held.identity.to_owned(),
+            revision: held.revision.to_owned(),
+        };
+        let supported = SupportedSpecifications::revision_zero(ACTIVE, Supported::revision_zero());
+        for (slot, value, held) in [
+            (
+                Slot::LocaleNegotiation,
+                &slots.locale_negotiation,
+                &supported.locale_negotiation,
+            ),
+            (
+                Slot::MessageLocaleFallback,
+                &slots.message_locale_fallback,
+                &supported.message_locale_fallback,
+            ),
+            (Slot::Coverage, &slots.coverage, &supported.coverage),
+            (
+                Slot::DeliveryGraph,
+                &slots.delivery_graph,
+                &supported.delivery_graph,
+            ),
+            (
+                Slot::DeliveryPlacement,
+                &slots.delivery_placement,
+                &supported.delivery_placement,
+            ),
+        ] {
+            assert_eq!(pinned(value), owned(held), "{}", slot.name());
+        }
+        // The canonicalization specifications admit the body's one, construction
+        // fixes the active specification, and the vocabulary has no value.
+        assert!(Supported::<String>::revision_zero()
+            .expected(&pinned(&slots.locale_canonicalization))
+            .is_ok());
+        assert_eq!(
+            pinned(&slots.project_profile),
+            VersionedIdentity {
+                identity: IDENTITY.to_owned(),
+                revision: REVISION.to_owned(),
+            }
+        );
+        assert_eq!(
+            slots.intent_surface_class_vocabulary,
+            SlotValue::Asserted(Asserted::Asserted)
+        );
     }
 
     #[test]

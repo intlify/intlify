@@ -1,0 +1,164 @@
+{
+  "specificationSlots": {
+    "project-profile": {
+      "identity": "intlify-project-profile",
+      "revision": "0"
+    },
+    "locale-canonicalization": {
+      "identity": "intlify-locale-canonicalization",
+      "revision": "0"
+    },
+    "locale-negotiation": {
+      "identity": "intlify-locale-negotiation",
+      "revision": "0"
+    },
+    "message-locale-fallback": {
+      "identity": "intlify-message-locale-fallback",
+      "revision": "0"
+    },
+    "coverage": {
+      "identity": "intlify-localization-coverage",
+      "revision": "0"
+    },
+    "intent-surface-class-vocabulary": "asserted",
+    "delivery-graph": {
+      "identity": "intlify-delivery-graph",
+      "revision": "0"
+    },
+    "delivery-placement": {
+      "identity": "intlify-delivery-placement",
+      "revision": "0"
+    }
+  },
+  "localeCanonicalizationDataset": {
+    "identity": "intlify-locale-canonicalization-cldr-48.2.0",
+    "semanticDigest": "sha256:6182421172339b8c416890e20b3121ab40e412a896df6316d8e991c756505e16"
+  },
+  "phases": [
+    "resolver-bootstrap-admission",
+    "entry-admission",
+    "structural-admission",
+    "profile-selection",
+    "resource-policy-admission",
+    "specification-admission",
+    "project-identity-resolution",
+    "locale-resolution",
+    "locale-policy-resolution",
+    "artifact-reference-resolution",
+    "delivery-resolution",
+    "target-resolution",
+    "group-resolution",
+    "hydration-validation",
+    "profile-projection",
+    "reporting-finalization"
+  ],
+  "semanticGroups": [
+    "profileSpecification",
+    "projectIdentity",
+    "localeCanonicalization",
+    "projectLocales",
+    "localeNegotiation",
+    "messageFallback",
+    "coverage",
+    "requiredPolicies",
+    "optionalPolicies",
+    "targets",
+    "deploymentGroups",
+    "delivery"
+  ],
+  "resourceBounds": [
+    "configurationInput.maxNodes",
+    "configurationInput.maxDepth",
+    "configurationInput.maxCollectionEntries",
+    "configurationInput.maxTotalStringBytes",
+    "configurationInput.maxSingleStringBytes",
+    "configurationInput.maxProfiles",
+    "configurationInput.maxProfileIdBytes",
+    "configurationInput.maxStructuralAnalysisUnits",
+    "localeResolution.maxLocaleIdentifierBytes",
+    "localeResolution.maxLocaleOccurrences",
+    "localeResolution.maxRequestedLocales",
+    "localeResolution.maxNegotiationAliases",
+    "localeResolution.maxFallbackSources",
+    "localeResolution.maxFallbackCandidatesPerSource",
+    "localeResolution.maxCoverageRules",
+    "localeResolution.maxCoverageLocaleSelectorOccurrences",
+    "localeResolution.maxCoverageSurfaceSelectorOccurrences",
+    "localeResolution.maxCoverageDecisionCells",
+    "localeResolution.maxCoverageRuleCellComparisons",
+    "artifactAdmission.maxArtifacts",
+    "artifactAdmission.maxPolicyArtifacts",
+    "artifactAdmission.maxTargetProfileArtifacts",
+    "artifactAdmission.maxArtifactReferences",
+    "artifactAdmission.maxSingleArtifactCanonicalBytes",
+    "artifactAdmission.maxTotalArtifactCanonicalBytes",
+    "artifactAdmission.maxSingleReferenceCanonicalBytes",
+    "artifactAdmission.maxTotalReferenceCanonicalBytes",
+    "targetGrouping.maxTargetProfiles",
+    "targetGrouping.maxTargetIdBytes",
+    "targetGrouping.maxDeploymentGroups",
+    "targetGrouping.maxGroupIdBytes",
+    "targetGrouping.maxMembersPerGroup",
+    "targetGrouping.maxMembershipOccurrences",
+    "targetGrouping.maxHydrationRelations",
+    "diagnostics.entry.maxFindingOccurrences",
+    "diagnostics.entry.maxFindings",
+    "diagnostics.entry.maxRelatedEvidencePerOccurrenceGroup",
+    "diagnostics.entry.maxRelatedEvidenceOccurrences",
+    "diagnostics.entry.maxSingleEvidenceBytes",
+    "diagnostics.entry.maxTotalEvidenceBytes",
+    "diagnostics.entry.maxEvaluationStatusEntries",
+    "diagnostics.entry.maxSuppressionCausesPerStatus",
+    "diagnostics.entry.maxSuppressionCauseOccurrences",
+    "diagnostics.entry.maxRecords",
+    "diagnostics.entry.maxTotalCanonicalBytes",
+    "diagnostics.shared.maxFindingOccurrences",
+    "diagnostics.shared.maxFindings",
+    "diagnostics.shared.maxEvaluationStatusEntries",
+    "diagnostics.shared.maxSuppressionCausesPerStatus",
+    "diagnostics.shared.maxSuppressionCauseOccurrences",
+    "diagnostics.shared.maxRecords",
+    "diagnostics.shared.maxTotalCanonicalBytes"
+  ],
+  "authorities": {
+    "profileSpecificationSchema": {
+      "identity": "intlify-project-profile-specification-schema",
+      "revision": "0"
+    },
+    "configurationSchemaAuthoritySet": {
+      "identity": "intlify-configuration-schema-authority-set",
+      "revision": "0"
+    },
+    "resolverCapabilitySpecification": {
+      "identity": "intlify-project-profile-resolver-capability",
+      "revision": "0"
+    },
+    "registryPackage": {
+      "identity": "intlify-project-profile-resolver-registry-package",
+      "revision": "0"
+    }
+  },
+  "tokenDomains": {
+    "subject": "intlify.project-profile.subject",
+    "evidence": "intlify.project-profile.evidence"
+  },
+  "revisionDomains": {
+    "fileSource": "intlify.project-profile.file-source-revision.v0",
+    "callSiteSource": "intlify.project-profile.call-site-source-revision.v0"
+  },
+  "snapshot": {
+    "domain": "intlify.programmatic-entry-snapshot.v0",
+    "markerReasons": [
+      "unsupported-type",
+      "non-finite-number",
+      "non-portable-number",
+      "invalid-unicode",
+      "non-string-key",
+      "dynamic-container",
+      "dynamic-property",
+      "sparse-array",
+      "cycle",
+      "bootstrap-limit-exceeded"
+    ]
+  }
+}

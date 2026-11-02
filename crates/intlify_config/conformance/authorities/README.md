@@ -1,0 +1,68 @@
+<!-- @license MIT -->
+
+# Construction authorities
+
+Design 015's [resolver construction](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#active-project-profile-specification-and-profile-resolution-specification-input) is given five authorities. This directory holds the revision `"0"` artifacts of three of them, at the paths 015's Suite Index example uses below the conformance suite's root, `conformance/`: the Profile Specification Schema, the Active Project Profile Specification, and the Configuration Schema Authority Set with the one configuration schema it maps. The Resolver Capability Specification and the Registry Package come with their own stages.
+
+This crate writes every artifact from its own values, and compiles in only their digests: the Profile Specification's semantic digest, and the file digests of the other three. Construction compares them with the authorities it is given, as the last row of the construction-failure precedence. The Profile Specification's file digest is compared only with the tuple declared beside its bytes, so a body that differs from this one in formatting or member order alone is the same Profile Specification.
+
+A file digest covers every byte, so these files are kept out of the repository formatter and out of line-ending conversion. Change them only by changing the values and rewriting them.
+
+## Running them
+
+```sh
+# every unit test, including the committed bytes and the pinned digests
+cargo test -p intlify_config --all-features --lib construction
+
+# rewrite the artifacts after changing a value; it prints the digests to pin
+# in src/construction/profile.rs and src/construction/authority_set.rs
+cargo run -p intlify_config --features vectors --example generate_construction_artifacts -- --write
+
+# the committed bytes, and the independent Node checks
+vp run construction:check
+```
+
+## Files
+
+| File | Authority | Contents |
+| --- | --- | --- |
+| `project-profile-specification-v0.schema.json` | Profile Specification Schema, `intlify-project-profile-specification-schema` | The Draft 7 schema of the Profile Specification's body, generated from the body's types |
+| `project-profile-specification-v0.json` | Profile Specification, `intlify-project-profile` | The value each of the eight specification slots supports, the locale canonicalization dataset, the 16 phases in rank order, the profile view's 12 semantic groups, the 52 `projectProfileResolution` bound paths, the four other authorities, and the domain separators of the subject and evidence tokens, of the two source revisions, and of the Programmatic Entry Snapshot, with the Snapshot's 10 marker reasons |
+| `configuration-schema-authority-set-v0.json` | Configuration Schema Authority Set, `intlify-configuration-schema-authority-set` | The Profile Specification the set belongs to, by identity, revision, and semantic digest, and `schemaVersion` `"0"` mapped to the configuration schema's identity, revision, dialect, and file digest |
+| `configuration-v0.schema.json` | The configuration schema for `schemaVersion` `"0"`, `intlify-configuration-schema` | The bytes of the published [configuration schema](../../schema/project-profile-config-v0.schema.json) |
+
+Every authority is at revision `"0"`.
+
+## The Profile Specification
+
+- **Values.** The body is written from the values this crate implements: the slots' values from 015's table of supported values, with `"asserted"` for `intent-surface-class-vocabulary`, which has no fixed value; the dataset the canonicalization specification admits; the resolver's phases; the members of 015's profile view; the bounds of the Resource Limit Policy's `projectProfileResolution` section, each as its group's path and its name; the identities construction admits; and the domain separators and marker reasons as 015 writes them.
+- **Schema.** The schema constrains only the form of each value: every object is closed and requires its members, an identity, revision, phase, domain separator, or marker reason is a token, a digest is a `sha256:` presentation, a semantic group or bound path is a name of its form, an array is not empty and has no repeats, and a slot is `{ identity, revision }` or `"asserted"`. No position admits a JSON number, so a schema-valid body is in 017's value domain.
+- **Semantic digest.** The semantic digest is 017's `H` over the complete body, under the domain `project-profile-specification-semantic-digest`. It covers every value, but neither the body's formatting nor its member order. What each value must be is fixed by this digest, which construction compares with the one compiled in, not by the schema.
+
+## The Configuration Schema Authority Set
+
+The set names the Profile Specification it belongs to, which construction compares with the admitted Profile Specification, and maps each `schemaVersion` to one configuration schema, keyed in ascending unsigned UTF-8 order. Revision `"0"` maps `"0"` alone, to `intlify-configuration-schema` at revision `"0"` in Draft 7. The mapped schema's bytes are the configuration schema as this crate publishes it, so its file digest is that of the published file.
+
+The Node checker shares no code with this crate. It builds the Profile Specification from its own copy of 015's tables and the locale data's manifest, computes the semantic digest with its own framing of 017's values, hashes every artifact, compares the mapped schema with the published configuration schema, checks that every position of the schema names a type other than a number, and reads the four pinned digests out of the crate's source. It does not read the design document.
+
+## The matrix
+
+The unit tests are at the end of each source file below `src/construction/`, named here by their function.
+
+| 015 rule | Checked by |
+| --- | --- |
+| The eight slots in their order, each with the value revision `"0"` supports, and the dataset the canonicalization specification admits | `profile.rs`: `the_slots_are_015s_eight_with_the_value_each_supports`. `src/resolver/specification.rs`: `the_supported_values_are_the_profile_specifications_slots`. Node: the body and the manifest |
+| The phases, the semantic groups, the bound paths, the authorities, the domain separators, and the marker reasons, each in 015's order | `profile.rs`: `the_body_lists_015s_inventories_in_their_order`, `the_body_names_the_identities_construction_admits`. Node: the body |
+| The bound paths are the Capability Specification's mirrored paths without their namespace | `profile.rs`: `the_body_lists_015s_inventories_in_their_order` |
+| The body reads back as its type | `profile.rs`: `the_body_reads_back_as_its_type` |
+| The semantic digest is 017's `H` over the complete body, without its formatting or member order | `profile.rs`: `the_semantic_digest_covers_the_values_and_not_their_form`. Node: the semantic digest |
+| The schema is a Draft 7 schema the validator reads, and the body is valid against it | `profile.rs`: `the_schema_is_a_draft_7_schema_the_validator_reads`. `generate.rs`: `the_set_belongs_to_the_written_profile_specification_and_maps_the_written_schema` |
+| The schema closes every object, requires every member, and checks the form of every value | `profile.rs`: `the_schema_closes_every_object_and_requires_every_member`, `the_schema_checks_the_form_of_every_value` |
+| No position of the body admits a number | `profile.rs`: `no_position_of_the_body_admits_a_number`. Node: every schema position |
+| The set belongs to the Profile Specification and maps `schemaVersion` `"0"` to the configuration schema, as construction admits them | `authority_set.rs`: `the_set_maps_schema_version_0_to_the_configuration_schema`, `the_set_names_what_construction_admits`. `generate.rs`: `the_set_belongs_to_the_written_profile_specification_and_maps_the_written_schema`. Node: the set |
+| Its `schemaVersion` keys are in ascending unsigned UTF-8 order | `authority_set.rs`: `schema_versions_are_keyed_in_ascending_unsigned_utf_8_order` |
+| The set is an instance of its envelope schema, and reads back as its type | `authority_set.rs`: `the_set_is_an_instance_of_its_envelope_schema`, `the_set_reads_back_as_its_type` |
+| The mapped schema is the published configuration schema, a Draft 7 schema the validator reads | `authority_set.rs`: `the_member_is_the_configuration_schema_this_crate_publishes`. Node: the mapped bytes |
+| The committed bytes are the ones this crate writes, and the pinned digests are theirs | `generate.rs`: `the_committed_authorities_are_the_ones_this_crate_writes`, `the_pinned_authority_digests_are_the_ones_the_authorities_make`, `every_artifact_ends_with_one_newline_and_has_no_carriage_return`. Node: every digest |
+
+The checks construction makes of the authorities it is given, row by row of the precedence, come with the next stage.
