@@ -4,13 +4,14 @@
 //! Write the built-in Resolver Construction Root Package's artifacts and the
 //! construction authorities.
 //!
-//! The five members, the Root Package artifact, and the four authorities are
+//! The five members, the Root Package artifact, and the five authorities are
 //! written from this crate's values. A file digest covers every byte, so
 //! `--check` compares the exact bytes, not decoded values, and the artifacts
 //! are kept out of the repository formatter. `--write` also prints the digests
 //! the crate pins: the Root Package's two belong in
 //! `src/construction/root.rs`, and the authorities' in
-//! `src/construction/profile.rs` and `src/construction/authority_set.rs`.
+//! `src/construction/profile.rs`, `src/construction/authority_set.rs`, and
+//! `src/construction/capability.rs`.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -80,6 +81,10 @@ fn main() -> ExitCode {
         println!(
             "pinned configuration schema digest: {}",
             authority_pins.configuration_schema
+        );
+        println!(
+            "pinned Resolver Capability Specification digest: {}",
+            authority_pins.resolver_capability_specification
         );
     }
     if stale {

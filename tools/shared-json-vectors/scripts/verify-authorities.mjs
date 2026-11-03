@@ -2,24 +2,27 @@
  * Check the committed construction authorities against this implementation.
  *
  * The Rust crate writes the Profile Specification Schema, the Profile
- * Specification, the Configuration Schema Authority Set, and the schema the
- * set maps to `schemaVersion` `"0"`, and compiles in four digests: the Profile
- * Specification's semantic digest and the file digests of the other three.
- * This script shares no code with it: it builds the Profile Specification from
- * its own copy of design 015's tables and the locale data's manifest, computes
- * the semantic digest with this package's own framing, hashes every artifact,
- * compares the mapped schema with the published configuration schema, and
- * reads the four pinned digests out of the crate's source. It does not read
- * the design document.
+ * Specification, the Configuration Schema Authority Set, the schema the set
+ * maps to `schemaVersion` `"0"`, and the Resolver Capability Specification,
+ * and compiles in five digests: the Profile Specification's semantic digest
+ * and the file digests of the other four. This script shares no code with it:
+ * it builds the Profile Specification and the Capability Specification from
+ * its own copy of design 015's tables and the locale data's manifest, checks
+ * that the Capability Specification's envelope schema closes exactly those
+ * bounds, computes the semantic digest with this package's own framing,
+ * hashes every artifact, compares the mapped schema with the published
+ * configuration schema, and reads the five pinned digests out of the crate's
+ * source. It does not read the design document.
  */
 
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { isDeepStrictEqual } from 'node:util'
 
 import { digest as semanticDigest } from './framing.mjs'
-import { POLICY_GROUPS } from './resolution-bounds.mjs'
+import { BOOTSTRAP_GROUPS, POLICY_GROUPS } from './resolution-bounds.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const crate = resolve(here, '../../../crates/intlify_config')
@@ -173,15 +176,24 @@ const schemaBytes = read('project-profile-specification-v0.schema.json')
 const bodyBytes = read('project-profile-specification-v0.json')
 const setBytes = read('configuration-schema-authority-set-v0.json')
 const memberBytes = read('configuration-v0.schema.json')
+const capabilityBytes = read('resolver-capability-v0.json')
 const published = readFileSync(resolve(crate, 'schema/project-profile-config-v0.schema.json'))
+const envelopes = JSON.parse(
+  readFileSync(
+    resolve(crate, 'conformance/construction/authority-envelope-schemas-v0.json'),
+    'utf8'
+  )
+)
 const profileSource = readFileSync(resolve(crate, 'src/construction/profile.rs'), 'utf8')
 const setSource = readFileSync(resolve(crate, 'src/construction/authority_set.rs'), 'utf8')
+const capabilitySource = readFileSync(resolve(crate, 'src/construction/capability.rs'), 'utf8')
 
 for (const [name, bytes] of [
   ['project-profile-specification-v0.schema.json', schemaBytes],
   ['project-profile-specification-v0.json', bodyBytes],
   ['configuration-schema-authority-set-v0.json', setBytes],
-  ['configuration-v0.schema.json', memberBytes]
+  ['configuration-v0.schema.json', memberBytes],
+  ['resolver-capability-v0.json', capabilityBytes]
 ]) {
   if (
     bytes.includes(0x0d) ||
@@ -205,7 +217,7 @@ const expected = {
   phases: PHASES,
   semanticGroups: SEMANTIC_GROUPS,
   resourceBounds: POLICY_GROUPS.flatMap(([group, bounds]) =>
-    bounds.map(bound => `${group}.${bound}`)
+    bounds.map(([bound]) => `${group}.${bound}`)
   ),
   authorities: Object.fromEntries(AUTHORITIES.map(([name, identity]) => [name, pin(identity)])),
   tokenDomains: {
@@ -308,6 +320,62 @@ if (fileDigest(setBytes) !== pinned(setSource, 'DIGEST')) {
   )
 }
 
+// The Capability Specification: every bound in order, each with its unit as
+// 015's table writes it, and each `bootstrapOnly` bound with its minimum.
+const expectedCapability = {
+  policyComparable: POLICY_GROUPS.flatMap(([group, bounds]) =>
+    bounds.map(([bound, unit]) => ({ path: `${group}.${bound}`, unit }))
+  ),
+  bootstrapOnly: BOOTSTRAP_GROUPS.flatMap(([group, bounds]) =>
+    bounds.map(([bound, unit, minimum]) => ({ path: `${group}.${bound}`, unit, minimum }))
+  )
+}
+const capability = JSON.parse(capabilityBytes.toString('utf8'))
+if (JSON.stringify(capability) !== JSON.stringify(expectedCapability)) {
+  fail(
+    `capability specification: the body differs from 015's tables\n  committed ${JSON.stringify(capability)}\n  expected  ${JSON.stringify(expectedCapability)}`
+  )
+}
+const capabilityBounds =
+  expectedCapability.policyComparable.length + expectedCapability.bootstrapOnly.length
+if (capabilityBounds !== 106) {
+  fail(`the transcribed capability bounds are ${capabilityBounds}, not 106`)
+}
+if (fileDigest(capabilityBytes) !== pinned(capabilitySource, 'DIGEST')) {
+  fail(
+    `capability specification: the file digest ${fileDigest(capabilityBytes)} is not the pinned ${pinned(capabilitySource, 'DIGEST')}`
+  )
+}
+
+// Its envelope schema closes the body's values: a closed object of the two
+// lists, each exactly its bounds in order, each bound exactly its values.
+const bodySchema = envelopes.schemas?.['resolver-capability-specification']
+const namespaces = ['policyComparable', 'bootstrapOnly']
+if (
+  bodySchema?.$schema !== DRAFT_7 ||
+  bodySchema.type !== 'object' ||
+  bodySchema.additionalProperties !== false ||
+  !isDeepStrictEqual(bodySchema.required, namespaces) ||
+  !isDeepStrictEqual(Object.keys(bodySchema.properties ?? {}), namespaces)
+) {
+  fail('capability specification schema: not a closed object of the two namespaces')
+}
+for (const namespace of namespaces) {
+  const list = bodySchema?.properties?.[namespace]
+  const bounds = expectedCapability[namespace]
+  if (
+    list?.type !== 'array' ||
+    list.additionalItems !== false ||
+    list.minItems !== bounds.length ||
+    !isDeepStrictEqual(
+      list.items,
+      bounds.map(bound => ({ const: bound }))
+    )
+  ) {
+    fail(`capability specification schema: ${namespace} is not exactly 015's bounds in order`)
+  }
+}
+
 if (failures.length > 0) {
   for (const message of failures) {
     console.error(message)
@@ -316,5 +384,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `construction authorities agree: ${SLOTS.length} slots, ${PHASES.length} phases, ${SEMANTIC_GROUPS.length} semantic groups, ${expected.resourceBounds.length} bounds, ${positions} schema positions, semantic digest ${semantic}`
+  `construction authorities agree: ${SLOTS.length} slots, ${PHASES.length} phases, ${SEMANTIC_GROUPS.length} semantic groups, ${expected.resourceBounds.length} bounds, ${positions} schema positions, semantic digest ${semantic}, ${capabilityBounds} capability bounds`
 )

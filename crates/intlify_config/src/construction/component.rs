@@ -11,9 +11,10 @@
 //! lists for it, that its bytes are strict UTF-8 JSON, and what the
 //! component's row adds, such as a container's envelope schema; then that it
 //! declares the identity the Root Package fixes for its role, a revision the
-//! root admits, and the file digest of its bytes. A check refuses with the
-//! precedence row it belongs to, and a component's checks stop at the first
-//! refusal.
+//! root admits, and the file digest of its bytes; and, for the Capability
+//! Specification, that its body is valid against its own envelope schema. A
+//! check refuses with the precedence row it belongs to, and a component's
+//! checks stop at the first refusal.
 //!
 //! Construction applies the construction-root bounds to the whole input before
 //! any of these checks, so reading an artifact applies no capacity of its own:
@@ -130,6 +131,7 @@ pub(crate) struct Rows {
     identity: Refusal,
     revision: Refusal,
     file_digest: Refusal,
+    body: Option<Refusal>,
 }
 
 impl Rows {
@@ -141,6 +143,17 @@ impl Rows {
             identity: Refusal::at(component, Check::Identity),
             revision: Refusal::at(component, Check::Revision),
             file_digest: Refusal::at(component, Check::FileDigest),
+            body: None,
+        }
+    }
+
+    /// The same rows, with the artifact checked against its envelope schema
+    /// in `row`, after the file digest, instead of in the envelope row: the
+    /// Capability Specification's body has a row of its own.
+    pub(crate) const fn with_body(self, row: Refusal) -> Self {
+        Self {
+            body: Some(row),
+            ..self
         }
     }
 }
@@ -157,12 +170,17 @@ pub(crate) struct Checked<'a, T> {
 }
 
 /// Check that a component is present, its envelope row, its identity, its
-/// revision, and its file digest, in that order.
+/// revision, and its file digest, in that order, and then, when its rows give
+/// its body a row of its own, its body.
 ///
 /// The root lists the envelope schemas a component is checked against: the
-/// first for its declared tuple and, for a container, a second for its
-/// artifact. `rest` is the rest of the envelope row: it reads what the
-/// component needs from the artifact's value, or returns `None` to refuse.
+/// first for its declared tuple and, for a container or the Capability
+/// Specification, a second for its artifact. A container's artifact is part
+/// of its envelope row; the Capability Specification's body is checked in its
+/// own row, after the file digest, since design 015 checks each authority's
+/// envelope, identity, revision, and digest before its body. `rest` is the
+/// rest of the envelope row: it reads what the component needs from the
+/// artifact's value, or returns `None` to refuse.
 pub(crate) fn check<'a, T>(
     root: &ConstructionRoot,
     rows: Rows,
@@ -181,10 +199,9 @@ pub(crate) fn check<'a, T>(
         .and_then(|_| decode::typed::<Declared>(submitted.tuple.clone()).ok())
         .ok_or(rows.envelope)?;
     let value = submitted.artifact.value().ok_or(rows.envelope)?;
-    if schemas
-        .next()
-        .is_some_and(|container| !container.validate(value).valid)
-    {
+    let artifact_schema = schemas.next();
+    let refused = || artifact_schema.is_some_and(|schema| !schema.validate(value).valid);
+    if rows.body.is_none() && refused() {
         return Err(rows.envelope);
     }
     let read = rest(value).ok_or(rows.envelope)?;
@@ -196,6 +213,9 @@ pub(crate) fn check<'a, T>(
     }
     if file_digest(submitted.artifact.bytes()).as_str() != declared.digest {
         return Err(rows.file_digest);
+    }
+    if let Some(body) = rows.body.filter(|_| refused()) {
+        return Err(body);
     }
     Ok(Checked {
         declared,
@@ -390,7 +410,17 @@ mod tests {
             (Component::RegistryPackage, [31, 32, 33, 34, 35]),
         ] {
             assert_eq!(numbers(Rows::of(component)), expected, "{component:?}");
+            assert_eq!(Rows::of(component).body, None, "{component:?}");
         }
+        // Giving the body a row of its own keeps the other five.
+        let capability = Rows::of(Component::ResolverCapabilitySpecification);
+        let body = Refusal::at(
+            Component::ResolverCapabilitySpecification,
+            Check::BodySchema,
+        );
+        let with_body = capability.with_body(body);
+        assert_eq!(numbers(with_body), numbers(capability));
+        assert_eq!(with_body.body.map(Refusal::number), Some(30));
     }
 
     /// Check a component under the Profile Specification Schema's rows, with
@@ -541,6 +571,51 @@ mod tests {
         assert_eq!(
             check_set(&submitted(identity, "0", br#"{"members": {}}"#)),
             Some(16)
+        );
+    }
+
+    #[test]
+    fn a_body_with_a_row_of_its_own_is_checked_after_the_file_digest() {
+        let identity = "intlify-project-profile-resolver-capability";
+        let component = Component::ResolverCapabilitySpecification;
+        let admission = &root()
+            .admission()
+            .components
+            .resolver_capability_specification;
+        let check_with = |rows: Rows, submitted: &Submitted| {
+            row(check(
+                root(),
+                rows,
+                admission,
+                Some(submitted),
+                |_| Some(()),
+            ))
+        };
+        let own_row = Rows::of(component).with_body(Refusal::at(component, Check::BodySchema));
+        let body = serde_json::to_vec(
+            &crate::construction::capability::CapabilitySpecification::revision_zero(),
+        )
+        .unwrap();
+        assert_eq!(check_with(own_row, &submitted(identity, "0", &body)), None);
+        // A body its envelope schema refuses is refused in its own row, after
+        // the identity, revision, and file digest pass.
+        let refused = br#"{"policyComparable": [], "bootstrapOnly": []}"#;
+        assert_eq!(
+            check_with(own_row, &submitted(identity, "0", refused)),
+            Some(30)
+        );
+        assert_eq!(
+            check_with(own_row, &submitted("another", "0", refused)),
+            Some(27)
+        );
+        let mut wrong_digest = submitted(identity, "0", refused);
+        wrong_digest.artifact = Artifact::read(b"{}".to_vec());
+        assert_eq!(check_with(own_row, &wrong_digest), Some(29));
+        // Without a row of its own, the same schema is part of the envelope
+        // row.
+        assert_eq!(
+            check_with(Rows::of(component), &submitted("another", "0", refused)),
+            Some(26)
         );
     }
 

@@ -51,11 +51,11 @@ pub(crate) const PATH: &str = "construction/root-package-v0.json";
 
 /// The artifact's file digest, which the implementation compiles in.
 pub(crate) const DIGEST: &str =
-    "sha256:5d0ce7e61ff704357d8622b2ecd772710bcd36ad0eed23cf5ac18a7027bc8377";
+    "sha256:c78a379dd6d80f0448f62597385a5b12aceeeb0db4ce3f4a260ab6f5e58fc1e1";
 
 /// The package's canonical digest, which the implementation compiles in.
 pub(crate) const CANONICAL_DIGEST: &str =
-    "sha256:43691bdd64c5ee490d9532fddd6d637da86e4dcf3a668a3439188e630aad1cef";
+    "sha256:9f6a0490078476833a77047cbbc638cba4ac472cb1079a32a6521a26926e7133";
 
 const BYTES: &[u8] = include_bytes!("../../conformance/construction/root-package-v0.json");
 
@@ -195,6 +195,7 @@ struct Envelopes {
     profile_specification_tuple: Schema,
     configuration_schema_authority_set: Schema,
     registry_package: Schema,
+    resolver_capability_specification: Schema,
 }
 
 /// The Root Package's members construction checks components against: the
@@ -252,6 +253,9 @@ impl ConstructionRoot {
                 &self.envelopes.configuration_schema_authority_set
             }
             EnvelopeSchema::RegistryPackage => &self.envelopes.registry_package,
+            EnvelopeSchema::ResolverCapabilitySpecification => {
+                &self.envelopes.resolver_capability_specification
+            }
         }
     }
 
@@ -273,6 +277,7 @@ fn envelopes(bytes: &[u8]) -> Option<Envelopes> {
             EnvelopeSchema::ConfigurationSchemaAuthoritySet,
         )?,
         registry_package: schema(EnvelopeSchema::RegistryPackage)?,
+        resolver_capability_specification: schema(EnvelopeSchema::ResolverCapabilitySpecification)?,
     })
 }
 
@@ -695,7 +700,11 @@ mod tests {
             roles.insert(role.to_owned(), tuple.clone());
         }
         let registry = json!({ "members": roles });
-        let instances = [tuple, profile, set, registry];
+        let capability = serde_json::to_value(
+            crate::construction::capability::CapabilitySpecification::revision_zero(),
+        )
+        .unwrap();
+        let instances = [tuple, profile, set, registry, capability];
         for (index, envelope) in EnvelopeSchema::ALL.into_iter().enumerate() {
             for (other, instance) in instances.iter().enumerate() {
                 assert_eq!(

@@ -20,6 +20,7 @@ use super::schema::{census, Schema, SchemaFailure};
 use super::suite_tests::{defined_pairs, elsewhere, groups};
 use super::validation::instance_nodes;
 use crate::construction::admission::EnvelopeSchema;
+use crate::construction::capability::CapabilitySpecification;
 use crate::construction::envelope;
 use crate::construction::meta_schema::DRAFT_7_META_SCHEMA;
 use crate::profile_fixtures::{complete_config, minimal_config};
@@ -293,6 +294,16 @@ fn the_configuration_and_envelope_schemas_judge_as_the_oracle_does() {
     for (valid, invalid) in &counts {
         assert!(*valid > 1 && *invalid > 0, "{counts:?}");
     }
+    // The Capability Specification's body schema closes every value, so no
+    // variant of the body is valid.
+    let (valid, invalid) = judge_near(
+        &Pair::new(envelope::schema(
+            EnvelopeSchema::ResolverCapabilitySpecification,
+        )),
+        &serde_json::to_value(CapabilitySpecification::revision_zero()).expect("a body"),
+    );
+    assert_eq!(valid, 1);
+    assert!(invalid > 0);
 }
 
 /// Keywords set into a schema object, valid and not under the meta-schema.
@@ -369,12 +380,7 @@ fn the_meta_schema_judges_schemas_as_the_oracle_does() {
     documents.push(parse(CONFIGURATION_SCHEMA));
     documents.push(parse(ADMISSION_SCHEMA));
     documents.push(parse(DRAFT_7_META_SCHEMA));
-    for kind in [
-        EnvelopeSchema::ComponentTuple,
-        EnvelopeSchema::ProfileSpecificationTuple,
-        EnvelopeSchema::ConfigurationSchemaAuthoritySet,
-        EnvelopeSchema::RegistryPackage,
-    ] {
+    for kind in EnvelopeSchema::ALL {
         documents.push(envelope::schema(kind));
     }
     let vectors = parse(SCHEMA_VECTORS);

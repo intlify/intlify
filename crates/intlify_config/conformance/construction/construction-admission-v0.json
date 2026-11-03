@@ -126,7 +126,8 @@
         "0"
       ],
       "envelopeSchemas": [
-        "component-tuple"
+        "component-tuple",
+        "resolver-capability-specification"
       ]
     },
     "registryPackage": {

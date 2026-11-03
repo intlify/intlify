@@ -2,7 +2,8 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! The authority-envelope schema package: the closed Draft 7 schemas a
-//! component's declared tuple and a container's artifact are checked against.
+//! component's declared tuple and a container's artifact are checked against,
+//! and the one the Capability Specification's body is.
 //!
 //! The schemas constrain only the form of each value: an identity or revision
 //! is a token, a digest is a `sha256:` presentation, and a container has
@@ -13,15 +14,18 @@
 //! A container's member order is part of its artifact, which a JSON Schema
 //! cannot express; construction checks it beside the container's schema.
 //!
-//! The Capability Specification body's schema is not here yet: it closes the
-//! body's groups, bounds, units, order, and minimum vector, and comes with the
-//! Capability Specification itself.
+//! The Capability Specification body's schema goes further, as its precedence
+//! row says: it closes the body's groups, bounds, units, order, and minimum
+//! vector. It lists every bound in order, each with exactly its path, unit,
+//! and minimum, and is written from the same inventory as the body, with the
+//! Capability Specification ([`super::capability`]).
 
 use serde_json::{json, Map, Value};
 
 use intlify_shared_json::token::ID_PATTERN;
 
 use super::admission::{EnvelopeSchema, DRAFT_7};
+use super::capability;
 
 /// A `sha256:` presentation of a complete digest.
 pub(crate) const DIGEST_PATTERN: &str = "^sha256:[0-9a-f]{64}$";
@@ -115,6 +119,7 @@ pub(crate) fn schema(envelope: EnvelopeSchema) -> Value {
             let members = roles.map(|role| (role, tuple()));
             document(closed(&[("members", closed(&members))]))
         }
+        EnvelopeSchema::ResolverCapabilitySpecification => document(capability::body_schema()),
     }
 }
 
@@ -140,12 +145,7 @@ mod tests {
     #[test]
     fn every_envelope_schema_is_a_valid_draft_7_schema() {
         let meta = jsonschema::draft7::meta::validator();
-        for envelope in [
-            EnvelopeSchema::ComponentTuple,
-            EnvelopeSchema::ProfileSpecificationTuple,
-            EnvelopeSchema::ConfigurationSchemaAuthoritySet,
-            EnvelopeSchema::RegistryPackage,
-        ] {
+        for envelope in EnvelopeSchema::ALL {
             let schema = schema(envelope);
             assert_eq!(schema["$schema"], DRAFT_7, "{envelope:?}");
             assert!(meta.is_valid(&schema), "{envelope:?}");
@@ -249,7 +249,8 @@ mod tests {
                 "component-tuple",
                 "profile-specification-tuple",
                 "configuration-schema-authority-set",
-                "registry-package"
+                "registry-package",
+                "resolver-capability-specification"
             ]
         );
     }

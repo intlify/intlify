@@ -6,15 +6,16 @@
  * with the reason the capability boundary gives for each, and every capability
  * bound path with its minimum. This script shares no code with it: it reads
  * every string with BigInt, encodes every value itself, and lists the
- * capability bounds from its own copy of design 015's tables. It does not read
- * the design document, so a design change can land before the code follows.
+ * capability bounds from the checkers' copy of design 015's tables. It does
+ * not read the design document, so a design change can land before the code
+ * follows.
  */
 
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { POLICY_GROUPS } from './resolution-bounds.mjs'
+import { BOOTSTRAP_GROUPS, POLICY_GROUPS } from './resolution-bounds.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const vectorsPath = resolve(here, '../../../crates/intlify_config/fixtures/bounds/vectors.json')
@@ -24,104 +25,6 @@ const LARGEST = 2n ** 64n - 2n
 
 /** A count's shortest decimal spelling: zero alone, or no leading zero. */
 const CANONICAL = /^(?:0|[1-9]\d*)$/
-
-/**
- * Design 015's `bootstrapOnly` table: each group and its bounds in table order.
- *
- * @type {[string, string[]][]}
- */
-const BOOTSTRAP_GROUPS = [
-  ['rawInput', ['maxFileBytes', 'maxParserTokens']],
-  [
-    'snapshot',
-    [
-      'maxNodes',
-      'maxDepth',
-      'maxCollectionEntries',
-      'maxTotalStringBytes',
-      'maxSingleStringBytes',
-      'maxRejectedMarkers',
-      'maxEnvelopeCanonicalBytes',
-      'maxSingleMarkerCanonicalBytes',
-      'maxTraversalUnits'
-    ]
-  ],
-  [
-    'inputBoundary',
-    [
-      'maxDepth',
-      'maxSpecificationInputBytes',
-      'maxVocabularyBytes',
-      'maxVocabularyMembers',
-      'maxVocabularyMemberBytes',
-      'maxVocabularyTotalMemberBytes',
-      'maxLocaleDataManifestBytes',
-      'maxCollectionMemberBytes',
-      'maxCollectionTotalBytes',
-      'maxVerificationInputBytes',
-      'maxVerificationPins'
-    ]
-  ],
-  [
-    'artifactBootstrap',
-    [
-      'maxEnvelopeDepth',
-      'maxDecodedAllocationBytes',
-      'maxMetadataScanUnits',
-      'maxValidationWorkUnits'
-    ]
-  ],
-  [
-    'localeData',
-    [
-      'maxPayloads',
-      'maxPayloadBytes',
-      'maxMarkerBytes',
-      'maxValidityGroups',
-      'maxCodes',
-      'maxExtensionKeys',
-      'maxTypes',
-      'maxCorrections',
-      'maxValidationWorkUnits'
-    ]
-  ],
-  [
-    'evidenceMetadata',
-    [
-      'maxSourceIdentityBytes',
-      'maxSourceRevisionBytes',
-      'maxLocatorBytes',
-      'maxCallSiteSourceBytes',
-      'maxCallSiteMappings',
-      'maxLogicalPathSegments',
-      'maxLogicalPathCanonicalBytes',
-      'maxSubjectOccurrences',
-      'maxTokenInputs',
-      'maxCollisionComparisons',
-      'maxMetadataWorkUnits'
-    ]
-  ],
-  [
-    'mandatoryReserve',
-    [
-      'maxOutcomeEnvelopeSlots',
-      'maxConstructionIdentitySlots',
-      'maxEntryTerminalFindingSlots',
-      'maxEntryTerminalStatusSlots',
-      'maxSharedTerminalFindingSlots',
-      'maxSharedTerminalStatusSlots',
-      'maxSharedUnavailableCauseSlots',
-      'maxCanonicalBytes'
-    ]
-  ]
-]
-
-/** The `bootstrapOnly` minima other than one; every other minimum is one. */
-const LARGER_MINIMA = new Map([
-  ['snapshot.maxEnvelopeCanonicalBytes', '4096'],
-  ['snapshot.maxSingleMarkerCanonicalBytes', '1024'],
-  ['mandatoryReserve.maxCanonicalBytes', '65536']
-])
 
 /**
  * Decide the reason the capability boundary gives a string that is no bound.
@@ -173,13 +76,10 @@ function semantic(value) {
  */
 function capabilityBounds() {
   const policy = POLICY_GROUPS.flatMap(([group, bounds]) =>
-    bounds.map(bound => ({ path: `policyComparable.${group}.${bound}`, minimum: '1' }))
+    bounds.map(([bound]) => ({ path: `policyComparable.${group}.${bound}`, minimum: '1' }))
   )
   const bootstrap = BOOTSTRAP_GROUPS.flatMap(([group, bounds]) =>
-    bounds.map(bound => ({
-      path: `bootstrapOnly.${group}.${bound}`,
-      minimum: LARGER_MINIMA.get(`${group}.${bound}`) ?? '1'
-    }))
+    bounds.map(([bound, , minimum]) => ({ path: `bootstrapOnly.${group}.${bound}`, minimum }))
   )
   return [...policy, ...bootstrap]
 }
