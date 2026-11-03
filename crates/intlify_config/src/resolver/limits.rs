@@ -160,6 +160,293 @@ pub(crate) struct BoundId {
 /// The number of bounds in the section.
 pub(crate) const BOUND_COUNT: usize = 52;
 
+/// Each bound's counting unit, as the cell of 015's table writes it, in the
+/// canonical order.
+const UNITS: [(Group, &str, &str); BOUND_COUNT] = {
+    use Group::{
+        ArtifactAdmission, ConfigurationInput, DiagnosticsEntry, DiagnosticsShared,
+        LocaleResolution, TargetGrouping,
+    };
+    [
+        (
+            ConfigurationInput,
+            "maxNodes",
+            "One logical JSON value; the root counts as one and object keys are not nodes",
+        ),
+        (
+            ConfigurationInput,
+            "maxDepth",
+            "Maximum value level with the root at depth one",
+        ),
+        (
+            ConfigurationInput,
+            "maxCollectionEntries",
+            "One object-member or array-element occurrence",
+        ),
+        (
+            ConfigurationInput,
+            "maxTotalStringBytes",
+            "One UTF-8 byte in every string value and object key",
+        ),
+        (
+            ConfigurationInput,
+            "maxSingleStringBytes",
+            "UTF-8 byte length of one string value or object key",
+        ),
+        (
+            ConfigurationInput,
+            "maxProfiles",
+            "One profile declaration",
+        ),
+        (
+            ConfigurationInput,
+            "maxProfileIdBytes",
+            "UTF-8 byte length of one complete raw ID, or the smallest first-over witness for an over-limit selector",
+        ),
+        (
+            ConfigurationInput,
+            "maxStructuralAnalysisUnits",
+            "One applicable `(schema keyword, logical subject)` evaluation",
+        ),
+        (
+            LocaleResolution,
+            "maxLocaleIdentifierBytes",
+            "UTF-8 bytes in one spelling",
+        ),
+        (
+            LocaleResolution,
+            "maxLocaleOccurrences",
+            "One raw locale spelling",
+        ),
+        (
+            LocaleResolution,
+            "maxRequestedLocales",
+            "One unique canonical locale identity",
+        ),
+        (
+            LocaleResolution,
+            "maxNegotiationAliases",
+            "One raw map entry",
+        ),
+        (
+            LocaleResolution,
+            "maxFallbackSources",
+            "One raw mapping-key occurrence",
+        ),
+        (
+            LocaleResolution,
+            "maxFallbackCandidatesPerSource",
+            "One candidate occurrence of either admitted kind",
+        ),
+        (
+            LocaleResolution,
+            "maxCoverageRules",
+            "One rule occurrence",
+        ),
+        (
+            LocaleResolution,
+            "maxCoverageLocaleSelectorOccurrences",
+            "One raw selector item",
+        ),
+        (
+            LocaleResolution,
+            "maxCoverageSurfaceSelectorOccurrences",
+            "One raw selector item",
+        ),
+        (
+            LocaleResolution,
+            "maxCoverageDecisionCells",
+            "One canonical Cartesian-product cell",
+        ),
+        (
+            LocaleResolution,
+            "maxCoverageRuleCellComparisons",
+            "One logical rule-to-cell predicate evaluation",
+        ),
+        (
+            ArtifactAdmission,
+            "maxArtifacts",
+            "One submitted artifact envelope occurrence",
+        ),
+        (
+            ArtifactAdmission,
+            "maxPolicyArtifacts",
+            "One artifact occurrence declaring an admitted Policy kind",
+        ),
+        (
+            ArtifactAdmission,
+            "maxTargetProfileArtifacts",
+            "One artifact occurrence declaring Target Profile kind",
+        ),
+        (
+            ArtifactAdmission,
+            "maxArtifactReferences",
+            "One Policy or Target Profile reference occurrence",
+        ),
+        (
+            ArtifactAdmission,
+            "maxSingleArtifactCanonicalBytes",
+            "017-defined canonical bytes of one envelope and body",
+        ),
+        (
+            ArtifactAdmission,
+            "maxTotalArtifactCanonicalBytes",
+            "One canonical byte across submitted artifact occurrences",
+        ),
+        (
+            ArtifactAdmission,
+            "maxSingleReferenceCanonicalBytes",
+            "017-defined canonical bytes of one reference",
+        ),
+        (
+            ArtifactAdmission,
+            "maxTotalReferenceCanonicalBytes",
+            "One canonical byte across references",
+        ),
+        (
+            TargetGrouping,
+            "maxTargetProfiles",
+            "One Target ID entry",
+        ),
+        (
+            TargetGrouping,
+            "maxTargetIdBytes",
+            "UTF-8 bytes in one raw ID",
+        ),
+        (
+            TargetGrouping,
+            "maxDeploymentGroups",
+            "One Group entry",
+        ),
+        (
+            TargetGrouping,
+            "maxGroupIdBytes",
+            "UTF-8 bytes in one raw ID",
+        ),
+        (
+            TargetGrouping,
+            "maxMembersPerGroup",
+            "One Target ID occurrence",
+        ),
+        (
+            TargetGrouping,
+            "maxMembershipOccurrences",
+            "One Target ID occurrence",
+        ),
+        (
+            TargetGrouping,
+            "maxHydrationRelations",
+            "One relation occurrence",
+        ),
+        (
+            DiagnosticsEntry,
+            "maxFindingOccurrences",
+            "One candidate occurrence",
+        ),
+        (
+            DiagnosticsEntry,
+            "maxFindings",
+            "One distinct Entry Finding Key",
+        ),
+        (
+            DiagnosticsEntry,
+            "maxRelatedEvidencePerOccurrenceGroup",
+            "One distinct related-Evidence record",
+        ),
+        (
+            DiagnosticsEntry,
+            "maxRelatedEvidenceOccurrences",
+            "One related-evidence occurrence",
+        ),
+        (
+            DiagnosticsEntry,
+            "maxSingleEvidenceBytes",
+            "Length of `C` of one evidence record's canonical view",
+        ),
+        (
+            DiagnosticsEntry,
+            "maxTotalEvidenceBytes",
+            "One canonical Evidence byte",
+        ),
+        (
+            DiagnosticsEntry,
+            "maxEvaluationStatusEntries",
+            "One evaluated or not-evaluated Entry status",
+        ),
+        (
+            DiagnosticsEntry,
+            "maxSuppressionCausesPerStatus",
+            "One distinct causal Finding Key",
+        ),
+        (
+            DiagnosticsEntry,
+            "maxSuppressionCauseOccurrences",
+            "One causal Finding Key occurrence",
+        ),
+        (
+            DiagnosticsEntry,
+            "maxRecords",
+            "One Entry Finding, status, Finding Occurrence, Coverage Decision Evidence record, source-evidence-index record, entry dependency, or shared-unavailability cause reference",
+        ),
+        (
+            DiagnosticsEntry,
+            "maxTotalCanonicalBytes",
+            "One byte of `C` of one record's accounting view",
+        ),
+        (
+            DiagnosticsShared,
+            "maxFindingOccurrences",
+            "One candidate occurrence",
+        ),
+        (
+            DiagnosticsShared,
+            "maxFindings",
+            "One distinct Shared Finding Key",
+        ),
+        (
+            DiagnosticsShared,
+            "maxEvaluationStatusEntries",
+            "One evaluated or not-evaluated Shared status",
+        ),
+        (
+            DiagnosticsShared,
+            "maxSuppressionCausesPerStatus",
+            "One distinct causal Finding Key",
+        ),
+        (
+            DiagnosticsShared,
+            "maxSuppressionCauseOccurrences",
+            "One causal Finding Key occurrence",
+        ),
+        (
+            DiagnosticsShared,
+            "maxRecords",
+            "One Shared Finding, status, Coverage Decision Basis record, semantic dependency, or materialized re-resolution dependency",
+        ),
+        (
+            DiagnosticsShared,
+            "maxTotalCanonicalBytes",
+            "One byte of `C` of one record's accounting view",
+        ),
+    ]
+};
+
+impl BoundId {
+    /// The unit the bound counts in, as 015's table writes it. A capability
+    /// that mirrors the bound counts in the same unit.
+    ///
+    /// # Panics
+    ///
+    /// Panics for an ID no bound of the section has.
+    pub(crate) fn unit(self) -> &'static str {
+        UNITS
+            .iter()
+            .find(|(group, name, _)| *group == self.group && *name == self.name)
+            .map(|(_, _, unit)| *unit)
+            .expect("every bound of the section has a unit")
+    }
+}
+
 impl ResolutionLimits {
     /// Every bound in 015's canonical order: the groups, `entry` before
     /// `shared`, then each table's declaration order. Policy/capability
@@ -785,6 +1072,49 @@ mod tests {
         // field, or a field read twice, breaks the sequence.
         let values = fixture_limits(7).bounds().map(|(_, bound)| bound.get());
         assert_eq!(values, std::array::from_fn(|index| index as u64 + 7));
+    }
+
+    #[test]
+    fn each_bound_counts_in_the_unit_of_its_own_row_of_015s_table() {
+        // The table has one row for each bound, in the bounds' order, and each
+        // bound reads its own row.
+        let ids = fixture_limits(1).bounds().map(|(id, _)| id);
+        assert_eq!(
+            UNITS.map(|(group, name, _)| (group, name)),
+            ids.map(|id| (id.group, id.name))
+        );
+        assert_eq!(ids.map(BoundId::unit), UNITS.map(|(_, _, unit)| unit));
+        // A bound of the same name in another group may count in another unit.
+        let unit = |group, name| BoundId { group, name }.unit();
+        assert_eq!(
+            unit(Group::DiagnosticsEntry, "maxFindings"),
+            "One distinct Entry Finding Key"
+        );
+        assert_eq!(
+            unit(Group::DiagnosticsShared, "maxFindings"),
+            "One distinct Shared Finding Key"
+        );
+        // A unit is the table's cell, code spans included, and 015 counts the
+        // 52 bounds in 45 distinct units.
+        assert_eq!(
+            unit(Group::ConfigurationInput, "maxStructuralAnalysisUnits"),
+            "One applicable `(schema keyword, logical subject)` evaluation"
+        );
+        let distinct = UNITS
+            .iter()
+            .map(|(_, _, unit)| *unit)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(distinct.len(), 45);
+    }
+
+    #[test]
+    #[should_panic(expected = "every bound of the section has a unit")]
+    fn an_id_of_no_bound_has_no_unit() {
+        let _ = BoundId {
+            group: Group::LocaleResolution,
+            name: "maxNodes",
+        }
+        .unit();
     }
 
     #[test]

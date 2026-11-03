@@ -5,9 +5,10 @@
  * artifact, and compiles in two digests: the artifact's file digest and the
  * package's canonical digest. This script shares no code with it: it hashes
  * every artifact itself, frames the canonical digest from design 015's record
- * shape, lists the roles, bounds, units, and failure precedence from its own
- * copy of the design's tables, and reads the two pinned digests out of the
- * crate's source. It does not read the design document.
+ * shape, lists the roles, bounds, units, envelope schema references, and
+ * failure precedence from its own copy of the design's tables, and reads the
+ * two pinned digests out of the crate's source. It does not read the design
+ * document.
  */
 
 import { createHash } from 'node:crypto'
@@ -155,13 +156,44 @@ const PRECEDENCE = [
   ['all', 'implemented-authority', 'construction-authority-not-implemented']
 ]
 
-/** Design 015's five construction components and the identity each admits. */
+/**
+ * Design 015's five construction components, each with the identity it admits
+ * and the envelope schemas it is checked against: its declared tuple's and,
+ * for a container or the Capability Specification, its artifact's.
+ *
+ * @type {[string, string, string[]][]}
+ */
 const COMPONENTS = [
-  ['profileSpecificationSchema', 'intlify-project-profile-specification-schema'],
-  ['profileSpecification', 'intlify-project-profile'],
-  ['configurationSchemaAuthoritySet', 'intlify-configuration-schema-authority-set'],
-  ['resolverCapabilitySpecification', 'intlify-project-profile-resolver-capability'],
-  ['registryPackage', 'intlify-project-profile-resolver-registry-package']
+  [
+    'profileSpecificationSchema',
+    'intlify-project-profile-specification-schema',
+    ['component-tuple']
+  ],
+  ['profileSpecification', 'intlify-project-profile', ['profile-specification-tuple']],
+  [
+    'configurationSchemaAuthoritySet',
+    'intlify-configuration-schema-authority-set',
+    ['component-tuple', 'configuration-schema-authority-set']
+  ],
+  [
+    'resolverCapabilitySpecification',
+    'intlify-project-profile-resolver-capability',
+    ['component-tuple', 'resolver-capability-specification']
+  ],
+  [
+    'registryPackage',
+    'intlify-project-profile-resolver-registry-package',
+    ['component-tuple', 'registry-package']
+  ]
+]
+
+/** The authority-envelope schema package's schemas, in its order. */
+const ENVELOPE_SCHEMAS = [
+  'component-tuple',
+  'profile-specification-tuple',
+  'configuration-schema-authority-set',
+  'registry-package',
+  'resolver-capability-specification'
 ]
 
 /** Design 015's six Registry Package roles in their fixed order. */
@@ -333,9 +365,13 @@ if (
 ) {
   fail(`admission: components ${JSON.stringify(Object.keys(admission.components ?? {}))}`)
 }
-for (const [role, identity] of COMPONENTS) {
+for (const [role, identity, envelopeSchemas] of COMPONENTS) {
   const component = admission.components?.[role]
-  if (component?.identity !== identity || !isDeepStrictEqual(component?.revisions, [REVISION])) {
+  if (
+    component?.identity !== identity ||
+    !isDeepStrictEqual(component?.revisions, [REVISION]) ||
+    !isDeepStrictEqual(component?.envelopeSchemas, envelopeSchemas)
+  ) {
     fail(`admission: component ${role} admits ${JSON.stringify(component)}`)
   }
 }
@@ -397,6 +433,9 @@ if (schema.$schema !== DRAFT_7) {
 }
 
 const envelope = JSON.parse(envelopeBytes.toString('utf8'))
+if (!isDeepStrictEqual(Object.keys(envelope.schemas ?? {}), ENVELOPE_SCHEMAS)) {
+  fail(`envelope schemas: ${JSON.stringify(Object.keys(envelope.schemas ?? {}))}`)
+}
 for (const [name, value] of Object.entries(envelope.schemas ?? {})) {
   if (value.$schema !== DRAFT_7 || value.additionalProperties !== false) {
     fail(`envelope schema ${name}: not a closed Draft 7 schema`)

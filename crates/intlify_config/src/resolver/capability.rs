@@ -4,10 +4,11 @@
 //! The bounds of 015's Project Profile Resolver Capability Specification:
 //! `policyComparable`, which mirrors the Resource Limit Policy's
 //! `projectProfileResolution` section, and `bootstrapOnly`, for the work no
-//! Resource Limit Policy bounds, with the revision-"0" minimum of every bound.
-//! Not the Capability Specification artifact, which construction admits, and
-//! not the capability boundary, which admits a submitted value against this
-//! inventory.
+//! Resource Limit Policy bounds, with the revision-"0" minimum of every bound
+//! and the unit 015's tables count it in. Not the Capability Specification
+//! artifact, which construction admits and which is written from this
+//! inventory, and not the capability boundary, which admits a submitted value
+//! against it.
 
 use std::fmt;
 
@@ -70,6 +71,302 @@ pub(crate) const BOOTSTRAP_BOUND_COUNT: usize = 54;
 
 /// The number of capability bounds in both namespaces.
 pub(crate) const CAPABILITY_BOUND_COUNT: usize = BOUND_COUNT + BOOTSTRAP_BOUND_COUNT;
+
+/// Each `bootstrapOnly` bound's counting unit, as the cell of 015's table
+/// writes it, in the canonical order.
+const UNITS: [(BootstrapGroup, &str, &str); BOOTSTRAP_BOUND_COUNT] = {
+    use BootstrapGroup::{
+        ArtifactBootstrap, EvidenceMetadata, InputBoundary, LocaleData, MandatoryReserve, RawInput,
+        Snapshot,
+    };
+    [
+        (
+            RawInput,
+            "maxFileBytes",
+            "One submitted raw file byte",
+        ),
+        (
+            RawInput,
+            "maxParserTokens",
+            "One strict-JSON lexical value, member-name, or punctuation token",
+        ),
+        (
+            Snapshot,
+            "maxNodes",
+            "One canonical Snapshot node, including a rejected marker",
+        ),
+        (
+            Snapshot,
+            "maxDepth",
+            "One Snapshot tree level, with the root at one",
+        ),
+        (
+            Snapshot,
+            "maxCollectionEntries",
+            "One Snapshot object-member or array-element occurrence",
+        ),
+        (
+            Snapshot,
+            "maxTotalStringBytes",
+            "One UTF-8 byte in a Snapshot string or object key",
+        ),
+        (
+            Snapshot,
+            "maxSingleStringBytes",
+            "UTF-8 byte length of one Snapshot string or object key",
+        ),
+        (
+            Snapshot,
+            "maxRejectedMarkers",
+            "One canonical rejected-node marker",
+        ),
+        (
+            Snapshot,
+            "maxEnvelopeCanonicalBytes",
+            "One canonical byte in the complete formal Snapshot envelope",
+        ),
+        (
+            Snapshot,
+            "maxSingleMarkerCanonicalBytes",
+            "One canonical byte in one rejected-node marker",
+        ),
+        (
+            Snapshot,
+            "maxTraversalUnits",
+            "One visited Snapshot node or edge",
+        ),
+        (
+            InputBoundary,
+            "maxDepth",
+            "One JSON nesting level of one raw boundary input or collection member, with its root at one",
+        ),
+        (
+            InputBoundary,
+            "maxSpecificationInputBytes",
+            "One byte of the raw Profile Resolution Specification Input",
+        ),
+        (
+            InputBoundary,
+            "maxVocabularyBytes",
+            "One byte of the raw Intent Surface-Class Vocabulary Artifact",
+        ),
+        (
+            InputBoundary,
+            "maxVocabularyMembers",
+            "One vocabulary member",
+        ),
+        (
+            InputBoundary,
+            "maxVocabularyMemberBytes",
+            "UTF-8 byte length of one vocabulary member",
+        ),
+        (
+            InputBoundary,
+            "maxVocabularyTotalMemberBytes",
+            "One UTF-8 byte across all vocabulary members",
+        ),
+        (
+            InputBoundary,
+            "maxLocaleDataManifestBytes",
+            "One byte of the raw Locale Canonicalization Data Artifact manifest",
+        ),
+        (
+            InputBoundary,
+            "maxCollectionMemberBytes",
+            "Raw byte length of one submitted collection member",
+        ),
+        (
+            InputBoundary,
+            "maxCollectionTotalBytes",
+            "One raw byte across all submitted collection members",
+        ),
+        (
+            InputBoundary,
+            "maxVerificationInputBytes",
+            "One byte of the raw Resource Limit Policy Verification Input",
+        ),
+        (
+            InputBoundary,
+            "maxVerificationPins",
+            "One submitted pin",
+        ),
+        (
+            ArtifactBootstrap,
+            "maxEnvelopeDepth",
+            "One nesting level of the selected candidate member, with the member root at one",
+        ),
+        (
+            ArtifactBootstrap,
+            "maxDecodedAllocationBytes",
+            "One UTF-8 byte of a string value or object key decoded from the selected candidate's `content`",
+        ),
+        (
+            ArtifactBootstrap,
+            "maxMetadataScanUnits",
+            "One envelope field read from one member to establish its exact-reference tuple: `kind`, `specification.identity`, `specification.revision`, `body.identity`, or `body.revision`",
+        ),
+        (
+            ArtifactBootstrap,
+            "maxValidationWorkUnits",
+            "One evaluation of the selected candidate's integrity, its pin lookup, its common body, or one `projectProfileResolution` rule: the section's presence, one group's closed shape, or one bound's value",
+        ),
+        (
+            LocaleData,
+            "maxPayloads",
+            "One payload entry of the admitted manifest",
+        ),
+        (
+            LocaleData,
+            "maxPayloadBytes",
+            "Declared byte length of one payload",
+        ),
+        (
+            LocaleData,
+            "maxMarkerBytes",
+            "One byte of the four marker payloads as compact JSON text",
+        ),
+        (
+            LocaleData,
+            "maxValidityGroups",
+            "One conformance validity group",
+        ),
+        (
+            LocaleData,
+            "maxCodes",
+            "One conformance code",
+        ),
+        (
+            LocaleData,
+            "maxExtensionKeys",
+            "One conformance extension key",
+        ),
+        (
+            LocaleData,
+            "maxTypes",
+            "One conformance type",
+        ),
+        (
+            LocaleData,
+            "maxCorrections",
+            "One conformance correction",
+        ),
+        (
+            LocaleData,
+            "maxValidationWorkUnits",
+            "One conformance group, code, key, type, or correction, each counted once",
+        ),
+        (
+            EvidenceMetadata,
+            "maxSourceIdentityBytes",
+            "One byte in an exact source-identity input",
+        ),
+        (
+            EvidenceMetadata,
+            "maxSourceRevisionBytes",
+            "One byte in an exact Source-content, Programmatic Entry, or Call-Site Source revision input",
+        ),
+        (
+            EvidenceMetadata,
+            "maxLocatorBytes",
+            "One byte in a locator candidate",
+        ),
+        (
+            EvidenceMetadata,
+            "maxCallSiteSourceBytes",
+            "One byte in the optional exact UTF-8 call-site source snapshot",
+        ),
+        (
+            EvidenceMetadata,
+            "maxCallSiteMappings",
+            "One submitted Snapshot Structural Path and location-role mapping",
+        ),
+        (
+            EvidenceMetadata,
+            "maxLogicalPathSegments",
+            "One internal or projected path segment",
+        ),
+        (
+            EvidenceMetadata,
+            "maxLogicalPathCanonicalBytes",
+            "One canonical byte in one projected logical path",
+        ),
+        (
+            EvidenceMetadata,
+            "maxSubjectOccurrences",
+            "One pre-deduplication logical subject occurrence",
+        ),
+        (
+            EvidenceMetadata,
+            "maxTokenInputs",
+            "One safe projected token-input occurrence",
+        ),
+        (
+            EvidenceMetadata,
+            "maxCollisionComparisons",
+            "One full safe-projection comparison inside a digest-collision bucket",
+        ),
+        (
+            EvidenceMetadata,
+            "maxMetadataWorkUnits",
+            "One source, locator, path, projection, or token rule evaluation",
+        ),
+        (
+            MandatoryReserve,
+            "maxOutcomeEnvelopeSlots",
+            "One complete checked-or-blocked outcome envelope",
+        ),
+        (
+            MandatoryReserve,
+            "maxConstructionIdentitySlots",
+            "One outcome-level Resolver Construction Identity",
+        ),
+        (
+            MandatoryReserve,
+            "maxEntryTerminalFindingSlots",
+            "One Entry-domain terminal Finding",
+        ),
+        (
+            MandatoryReserve,
+            "maxEntryTerminalStatusSlots",
+            "One Entry-domain terminal evaluation-status record",
+        ),
+        (
+            MandatoryReserve,
+            "maxSharedTerminalFindingSlots",
+            "One Shared-domain terminal Finding",
+        ),
+        (
+            MandatoryReserve,
+            "maxSharedTerminalStatusSlots",
+            "One Shared-domain terminal evaluation-status record",
+        ),
+        (
+            MandatoryReserve,
+            "maxSharedUnavailableCauseSlots",
+            "One Entry-owned Shared-unavailability cause reference",
+        ),
+        (
+            MandatoryReserve,
+            "maxCanonicalBytes",
+            "One byte in the complete revision-`\"0\"` mandatory logical reserve representation",
+        ),
+    ]
+};
+
+impl BootstrapBoundId {
+    /// The unit the bound counts in, as 015's table writes it.
+    ///
+    /// # Panics
+    ///
+    /// Panics for an ID no `bootstrapOnly` bound has.
+    pub(crate) fn unit(self) -> &'static str {
+        UNITS
+            .iter()
+            .find(|(group, name, _)| *group == self.group && *name == self.name)
+            .map(|(_, _, unit)| *unit)
+            .expect("every bootstrapOnly bound has a unit")
+    }
+}
 
 /// Every `bootstrapOnly` bound. Each is required, and none has a default.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -600,31 +897,41 @@ impl CapabilityBound {
             Some(index) => (Self::BootstrapOnly(bootstrap[index].0), bootstrap[index].1),
         })
     }
+
+    /// The namespace the bound belongs to.
+    pub(crate) const fn namespace(self) -> &'static str {
+        match self {
+            Self::PolicyComparable(_) => POLICY_COMPARABLE,
+            Self::BootstrapOnly(_) => BOOTSTRAP_ONLY,
+        }
+    }
+
+    /// The bound's path inside its namespace, such as `snapshot.maxNodes`: its
+    /// group's path and its name, joined by a dot. A `policyComparable` bound's
+    /// path is the path of the policy bound it mirrors.
+    pub(crate) fn path(self) -> String {
+        let (group, name) = match self {
+            Self::PolicyComparable(id) => (id.group.path(), id.name),
+            Self::BootstrapOnly(id) => (id.group.path(), id.name),
+        };
+        format!("{group}.{name}")
+    }
+
+    /// The unit the bound counts in, as 015's tables write it.
+    pub(crate) fn unit(self) -> &'static str {
+        match self {
+            Self::PolicyComparable(id) => id.unit(),
+            Self::BootstrapOnly(id) => id.unit(),
+        }
+    }
 }
 
 impl fmt::Display for CapabilityBound {
     /// The bound's capability bound path, such as
-    /// `bootstrapOnly.snapshot.maxNodes`: its namespace, its group's path, and
-    /// its name, joined by dots.
+    /// `bootstrapOnly.snapshot.maxNodes`: its namespace and its path inside
+    /// it, joined by a dot.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::PolicyComparable(id) => {
-                write!(
-                    formatter,
-                    "{POLICY_COMPARABLE}.{}.{}",
-                    id.group.path(),
-                    id.name
-                )
-            }
-            Self::BootstrapOnly(id) => {
-                write!(
-                    formatter,
-                    "{BOOTSTRAP_ONLY}.{}.{}",
-                    id.group.path(),
-                    id.name
-                )
-            }
-        }
+        write!(formatter, "{}.{}", self.namespace(), self.path())
     }
 }
 
@@ -919,5 +1226,106 @@ mod tests {
         sorted.sort();
         sorted.dedup();
         assert_eq!(sorted.len(), paths.len());
+    }
+
+    #[test]
+    fn a_bound_s_path_inside_its_namespace_leaves_the_namespace_out() {
+        for (bound, _) in CapabilityBound::inventory() {
+            assert_eq!(
+                bound.to_string(),
+                format!("{}.{}", bound.namespace(), bound.path())
+            );
+        }
+        let entry = CapabilityBound::PolicyComparable(BoundId {
+            group: Group::DiagnosticsEntry,
+            name: "maxFindings",
+        });
+        assert_eq!(entry.namespace(), "policyComparable");
+        assert_eq!(entry.path(), "diagnostics.entry.maxFindings");
+        let snapshot = CapabilityBound::BootstrapOnly(BootstrapBoundId {
+            group: BootstrapGroup::Snapshot,
+            name: "maxNodes",
+        });
+        assert_eq!(snapshot.namespace(), "bootstrapOnly");
+        assert_eq!(snapshot.path(), "snapshot.maxNodes");
+        // A mirrored bound's path is its policy bound's.
+        let mirrored = fixture_limits(1)
+            .bounds()
+            .map(|(id, _)| format!("{}.{}", id.group.path(), id.name));
+        let listed = CapabilityBound::inventory()[..BOUND_COUNT]
+            .iter()
+            .map(|(bound, _)| bound.path())
+            .collect::<Vec<_>>();
+        assert_eq!(listed, mirrored);
+    }
+
+    #[test]
+    fn each_bootstrap_bound_counts_in_the_unit_of_its_own_row_of_015s_table() {
+        // The table has one row for each bound, in the bounds' order, and each
+        // bound reads its own row.
+        let ids = BootstrapLimits::MINIMUM.bounds().map(|(id, _)| id);
+        assert_eq!(
+            UNITS.map(|(group, name, _)| (group, name)),
+            ids.map(|id| (id.group, id.name))
+        );
+        assert_eq!(
+            ids.map(BootstrapBoundId::unit),
+            UNITS.map(|(_, _, unit)| unit)
+        );
+        // A bound of the same name in another group may count in another unit.
+        let unit = |group, name| BootstrapBoundId { group, name }.unit();
+        assert_eq!(
+            unit(BootstrapGroup::Snapshot, "maxDepth"),
+            "One Snapshot tree level, with the root at one"
+        );
+        assert_eq!(
+            unit(BootstrapGroup::InputBoundary, "maxDepth"),
+            "One JSON nesting level of one raw boundary input or collection member, with its \
+             root at one"
+        );
+        // A unit is the table's cell, code spans included, and every
+        // `bootstrapOnly` bound has a unit of its own.
+        assert_eq!(
+            unit(BootstrapGroup::MandatoryReserve, "maxCanonicalBytes"),
+            "One byte in the complete revision-`\"0\"` mandatory logical reserve representation"
+        );
+        let distinct = UNITS
+            .iter()
+            .map(|(_, _, unit)| *unit)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(distinct.len(), BOOTSTRAP_BOUND_COUNT);
+    }
+
+    #[test]
+    fn a_capability_bound_counts_in_the_unit_of_its_table() {
+        // A mirrored bound counts in its policy bound's unit, a `bootstrapOnly`
+        // bound in its own, and no unit of one namespace is a unit of the
+        // other.
+        let inventory = CapabilityBound::inventory();
+        assert_eq!(
+            inventory[1].0.unit(),
+            "Maximum value level with the root at depth one"
+        );
+        assert_eq!(
+            inventory[BOUND_COUNT + 3].0.unit(),
+            "One Snapshot tree level, with the root at one"
+        );
+        let policy = inventory[..BOUND_COUNT]
+            .iter()
+            .map(|(bound, _)| bound.unit())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert!(inventory[BOUND_COUNT..]
+            .iter()
+            .all(|(bound, _)| !policy.contains(bound.unit())));
+    }
+
+    #[test]
+    #[should_panic(expected = "every bootstrapOnly bound has a unit")]
+    fn an_id_of_no_bootstrap_bound_has_no_unit() {
+        let _ = BootstrapBoundId {
+            group: BootstrapGroup::RawInput,
+            name: "maxNodes",
+        }
+        .unit();
     }
 }

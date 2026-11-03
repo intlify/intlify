@@ -283,6 +283,721 @@
           }
         }
       }
+    },
+    "resolver-capability-specification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policyComparable",
+        "bootstrapOnly"
+      ],
+      "properties": {
+        "policyComparable": {
+          "type": "array",
+          "minItems": 52,
+          "additionalItems": false,
+          "items": [
+            {
+              "const": {
+                "path": "configurationInput.maxNodes",
+                "unit": "One logical JSON value; the root counts as one and object keys are not nodes"
+              }
+            },
+            {
+              "const": {
+                "path": "configurationInput.maxDepth",
+                "unit": "Maximum value level with the root at depth one"
+              }
+            },
+            {
+              "const": {
+                "path": "configurationInput.maxCollectionEntries",
+                "unit": "One object-member or array-element occurrence"
+              }
+            },
+            {
+              "const": {
+                "path": "configurationInput.maxTotalStringBytes",
+                "unit": "One UTF-8 byte in every string value and object key"
+              }
+            },
+            {
+              "const": {
+                "path": "configurationInput.maxSingleStringBytes",
+                "unit": "UTF-8 byte length of one string value or object key"
+              }
+            },
+            {
+              "const": {
+                "path": "configurationInput.maxProfiles",
+                "unit": "One profile declaration"
+              }
+            },
+            {
+              "const": {
+                "path": "configurationInput.maxProfileIdBytes",
+                "unit": "UTF-8 byte length of one complete raw ID, or the smallest first-over witness for an over-limit selector"
+              }
+            },
+            {
+              "const": {
+                "path": "configurationInput.maxStructuralAnalysisUnits",
+                "unit": "One applicable `(schema keyword, logical subject)` evaluation"
+              }
+            },
+            {
+              "const": {
+                "path": "localeResolution.maxLocaleIdentifierBytes",
+                "unit": "UTF-8 bytes in one spelling"
+              }
+            },
+            {
+              "const": {
+                "path": "localeResolution.maxLocaleOccurrences",
+                "unit": "One raw locale spelling"
+              }
+            },
+            {
+              "const": {
+                "path": "localeResolution.maxRequestedLocales",
+                "unit": "One unique canonical locale identity"
+              }
+            },
+            {
+              "const": {
+                "path": "localeResolution.maxNegotiationAliases",
+                "unit": "One raw map entry"
+              }
+            },
+            {
+              "const": {
+                "path": "localeResolution.maxFallbackSources",
+                "unit": "One raw mapping-key occurrence"
+              }
+            },
+            {
+              "const": {
+                "path": "localeResolution.maxFallbackCandidatesPerSource",
+                "unit": "One candidate occurrence of either admitted kind"
+              }
+            },
+            {
+              "const": {
+                "path": "localeResolution.maxCoverageRules",
+                "unit": "One rule occurrence"
+              }
+            },
+            {
+              "const": {
+                "path": "localeResolution.maxCoverageLocaleSelectorOccurrences",
+                "unit": "One raw selector item"
+              }
+            },
+            {
+              "const": {
+                "path": "localeResolution.maxCoverageSurfaceSelectorOccurrences",
+                "unit": "One raw selector item"
+              }
+            },
+            {
+              "const": {
+                "path": "localeResolution.maxCoverageDecisionCells",
+                "unit": "One canonical Cartesian-product cell"
+              }
+            },
+            {
+              "const": {
+                "path": "localeResolution.maxCoverageRuleCellComparisons",
+                "unit": "One logical rule-to-cell predicate evaluation"
+              }
+            },
+            {
+              "const": {
+                "path": "artifactAdmission.maxArtifacts",
+                "unit": "One submitted artifact envelope occurrence"
+              }
+            },
+            {
+              "const": {
+                "path": "artifactAdmission.maxPolicyArtifacts",
+                "unit": "One artifact occurrence declaring an admitted Policy kind"
+              }
+            },
+            {
+              "const": {
+                "path": "artifactAdmission.maxTargetProfileArtifacts",
+                "unit": "One artifact occurrence declaring Target Profile kind"
+              }
+            },
+            {
+              "const": {
+                "path": "artifactAdmission.maxArtifactReferences",
+                "unit": "One Policy or Target Profile reference occurrence"
+              }
+            },
+            {
+              "const": {
+                "path": "artifactAdmission.maxSingleArtifactCanonicalBytes",
+                "unit": "017-defined canonical bytes of one envelope and body"
+              }
+            },
+            {
+              "const": {
+                "path": "artifactAdmission.maxTotalArtifactCanonicalBytes",
+                "unit": "One canonical byte across submitted artifact occurrences"
+              }
+            },
+            {
+              "const": {
+                "path": "artifactAdmission.maxSingleReferenceCanonicalBytes",
+                "unit": "017-defined canonical bytes of one reference"
+              }
+            },
+            {
+              "const": {
+                "path": "artifactAdmission.maxTotalReferenceCanonicalBytes",
+                "unit": "One canonical byte across references"
+              }
+            },
+            {
+              "const": {
+                "path": "targetGrouping.maxTargetProfiles",
+                "unit": "One Target ID entry"
+              }
+            },
+            {
+              "const": {
+                "path": "targetGrouping.maxTargetIdBytes",
+                "unit": "UTF-8 bytes in one raw ID"
+              }
+            },
+            {
+              "const": {
+                "path": "targetGrouping.maxDeploymentGroups",
+                "unit": "One Group entry"
+              }
+            },
+            {
+              "const": {
+                "path": "targetGrouping.maxGroupIdBytes",
+                "unit": "UTF-8 bytes in one raw ID"
+              }
+            },
+            {
+              "const": {
+                "path": "targetGrouping.maxMembersPerGroup",
+                "unit": "One Target ID occurrence"
+              }
+            },
+            {
+              "const": {
+                "path": "targetGrouping.maxMembershipOccurrences",
+                "unit": "One Target ID occurrence"
+              }
+            },
+            {
+              "const": {
+                "path": "targetGrouping.maxHydrationRelations",
+                "unit": "One relation occurrence"
+              }
+            },
+            {
+              "const": {
+                "path": "diagnostics.entry.maxFindingOccurrences",
+                "unit": "One candidate occurrence"
+              }
+            },
+            {
+              "const": {
+                "path": "diagnostics.entry.maxFindings",
+                "unit": "One distinct Entry Finding Key"
+              }
+            },
+            {
+              "const": {
+                "path": "diagnostics.entry.maxRelatedEvidencePerOccurrenceGroup",
+                "unit": "One distinct related-Evidence record"
+              }
+            },
+            {
+              "const": {
+                "path": "diagnostics.entry.maxRelatedEvidenceOccurrences",
+                "unit": "One related-evidence occurrence"
+              }
+            },
+            {
+              "const": {
+                "path": "diagnostics.entry.maxSingleEvidenceBytes",
+                "unit": "Length of `C` of one evidence record's canonical view"
+              }
+            },
+            {
+              "const": {
+                "path": "diagnostics.entry.maxTotalEvidenceBytes",
+                "unit": "One canonical Evidence byte"
+              }
+            },
+            {
+              "const": {
+                "path": "diagnostics.entry.maxEvaluationStatusEntries",
+                "unit": "One evaluated or not-evaluated Entry status"
+              }
+            },
+            {
+              "const": {
+                "path": "diagnostics.entry.maxSuppressionCausesPerStatus",
+                "unit": "One distinct causal Finding Key"
+              }
+            },
+            {
+              "const": {
+                "path": "diagnostics.entry.maxSuppressionCauseOccurrences",
+                "unit": "One causal Finding Key occurrence"
+              }
+            },
+            {
+              "const": {
+                "path": "diagnostics.entry.maxRecords",
+                "unit": "One Entry Finding, status, Finding Occurrence, Coverage Decision Evidence record, source-evidence-index record, entry dependency, or shared-unavailability cause reference"
+              }
+            },
+            {
+              "const": {
+                "path": "diagnostics.entry.maxTotalCanonicalBytes",
+                "unit": "One byte of `C` of one record's accounting view"
+              }
+            },
+            {
+              "const": {
+                "path": "diagnostics.shared.maxFindingOccurrences",
+                "unit": "One candidate occurrence"
+              }
+            },
+            {
+              "const": {
+                "path": "diagnostics.shared.maxFindings",
+                "unit": "One distinct Shared Finding Key"
+              }
+            },
+            {
+              "const": {
+                "path": "diagnostics.shared.maxEvaluationStatusEntries",
+                "unit": "One evaluated or not-evaluated Shared status"
+              }
+            },
+            {
+              "const": {
+                "path": "diagnostics.shared.maxSuppressionCausesPerStatus",
+                "unit": "One distinct causal Finding Key"
+              }
+            },
+            {
+              "const": {
+                "path": "diagnostics.shared.maxSuppressionCauseOccurrences",
+                "unit": "One causal Finding Key occurrence"
+              }
+            },
+            {
+              "const": {
+                "path": "diagnostics.shared.maxRecords",
+                "unit": "One Shared Finding, status, Coverage Decision Basis record, semantic dependency, or materialized re-resolution dependency"
+              }
+            },
+            {
+              "const": {
+                "path": "diagnostics.shared.maxTotalCanonicalBytes",
+                "unit": "One byte of `C` of one record's accounting view"
+              }
+            }
+          ]
+        },
+        "bootstrapOnly": {
+          "type": "array",
+          "minItems": 54,
+          "additionalItems": false,
+          "items": [
+            {
+              "const": {
+                "path": "rawInput.maxFileBytes",
+                "unit": "One submitted raw file byte",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "rawInput.maxParserTokens",
+                "unit": "One strict-JSON lexical value, member-name, or punctuation token",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "snapshot.maxNodes",
+                "unit": "One canonical Snapshot node, including a rejected marker",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "snapshot.maxDepth",
+                "unit": "One Snapshot tree level, with the root at one",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "snapshot.maxCollectionEntries",
+                "unit": "One Snapshot object-member or array-element occurrence",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "snapshot.maxTotalStringBytes",
+                "unit": "One UTF-8 byte in a Snapshot string or object key",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "snapshot.maxSingleStringBytes",
+                "unit": "UTF-8 byte length of one Snapshot string or object key",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "snapshot.maxRejectedMarkers",
+                "unit": "One canonical rejected-node marker",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "snapshot.maxEnvelopeCanonicalBytes",
+                "unit": "One canonical byte in the complete formal Snapshot envelope",
+                "minimum": "4096"
+              }
+            },
+            {
+              "const": {
+                "path": "snapshot.maxSingleMarkerCanonicalBytes",
+                "unit": "One canonical byte in one rejected-node marker",
+                "minimum": "1024"
+              }
+            },
+            {
+              "const": {
+                "path": "snapshot.maxTraversalUnits",
+                "unit": "One visited Snapshot node or edge",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "inputBoundary.maxDepth",
+                "unit": "One JSON nesting level of one raw boundary input or collection member, with its root at one",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "inputBoundary.maxSpecificationInputBytes",
+                "unit": "One byte of the raw Profile Resolution Specification Input",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "inputBoundary.maxVocabularyBytes",
+                "unit": "One byte of the raw Intent Surface-Class Vocabulary Artifact",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "inputBoundary.maxVocabularyMembers",
+                "unit": "One vocabulary member",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "inputBoundary.maxVocabularyMemberBytes",
+                "unit": "UTF-8 byte length of one vocabulary member",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "inputBoundary.maxVocabularyTotalMemberBytes",
+                "unit": "One UTF-8 byte across all vocabulary members",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "inputBoundary.maxLocaleDataManifestBytes",
+                "unit": "One byte of the raw Locale Canonicalization Data Artifact manifest",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "inputBoundary.maxCollectionMemberBytes",
+                "unit": "Raw byte length of one submitted collection member",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "inputBoundary.maxCollectionTotalBytes",
+                "unit": "One raw byte across all submitted collection members",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "inputBoundary.maxVerificationInputBytes",
+                "unit": "One byte of the raw Resource Limit Policy Verification Input",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "inputBoundary.maxVerificationPins",
+                "unit": "One submitted pin",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "artifactBootstrap.maxEnvelopeDepth",
+                "unit": "One nesting level of the selected candidate member, with the member root at one",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "artifactBootstrap.maxDecodedAllocationBytes",
+                "unit": "One UTF-8 byte of a string value or object key decoded from the selected candidate's `content`",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "artifactBootstrap.maxMetadataScanUnits",
+                "unit": "One envelope field read from one member to establish its exact-reference tuple: `kind`, `specification.identity`, `specification.revision`, `body.identity`, or `body.revision`",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "artifactBootstrap.maxValidationWorkUnits",
+                "unit": "One evaluation of the selected candidate's integrity, its pin lookup, its common body, or one `projectProfileResolution` rule: the section's presence, one group's closed shape, or one bound's value",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "localeData.maxPayloads",
+                "unit": "One payload entry of the admitted manifest",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "localeData.maxPayloadBytes",
+                "unit": "Declared byte length of one payload",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "localeData.maxMarkerBytes",
+                "unit": "One byte of the four marker payloads as compact JSON text",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "localeData.maxValidityGroups",
+                "unit": "One conformance validity group",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "localeData.maxCodes",
+                "unit": "One conformance code",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "localeData.maxExtensionKeys",
+                "unit": "One conformance extension key",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "localeData.maxTypes",
+                "unit": "One conformance type",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "localeData.maxCorrections",
+                "unit": "One conformance correction",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "localeData.maxValidationWorkUnits",
+                "unit": "One conformance group, code, key, type, or correction, each counted once",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "evidenceMetadata.maxSourceIdentityBytes",
+                "unit": "One byte in an exact source-identity input",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "evidenceMetadata.maxSourceRevisionBytes",
+                "unit": "One byte in an exact Source-content, Programmatic Entry, or Call-Site Source revision input",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "evidenceMetadata.maxLocatorBytes",
+                "unit": "One byte in a locator candidate",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "evidenceMetadata.maxCallSiteSourceBytes",
+                "unit": "One byte in the optional exact UTF-8 call-site source snapshot",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "evidenceMetadata.maxCallSiteMappings",
+                "unit": "One submitted Snapshot Structural Path and location-role mapping",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "evidenceMetadata.maxLogicalPathSegments",
+                "unit": "One internal or projected path segment",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "evidenceMetadata.maxLogicalPathCanonicalBytes",
+                "unit": "One canonical byte in one projected logical path",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "evidenceMetadata.maxSubjectOccurrences",
+                "unit": "One pre-deduplication logical subject occurrence",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "evidenceMetadata.maxTokenInputs",
+                "unit": "One safe projected token-input occurrence",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "evidenceMetadata.maxCollisionComparisons",
+                "unit": "One full safe-projection comparison inside a digest-collision bucket",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "evidenceMetadata.maxMetadataWorkUnits",
+                "unit": "One source, locator, path, projection, or token rule evaluation",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "mandatoryReserve.maxOutcomeEnvelopeSlots",
+                "unit": "One complete checked-or-blocked outcome envelope",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "mandatoryReserve.maxConstructionIdentitySlots",
+                "unit": "One outcome-level Resolver Construction Identity",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "mandatoryReserve.maxEntryTerminalFindingSlots",
+                "unit": "One Entry-domain terminal Finding",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "mandatoryReserve.maxEntryTerminalStatusSlots",
+                "unit": "One Entry-domain terminal evaluation-status record",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "mandatoryReserve.maxSharedTerminalFindingSlots",
+                "unit": "One Shared-domain terminal Finding",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "mandatoryReserve.maxSharedTerminalStatusSlots",
+                "unit": "One Shared-domain terminal evaluation-status record",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "mandatoryReserve.maxSharedUnavailableCauseSlots",
+                "unit": "One Entry-owned Shared-unavailability cause reference",
+                "minimum": "1"
+              }
+            },
+            {
+              "const": {
+                "path": "mandatoryReserve.maxCanonicalBytes",
+                "unit": "One byte in the complete revision-`\"0\"` mandatory logical reserve representation",
+                "minimum": "65536"
+              }
+            }
+          ]
+        }
+      }
     }
   }
 }

@@ -23,6 +23,7 @@ use intlify_shared_json::token::IntegrityDigest;
 
 use super::admission::ConstructionAdmission;
 use super::authority_set::{self, ConfigurationSchemaAuthoritySet};
+use super::capability::{self, CapabilitySpecification};
 use super::component::file_digest;
 use super::profile::{self, ProjectProfileSpecification};
 use super::root::{canonical_digest, RootRole, PATH};
@@ -44,13 +45,14 @@ pub struct Pinned {
 }
 
 /// The authorities' digests the implementation compiles in: the Profile
-/// Specification's semantic digest, and the file digests of the other three.
+/// Specification's semantic digest, and the file digests of the other four.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthorityPins {
     pub profile_specification_schema: String,
     pub profile_specification_semantic: String,
     pub configuration_schema_authority_set: String,
     pub configuration_schema: String,
+    pub resolver_capability_specification: String,
 }
 
 fn write(value: &Value) -> Result<Vec<u8>, serde_json::Error> {
@@ -101,8 +103,9 @@ pub fn artifacts() -> Result<Vec<Artifact>, serde_json::Error> {
 }
 
 /// Write the construction authorities: the Profile Specification Schema, the
-/// Profile Specification, the Configuration Schema Authority Set, and the
-/// schema it maps to `schemaVersion` `"0"`.
+/// Profile Specification, the Configuration Schema Authority Set, the schema
+/// it maps to `schemaVersion` `"0"`, and the Resolver Capability
+/// Specification.
 ///
 /// # Errors
 ///
@@ -139,6 +142,12 @@ pub fn authorities() -> Result<Vec<Artifact>, serde_json::Error> {
             path: authority_set::MEMBER_PATH,
             bytes: member,
         },
+        Artifact {
+            path: capability::PATH,
+            bytes: write(&serde_json::to_value(
+                CapabilitySpecification::revision_zero(),
+            )?)?,
+        },
     ])
 }
 
@@ -154,8 +163,8 @@ pub fn authorities() -> Result<Vec<Artifact>, serde_json::Error> {
 /// Panics when the written Profile Specification is not JSON or has no
 /// semantic digest, which [`authorities`] rules out.
 pub fn authority_pins() -> Result<AuthorityPins, serde_json::Error> {
-    let [schema, body, set, member] = <[Artifact; 4]>::try_from(authorities()?)
-        .unwrap_or_else(|_| unreachable!("four authorities are written"));
+    let [schema, body, set, member, capability] = <[Artifact; 5]>::try_from(authorities()?)
+        .unwrap_or_else(|_| unreachable!("five authorities are written"));
     let body: Value = serde_json::from_slice(&body.bytes)?;
     Ok(AuthorityPins {
         profile_specification_schema: file_digest(&schema.bytes).as_str().to_owned(),
@@ -165,6 +174,7 @@ pub fn authority_pins() -> Result<AuthorityPins, serde_json::Error> {
             .to_owned(),
         configuration_schema_authority_set: file_digest(&set.bytes).as_str().to_owned(),
         configuration_schema: file_digest(&member.bytes).as_str().to_owned(),
+        resolver_capability_specification: file_digest(&capability.bytes).as_str().to_owned(),
     })
 }
 
@@ -199,7 +209,7 @@ mod tests {
     use crate::construction::validator::schema::Schema;
 
     /// The committed authorities, at their paths.
-    const COMMITTED: [(&str, &[u8]); 4] = [
+    const COMMITTED: [(&str, &[u8]); 5] = [
         (
             profile::SCHEMA_PATH,
             include_bytes!(
@@ -219,6 +229,10 @@ mod tests {
         (
             authority_set::MEMBER_PATH,
             include_bytes!("../../conformance/authorities/configuration-v0.schema.json"),
+        ),
+        (
+            capability::PATH,
+            include_bytes!("../../conformance/authorities/resolver-capability-v0.json"),
         ),
     ];
 
@@ -253,7 +267,7 @@ mod tests {
     #[test]
     fn the_committed_authorities_are_the_ones_this_crate_writes() {
         let authorities = authorities().unwrap();
-        assert_eq!(authorities.len(), 4);
+        assert_eq!(authorities.len(), 5);
         for (artifact, (path, bytes)) in authorities.iter().zip(COMMITTED) {
             assert_eq!(artifact.path, path);
             assert_eq!(
@@ -272,9 +286,10 @@ mod tests {
                 profile_specification_semantic: profile::SEMANTIC_DIGEST.to_owned(),
                 configuration_schema_authority_set: authority_set::DIGEST.to_owned(),
                 configuration_schema: authority_set::MEMBER_DIGEST.to_owned(),
+                resolver_capability_specification: capability::DIGEST.to_owned(),
             },
-            "the pinned digests in construction/profile.rs and construction/authority_set.rs \
-             are stale"
+            "the pinned digests in construction/profile.rs, construction/authority_set.rs, \
+             and construction/capability.rs are stale"
         );
     }
 

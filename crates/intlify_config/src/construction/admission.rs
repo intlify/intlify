@@ -187,15 +187,19 @@ pub(crate) enum EnvelopeSchema {
     ProfileSpecificationTuple,
     ConfigurationSchemaAuthoritySet,
     RegistryPackage,
+    // The Capability Specification's body: its bounds, units, order, and
+    // minima, closed by value.
+    ResolverCapabilitySpecification,
 }
 
 impl EnvelopeSchema {
     /// Every envelope schema, in the package's order.
-    pub(crate) const ALL: [Self; 4] = [
+    pub(crate) const ALL: [Self; 5] = [
         Self::ComponentTuple,
         Self::ProfileSpecificationTuple,
         Self::ConfigurationSchemaAuthoritySet,
         Self::RegistryPackage,
+        Self::ResolverCapabilitySpecification,
     ];
 
     /// The name the package holds the schema under.
@@ -205,6 +209,7 @@ impl EnvelopeSchema {
             Self::ProfileSpecificationTuple => "profile-specification-tuple",
             Self::ConfigurationSchemaAuthoritySet => "configuration-schema-authority-set",
             Self::RegistryPackage => "registry-package",
+            Self::ResolverCapabilitySpecification => "resolver-capability-specification",
         }
     }
 }
@@ -326,7 +331,7 @@ impl ConstructionAdmission {
                 ),
                 resolver_capability_specification: component(
                     "intlify-project-profile-resolver-capability",
-                    &[E::ComponentTuple],
+                    &[E::ComponentTuple, E::ResolverCapabilitySpecification],
                 ),
                 registry_package: component(
                     "intlify-project-profile-resolver-registry-package",
@@ -554,8 +559,24 @@ mod tests {
     }
 
     #[test]
-    fn a_container_is_checked_against_its_tuple_and_its_container_schema() {
+    fn a_component_lists_its_tuple_s_schema_and_then_its_artifact_s() {
         let body = ConstructionAdmission::revision_zero();
+        assert_eq!(
+            body.components
+                .profile_specification_schema
+                .envelope_schemas,
+            [EnvelopeSchema::ComponentTuple]
+        );
+        // A container and the Capability Specification's body each have one.
+        assert_eq!(
+            body.components
+                .resolver_capability_specification
+                .envelope_schemas,
+            [
+                EnvelopeSchema::ComponentTuple,
+                EnvelopeSchema::ResolverCapabilitySpecification
+            ]
+        );
         assert_eq!(
             body.components
                 .configuration_schema_authority_set
@@ -586,7 +607,8 @@ mod tests {
                 "component-tuple",
                 "profile-specification-tuple",
                 "configuration-schema-authority-set",
-                "registry-package"
+                "registry-package",
+                "resolver-capability-specification"
             ]
         );
         for envelope in EnvelopeSchema::ALL {
