@@ -1,0 +1,76 @@
+{
+  "rows": [
+    {
+      "id": "configuration-file",
+      "rank": "0",
+      "permittedEvidenceKinds": [
+        "entry-source",
+        "configuration-value"
+      ]
+    },
+    {
+      "id": "configuration-programmatic",
+      "rank": "1",
+      "permittedEvidenceKinds": [
+        "entry-source",
+        "configuration-value"
+      ]
+    },
+    {
+      "id": "profile-selector-cli",
+      "rank": "2",
+      "permittedEvidenceKinds": [
+        "profile-selector"
+      ]
+    },
+    {
+      "id": "profile-selector-programmatic",
+      "rank": "3",
+      "permittedEvidenceKinds": [
+        "profile-selector"
+      ]
+    },
+    {
+      "id": "profile-resolution-specification-input",
+      "rank": "4",
+      "permittedEvidenceKinds": [
+        "specification-input"
+      ]
+    },
+    {
+      "id": "intent-surface-class-vocabulary",
+      "rank": "5",
+      "permittedEvidenceKinds": [
+        "artifact-input"
+      ]
+    },
+    {
+      "id": "locale-canonicalization-data",
+      "rank": "6",
+      "permittedEvidenceKinds": [
+        "artifact-input"
+      ]
+    },
+    {
+      "id": "profile-resolution-artifact-collection",
+      "rank": "7",
+      "permittedEvidenceKinds": [
+        "artifact-input"
+      ]
+    },
+    {
+      "id": "resource-limit-policy-verification",
+      "rank": "8",
+      "permittedEvidenceKinds": [
+        "verification-input"
+      ]
+    },
+    {
+      "id": "implementation-capability",
+      "rank": "9",
+      "permittedEvidenceKinds": [
+        "implementation-capability"
+      ]
+    }
+  ]
+}

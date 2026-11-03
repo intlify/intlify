@@ -4,14 +4,16 @@
 //! Write the built-in Resolver Construction Root Package's artifacts and the
 //! construction authorities.
 //!
-//! The five members, the Root Package artifact, and the five authorities are
-//! written from this crate's values. A file digest covers every byte, so
+//! The five members, the Root Package artifact, the five authorities, and the
+//! Registry Package's members written so far are written from this crate's
+//! values. A file digest covers every byte, so
 //! `--check` compares the exact bytes, not decoded values, and the artifacts
 //! are kept out of the repository formatter. `--write` also prints the digests
 //! the crate pins: the Root Package's two belong in
 //! `src/construction/root.rs`, and the authorities' in
 //! `src/construction/profile.rs`, `src/construction/authority_set.rs`, and
-//! `src/construction/capability.rs`.
+//! `src/construction/capability.rs`, and the registries' in
+//! `src/construction/registry/safe_origin.rs`.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -31,9 +33,15 @@ fn main() -> ExitCode {
         use intlify_config::construction_support as support;
         let mut artifacts = support::artifacts()?;
         artifacts.extend(support::authorities()?);
-        Ok::<_, serde_json::Error>((artifacts, support::pinned()?, support::authority_pins()?))
+        artifacts.extend(support::registries()?);
+        Ok::<_, serde_json::Error>((
+            artifacts,
+            support::pinned()?,
+            support::authority_pins()?,
+            support::registry_pins()?,
+        ))
     })();
-    let (artifacts, pinned, authority_pins) = match support {
+    let (artifacts, pinned, authority_pins, registry_pins) = match support {
         Ok(support) => support,
         Err(error) => {
             eprintln!("the artifacts could not be written: {error}");
@@ -85,6 +93,14 @@ fn main() -> ExitCode {
         println!(
             "pinned Resolver Capability Specification digest: {}",
             authority_pins.resolver_capability_specification
+        );
+        println!(
+            "pinned Safe Origin Kind Registry schema digest: {}",
+            registry_pins.safe_origin_kind_registry_schema
+        );
+        println!(
+            "pinned Safe Origin Kind Registry digest: {}",
+            registry_pins.safe_origin_kind_registry
         );
     }
     if stale {
