@@ -93,9 +93,10 @@ impl Phase {
     }
 }
 
-/// What one unit checks: 015's subject kind and Logical subject key. Kinds are
-/// declared in rank order, so subjects order by kind and then by key.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+/// What one unit checks: a Logical subject key of one subject kind, which
+/// [`Subject::kind`] names ([`SubjectKind`](super::subject::SubjectKind)).
+/// Subjects order by their kind's rank, then by key.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Subject {
     /// One slot of the Profile Resolution Specification Input.
     Slot(Slot),
@@ -616,6 +617,10 @@ pub(crate) enum Status {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum EvaluationInvariant {
+    /// A resolver bug: a unit's subject is of a kind another phase checks.
+    KindOutsidePhase(Unit),
+    /// A resolver bug: a unit runs a check its subject's kind does not run.
+    CheckOutsideKind(Unit),
     /// A resolver bug: each unit is evaluated at most once.
     UnitRecordedTwice(Unit),
     /// A resolver bug: only an evaluated unit finds a non-blocking result.
@@ -634,6 +639,8 @@ pub(crate) struct Evaluation {
 
 impl Evaluation {
     /// Runs `unit` when its prerequisite is admitted and records its status.
+    /// A unit whose subject is of another phase's kind, or that runs a check its
+    /// kind does not run, is a resolver bug and is not recorded.
     /// `evaluate` returns the value the unit establishes or the blocking result
     /// it found. An unavailable prerequisite becomes the unit's causes: the unit
     /// reports nothing, and whatever depends on it inherits the same causes.
@@ -643,6 +650,13 @@ impl Evaluation {
         prerequisite: Admitted<P>,
         evaluate: impl FnOnce(P) -> Result<T, Blocking>,
     ) -> Result<Admitted<T>, EvaluationInvariant> {
+        let kind = unit.subject.kind();
+        if kind.phase() != unit.phase {
+            return Err(EvaluationInvariant::KindOutsidePhase(unit));
+        }
+        if !kind.checks().contains(&unit.check) {
+            return Err(EvaluationInvariant::CheckOutsideKind(unit));
+        }
         if self.statuses.contains_key(&unit) {
             return Err(EvaluationInvariant::UnitRecordedTwice(unit));
         }
@@ -1037,6 +1051,48 @@ mod tests {
             ]
         );
         assert_eq!(joined.clone().union(placement), joined);
+    }
+
+    #[test]
+    fn a_unit_is_of_a_kind_its_phase_checks_and_runs_one_of_its_checks() {
+        let mut evaluation = Evaluation::default();
+        let mut ran = false;
+        let outside = Unit {
+            phase: Phase::ResourcePolicyAdmission,
+            ..data()
+        };
+        assert_eq!(
+            evaluation
+                .check(outside.clone(), Ok(()), |()| {
+                    ran = true;
+                    Ok::<(), Blocking>(())
+                })
+                .err(),
+            Some(EvaluationInvariant::KindOutsidePhase(outside))
+        );
+        // An unavailable prerequisite does not hide a check the kind lacks.
+        let foreign = Unit {
+            check: Check::WithinBound,
+            ..data()
+        };
+        let causes = missing(&mut evaluation, slot(Slot::Coverage));
+        assert_eq!(
+            evaluation
+                .check(foreign.clone(), Err::<(), _>(causes), |()| {
+                    ran = true;
+                    Ok::<(), Blocking>(())
+                })
+                .err(),
+            Some(EvaluationInvariant::CheckOutsideKind(foreign))
+        );
+        assert!(!ran);
+        // Neither was recorded, so the right unit still can be.
+        assert_eq!(evaluation.statuses().count(), 1);
+        evaluation
+            .check(data(), Ok(()), |()| Ok::<(), Blocking>(()))
+            .unwrap()
+            .unwrap();
+        assert_eq!(evaluation.status(&data()), Some(&Status::Evaluated));
     }
 
     #[test]

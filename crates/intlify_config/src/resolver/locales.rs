@@ -552,13 +552,15 @@ pub(crate) mod fixtures {
     }
 
     /// Causes a caller passes for a value an earlier phase left unavailable.
-    /// Those phases' keys arrive with them, so a Phase 5 slot's key stands in.
+    /// Those phases' keys arrive with them, so the key of a specification
+    /// slot, in the phase that checks it, stands in.
     pub(crate) fn stand_in(slot: Slot) -> Causes {
+        let subject = Subject::Slot(slot);
         Evaluation::default()
             .check(
                 Unit {
-                    phase: Phase::SpecificationAdmission,
-                    subject: Subject::Slot(slot),
+                    phase: subject.kind().phase(),
+                    subject,
                     check: Check::SupportedAssertion,
                 },
                 Ok(()),

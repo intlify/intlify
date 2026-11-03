@@ -1018,13 +1018,13 @@ mod tests {
         // boundary would refuse.
         let (_, vocabulary) = blocked_unit(
             Unit {
-                phase: Phase::ArtifactReferenceResolution,
+                phase: Phase::SpecificationAdmission,
                 subject: Subject::Vocabulary,
-                check: Check::VocabularyMember,
+                check: Check::IntactArtifact,
             },
             Blocking {
-                code: Code::ArtifactReferenceNotAdmitted,
-                reason: Some(Reason::NotFound),
+                code: Code::IntentSurfaceClassVocabularyNotAdmitted,
+                reason: Some(Reason::BodyIntegrityInvalid),
                 details: None,
             },
         );
