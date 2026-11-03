@@ -189,6 +189,26 @@ pub(crate) enum EnvelopeSchema {
     RegistryPackage,
 }
 
+impl EnvelopeSchema {
+    /// Every envelope schema, in the package's order.
+    pub(crate) const ALL: [Self; 4] = [
+        Self::ComponentTuple,
+        Self::ProfileSpecificationTuple,
+        Self::ConfigurationSchemaAuthoritySet,
+        Self::RegistryPackage,
+    ];
+
+    /// The name the package holds the schema under.
+    pub(crate) const fn name(self) -> &'static str {
+        match self {
+            Self::ComponentTuple => "component-tuple",
+            Self::ProfileSpecificationTuple => "profile-specification-tuple",
+            Self::ConfigurationSchemaAuthoritySet => "configuration-schema-authority-set",
+            Self::RegistryPackage => "registry-package",
+        }
+    }
+}
+
 /// The identity and revisions one construction slot admits.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -556,6 +576,25 @@ mod tests {
             body.components.profile_specification.envelope_schemas,
             [EnvelopeSchema::ProfileSpecificationTuple]
         );
+    }
+
+    #[test]
+    fn an_envelope_schema_is_named_as_the_admission_body_spells_it() {
+        assert_eq!(
+            EnvelopeSchema::ALL.map(EnvelopeSchema::name),
+            [
+                "component-tuple",
+                "profile-specification-tuple",
+                "configuration-schema-authority-set",
+                "registry-package"
+            ]
+        );
+        for envelope in EnvelopeSchema::ALL {
+            assert_eq!(
+                serde_json::to_value(envelope).unwrap(),
+                json!(envelope.name())
+            );
+        }
     }
 
     #[test]

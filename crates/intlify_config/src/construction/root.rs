@@ -19,14 +19,23 @@
 //! framed record: the package identity, its revision, and the members in role
 //! order, each a record of its role and its member digest. Paths enter neither
 //! digest's preimage beyond the artifact's own bytes.
+//!
+//! Construction then reads, once, the members it checks components against:
+//! the admission body, and the envelope schemas and the Draft 7 meta-schema,
+//! read by the validator. A verified member that does not read as its role's
+//! body is an implementation failure too.
 
 use std::sync::OnceLock;
 
+use intlify_shared_json::decode;
 use intlify_shared_json::encoding::digest_bytes;
 use intlify_shared_json::token::IntegrityDigest;
 use serde_json::Value;
 
 use crate::framing::{collection, Record};
+
+use super::admission::{ConstructionAdmission, EnvelopeSchema, DRAFT_7};
+use super::validator::schema::Schema;
 
 /// The Root Package's identity.
 pub(crate) const IDENTITY: &str = "intlify-resolver-construction-root-package";
@@ -120,7 +129,8 @@ impl RootRole {
     }
 }
 
-/// Why the built-in package is not the one the implementation pins.
+/// Why the built-in package cannot be the root: it is not the one the
+/// implementation pins, or a member does not read as its role's body.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RootPackageFailure {
     /// The artifact's bytes do not have the pinned file digest.
@@ -134,6 +144,8 @@ pub(crate) enum RootPackageFailure {
     MemberDigestMismatch(RootRole),
     /// The recomputed canonical digest is not the pinned one.
     CanonicalDigestMismatch,
+    /// A member's verified bytes are not the body its role holds.
+    Unreadable(RootRole),
 }
 
 /// A verified Root Package and its members' bodies.
@@ -174,6 +186,105 @@ impl<'a> RootPackage<'a> {
             .map(|(_, bytes)| *bytes)
             .expect("a verified package holds every role")
     }
+}
+
+/// The envelope schemas, read.
+#[derive(Debug)]
+struct Envelopes {
+    component_tuple: Schema,
+    profile_specification_tuple: Schema,
+    configuration_schema_authority_set: Schema,
+    registry_package: Schema,
+}
+
+/// The Root Package's members construction checks components against: the
+/// admission body, and the envelope schemas and the Draft 7 meta-schema, read
+/// by the validator.
+#[derive(Debug)]
+pub(crate) struct ConstructionRoot {
+    admission: ConstructionAdmission,
+    envelopes: Envelopes,
+    meta_schema: Schema,
+}
+
+impl ConstructionRoot {
+    /// Borrow the built-in root, read once after its package is verified.
+    pub(crate) fn built_in() -> Result<&'static Self, RootPackageFailure> {
+        static BUILT_IN: OnceLock<Result<ConstructionRoot, RootPackageFailure>> = OnceLock::new();
+        BUILT_IN
+            .get_or_init(|| RootPackage::built_in().and_then(|package| Self::read(package)))
+            .as_ref()
+            .map_err(|failure| *failure)
+    }
+
+    /// Read a verified package's members.
+    pub(crate) fn read(package: &RootPackage<'_>) -> Result<Self, RootPackageFailure> {
+        use RootRole as R;
+        let admission = decode::value(package.member(R::ConstructionAdmissionSpecification), true)
+            .and_then(decode::typed::<ConstructionAdmission>)
+            .map_err(|_| RootPackageFailure::Unreadable(R::ConstructionAdmissionSpecification))?;
+        let envelopes = envelopes(package.member(R::AuthorityEnvelopeSchemaPackage)).ok_or(
+            RootPackageFailure::Unreadable(R::AuthorityEnvelopeSchemaPackage),
+        )?;
+        let meta_schema = meta_schema(package.member(R::JsonSchemaMetaSchemaPackage)).ok_or(
+            RootPackageFailure::Unreadable(R::JsonSchemaMetaSchemaPackage),
+        )?;
+        Ok(Self {
+            admission,
+            envelopes,
+            meta_schema,
+        })
+    }
+
+    /// The admission body.
+    pub(crate) const fn admission(&self) -> &ConstructionAdmission {
+        &self.admission
+    }
+
+    /// One envelope schema.
+    pub(crate) const fn envelope(&self, envelope: EnvelopeSchema) -> &Schema {
+        match envelope {
+            EnvelopeSchema::ComponentTuple => &self.envelopes.component_tuple,
+            EnvelopeSchema::ProfileSpecificationTuple => {
+                &self.envelopes.profile_specification_tuple
+            }
+            EnvelopeSchema::ConfigurationSchemaAuthoritySet => {
+                &self.envelopes.configuration_schema_authority_set
+            }
+            EnvelopeSchema::RegistryPackage => &self.envelopes.registry_package,
+        }
+    }
+
+    /// The Draft 7 meta-schema.
+    pub(crate) const fn meta_schema(&self) -> &Schema {
+        &self.meta_schema
+    }
+}
+
+/// Read the envelope schema package: each schema under its name.
+fn envelopes(bytes: &[u8]) -> Option<Envelopes> {
+    let package = decode::value(bytes, false).ok()?;
+    let schemas = package.get("schemas")?;
+    let schema = |envelope: EnvelopeSchema| Schema::compile(schemas.get(envelope.name())?).ok();
+    Some(Envelopes {
+        component_tuple: schema(EnvelopeSchema::ComponentTuple)?,
+        profile_specification_tuple: schema(EnvelopeSchema::ProfileSpecificationTuple)?,
+        configuration_schema_authority_set: schema(
+            EnvelopeSchema::ConfigurationSchemaAuthoritySet,
+        )?,
+        registry_package: schema(EnvelopeSchema::RegistryPackage)?,
+    })
+}
+
+/// Read the meta-schema package: the meta-schema of Draft 7.
+fn meta_schema(bytes: &[u8]) -> Option<Schema> {
+    let package = decode::value(bytes, false).ok()?;
+    let dialect = package
+        .get("dialects")?
+        .as_array()?
+        .iter()
+        .find(|entry| entry.get("dialect").and_then(Value::as_str) == Some(DRAFT_7))?;
+    Schema::compile(dialect.get("metaSchema")?).ok()
 }
 
 /// Read a `sha256:` presentation back into its 32 bytes.
@@ -529,6 +640,163 @@ mod tests {
             text.replacen("sha256:", "", 1),
         ] {
             assert_eq!(digest_bytes_of(&invalid), None, "{invalid}");
+        }
+    }
+
+    /// Read a package whose member of `role` is `body`, as if it were
+    /// verified; the other members are the built-in ones.
+    fn read_with(role: RootRole, body: &[u8]) -> Result<(), RootPackageFailure> {
+        let members = RootRole::ALL.map(|member| {
+            (
+                member,
+                if member == role {
+                    body
+                } else {
+                    member.built_in()
+                },
+            )
+        });
+        let package = RootPackage {
+            canonical_digest: [0; 32],
+            members,
+        };
+        ConstructionRoot::read(&package).map(|_| ())
+    }
+
+    fn built_in_value(role: RootRole) -> Value {
+        serde_json::from_slice(role.built_in()).unwrap()
+    }
+
+    #[test]
+    fn the_built_in_root_reads_the_admission_body_and_the_schemas() {
+        let root = ConstructionRoot::built_in().unwrap();
+        assert_eq!(root.admission(), &ConstructionAdmission::revision_zero());
+        // Each envelope schema is the one its name holds: an instance of one
+        // envelope is an instance of no other.
+        let digest = format!("sha256:{}", "0".repeat(64));
+        let tuple = json!({ "identity": "a", "revision": "0", "digest": digest });
+        let mut profile = tuple.clone();
+        profile["semanticDigest"] = json!(digest);
+        let set = json!({
+            "profileSpecification": { "identity": "a", "revision": "0", "semanticDigest": digest },
+            "members": {
+                "0": { "identity": "a", "revision": "0", "dialect": DRAFT_7, "digest": digest }
+            }
+        });
+        let mut roles = serde_json::Map::new();
+        for role in [
+            "safe-origin-kind-registry-schema",
+            "check-registry-schema",
+            "finding-registry-schema",
+            "safe-origin-kind-registry",
+            "check-registry",
+            "finding-registry",
+        ] {
+            roles.insert(role.to_owned(), tuple.clone());
+        }
+        let registry = json!({ "members": roles });
+        let instances = [tuple, profile, set, registry];
+        for (index, envelope) in EnvelopeSchema::ALL.into_iter().enumerate() {
+            for (other, instance) in instances.iter().enumerate() {
+                assert_eq!(
+                    root.envelope(envelope).validate(instance).valid,
+                    index == other,
+                    "{envelope:?} against instance {other}"
+                );
+            }
+        }
+        // The meta-schema is Draft 7's: it admits itself, and refuses a type
+        // that is not one of Draft 7's type names.
+        let meta: Value =
+            serde_json::from_str(crate::construction::meta_schema::DRAFT_7_META_SCHEMA).unwrap();
+        assert!(root.meta_schema().validate(&meta).valid);
+        assert!(
+            !root
+                .meta_schema()
+                .validate(&json!({ "type": "integral" }))
+                .valid
+        );
+    }
+
+    #[test]
+    fn the_admission_body_reads_only_as_its_closed_type() {
+        let role = RootRole::ConstructionAdmissionSpecification;
+        assert_eq!(read_with(role, role.built_in()), Ok(()));
+        let mut extra = built_in_value(role);
+        extra["extra"] = json!("member");
+        let mut number = built_in_value(role);
+        number["bounds"][0]["value"] = json!(16_777_216);
+        for body in [
+            b"[".to_vec(),
+            b"{}".to_vec(),
+            serde_json::to_vec(&extra).unwrap(),
+            serde_json::to_vec(&number).unwrap(),
+        ] {
+            assert_eq!(
+                read_with(role, &body),
+                Err(RootPackageFailure::Unreadable(role)),
+                "{}",
+                String::from_utf8_lossy(&body)
+            );
+        }
+    }
+
+    #[test]
+    fn every_envelope_schema_must_be_held_and_read() {
+        let role = RootRole::AuthorityEnvelopeSchemaPackage;
+        let mut bodies = vec![b"[".to_vec(), b"{}".to_vec(), br#"{"schemas":{}}"#.to_vec()];
+        for envelope in EnvelopeSchema::ALL {
+            let mut missing = built_in_value(role);
+            missing["schemas"]
+                .as_object_mut()
+                .unwrap()
+                .remove(envelope.name());
+            bodies.push(serde_json::to_vec(&missing).unwrap());
+            let mut unread = built_in_value(role);
+            unread["schemas"][envelope.name()] = json!({ "type": "integral" });
+            bodies.push(serde_json::to_vec(&unread).unwrap());
+        }
+        for body in bodies {
+            assert_eq!(
+                read_with(role, &body),
+                Err(RootPackageFailure::Unreadable(role)),
+                "{}",
+                String::from_utf8_lossy(&body)
+            );
+        }
+    }
+
+    #[test]
+    fn the_meta_schema_is_the_one_listed_for_draft_7() {
+        let role = RootRole::JsonSchemaMetaSchemaPackage;
+        let draft_6 = "http://json-schema.org/draft-06/schema#";
+        let package = built_in_value(role);
+        let meta = &package["dialects"][0]["metaSchema"];
+        // Another dialect listed first is passed over.
+        let other_first = json!({
+            "dialects": [
+                { "dialect": draft_6, "metaSchema": { "type": "integral" } },
+                { "dialect": DRAFT_7, "metaSchema": meta }
+            ]
+        });
+        assert_eq!(
+            read_with(role, &serde_json::to_vec(&other_first).unwrap()),
+            Ok(())
+        );
+        for body in [
+            json!([]),
+            json!({}),
+            json!({ "dialects": {} }),
+            json!({ "dialects": [] }),
+            json!({ "dialects": [{ "dialect": draft_6, "metaSchema": meta }] }),
+            json!({ "dialects": [{ "dialect": DRAFT_7 }] }),
+            json!({ "dialects": [{ "dialect": DRAFT_7, "metaSchema": { "type": "integral" } }] }),
+        ] {
+            assert_eq!(
+                read_with(role, &serde_json::to_vec(&body).unwrap()),
+                Err(RootPackageFailure::Unreadable(role)),
+                "{body}"
+            );
         }
     }
 }

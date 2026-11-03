@@ -15,9 +15,16 @@
 //! ([`profile`]), and the Configuration Schema Authority Set with its mapped
 //! schema ([`authority_set`]). The implementation compiles in only their
 //! digests, which construction compares with the authorities it is given.
+//!
+//! Construction checks the authorities it is given in the order of the
+//! construction-failure precedence, each check refusing with its row: the
+//! checks every component starts with ([`component`]), against the members of
+//! the built-in root ([`root`]), and then each authority's own checks, in the
+//! authority's module.
 
 pub(crate) mod admission;
 pub(crate) mod authority_set;
+pub(crate) mod component;
 pub(crate) mod envelope;
 pub(crate) mod failure;
 pub(crate) mod meta_schema;
