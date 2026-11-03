@@ -13,6 +13,7 @@
     "check:locale": "node scripts/verify-locale.mjs",
     "check:locale-corpus": "node scripts/verify-locale-corpus.mjs",
     "check:pattern": "node scripts/verify-pattern.mjs",
+    "check:registries": "node scripts/verify-registries.mjs",
     "check:validator-schemas": "node scripts/verify-validator-schemas.mjs",
     "check:validator-values": "node scripts/verify-validator-values.mjs",
     "check:vocabulary": "node scripts/verify-vocabulary.mjs"

@@ -14,7 +14,7 @@
 //! `schemaVersion` `"0"`, whose bytes are the configuration schema as this
 //! crate publishes it. The Profile Specification's semantic digest goes into
 //! the Configuration Schema Authority Set, and so does the mapped schema's
-//! file digest.
+//! file digest. The Registry Package's members follow the same form.
 
 use serde_json::{json, Map, Value};
 
@@ -26,6 +26,7 @@ use super::authority_set::{self, ConfigurationSchemaAuthoritySet};
 use super::capability::{self, CapabilitySpecification};
 use super::component::file_digest;
 use super::profile::{self, ProjectProfileSpecification};
+use super::registry::safe_origin::{self, SafeOriginKindRegistry};
 use super::root::{canonical_digest, RootRole, PATH};
 use super::rules::CrossAuthorityRules;
 use super::{envelope, meta_schema};
@@ -35,6 +36,13 @@ use super::{envelope, meta_schema};
 pub struct Artifact {
     pub path: &'static str,
     pub bytes: Vec<u8>,
+}
+
+/// The Registry Package members' file digests the implementation compiles in.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegistryPins {
+    pub safe_origin_kind_registry_schema: String,
+    pub safe_origin_kind_registry: String,
 }
 
 /// The two digests the implementation compiles in.
@@ -151,6 +159,41 @@ pub fn authorities() -> Result<Vec<Artifact>, serde_json::Error> {
     ])
 }
 
+/// Write the Registry Package's members: the Safe Origin Kind Registry's
+/// schema and the registry.
+///
+/// # Errors
+///
+/// Returns the serialization failure of a member, which the values rule out.
+pub fn registries() -> Result<Vec<Artifact>, serde_json::Error> {
+    Ok(vec![
+        Artifact {
+            path: safe_origin::SCHEMA_PATH,
+            bytes: write(&safe_origin::schema()?)?,
+        },
+        Artifact {
+            path: safe_origin::PATH,
+            bytes: write(&serde_json::to_value(
+                SafeOriginKindRegistry::revision_zero(),
+            )?)?,
+        },
+    ])
+}
+
+/// The Registry Package members' digests the implementation compiles in.
+///
+/// # Errors
+///
+/// Returns the serialization failure of a member, which the values rule out.
+pub fn registry_pins() -> Result<RegistryPins, serde_json::Error> {
+    let [schema, registry] = <[Artifact; 2]>::try_from(registries()?)
+        .unwrap_or_else(|_| unreachable!("two members are written"));
+    Ok(RegistryPins {
+        safe_origin_kind_registry_schema: file_digest(&schema.bytes).as_str().to_owned(),
+        safe_origin_kind_registry: file_digest(&registry.bytes).as_str().to_owned(),
+    })
+}
+
 /// The authorities' digests the implementation compiles in.
 ///
 /// # Errors
@@ -235,6 +278,43 @@ mod tests {
             include_bytes!("../../conformance/authorities/resolver-capability-v0.json"),
         ),
     ];
+
+    /// The committed Registry Package members, at their paths.
+    const COMMITTED_REGISTRIES: [(&str, &[u8]); 2] = [
+        (
+            safe_origin::SCHEMA_PATH,
+            include_bytes!("../../conformance/registries/safe-origin-kind-v0.schema.json"),
+        ),
+        (
+            safe_origin::PATH,
+            include_bytes!("../../conformance/registries/safe-origin-kind-v0.json"),
+        ),
+    ];
+
+    #[test]
+    fn the_committed_registries_are_the_ones_this_crate_writes() {
+        let registries = registries().unwrap();
+        assert_eq!(registries.len(), 2);
+        for (artifact, (path, bytes)) in registries.iter().zip(COMMITTED_REGISTRIES) {
+            assert_eq!(artifact.path, path);
+            assert_eq!(
+                artifact.bytes, bytes,
+                "{path} is stale; regenerate it with the generate_construction_artifacts example"
+            );
+        }
+    }
+
+    #[test]
+    fn the_pinned_registry_digests_are_the_ones_the_registries_make() {
+        assert_eq!(
+            registry_pins().unwrap(),
+            RegistryPins {
+                safe_origin_kind_registry_schema: safe_origin::SCHEMA_DIGEST.to_owned(),
+                safe_origin_kind_registry: safe_origin::DIGEST.to_owned(),
+            },
+            "the pinned digests in construction/registry/safe_origin.rs are stale"
+        );
+    }
 
     #[test]
     fn the_committed_artifacts_are_the_ones_this_crate_writes() {
@@ -335,6 +415,7 @@ mod tests {
             .unwrap()
             .into_iter()
             .chain(authorities().unwrap())
+            .chain(registries().unwrap())
         {
             assert!(artifact.bytes.ends_with(b"}\n"), "{}", artifact.path);
             assert!(!artifact.bytes.ends_with(b"\n\n"), "{}", artifact.path);

@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SafeOriginKindRegistry",
+  "description": "The registry's body.",
+  "type": "object",
+  "properties": {
+    "rows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/SafeOriginKindRow"
+      },
+      "minItems": 1
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "rows"
+  ],
+  "definitions": {
+    "SafeOriginKindRow": {
+      "description": "One Safe Origin Kind.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/SafeOriginKind"
+        },
+        "rank": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "permittedEvidenceKinds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EvidenceKind"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "rank",
+        "permittedEvidenceKinds"
+      ]
+    },
+    "SafeOriginKind": {
+      "description": "The fixed input boundary that supplied an origin-bearing Evidence item,\ndeclared in rank order.",
+      "type": "string",
+      "enum": [
+        "configuration-file",
+        "configuration-programmatic",
+        "profile-selector-cli",
+        "profile-selector-programmatic",
+        "profile-resolution-specification-input",
+        "intent-surface-class-vocabulary",
+        "locale-canonicalization-data",
+        "profile-resolution-artifact-collection",
+        "resource-limit-policy-verification",
+        "implementation-capability"
+      ]
+    },
+    "EvidenceKind": {
+      "description": "What an origin-bearing Evidence item describes.",
+      "type": "string",
+      "enum": [
+        "entry-source",
+        "configuration-value",
+        "profile-selector",
+        "specification-input",
+        "artifact-input",
+        "verification-input",
+        "implementation-capability"
+      ]
+    }
+  }
+}

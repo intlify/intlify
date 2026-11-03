@@ -17,6 +17,10 @@
 //! ([`capability`]). The implementation compiles in only their digests, which
 //! construction compares with the authorities it is given.
 //!
+//! The Registry Package's members are checked in below
+//! `conformance/registries/` in the same way ([`registry`]); revision `"0"`
+//! writes the Safe Origin Kind Registry and its schema so far.
+//!
 //! Construction checks the authorities it is given in the order of the
 //! construction-failure precedence, each check refusing with its row: the
 //! checks every component starts with ([`component`]), against the members of
@@ -31,6 +35,7 @@ pub(crate) mod envelope;
 pub(crate) mod failure;
 pub(crate) mod meta_schema;
 pub(crate) mod profile;
+pub(crate) mod registry;
 pub(crate) mod root;
 pub(crate) mod rules;
 pub(crate) mod validator;
