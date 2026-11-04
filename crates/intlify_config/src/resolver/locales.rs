@@ -576,6 +576,31 @@ pub(crate) mod fixtures {
             .unwrap_err()
     }
 
+    /// Causes a phase before Phase 4 left behind, told apart by `code`.
+    /// Phases 1 to 3 record no units yet, so the key of Phase 0's one unit
+    /// with `code` stands in for theirs.
+    pub(crate) fn earlier(code: Code) -> Causes {
+        let subject = Subject::Slot(Slot::ProjectProfile);
+        Evaluation::default()
+            .check(
+                Unit {
+                    phase: subject.kind().phase(),
+                    subject,
+                    check: Check::SupportedAssertion,
+                },
+                Ok(()),
+                |()| {
+                    Err::<(), _>(Blocking {
+                        code,
+                        reason: None,
+                        details: None,
+                    })
+                },
+            )
+            .unwrap()
+            .unwrap_err()
+    }
+
     /// The units behind `causes`.
     pub(crate) fn units(causes: &Causes) -> Vec<Unit> {
         causes.keys().map(|key| key.unit().clone()).collect()

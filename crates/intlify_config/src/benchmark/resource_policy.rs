@@ -12,7 +12,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::artifacts::collection::FormalCollection;
-use crate::artifacts::envelope::ArtifactKind;
+use crate::artifacts::envelope::{ArtifactKind, MemberKey};
 use crate::model::ProfileId;
 use crate::references::PolicyReference;
 use crate::resolver::bootstrap::VerificationInput;
@@ -22,11 +22,12 @@ use crate::resolver::evaluation::{
 };
 use crate::resolver::limits::{ImplementationCapability, ResolutionLimits};
 use crate::resolver::resource_policy::{
-    admit_resource_policy, ConfigurationMeasures, DeclarationReferences, PolicyInvariant,
-    PolicyOutcome, PolicySubject, ReferenceField,
+    admit_resource_policy, ArtifactSubject, ConfigurationMeasures, DeclarationReferences,
+    PolicyInvariant, PolicyOutcome, PolicySubject, ReferenceField,
 };
 use crate::structural::selection::{SelectorInput, StringLengthFact};
 
+use super::artifact_collection::tuple;
 use super::observation::{Frame, Observation};
 use super::operation::{Analysis, Config, OutputFailure};
 use super::quantity::Quantity;
@@ -41,8 +42,8 @@ pub(super) struct PreparedPolicy {
     pub(super) selector: SelectorInput,
     pub(super) capability: ImplementationCapability,
     pub(super) collection: FormalCollection,
-    /// The bytes of every declared Profile ID, in their unsigned byte order.
-    pub(super) profile_ids: Vec<u64>,
+    /// Every declared Profile ID, in their unsigned byte order.
+    pub(super) profile_ids: Vec<ProfileId>,
 }
 
 /// What Phase 4 borrows from the configuration, and the Verification Input
@@ -186,37 +187,62 @@ fn field(frame: &mut Frame, field: &ReferenceField) {
     }
 }
 
-fn subject(frame: &mut Frame, subject: &PolicySubject) -> Result<(), OutputFailure> {
+fn member(frame: &mut Frame, key: &MemberKey) {
+    match key {
+        MemberKey::Tuple(own) => {
+            frame.uint(0);
+            tuple(frame, own);
+        }
+        MemberKey::Content(content) => {
+            frame.uint(1);
+            frame.bytes(content.as_bytes());
+        }
+    }
+}
+
+fn artifact(frame: &mut Frame, subject: &ArtifactSubject) {
     match subject {
-        PolicySubject::Nodes => frame.uint(0),
-        PolicySubject::Depth => frame.uint(1),
-        PolicySubject::CollectionEntries => frame.uint(2),
-        PolicySubject::StringBytes => frame.uint(3),
-        PolicySubject::LongestString => frame.uint(4),
-        PolicySubject::Profiles => frame.uint(5),
-        PolicySubject::ProfileId(rank) => {
+        ArtifactSubject::Artifacts => frame.uint(0),
+        ArtifactSubject::PolicyArtifacts => frame.uint(1),
+        ArtifactSubject::TargetProfileArtifacts => frame.uint(2),
+        ArtifactSubject::References => frame.uint(3),
+        ArtifactSubject::Artifact(key) => {
+            frame.uint(4);
+            member(frame, key);
+        }
+        ArtifactSubject::ArtifactBytes => frame.uint(5),
+        ArtifactSubject::Reference(own) => {
             frame.uint(6);
-            frame.uint(count(*rank)?);
-        }
-        PolicySubject::Selector => frame.uint(7),
-        PolicySubject::StructuralAnalysis => frame.uint(8),
-        PolicySubject::Artifacts => frame.uint(9),
-        PolicySubject::PolicyArtifacts => frame.uint(10),
-        PolicySubject::TargetProfileArtifacts => frame.uint(11),
-        PolicySubject::References => frame.uint(12),
-        PolicySubject::Artifact(rank) => {
-            frame.uint(13);
-            frame.uint(count(*rank)?);
-        }
-        PolicySubject::ArtifactBytes => frame.uint(14),
-        PolicySubject::Reference(own) => {
-            frame.uint(15);
             field(frame, own);
         }
-        PolicySubject::ReferenceBytes => frame.uint(16),
-        PolicySubject::ResourceLimits => frame.uint(17),
+        ArtifactSubject::ReferenceBytes => frame.uint(7),
     }
-    Ok(())
+}
+
+fn subject(frame: &mut Frame, subject: &PolicySubject) {
+    match subject {
+        PolicySubject::Capability(own) => {
+            frame.uint(0);
+            artifact(frame, own);
+        }
+        PolicySubject::ResourceLimits => frame.uint(1),
+        PolicySubject::Nodes => frame.uint(2),
+        PolicySubject::Depth => frame.uint(3),
+        PolicySubject::CollectionEntries => frame.uint(4),
+        PolicySubject::StringBytes => frame.uint(5),
+        PolicySubject::LongestString => frame.uint(6),
+        PolicySubject::Profiles => frame.uint(7),
+        PolicySubject::ProfileId(id) => {
+            frame.uint(8);
+            frame.text(id.as_str());
+        }
+        PolicySubject::Selector => frame.uint(9),
+        PolicySubject::StructuralAnalysis => frame.uint(10),
+        PolicySubject::Recheck(own) => {
+            frame.uint(11);
+            artifact(frame, own);
+        }
+    }
 }
 
 /// Only Phase 4's own units can appear: no other phase runs in the interval.
@@ -225,7 +251,7 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         return Err(OutputFailure::ResourcePolicyInvariant);
     };
     frame.text(unit.phase.id());
-    subject(frame, policy)?;
+    subject(frame, policy);
     frame.uint(match unit.check {
         Check::WithinCapability => 0,
         Check::WithinBound => 1,
@@ -421,7 +447,7 @@ mod tests {
     fn a_resolver_defect_fails_the_case() {
         for invariant in [
             PolicyInvariant::Evaluation(EvaluationInvariant::UnitRecordedTwice(policy_unit(
-                PolicySubject::Artifacts,
+                PolicySubject::Capability(ArtifactSubject::Artifacts),
                 Check::WithinCapability,
             ))),
             PolicyInvariant::Selection(SelectionInvariant::BootstrapBoundMismatch),
@@ -474,7 +500,10 @@ mod tests {
             Check::ResolvedReference,
         ] {
             assert_eq!(
-                unit(&mut frame, &policy_unit(PolicySubject::Artifacts, check)),
+                unit(
+                    &mut frame,
+                    &policy_unit(PolicySubject::ResourceLimits, check)
+                ),
                 Err(OutputFailure::ResourcePolicyInvariant)
             );
         }
@@ -486,7 +515,7 @@ mod tests {
         ]
         .map(|check| {
             digest(|frame| {
-                unit(frame, &policy_unit(PolicySubject::Artifacts, check)).unwrap();
+                unit(frame, &policy_unit(PolicySubject::ResourceLimits, check)).unwrap();
             })
         });
         for (index, left) in checks.iter().enumerate() {
@@ -496,40 +525,105 @@ mod tests {
 
     #[test]
     fn every_subject_frames_apart() {
+        use crate::artifacts::envelope::{envelope_of, FormalMember};
         use crate::model::TargetId;
         use crate::resolver::resource_policy::PolicySlot;
 
         let target =
             |id: &str| -> TargetId { serde_json::from_value(serde_json::Value::from(id)).unwrap() };
-        let subjects = [
-            PolicySubject::Nodes,
-            PolicySubject::Depth,
-            PolicySubject::CollectionEntries,
-            PolicySubject::StringBytes,
-            PolicySubject::LongestString,
-            PolicySubject::Profiles,
-            PolicySubject::ProfileId(0),
-            PolicySubject::ProfileId(1),
-            PolicySubject::Selector,
-            PolicySubject::StructuralAnalysis,
-            PolicySubject::Artifacts,
-            PolicySubject::PolicyArtifacts,
-            PolicySubject::TargetProfileArtifacts,
-            PolicySubject::References,
-            PolicySubject::Artifact(0),
-            PolicySubject::Artifact(1),
-            PolicySubject::ArtifactBytes,
-            PolicySubject::Reference(ReferenceField::Policy(PolicySlot::Approval)),
-            PolicySubject::Reference(ReferenceField::Policy(PolicySlot::Trust)),
-            PolicySubject::Reference(ReferenceField::TargetProfile(target("browser"))),
-            PolicySubject::Reference(ReferenceField::TargetProfile(target("server"))),
-            PolicySubject::ReferenceBytes,
-            PolicySubject::ResourceLimits,
-        ]
-        .map(|own| digest(|frame| subject(frame, &own).unwrap()));
+        let profile = |id: &str| -> ProfileId {
+            serde_json::from_value(serde_json::Value::from(id)).unwrap()
+        };
+        let key = |value| FormalMember::new(value).unwrap().key();
+        let trust = |identity| {
+            key(envelope_of(
+                ArtifactKind::TrustPolicy,
+                identity,
+                "1",
+                serde_json::json!({}),
+            ))
+        };
+        // Each `artifactAdmission` subject under both stages, with two keys
+        // of each member key's form.
+        let artifacts = || {
+            [
+                ArtifactSubject::Artifacts,
+                ArtifactSubject::PolicyArtifacts,
+                ArtifactSubject::TargetProfileArtifacts,
+                ArtifactSubject::References,
+                ArtifactSubject::Artifact(trust("storefront-trust")),
+                ArtifactSubject::Artifact(trust("storefront-other")),
+                ArtifactSubject::Artifact(key(serde_json::json!("a"))),
+                ArtifactSubject::Artifact(key(serde_json::json!("b"))),
+                ArtifactSubject::ArtifactBytes,
+                ArtifactSubject::Reference(ReferenceField::Policy(PolicySlot::Approval)),
+                ArtifactSubject::Reference(ReferenceField::Policy(PolicySlot::Trust)),
+                ArtifactSubject::Reference(ReferenceField::TargetProfile(target("browser"))),
+                ArtifactSubject::Reference(ReferenceField::TargetProfile(target("server"))),
+                ArtifactSubject::ReferenceBytes,
+            ]
+        };
+        let subjects: Vec<_> = artifacts()
+            .into_iter()
+            .map(PolicySubject::Capability)
+            .chain([
+                PolicySubject::ResourceLimits,
+                PolicySubject::Nodes,
+                PolicySubject::Depth,
+                PolicySubject::CollectionEntries,
+                PolicySubject::StringBytes,
+                PolicySubject::LongestString,
+                PolicySubject::Profiles,
+                PolicySubject::ProfileId(profile("app")),
+                PolicySubject::ProfileId(profile("web")),
+                PolicySubject::Selector,
+                PolicySubject::StructuralAnalysis,
+            ])
+            .chain(artifacts().into_iter().map(PolicySubject::Recheck))
+            .map(|own| digest(|frame| subject(frame, &own)))
+            .collect();
         for (index, left) in subjects.iter().enumerate() {
             assert!(subjects[index + 1..].iter().all(|right| right != left));
         }
+    }
+
+    #[test]
+    fn a_member_key_frames_its_form_before_its_tuple_or_body() {
+        use crate::artifacts::envelope::{envelope_of, FormalMember};
+
+        // No Phase 4 fixture submits a member without a tuple, so the
+        // fixture digests never frame the content form; it is pinned here.
+        let trust = FormalMember::new(envelope_of(
+            ArtifactKind::TrustPolicy,
+            "storefront-trust",
+            "1",
+            serde_json::json!({}),
+        ))
+        .unwrap()
+        .key();
+        let MemberKey::Tuple(own) = &trust else {
+            unreachable!("an envelope establishes its tuple")
+        };
+        assert_eq!(
+            digest(|frame| member(frame, &trust)),
+            digest(|frame| {
+                frame.uint(0);
+                tuple(frame, own);
+            })
+        );
+        let untupled = FormalMember::new(serde_json::json!({"schemaRevision": "0"}))
+            .unwrap()
+            .key();
+        let MemberKey::Content(body) = &untupled else {
+            unreachable!("no tuple")
+        };
+        assert_eq!(
+            digest(|frame| member(frame, &untupled)),
+            digest(|frame| {
+                frame.uint(1);
+                frame.bytes(body.as_bytes());
+            })
+        );
     }
 
     #[test]

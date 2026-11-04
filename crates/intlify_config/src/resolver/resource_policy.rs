@@ -10,15 +10,20 @@
 //! selector-projection authority, its `configurationInput` and
 //! `artifactAdmission` bounds are reapplied to what the earlier phases and the
 //! bounds above measured, and only when every recheck holds is it confirmed,
-//! which confirms the provisional selection. Recounting the diagnostics under
-//! it waits for 015 Implementation Phase 5.
+//! which confirms the provisional selection. A bound's check under the
+//! capability and its recheck are units of different subject kinds, ranked on
+//! either side of the decision, so every unit follows the units it waits on.
+//! Recounting the diagnostics under the policy waits for 015 Implementation
+//! Phase 5.
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 
 use crate::artifacts::collection::FormalCollection;
-use crate::artifacts::envelope::{ArtifactKind, Declaration, FormalMember};
+use crate::artifacts::envelope::{ArtifactKind, Declaration, FormalMember, MemberKey};
 use crate::input_limits::{Bound, ValueCounts};
-use crate::model::{NonEmptyMap, Policies, RequiredNullable, TargetDeclaration, TargetId};
+use crate::model::{
+    NonEmptyMap, Policies, ProfileId, RequiredNullable, TargetDeclaration, TargetId,
+};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::selection::{SelectionInvariant, SelectorInput, StringLengthFact};
 
@@ -31,7 +36,7 @@ use super::limits::{
     ArtifactAdmissionLimits, BoundId, ConfigurationInputLimits, ConfirmedPolicy, Group,
     ImplementationCapability, ResolutionLimits,
 };
-use super::tally::{actual, measure, total, within, Tally};
+use super::tally::{actual, first_over, measure, total, within, Tally};
 
 const fn configuration_bound(name: &'static str) -> BoundId {
     BoundId {
@@ -69,11 +74,18 @@ const MAX_SINGLE_REFERENCE_CANONICAL_BYTES: BoundId =
 const MAX_TOTAL_REFERENCE_CANONICAL_BYTES: BoundId =
     artifact_bound("maxTotalReferenceCanonicalBytes");
 
-/// What one Phase 4 unit checks: a bound of 015's `configurationInput` table,
-/// then of its `artifactAdmission` table, each in the table's declaration
-/// order and over the table's scope, then the selected reference.
+/// What one Phase 4 unit checks, in rank order: each bound of 015's
+/// `artifactAdmission` table under the capability's value, which needs no
+/// policy; the selected `resourceLimits` reference and the policy it names;
+/// and then, under the admitted policy, each bound of the `configurationInput`
+/// table and again of the `artifactAdmission` table, in the tables'
+/// declaration order and over their scopes.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum PolicySubject {
+    /// An `artifactAdmission` bound under the capability's value.
+    Capability(ArtifactSubject),
+    /// The selected `resourceLimits` reference and the policy it names.
+    ResourceLimits,
     /// The materialized root's logical values, under `maxNodes`.
     Nodes,
     /// The materialized root's deepest value level, under `maxDepth`.
@@ -89,13 +101,20 @@ pub(crate) enum PolicySubject {
     LongestString,
     /// The root `profiles` object's declarations, under `maxProfiles`.
     Profiles,
-    /// One declared Profile ID, by its place in the IDs' unsigned byte order,
-    /// under `maxProfileIdBytes`.
-    ProfileId(usize),
+    /// One declared Profile ID, its own key, under `maxProfileIdBytes`.
+    ProfileId(ProfileId),
     /// A string External Profile Selector Input, under `maxProfileIdBytes`.
     Selector,
     /// The completed structural analysis, under `maxStructuralAnalysisUnits`.
     StructuralAnalysis,
+    /// An `artifactAdmission` bound under the admitted policy's value.
+    Recheck(ArtifactSubject),
+}
+
+/// What one `artifactAdmission` unit checks, in the table's declaration order
+/// and over the table's scope.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum ArtifactSubject {
     /// Every submitted occurrence, under `maxArtifacts`.
     Artifacts,
     /// The occurrences declaring a Policy kind, under `maxPolicyArtifacts`.
@@ -105,9 +124,9 @@ pub(crate) enum PolicySubject {
     TargetProfileArtifacts,
     /// The selected declaration's references, under `maxArtifactReferences`.
     References,
-    /// One distinct canonical submitted body, by its place in their unsigned
-    /// byte order, under `maxSingleArtifactCanonicalBytes`.
-    Artifact(usize),
+    /// The submitted bodies of one member key, under
+    /// `maxSingleArtifactCanonicalBytes`.
+    Artifact(MemberKey),
     /// Every occurrence's canonical bytes, under
     /// `maxTotalArtifactCanonicalBytes`.
     ArtifactBytes,
@@ -117,8 +136,6 @@ pub(crate) enum PolicySubject {
     /// Every reference's canonical bytes, under
     /// `maxTotalReferenceCanonicalBytes`.
     ReferenceBytes,
-    /// The selected `resourceLimits` reference and the policy it names.
-    ResourceLimits,
 }
 
 /// Where a reference sits in the selected declaration: a `policies` slot, in
@@ -226,9 +243,8 @@ impl DeclarationReferences<'_> {
 pub(crate) struct ConfigurationMeasures<'a> {
     /// The materialized root's value counts.
     pub(crate) value: Admitted<ValueCounts>,
-    /// The UTF-8 bytes of every declared Profile ID, in the IDs' unsigned
-    /// byte order.
-    pub(crate) profile_ids: Admitted<&'a [u64]>,
+    /// Every declared Profile ID, in their unsigned byte order.
+    pub(crate) profile_ids: Admitted<&'a [ProfileId]>,
     /// The normalized External Profile Selector Input.
     pub(crate) selector: &'a SelectorInput,
     /// The units the completed structural analysis evaluated.
@@ -273,6 +289,54 @@ pub(crate) const fn unit(subject: PolicySubject, check: Check) -> Unit {
     }
 }
 
+/// The `artifactAdmission` units of one stage: under the capability's value,
+/// before a policy is admitted, or as the admitted policy's recheck.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Stage {
+    Capability,
+    Policy,
+}
+
+impl Stage {
+    fn unit(self, subject: ArtifactSubject) -> Unit {
+        match self {
+            Self::Capability => unit(PolicySubject::Capability(subject), Check::WithinCapability),
+            Self::Policy => unit(PolicySubject::Recheck(subject), Check::WithinBound),
+        }
+    }
+}
+
+/// The collection as the `artifactAdmission` bounds count it: every
+/// occurrence, and each member key with its largest canonical body. Members
+/// with one key share its unit, which holds exactly when that body does.
+struct Submitted<'a> {
+    members: &'a [FormalMember],
+    largest: BTreeMap<MemberKey, u64>,
+}
+
+impl<'a> Submitted<'a> {
+    fn of(collection: &'a FormalCollection) -> Self {
+        let members = collection.members();
+        let mut largest: BTreeMap<MemberKey, u64> = BTreeMap::new();
+        for member in members {
+            let bytes = member.canonical_bytes();
+            let most = largest.entry(member.key()).or_insert(bytes);
+            *most = (*most).max(bytes);
+        }
+        Self { members, largest }
+    }
+}
+
+/// What one stage's `artifactAdmission` units settle: whether the
+/// collection's bounds hold and whether the `resourceLimits` reference's own
+/// bytes do, which the decision needs, and whether every unit does, which the
+/// confirmation needs.
+struct Inspected {
+    collection: Admitted<()>,
+    own_bytes: Admitted<()>,
+    every: Admitted<()>,
+}
+
 /// Phase 4. The bounds over the collection need nothing earlier, so they are
 /// checked whatever the selection; the reference bounds need the selected
 /// declaration's fields; the decision needs the `resourceLimits` reference,
@@ -288,10 +352,11 @@ pub(crate) fn admit_resource_policy(
     measures: &ConfigurationMeasures<'_>,
     verification: &VerificationInput,
 ) -> Result<PolicyOutcome, PolicyInvariant> {
+    let submitted = Submitted::of(collection);
     let compatible = admit_and_compare(
         evaluation,
         capability,
-        collection,
+        &submitted,
         resource_limits,
         references,
         verification,
@@ -318,21 +383,15 @@ pub(crate) fn admit_resource_policy(
         measures,
         selector_length,
     )?;
-    let artifact_limits = limits.map(|limits| &limits.artifact_admission);
-    let inspected = collection_bounds(
+    let inspected = artifact_bounds(
         evaluation,
-        Check::WithinBound,
-        artifact_limits,
-        collection.members(),
-    )?;
-    let (_, referenced) = reference_bounds(
-        evaluation,
-        Check::WithinBound,
-        artifact_limits,
+        Stage::Policy,
+        limits.map(|limits| &limits.artifact_admission),
+        &submitted,
         resource_limits,
         references,
     )?;
-    let rechecked = and(configured, and(inspected, referenced));
+    let rechecked = and(configured, inspected.every);
     Ok(PolicyOutcome {
         selector_length,
         confirmed: both(compatible, rechecked)
@@ -340,35 +399,32 @@ pub(crate) fn admit_resource_policy(
     })
 }
 
-/// Phase 4 up to the comparison with the capability: the collection and
-/// reference bounds under the capability's values, the decision, and the
-/// comparison.
+/// Phase 4 up to the comparison with the capability: the `artifactAdmission`
+/// bounds under the capability's values, the decision, and the comparison.
 fn admit_and_compare(
     evaluation: &mut Evaluation,
     capability: &ImplementationCapability,
-    collection: &FormalCollection,
+    submitted: &Submitted<'_>,
     resource_limits: Result<&PolicyReference, &Causes>,
     references: &DeclarationReferences<'_>,
     verification: &VerificationInput,
 ) -> Result<Admitted<AdmittedResourcePolicy>, EvaluationInvariant> {
-    let limits: Result<_, &Causes> = Ok(&capability.policy_comparable().artifact_admission);
-    let members = collection.members();
-    let inspected = collection_bounds(evaluation, Check::WithinCapability, limits, members)?;
-    let (own_bytes, _) = reference_bounds(
+    let inspected = artifact_bounds(
         evaluation,
-        Check::WithinCapability,
-        limits,
+        Stage::Capability,
+        Ok(&capability.policy_comparable().artifact_admission),
+        submitted,
         resource_limits,
         references,
     )?;
     let decided = evaluation.check(
         unit(PolicySubject::ResourceLimits, Check::BootstrapCandidate),
         both(
-            both(resource_limits.map_err(Causes::clone), inspected),
-            own_bytes,
+            both(resource_limits.map_err(Causes::clone), inspected.collection),
+            inspected.own_bytes,
         )
         .map(|((reference, ()), ())| reference),
-        |reference| admit_candidate(&reference.tuple(), members, verification),
+        |reference| admit_candidate(&reference.tuple(), submitted.members, verification),
     )?;
     evaluation.check(
         unit(PolicySubject::ResourceLimits, Check::CompatiblePolicy),
@@ -393,6 +449,23 @@ fn bounded(
         unit,
         both(limit.map_err(Causes::clone), tally.map_err(Causes::clone)),
         |(limit, tally)| within(bound, limit, actual(tally, limit)),
+    )
+}
+
+/// One bound's unit whose key stands for several values that are checked
+/// independently, of which `tally` is the largest: past the bound it reports
+/// only the first-over witness, the same for every value the key stands for.
+fn witnessed(
+    evaluation: &mut Evaluation,
+    unit: Unit,
+    bound: BoundId,
+    limit: Result<Bound, &Causes>,
+    tally: Result<Tally, &Causes>,
+) -> Result<Admitted<()>, EvaluationInvariant> {
+    evaluation.check(
+        unit,
+        both(limit.map_err(Causes::clone), tally.map_err(Causes::clone)),
+        |(limit, tally)| within(bound, limit, first_over(tally, limit)),
     )
 }
 
@@ -455,12 +528,6 @@ fn configuration_bounds(
             value.map(|limits| limits.max_total_string_bytes),
             counts.map(|counts| counts.total_string_bytes),
         ),
-        (
-            PolicySubject::LongestString,
-            MAX_SINGLE_STRING_BYTES,
-            value.map(|limits| limits.max_single_string_bytes),
-            counts.map(|counts| counts.single_string_bytes),
-        ),
     ] {
         let held = bounded(
             evaluation,
@@ -471,6 +538,16 @@ fn configuration_bounds(
         )?;
         holds = and(holds, held);
     }
+    // Each string value and object key is checked on its own, so the longest
+    // reports only the first-over witness.
+    let held = witnessed(
+        evaluation,
+        recheck(PolicySubject::LongestString),
+        MAX_SINGLE_STRING_BYTES,
+        value.map(|limits| limits.max_single_string_bytes),
+        counts.map(|counts| Tally::exactly(counts.single_string_bytes)),
+    )?;
+    holds = and(holds, held);
     let ids = measures.profile_ids.as_ref();
     let held = bounded(
         evaluation,
@@ -482,13 +559,13 @@ fn configuration_bounds(
     holds = and(holds, held);
     let id_limit = structural.map(|limits| limits.max_profile_id_bytes);
     if let Ok(ids) = ids {
-        for (ordinal, &bytes) in ids.iter().enumerate() {
+        for id in *ids {
             let held = bounded(
                 evaluation,
-                recheck(PolicySubject::ProfileId(ordinal)),
+                recheck(PolicySubject::ProfileId(id.clone())),
                 MAX_PROFILE_ID_BYTES,
                 id_limit,
-                Ok(Tally::exactly(bytes)),
+                Ok(Tally::of(id.as_str().len())),
             )?;
             holds = and(holds, held);
         }
@@ -523,16 +600,64 @@ fn configuration_bounds(
     Ok(and(holds, held))
 }
 
-/// The five bounds over the collection, one unit each but one per distinct
-/// canonical body, and whether all of them hold.
-fn collection_bounds(
+/// The eight `artifactAdmission` bounds of one stage, in 015's table order:
+/// the collection's occurrences and its Policy and Target Profile
+/// occurrences, the declaration's references, each member key and the
+/// collection's bytes, and each reference and the references' bytes. A field
+/// structural admission did not admit has no references to count: a count is
+/// proved only when what is visible already exceeds the bound.
+fn artifact_bounds(
     evaluation: &mut Evaluation,
-    check: Check,
+    stage: Stage,
+    limits: Result<&ArtifactAdmissionLimits, &Causes>,
+    submitted: &Submitted<'_>,
+    resource_limits: Result<&PolicyReference, &Causes>,
+    references: &DeclarationReferences<'_>,
+) -> Result<Inspected, EvaluationInvariant> {
+    let occurrences = occurrence_bounds(evaluation, stage, limits, submitted.members)?;
+    let (visible, unavailable) = references.visible(
+        PolicyReference::canonical_bytes,
+        TargetProfileReference::canonical_bytes,
+    );
+    // The declaration's count and total never gate the decision for the
+    // selected reference.
+    let count = measured(
+        evaluation,
+        stage.unit(ArtifactSubject::References),
+        MAX_ARTIFACT_REFERENCES,
+        limits.map(|limits| limits.max_artifact_references),
+        Tally::of(visible.len()),
+        unavailable.as_ref(),
+    )?;
+    let collection = and(
+        occurrences,
+        body_bounds(evaluation, stage, limits, submitted)?,
+    );
+    let (own_bytes, each) = each_reference(evaluation, stage, limits, resource_limits, &visible)?;
+    let bytes = measured(
+        evaluation,
+        stage.unit(ArtifactSubject::ReferenceBytes),
+        MAX_TOTAL_REFERENCE_CANONICAL_BYTES,
+        limits.map(|limits| limits.max_total_reference_canonical_bytes),
+        total(visible.iter().map(|&(_, bytes)| Tally::exactly(bytes))),
+        unavailable.as_ref(),
+    )?;
+    Ok(Inspected {
+        every: and(and(collection.clone(), count), and(each, bytes)),
+        collection,
+        own_bytes,
+    })
+}
+
+/// The collection's three occurrence counts, and whether they hold. A member
+/// declaring another kind or schema revision is unsupported and counts only
+/// as an artifact.
+fn occurrence_bounds(
+    evaluation: &mut Evaluation,
+    stage: Stage,
     limits: Result<&ArtifactAdmissionLimits, &Causes>,
     members: &[FormalMember],
 ) -> Result<Admitted<()>, EvaluationInvariant> {
-    // A member declaring another kind or schema revision is unsupported and
-    // counts only as an artifact.
     let declared = |policy: bool| {
         members
             .iter()
@@ -541,22 +666,22 @@ fn collection_bounds(
             })
             .count()
     };
-    let mut holds = bounded(
-        evaluation,
-        unit(PolicySubject::Artifacts, check),
-        MAX_ARTIFACTS,
-        limits.map(|limits| limits.max_artifacts),
-        Ok(Tally::of(members.len())),
-    )?;
+    let mut holds: Admitted<()> = Ok(());
     for (subject, bound, limit, count) in [
         (
-            PolicySubject::PolicyArtifacts,
+            ArtifactSubject::Artifacts,
+            MAX_ARTIFACTS,
+            limits.map(|limits| limits.max_artifacts),
+            members.len(),
+        ),
+        (
+            ArtifactSubject::PolicyArtifacts,
             MAX_POLICY_ARTIFACTS,
             limits.map(|limits| limits.max_policy_artifacts),
             declared(true),
         ),
         (
-            PolicySubject::TargetProfileArtifacts,
+            ArtifactSubject::TargetProfileArtifacts,
             MAX_TARGET_PROFILE_ARTIFACTS,
             limits.map(|limits| limits.max_target_profile_artifacts),
             declared(false),
@@ -564,38 +689,85 @@ fn collection_bounds(
     ] {
         let held = bounded(
             evaluation,
-            unit(subject, check),
+            stage.unit(subject),
             bound,
             limit,
             Ok(Tally::of(count)),
         )?;
         holds = and(holds, held);
     }
-    // Equal occurrences have one canonical body and commute, so they share
-    // its unit; every occurrence still counts toward the total.
-    let bodies: BTreeSet<&[u8]> = members.iter().map(FormalMember::canonical_body).collect();
-    for (ordinal, body) in bodies.into_iter().enumerate() {
-        let held = bounded(
+    Ok(holds)
+}
+
+/// Each member key's bodies, equal occurrences among them, under one unit,
+/// and then the canonical bytes of every occurrence. Whether they hold.
+fn body_bounds(
+    evaluation: &mut Evaluation,
+    stage: Stage,
+    limits: Result<&ArtifactAdmissionLimits, &Causes>,
+    submitted: &Submitted<'_>,
+) -> Result<Admitted<()>, EvaluationInvariant> {
+    let mut holds: Admitted<()> = Ok(());
+    for (key, &largest) in &submitted.largest {
+        let held = witnessed(
             evaluation,
-            unit(PolicySubject::Artifact(ordinal), check),
+            stage.unit(ArtifactSubject::Artifact(key.clone())),
             MAX_SINGLE_ARTIFACT_CANONICAL_BYTES,
             limits.map(|limits| limits.max_single_artifact_canonical_bytes),
-            Ok(Tally::of(body.len())),
+            Ok(Tally::exactly(largest)),
         )?;
         holds = and(holds, held);
     }
     let held = bounded(
         evaluation,
-        unit(PolicySubject::ArtifactBytes, check),
+        stage.unit(ArtifactSubject::ArtifactBytes),
         MAX_TOTAL_ARTIFACT_CANONICAL_BYTES,
         limits.map(|limits| limits.max_total_artifact_canonical_bytes),
         Ok(total(
-            members
+            submitted
+                .members
                 .iter()
                 .map(|member| Tally::exactly(member.canonical_bytes())),
         )),
     )?;
     Ok(and(holds, held))
+}
+
+/// Each reference's own bytes: whether the `resourceLimits` reference's hold,
+/// and whether every one does. The selected reference is checked from what
+/// selection admitted, even when the rest of `policies` was not. The units
+/// commit in canonical order whatever order they run in.
+fn each_reference(
+    evaluation: &mut Evaluation,
+    stage: Stage,
+    limits: Result<&ArtifactAdmissionLimits, &Causes>,
+    resource_limits: Result<&PolicyReference, &Causes>,
+    visible: &[(ReferenceField, u64)],
+) -> Result<(Admitted<()>, Admitted<()>), EvaluationInvariant> {
+    let single_limit = limits.map(|limits| limits.max_single_reference_canonical_bytes);
+    let selected = ReferenceField::Policy(PolicySlot::ResourceLimits);
+    let own_bytes = bounded(
+        evaluation,
+        stage.unit(ArtifactSubject::Reference(selected.clone())),
+        MAX_SINGLE_REFERENCE_CANONICAL_BYTES,
+        single_limit,
+        resource_limits.map(|reference| Tally::exactly(reference.canonical_bytes())),
+    )?;
+    let mut holds = own_bytes.clone();
+    for (field, bytes) in visible {
+        if *field == selected {
+            continue;
+        }
+        let held = bounded(
+            evaluation,
+            stage.unit(ArtifactSubject::Reference(field.clone())),
+            MAX_SINGLE_REFERENCE_CANONICAL_BYTES,
+            single_limit,
+            Ok(Tally::exactly(*bytes)),
+        )?;
+        holds = and(holds, held);
+    }
+    Ok((own_bytes, holds))
 }
 
 /// The references present in `policies`, in the name order of their slots.
@@ -635,71 +807,6 @@ fn join(earlier: Option<Causes>, causes: &Causes) -> Causes {
     }
 }
 
-/// The three bounds over the selected declaration's references: whether the
-/// `resourceLimits` reference's own bytes hold, which the decision needs, and
-/// whether every unit does, which the confirmation needs. A field structural
-/// admission did not admit has no references to count: a count is proved only
-/// when what is visible already exceeds the bound.
-fn reference_bounds(
-    evaluation: &mut Evaluation,
-    check: Check,
-    limits: Result<&ArtifactAdmissionLimits, &Causes>,
-    resource_limits: Result<&PolicyReference, &Causes>,
-    references: &DeclarationReferences<'_>,
-) -> Result<(Admitted<()>, Admitted<()>), EvaluationInvariant> {
-    let (visible, unavailable) = references.visible(
-        PolicyReference::canonical_bytes,
-        TargetProfileReference::canonical_bytes,
-    );
-    // The declaration's count and total never gate the decision for the
-    // selected reference.
-    let count = measured(
-        evaluation,
-        unit(PolicySubject::References, check),
-        MAX_ARTIFACT_REFERENCES,
-        limits.map(|limits| limits.max_artifact_references),
-        Tally::of(visible.len()),
-        unavailable.as_ref(),
-    )?;
-    // The selected reference is checked from what selection admitted, even
-    // when the rest of `policies` was not.
-    let single_limit = limits.map(|limits| limits.max_single_reference_canonical_bytes);
-    let resource_limits_slot = ReferenceField::Policy(PolicySlot::ResourceLimits);
-    let own_bytes = bounded(
-        evaluation,
-        unit(
-            PolicySubject::Reference(resource_limits_slot.clone()),
-            check,
-        ),
-        MAX_SINGLE_REFERENCE_CANONICAL_BYTES,
-        single_limit,
-        resource_limits.map(|reference| Tally::exactly(reference.canonical_bytes())),
-    )?;
-    let mut holds = and(count, own_bytes.clone());
-    for (field, bytes) in &visible {
-        if *field == resource_limits_slot {
-            continue;
-        }
-        let held = bounded(
-            evaluation,
-            unit(PolicySubject::Reference(field.clone()), check),
-            MAX_SINGLE_REFERENCE_CANONICAL_BYTES,
-            single_limit,
-            Ok(Tally::exactly(*bytes)),
-        )?;
-        holds = and(holds, held);
-    }
-    let bytes = measured(
-        evaluation,
-        unit(PolicySubject::ReferenceBytes, check),
-        MAX_TOTAL_REFERENCE_CANONICAL_BYTES,
-        limits.map(|limits| limits.max_total_reference_canonical_bytes),
-        total(visible.iter().map(|&(_, bytes)| Tally::exactly(bytes))),
-        unavailable.as_ref(),
-    )?;
-    Ok((own_bytes, and(holds, bytes)))
-}
-
 /// The first bound, in canonical order, that the policy requires more of than
 /// the capability makes available. The comparison is always
 /// `available >= required`.
@@ -721,13 +828,14 @@ fn first_shortfall(policy: &ResolutionLimits, available: &ResolutionLimits) -> O
 mod tests {
     use serde_json::{json, Value};
 
+    use std::collections::BTreeSet;
+
     use super::*;
     use crate::artifacts::collection::{read_collection, CollectionLimits};
     use crate::artifacts::envelope::{envelope_of, ArtifactKind, ExactTuple};
     use crate::resolver::evaluation::{Code, IssueKey, LimitExceeded, Reason, Status};
     use crate::resolver::limits::{fixture_limits, SECTION};
-    use crate::resolver::locales::fixtures::stand_in;
-    use crate::resolver::specification::Slot;
+    use crate::resolver::locales::fixtures::earlier;
     use crate::structural::selection::InvalidSelectorType;
 
     /// Limits no test reaches.
@@ -883,10 +991,14 @@ mod tests {
             .max_profile_id_bytes
     }
 
+    fn profile(id: &str) -> ProfileId {
+        serde_json::from_value(json!(id)).unwrap()
+    }
+
     /// What Phases 1 to 3 measured, as a test states it.
     struct Measures {
         value: Admitted<ValueCounts>,
-        profile_ids: Admitted<Vec<u64>>,
+        profile_ids: Admitted<Vec<ProfileId>>,
         selector: SelectorInput,
         structural_units: Admitted<u64>,
     }
@@ -902,7 +1014,7 @@ mod tests {
                     total_string_bytes: 400,
                     single_string_bytes: 30,
                 }),
-                profile_ids: Ok(vec![3, 10]),
+                profile_ids: Ok(vec![profile("app"), profile("storefront")]),
                 selector: SelectorInput::string("app", observed(capability)),
                 structural_units: Ok(120),
             }
@@ -991,10 +1103,11 @@ mod tests {
         /// Phase 4 up to the comparison.
         fn run(&self) -> (Evaluation, Admitted<AdmittedResourcePolicy>) {
             let mut evaluation = Evaluation::default();
+            let collection = collection(&self.members);
             let admitted = admit_and_compare(
                 &mut evaluation,
                 &self.capability,
-                &collection(&self.members),
+                &Submitted::of(&collection),
                 self.resource_limits.as_ref(),
                 &self.references(),
                 &self.verification(),
@@ -1057,6 +1170,22 @@ mod tests {
         unit(PolicySubject::ResourceLimits, Check::BootstrapCandidate)
     }
 
+    /// The unit of an `artifactAdmission` bound under the capability.
+    fn capability_unit(subject: ArtifactSubject) -> Unit {
+        Stage::Capability.unit(subject)
+    }
+
+    /// The member keys of `values`, in their order.
+    fn keys_of(values: &[Value]) -> Vec<MemberKey> {
+        collection(values)
+            .members()
+            .iter()
+            .map(FormalMember::key)
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect()
+    }
+
     fn comparison() -> Unit {
         unit(PolicySubject::ResourceLimits, Check::CompatiblePolicy)
     }
@@ -1069,25 +1198,34 @@ mod tests {
         let policy = admitted.unwrap();
         assert_eq!(policy.tuple(), &tuple_of(&chosen()));
         assert_eq!(policy.limits().bounds(), policy_limits().bounds());
-        // Every unit was evaluated: five over the collection (one per distinct
-        // body), three over the references (one per visible reference), the
-        // decision, and the comparison.
-        let reference = |field| unit(PolicySubject::Reference(field), Check::WithinCapability);
+        // Every unit was evaluated, in 015's table order: the collection's
+        // three counts, the references' count, one unit per member key (three
+        // tuples, then the two members that establish none), the collection's
+        // bytes, one unit per visible reference, and the references' bytes;
+        // then the decision and the comparison.
+        let reference = |field| capability_unit(ArtifactSubject::Reference(field));
         let target = |id: &str| {
             reference(ReferenceField::TargetProfile(
                 serde_json::from_value(json!(id)).unwrap(),
             ))
         };
+        let keys = keys_of(&inputs.members);
+        assert_eq!(
+            keys.iter()
+                .map(|key| matches!(key, MemberKey::Tuple(_)))
+                .collect::<Vec<_>>(),
+            [true, true, true, false, false]
+        );
         let mut expected: Vec<Unit> = [
-            PolicySubject::Artifacts,
-            PolicySubject::PolicyArtifacts,
-            PolicySubject::TargetProfileArtifacts,
-            PolicySubject::References,
+            ArtifactSubject::Artifacts,
+            ArtifactSubject::PolicyArtifacts,
+            ArtifactSubject::TargetProfileArtifacts,
+            ArtifactSubject::References,
         ]
         .into_iter()
-        .chain((0..5).map(PolicySubject::Artifact))
-        .chain([PolicySubject::ArtifactBytes])
-        .map(|subject| unit(subject, Check::WithinCapability))
+        .chain(keys.into_iter().map(ArtifactSubject::Artifact))
+        .chain([ArtifactSubject::ArtifactBytes])
+        .map(capability_unit)
         .collect();
         expected.extend(
             [
@@ -1101,7 +1239,7 @@ mod tests {
             .map(|slot| reference(ReferenceField::Policy(slot))),
         );
         expected.extend([target("app"), target("web")]);
-        expected.push(unit(PolicySubject::ReferenceBytes, Check::WithinCapability));
+        expected.push(capability_unit(ArtifactSubject::ReferenceBytes));
         expected.extend([decision(), comparison()]);
         let recorded: Vec<(&Unit, &Status)> = evaluation.statuses().collect();
         assert_eq!(
@@ -1118,11 +1256,11 @@ mod tests {
 
     /// The exact count Phase 4 measures for `subject` over the default
     /// inputs, from the issue it reports under a bound of one.
-    fn measured(subject: PolicySubject, edit: fn(&mut ArtifactAdmissionLimits)) -> u64 {
+    fn measured(subject: ArtifactSubject, edit: fn(&mut ArtifactAdmissionLimits)) -> u64 {
         let mut inputs = Inputs::new();
         inputs.capability = capability(edit);
         let (evaluation, _) = inputs.run();
-        let key = key_of(&evaluation, &unit(subject, Check::WithinCapability));
+        let key = key_of(&evaluation, &capability_unit(subject));
         match evaluation.limit(&key).unwrap().actual {
             Actual::Exact(count) => count,
             Actual::AtLeast(_) => panic!("an exact count"),
@@ -1140,14 +1278,14 @@ mod tests {
             .collect();
         // Every occurrence, whatever it declares.
         assert_eq!(
-            measured(PolicySubject::Artifacts, |limits| limits.max_artifacts =
+            measured(ArtifactSubject::Artifacts, |limits| limits.max_artifacts =
                 bound(1)),
             5
         );
         // The Resource Limit Policy and the Trust Policy; neither the Target
         // Profile, the unsupported kind, nor the member declaring none.
         assert_eq!(
-            measured(PolicySubject::PolicyArtifacts, |limits| {
+            measured(ArtifactSubject::PolicyArtifacts, |limits| {
                 limits.max_policy_artifacts = bound(1);
             }),
             2
@@ -1166,15 +1304,12 @@ mod tests {
         let (evaluation, _) = inputs.run();
         let key = key_of(
             &evaluation,
-            &unit(
-                PolicySubject::TargetProfileArtifacts,
-                Check::WithinCapability,
-            ),
+            &capability_unit(ArtifactSubject::TargetProfileArtifacts),
         );
         assert_eq!(evaluation.limit(&key).unwrap().actual, Actual::Exact(2));
         // The canonical bytes of every occurrence.
         assert_eq!(
-            measured(PolicySubject::ArtifactBytes, |limits| {
+            measured(ArtifactSubject::ArtifactBytes, |limits| {
                 limits.max_total_artifact_canonical_bytes = bound(1);
             }),
             bytes.iter().sum::<u64>()
@@ -1243,12 +1378,19 @@ mod tests {
             let found: Vec<IssueKey> = evaluation.issues().cloned().collect();
             assert_eq!(found.len(), 1, "{}", id.name);
             assert_eq!(found[0].code(), Code::ResourceLimitExceeded);
+            // A member key stands for every body under it, so its unit reports
+            // only the first-over witness.
+            let actual = if id == MAX_SINGLE_ARTIFACT_CANONICAL_BYTES {
+                Actual::AtLeast(exact)
+            } else {
+                Actual::Exact(exact)
+            };
             assert_eq!(
                 evaluation.limit(&found[0]),
                 Some(LimitExceeded {
                     bound: id,
                     limit: bound(exact - 1),
-                    actual: Actual::Exact(exact),
+                    actual,
                 }),
                 "{}",
                 id.name
@@ -1268,8 +1410,53 @@ mod tests {
         }
     }
 
+    #[test]
+    fn the_bodies_of_one_tuple_share_its_unit_and_report_only_the_first_over_witness() {
+        // A second body of the selected policy's tuple, which only its
+        // integrity digest tells apart.
+        let mut inputs = Inputs::new();
+        let mut tampered = chosen();
+        tampered["integrityDigest"] = json!(format!("sha256:{}", "0".repeat(64)));
+        inputs.members.push(tampered);
+        let members = collection(&inputs.members);
+        let bodies: BTreeSet<&[u8]> = members
+            .members()
+            .iter()
+            .map(FormalMember::canonical_body)
+            .collect();
+        assert_eq!((bodies.len(), keys_of(&inputs.members).len()), (6, 5));
+        let largest = members
+            .members()
+            .iter()
+            .map(FormalMember::canonical_bytes)
+            .max()
+            .unwrap();
+        inputs.capability = capability(|limits| {
+            limits.max_single_artifact_canonical_bytes = bound(largest - 1);
+        });
+        let (evaluation, _) = inputs.run();
+        // One unit for both bodies, and one result for it.
+        let tuple = MemberKey::Tuple(std::sync::Arc::new(tuple_of(&chosen())));
+        let crossed = capability_unit(ArtifactSubject::Artifact(tuple));
+        assert_eq!(
+            issues(&evaluation)
+                .into_iter()
+                .map(|(unit, _, _)| unit)
+                .collect::<Vec<_>>(),
+            std::slice::from_ref(&crossed)
+        );
+        assert_eq!(
+            evaluation.limit(&key_of(&evaluation, &crossed)),
+            Some(LimitExceeded {
+                bound: MAX_SINGLE_ARTIFACT_CANONICAL_BYTES,
+                limit: bound(largest - 1),
+                actual: Actual::AtLeast(largest),
+            })
+        );
+    }
+
     fn reference_unit(field: ReferenceField) -> Unit {
-        unit(PolicySubject::Reference(field), Check::WithinCapability)
+        capability_unit(ArtifactSubject::Reference(field))
     }
 
     #[test]
@@ -1292,14 +1479,11 @@ mod tests {
             limits.max_total_reference_canonical_bytes = bound(bytes - 1);
         });
         let (evaluation, admitted) = counted.run();
-        let count = key_of(
-            &evaluation,
-            &unit(PolicySubject::References, Check::WithinCapability),
-        );
+        let count = key_of(&evaluation, &capability_unit(ArtifactSubject::References));
         assert_eq!(evaluation.limit(&count).unwrap().actual, Actual::Exact(8));
         let total = key_of(
             &evaluation,
-            &unit(PolicySubject::ReferenceBytes, Check::WithinCapability),
+            &capability_unit(ArtifactSubject::ReferenceBytes),
         );
         assert_eq!(
             evaluation.limit(&total).unwrap().actual,
@@ -1372,17 +1556,14 @@ mod tests {
 
     #[test]
     fn a_reference_field_structural_admission_did_not_admit_is_counted_only_past_the_bound() {
-        let unavailable = stand_in(Slot::Coverage);
+        let unavailable = earlier(Code::SpecificationInputIncomplete);
         let mut inputs = Inputs::new();
         inputs.policies = Err(unavailable.clone());
         let (evaluation, admitted) = inputs.run();
         // The two targets alone are within the bounds, so nothing is proved.
-        for subject in [PolicySubject::References, PolicySubject::ReferenceBytes] {
+        for subject in [ArtifactSubject::References, ArtifactSubject::ReferenceBytes] {
             let cause: Vec<IssueKey> = unavailable.keys().cloned().collect();
-            assert_eq!(
-                waits_on(&evaluation, &unit(subject, Check::WithinCapability)),
-                cause
-            );
+            assert_eq!(waits_on(&evaluation, &capability_unit(subject)), cause);
         }
         // The selected reference is still checked from what selection
         // admitted, and the other policy slots have no unit.
@@ -1401,16 +1582,13 @@ mod tests {
         // proved with the smallest witness.
         inputs.capability = capability(|limits| limits.max_artifact_references = bound(1));
         let (evaluation, _) = inputs.run();
-        let key = key_of(
-            &evaluation,
-            &unit(PolicySubject::References, Check::WithinCapability),
-        );
+        let key = key_of(&evaluation, &capability_unit(ArtifactSubject::References));
         assert_eq!(evaluation.limit(&key).unwrap().actual, Actual::AtLeast(2));
     }
 
     #[test]
     fn without_the_selected_reference_only_the_collection_and_the_visible_references_are_checked() {
-        let unselected = stand_in(Slot::Coverage);
+        let unselected = earlier(Code::SpecificationInputIncomplete);
         let mut inputs = Inputs::new();
         inputs.resource_limits = Err(unselected.clone());
         let (evaluation, admitted) = inputs.run();
@@ -1424,9 +1602,9 @@ mod tests {
             ),
             causes
         );
-        for subject in [PolicySubject::Artifacts, PolicySubject::ArtifactBytes] {
+        for subject in [ArtifactSubject::Artifacts, ArtifactSubject::ArtifactBytes] {
             assert_eq!(
-                evaluation.status(&unit(subject, Check::WithinCapability)),
+                evaluation.status(&capability_unit(subject)),
                 Some(&Status::Evaluated)
             );
         }
@@ -1465,7 +1643,9 @@ mod tests {
             .filter(|(unit, _)| {
                 matches!(
                     unit.subject,
-                    Subject::ResourcePolicy(PolicySubject::Artifact(_))
+                    Subject::ResourcePolicy(PolicySubject::Capability(ArtifactSubject::Artifact(
+                        _
+                    )))
                 )
             })
             .count();
@@ -1478,10 +1658,7 @@ mod tests {
             limits.max_total_artifact_canonical_bytes = bound(1);
         });
         let (evaluation, _) = counted.run();
-        let occurrences = key_of(
-            &evaluation,
-            &unit(PolicySubject::Artifacts, Check::WithinCapability),
-        );
+        let occurrences = key_of(&evaluation, &capability_unit(ArtifactSubject::Artifacts));
         assert_eq!(
             evaluation.limit(&occurrences).unwrap().actual,
             Actual::Exact(6)
@@ -1493,7 +1670,7 @@ mod tests {
             .sum();
         let total = key_of(
             &evaluation,
-            &unit(PolicySubject::ArtifactBytes, Check::WithinCapability),
+            &capability_unit(ArtifactSubject::ArtifactBytes),
         );
         assert_eq!(
             evaluation.limit(&total).unwrap().actual,
@@ -1578,6 +1755,11 @@ mod tests {
         unit(subject, Check::WithinBound)
     }
 
+    /// The Policy recheck of an `artifactAdmission` bound.
+    fn artifact_recheck(subject: ArtifactSubject) -> Unit {
+        Stage::Policy.unit(subject)
+    }
+
     fn keys(causes: &Causes) -> Vec<IssueKey> {
         causes.keys().cloned().collect()
     }
@@ -1601,7 +1783,7 @@ mod tests {
         present(&policies())
             .map(|(slot, _)| ReferenceField::Policy(slot))
             .chain([target("app"), target("web")])
-            .map(PolicySubject::Reference)
+            .map(|field| PolicySubject::Recheck(ArtifactSubject::Reference(field)))
             .collect()
     }
 
@@ -1623,19 +1805,30 @@ mod tests {
             PolicySubject::StringBytes,
             PolicySubject::LongestString,
             PolicySubject::Profiles,
-            PolicySubject::ProfileId(0),
-            PolicySubject::ProfileId(1),
+            PolicySubject::ProfileId(profile("app")),
+            PolicySubject::ProfileId(profile("storefront")),
             PolicySubject::Selector,
             PolicySubject::StructuralAnalysis,
-            PolicySubject::Artifacts,
-            PolicySubject::PolicyArtifacts,
-            PolicySubject::TargetProfileArtifacts,
-            PolicySubject::References,
         ];
-        expected.extend((0..5).map(PolicySubject::Artifact));
-        expected.push(PolicySubject::ArtifactBytes);
+        let again = PolicySubject::Recheck;
+        expected.extend(
+            [
+                ArtifactSubject::Artifacts,
+                ArtifactSubject::PolicyArtifacts,
+                ArtifactSubject::TargetProfileArtifacts,
+                ArtifactSubject::References,
+            ]
+            .map(again),
+        );
+        let inputs = under(|_| {});
+        expected.extend(
+            keys_of(&inputs.members)
+                .into_iter()
+                .map(|key| again(ArtifactSubject::Artifact(key))),
+        );
+        expected.push(again(ArtifactSubject::ArtifactBytes));
         expected.extend(reference_subjects());
-        expected.push(PolicySubject::ReferenceBytes);
+        expected.push(again(ArtifactSubject::ReferenceBytes));
         assert_eq!(rechecked(&evaluation), expected);
         // Every recheck was evaluated, and each artifact and reference bound
         // also keeps its unit under the capability.
@@ -1683,7 +1876,7 @@ mod tests {
             // The longer declared ID; the other and the selector are three
             // bytes.
             (
-                PolicySubject::ProfileId(1),
+                PolicySubject::ProfileId(profile("storefront")),
                 MAX_PROFILE_ID_BYTES,
                 10,
                 |limits, value| limits.configuration_input.structural.max_profile_id_bytes = value,
@@ -1707,13 +1900,20 @@ mod tests {
             let (evaluation, outcome) = under(|limits| edit(limits, bound(exact - 1))).confirm();
             let found: Vec<IssueKey> = evaluation.issues().cloned().collect();
             assert_eq!(found.len(), 1, "{}", id.name);
+            // Each string is checked on its own, so the longest reports only
+            // the first-over witness.
+            let actual = if subject == PolicySubject::LongestString {
+                Actual::AtLeast(exact)
+            } else {
+                Actual::Exact(exact)
+            };
             assert_eq!(found[0].unit(), &recheck(subject), "{}", id.name);
             assert_eq!(
                 evaluation.limit(&found[0]),
                 Some(LimitExceeded {
                     bound: id,
                     limit: bound(exact - 1),
-                    actual: Actual::Exact(exact),
+                    actual,
                 }),
                 "{}",
                 id.name
@@ -1891,41 +2091,29 @@ mod tests {
                 .iter()
                 .map(FormalMember::canonical_bytes)
                 .collect();
-            let mut distinct = bytes.clone();
-            distinct.sort_unstable();
-            distinct.dedup();
             let found: Vec<IssueKey> = evaluation.issues().cloned().collect();
-            let actuals: Vec<u64> = found
+            let actuals: Vec<Actual> = found
                 .iter()
                 .map(|key| {
                     assert_eq!(key.unit().check, Check::WithinBound, "{}", id.name);
                     let exceeded = evaluation.limit(key).unwrap();
                     assert_eq!(exceeded.bound, id);
-                    match exceeded.actual {
-                        Actual::Exact(count) => count,
-                        Actual::AtLeast(_) => panic!("an exact count"),
-                    }
+                    exceeded.actual
                 })
                 .collect();
-            let expected: Vec<u64> = match id.name {
-                "maxArtifacts" => vec![6],
-                "maxPolicyArtifacts" | "maxTargetProfileArtifacts" => vec![2],
-                "maxArtifactReferences" => vec![8],
-                "maxSingleArtifactCanonicalBytes" => {
-                    // One unit per distinct body, in their byte order.
-                    let bodies: BTreeSet<Vec<u8>> = collection(&inputs.members)
-                        .members()
-                        .iter()
-                        .map(|member| member.canonical_body().to_vec())
-                        .collect();
-                    bodies
-                        .iter()
-                        .map(|body| u64::try_from(body.len()).unwrap())
-                        .collect()
-                }
-                "maxTotalArtifactCanonicalBytes" => vec![bytes.iter().sum()],
-                "maxSingleReferenceCanonicalBytes" => references.clone(),
-                _ => vec![references.iter().sum()],
+            let exactly = |counts: Vec<u64>| counts.into_iter().map(Actual::Exact).collect();
+            let expected: Vec<Actual> = match id.name {
+                "maxArtifacts" => exactly(vec![6]),
+                "maxPolicyArtifacts" | "maxTargetProfileArtifacts" => exactly(vec![2]),
+                "maxArtifactReferences" => exactly(vec![8]),
+                // One unit per member key, each with the first-over witness.
+                "maxSingleArtifactCanonicalBytes" => keys_of(&inputs.members)
+                    .iter()
+                    .map(|_| Actual::AtLeast(2))
+                    .collect(),
+                "maxTotalArtifactCanonicalBytes" => exactly(vec![bytes.iter().sum()]),
+                "maxSingleReferenceCanonicalBytes" => exactly(references.clone()),
+                _ => exactly(vec![references.iter().sum()]),
             };
             assert_eq!(actuals, expected, "{}", id.name);
             assert_eq!(keys(&outcome.confirmed.unwrap_err()), found, "{}", id.name);
@@ -1942,10 +2130,10 @@ mod tests {
 
     #[test]
     fn a_recheck_whose_input_is_unavailable_leaves_the_selection_unconfirmed() {
-        let root = stand_in(Slot::Coverage);
-        let declarations = stand_in(Slot::DeliveryGraph);
-        let work = stand_in(Slot::DeliveryPlacement);
-        let fields = stand_in(Slot::LocaleNegotiation);
+        let root = earlier(Code::SpecificationInputIncomplete);
+        let declarations = earlier(Code::SpecificationNotAdmitted);
+        let work = earlier(Code::LocaleSpecificationNotAdmitted);
+        let fields = earlier(Code::LocaleDataNotAdmitted);
         let mut inputs = under(|_| {});
         inputs.measures.value = Err(root.clone());
         inputs.measures.profile_ids = Err(declarations.clone());
@@ -1982,8 +2170,11 @@ mod tests {
         );
         // The visible targets alone prove no count, so the declaration's
         // reference rechecks wait as well.
-        for subject in [PolicySubject::References, PolicySubject::ReferenceBytes] {
-            assert_eq!(waits_on(&evaluation, &recheck(subject)), keys(&fields));
+        for subject in [ArtifactSubject::References, ArtifactSubject::ReferenceBytes] {
+            assert_eq!(
+                waits_on(&evaluation, &artifact_recheck(subject)),
+                keys(&fields)
+            );
         }
         // The policy is admitted and compatible, but not confirmed.
         let every = root
@@ -1993,7 +2184,7 @@ mod tests {
             .union(fields.clone());
         assert_eq!(keys(&outcome.confirmed.unwrap_err()), keys(&every));
         // Without the policy as well, a recheck waits on both.
-        let unselected = stand_in(Slot::MessageLocaleFallback);
+        let unselected = earlier(Code::NegotiationSpecificationNotAdmitted);
         inputs.resource_limits = Err(unselected.clone());
         let (evaluation, _) = inputs.confirm();
         assert_eq!(
@@ -2001,7 +2192,7 @@ mod tests {
             keys(&root.union(unselected.clone()))
         );
         assert_eq!(
-            waits_on(&evaluation, &recheck(PolicySubject::References)),
+            waits_on(&evaluation, &artifact_recheck(ArtifactSubject::References)),
             keys(&fields.union(unselected))
         );
     }
