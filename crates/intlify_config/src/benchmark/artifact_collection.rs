@@ -2,18 +2,20 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! 015 Phase 9's complete collection admission over a formally admitted
-//! collection, under a fixture-owned confirmed policy: each distinct
-//! submitted body checked once, each tuple for a single occurrence, each
-//! group of tuples for one body, and the duplicate-free Set built when every
-//! unit holds. No declaration is an input, so no reference decides which
+//! collection, under a fixture-owned confirmed policy: each member key
+//! checked once over its bodies, each tuple for a single occurrence of each
+//! body, each conflict group for one body, and the duplicate-free Set built
+//! when every unit holds. No declaration is an input, so no reference decides which
 //! member is checked. Neither the result nor its observation is a Profile or
 //! a shared artifact.
 
 use serde::{Deserialize, Serialize};
 
 use crate::artifacts::collection::FormalCollection;
-use crate::artifacts::envelope::ExactTuple;
-use crate::resolver::artifact_resolution::{admit_collection, ArtifactSet, CollectionSubject};
+use crate::artifacts::envelope::{ExactTuple, MemberKey};
+use crate::resolver::artifact_resolution::{
+    admit_collection, ArtifactSet, CollectionSubject, ConflictKey,
+};
 use crate::resolver::evaluation::{
     Admitted, Causes, Check, Evaluation, EvaluationInvariant, IssueKey, Status, Subject, Unit,
 };
@@ -165,12 +167,16 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         return Err(OutputFailure::ArtifactCollectionInvariant);
     };
     frame.text(unit.phase.id());
-    let (kind, rank) = match subject {
-        CollectionSubject::Member(rank) => (0, rank),
-        CollectionSubject::Group(rank) => (1, rank),
-    };
-    frame.uint(kind);
-    frame.uint(count(*rank)?);
+    match subject {
+        CollectionSubject::Member(key) => {
+            frame.uint(0);
+            member_key(frame, key);
+        }
+        CollectionSubject::Group(group) => {
+            frame.uint(1);
+            conflict(frame, group);
+        }
+    }
     frame.uint(match unit.check {
         Check::AdmissibleMember => 0,
         Check::SingleOccurrence => 1,
@@ -242,6 +248,28 @@ pub(super) fn tuple(frame: &mut Frame, tuple: &ExactTuple) {
     frame.text(tuple.revision.as_str());
     frame.text(tuple.specification_revision.as_str());
     frame.text(tuple.semantic_digest.as_str());
+}
+
+/// A member key: its form, then the tuple or the body.
+pub(super) fn member_key(frame: &mut Frame, key: &MemberKey) {
+    match key {
+        MemberKey::Tuple(own) => {
+            frame.uint(0);
+            tuple(frame, own);
+        }
+        MemberKey::Content(content) => {
+            frame.uint(1);
+            frame.bytes(content.as_bytes());
+        }
+    }
+}
+
+/// A conflict group's key: the four parts of a tuple it shares.
+fn conflict(frame: &mut Frame, key: &ConflictKey) {
+    frame.text(key.kind.spelling());
+    frame.text(key.identity.as_str());
+    frame.text(key.revision.as_str());
+    frame.text(key.specification_revision.as_str());
 }
 
 /// The Set's tuples and bodies in the tuples' order, or why there is none.
@@ -330,6 +358,19 @@ mod tests {
         frame.finish()
     }
 
+    /// The key of the member `value`.
+    fn key_of(value: Value) -> MemberKey {
+        FormalMember::new(value).unwrap().key()
+    }
+
+    /// The conflict group of the member `value`, which establishes a tuple.
+    fn group_of(value: Value) -> ConflictKey {
+        let MemberKey::Tuple(tuple) = key_of(value) else {
+            panic!("a member with a tuple")
+        };
+        ConflictKey::of(&tuple)
+    }
+
     fn apart<T: PartialEq>(values: &[T]) -> bool {
         values
             .iter()
@@ -381,7 +422,7 @@ mod tests {
         let resolved = Resolved {
             evaluation: Evaluation::default(),
             result: Err(EvaluationInvariant::UnitRecordedTwice(collection_unit(
-                CollectionSubject::Member(0),
+                CollectionSubject::Member(key_of(serde_json::json!({"schemaRevision": "0"}))),
                 Check::AdmissibleMember,
             ))),
         };
@@ -401,7 +442,10 @@ mod tests {
     #[test]
     fn only_what_a_confirmed_collection_admission_records_is_observed() {
         let values = [member(ArtifactKind::TargetProfile, "storefront-web")];
-        let first = collection_unit(CollectionSubject::Member(0), Check::AdmissibleMember);
+        let first = collection_unit(
+            CollectionSubject::Member(key_of(values[0].clone())),
+            Check::AdmissibleMember,
+        );
         let blocked = |blocking: Blocking| {
             let mut evaluation = Evaluation::default();
             let _ = evaluation
@@ -486,6 +530,14 @@ mod tests {
     #[test]
     fn only_phase_9_collection_units_frame_and_each_check_frames_apart() {
         let mut frame = Frame::new("artifact-collection-test");
+        // Two tuples and their conflict groups, and a member without a tuple.
+        let web_member = member(ArtifactKind::TargetProfile, "storefront-web");
+        let server_member = member(ArtifactKind::TargetProfile, "storefront-server");
+        let web = key_of(web_member.clone());
+        let server = key_of(server_member.clone());
+        let untupled = key_of(serde_json::json!({"schemaRevision": "0"}));
+        let web_group = group_of(web_member);
+        let server_group = group_of(server_member);
         let foreign = Unit {
             phase: Phase::ArtifactReferenceResolution,
             subject: Subject::Vocabulary,
@@ -519,19 +571,35 @@ mod tests {
             assert_eq!(
                 unit(
                     &mut frame,
-                    &collection_unit(CollectionSubject::Member(0), check)
+                    &collection_unit(CollectionSubject::Member(web.clone()), check)
                 ),
                 Err(OutputFailure::ArtifactCollectionInvariant),
                 "{check:?}"
             );
         }
         let framed = [
-            (CollectionSubject::Member(0), Check::AdmissibleMember),
-            (CollectionSubject::Member(0), Check::SingleOccurrence),
-            (CollectionSubject::Member(0), Check::ConsistentContent),
-            (CollectionSubject::Member(1), Check::AdmissibleMember),
-            (CollectionSubject::Group(0), Check::AdmissibleMember),
-            (CollectionSubject::Group(1), Check::AdmissibleMember),
+            (
+                CollectionSubject::Member(web.clone()),
+                Check::AdmissibleMember,
+            ),
+            (
+                CollectionSubject::Member(web.clone()),
+                Check::SingleOccurrence,
+            ),
+            (
+                CollectionSubject::Member(web.clone()),
+                Check::ConsistentContent,
+            ),
+            (
+                CollectionSubject::Member(server.clone()),
+                Check::AdmissibleMember,
+            ),
+            (CollectionSubject::Member(untupled), Check::AdmissibleMember),
+            (CollectionSubject::Group(web_group), Check::AdmissibleMember),
+            (
+                CollectionSubject::Group(server_group),
+                Check::AdmissibleMember,
+            ),
         ]
         .map(|(subject, check)| {
             digest(|frame| unit(frame, &collection_unit(subject, check)).unwrap())
@@ -540,11 +608,49 @@ mod tests {
         // The phase is part of the unit.
         let other_phase = Unit {
             phase: Phase::ResourcePolicyAdmission,
-            ..collection_unit(CollectionSubject::Member(0), Check::AdmissibleMember)
+            ..collection_unit(CollectionSubject::Member(web), Check::AdmissibleMember)
         };
         assert_ne!(
             digest(|frame| unit(frame, &other_phase).unwrap()),
             framed[0]
+        );
+    }
+
+    #[test]
+    fn a_member_key_frames_its_form_before_its_tuple_or_body() {
+        // Phase 4's fixtures submit no member without a tuple, so only
+        // Phase 9's digests frame the content form; both forms are pinned
+        // here, for each phase that frames a member key.
+        let trust = FormalMember::new(envelope_of(
+            ArtifactKind::TrustPolicy,
+            "storefront-trust",
+            "1",
+            serde_json::json!({}),
+        ))
+        .unwrap()
+        .key();
+        let MemberKey::Tuple(own) = &trust else {
+            unreachable!("an envelope establishes its tuple")
+        };
+        assert_eq!(
+            digest(|frame| member_key(frame, &trust)),
+            digest(|frame| {
+                frame.uint(0);
+                tuple(frame, own);
+            })
+        );
+        let untupled = FormalMember::new(serde_json::json!({"schemaRevision": "0"}))
+            .unwrap()
+            .key();
+        let MemberKey::Content(body) = &untupled else {
+            unreachable!("no tuple")
+        };
+        assert_eq!(
+            digest(|frame| member_key(frame, &untupled)),
+            digest(|frame| {
+                frame.uint(1);
+                frame.bytes(body.as_bytes());
+            })
         );
     }
 
@@ -566,7 +672,10 @@ mod tests {
             let mut evaluation = Evaluation::default();
             evaluation
                 .check(
-                    collection_unit(CollectionSubject::Member(0), Check::AdmissibleMember),
+                    collection_unit(
+                        CollectionSubject::Member(key_of(values[0].clone())),
+                        Check::AdmissibleMember,
+                    ),
                     Ok(()),
                     |()| {
                         Err::<Vec<SetEntry>, _>(Blocking {

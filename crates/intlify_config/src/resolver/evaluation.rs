@@ -119,8 +119,8 @@ pub(crate) enum Subject {
     /// The declaration's coverage rules, a rule's selector item, a normalized
     /// domain, or the decision table and one of its cells.
     Coverage(CoverageSubject),
-    /// One distinct submitted body, or one group of tuples differing only in
-    /// their digest, of the complete artifact collection.
+    /// The bodies of one member key, or one conflict group of tuples
+    /// differing only in their digest, of the complete artifact collection.
     ArtifactCollection(CollectionSubject),
     /// One present reference of the selected declaration, resolved against
     /// the Profile Resolution Artifact Set.

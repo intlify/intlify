@@ -228,6 +228,9 @@ fn each_blocked_recipe_reports_its_one_decision() {
     // The second trust policy blocks the collection: every reference waits
     // on that one duplicate, and none is checked.
     let unset = resolved(R::CollectionNotAdmitted);
+    // The second copy of the trust policy, which the recipe adds last.
+    let mut members = R::CollectionNotAdmitted.fixture().members;
+    let duplicated = FormalMember::new(members.pop().unwrap()).unwrap().key();
     assert!(unset.evaluation.issues().next().is_none());
     let causes = unset.result.unwrap().unwrap_err();
     assert_eq!(
@@ -235,9 +238,11 @@ fn each_blocked_recipe_reports_its_one_decision() {
             .keys()
             .map(|key| (key.unit().clone(), key.code(), key.reason()))
             .collect::<Vec<_>>(),
-        // The trust policy's kind sorts last, after the Target Profile's.
         [(
-            collection_unit(CollectionSubject::Member(5), Check::SingleOccurrence),
+            collection_unit(
+                CollectionSubject::Member(duplicated),
+                Check::SingleOccurrence
+            ),
             Code::ArtifactCollectionNotAdmitted,
             Some(Reason::DuplicateEnvelope)
         )]

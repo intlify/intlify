@@ -5,11 +5,13 @@ use std::collections::BTreeMap;
 
 use super::prepare::prepare;
 use super::*;
-use crate::artifacts::envelope::{ExactTuple, FormalMember};
+use serde_json::Value;
+
+use crate::artifacts::envelope::{ExactTuple, FormalMember, MemberKey};
 use crate::benchmark::artifact_collection::Resolved;
 use crate::benchmark::operation::{Output, Prepared};
 use crate::benchmark::work::LogicalWork;
-use crate::resolver::artifact_resolution::{unit, CollectionSubject};
+use crate::resolver::artifact_resolution::{unit, CollectionSubject, ConflictKey};
 use crate::resolver::evaluation::{Check, Code, Reason, Status, Unit};
 
 use ArtifactCollectionRecipe as R;
@@ -36,12 +38,21 @@ fn issues(resolved: &Resolved) -> Vec<(Unit, Code, Option<Reason>)> {
         .collect()
 }
 
-fn member(rank: usize, check: Check) -> Unit {
-    unit(CollectionSubject::Member(rank), check)
+/// The unit of `check` over the member key of `value`.
+fn member(value: &Value, check: Check) -> Unit {
+    let key = FormalMember::new(value.clone()).unwrap().key();
+    unit(CollectionSubject::Member(key), check)
 }
 
-fn group(rank: usize) -> Unit {
-    unit(CollectionSubject::Group(rank), Check::ConsistentContent)
+/// The unit over the conflict group of `value`, which establishes a tuple.
+fn group(value: &Value) -> Unit {
+    let MemberKey::Tuple(tuple) = FormalMember::new(value.clone()).unwrap().key() else {
+        panic!("a member with a tuple")
+    };
+    unit(
+        CollectionSubject::Group(ConflictKey::of(&tuple)),
+        Check::ConsistentContent,
+    )
 }
 
 #[test]
@@ -131,56 +142,68 @@ fn an_admitted_collection_is_the_set_of_its_distinct_tuples() {
     }
 }
 
-/// Each blocked recipe adds one failure, found at its own unit whether or
-/// not a reference reaches the member. Distinct bodies order by their tuple
-/// before the members that establish none, and groups by their tuple.
+/// Each blocked recipe adds one failure, found at the unit of the member
+/// key or conflict group it concerns, whether or not a reference reaches the
+/// member.
 #[test]
 fn each_blocked_recipe_reports_its_one_kind_of_failure() {
     use Code::ArtifactCollectionNotAdmitted as Collection;
 
-    let conflicts = (0..32)
-        .map(|rank| (group(rank), Collection, Some(Reason::ConflictingContent)))
+    // What each recipe adds last, and the Target Profile `RepeatedBodies`
+    // submits after its policy.
+    let added = |recipe: R| recipe.members().pop().expect("a recipe's member");
+    let repeated = R::RepeatedBodies.members()[1].clone();
+    // Every approval group, but not the policy's, in their identities' order.
+    let conflicts = R::ManyConflicts.members()[1..]
+        .chunks(2)
+        .map(|pair| {
+            (
+                group(&pair[0]),
+                Collection,
+                Some(Reason::ConflictingContent),
+            )
+        })
         .collect::<Vec<_>>();
+    assert_eq!(conflicts.len(), 32);
     for (recipe, expected) in [
-        // The approval policy's kind sorts first.
         (
             R::UnreferencedDuplicate,
             vec![(
-                member(0, Check::SingleOccurrence),
+                member(&added(R::UnreferencedDuplicate), Check::SingleOccurrence),
                 Collection,
                 Some(Reason::DuplicateEnvelope),
             )],
         ),
-        // The policy, then the Target Profile submitted 32 times.
         (
             R::RepeatedBodies,
             vec![(
-                member(1, Check::SingleOccurrence),
+                member(&repeated, Check::SingleOccurrence),
                 Collection,
                 Some(Reason::DuplicateEnvelope),
             )],
         ),
         (
             R::ArtifactConflict,
-            vec![(group(0), Collection, Some(Reason::ConflictingContent))],
+            vec![(
+                group(&added(R::ArtifactConflict)),
+                Collection,
+                Some(Reason::ConflictingContent),
+            )],
         ),
-        // Every approval group, but not the policy's.
         (R::ManyConflicts, conflicts),
-        // The approval policy, the policy, and then `storefront-server`
-        // before `storefront-web`.
         (
             R::EnvelopeInvalid,
             vec![(
-                member(2, Check::AdmissibleMember),
+                member(&added(R::EnvelopeInvalid), Check::AdmissibleMember),
                 Collection,
                 Some(Reason::EnvelopeInvalid),
             )],
         ),
-        // A member establishing no tuple follows the three that do.
+        // A member establishing no tuple has its body as its key.
         (
             R::NoTuple,
             vec![(
-                member(3, Check::AdmissibleMember),
+                member(&added(R::NoTuple), Check::AdmissibleMember),
                 Collection,
                 Some(Reason::EnvelopeInvalid),
             )],
@@ -188,7 +211,7 @@ fn each_blocked_recipe_reports_its_one_kind_of_failure() {
         (
             R::KindUnsupported,
             vec![(
-                member(3, Check::AdmissibleMember),
+                member(&added(R::KindUnsupported), Check::AdmissibleMember),
                 Collection,
                 Some(Reason::KindUnsupported),
             )],

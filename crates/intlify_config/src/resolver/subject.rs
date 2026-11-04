@@ -176,10 +176,10 @@ pub(crate) enum SubjectKind {
     CoverageCell,
 
     // artifact-reference-resolution
-    /// One distinct canonical submitted body of the collection.
+    /// The submitted bodies of one member key of the collection.
     CollectionMember,
-    /// The members sharing a kind, identity, revision, and specification
-    /// revision.
+    /// One conflict group: the members sharing a kind, identity, revision,
+    /// and specification revision.
     CollectionGroup,
     /// One `policies` reference, resolved against the Set.
     ResolvedPolicyReference,
@@ -685,8 +685,9 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::artifacts::envelope::FormalMember;
+    use crate::artifacts::envelope::{ArtifactKind, FormalMember};
     use crate::model::{CoverageRule, DeploymentGroupId, ProfileId};
+    use crate::resolver::artifact_resolution::ConflictKey;
     use crate::resolver::coverage::{RuleContent, SurfaceKey};
     use crate::resolver::identity::DeclarationField;
     use crate::resolver::locales::fixtures::{canonical, content, key, target};
@@ -741,7 +742,7 @@ mod tests {
             recheck(ArtifactSubject::PolicyArtifacts),
             recheck(ArtifactSubject::TargetProfileArtifacts),
             recheck(ArtifactSubject::References),
-            recheck(ArtifactSubject::Artifact(member)),
+            recheck(ArtifactSubject::Artifact(member.clone())),
             recheck(ArtifactSubject::ArtifactBytes),
             recheck(policy_reference()),
             recheck(target_reference()),
@@ -798,8 +799,13 @@ mod tests {
             coverage(CoverageSubject::Cells),
             coverage(CoverageSubject::Comparisons),
             coverage(CoverageSubject::Cell(canonical("ja"), surface)),
-            Subject::ArtifactCollection(CollectionSubject::Member(0)),
-            Subject::ArtifactCollection(CollectionSubject::Group(0)),
+            Subject::ArtifactCollection(CollectionSubject::Member(member)),
+            Subject::ArtifactCollection(CollectionSubject::Group(ConflictKey {
+                kind: ArtifactKind::TrustPolicy,
+                identity: Token::new("storefront-trust").unwrap(),
+                revision: Token::new("1").unwrap(),
+                specification_revision: Token::new("0").unwrap(),
+            })),
             Subject::ArtifactReference(ReferenceField::Policy(PolicySlot::Trust)),
             Subject::ArtifactReference(ReferenceField::TargetProfile(target("browser"))),
             Subject::DeliveryPlacement,

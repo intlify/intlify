@@ -987,7 +987,16 @@ mod tests {
         )
         .1;
         let collection = blocked_unit(
-            collection_unit(CollectionSubject::Member(0), Check::SingleOccurrence),
+            collection_unit(
+                CollectionSubject::Member(
+                    crate::artifacts::envelope::FormalMember::new(
+                        serde_json::json!({"schemaRevision": "0"}),
+                    )
+                    .unwrap()
+                    .key(),
+                ),
+                Check::SingleOccurrence,
+            ),
             Blocking {
                 code: Code::ArtifactCollectionNotAdmitted,
                 reason: Some(Reason::DuplicateEnvelope),

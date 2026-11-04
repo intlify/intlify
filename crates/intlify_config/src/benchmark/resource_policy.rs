@@ -12,7 +12,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::artifacts::collection::FormalCollection;
-use crate::artifacts::envelope::{ArtifactKind, MemberKey};
+use crate::artifacts::envelope::ArtifactKind;
 use crate::model::ProfileId;
 use crate::references::PolicyReference;
 use crate::resolver::bootstrap::VerificationInput;
@@ -27,7 +27,7 @@ use crate::resolver::resource_policy::{
 };
 use crate::structural::selection::{SelectorInput, StringLengthFact};
 
-use super::artifact_collection::tuple;
+use super::artifact_collection::member_key;
 use super::observation::{Frame, Observation};
 use super::operation::{Analysis, Config, OutputFailure};
 use super::quantity::Quantity;
@@ -187,19 +187,6 @@ fn field(frame: &mut Frame, field: &ReferenceField) {
     }
 }
 
-fn member(frame: &mut Frame, key: &MemberKey) {
-    match key {
-        MemberKey::Tuple(own) => {
-            frame.uint(0);
-            tuple(frame, own);
-        }
-        MemberKey::Content(content) => {
-            frame.uint(1);
-            frame.bytes(content.as_bytes());
-        }
-    }
-}
-
 fn artifact(frame: &mut Frame, subject: &ArtifactSubject) {
     match subject {
         ArtifactSubject::Artifacts => frame.uint(0),
@@ -208,7 +195,7 @@ fn artifact(frame: &mut Frame, subject: &ArtifactSubject) {
         ArtifactSubject::References => frame.uint(3),
         ArtifactSubject::Artifact(key) => {
             frame.uint(4);
-            member(frame, key);
+            member_key(frame, key);
         }
         ArtifactSubject::ArtifactBytes => frame.uint(5),
         ArtifactSubject::Reference(own) => {
@@ -585,45 +572,6 @@ mod tests {
         for (index, left) in subjects.iter().enumerate() {
             assert!(subjects[index + 1..].iter().all(|right| right != left));
         }
-    }
-
-    #[test]
-    fn a_member_key_frames_its_form_before_its_tuple_or_body() {
-        use crate::artifacts::envelope::{envelope_of, FormalMember};
-
-        // No Phase 4 fixture submits a member without a tuple, so the
-        // fixture digests never frame the content form; it is pinned here.
-        let trust = FormalMember::new(envelope_of(
-            ArtifactKind::TrustPolicy,
-            "storefront-trust",
-            "1",
-            serde_json::json!({}),
-        ))
-        .unwrap()
-        .key();
-        let MemberKey::Tuple(own) = &trust else {
-            unreachable!("an envelope establishes its tuple")
-        };
-        assert_eq!(
-            digest(|frame| member(frame, &trust)),
-            digest(|frame| {
-                frame.uint(0);
-                tuple(frame, own);
-            })
-        );
-        let untupled = FormalMember::new(serde_json::json!({"schemaRevision": "0"}))
-            .unwrap()
-            .key();
-        let MemberKey::Content(body) = &untupled else {
-            unreachable!("no tuple")
-        };
-        assert_eq!(
-            digest(|frame| member(frame, &untupled)),
-            digest(|frame| {
-                frame.uint(1);
-                frame.bytes(body.as_bytes());
-            })
-        );
     }
 
     #[test]
