@@ -507,7 +507,8 @@ mod tests {
                 .unwrap();
             evaluation
         };
-        let elsewhere = waiting(blocked(target("web"), mismatch(Some(Reason::NotFound), None)).1);
+        let approval = ReferenceField::Policy(PolicySlot::Approval);
+        let elsewhere = waiting(blocked(approval, mismatch(Some(Reason::NotFound), None)).1);
         let beside = {
             let mut evaluation = waiting(set_causes());
             let _ = evaluation

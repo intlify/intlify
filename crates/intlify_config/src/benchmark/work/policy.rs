@@ -8,7 +8,7 @@ use crate::benchmark::resource_policy::{require_observable, PreparedPolicy, Reso
 use crate::model::{ProfileDeclaration, RequiredNullable};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::resolver::evaluation::{Status, Subject};
-use crate::resolver::resource_policy::PolicySubject;
+use crate::resolver::resource_policy::{ArtifactSubject, PolicySubject};
 
 use super::{LogicalWork, WorkFailure, WorkKind, WorkStage, WorkValue};
 
@@ -95,19 +95,29 @@ impl LogicalWork {
             .len();
         let artifact_bytes = sum(members.iter().map(FormalMember::canonical_bytes))?;
         let references = references(declaration);
-        // Each distinct body has one unit under the capability and one under
-        // the policy, both recorded whatever the selection.
+        // Each member key, the tuple a member establishes or else its body,
+        // has one unit under the capability and one under the policy, both
+        // recorded whatever the selection; the unit checks each of its
+        // distinct bodies.
+        let keys = members
+            .iter()
+            .map(FormalMember::key)
+            .collect::<BTreeSet<_>>()
+            .len();
         let evaluation = &resolved.evaluation;
         let checked = evaluation
             .statuses()
             .filter(|(unit, _)| {
                 matches!(
                     unit.subject,
-                    Subject::ResourcePolicy(PolicySubject::Artifact(_))
+                    Subject::ResourcePolicy(
+                        PolicySubject::Capability(ArtifactSubject::Artifact(_))
+                            | PolicySubject::Recheck(ArtifactSubject::Artifact(_))
+                    )
                 )
             })
             .count();
-        if Some(checked) != bodies.checked_mul(2) {
+        if Some(checked) != keys.checked_mul(2) {
             return Err(WorkFailure::InvalidOrdinaryResult);
         }
         for (kind, value) in [

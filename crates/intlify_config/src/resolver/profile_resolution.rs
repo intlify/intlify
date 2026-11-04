@@ -19,7 +19,7 @@ use crate::artifacts::collection::FormalCollection;
 use crate::artifacts::vocabulary::FormalVocabulary;
 use crate::input_limits::ValueCounts;
 use crate::locale::{CanonicalizationFailure, Provider};
-use crate::model::{IntlifyConfig, ProfileDeclaration};
+use crate::model::{IntlifyConfig, ProfileDeclaration, ProfileId};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::selection::{ProvisionalSelection, SelectionInvariant, SelectorInput};
 use crate::structural::StructuralAnalysis;
@@ -61,9 +61,8 @@ pub(crate) struct CompleteConfiguration<'a> {
     resource_limits: &'a PolicyReference,
     selector: &'a SelectorInput,
     value: ValueCounts,
-    /// The UTF-8 bytes of every declared Profile ID, in the IDs' unsigned
-    /// byte order.
-    profile_ids: Vec<u64>,
+    /// Every declared Profile ID, in their unsigned byte order.
+    profile_ids: Vec<ProfileId>,
     structural_units: u64,
 }
 
@@ -89,12 +88,7 @@ impl<'a> CompleteConfiguration<'a> {
             resource_limits: selection.resource_limits(),
             selector,
             value: analysis.value_counts(),
-            profile_ids: profiles
-                .iter()
-                .map(|(id, _)| {
-                    u64::try_from(id.as_str().len()).expect("an in-memory length fits u64")
-                })
-                .collect(),
+            profile_ids: profiles.iter().map(|(id, _)| id.clone()).collect(),
             structural_units: analysis.structural_units()?,
         })
     }
@@ -1087,7 +1081,7 @@ pub(super) mod tests {
                 rechecked,
                 [
                     PolicySubject::Nodes,
-                    PolicySubject::ProfileId(0),
+                    PolicySubject::ProfileId(serde_json::from_value(json!("web")).unwrap()),
                     PolicySubject::Selector,
                     PolicySubject::StructuralAnalysis
                 ]

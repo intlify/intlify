@@ -683,12 +683,7 @@ fn prepare_policy(declaration: &Declaration) -> Result<Candidate, PreparationFai
         selected,
     } = select_config(&fixture.config, declaration.selector)?;
     let collection = submitted(&fixture.members)?;
-    let profile_ids = config
-        .profiles()
-        .iter()
-        .map(|(id, _)| u64::try_from(id.as_str().len()))
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|_| PreparationFailure::CoreInvariant)?;
+    let profile_ids = config.profiles().iter().map(|(id, _)| id.clone()).collect();
     let prepared = PreparedPolicy {
         analysis,
         config,

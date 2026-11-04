@@ -11,6 +11,9 @@
 //! decide and report. No member declares its semantic digest: the digest of a
 //! tuple is computed from the submitted content.
 
+use std::fmt;
+use std::sync::Arc;
+
 use intlify_shared_json::encoding::{
     encode, hash, hash_with_excluded_member, Domain, EncodingFailure,
 };
@@ -152,6 +155,36 @@ pub(crate) struct ExactTuple {
     pub(crate) semantic_digest: SemanticDigest,
 }
 
+/// What names a collection member: the exact tuple it establishes, or,
+/// without one, its admission key. Every tuple orders before every admission
+/// key, and members with one tuple share its key whatever their bodies. Both
+/// are shared, so a key is cheap to copy into every unit that has it.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum MemberKey {
+    Tuple(Arc<ExactTuple>),
+    Content(AdmissionKey),
+}
+
+/// The admission key of a member that establishes no tuple: its `C(member)`,
+/// standing for itself. Its Debug shows only its length: a rejected body
+/// never reaches a log.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct AdmissionKey(Arc<[u8]>);
+
+impl fmt::Debug for AdmissionKey {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "AdmissionKey({} bytes)", self.0.len())
+    }
+}
+
+impl AdmissionKey {
+    /// The bytes themselves, for a caller that compares or digests them;
+    /// never for display.
+    pub(crate) fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 /// A collection member past 015's pre-invocation boundary: a JSON value with
 /// no number in it, and its canonical submitted body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -200,6 +233,15 @@ impl FormalMember {
             }
             Some(kind) => Declaration::Admitted(kind),
         }
+    }
+
+    /// The member's key: the tuple its envelope establishes, or else its
+    /// admission key.
+    pub(crate) fn key(&self) -> MemberKey {
+        self.envelope().map_or_else(
+            || MemberKey::Content(AdmissionKey(Arc::from(self.canonical.as_slice()))),
+            |envelope| MemberKey::Tuple(Arc::new(envelope.tuple)),
+        )
     }
 
     /// The envelope this member is, when it establishes its exact-reference
@@ -897,6 +939,39 @@ mod tests {
             tuple(ArtifactKind::GlossarySet, "b", "2", "1", 1),
         ];
         assert!(ordered.windows(2).all(|pair| pair[0] < pair[1]));
+    }
+
+    #[test]
+    fn a_member_is_keyed_by_its_tuple_and_else_by_its_canonical_body() {
+        let tuple = tuple_of(approval()).unwrap();
+        let key = MemberKey::Tuple(Arc::new(tuple));
+        assert_eq!(member(approval()).key(), key);
+        // A failing integrity keeps the tuple, so both bodies share its key.
+        let tampered = edited(
+            &approval(),
+            "/integrityDigest",
+            Some(json!(format!("sha256:{}", "0".repeat(64)))),
+        );
+        assert_ne!(
+            member(tampered.clone()).canonical_body(),
+            member(approval()).canonical_body()
+        );
+        assert_eq!(member(tampered).key(), key);
+        // Without a tuple, the canonical body is the key.
+        let untupled = member(json!({"kind": "approval-policy", "schemaRevision": "0"}));
+        let MemberKey::Content(content) = untupled.key() else {
+            panic!("no tuple");
+        };
+        assert_eq!(content.as_bytes(), untupled.canonical_body());
+        assert_eq!(
+            format!("{content:?}"),
+            format!("AdmissionKey({} bytes)", untupled.canonical_body().len())
+        );
+        // Every tuple comes first, and admission keys order by their bytes.
+        let shorter = member(json!("a")).key();
+        let longer = member(json!("ab")).key();
+        assert!(key < shorter);
+        assert!(shorter < longer);
     }
 
     fn reference(kind: &str, identity: &str, digest: &SemanticDigest) -> Value {

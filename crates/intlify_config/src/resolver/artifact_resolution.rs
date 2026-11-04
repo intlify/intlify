@@ -572,11 +572,22 @@ mod tests {
 
     #[test]
     fn without_a_confirmed_policy_nothing_is_admitted() {
+        use crate::resolver::resource_policy::{unit as policy_unit, PolicySubject};
+
+        // What Phase 4 leaves when no submitted artifact is the policy.
         let mut other = Evaluation::default();
         let causes = other
-            .check(unit(Member(0), Check::AdmissibleMember), Ok(()), |()| {
-                Err::<(), _>(not_admitted(Reason::EnvelopeInvalid))
-            })
+            .check(
+                policy_unit(PolicySubject::ResourceLimits, Check::BootstrapCandidate),
+                Ok(()),
+                |()| {
+                    Err::<(), _>(Blocking {
+                        code: Code::ArtifactReferenceNotAdmitted,
+                        reason: Some(Reason::NotFound),
+                        details: None,
+                    })
+                },
+            )
             .unwrap()
             .unwrap_err();
         let collection = collection(&[

@@ -621,6 +621,9 @@ pub(crate) enum EvaluationInvariant {
     KindOutsidePhase(Unit),
     /// A resolver bug: a unit runs a check its subject's kind does not run.
     CheckOutsideKind(Unit),
+    /// A resolver bug: a unit waits on a result that comes after it in
+    /// canonical unit order, so a prerequisite would follow its dependent.
+    CauseNotBefore(Unit),
     /// A resolver bug: each unit is evaluated at most once.
     UnitRecordedTwice(Unit),
     /// A resolver bug: only an evaluated unit finds a non-blocking result.
@@ -639,8 +642,9 @@ pub(crate) struct Evaluation {
 
 impl Evaluation {
     /// Runs `unit` when its prerequisite is admitted and records its status.
-    /// A unit whose subject is of another phase's kind, or that runs a check its
-    /// kind does not run, is a resolver bug and is not recorded.
+    /// A unit whose subject is of another phase's kind, that runs a check its
+    /// kind does not run, or that waits on a result not before it, is a
+    /// resolver bug and is not recorded.
     /// `evaluate` returns the value the unit establishes or the blocking result
     /// it found. An unavailable prerequisite becomes the unit's causes: the unit
     /// reports nothing, and whatever depends on it inherits the same causes.
@@ -656,6 +660,11 @@ impl Evaluation {
         }
         if !kind.checks().contains(&unit.check) {
             return Err(EvaluationInvariant::CheckOutsideKind(unit));
+        }
+        if let Err(causes) = &prerequisite {
+            if causes.keys().any(|cause| cause.unit >= unit) {
+                return Err(EvaluationInvariant::CauseNotBefore(unit));
+            }
         }
         if self.statuses.contains_key(&unit) {
             return Err(EvaluationInvariant::UnitRecordedTwice(unit));
@@ -1093,6 +1102,58 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(evaluation.status(&data()), Some(&Status::Evaluated));
+    }
+
+    #[test]
+    fn a_unit_waits_only_on_results_before_it() {
+        // The data comes after the slots in its phase, and the declaration's
+        // fields in the next phase.
+        let mut earlier = Evaluation::default();
+        let slot_causes = missing(&mut earlier, slot(Slot::Coverage));
+        let data_causes = missing(&mut earlier, data());
+        let field_causes = missing(&mut earlier, field(DeclarationField::ProjectId));
+        let mut ran = false;
+        let mut evaluation = Evaluation::default();
+        for (unit, causes) in [
+            // Not on a result of a later subject kind in the same phase,
+            (slot(Slot::Coverage), data_causes.clone()),
+            // of a later phase,
+            (data(), field_causes),
+            // or of the unit itself.
+            (data(), data_causes),
+            // One cause after it is enough.
+            (
+                data(),
+                slot_causes
+                    .clone()
+                    .union(missing(&mut Evaluation::default(), data())),
+            ),
+        ] {
+            assert_eq!(
+                evaluation
+                    .check(unit.clone(), Err::<(), _>(causes), |()| {
+                        ran = true;
+                        Ok::<(), Blocking>(())
+                    })
+                    .err(),
+                Some(EvaluationInvariant::CauseNotBefore(unit))
+            );
+        }
+        assert!(!ran);
+        assert_eq!(evaluation.statuses().count(), 0);
+        // On an earlier result, the unit is not evaluated.
+        evaluation
+            .check(
+                data(),
+                Err::<(), _>(slot_causes.clone()),
+                Ok::<(), Blocking>,
+            )
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(
+            evaluation.status(&data()),
+            Some(&Status::NotEvaluated(slot_causes))
+        );
     }
 
     #[test]

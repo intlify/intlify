@@ -19,7 +19,7 @@ use super::groups::GroupSubject;
 use super::hydration::HydrationSubject;
 use super::locales::LocaleSubject;
 use super::negotiation::NegotiationSubject;
-use super::resource_policy::{PolicySubject, ReferenceField};
+use super::resource_policy::{ArtifactSubject, PolicySubject, ReferenceField};
 use super::specification::Slot;
 use super::targets::TargetSubject;
 
@@ -32,6 +32,28 @@ pub(crate) enum SubjectKind {
     ProjectProfileSlot,
 
     // resource-policy-admission
+    /// Every submitted artifact occurrence, under the capability.
+    CapabilityArtifacts,
+    /// The occurrences declaring a Policy kind, under the capability.
+    CapabilityPolicyArtifacts,
+    /// The occurrences declaring the Target Profile kind, under the
+    /// capability.
+    CapabilityTargetProfileArtifacts,
+    /// The selected declaration's references, under the capability.
+    CapabilityReferences,
+    /// The submitted bodies of one member key, under the capability.
+    CapabilityArtifact,
+    /// Every occurrence's canonical bytes, under the capability.
+    CapabilityArtifactBytes,
+    /// One `policies` reference of the selected declaration, under the
+    /// capability.
+    CapabilityPolicyReference,
+    /// One Target ID's Target Profile reference, under the capability.
+    CapabilityTargetProfileReference,
+    /// Every reference's canonical bytes, under the capability.
+    CapabilityReferenceBytes,
+    /// The selected `resourceLimits` reference and the policy it names.
+    ResourceLimits,
     /// The materialized root's logical values.
     RootNodes,
     /// The materialized root's deepest value level.
@@ -50,26 +72,26 @@ pub(crate) enum SubjectKind {
     Selector,
     /// The completed structural analysis.
     StructuralAnalysis,
-    /// Every submitted artifact occurrence.
+    /// Every submitted artifact occurrence, under the admitted policy.
     Artifacts,
-    /// The occurrences declaring a Policy kind.
+    /// The occurrences declaring a Policy kind, under the admitted policy.
     PolicyArtifacts,
-    /// The occurrences declaring the Target Profile kind.
+    /// The occurrences declaring the Target Profile kind, under the admitted
+    /// policy.
     TargetProfileArtifacts,
-    /// The selected declaration's references.
+    /// The selected declaration's references, under the admitted policy.
     References,
-    /// One distinct canonical submitted body.
+    /// The submitted bodies of one member key, under the admitted policy.
     Artifact,
-    /// Every occurrence's canonical bytes.
+    /// Every occurrence's canonical bytes, under the admitted policy.
     ArtifactBytes,
-    /// One `policies` reference of the selected declaration.
+    /// One `policies` reference of the selected declaration, under the
+    /// admitted policy.
     PolicyReference,
-    /// One Target ID's Target Profile reference.
+    /// One Target ID's Target Profile reference, under the admitted policy.
     TargetProfileReference,
-    /// Every reference's canonical bytes.
+    /// Every reference's canonical bytes, under the admitted policy.
     ReferenceBytes,
-    /// The selected `resourceLimits` reference and the policy it names.
-    ResourceLimits,
 
     // specification-admission
     /// The `locale-canonicalization` slot.
@@ -199,8 +221,18 @@ pub(crate) enum SubjectKind {
 
 impl SubjectKind {
     /// Every kind, phase by phase in rank order.
-    pub(crate) const ALL: [Self; 73] = [
+    pub(crate) const ALL: [Self; 82] = [
         Self::ProjectProfileSlot,
+        Self::CapabilityArtifacts,
+        Self::CapabilityPolicyArtifacts,
+        Self::CapabilityTargetProfileArtifacts,
+        Self::CapabilityReferences,
+        Self::CapabilityArtifact,
+        Self::CapabilityArtifactBytes,
+        Self::CapabilityPolicyReference,
+        Self::CapabilityTargetProfileReference,
+        Self::CapabilityReferenceBytes,
+        Self::ResourceLimits,
         Self::RootNodes,
         Self::RootDepth,
         Self::RootCollectionEntries,
@@ -219,7 +251,6 @@ impl SubjectKind {
         Self::PolicyReference,
         Self::TargetProfileReference,
         Self::ReferenceBytes,
-        Self::ResourceLimits,
         Self::LocaleCanonicalizationSlot,
         Self::LocaleNegotiationSlot,
         Self::MessageLocaleFallbackSlot,
@@ -279,7 +310,17 @@ impl SubjectKind {
     pub(crate) const fn phase(self) -> Phase {
         match self {
             Self::ProjectProfileSlot => Phase::ResolverBootstrapAdmission,
-            Self::RootNodes
+            Self::CapabilityArtifacts
+            | Self::CapabilityPolicyArtifacts
+            | Self::CapabilityTargetProfileArtifacts
+            | Self::CapabilityReferences
+            | Self::CapabilityArtifact
+            | Self::CapabilityArtifactBytes
+            | Self::CapabilityPolicyReference
+            | Self::CapabilityTargetProfileReference
+            | Self::CapabilityReferenceBytes
+            | Self::ResourceLimits
+            | Self::RootNodes
             | Self::RootDepth
             | Self::RootCollectionEntries
             | Self::RootStringBytes
@@ -296,8 +337,7 @@ impl SubjectKind {
             | Self::ArtifactBytes
             | Self::PolicyReference
             | Self::TargetProfileReference
-            | Self::ReferenceBytes
-            | Self::ResourceLimits => Phase::ResourcePolicyAdmission,
+            | Self::ReferenceBytes => Phase::ResourcePolicyAdmission,
             Self::LocaleCanonicalizationSlot
             | Self::LocaleNegotiationSlot
             | Self::MessageLocaleFallbackSlot
@@ -362,6 +402,16 @@ impl SubjectKind {
             | Self::IntentSurfaceClassVocabularySlot
             | Self::DeliveryGraphSlot
             | Self::DeliveryPlacementSlot => &[Check::SupportedAssertion],
+            Self::CapabilityArtifacts
+            | Self::CapabilityPolicyArtifacts
+            | Self::CapabilityTargetProfileArtifacts
+            | Self::CapabilityReferences
+            | Self::CapabilityArtifact
+            | Self::CapabilityArtifactBytes
+            | Self::CapabilityPolicyReference
+            | Self::CapabilityTargetProfileReference
+            | Self::CapabilityReferenceBytes => &[Check::WithinCapability],
+            Self::ResourceLimits => &[Check::BootstrapCandidate, Check::CompatiblePolicy],
             Self::RootNodes
             | Self::RootDepth
             | Self::RootCollectionEntries
@@ -371,6 +421,15 @@ impl SubjectKind {
             | Self::ProfileId
             | Self::Selector
             | Self::StructuralAnalysis
+            | Self::Artifacts
+            | Self::PolicyArtifacts
+            | Self::TargetProfileArtifacts
+            | Self::References
+            | Self::Artifact
+            | Self::ArtifactBytes
+            | Self::PolicyReference
+            | Self::TargetProfileReference
+            | Self::ReferenceBytes
             | Self::LocaleOccurrences
             | Self::RequestedLocales
             | Self::NegotiationAliases
@@ -386,16 +445,6 @@ impl SubjectKind {
             | Self::Group
             | Self::GroupMembers
             | Self::Relations => &[Check::WithinBound],
-            Self::Artifacts
-            | Self::PolicyArtifacts
-            | Self::TargetProfileArtifacts
-            | Self::References
-            | Self::Artifact
-            | Self::ArtifactBytes
-            | Self::PolicyReference
-            | Self::TargetProfileReference
-            | Self::ReferenceBytes => &[Check::WithinCapability, Check::WithinBound],
-            Self::ResourceLimits => &[Check::BootstrapCandidate, Check::CompatiblePolicy],
             Self::Vocabulary => &[Check::IntactArtifact, Check::AssertedArtifact],
             Self::CanonicalizationData => &[Check::MatchingData],
             Self::DeclarationField => &[Check::OpaqueIdentity],
@@ -482,6 +531,24 @@ impl Subject {
             Self::Vocabulary => SubjectKind::Vocabulary,
             Self::CanonicalizationData => SubjectKind::CanonicalizationData,
             Self::ResourcePolicy(subject) => match subject {
+                PolicySubject::Capability(subject) => match subject {
+                    ArtifactSubject::Artifacts => SubjectKind::CapabilityArtifacts,
+                    ArtifactSubject::PolicyArtifacts => SubjectKind::CapabilityPolicyArtifacts,
+                    ArtifactSubject::TargetProfileArtifacts => {
+                        SubjectKind::CapabilityTargetProfileArtifacts
+                    }
+                    ArtifactSubject::References => SubjectKind::CapabilityReferences,
+                    ArtifactSubject::Artifact(_) => SubjectKind::CapabilityArtifact,
+                    ArtifactSubject::ArtifactBytes => SubjectKind::CapabilityArtifactBytes,
+                    ArtifactSubject::Reference(ReferenceField::Policy(_)) => {
+                        SubjectKind::CapabilityPolicyReference
+                    }
+                    ArtifactSubject::Reference(ReferenceField::TargetProfile(_)) => {
+                        SubjectKind::CapabilityTargetProfileReference
+                    }
+                    ArtifactSubject::ReferenceBytes => SubjectKind::CapabilityReferenceBytes,
+                },
+                PolicySubject::ResourceLimits => SubjectKind::ResourceLimits,
                 PolicySubject::Nodes => SubjectKind::RootNodes,
                 PolicySubject::Depth => SubjectKind::RootDepth,
                 PolicySubject::CollectionEntries => SubjectKind::RootCollectionEntries,
@@ -491,18 +558,21 @@ impl Subject {
                 PolicySubject::ProfileId(_) => SubjectKind::ProfileId,
                 PolicySubject::Selector => SubjectKind::Selector,
                 PolicySubject::StructuralAnalysis => SubjectKind::StructuralAnalysis,
-                PolicySubject::Artifacts => SubjectKind::Artifacts,
-                PolicySubject::PolicyArtifacts => SubjectKind::PolicyArtifacts,
-                PolicySubject::TargetProfileArtifacts => SubjectKind::TargetProfileArtifacts,
-                PolicySubject::References => SubjectKind::References,
-                PolicySubject::Artifact(_) => SubjectKind::Artifact,
-                PolicySubject::ArtifactBytes => SubjectKind::ArtifactBytes,
-                PolicySubject::Reference(ReferenceField::Policy(_)) => SubjectKind::PolicyReference,
-                PolicySubject::Reference(ReferenceField::TargetProfile(_)) => {
-                    SubjectKind::TargetProfileReference
-                }
-                PolicySubject::ReferenceBytes => SubjectKind::ReferenceBytes,
-                PolicySubject::ResourceLimits => SubjectKind::ResourceLimits,
+                PolicySubject::Recheck(subject) => match subject {
+                    ArtifactSubject::Artifacts => SubjectKind::Artifacts,
+                    ArtifactSubject::PolicyArtifacts => SubjectKind::PolicyArtifacts,
+                    ArtifactSubject::TargetProfileArtifacts => SubjectKind::TargetProfileArtifacts,
+                    ArtifactSubject::References => SubjectKind::References,
+                    ArtifactSubject::Artifact(_) => SubjectKind::Artifact,
+                    ArtifactSubject::ArtifactBytes => SubjectKind::ArtifactBytes,
+                    ArtifactSubject::Reference(ReferenceField::Policy(_)) => {
+                        SubjectKind::PolicyReference
+                    }
+                    ArtifactSubject::Reference(ReferenceField::TargetProfile(_)) => {
+                        SubjectKind::TargetProfileReference
+                    }
+                    ArtifactSubject::ReferenceBytes => SubjectKind::ReferenceBytes,
+                },
             },
             Self::DeclarationField(_) => SubjectKind::DeclarationField,
             Self::Locale(subject) => match subject {
@@ -615,7 +685,8 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::model::{CoverageRule, DeploymentGroupId};
+    use crate::artifacts::envelope::FormalMember;
+    use crate::model::{CoverageRule, DeploymentGroupId, ProfileId};
     use crate::resolver::coverage::{RuleContent, SurfaceKey};
     use crate::resolver::identity::DeclarationField;
     use crate::resolver::locales::fixtures::{canonical, content, key, target};
@@ -630,36 +701,51 @@ mod tests {
                 .unwrap();
         let rule = RuleContent::of(&rule);
         let surface = Token::new("checkout").unwrap();
+        let member = FormalMember::new(json!({"schemaRevision": "0"}))
+            .unwrap()
+            .key();
+        let profile: ProfileId = serde_json::from_value(json!("storefront")).unwrap();
         let policy = |subject| Subject::ResourcePolicy(subject);
+        let capability = |subject| Subject::ResourcePolicy(PolicySubject::Capability(subject));
+        let recheck = |subject| Subject::ResourcePolicy(PolicySubject::Recheck(subject));
+        let policy_reference =
+            || ArtifactSubject::Reference(ReferenceField::Policy(PolicySlot::Trust));
+        let target_reference =
+            || ArtifactSubject::Reference(ReferenceField::TargetProfile(target("browser")));
         let locale = |subject| Subject::Locale(subject);
         let coverage = |subject| Subject::Coverage(subject);
         let groups = |subject| Subject::Group(subject);
         let hydration = |subject| Subject::Hydration(subject);
         vec![
             Subject::Slot(Slot::ProjectProfile),
+            capability(ArtifactSubject::Artifacts),
+            capability(ArtifactSubject::PolicyArtifacts),
+            capability(ArtifactSubject::TargetProfileArtifacts),
+            capability(ArtifactSubject::References),
+            capability(ArtifactSubject::Artifact(member.clone())),
+            capability(ArtifactSubject::ArtifactBytes),
+            capability(policy_reference()),
+            capability(target_reference()),
+            capability(ArtifactSubject::ReferenceBytes),
+            policy(PolicySubject::ResourceLimits),
             policy(PolicySubject::Nodes),
             policy(PolicySubject::Depth),
             policy(PolicySubject::CollectionEntries),
             policy(PolicySubject::StringBytes),
             policy(PolicySubject::LongestString),
             policy(PolicySubject::Profiles),
-            policy(PolicySubject::ProfileId(0)),
+            policy(PolicySubject::ProfileId(profile)),
             policy(PolicySubject::Selector),
             policy(PolicySubject::StructuralAnalysis),
-            policy(PolicySubject::Artifacts),
-            policy(PolicySubject::PolicyArtifacts),
-            policy(PolicySubject::TargetProfileArtifacts),
-            policy(PolicySubject::References),
-            policy(PolicySubject::Artifact(0)),
-            policy(PolicySubject::ArtifactBytes),
-            policy(PolicySubject::Reference(ReferenceField::Policy(
-                PolicySlot::Trust,
-            ))),
-            policy(PolicySubject::Reference(ReferenceField::TargetProfile(
-                target("browser"),
-            ))),
-            policy(PolicySubject::ReferenceBytes),
-            policy(PolicySubject::ResourceLimits),
+            recheck(ArtifactSubject::Artifacts),
+            recheck(ArtifactSubject::PolicyArtifacts),
+            recheck(ArtifactSubject::TargetProfileArtifacts),
+            recheck(ArtifactSubject::References),
+            recheck(ArtifactSubject::Artifact(member)),
+            recheck(ArtifactSubject::ArtifactBytes),
+            recheck(policy_reference()),
+            recheck(target_reference()),
+            recheck(ArtifactSubject::ReferenceBytes),
             Subject::Slot(Slot::LocaleCanonicalization),
             Subject::Slot(Slot::LocaleNegotiation),
             Subject::Slot(Slot::MessageLocaleFallback),
@@ -798,7 +884,7 @@ mod tests {
             assert_eq!(ranks, (0..ranks.len()).collect::<Vec<_>>(), "{phase:?}");
         }
         assert_eq!(SubjectKind::ProjectProfileSlot.rank(), 0);
-        assert_eq!(SubjectKind::ResourceLimits.rank(), 18);
+        assert_eq!(SubjectKind::ResourceLimits.rank(), 9);
         assert_eq!(SubjectKind::Roles.rank(), 2);
     }
 
@@ -839,5 +925,27 @@ mod tests {
         );
         assert!(Subject::Slot(Slot::Coverage) < Subject::Vocabulary);
         assert!(Subject::Vocabulary < Subject::CanonicalizationData);
+        // Each bound's check under the capability and its Policy recheck are
+        // of different kinds, on either side of the selected policy's.
+        let policy = |subject| Subject::ResourcePolicy(subject);
+        let bound = || ArtifactSubject::Reference(ReferenceField::TargetProfile(target("z")));
+        let capability = policy(PolicySubject::Capability(bound()));
+        let recheck = policy(PolicySubject::Recheck(bound()));
+        assert_eq!(
+            capability.kind(),
+            SubjectKind::CapabilityTargetProfileReference
+        );
+        assert_eq!(recheck.kind(), SubjectKind::TargetProfileReference);
+        assert!(capability < policy(PolicySubject::ResourceLimits));
+        assert!(policy(PolicySubject::ResourceLimits) < policy(PolicySubject::Nodes));
+        assert!(policy(PolicySubject::StructuralAnalysis) < recheck);
+        assert_eq!(
+            SubjectKind::CapabilityTargetProfileReference.checks(),
+            [Check::WithinCapability]
+        );
+        assert_eq!(
+            SubjectKind::TargetProfileReference.checks(),
+            [Check::WithinBound]
+        );
     }
 }

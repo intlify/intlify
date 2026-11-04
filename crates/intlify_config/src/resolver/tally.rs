@@ -46,6 +46,17 @@ pub(crate) fn actual(tally: Tally, limit: Bound) -> Actual {
         .map_or(Actual::AtLeast(limit.get() + 1), Actual::Exact)
 }
 
+/// What a count proves against `limit` when its unit's key stands for several
+/// values checked independently: the exact count while it holds, and past the
+/// bound only the smallest witness, so every value the key stands for reports
+/// the same.
+pub(crate) fn first_over(tally: Tally, limit: Bound) -> Actual {
+    match actual(tally, limit) {
+        Actual::Exact(total) if total <= limit.get() => Actual::Exact(total),
+        _ => Actual::AtLeast(limit.get() + 1),
+    }
+}
+
 /// What a count proves against `limit` while part of what it counts may be
 /// unavailable: an exact total when nothing is, a witness when what is
 /// visible already exceeds `limit` (the rest can only add), and otherwise
@@ -100,6 +111,15 @@ mod tests {
         );
         assert_eq!(actual(Tally(Some(9)), bound(7)), Actual::Exact(9));
         assert_eq!(actual(Tally(None), bound(7)), Actual::AtLeast(8));
+    }
+
+    #[test]
+    fn a_key_standing_for_several_values_reports_only_the_first_over_witness() {
+        assert_eq!(first_over(Tally(Some(5)), bound(5)), Actual::Exact(5));
+        assert_eq!(first_over(Tally(Some(0)), bound(5)), Actual::Exact(0));
+        for tally in [Tally(Some(6)), Tally(Some(900)), Tally(None)] {
+            assert_eq!(first_over(tally, bound(5)), Actual::AtLeast(6));
+        }
     }
 
     #[test]

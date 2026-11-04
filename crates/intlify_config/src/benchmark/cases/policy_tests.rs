@@ -10,7 +10,7 @@ use crate::benchmark::work::LogicalWork;
 use crate::input_limits::Bound;
 use crate::resolver::evaluation::{Actual, Check, Code, Reason, Status, Unit};
 use crate::resolver::limits::{BoundId, Group};
-use crate::resolver::resource_policy::{unit, PolicyOutcome, PolicySubject};
+use crate::resolver::resource_policy::{unit, ArtifactSubject, PolicyOutcome, PolicySubject};
 use crate::structural::selection::StringLengthFact;
 
 use ResourcePolicyRecipe as R;
@@ -324,7 +324,12 @@ fn the_scales_count_occurrences_and_distinct_bodies_apart() {
 
 #[test]
 fn each_bound_edge_holds_at_its_exact_value_and_blocks_one_below() {
-    let artifacts = |check| unit(PolicySubject::Artifacts, check);
+    let artifacts = |check| match check {
+        Check::WithinCapability => {
+            unit(PolicySubject::Capability(ArtifactSubject::Artifacts), check)
+        }
+        _ => unit(PolicySubject::Recheck(ArtifactSubject::Artifacts), check),
+    };
     for kind in [
         LimitKind::BootstrapArtifacts,
         LimitKind::RecheckArtifacts,
@@ -377,7 +382,8 @@ fn each_bound_edge_holds_at_its_exact_value_and_blocks_one_below() {
             // `app` is both the only declared ID and the selector; the
             // selector keeps only the smallest first-over witness.
             _ => {
-                let id = unit(PolicySubject::ProfileId(0), Check::WithinBound);
+                let app = serde_json::from_value(serde_json::json!("app")).unwrap();
+                let id = unit(PolicySubject::ProfileId(app), Check::WithinBound);
                 let selector = unit(PolicySubject::Selector, Check::WithinBound);
                 assert_eq!(found, vec![id.clone(), selector.clone()]);
                 assert_eq!(limit(&id), (2, Actual::Exact(3)));
@@ -412,7 +418,8 @@ fn the_inputs_hand_phase_4_what_the_earlier_phases_measured() {
     assert_eq!(inputs.measures.value, Ok(counts.value));
     assert!(counts.value.nodes > 1);
     // `app` is the only declared Profile ID.
-    assert_eq!(inputs.measures.profile_ids, Ok(&[3_u64][..]));
+    let app = serde_json::from_value(serde_json::json!("app")).unwrap();
+    assert_eq!(inputs.measures.profile_ids, Ok(&[app][..]));
     assert_eq!(
         inputs.measures.structural_units,
         Ok(prepared.analysis.structural_units().unwrap())
