@@ -39,11 +39,13 @@ pub(super) enum Scope {
 }
 
 impl Scope {
+    /// The subject of a spelling with `key` here. A single-valued field's
+    /// subject is its path, whatever the spelling names.
     fn subject(self, key: LocaleKey) -> LocaleSubject {
         match self {
             Self::RequestedLocale => LocaleSubject::RequestedLocale(key),
-            Self::DefaultSourceLocale => LocaleSubject::DefaultSourceLocale(key),
-            Self::DefaultRequestedLocale => LocaleSubject::DefaultRequestedLocale(key),
+            Self::DefaultSourceLocale => LocaleSubject::DefaultSourceLocale,
+            Self::DefaultRequestedLocale => LocaleSubject::DefaultRequestedLocale,
             Self::NegotiationAliasKey => LocaleSubject::NegotiationAliasKey(key),
             Self::NegotiationAliasValue(owner) => LocaleSubject::NegotiationAliasValue(owner, key),
             Self::MessageFallbackKey => LocaleSubject::MessageFallbackKey(key),
@@ -52,7 +54,7 @@ impl Scope {
             }
             Self::TargetRequestedLocale(id) => LocaleSubject::TargetRequestedLocale(id, key),
             Self::TargetDefaultRequestedLocale(id) => {
-                LocaleSubject::TargetDefaultRequestedLocale(id, key)
+                LocaleSubject::TargetDefaultRequestedLocale(id)
             }
         }
     }
@@ -109,6 +111,7 @@ impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
             self.occurrences.push(LocaleOccurrence {
                 location,
                 subject: subject.clone(),
+                key: key.clone(),
                 corrected,
             });
             let attempt = attempt.map(|attempt| attempt.map(|(locale, _)| locale));

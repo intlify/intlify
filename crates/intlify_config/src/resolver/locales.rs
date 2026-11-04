@@ -79,8 +79,11 @@ pub(crate) enum LocaleSubject {
     RequestedLocale(LocaleKey),
     /// The project's requested-locale set, under `maxRequestedLocales`.
     RequestedLocales,
-    DefaultSourceLocale(LocaleKey),
-    DefaultRequestedLocale(LocaleKey),
+    /// The project's `defaultSourceLocale`, keyed by its path: one field's
+    /// value never enters its key.
+    DefaultSourceLocale,
+    /// The project's `defaultRequestedLocale`, keyed by its path.
+    DefaultRequestedLocale,
     /// A key of `localeNegotiation.aliases`.
     NegotiationAliasKey(LocaleKey),
     /// An alias destination, under its key's subject key.
@@ -92,8 +95,8 @@ pub(crate) enum LocaleSubject {
     MessageFallbackCandidate(LocaleKey, usize, LocaleKey),
     /// A member of one target's `requestedLocales`.
     TargetRequestedLocale(TargetId, LocaleKey),
-    /// One target's `defaultRequestedLocale`.
-    TargetDefaultRequestedLocale(TargetId, LocaleKey),
+    /// One target's `defaultRequestedLocale`, under its Target ID.
+    TargetDefaultRequestedLocale(TargetId),
 }
 
 /// The unit Phase 7 records for `check` over `subject`.
@@ -122,11 +125,14 @@ pub(crate) enum Location {
 }
 
 /// One spelling Phase 7 canonicalized, or could not: where it sits, the
-/// subject it belongs to, and whether it differs from its canonical form.
+/// subject it belongs to, its own key, and whether it differs from its
+/// canonical form. A single-valued field's subject is its path, so only the
+/// key says which locale the spelling names.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct LocaleOccurrence {
     pub(crate) location: Location,
     pub(crate) subject: LocaleSubject,
+    pub(crate) key: LocaleKey,
     pub(crate) corrected: bool,
 }
 
@@ -421,7 +427,7 @@ fn member(
 ) -> Result<Admitted<()>, EvaluationInvariant> {
     evaluation.check(
         unit(
-            LocaleSubject::DefaultRequestedLocale(default.key.clone()),
+            LocaleSubject::DefaultRequestedLocale,
             Check::RequestedMember,
         ),
         both(
@@ -705,8 +711,8 @@ mod tests {
             LocaleSubject::RequestedLocale(key("en")),
             LocaleSubject::RequestedLocale(content("zz")),
             LocaleSubject::RequestedLocales,
-            LocaleSubject::DefaultSourceLocale(key("en")),
-            LocaleSubject::DefaultRequestedLocale(key("en")),
+            LocaleSubject::DefaultSourceLocale,
+            LocaleSubject::DefaultRequestedLocale,
             LocaleSubject::NegotiationAliasKey(key("fr")),
             LocaleSubject::NegotiationAliasValue(key("de"), key("fr")),
             LocaleSubject::NegotiationAliasValue(key("en"), key("de")),
@@ -716,14 +722,14 @@ mod tests {
             LocaleSubject::MessageFallbackCandidate(key("ja"), 1, key("de")),
             LocaleSubject::TargetRequestedLocale(target("browser"), key("fr")),
             LocaleSubject::TargetRequestedLocale(target("server"), key("de")),
-            LocaleSubject::TargetDefaultRequestedLocale(target("browser"), key("fr")),
-            LocaleSubject::TargetDefaultRequestedLocale(target("server"), key("de")),
+            LocaleSubject::TargetDefaultRequestedLocale(target("browser")),
+            LocaleSubject::TargetDefaultRequestedLocale(target("server")),
         ];
         assert!(ordered.windows(2).all(|pair| pair[0] < pair[1]));
         // A locale's own check runs before the checks that need its identity.
         let en = LocaleSubject::RequestedLocale(key("en"));
         assert!(unit(en.clone(), Check::CanonicalLocale) < unit(en, Check::UniqueLocale));
-        let default = LocaleSubject::DefaultRequestedLocale(key("en"));
+        let default = LocaleSubject::DefaultRequestedLocale;
         assert!(
             unit(default.clone(), Check::CanonicalLocale) < unit(default, Check::RequestedMember)
         );
@@ -775,10 +781,10 @@ mod tests {
                     Check::UniqueLocale
                 ),
                 unit(LocaleSubject::RequestedLocales, Check::WithinBound),
-                canonical_unit(LocaleSubject::DefaultSourceLocale(key("en"))),
-                canonical_unit(LocaleSubject::DefaultRequestedLocale(key("en"))),
+                canonical_unit(LocaleSubject::DefaultSourceLocale),
+                canonical_unit(LocaleSubject::DefaultRequestedLocale),
                 unit(
-                    LocaleSubject::DefaultRequestedLocale(key("en")),
+                    LocaleSubject::DefaultRequestedLocale,
                     Check::RequestedMember
                 ),
                 canonical_unit(LocaleSubject::NegotiationAliasKey(key("fr"))),
@@ -808,10 +814,9 @@ mod tests {
                     LocaleSubject::TargetRequestedLocale(target("server"), key("en")),
                     Check::UniqueLocale
                 ),
-                canonical_unit(LocaleSubject::TargetDefaultRequestedLocale(
-                    target("browser"),
-                    key("en")
-                )),
+                canonical_unit(LocaleSubject::TargetDefaultRequestedLocale(target(
+                    "browser"
+                ))),
             ]
             .map(|unit| (unit, Status::Evaluated))
         );
@@ -897,7 +902,7 @@ mod tests {
         };
         let size = unit(LocaleSubject::RequestedLocales, Check::WithinBound);
         let membership = unit(
-            LocaleSubject::DefaultRequestedLocale(key("fr")),
+            LocaleSubject::DefaultRequestedLocale,
             Check::RequestedMember,
         );
         // Three locales, though five spellings: the bound holds at 3 and the
@@ -987,7 +992,7 @@ mod tests {
             issues(&evaluation),
             [
                 invalid(LocaleSubject::RequestedLocale(content("zz"))),
-                invalid(LocaleSubject::DefaultSourceLocale(content("Latn"))),
+                invalid(LocaleSubject::DefaultSourceLocale),
             ]
         );
         for waiting in [
@@ -997,7 +1002,7 @@ mod tests {
             ),
             unit(LocaleSubject::RequestedLocales, Check::WithinBound),
             unit(
-                LocaleSubject::DefaultRequestedLocale(key("en")),
+                LocaleSubject::DefaultRequestedLocale,
                 Check::RequestedMember,
             ),
         ] {
@@ -1009,7 +1014,7 @@ mod tests {
                 Check::UniqueLocale,
             ),
             unit(
-                LocaleSubject::DefaultRequestedLocale(key("en")),
+                LocaleSubject::DefaultRequestedLocale,
                 Check::CanonicalLocale,
             ),
         ] {
@@ -1023,10 +1028,7 @@ mod tests {
             units(&resolved.project.unwrap_err()),
             [
                 zz,
-                unit(
-                    LocaleSubject::DefaultSourceLocale(content("Latn")),
-                    Check::CanonicalLocale
-                ),
+                unit(LocaleSubject::DefaultSourceLocale, Check::CanonicalLocale),
             ]
         );
         assert!(resolved.targets.is_ok());
@@ -1037,14 +1039,14 @@ mod tests {
         });
         let (evaluation, resolved) = resolve(&invalid_default);
         let default = unit(
-            LocaleSubject::DefaultRequestedLocale(content("zz")),
+            LocaleSubject::DefaultRequestedLocale,
             Check::CanonicalLocale,
         );
         assert_eq!(
             waits_on(
                 &evaluation,
                 &unit(
-                    LocaleSubject::DefaultRequestedLocale(content("zz")),
+                    LocaleSubject::DefaultRequestedLocale,
                     Check::RequestedMember
                 )
             ),
@@ -1081,19 +1083,22 @@ mod tests {
             status,
             Status::NotEvaluated(causes) if units(causes) == [occurrence_unit()]
         )));
+        // Every spelling stands for itself, and so does every subject that a
+        // spelling's key names.
         assert!(resolved.occurrences.iter().all(|occurrence| {
             !occurrence.corrected
+                && matches!(occurrence.key, LocaleKey::Content(_))
                 && matches!(
                     occurrence.subject,
                     LocaleSubject::RequestedLocale(LocaleKey::Content(_))
-                        | LocaleSubject::DefaultSourceLocale(LocaleKey::Content(_))
-                        | LocaleSubject::DefaultRequestedLocale(LocaleKey::Content(_))
+                        | LocaleSubject::DefaultSourceLocale
+                        | LocaleSubject::DefaultRequestedLocale
                         | LocaleSubject::NegotiationAliasKey(LocaleKey::Content(_))
                         | LocaleSubject::NegotiationAliasValue(_, LocaleKey::Content(_))
                         | LocaleSubject::MessageFallbackKey(LocaleKey::Content(_))
                         | LocaleSubject::MessageFallbackCandidate(_, _, LocaleKey::Content(_))
                         | LocaleSubject::TargetRequestedLocale(_, LocaleKey::Content(_))
-                        | LocaleSubject::TargetDefaultRequestedLocale(_, LocaleKey::Content(_))
+                        | LocaleSubject::TargetDefaultRequestedLocale(_)
                 )
         }));
         let over = resolved.requested_set.clone().unwrap_err();
@@ -1239,12 +1244,86 @@ mod tests {
     }
 
     #[test]
+    fn a_single_valued_field_is_keyed_by_its_path_whatever_it_names() {
+        // Two values of each default field: the units are the same, and only
+        // each spelling's own key says which locale it names.
+        let resolved_with = |source: &str, default: &str, target: &str| {
+            resolve(&declaration(&minimal_config(), |app| {
+                app["defaultSourceLocale"] = json!(source);
+                app["requestedLocales"] = json!(["en", "ja"]);
+                app["defaultRequestedLocale"] = json!(default);
+                app["targetProfiles"]["browser"]["requestedLocales"] = json!(["en", "ja"]);
+                app["targetProfiles"]["browser"]["defaultRequestedLocale"] = json!(target);
+            }))
+        };
+        let (first, first_resolved) = resolved_with("EN", "en", "ja");
+        let (second, second_resolved) = resolved_with("ja", "ja", "en");
+        let subjects = |evaluation: &Evaluation| {
+            evaluation
+                .statuses()
+                .filter_map(|(unit, _)| match &unit.subject {
+                    Subject::Locale(
+                        subject @ (LocaleSubject::DefaultSourceLocale
+                        | LocaleSubject::DefaultRequestedLocale
+                        | LocaleSubject::TargetDefaultRequestedLocale(_)),
+                    ) => Some((subject.clone(), unit.check)),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            subjects(&first),
+            [
+                (LocaleSubject::DefaultSourceLocale, Check::CanonicalLocale),
+                (
+                    LocaleSubject::DefaultRequestedLocale,
+                    Check::CanonicalLocale
+                ),
+                (
+                    LocaleSubject::DefaultRequestedLocale,
+                    Check::RequestedMember
+                ),
+                (
+                    LocaleSubject::TargetDefaultRequestedLocale(target("browser")),
+                    Check::CanonicalLocale
+                ),
+            ]
+        );
+        assert_eq!(subjects(&first), subjects(&second));
+        let key_at = |resolved: &ResolvedLocales, location: &Location| {
+            resolved
+                .occurrences
+                .iter()
+                .find(|occurrence| occurrence.location == *location)
+                .map(|occurrence| (occurrence.subject.clone(), occurrence.key.clone()))
+                .unwrap()
+        };
+        let source = Location::DefaultSourceLocale;
+        let default = Location::TargetDefaultRequestedLocale(target("browser"));
+        assert_eq!(
+            key_at(&first_resolved, &source),
+            (LocaleSubject::DefaultSourceLocale, key("en"))
+        );
+        assert_eq!(
+            key_at(&second_resolved, &source),
+            (LocaleSubject::DefaultSourceLocale, key("ja"))
+        );
+        assert_eq!(
+            key_at(&first_resolved, &default),
+            (
+                LocaleSubject::TargetDefaultRequestedLocale(target("browser")),
+                key("ja")
+            )
+        );
+    }
+
+    #[test]
     fn a_source_default_is_resolved_only_when_declared() {
         let (evaluation, resolved) = resolve(&declaration(&minimal_config(), |_| {}));
         assert_eq!(resolved.project.unwrap().source_default(), None);
         assert!(evaluation.statuses().all(|(unit, _)| !matches!(
             unit.subject,
-            Subject::Locale(LocaleSubject::DefaultSourceLocale(_))
+            Subject::Locale(LocaleSubject::DefaultSourceLocale)
         )));
         let (evaluation, resolved) = resolve(&declaration(&minimal_config(), |app| {
             app["defaultSourceLocale"] = json!("EN");
@@ -1256,7 +1335,7 @@ mod tests {
         assert_eq!(
             notices(&evaluation),
             [unit(
-                LocaleSubject::DefaultSourceLocale(key("en")),
+                LocaleSubject::DefaultSourceLocale,
                 Check::CanonicalLocale
             )]
         );

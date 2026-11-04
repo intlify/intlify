@@ -348,7 +348,7 @@ mod tests {
         assert!(ordered.windows(2).all(|pair| pair[0] < pair[1]));
         // Phase 8 commits after every Phase 7 unit.
         let last_of_phase_7 = locales::unit(
-            LocaleSubject::TargetDefaultRequestedLocale(target("server"), content("zz")),
+            LocaleSubject::TargetDefaultRequestedLocale(target("server")),
             Check::RequestedMember,
         );
         assert!(last_of_phase_7 < bound_unit());

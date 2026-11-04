@@ -315,14 +315,8 @@ fn subject(frame: &mut Frame, subject: &LocaleSubject) -> Result<(), OutputFailu
             key(frame, own);
         }
         LocaleSubject::RequestedLocales => frame.uint(2),
-        LocaleSubject::DefaultSourceLocale(own) => {
-            frame.uint(3);
-            key(frame, own);
-        }
-        LocaleSubject::DefaultRequestedLocale(own) => {
-            frame.uint(4);
-            key(frame, own);
-        }
+        LocaleSubject::DefaultSourceLocale => frame.uint(3),
+        LocaleSubject::DefaultRequestedLocale => frame.uint(4),
         LocaleSubject::NegotiationAliasKey(own) => {
             frame.uint(5);
             key(frame, own);
@@ -347,10 +341,9 @@ fn subject(frame: &mut Frame, subject: &LocaleSubject) -> Result<(), OutputFailu
             frame.text(id.as_str());
             key(frame, own);
         }
-        LocaleSubject::TargetDefaultRequestedLocale(id, own) => {
+        LocaleSubject::TargetDefaultRequestedLocale(id) => {
             frame.uint(10);
             frame.text(id.as_str());
-            key(frame, own);
         }
     }
     Ok(())
