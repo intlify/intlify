@@ -102,6 +102,7 @@ impl PreparedTargets {
                 policies: Ok(&declaration.policies),
                 target_profiles: Ok(&declaration.target_profiles),
             },
+            locales.targets.as_deref(),
         )
         .ok()?;
         Some(TargetInputs {

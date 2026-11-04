@@ -424,6 +424,7 @@ mod tests {
                     policies: Err(stand_in(Slot::ProjectProfile)),
                     target_profiles: Ok(&declaration.target_profiles),
                 },
+                locales.targets.as_deref(),
             )
             .unwrap();
             let targets = resolve_targets(

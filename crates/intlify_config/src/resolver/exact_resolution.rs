@@ -9,7 +9,9 @@
 //! resolver supports; it then names the Set's artifact with its exact tuple, or
 //! takes the closest mismatch in the bootstrap's vocabulary and order. The Set
 //! holds one artifact for each tuple, so neither several matches nor
-//! conflicting content can occur here.
+//! conflicting content can occur here. A Target Profile reference is a check
+//! of its target, so it also waits on the target bounds Phase 7 checked: the
+//! Target ID map's `maxTargetProfiles` and the key's `maxTargetIdBytes`.
 //!
 //! When every present reference names its artifact, the resolution also makes
 //! the Resolved Profile Artifact Bindings, kept as Phase 3's internal sidecar
@@ -20,14 +22,16 @@
 use std::collections::BTreeMap;
 
 use crate::artifacts::envelope::{ArtifactKind, ExactTuple};
+use crate::model::TargetId;
 use crate::references::{PolicyReference, TargetProfileReference};
 
 use super::artifact_resolution::{AdmittedArtifact, ArtifactSet};
 use super::bootstrap::{mismatch, reference_checks};
 use super::evaluation::{
-    and, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Phase, Subject,
-    Unit,
+    and, both, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Phase,
+    Subject, Unit,
 };
+use super::locales::TargetLocales;
 use super::resource_policy::{DeclarationReferences, ReferenceField};
 
 /// The unit Phase 9 records for the reference at `field`.
@@ -131,14 +135,17 @@ impl<'s> ReferenceResults<'s> {
 }
 
 /// Phase 9's ordinary exact resolution. Each present reference is one unit
-/// under the Set. A field structural admission did not admit has no
-/// references to resolve, and its causes leave the resolution unavailable.
+/// under the Set; a Target Profile reference also waits on its target's
+/// bounds, which `targets` holds as Phase 7 checked them. A field structural
+/// admission did not admit has no references to resolve, and its causes leave
+/// the resolution unavailable.
 pub(crate) fn resolve_references<'s>(
     evaluation: &mut Evaluation,
     set: Result<&'s ArtifactSet<'s>, &Causes>,
     references: &DeclarationReferences<'_>,
+    targets: Result<&[TargetLocales], &Causes>,
 ) -> Result<Admitted<ResolvedReferences<'s>>, EvaluationInvariant> {
-    Ok(resolve_fields(evaluation, set, references)?.all())
+    Ok(resolve_fields(evaluation, set, references, targets)?.all())
 }
 
 /// The same resolution, with each reference's result kept apart.
@@ -146,19 +153,46 @@ pub(crate) fn resolve_fields<'s>(
     evaluation: &mut Evaluation,
     set: Result<&'s ArtifactSet<'s>, &Causes>,
     references: &DeclarationReferences<'_>,
+    targets: Result<&[TargetLocales], &Causes>,
 ) -> Result<ReferenceResults<'s>, EvaluationInvariant> {
     let (present, unavailable) =
         references.visible(PolicyReference::tuple, TargetProfileReference::tuple);
-    let prerequisite = set.map_err(Causes::clone);
+    let set = set.map_err(Causes::clone);
+    let bounds: Admitted<BTreeMap<&TargetId, &Admitted<()>>> = targets
+        .map(|targets| {
+            targets
+                .iter()
+                .map(|target| (&target.id, &target.admitted))
+                .collect()
+        })
+        .map_err(Causes::clone);
     let mut found = BTreeMap::new();
     for (field, reference) in present {
         let role = field.role_kind();
-        let result = evaluation.check(unit(field.clone()), prerequisite.clone(), |set| {
+        let prerequisite = both(set.clone(), bounded(&bounds, &field)).map(|(set, ())| set);
+        let result = evaluation.check(unit(field.clone()), prerequisite, |set| {
             resolve(set, &reference, role)
         })?;
         found.insert(field, result);
     }
     Ok(ReferenceResults { found, unavailable })
+}
+
+/// What the reference at `field` waits on besides the Set: nothing for a
+/// policy's, and for a Target Profile's, its Target ID within the map's bound
+/// and its own.
+fn bounded(
+    bounds: &Admitted<BTreeMap<&TargetId, &Admitted<()>>>,
+    field: &ReferenceField,
+) -> Admitted<()> {
+    let ReferenceField::TargetProfile(id) = field else {
+        return Ok(());
+    };
+    let bounds = bounds.as_ref().map_err(Causes::clone)?;
+    let own = bounds
+        .get(id)
+        .expect("Phase 7 bounds every declared target");
+    (*own).clone()
 }
 
 /// One reference's decision: its own two checks, then the Set's artifact with
@@ -189,11 +223,13 @@ mod tests {
     use crate::artifacts::collection::{read_collection, CollectionLimits};
     use crate::artifacts::content::sample;
     use crate::artifacts::envelope::{envelope_of, FormalMember};
-    use crate::model::{NonEmptyMap, Policies, TargetDeclaration, TargetId};
+    use crate::input_limits::Bound;
+    use crate::model::{NonEmptyMap, Policies, TargetDeclaration};
     use crate::resolver::artifact_resolution::admit_collection;
     use crate::resolver::evaluation::{IssueKey, Reason, Status};
-    use crate::resolver::limits::{fixture_limits, ConfirmedPolicy};
-    use crate::resolver::locales::fixtures::stand_in;
+    use crate::resolver::limits::{fixture_limits, ConfirmedPolicy, ResolutionLimits};
+    use crate::resolver::locales::fixtures::{canonicalizer, stand_in, units};
+    use crate::resolver::locales::{self, resolve_locales, LocaleFields, LocaleSubject};
     use crate::resolver::resource_policy::PolicySlot::{
         self, Approval, GlossarySet, ProviderRouting, ResourceLimits, Selection, SourceAdmission,
         Trust,
@@ -284,13 +320,15 @@ mod tests {
     }
 
     /// What Phase 9 reads, which a test edits: the submitted members, the
-    /// reference each field writes (`null` for an explicit absence), and
-    /// whether structural admission admitted `policies` and `targets`.
+    /// reference each field writes (`null` for an explicit absence), whether
+    /// structural admission admitted `policies` and `targets`, and the
+    /// policy's bounds, among them the target bounds Phase 7 checks.
     struct Inputs {
         members: Vec<Value>,
         references: Vec<(ReferenceField, Value)>,
         policies: Admitted<()>,
         targets: Admitted<()>,
+        limits: ResolutionLimits,
     }
 
     impl Inputs {
@@ -305,6 +343,7 @@ mod tests {
                 members: artifacts.into_iter().map(|(_, value)| value).collect(),
                 policies: Ok(()),
                 targets: Ok(()),
+                limits: fixture_limits(1),
             }
         }
 
@@ -317,9 +356,22 @@ mod tests {
                 .1
         }
 
+        /// Gives the target that `from` names the ID `to`, keeping its
+        /// reference.
+        fn rename(&mut self, from: &ReferenceField, to: &str) {
+            let field = self
+                .references
+                .iter_mut()
+                .find(|(written, _)| written == from)
+                .unwrap();
+            field.0 = target(to);
+        }
+
         /// Phase 9 over the inputs: the collection's admission, then the exact
-        /// resolution, whose result `keep` copies out. Returns the evaluation
-        /// and the copy.
+        /// resolution, whose result `keep` copies out. Phase 7 checks the
+        /// target bounds first, into an evaluation of its own, with the other
+        /// locale fields standing in as unavailable. Returns Phase 9's
+        /// evaluation and the copy.
         fn with<T>(
             &self,
             keep: impl FnOnce(Admitted<ResolvedReferences<'_>>) -> Admitted<T>,
@@ -346,14 +398,38 @@ mod tests {
             let texts: Vec<String> = self.members.iter().map(Value::to_string).collect();
             let bytes: Vec<&[u8]> = texts.iter().map(String::as_bytes).collect();
             let collection = read_collection(Some(&bytes), &ROOM).unwrap();
+            let confirmed = ConfirmedPolicy::fixture_owned(self.limits.clone());
+            let declared = self.targets.clone().map(|()| &targets);
+            let behind = stand_in(Slot::ProjectProfile);
+            let fields = LocaleFields {
+                requested_locales: Err(behind.clone()),
+                default_requested_locale: Err(behind.clone()),
+                default_source_locale: Err(behind.clone()),
+                locale_negotiation: Err(behind.clone()),
+                message_fallback: Err(behind.clone()),
+                coverage: Err(behind),
+                target_profiles: declared.clone(),
+            };
+            let locales = resolve_locales(
+                &mut Evaluation::default(),
+                Ok(&confirmed),
+                Ok(&canonicalizer(64)),
+                &fields,
+            )
+            .unwrap();
             let mut evaluation = Evaluation::default();
-            let confirmed = ConfirmedPolicy::fixture_owned(fixture_limits(1));
             let set = admit_collection(&mut evaluation, Ok(&confirmed), &collection).unwrap();
             let references = DeclarationReferences {
                 policies: self.policies.clone().map(|()| &policies),
-                target_profiles: self.targets.clone().map(|()| &targets),
+                target_profiles: declared,
             };
-            let resolved = resolve_references(&mut evaluation, set.as_ref(), &references).unwrap();
+            let resolved = resolve_references(
+                &mut evaluation,
+                set.as_ref(),
+                &references,
+                locales.targets.as_deref(),
+            )
+            .unwrap();
             (evaluation, keep(resolved))
         }
 
@@ -693,7 +769,12 @@ mod tests {
         let mut inputs = Inputs::new();
         inputs.targets = Err(behind.clone());
         let (evaluation, resolved) = inputs.run();
+        // Phase 7 bounds no target either, which no policy's reference waits
+        // on.
         assert_eq!(statuses(&evaluation).len(), 7);
+        assert!(statuses(&evaluation)
+            .iter()
+            .all(|(_, status)| *status == Status::Evaluated));
         assert!(evaluation
             .issues()
             .all(|key| !matches!(key.unit().subject, Subject::ArtifactReference(_))));
@@ -770,5 +851,109 @@ mod tests {
         assert!(causes
             .keys()
             .all(|key| matches!(key.unit().subject, Subject::ArtifactCollection(_))));
+    }
+
+    fn bound(value: u64) -> Bound {
+        Bound::new(value).unwrap()
+    }
+
+    /// Phase 7's unit over the Target ID map.
+    fn map_unit() -> Unit {
+        locales::unit(LocaleSubject::TargetProfiles, Check::WithinBound)
+    }
+
+    /// Phase 7's unit over one Target ID key.
+    fn id_unit(id: &str) -> Unit {
+        locales::unit(
+            LocaleSubject::TargetId(serde_json::from_value(json!(id)).unwrap()),
+            Check::WithinBound,
+        )
+    }
+
+    /// The units each reference unit waits on, by field, or `None` for one
+    /// that was evaluated.
+    fn waits(evaluation: &Evaluation) -> Vec<(ReferenceField, Option<Vec<Unit>>)> {
+        statuses(evaluation)
+            .into_iter()
+            .map(|(field, status)| match status {
+                Status::Evaluated => (field, None),
+                Status::NotEvaluated(causes) => (field, Some(units(&causes))),
+            })
+            .collect()
+    }
+
+    /// 015 checks the Target ID map's `maxTargetProfiles` and each Target ID
+    /// key's `maxTargetIdBytes` in Phase 7, before every later check of a
+    /// target. A Target Profile reference is one, so it waits on both; a
+    /// policy's reference names no target and waits on neither.
+    #[test]
+    fn a_target_profile_reference_waits_on_its_target_bounds_and_a_policy_s_does_not() {
+        // The map of `app` and `web` holds at two and not at one, and then
+        // every Target Profile reference waits on it.
+        for (limit, over) in [(2, false), (1, true)] {
+            let mut inputs = Inputs::new();
+            inputs.limits.target_grouping.max_target_profiles = bound(limit);
+            let (evaluation, resolved) = inputs.run();
+            assert!(evaluation.issues().next().is_none(), "{limit}");
+            let waits = waits(&evaluation);
+            assert_eq!(waits.len(), 9, "{limit}");
+            for (field, waits) in waits {
+                let target = matches!(field, ReferenceField::TargetProfile(_));
+                assert_eq!(
+                    waits,
+                    (target && over).then(|| vec![map_unit()]),
+                    "{limit}: {field:?}"
+                );
+            }
+            match resolved {
+                Ok(resolved) => assert!(!over && resolved.len() == 9, "{limit}"),
+                Err(causes) => assert!(over && units(&causes) == [map_unit()], "{limit}"),
+            }
+        }
+        // `app` is three bytes and `storefront` ten: one byte less leaves
+        // only the longer ID's reference waiting on its bound.
+        for (limit, over) in [(10, false), (9, true)] {
+            let mut inputs = Inputs::new();
+            inputs.rename(&target("web"), "storefront");
+            inputs.limits.target_grouping.max_target_id_bytes = bound(limit);
+            let (evaluation, resolved) = inputs.run();
+            assert!(evaluation.issues().next().is_none(), "{limit}");
+            for (field, waits) in waits(&evaluation) {
+                let longer = field == target("storefront");
+                assert_eq!(
+                    waits,
+                    (longer && over).then(|| vec![id_unit("storefront")]),
+                    "{limit}: {field:?}"
+                );
+            }
+            assert_eq!(
+                resolved.map_err(|causes| units(&causes)).err(),
+                over.then(|| vec![id_unit("storefront")]),
+                "{limit}"
+            );
+        }
+        // Without the Set, a Target Profile reference waits on its bounds as
+        // well as on the Set's causes, and only a complete resolution binds.
+        let mut inputs = Inputs::new();
+        inputs
+            .members
+            .push(valid(ArtifactKind::TrustPolicy, "storefront-trust"));
+        inputs.limits.target_grouping.max_target_profiles = bound(1);
+        let (evaluation, _) = inputs.run();
+        let collection: Vec<Unit> = evaluation.issues().map(|key| key.unit().clone()).collect();
+        assert_eq!(collection.len(), 1);
+        for (field, waits) in waits(&evaluation) {
+            let mut expected = collection.clone();
+            if matches!(field, ReferenceField::TargetProfile(_)) {
+                expected.insert(0, map_unit());
+            }
+            assert_eq!(waits, Some(expected), "{field:?}");
+        }
+        let mut inputs = Inputs::new();
+        inputs.limits.target_grouping.max_target_profiles = bound(1);
+        assert_eq!(
+            inputs.bind().map_err(|causes| units(&causes)),
+            Err(vec![map_unit()])
+        );
     }
 }

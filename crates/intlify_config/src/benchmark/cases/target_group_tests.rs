@@ -457,7 +457,9 @@ fn each_bound_holds_at_its_count_and_one_less_blocks_its_unit() {
 /// The two target bounds are Phase 7's, which runs before the interval: at
 /// the exact count nothing waits, and one less leaves each check of an
 /// over-bound target waiting on Phase 7's unit, with nothing blocked in the
-/// interval itself.
+/// interval itself. Phase 9, before the interval too, leaves the target's
+/// Target Profile reference waiting on the same unit, so the target retains
+/// no Target Profile.
 #[test]
 fn the_target_bounds_are_phase_7_s_and_one_less_leaves_their_targets_waiting() {
     use crate::resolver::locales::{unit as locale_unit, LocaleSubject};
@@ -493,6 +495,35 @@ fn the_target_bounds_are_phase_7_s_and_one_less_leaves_their_targets_waiting() {
             .all(|(_, status)| *status == Status::Evaluated));
         let over = resolved(&edge(limit, LimitEdge::FirstOver));
         assert_eq!(issues(&over), [], "{limit:?}");
+        let profiles = |resolved: &Resolved| {
+            let Ok(Ok(retained)) = &resolved.result else {
+                panic!("{limit:?}: no targets");
+            };
+            retained
+                .targets
+                .iter()
+                .map(|target| {
+                    let units = target.profile.as_ref().err().map(|causes| {
+                        causes
+                            .keys()
+                            .map(|key| key.unit().clone())
+                            .collect::<Vec<_>>()
+                    });
+                    (target.id.clone(), units)
+                })
+                .collect::<Vec<_>>()
+        };
+        assert!(
+            profiles(&held).iter().all(|(_, units)| units.is_none()),
+            "{limit:?}"
+        );
+        for (id, units) in profiles(&over) {
+            assert_eq!(
+                units,
+                waiting.contains(&id.as_str()).then(|| vec![cause.clone()]),
+                "{limit:?} {id}"
+            );
+        }
         for id in waiting {
             for check in checks {
                 let Some(Status::NotEvaluated(causes)) =

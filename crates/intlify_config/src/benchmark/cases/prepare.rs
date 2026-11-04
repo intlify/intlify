@@ -768,13 +768,17 @@ fn prepare_collection(declaration: &Declaration) -> Result<Candidate, Preparatio
 /// Phase 9's exact resolution over a recipe's configuration, selected with
 /// `app`, and its collection, read at 015's pre-invocation boundary and
 /// admitted into the Set under the policy whose bounds its Resource Limit
-/// Policy sets.
+/// Policy sets. Phase 7, which checks the target bounds a Target Profile
+/// reference waits on, canonicalizes through the finite provider bound under
+/// the policy's identifier bound, as Phase 5 binds it, before the interval.
 fn prepare_bindings(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
     use crate::benchmark::resolved_binding::PreparedBindings;
 
     let Recipe::ResolvedBinding(recipe) = declaration.fixture else {
         return Err(PreparationFailure::UndeclaredCase);
     };
+    let policy = ConfirmedPolicy::fixture_owned(capacity());
+    let canonicalizer = finite_canonicalizer(&policy)?;
     let fixture = recipe.fixture();
     let SelectedConfig {
         analysis,
@@ -786,7 +790,8 @@ fn prepare_bindings(declaration: &Declaration) -> Result<Candidate, PreparationF
         analysis,
         config,
         selected,
-        policy: ConfirmedPolicy::fixture_owned(capacity()),
+        policy,
+        canonicalizer,
         collection: submitted(&fixture.members)?,
     };
     let resolved = prepared
