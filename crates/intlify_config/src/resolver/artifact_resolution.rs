@@ -15,7 +15,9 @@ use intlify_shared_json::token::Token;
 
 use crate::artifacts::collection::FormalCollection;
 use crate::artifacts::content::Content;
-use crate::artifacts::envelope::{ArtifactKind, Declaration, Envelope, ExactTuple, FormalMember};
+use crate::artifacts::envelope::{
+    ArtifactKind, Declaration, Envelope, ExactTuple, FormalMember, MemberKey,
+};
 
 use super::evaluation::{
     and, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Phase, Reason,
@@ -23,16 +25,37 @@ use super::evaluation::{
 };
 use super::limits::ConfirmedPolicy;
 
-/// What one Phase 9 collection unit checks. Every distinct submitted body
-/// comes before the groups.
+/// What one Phase 9 collection unit checks. Every member key comes before
+/// the conflict groups.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum CollectionSubject {
-    /// One distinct canonical submitted body, by its place in the members'
-    /// canonical order.
-    Member(usize),
+    /// The submitted bodies of one member key: the exact tuple they
+    /// establish, or, without one, the body itself.
+    Member(MemberKey),
     /// The members sharing a kind, identity, revision, and specification
-    /// revision, by the group's place in their order.
-    Group(usize),
+    /// revision: a conflict group, by those four parts.
+    Group(ConflictKey),
+}
+
+/// The parts of a tuple its conflict group shares: everything but the
+/// semantic digest, in the tuple's order.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct ConflictKey {
+    pub(crate) kind: ArtifactKind,
+    pub(crate) identity: Token,
+    pub(crate) revision: Token,
+    pub(crate) specification_revision: Token,
+}
+
+impl ConflictKey {
+    pub(crate) fn of(tuple: &ExactTuple) -> Self {
+        Self {
+            kind: tuple.kind,
+            identity: tuple.identity.clone(),
+            revision: tuple.revision.clone(),
+            specification_revision: tuple.specification_revision.clone(),
+        }
+    }
 }
 
 /// The unit Phase 9 records for `check` over a collection `subject`.
@@ -73,27 +96,6 @@ impl<'a> ArtifactSet<'a> {
     }
 }
 
-/// Where a distinct submitted body sits: members that establish a tuple first,
-/// by the tuple and then by the body's bytes, and then the others by the
-/// bytes, which are their admission key.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-enum Place<'a> {
-    Tuple(ExactTuple, &'a [u8]),
-    Content(&'a [u8]),
-}
-
-/// The parts of a tuple a group shares: everything but the semantic digest.
-type GroupKey = (ArtifactKind, Token, Token, Token);
-
-fn group_of(tuple: &ExactTuple) -> GroupKey {
-    (
-        tuple.kind,
-        tuple.identity.clone(),
-        tuple.revision.clone(),
-        tuple.specification_revision.clone(),
-    )
-}
-
 /// One distinct submitted body: the member that has it, its envelope when it
 /// establishes a tuple, and how many times it was submitted.
 struct Distinct<'a> {
@@ -127,25 +129,23 @@ fn admit_member<'a>(
         .map_err(|_| not_admitted(Reason::EnvelopeInvalid))
 }
 
-/// Phase 9's complete collection admission. Each distinct submitted body is
-/// checked once, however often it was submitted: whether it is an admissible
-/// member, and, when it establishes a tuple, whether it was submitted only
-/// once. Each group of tuples differing only in their digest is checked for
-/// one body. The Set exists only when every unit holds.
+/// Phase 9's complete collection admission. Each member key is checked once,
+/// over every distinct body under it: whether its bodies are admissible
+/// members, and, for a tuple, whether each was submitted only once. Each
+/// conflict group is checked for one body. The Set exists only when every
+/// unit holds, so it then has one body for each tuple.
 pub(crate) fn admit_collection<'a>(
     evaluation: &mut Evaluation,
     confirmed: Result<&ConfirmedPolicy, &Causes>,
     collection: &'a FormalCollection,
 ) -> Result<Admitted<ArtifactSet<'a>>, EvaluationInvariant> {
-    let mut distinct: BTreeMap<Place<'a>, Distinct<'a>> = BTreeMap::new();
+    let mut keyed: BTreeMap<MemberKey, BTreeMap<&'a [u8], Distinct<'a>>> = BTreeMap::new();
     for member in collection.members() {
-        let body = member.canonical_body();
-        let envelope = member.envelope();
-        let place = envelope.as_ref().map_or(Place::Content(body), |envelope| {
-            Place::Tuple(envelope.tuple().clone(), body)
-        });
-        distinct
-            .entry(place)
+        let (key, envelope) = member.keyed();
+        keyed
+            .entry(key)
+            .or_default()
+            .entry(member.canonical_body())
             .or_insert(Distinct {
                 member,
                 envelope,
@@ -156,22 +156,33 @@ pub(crate) fn admit_collection<'a>(
     let prerequisite = confirmed.map(|_| ()).map_err(Causes::clone);
     let mut holds: Admitted<()> = Ok(());
     let mut set = BTreeMap::new();
-    let mut groups: BTreeMap<GroupKey, BTreeSet<&[u8]>> = BTreeMap::new();
-    for (ordinal, (place, member)) in distinct.iter().enumerate() {
+    let mut groups: BTreeMap<ConflictKey, BTreeSet<&[u8]>> = BTreeMap::new();
+    for (key, bodies) in &keyed {
+        let member = |check| unit(CollectionSubject::Member(key.clone()), check);
+        // Every body is checked, and the first that fails, in the bodies'
+        // order, is the unit's result.
         let admitted = evaluation.check(
-            unit(CollectionSubject::Member(ordinal), Check::AdmissibleMember),
+            member(Check::AdmissibleMember),
             prerequisite.clone(),
-            |()| admit_member(member.member, member.envelope.as_ref()),
+            |()| {
+                bodies
+                    .values()
+                    .map(|distinct| {
+                        admit_member(distinct.member, distinct.envelope.as_ref())
+                            .map(|content| (distinct.member, content))
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            },
         )?;
-        let Place::Tuple(tuple, body) = place else {
+        let MemberKey::Tuple(tuple) = key else {
             holds = and(holds, admitted.map(|_| ()));
             continue;
         };
         let single = evaluation.check(
-            unit(CollectionSubject::Member(ordinal), Check::SingleOccurrence),
+            member(Check::SingleOccurrence),
             prerequisite.clone(),
             |()| {
-                if member.occurrences == 1 {
+                if bodies.values().all(|distinct| distinct.occurrences == 1) {
                     Ok(())
                 } else {
                     Err(not_admitted(Reason::DuplicateEnvelope))
@@ -180,22 +191,29 @@ pub(crate) fn admit_collection<'a>(
         )?;
         holds = and(holds, single);
         match admitted {
-            Ok(content) => {
+            Ok(mut admitted) if admitted.len() == 1 => {
+                let (member, content) = admitted.remove(0);
                 set.insert(
-                    tuple.clone(),
-                    AdmittedArtifact {
-                        member: member.member,
-                        content,
-                    },
+                    ExactTuple::clone(tuple),
+                    AdmittedArtifact { member, content },
                 );
             }
+            // Several bodies under one tuple conflict, which their group
+            // reports, so none of them enters the Set.
+            Ok(_) => {}
             Err(causes) => holds = and(holds, Err(causes)),
         }
-        groups.entry(group_of(tuple)).or_default().insert(body);
+        groups
+            .entry(ConflictKey::of(tuple))
+            .or_default()
+            .extend(bodies.keys());
     }
-    for (ordinal, bodies) in groups.values().enumerate() {
+    for (group, bodies) in &groups {
         let consistent = evaluation.check(
-            unit(CollectionSubject::Group(ordinal), Check::ConsistentContent),
+            unit(
+                CollectionSubject::Group(group.clone()),
+                Check::ConsistentContent,
+            ),
             prerequisite.clone(),
             |()| {
                 if bodies.len() == 1 {
@@ -294,6 +312,16 @@ mod tests {
 
     use CollectionSubject::{Group, Member};
 
+    /// The member key of `value`.
+    fn key(value: &Value) -> MemberKey {
+        FormalMember::new(value.clone()).unwrap().key()
+    }
+
+    /// The conflict group of `value`, which establishes a tuple.
+    fn group(value: &Value) -> ConflictKey {
+        ConflictKey::of(&tuple_of(value))
+    }
+
     #[test]
     fn admissible_single_members_form_the_set_in_tuple_order() {
         let members = [
@@ -307,15 +335,23 @@ mod tests {
         let mut tuples = members.iter().map(tuple_of).collect::<Vec<_>>();
         tuples.sort();
         assert_eq!(set, Some(tuples));
-        // Each member has both of its checks, and each group one.
-        let expected = (0..4)
-            .flat_map(|ordinal| {
+        // Each member has both of its checks, and each group one, in the
+        // tuples' order.
+        let mut sorted = members.to_vec();
+        sorted.sort_by_key(tuple_of);
+        let expected = sorted
+            .iter()
+            .flat_map(|value| {
                 [
-                    (Member(ordinal), Check::AdmissibleMember),
-                    (Member(ordinal), Check::SingleOccurrence),
+                    (Member(key(value)), Check::AdmissibleMember),
+                    (Member(key(value)), Check::SingleOccurrence),
                 ]
             })
-            .chain((0..4).map(|ordinal| (Group(ordinal), Check::ConsistentContent)))
+            .chain(
+                sorted
+                    .iter()
+                    .map(|value| (Group(group(value)), Check::ConsistentContent)),
+            )
             .collect::<Vec<_>>();
         assert_eq!(statuses(&evaluation), expected);
         // Submission order is not part of the input.
@@ -418,7 +454,7 @@ mod tests {
             let (evaluation, set) = admit(std::slice::from_ref(&member));
             assert_eq!(
                 issues(&evaluation),
-                [(Member(0), Check::AdmissibleMember, reason)],
+                [(Member(key(&member)), Check::AdmissibleMember, reason)],
                 "{member}"
             );
             assert_eq!(set, None, "{member}");
@@ -426,12 +462,12 @@ mod tests {
             // belongs to a group.
             let expected = if has_tuple {
                 vec![
-                    (Member(0), Check::AdmissibleMember),
-                    (Member(0), Check::SingleOccurrence),
-                    (Group(0), Check::ConsistentContent),
+                    (Member(key(&member)), Check::AdmissibleMember),
+                    (Member(key(&member)), Check::SingleOccurrence),
+                    (Group(group(&member)), Check::ConsistentContent),
                 ]
             } else {
-                vec![(Member(0), Check::AdmissibleMember)]
+                vec![(Member(key(&member)), Check::AdmissibleMember)]
             };
             assert_eq!(statuses(&evaluation), expected, "{member}");
         }
@@ -440,11 +476,12 @@ mod tests {
     #[test]
     fn a_repeated_body_is_a_duplicate_whether_or_not_it_is_admissible() {
         let approval = valid(ArtifactKind::ApprovalPolicy, "storefront-approval");
+        let named = Member(key(&approval));
         let (evaluation, set) = admit(&[approval.clone(), approval.clone()]);
         assert_eq!(
             issues(&evaluation),
             [(
-                Member(0),
+                named.clone(),
                 Check::SingleOccurrence,
                 Reason::DuplicateEnvelope
             )]
@@ -457,24 +494,28 @@ mod tests {
         assert_eq!(
             issues(&evaluation),
             [
-                (Member(0), Check::AdmissibleMember, Reason::EnvelopeInvalid),
                 (
-                    Member(0),
-                    Check::SingleOccurrence,
-                    Reason::DuplicateEnvelope
+                    named.clone(),
+                    Check::AdmissibleMember,
+                    Reason::EnvelopeInvalid
                 ),
+                (named, Check::SingleOccurrence, Reason::DuplicateEnvelope),
             ]
         );
         // A repeated member without a tuple is an invalid envelope, once.
         let lone = json!({"schemaRevision": "0"});
-        let (evaluation, _) = admit(&[lone.clone(), lone]);
+        let (evaluation, _) = admit(&[lone.clone(), lone.clone()]);
         assert_eq!(
             issues(&evaluation),
-            [(Member(0), Check::AdmissibleMember, Reason::EnvelopeInvalid)]
+            [(
+                Member(key(&lone)),
+                Check::AdmissibleMember,
+                Reason::EnvelopeInvalid
+            )]
         );
         assert_eq!(
             statuses(&evaluation),
-            [(Member(0), Check::AdmissibleMember)]
+            [(Member(key(&lone)), Check::AdmissibleMember)]
         );
     }
 
@@ -492,28 +533,29 @@ mod tests {
         assert_eq!(
             issues(&evaluation),
             [(
-                Group(0),
+                Group(group(&first)),
                 Check::ConsistentContent,
                 Reason::ConflictingContent
             )]
         );
         assert_eq!(set, None);
         // The same tuple with another body: the digest pins the content, not
-        // the integrity value, which here no longer holds.
+        // the integrity value, which here no longer holds. Both bodies are
+        // the tuple's one unit, which the invalid one fails.
         let mut tampered = first.clone();
         tampered["integrityDigest"] = json!(format!("sha256:{}", "1".repeat(64)));
         assert_eq!(tuple_of(&first), tuple_of(&tampered));
-        let (evaluation, _) = admit(&[first.clone(), tampered.clone()]);
-        // The two bodies share the tuple, so they order by their bytes.
-        let tampered_first = FormalMember::new(tampered).unwrap().canonical_body()
-            < FormalMember::new(first).unwrap().canonical_body();
-        let invalid = Member(usize::from(!tampered_first));
+        let (evaluation, _) = admit(&[first.clone(), tampered]);
         assert_eq!(
             issues(&evaluation),
             [
-                (invalid, Check::AdmissibleMember, Reason::EnvelopeInvalid),
                 (
-                    Group(0),
+                    Member(key(&first)),
+                    Check::AdmissibleMember,
+                    Reason::EnvelopeInvalid
+                ),
+                (
+                    Group(group(&first)),
                     Check::ConsistentContent,
                     Reason::ConflictingContent
                 ),
@@ -539,35 +581,99 @@ mod tests {
             |value| value["specification"]["revision"] = json!("1"),
         );
         let (evaluation, _) = admit(&[
-            later,
+            later.clone(),
             valid(ArtifactKind::ApprovalPolicy, "storefront-approval"),
         ]);
         assert_eq!(
             issues(&evaluation),
-            [(Member(1), Check::AdmissibleMember, Reason::EnvelopeInvalid)]
+            [(
+                Member(key(&later)),
+                Check::AdmissibleMember,
+                Reason::EnvelopeInvalid
+            )]
         );
-        assert!(statuses(&evaluation).contains(&(Group(1), Check::ConsistentContent)));
+        assert!(statuses(&evaluation).contains(&(Group(group(&later)), Check::ConsistentContent)));
     }
 
     #[test]
     fn members_with_a_tuple_come_before_members_without_one() {
-        let (evaluation, _) = admit(&[
-            json!({"schemaRevision": "0"}),
-            valid(ArtifactKind::TrustPolicy, "storefront-trust"),
-        ]);
+        let lone = json!({"schemaRevision": "0"});
+        let trust = valid(ArtifactKind::TrustPolicy, "storefront-trust");
+        let (evaluation, _) = admit(&[lone.clone(), trust.clone()]);
         assert_eq!(
             statuses(&evaluation),
             [
-                (Member(0), Check::AdmissibleMember),
-                (Member(0), Check::SingleOccurrence),
-                (Member(1), Check::AdmissibleMember),
-                (Group(0), Check::ConsistentContent),
+                (Member(key(&trust)), Check::AdmissibleMember),
+                (Member(key(&trust)), Check::SingleOccurrence),
+                (Member(key(&lone)), Check::AdmissibleMember),
+                (Group(group(&trust)), Check::ConsistentContent),
             ]
         );
         assert_eq!(
             issues(&evaluation),
-            [(Member(1), Check::AdmissibleMember, Reason::EnvelopeInvalid)]
+            [(
+                Member(key(&lone)),
+                Check::AdmissibleMember,
+                Reason::EnvelopeInvalid
+            )]
         );
+    }
+
+    #[test]
+    fn the_bodies_of_one_tuple_share_its_units() {
+        // One body twice and another once, under one tuple: the invalid body,
+        // the repeated one, and the conflict each fail one unit. The invalid
+        // body is found on either side of the valid one in the bodies' order.
+        let first = valid(ArtifactKind::ApprovalPolicy, "storefront-approval");
+        let named = Member(key(&first));
+        for digit in ["0", "f"] {
+            let mut tampered = first.clone();
+            tampered["integrityDigest"] = json!(format!("sha256:{}", digit.repeat(64)));
+            assert_eq!(key(&tampered), key(&first));
+            let (evaluation, set) = admit(&[first.clone(), tampered, first.clone()]);
+            assert_eq!(
+                statuses(&evaluation),
+                [
+                    (named.clone(), Check::AdmissibleMember),
+                    (named.clone(), Check::SingleOccurrence),
+                    (Group(group(&first)), Check::ConsistentContent),
+                ],
+                "{digit}"
+            );
+            assert_eq!(
+                issues(&evaluation),
+                [
+                    (
+                        named.clone(),
+                        Check::AdmissibleMember,
+                        Reason::EnvelopeInvalid
+                    ),
+                    (
+                        named.clone(),
+                        Check::SingleOccurrence,
+                        Reason::DuplicateEnvelope
+                    ),
+                    (
+                        Group(group(&first)),
+                        Check::ConsistentContent,
+                        Reason::ConflictingContent
+                    ),
+                ],
+                "{digit}"
+            );
+            assert_eq!(set, None, "{digit}");
+        }
+        // The two orders really differ: the valid body sorts between them.
+        let body = |digit: &str| {
+            let mut value = first.clone();
+            value["integrityDigest"] = json!(format!("sha256:{}", digit.repeat(64)));
+            FormalMember::new(value).unwrap().canonical_body().to_vec()
+        };
+        let valid_body = FormalMember::new(first.clone())
+            .unwrap()
+            .canonical_body()
+            .to_vec();
+        assert!(body("0") < valid_body && valid_body < body("f"));
     }
 
     #[test]

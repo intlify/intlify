@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::artifacts::envelope::{ArtifactKind, Declaration, FormalMember};
+use crate::artifacts::envelope::{ArtifactKind, Declaration, FormalMember, MemberKey};
 use crate::benchmark::artifact_collection::{require_observable, PreparedCollection, Resolved};
 use crate::resolver::artifact_resolution::CollectionSubject;
 use crate::resolver::evaluation::Subject;
@@ -47,14 +47,18 @@ impl LogicalWork {
             .iter()
             .map(FormalMember::canonical_body)
             .collect::<BTreeSet<_>>();
-        let tupled = members
-            .iter()
-            .filter(|member| member.envelope().is_some())
-            .map(FormalMember::canonical_body)
-            .collect::<BTreeSet<_>>();
         let artifact_bytes = sum(members.iter().map(FormalMember::canonical_bytes))?;
-        // Each distinct body has a unit checking it, and each one that
-        // establishes a tuple another checking its occurrences.
+        // Each member key, the tuple a member establishes or else its body,
+        // has a unit checking its bodies, and each tuple another checking
+        // their occurrences.
+        let keys = members
+            .iter()
+            .map(FormalMember::key)
+            .collect::<BTreeSet<_>>();
+        let tuples = keys
+            .iter()
+            .filter(|key| matches!(key, MemberKey::Tuple(_)))
+            .count();
         let evaluation = &resolved.evaluation;
         let checked = evaluation
             .statuses()
@@ -65,7 +69,7 @@ impl LogicalWork {
                 )
             })
             .count();
-        if Some(checked) != bodies.len().checked_add(tupled.len()) {
+        if Some(checked) != keys.len().checked_add(tuples) {
             return Err(WorkFailure::InvalidOrdinaryResult);
         }
         for (kind, value) in [

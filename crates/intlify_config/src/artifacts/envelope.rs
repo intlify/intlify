@@ -238,10 +238,17 @@ impl FormalMember {
     /// The member's key: the tuple its envelope establishes, or else its
     /// admission key.
     pub(crate) fn key(&self) -> MemberKey {
-        self.envelope().map_or_else(
+        self.keyed().0
+    }
+
+    /// The member's key and its envelope, read once.
+    pub(crate) fn keyed(&self) -> (MemberKey, Option<Envelope<'_>>) {
+        let envelope = self.envelope();
+        let key = envelope.as_ref().map_or_else(
             || MemberKey::Content(AdmissionKey(Arc::from(self.canonical.as_slice()))),
-            |envelope| MemberKey::Tuple(Arc::new(envelope.tuple)),
-        )
+            |envelope| MemberKey::Tuple(Arc::new(envelope.tuple.clone())),
+        );
+        (key, envelope)
     }
 
     /// The envelope this member is, when it establishes its exact-reference

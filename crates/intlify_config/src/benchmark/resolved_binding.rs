@@ -570,7 +570,16 @@ mod tests {
     fn only_reference_units_frame_and_collection_units_only_as_causes() {
         let mut frame = Frame::new("resolved-binding-test");
         let foreign = [
-            collection_unit(CollectionSubject::Member(0), Check::AdmissibleMember),
+            collection_unit(
+                CollectionSubject::Member(
+                    crate::artifacts::envelope::FormalMember::new(
+                        serde_json::json!({"schemaRevision": "0"}),
+                    )
+                    .unwrap()
+                    .key(),
+                ),
+                Check::AdmissibleMember,
+            ),
             Unit {
                 check: Check::ConsistentContent,
                 ..reference_unit(trust())

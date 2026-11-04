@@ -957,7 +957,16 @@ mod tests {
         let mut frame = Frame::new("target-and-group-test");
         let foreign = [
             reference_unit(ReferenceField::Policy(PolicySlot::Trust)),
-            collection_unit(CollectionSubject::Member(0), Check::AdmissibleMember),
+            collection_unit(
+                CollectionSubject::Member(
+                    crate::artifacts::envelope::FormalMember::new(
+                        serde_json::json!({"schemaRevision": "0"}),
+                    )
+                    .unwrap()
+                    .key(),
+                ),
+                Check::AdmissibleMember,
+            ),
             Unit {
                 check: Check::ResolvedReference,
                 ..target_unit(TargetSubject::Targets, Check::WithinBound)
