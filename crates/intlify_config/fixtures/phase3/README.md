@@ -221,7 +221,7 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 
 | Requirement | Owner |
 | --- | --- |
-| Target locale subsets, effective defaults, Target and Group IDs, the group partition, and hydration relations | [Phase 4](../phase4/README.md) (Algo 11 to 13). Phase 3 canonicalizes and counts every target locale occurrence |
+| Target locale subsets, effective defaults, Target and Group IDs, the group partition, and hydration relations | [Phase 4](../phase4/README.md) (Algo 11 to 13, and the target bounds Algo 7 checks). Phase 3 canonicalizes and counts every target locale occurrence |
 | Construction, the Root Package, the capability as a constructed input, origins, tokens, locators, Findings, Evidence, outcomes, profile equality and digests, replay, and reporting bounds | Phase 5 |
 | Reading the Resource Limit Policy Verification Input from 017's shape at the pre-invocation boundary, with its ten boundary reasons | Phase 5. Design 029's lock supplies the input |
 | `bootstrapOnly.artifactBootstrap`'s four bounds on the bootstrap's own work: `maxEnvelopeDepth`, `maxDecodedAllocationBytes`, `maxMetadataScanUnits`, and `maxValidationWorkUnits` | Phase 5, whose Capability Specification closes their units (plan 022 decision #119). Until then the bootstrap counts none of them and reports no `project-profile-bootstrap-limit-exceeded`; the collection's limits still bound every member |

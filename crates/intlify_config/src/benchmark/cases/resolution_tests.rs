@@ -70,6 +70,8 @@ fn describe(subject: &LocaleSubject) -> String {
         LocaleSubject::MessageFallbackCandidate(owner, position, own) => {
             format!("fallback {} candidate {position} {}", key(owner), key(own))
         }
+        LocaleSubject::TargetProfiles => "targets".to_owned(),
+        LocaleSubject::TargetId(id) => format!("{} id", id.as_str()),
         LocaleSubject::TargetRequestedLocale(id, own) => {
             format!("{} requested {}", id.as_str(), key(own))
         }
@@ -642,12 +644,18 @@ fn the_occurrence_bound_counts_every_role_at_its_exact_value_and_first_over() {
             (exceeded.bound.name, exceeded.limit.get(), exceeded.actual),
             ("maxLocaleOccurrences", 20, Actual::Exact(21))
         );
-        // Nothing past the bound is canonicalized or checked. Phase 8's
-        // bounds over what was declared, the Intent source candidate, and the
-        // two surface items naming a vocabulary member need no canonical
-        // locale, so they still run; every other unit waits on the bound.
+        // Nothing past the bound is canonicalized or checked. Phase 7's
+        // target bounds and Phase 8's bounds over what was declared, the
+        // Intent source candidate, and the two surface items naming a
+        // vocabulary member need no canonical locale, so they still run;
+        // every other unit waits on the bound.
         let runs = |unit: &crate::resolver::evaluation::Unit| match &unit.subject {
-            Subject::Locale(subject) => *subject == LocaleSubject::Occurrences,
+            Subject::Locale(subject) => matches!(
+                subject,
+                LocaleSubject::Occurrences
+                    | LocaleSubject::TargetProfiles
+                    | LocaleSubject::TargetId(_)
+            ),
             Subject::Negotiation(NegotiationSubject::Aliases)
             | Subject::Fallback(FallbackSubject::Sources | FallbackSubject::IntentSource(_))
             | Subject::Coverage(
@@ -669,7 +677,7 @@ fn the_occurrence_bound_counts_every_role_at_its_exact_value_and_first_over() {
                 .statuses()
                 .filter(|(unit, _)| runs(unit))
                 .count(),
-            13
+            16
         );
         // Evaluated and waiting, per policy.
         let mut policies = [[0; 2]; 3];

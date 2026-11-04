@@ -141,7 +141,6 @@ fn phases<'s>(
 ) -> Result<(Admitted<ResolvedTargets<'s>>, Admitted<ResolvedGroups>), EvaluationInvariant> {
     let targets = resolve_targets(
         evaluation,
-        Ok(inputs.policy),
         Ok(&inputs.declaration.target_profiles),
         &inputs.locales,
         &inputs.references,
@@ -319,7 +318,6 @@ fn count(value: usize) -> Result<u64, OutputFailure> {
 
 fn target_subject(frame: &mut Frame, subject: &TargetSubject) {
     match subject {
-        TargetSubject::Targets => frame.uint(0),
         TargetSubject::Target(id) => {
             frame.uint(1);
             frame.text(id.as_str());
@@ -654,9 +652,14 @@ mod tests {
         target_unit(TargetSubject::Target(target("browser")), check)
     }
 
+    /// A bound of Phase 12: the Group ID `web` under `maxGroupIdBytes`.
+    fn web_group_bound() -> Unit {
+        group_unit(GroupSubject::Group(group("web")), Check::WithinBound)
+    }
+
     const ID_BYTES: BoundId = BoundId {
         group: Group::TargetGrouping,
-        name: "maxTargetIdBytes",
+        name: "maxGroupIdBytes",
     };
 
     /// An evaluation whose one unit, `recorded`, `blocking` blocks, and the
@@ -697,10 +700,10 @@ mod tests {
         }
     }
 
-    /// The causes a bound of Phase 11 leaves.
+    /// The causes a bound of Phase 12 leaves.
     fn own_causes() -> Causes {
         blocked_unit(
-            of_browser(Check::WithinBound),
+            web_group_bound(),
             Blocking::limit(exceeded(6, Actual::Exact(7))),
         )
         .1
@@ -798,8 +801,8 @@ mod tests {
         let resolved = Resolved {
             evaluation: Evaluation::default(),
             result: Err(EvaluationInvariant::UnitRecordedTwice(target_unit(
-                TargetSubject::Targets,
-                Check::WithinBound,
+                TargetSubject::Target(target("web")),
+                Check::ProjectSubset,
             ))),
         };
         assert_eq!(
@@ -833,7 +836,7 @@ mod tests {
         assert!(observe(&resolved(R::ExplicitDefaultNotRequested)).is_ok());
         assert!(observe(&resolved(R::TargetLocaleDirectionMissing)).is_ok());
         assert!(observed(blocked(
-            of_browser(Check::WithinBound),
+            web_group_bound(),
             Code::ResourceLimitExceeded,
             None,
             limit(),
@@ -889,12 +892,7 @@ mod tests {
             ),
             (
                 "a bound without its details",
-                blocked(
-                    of_browser(Check::WithinBound),
-                    Code::ResourceLimitExceeded,
-                    None,
-                    None,
-                ),
+                blocked(web_group_bound(), Code::ResourceLimitExceeded, None, None),
             ),
             (
                 "a shortfall",
@@ -969,7 +967,7 @@ mod tests {
             ),
             Unit {
                 check: Check::ResolvedReference,
-                ..target_unit(TargetSubject::Targets, Check::WithinBound)
+                ..target_unit(TargetSubject::Target(target("web")), Check::ProjectSubset)
             },
             Unit {
                 check: Check::KnownEndpoints,
@@ -986,7 +984,6 @@ mod tests {
         // Each subject frames apart, a group apart from a target of its
         // name, and a member by its group and its Target ID.
         let subjects = [
-            target_unit(TargetSubject::Targets, Check::WithinBound),
             target_unit(TargetSubject::Target(target("web")), Check::WithinBound),
             target_unit(TargetSubject::Target(target("ssr")), Check::WithinBound),
             group_unit(GroupSubject::Groups, Check::WithinBound),
@@ -1023,12 +1020,18 @@ mod tests {
             Check::DirectedLocales,
         ]
         .map(|check| {
-            digest(|frame| unit(frame, &target_unit(TargetSubject::Targets, check)).unwrap())
+            digest(|frame| {
+                unit(
+                    frame,
+                    &target_unit(TargetSubject::Target(target("web")), check),
+                )
+                .unwrap();
+            })
         });
         assert!(apart(&checks));
         let other_phase = Unit {
             phase: Phase::GroupResolution,
-            ..target_unit(TargetSubject::Targets, Check::WithinBound)
+            ..target_unit(TargetSubject::Target(target("web")), Check::WithinBound)
         };
         assert_ne!(
             digest(|frame| unit(frame, &other_phase).unwrap()),
@@ -1176,8 +1179,8 @@ mod tests {
             Some(exceeded(6, Actual::AtLeast(7))),
             Some(exceeded(6, Actual::Exact(8))),
             Some(exceeded(5, Actual::Exact(7))),
-            Some(other(Group::TargetGrouping, "maxGroupIdBytes")),
-            Some(other(Group::ArtifactAdmission, "maxTargetIdBytes")),
+            Some(other(Group::TargetGrouping, "maxTargetIdBytes")),
+            Some(other(Group::ArtifactAdmission, "maxGroupIdBytes")),
         ]
         .map(|exceeded| digest(|frame| limit(frame, exceeded)));
         assert!(apart(&limits));

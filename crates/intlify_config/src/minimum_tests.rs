@@ -33,7 +33,7 @@ fn locales(run: Run) -> Locales {
     let Outcome::Locale(locales) = run.outcome else {
         panic!("minimum slice did not reach locale resolution")
     };
-    locales
+    *locales
 }
 
 fn names(set: &LocaleSet) -> Vec<&str> {
@@ -466,10 +466,17 @@ fn resource_edges_stop_at_their_owning_stage_without_later_semantic_work() {
                 (exceeded.bound.name, exceeded.limit.get(), exceeded.actual),
                 ("maxLocaleOccurrences", 2, Actual::Exact(3))
             );
-            // Every spelling is recorded, and none is canonicalized.
+            // Every spelling is recorded, and none is canonicalized. The
+            // target bounds count no spelling and are checked all the same.
             assert!(locales.evaluation.statuses().all(|(unit, status)| {
-                unit.subject == Subject::Locale(LocaleSubject::Occurrences)
-                    || matches!(status, Status::NotEvaluated(_))
+                matches!(
+                    unit.subject,
+                    Subject::Locale(
+                        LocaleSubject::Occurrences
+                            | LocaleSubject::TargetProfiles
+                            | LocaleSubject::TargetId(_)
+                    )
+                ) || matches!(status, Status::NotEvaluated(_))
             }));
             assert_eq!(resolved.occurrences.len(), 3);
         } else {

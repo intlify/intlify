@@ -20,14 +20,14 @@ fn sum(mut values: impl Iterator<Item = usize>) -> Result<usize, WorkFailure> {
     })
 }
 
-/// Phase 11's unit for the map and four for each target, and Phase 12's two
-/// over every group, two for each group and for each of a group's distinct
-/// members, and one for each target's place.
+/// Phase 11's three units for each target, whose bounds Phase 7 checked, and
+/// Phase 12's two over every group, two for each group and for each of a
+/// group's distinct members, and one for each target's place.
 fn units(targets: usize, groups: usize, members: usize) -> Option<usize> {
-    let targets = targets.checked_mul(5)?;
+    let targets = targets.checked_mul(4)?;
     let groups = groups.checked_mul(2)?;
     let members = members.checked_mul(2)?;
-    3_usize
+    2_usize
         .checked_add(targets)?
         .checked_add(groups)?
         .checked_add(members)
@@ -141,16 +141,16 @@ mod tests {
     #[test]
     fn the_units_follow_the_targets_groups_and_distinct_members() {
         // The storefront: two targets in one group of two.
-        assert_eq!(units(2, 1, 2), Some(19));
-        assert_eq!(units(1, 1, 1), Some(12));
+        assert_eq!(units(2, 1, 2), Some(16));
+        assert_eq!(units(1, 1, 1), Some(10));
         assert_eq!(units(usize::MAX, 1, 1), None);
         assert_eq!(units(1, usize::MAX, 1), None);
         assert_eq!(units(1, 1, usize::MAX), None);
         // Each product fits, but not their sum.
-        let most = (usize::MAX - 3) / 5;
-        assert_eq!(units(most, 1, 0), Some(usize::MAX));
-        assert_eq!(units(most, 1, 1), None);
-        assert_eq!(units(usize::MAX / 5, 0, 0), None);
+        let most = (usize::MAX - 4) / 4;
+        assert_eq!(units(most, 1, 0), Some(usize::MAX - 3));
+        assert_eq!(units(most + 1, 1, 0), None);
+        assert_eq!(units(usize::MAX / 4 + 1, 0, 0), None);
     }
 
     /// A declaration the evaluation never resolved is no workload of it.

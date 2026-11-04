@@ -551,12 +551,15 @@ fn prepare_resolution(declaration: &Declaration) -> Result<Candidate, Preparatio
             _ => policy_edge = Some((kind, bound)),
         }
     }
-    // Phase 7's three bounds as the case gives them, and Phase 8's eight at
-    // a capacity no recipe reaches. Phase 5 binds the canonicalizer under the
-    // policy's identifier bound.
+    // Phase 7's three locale bounds as the case gives them, and its two
+    // target bounds and Phase 8's eight at a capacity no recipe reaches: the
+    // scales declare 256 targets of four-byte IDs. Phase 5 binds the
+    // canonicalizer under the policy's identifier bound.
     let mut limits = fixture_policy(identifier_bytes, occurrences, requested)
         .limits()
         .clone();
+    limits.target_grouping.max_target_profiles = bound(512);
+    limits.target_grouping.max_target_id_bytes = bound(64);
     policy_capacity(&mut limits.locale_resolution);
     if let Some((kind, bound)) = policy_edge {
         policy_bound(&mut limits.locale_resolution, kind, bound);

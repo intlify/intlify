@@ -78,7 +78,7 @@ pub(super) enum Outcome {
     Materialization(MaterializationError),
     Structural(Analysis),
     Selection(SelectionFailure),
-    Locale(Locales),
+    Locale(Box<Locales>),
 }
 
 /// Test-only call trace, not 015 Evidence, Findings, or an admitted outcome.
@@ -180,7 +180,7 @@ impl FixtureRunner {
         Run {
             steps,
             selected: Some(selected.id().clone()),
-            outcome: Outcome::Locale(Locales { evaluation, result }),
+            outcome: Outcome::Locale(Box::new(Locales { evaluation, result })),
         }
     }
 }

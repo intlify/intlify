@@ -136,6 +136,10 @@ pub(crate) enum SubjectKind {
     MessageFallbackKey,
     /// A literal fallback candidate.
     MessageFallbackCandidate,
+    /// The submitted Target ID map.
+    TargetProfiles,
+    /// One Target ID key.
+    TargetId,
     /// A member of one target's `requestedLocales`.
     TargetRequestedLocale,
     /// One target's `defaultRequestedLocale`.
@@ -191,8 +195,6 @@ pub(crate) enum SubjectKind {
     DeliveryPlacement,
 
     // target-resolution
-    /// The submitted Target ID map.
-    Targets,
     /// One Target ID.
     Target,
 
@@ -221,7 +223,7 @@ pub(crate) enum SubjectKind {
 
 impl SubjectKind {
     /// Every kind, phase by phase in rank order.
-    pub(crate) const ALL: [Self; 82] = [
+    pub(crate) const ALL: [Self; 83] = [
         Self::ProjectProfileSlot,
         Self::CapabilityArtifacts,
         Self::CapabilityPolicyArtifacts,
@@ -270,6 +272,8 @@ impl SubjectKind {
         Self::NegotiationAliasValue,
         Self::MessageFallbackKey,
         Self::MessageFallbackCandidate,
+        Self::TargetProfiles,
+        Self::TargetId,
         Self::TargetRequestedLocale,
         Self::TargetDefaultRequestedLocale,
         Self::NegotiationAliases,
@@ -293,7 +297,6 @@ impl SubjectKind {
         Self::ResolvedPolicyReference,
         Self::ResolvedTargetProfileReference,
         Self::DeliveryPlacement,
-        Self::Targets,
         Self::Target,
         Self::Groups,
         Self::Memberships,
@@ -357,6 +360,8 @@ impl SubjectKind {
             | Self::NegotiationAliasValue
             | Self::MessageFallbackKey
             | Self::MessageFallbackCandidate
+            | Self::TargetProfiles
+            | Self::TargetId
             | Self::TargetRequestedLocale
             | Self::TargetDefaultRequestedLocale => Phase::LocaleResolution,
             Self::NegotiationAliases
@@ -380,7 +385,7 @@ impl SubjectKind {
             | Self::ResolvedPolicyReference
             | Self::ResolvedTargetProfileReference => Phase::ArtifactReferenceResolution,
             Self::DeliveryPlacement => Phase::DeliveryResolution,
-            Self::Targets | Self::Target => Phase::TargetResolution,
+            Self::Target => Phase::TargetResolution,
             Self::Groups
             | Self::Memberships
             | Self::Group
@@ -439,7 +444,8 @@ impl SubjectKind {
             | Self::CoverageSurfaceSelectors
             | Self::CoverageCells
             | Self::CoverageComparisons
-            | Self::Targets
+            | Self::TargetProfiles
+            | Self::TargetId
             | Self::Groups
             | Self::Memberships
             | Self::Group
@@ -481,7 +487,6 @@ impl SubjectKind {
                 &[Check::ResolvedReference]
             }
             Self::Target => &[
-                Check::WithinBound,
                 Check::ProjectSubset,
                 Check::SupportedDefault,
                 Check::DirectedLocales,
@@ -587,6 +592,8 @@ impl Subject {
                 LocaleSubject::MessageFallbackCandidate(..) => {
                     SubjectKind::MessageFallbackCandidate
                 }
+                LocaleSubject::TargetProfiles => SubjectKind::TargetProfiles,
+                LocaleSubject::TargetId(_) => SubjectKind::TargetId,
                 LocaleSubject::TargetRequestedLocale(..) => SubjectKind::TargetRequestedLocale,
                 LocaleSubject::TargetDefaultRequestedLocale(..) => {
                     SubjectKind::TargetDefaultRequestedLocale
@@ -624,7 +631,6 @@ impl Subject {
             },
             Self::DeliveryPlacement => SubjectKind::DeliveryPlacement,
             Self::Target(subject) => match subject {
-                TargetSubject::Targets => SubjectKind::Targets,
                 TargetSubject::Target(_) => SubjectKind::Target,
             },
             Self::Group(subject) => match subject {
@@ -773,6 +779,8 @@ mod tests {
                 0,
                 key("en"),
             )),
+            locale(LocaleSubject::TargetProfiles),
+            locale(LocaleSubject::TargetId(target("browser"))),
             locale(LocaleSubject::TargetRequestedLocale(
                 target("browser"),
                 key("en"),
@@ -808,7 +816,6 @@ mod tests {
             Subject::ArtifactReference(ReferenceField::Policy(PolicySlot::Trust)),
             Subject::ArtifactReference(ReferenceField::TargetProfile(target("browser"))),
             Subject::DeliveryPlacement,
-            Subject::Target(TargetSubject::Targets),
             Subject::Target(TargetSubject::Target(target("browser"))),
             groups(GroupSubject::Groups),
             groups(GroupSubject::Memberships),
