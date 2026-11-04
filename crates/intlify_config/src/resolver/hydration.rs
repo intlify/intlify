@@ -487,7 +487,7 @@ mod tests {
     use crate::resolver::groups::{self, resolve_groups, GroupSubject};
     use crate::resolver::limits::{fixture_limits, ResolutionLimits};
     use crate::resolver::locales::fixtures::{canonicalizer, stand_in, target, waits_on};
-    use crate::resolver::locales::{resolve_locales, LocaleFields};
+    use crate::resolver::locales::{self, resolve_locales, LocaleFields, LocaleSubject};
     use crate::resolver::resource_policy::DeclarationReferences;
     use crate::resolver::specification::Slot;
     use crate::resolver::targets::{self, resolve_targets, TargetSubject};
@@ -646,10 +646,12 @@ mod tests {
             }
             let declaration: Declaration = serde_json::from_value(app).unwrap();
             let confirmed = ConfirmedPolicy::fixture_owned(self.limits.clone());
+            let unconfirmed = self.policy.clone().err();
+            let policy = unconfirmed.as_ref().map_or(Ok(&confirmed), Err);
             let mut evaluation = Evaluation::default();
             let locales = resolve_locales(
                 &mut evaluation,
-                Ok(&confirmed),
+                policy,
                 Ok(&canonicalizer(64)),
                 &LocaleFields::declared(&declaration),
             )
@@ -672,11 +674,8 @@ mod tests {
                 },
             )
             .unwrap();
-            let unconfirmed = self.policy.clone().err();
-            let policy = unconfirmed.as_ref().map_or(Ok(&confirmed), Err);
             let targets = resolve_targets(
                 &mut evaluation,
-                policy,
                 Ok(&declaration.target_profiles),
                 &locales,
                 &references,
@@ -943,12 +942,12 @@ mod tests {
     }
 
     #[test]
-    fn an_endpoint_naming_a_target_waits_on_the_target_map_phase_11_bounds() {
+    fn an_endpoint_naming_a_target_waits_on_the_target_map_phase_7_bounds() {
         let mut inputs = Inputs::new();
         // Three targets are declared.
         inputs.limits.target_grouping.max_target_profiles = bound(2);
         inputs.resolve(|evaluation, _| {
-            let map = targets::unit(TargetSubject::Targets, Check::WithinBound);
+            let map = locales::unit(LocaleSubject::TargetProfiles, Check::WithinBound);
             assert_eq!(
                 waits_on(
                     &evaluation,

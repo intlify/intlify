@@ -1,15 +1,18 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Phase 7's two counting bounds: `maxLocaleOccurrences` over every locale
-//! spelling of the declaration, checked before any is canonicalized, and
-//! `maxRequestedLocales` over the project's canonical requested set. Counts
-//! use checked arithmetic, and a count past `u64` is past every bound. The
-//! per-spelling `maxLocaleIdentifierBytes` is the canonicalizer's check.
+//! Phase 7's counting bounds: `maxLocaleOccurrences` over every locale
+//! spelling of the declaration, checked before any is canonicalized,
+//! `maxRequestedLocales` over the project's canonical requested set, and the
+//! two target bounds 015 fixes in this phase, `maxTargetProfiles` over the
+//! Target ID map and the `maxTargetIdBytes` of each Target ID key, which every
+//! later check of the targets waits on. Counts use checked arithmetic, and a
+//! count past `u64` is past every bound. The per-spelling
+//! `maxLocaleIdentifierBytes` is the canonicalizer's check.
 
 use std::collections::BTreeMap;
 
-use crate::model::FallbackCandidate;
+use crate::model::{FallbackCandidate, NonEmptyMap, TargetDeclaration, TargetId};
 
 use super::super::evaluation::{
     both, Actual, Admitted, Causes, Check, Evaluation, EvaluationInvariant,
@@ -28,6 +31,16 @@ const fn locale_bound(name: &'static str) -> BoundId {
 pub(super) const MAX_LOCALE_IDENTIFIER_BYTES: BoundId = locale_bound("maxLocaleIdentifierBytes");
 const MAX_LOCALE_OCCURRENCES: BoundId = locale_bound("maxLocaleOccurrences");
 const MAX_REQUESTED_LOCALES: BoundId = locale_bound("maxRequestedLocales");
+
+const fn grouping_bound(name: &'static str) -> BoundId {
+    BoundId {
+        group: Group::TargetGrouping,
+        name,
+    }
+}
+
+const MAX_TARGET_PROFILES: BoundId = grouping_bound("maxTargetProfiles");
+const MAX_TARGET_ID_BYTES: BoundId = grouping_bound("maxTargetIdBytes");
 
 /// Each field's locale spellings as `maxLocaleOccurrences` counts them: an
 /// alias key and its destination, a fallback key and its literal candidates
@@ -153,12 +166,62 @@ pub(super) fn requested(
     )
 }
 
+/// What the target bounds' units settle: the map's result, and each Target
+/// ID's own, which includes the map's.
+pub(super) struct TargetBounds {
+    pub(super) map: Admitted<()>,
+    pub(super) targets: BTreeMap<TargetId, Admitted<()>>,
+}
+
+/// The target bounds' units: the Target ID map within `maxTargetProfiles`,
+/// which every per-target check waits on, and then each Target ID key within
+/// `maxTargetIdBytes`, which every other check of that target waits on.
+pub(super) fn targets<Target>(
+    evaluation: &mut Evaluation,
+    policy: Result<&ConfirmedPolicy, &Causes>,
+    targets: &NonEmptyMap<TargetId, TargetDeclaration<Target>>,
+) -> Result<TargetBounds, EvaluationInvariant> {
+    let policy = policy.map_err(Causes::clone);
+    let bounded = evaluation.check(
+        unit(LocaleSubject::TargetProfiles, Check::WithinBound),
+        policy.clone(),
+        |policy| {
+            let limit = policy.limits().target_grouping.max_target_profiles;
+            within(
+                MAX_TARGET_PROFILES,
+                limit,
+                actual(Tally::of(targets.len()), limit),
+            )
+        },
+    )?;
+    let mut admitted = BTreeMap::new();
+    for (id, _) in targets.iter() {
+        let own = evaluation.check(
+            unit(LocaleSubject::TargetId(id.clone()), Check::WithinBound),
+            both(policy.clone(), bounded.clone()),
+            |(policy, ())| {
+                let limit = policy.limits().target_grouping.max_target_id_bytes;
+                within(
+                    MAX_TARGET_ID_BYTES,
+                    limit,
+                    actual(Tally::of(id.as_str().len()), limit),
+                )
+            },
+        )?;
+        admitted.insert(id.clone(), own);
+    }
+    Ok(TargetBounds {
+        map: bounded,
+        targets: admitted,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::{json, Value};
 
     use super::super::fixtures::{
-        canonical, declaration, issues, limits, policy, stand_in, units, waits_on,
+        canonical, declaration, issues, limits, policy, stand_in, target, units, waits_on,
     };
     use super::*;
     use crate::fixtures::{complete_config, minimal_config};
@@ -175,6 +238,22 @@ mod tests {
 
     fn occurrence_unit() -> Unit {
         unit(LocaleSubject::Occurrences, Check::WithinBound)
+    }
+
+    fn map_unit() -> Unit {
+        unit(LocaleSubject::TargetProfiles, Check::WithinBound)
+    }
+
+    fn id_unit(id: &str) -> Unit {
+        unit(LocaleSubject::TargetId(target(id)), Check::WithinBound)
+    }
+
+    /// A policy with the two target bounds as given.
+    fn target_policy(profiles: u64, id_bytes: u64) -> ConfirmedPolicy {
+        let mut limits = limits(64, 100, 100);
+        limits.target_grouping.max_target_profiles = bound(profiles);
+        limits.target_grouping.max_target_id_bytes = bound(id_bytes);
+        ConfirmedPolicy::fixture_owned(limits)
     }
 
     /// The total `occurrences` measures for the `app` declaration of `config`
@@ -410,5 +489,106 @@ mod tests {
             waits_on(&evaluation, &requested_unit),
             Some(units(&unconfirmed))
         );
+    }
+
+    #[test]
+    fn target_bounds_are_the_sections_target_grouping_bounds() {
+        let policy = target_policy(21, 22);
+        let bounds = policy.limits().bounds();
+        for (id, value) in [(MAX_TARGET_PROFILES, 21), (MAX_TARGET_ID_BYTES, 22)] {
+            assert!(
+                bounds.contains(&(id, bound(value))),
+                "{} is not in the section with {value}",
+                id.name
+            );
+        }
+    }
+
+    #[test]
+    fn the_target_bounds_hold_at_their_limits_and_the_ids_wait_on_the_map() {
+        // `browser` is seven bytes and `server` six.
+        let declaration = declaration(&complete_config(), |_| {});
+        let declared = &declaration.target_profiles;
+        let mut evaluation = Evaluation::default();
+        let bounds = targets(&mut evaluation, Ok(&target_policy(2, 7)), declared).unwrap();
+        assert_eq!(bounds.map, Ok(()));
+        assert_eq!(
+            bounds.targets,
+            BTreeMap::from([(target("browser"), Ok(())), (target("server"), Ok(()))])
+        );
+        assert_eq!(issues(&evaluation), []);
+
+        // One byte more blocks only that ID.
+        let mut evaluation = Evaluation::default();
+        let bounds = targets(&mut evaluation, Ok(&target_policy(2, 6)), declared).unwrap();
+        let exceeded = Some(LimitExceeded {
+            bound: MAX_TARGET_ID_BYTES,
+            limit: bound(6),
+            actual: Actual::Exact(7),
+        });
+        assert_eq!(
+            issues(&evaluation),
+            [(
+                id_unit("browser"),
+                "project-profile-resource-limit-exceeded",
+                exceeded
+            )]
+        );
+        assert_eq!(bounds.map, Ok(()));
+        assert_eq!(
+            units(bounds.targets[&target("browser")].as_ref().unwrap_err()),
+            [id_unit("browser")]
+        );
+        assert_eq!(bounds.targets[&target("server")], Ok(()));
+
+        // One target more blocks the map, and no ID is checked.
+        let mut evaluation = Evaluation::default();
+        let bounds = targets(&mut evaluation, Ok(&target_policy(1, 7)), declared).unwrap();
+        let exceeded = Some(LimitExceeded {
+            bound: MAX_TARGET_PROFILES,
+            limit: bound(1),
+            actual: Actual::Exact(2),
+        });
+        assert_eq!(
+            issues(&evaluation),
+            [(
+                map_unit(),
+                "project-profile-resource-limit-exceeded",
+                exceeded
+            )]
+        );
+        assert_eq!(units(bounds.map.as_ref().unwrap_err()), [map_unit()]);
+        for id in ["browser", "server"] {
+            assert_eq!(waits_on(&evaluation, &id_unit(id)), Some(vec![map_unit()]));
+            assert_eq!(
+                units(bounds.targets[&target(id)].as_ref().unwrap_err()),
+                [map_unit()]
+            );
+        }
+    }
+
+    #[test]
+    fn an_unconfirmed_policy_leaves_every_target_bound_not_evaluated() {
+        let declaration = declaration(&complete_config(), |_| {});
+        let unconfirmed = stand_in(Slot::Coverage);
+        let mut evaluation = Evaluation::default();
+        let bounds = targets(
+            &mut evaluation,
+            Err(&unconfirmed),
+            &declaration.target_profiles,
+        )
+        .unwrap();
+        assert_eq!(bounds.map, Err(unconfirmed.clone()));
+        assert_eq!(
+            waits_on(&evaluation, &map_unit()),
+            Some(units(&unconfirmed))
+        );
+        for id in ["browser", "server"] {
+            assert_eq!(bounds.targets[&target(id)], Err(unconfirmed.clone()));
+            assert_eq!(
+                waits_on(&evaluation, &id_unit(id)),
+                Some(units(&unconfirmed))
+            );
+        }
     }
 }

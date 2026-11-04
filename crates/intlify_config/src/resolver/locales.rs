@@ -4,14 +4,17 @@
 //! 015's Phase 7: every locale spelling of the selected declaration, counted
 //! before any is canonicalized, then canonicalized with its canonical form
 //! suggested, each requested-locale set checked for a locale named twice, and
-//! the project's source, requested, and default locales resolved. Not the
-//! locale-policy checks Phase 8 makes over these values (alias and fallback
-//! keys, fallback sequences, and coverage selectors, which Phase 7 only
-//! counts), not a target's subset or effective default (Phase 11), and not a
-//! Finding, Evidence, or 015's Logical subject key strategy, which 015 Phase 5
-//! owns. A subject here carries the locale's canonical identity, or its
-//! spelling when it has none; where each spelling sits is kept beside the
-//! units, never in their keys.
+//! the project's source, requested, and default locales resolved. The Target
+//! ID map's bound and each Target ID key's bytes are checked here too, before
+//! any of a target's spellings, and every later phase's check of a target
+//! waits on them. Not the locale-policy checks Phase 8 makes over these values
+//! (alias and fallback keys, fallback sequences, and coverage selectors, which
+//! Phase 7 only counts), not a target's subset or effective default (Phase
+//! 11), and not a Finding, Evidence, or 015's Logical subject key strategy,
+//! which 015 Phase 5 owns. A subject in a set carries the locale's canonical
+//! identity, or its spelling when it has none, and a single-valued field's
+//! subject is its path; where each spelling sits is kept beside the units,
+//! never in their keys.
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -93,6 +96,10 @@ pub(crate) enum LocaleSubject {
     /// A literal candidate, under its key's subject key at its position in
     /// the sequence.
     MessageFallbackCandidate(LocaleKey, usize, LocaleKey),
+    /// The submitted Target ID map, under `maxTargetProfiles`.
+    TargetProfiles,
+    /// One Target ID key, under `maxTargetIdBytes`.
+    TargetId(TargetId),
     /// A member of one target's `requestedLocales`.
     TargetRequestedLocale(TargetId, LocaleKey),
     /// One target's `defaultRequestedLocale`, under its Target ID.
@@ -223,6 +230,9 @@ pub(crate) struct FallbackLocales {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TargetLocales {
     pub(crate) id: TargetId,
+    /// The Target ID within the map's bound and its own: what every later
+    /// check of the target waits on, whatever its locales.
+    pub(crate) admitted: Admitted<()>,
     pub(crate) requested: Admitted<LocaleSet>,
     /// Whether no requested locale repeats.
     pub(crate) distinct: Admitted<()>,
@@ -271,6 +281,9 @@ pub(crate) struct ResolvedLocales {
     pub(crate) project: Admitted<ProjectLocales>,
     pub(crate) negotiation_aliases: Admitted<Vec<AliasLocales>>,
     pub(crate) message_fallback: Admitted<Vec<FallbackLocales>>,
+    /// The Target ID map within `maxTargetProfiles`: a later check over the
+    /// set of Target IDs waits on it.
+    pub(crate) target_bound: Admitted<()>,
     pub(crate) targets: Admitted<Vec<TargetLocales>>,
 }
 
@@ -317,9 +330,12 @@ pub(crate) fn resolve_locales<P: Provider, Target>(
         Ok(fallback) => Ok(pass.fallback(fallback)?),
         Err(ref causes) => Err(causes.clone()),
     };
-    let targets = match fields.target_profiles {
-        Ok(targets) => Ok(pass.targets(targets)?),
-        Err(ref causes) => Err(causes.clone()),
+    let (target_bound, targets) = match fields.target_profiles {
+        Ok(targets) => {
+            let bounds = bound::targets(pass.evaluation, policy, targets)?;
+            (bounds.map, Ok(pass.targets(targets, &bounds.targets)?))
+        }
+        Err(ref causes) => (Err(causes.clone()), Err(causes.clone())),
     };
     Ok(ResolvedLocales {
         occurrence_total,
@@ -330,6 +346,7 @@ pub(crate) fn resolve_locales<P: Provider, Target>(
         project,
         negotiation_aliases,
         message_fallback,
+        target_bound,
         targets,
     })
 }
@@ -798,6 +815,15 @@ mod tests {
                     0,
                     key("en")
                 )),
+                unit(LocaleSubject::TargetProfiles, Check::WithinBound),
+                unit(
+                    LocaleSubject::TargetId(target("browser")),
+                    Check::WithinBound
+                ),
+                unit(
+                    LocaleSubject::TargetId(target("server")),
+                    Check::WithinBound
+                ),
                 canonical_unit(LocaleSubject::TargetRequestedLocale(
                     target("browser"),
                     key("en")
@@ -842,17 +868,20 @@ mod tests {
                 ],
             }])
         );
+        assert_eq!(resolved.target_bound, Ok(()));
         assert_eq!(
             resolved.targets,
             Ok(vec![
                 TargetLocales {
                     id: target("browser"),
+                    admitted: Ok(()),
                     requested: Ok(set(&["en"])),
                     distinct: Ok(()),
                     default: Ok(Some(canonical("en"))),
                 },
                 TargetLocales {
                     id: target("server"),
+                    admitted: Ok(()),
                     requested: Ok(set(&["en"])),
                     distinct: Ok(()),
                     default: Ok(None),
@@ -1074,9 +1103,25 @@ mod tests {
             [(occurrence_unit(), "project-profile-resource-limit-exceeded")]
         );
         assert_eq!(notices(&evaluation), []);
+        // The target bounds count no spelling, so they do not wait on the
+        // occurrence bound; every other unit does.
+        let target_bound = |unit: &Unit| {
+            matches!(
+                unit.subject,
+                Subject::Locale(LocaleSubject::TargetProfiles | LocaleSubject::TargetId(_))
+            )
+        };
+        assert_eq!(
+            statuses(&evaluation)
+                .into_iter()
+                .filter(|(unit, _)| target_bound(unit))
+                .map(|(_, status)| status)
+                .collect::<Vec<_>>(),
+            [Status::Evaluated, Status::Evaluated, Status::Evaluated]
+        );
         let waiting: Vec<_> = statuses(&evaluation)
             .into_iter()
-            .filter(|(unit, _)| unit != &occurrence_unit())
+            .filter(|(unit, _)| unit != &occurrence_unit() && !target_bound(unit))
             .collect();
         assert_eq!(waiting.len(), 15);
         assert!(waiting.iter().all(|(_, status)| matches!(
@@ -1210,6 +1255,7 @@ mod tests {
         );
         assert_eq!(resolved.negotiation_aliases, Err(negotiation));
         assert_eq!(resolved.message_fallback, Err(fallback));
+        assert_eq!(resolved.target_bound, Err(targets.clone()));
         assert_eq!(resolved.targets, Err(targets));
         assert_eq!(resolved.occurrences, []);
     }

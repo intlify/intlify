@@ -95,13 +95,23 @@ impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
         &mut self,
         spellings: Vec<(Location, Scope, &str)>,
     ) -> Result<Vec<Spelled>, LocaleInvariant> {
+        self.spell_after(spellings, &Ok(()))
+    }
+
+    /// The same, once `after` also holds: a spelling is canonicalized only
+    /// then, and otherwise stands for itself and waits on its causes.
+    fn spell_after(
+        &mut self,
+        spellings: Vec<(Location, Scope, &str)>,
+        after: &Admitted<()>,
+    ) -> Result<Vec<Spelled>, LocaleInvariant> {
         type Attempt = Admitted<Result<CanonicalLocale, Blocking>>;
         let mut groups: BTreeMap<LocaleSubject, (Attempt, bool)> = BTreeMap::new();
         let mut subjects = Vec::with_capacity(spellings.len());
         for (location, scope, raw) in spellings {
-            let attempt = match self.canonicalizer {
-                Ok(canonicalizer) => Ok(canonicalize(canonicalizer, raw)?),
-                Err(ref causes) => Err(causes.clone()),
+            let attempt = match both(self.canonicalizer.clone(), after.clone()) {
+                Ok((canonicalizer, ())) => Ok(canonicalize(canonicalizer, raw)?),
+                Err(causes) => Err(causes),
             };
             let (key, corrected) = match &attempt {
                 Ok(Ok((locale, corrected))) => (LocaleKey::Canonical(locale.clone()), *corrected),
@@ -247,14 +257,20 @@ impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
     }
 
     /// Each target's requested locales, checked for a locale named twice, and
-    /// its default.
+    /// its default, once the target's bounds hold: `admitted` has each Target
+    /// ID's result, which includes the map's.
     pub(super) fn targets<Target>(
         &mut self,
         targets: &NonEmptyMap<TargetId, TargetDeclaration<Target>>,
+        admitted: &BTreeMap<TargetId, Admitted<()>>,
     ) -> Result<Vec<TargetLocales>, LocaleInvariant> {
         let mut resolved = Vec::with_capacity(targets.len());
         for (id, target) in targets.iter() {
-            let requested = self.spell(
+            let own = admitted
+                .get(id)
+                .expect("every declared Target ID has its bound's result")
+                .clone();
+            let requested = self.spell_after(
                 target
                     .requested_locales
                     .as_slice()
@@ -268,6 +284,7 @@ impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
                         )
                     })
                     .collect(),
+                &own,
             )?;
             // A repeated member is an issue of its own; the set still holds
             // the canonical identities Phase 11 compares.
@@ -276,17 +293,23 @@ impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
             })?;
             let default = match target.default_requested_locale.as_option() {
                 Some(raw) => self
-                    .spell_one(
-                        Location::TargetDefaultRequestedLocale(id.clone()),
-                        Scope::TargetDefaultRequestedLocale(id.clone()),
-                        raw,
+                    .spell_after(
+                        vec![(
+                            Location::TargetDefaultRequestedLocale(id.clone()),
+                            Scope::TargetDefaultRequestedLocale(id.clone()),
+                            raw,
+                        )],
+                        &own,
                     )?
+                    .pop()
+                    .expect("one result per spelling")
                     .locale
                     .map(Some),
                 None => Ok(None),
             };
             resolved.push(TargetLocales {
                 id: id.clone(),
+                admitted: own,
                 requested: set(&requested),
                 distinct,
                 default,
@@ -810,7 +833,8 @@ mod tests {
         let canonicalizer = canonicalizer(64);
         let mut evaluation = Evaluation::default();
         let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer));
-        let resolved = pass.targets(&targets).unwrap();
+        let admitted = targets.iter().map(|(id, _)| (id.clone(), Ok(()))).collect();
+        let resolved = pass.targets(&targets, &admitted).unwrap();
         drop(pass);
         let duplicate = unit(
             LocaleSubject::TargetRequestedLocale(target("browser"), key("en")),
@@ -864,6 +888,76 @@ mod tests {
                 )
             ),
             None
+        );
+    }
+
+    #[test]
+    fn a_target_whose_bounds_do_not_hold_keeps_its_spellings_as_they_are() {
+        let targets: NonEmptyMap<TargetId, TargetDeclaration<serde_json::Value>> =
+            serde_json::from_value(serde_json::json!({
+                "server": {"profile": {}, "requestedLocales": ["de"]},
+                "browser": {
+                    "profile": {},
+                    "requestedLocales": ["EN", "en"],
+                    "defaultRequestedLocale": "de"
+                }
+            }))
+            .unwrap();
+        // Stands in for the browser's Target ID bound.
+        let causes = stand_in(Slot::DeliveryGraph);
+        let admitted = BTreeMap::from([
+            (target("browser"), Err(causes.clone())),
+            (target("server"), Ok(())),
+        ]);
+        let canonicalizer = canonicalizer(64);
+        let mut evaluation = Evaluation::default();
+        let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer));
+        let resolved = pass.targets(&targets, &admitted).unwrap();
+        drop(pass);
+        // Each of the browser's spellings stands for itself and waits on its
+        // bound, so neither the repeat nor the casing is found.
+        for subject in [
+            LocaleSubject::TargetRequestedLocale(target("browser"), content("EN")),
+            LocaleSubject::TargetRequestedLocale(target("browser"), content("en")),
+            LocaleSubject::TargetDefaultRequestedLocale(target("browser")),
+        ] {
+            assert_eq!(
+                waits_on(&evaluation, &canonical_unit(subject.clone())),
+                Some(units(&causes)),
+                "{subject:?}"
+            );
+        }
+        assert_eq!(issues(&evaluation), []);
+        assert_eq!(notices(&evaluation), []);
+        let server = LocaleSubject::TargetRequestedLocale(target("server"), key("de"));
+        assert_eq!(waits_on(&evaluation, &canonical_unit(server)), None);
+        assert_eq!(
+            resolved
+                .iter()
+                .map(|target| (
+                    target.id.clone(),
+                    target.admitted.clone(),
+                    target.requested.clone(),
+                    target.distinct.clone(),
+                    target.default.clone(),
+                ))
+                .collect::<Vec<_>>(),
+            [
+                (
+                    target("browser"),
+                    Err(causes.clone()),
+                    Err(causes.clone()),
+                    Err(causes.clone()),
+                    Err(causes),
+                ),
+                (
+                    target("server"),
+                    Ok(()),
+                    Ok(LocaleSet::new(vec![canonical("de")])),
+                    Ok(()),
+                    Ok(None),
+                ),
+            ]
         );
     }
 }

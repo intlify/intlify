@@ -336,6 +336,11 @@ fn subject(frame: &mut Frame, subject: &LocaleSubject) -> Result<(), OutputFailu
             frame.uint(count(*position)?);
             key(frame, own);
         }
+        LocaleSubject::TargetProfiles => frame.uint(11),
+        LocaleSubject::TargetId(id) => {
+            frame.uint(12);
+            frame.text(id.as_str());
+        }
         LocaleSubject::TargetRequestedLocale(id, own) => {
             frame.uint(9);
             frame.text(id.as_str());
@@ -667,6 +672,7 @@ fn targets(frame: &mut Frame, targets: &[TargetLocales]) -> Result<(), OutputFai
     frame.uint(count(targets.len())?);
     for target in targets {
         frame.text(target.id.as_str());
+        admitted(frame, &target.admitted, |_, ()| Ok(()))?;
         admitted(frame, &target.requested, set)?;
         admitted(frame, &target.default, |frame, default| {
             frame.flag(default.is_some());
@@ -824,6 +830,7 @@ pub(super) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure>
     admitted(&mut shared, &locales.message_fallback, |frame, list| {
         fallback(frame, list)
     })?;
+    admitted(&mut shared, &locales.target_bound, |_, ()| Ok(()))?;
     admitted(&mut shared, &locales.targets, |frame, list| {
         targets(frame, list)
     })?;
@@ -848,11 +855,15 @@ pub(super) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fixtures::complete_config;
+    use crate::input_limits::Bound;
     use crate::locale::ProviderFailure;
     use crate::resolver::coverage::unit as coverage_unit;
     use crate::resolver::evaluation::EvaluationInvariant;
     use crate::resolver::fallback::unit as fallback_unit;
-    use crate::resolver::locales::fixtures::{canonical, content, key};
+    use crate::resolver::locales::fixtures::{
+        canonical, canonicalizer, content, declaration, key, limits,
+    };
     use crate::resolver::locales::unit as locale_unit;
     use crate::resolver::negotiation::unit as negotiation_unit;
     use crate::resolver::specification::Slot;
@@ -1039,5 +1050,40 @@ mod tests {
         ]
         .map(|recorded| digest(|frame| unit(frame, &recorded).unwrap()));
         distinct(&units);
+    }
+
+    /// The target bounds' results Phase 7 hands on frame apart from their
+    /// success: the map's, and each target's.
+    #[test]
+    fn the_target_bounds_results_frame() {
+        let declaration = declaration(&complete_config(), |_| {});
+        let fields = LocaleFields::declared(&declaration);
+        // Two targets over a map bound of one.
+        let mut limits = limits(64, 100, 100);
+        limits.target_grouping.max_target_profiles = Bound::new(1).unwrap();
+        let policy = ConfirmedPolicy::fixture_owned(limits);
+        let canonicalizer = canonicalizer(64);
+        let shared = |edit: fn(&mut ResolvedLocales)| {
+            let mut evaluation = Evaluation::default();
+            let mut locales =
+                resolve_locales(&mut evaluation, Ok(&policy), Ok(&canonicalizer), &fields).unwrap();
+            let blocked = locales.target_bound.clone().unwrap_err();
+            edit(&mut locales);
+            let resolved = Resolved {
+                evaluation,
+                result: Ok(Policies {
+                    locales,
+                    negotiation: Err(blocked.clone()),
+                    fallback: Err(blocked.clone()),
+                    coverage: Err(blocked),
+                }),
+            };
+            observe(&resolved).unwrap().shared
+        };
+        distinct(&[
+            shared(|_| {}),
+            shared(|locales| locales.target_bound = Ok(())),
+            shared(|locales| locales.targets.as_mut().unwrap()[0].admitted = Ok(())),
+        ]);
     }
 }

@@ -2,14 +2,15 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! 015's Phase 11 (`target-resolution`) over the selected declaration's
-//! targets: the Target ID map under `maxTargetProfiles`, each Target ID under
-//! `maxTargetIdBytes`, each target's requested locales as a subset of the
-//! project's, its effective default, which is its own override or else the
-//! project's default and must be one of its requested locales, and the
-//! directions its Target Profile has for its requested locales. No default is
-//! inferred: a target without an override takes the project's default, never
-//! the first, only, or smallest of its own locales. No direction is inferred
-//! either: only an entry spelled as the canonical locale covers it.
+//! targets: each target's requested locales as a subset of the project's, its
+//! effective default, which is its own override or else the project's default
+//! and must be one of its requested locales, and the directions its Target
+//! Profile has for its requested locales. Every check of a target waits on
+//! the Target ID map's `maxTargetProfiles` and the key's `maxTargetIdBytes`,
+//! which 015 has Phase 7 check. No default is inferred: a target without an
+//! override takes the project's default, never the first, only, or smallest of
+//! its own locales. No direction is inferred either: only an entry spelled as
+//! the canonical locale covers it.
 //!
 //! Not the canonicalization of a target's locales or the repeats among them,
 //! which Phase 7 did; not the exact resolution of its Target Profile reference,
@@ -25,32 +26,18 @@ use crate::model::{NonEmptyMap, TargetDeclaration, TargetId};
 
 use super::artifact_resolution::AdmittedArtifact;
 use super::evaluation::{
-    and, both, within, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant,
-    Phase, Reason, Subject, Unit,
+    and, both, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Phase,
+    Reason, Subject, Unit,
 };
 use super::exact_resolution::{Named, ReferenceResults};
-use super::limits::{BoundId, ConfirmedPolicy, Group};
 use super::locales::{LocaleSet, ResolvedLocales, TargetLocales};
 use super::resource_policy::ReferenceField;
 
-const MAX_TARGET_PROFILES: BoundId = BoundId {
-    group: Group::TargetGrouping,
-    name: "maxTargetProfiles",
-};
-
-const MAX_TARGET_ID_BYTES: BoundId = BoundId {
-    group: Group::TargetGrouping,
-    name: "maxTargetIdBytes",
-};
-
-/// What one Phase 11 unit checks. The map's bound, which every target waits
-/// on, comes first.
+/// What one Phase 11 unit checks.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum TargetSubject {
-    /// The submitted Target ID map, under `maxTargetProfiles`.
-    Targets,
-    /// One Target ID: its bytes under `maxTargetIdBytes`, then its requested
-    /// locales, its effective default, and its Target Profile's directions.
+    /// One Target ID: its requested locales, its effective default, and its
+    /// Target Profile's directions.
     Target(TargetId),
 }
 
@@ -77,8 +64,9 @@ pub(crate) struct ResolvedTarget<'s> {
 /// unevaluated.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TargetFacts<'s> {
-    /// The Target ID within the map's bound and its own: what a later check
-    /// that names the target needs, whatever its locales and Target Profile.
+    /// The Target ID within the map's bound and its own, as Phase 7 checked
+    /// them: what a later check that names the target needs, whatever its
+    /// locales and Target Profile.
     pub(crate) admitted: Admitted<()>,
     /// Its requested locales, once found a subset of the project's.
     pub(crate) requested: Admitted<LocaleSet>,
@@ -90,8 +78,8 @@ pub(crate) struct TargetFacts<'s> {
     pub(crate) resolved: Admitted<ResolvedTarget<'s>>,
 }
 
-/// Every declared target's facts, in Target ID order, and the map's bound,
-/// which a later check over the set of Target IDs needs.
+/// Every declared target's facts, in Target ID order, and the map's bound as
+/// Phase 7 checked it, which a later check over the set of Target IDs needs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ResolvedTargets<'s> {
     bounded: Admitted<()>,
@@ -123,31 +111,18 @@ impl<'s> ResolvedTargets<'s> {
     }
 }
 
-/// Phase 11 under the confirmed policy, over the declared targets, the locales
-/// Phase 7 resolved, and the references Phase 9 resolved. Every target waits
-/// on the map's bound, and each check of a target on its ID's bound. The
-/// subset, the effective default, and the directions are checked
-/// independently of each other; only the directions wait on the Target
-/// Profile, and the resolved target needs every one.
+/// Phase 11 over the declared targets, the locales and target bounds Phase 7
+/// resolved, and the references Phase 9 resolved. Each check of a target
+/// waits on its Target ID's bounds. The subset, the effective default, and
+/// the directions are checked independently of each other; only the
+/// directions wait on the Target Profile, and the resolved target needs every
+/// one.
 pub(crate) fn resolve_targets<'s, Target>(
     evaluation: &mut Evaluation,
-    policy: Result<&ConfirmedPolicy, &Causes>,
     declared: Admitted<&NonEmptyMap<TargetId, TargetDeclaration<Target>>>,
     locales: &ResolvedLocales,
     references: &ReferenceResults<'s>,
 ) -> Result<Admitted<ResolvedTargets<'s>>, EvaluationInvariant> {
-    let policy = policy.map_err(Causes::clone);
-    let bounded = evaluation.check(
-        unit(TargetSubject::Targets, Check::WithinBound),
-        both(policy.clone(), declared.clone()),
-        |(policy, declared)| {
-            within(
-                MAX_TARGET_PROFILES,
-                policy.limits().target_grouping.max_target_profiles,
-                declared.len(),
-            )
-        },
-    )?;
     let declared = match declared {
         Ok(declared) => declared,
         Err(causes) => return Ok(Err(causes)),
@@ -164,33 +139,30 @@ pub(crate) fn resolve_targets<'s, Target>(
                 .get(id)
                 .expect("Phase 7 resolves the locales of every declared target")
         });
-        let checks = Checks {
-            policy: &policy,
-            bounded: &bounded,
-            id,
-        };
         facts.insert(
             id.clone(),
-            checks.resolve(evaluation, own, locales, references)?,
+            Checks { id }.resolve(evaluation, own, locales, references)?,
         );
     }
-    Ok(Ok(ResolvedTargets { bounded, facts }))
+    Ok(Ok(ResolvedTargets {
+        bounded: locales.target_bound.clone(),
+        facts,
+    }))
 }
 
-/// One target's checks and what they share.
-struct Checks<'a, 'p> {
-    policy: &'a Admitted<&'p ConfirmedPolicy>,
-    bounded: &'a Admitted<()>,
+/// One target's checks.
+struct Checks<'a> {
     id: &'a TargetId,
 }
 
-impl Checks<'_, '_> {
+impl Checks<'_> {
     fn unit(&self, check: Check) -> Unit {
         unit(TargetSubject::Target(self.id.clone()), check)
     }
 
-    /// The ID's bound, then the subset, the effective default, and the
-    /// directions, then the target when everything it needs was admitted.
+    /// The subset, the effective default, and the directions, then the target
+    /// when everything it needs was admitted. Each waits on the Target ID's
+    /// bounds.
     fn resolve<'s>(
         &self,
         evaluation: &mut Evaluation,
@@ -198,17 +170,7 @@ impl Checks<'_, '_> {
         locales: &ResolvedLocales,
         references: &ReferenceResults<'s>,
     ) -> Result<TargetFacts<'s>, EvaluationInvariant> {
-        let admitted = evaluation.check(
-            self.unit(Check::WithinBound),
-            both(self.policy.clone(), self.bounded.clone()),
-            |(policy, ())| {
-                within(
-                    MAX_TARGET_ID_BYTES,
-                    policy.limits().target_grouping.max_target_id_bytes,
-                    self.id.as_str().len(),
-                )
-            },
-        )?;
+        let admitted = own.clone().and_then(|own| own.admitted.clone());
         let requested = own.clone().and_then(|own| own.requested.clone());
         let subset = evaluation.check(
             self.unit(Check::ProjectSubset),
@@ -346,7 +308,9 @@ mod tests {
     use crate::resolver::artifact_resolution::admit_collection;
     use crate::resolver::evaluation::{Actual, IssueKey, LimitExceeded, Status};
     use crate::resolver::exact_resolution::{self, resolve_fields};
-    use crate::resolver::limits::{fixture_limits, ResolutionLimits};
+    use crate::resolver::limits::{
+        fixture_limits, BoundId, ConfirmedPolicy, Group, ResolutionLimits,
+    };
     use crate::resolver::locales::fixtures::{
         canonical, canonicalizer, content, key, stand_in, target, waits_on,
     };
@@ -468,21 +432,23 @@ mod tests {
 
         /// Phase 7, Phase 9's exact resolution of the targets' references,
         /// and Phase 11, into one evaluation; `inspect` reads it and what
-        /// Phase 11 returned.
+        /// Phase 11 returned. Phase 7 checks the target bounds, under the
+        /// policy if one was confirmed, and sees the map only when structural
+        /// admission admitted it.
         fn resolve<R>(
             &self,
             inspect: impl FnOnce(Evaluation, Admitted<ResolvedTargets<'_>>) -> R,
         ) -> R {
             let declaration: Declaration = serde_json::from_value(self.app.clone()).unwrap();
             let confirmed = ConfirmedPolicy::fixture_owned(self.limits.clone());
+            let unconfirmed = self.policy.clone().err();
+            let policy = unconfirmed.as_ref().map_or(Ok(&confirmed), Err);
+            let declared = self.declared.clone().map(|()| &declaration.target_profiles);
+            let mut fields = LocaleFields::declared(&declaration);
+            fields.target_profiles = declared.clone();
             let mut evaluation = Evaluation::default();
-            let locales = resolve_locales(
-                &mut evaluation,
-                Ok(&confirmed),
-                Ok(&canonicalizer(64)),
-                &LocaleFields::declared(&declaration),
-            )
-            .unwrap();
+            let locales =
+                resolve_locales(&mut evaluation, policy, Ok(&canonicalizer(64)), &fields).unwrap();
             let texts: Vec<String> = self.members.iter().map(Value::to_string).collect();
             let bytes: Vec<&[u8]> = texts.iter().map(String::as_bytes).collect();
             let collection = read_collection(Some(&bytes), &ROOM).unwrap();
@@ -497,11 +463,8 @@ mod tests {
                 },
             )
             .unwrap();
-            let unconfirmed = self.policy.clone().err();
-            let policy = unconfirmed.as_ref().map_or(Ok(&confirmed), Err);
-            let declared = self.declared.clone().map(|()| &declaration.target_profiles);
             let targets =
-                resolve_targets(&mut evaluation, policy, declared, &locales, &references).unwrap();
+                resolve_targets(&mut evaluation, declared, &locales, &references).unwrap();
             inspect(evaluation, targets)
         }
     }
@@ -514,16 +477,28 @@ mod tests {
         unit(TargetSubject::Target(target(id)), check)
     }
 
+    /// Phase 7's unit over the Target ID map.
     fn map_unit() -> Unit {
-        unit(TargetSubject::Targets, Check::WithinBound)
+        locales::unit(LocaleSubject::TargetProfiles, Check::WithinBound)
+    }
+
+    /// Phase 7's unit over one Target ID key.
+    fn id_unit(id: &str) -> Unit {
+        locales::unit(LocaleSubject::TargetId(target(id)), Check::WithinBound)
+    }
+
+    const fn grouping_bound(name: &'static str) -> BoundId {
+        BoundId {
+            group: Group::TargetGrouping,
+            name,
+        }
     }
 
     /// Every unit Phase 11 records for the two targets, in 015's order.
     fn every_unit() -> Vec<Unit> {
-        let mut units = vec![map_unit()];
+        let mut units = Vec::new();
         for id in ["browser", "server"] {
             for check in [
-                Check::WithinBound,
                 Check::ProjectSubset,
                 Check::SupportedDefault,
                 Check::DirectedLocales,
@@ -564,22 +539,23 @@ mod tests {
     }
 
     #[test]
-    fn subjects_order_the_map_first_then_each_target_after_every_phase_10_unit() {
-        let ordered = [
-            map_unit(),
-            target_unit("browser", Check::WithinBound),
-            target_unit("browser", Check::ProjectSubset),
-            target_unit("browser", Check::SupportedDefault),
-            target_unit("browser", Check::DirectedLocales),
-            target_unit("server", Check::WithinBound),
-        ];
-        assert!(ordered.windows(2).all(|pair| pair[0] < pair[1]));
+    fn each_target_is_checked_after_its_bounds_in_phase_7_and_every_phase_10_unit() {
         let placement = Unit {
             phase: Phase::DeliveryResolution,
             subject: Subject::DeliveryPlacement,
             check: Check::EffectiveMode,
         };
-        assert!(placement < map_unit());
+        let ordered = [
+            map_unit(),
+            id_unit("browser"),
+            id_unit("server"),
+            placement,
+            target_unit("browser", Check::ProjectSubset),
+            target_unit("browser", Check::SupportedDefault),
+            target_unit("browser", Check::DirectedLocales),
+            target_unit("server", Check::ProjectSubset),
+        ];
+        assert!(ordered.windows(2).all(|pair| pair[0] < pair[1]));
     }
 
     #[test]
@@ -778,6 +754,7 @@ mod tests {
                     assert_eq!(issues(&evaluation), [], "{limit}");
                     return;
                 }
+                // Phase 7 finds it, and every check of a target waits on it.
                 let key = evaluation.issues().next().unwrap().clone();
                 assert_eq!(
                     issues(&evaluation),
@@ -786,12 +763,15 @@ mod tests {
                 assert_eq!(
                     evaluation.limit(&key),
                     Some(LimitExceeded {
-                        bound: MAX_TARGET_PROFILES,
+                        bound: grouping_bound("maxTargetProfiles"),
                         limit: bound(1),
                         actual: Actual::Exact(2),
                     })
                 );
-                for unit in &every_unit()[1..] {
+                for unit in every_unit()
+                    .iter()
+                    .chain(&[id_unit("browser"), id_unit("server")])
+                {
                     assert_eq!(
                         waits_on(&evaluation, unit),
                         Some(vec![map_unit()]),
@@ -820,7 +800,7 @@ mod tests {
                     assert_eq!(issues(&evaluation), [], "{limit}");
                     return;
                 }
-                let id = target_unit("browser", Check::WithinBound);
+                let id = id_unit("browser");
                 assert_eq!(
                     issues(&evaluation),
                     [(id.clone(), Code::ResourceLimitExceeded, None)]
@@ -829,7 +809,7 @@ mod tests {
                 assert_eq!(
                     evaluation.limit(&key),
                     Some(LimitExceeded {
-                        bound: MAX_TARGET_ID_BYTES,
+                        bound: grouping_bound("maxTargetIdBytes"),
                         limit: bound(6),
                         actual: Actual::Exact(7),
                     })
@@ -845,6 +825,31 @@ mod tests {
                     );
                     assert_eq!(waits_on(&evaluation, &target_unit("server", check)), None);
                 }
+                // Phase 7 canonicalizes none of the browser's spellings, which
+                // stand for themselves and wait on its ID, and the server's
+                // as ever.
+                for subject in [
+                    LocaleSubject::TargetRequestedLocale(target("browser"), content("ja")),
+                    LocaleSubject::TargetRequestedLocale(target("browser"), content("en")),
+                    LocaleSubject::TargetDefaultRequestedLocale(target("browser")),
+                ] {
+                    assert_eq!(
+                        waits_on(
+                            &evaluation,
+                            &locales::unit(subject.clone(), Check::CanonicalLocale)
+                        ),
+                        Some(vec![id.clone()]),
+                        "{subject:?}"
+                    );
+                }
+                let server = LocaleSubject::TargetRequestedLocale(
+                    target("server"),
+                    crate::resolver::locales::fixtures::key("en"),
+                );
+                assert_eq!(
+                    waits_on(&evaluation, &locales::unit(server, Check::CanonicalLocale)),
+                    None
+                );
                 let targets = targets.unwrap();
                 assert!(facts(&targets, "browser").admitted.is_err());
                 assert!(facts(&targets, "server").resolved.is_ok());
@@ -912,11 +917,8 @@ mod tests {
                 ),
                 Some(vec![member, default])
             );
-            // The ID was checked, and the server is untouched.
-            assert_eq!(
-                waits_on(&evaluation, &target_unit("browser", Check::WithinBound)),
-                None
-            );
+            // The ID was checked in Phase 7, and the server is untouched.
+            assert_eq!(waits_on(&evaluation, &id_unit("browser")), None);
             let targets = targets.unwrap();
             assert_eq!(facts(&targets, "browser").admitted, Ok(()));
             assert!(facts(&targets, "server").resolved.is_ok());
@@ -996,15 +998,13 @@ mod tests {
     }
 
     #[test]
-    fn a_map_structural_admission_did_not_admit_records_only_its_bound() {
+    fn a_map_structural_admission_did_not_admit_has_no_target_unit() {
         let mut inputs = Inputs::new();
         let causes = stand_in(Slot::DeliveryGraph);
         inputs.declared = Err(causes.clone());
         inputs.resolve(|evaluation, targets| {
-            assert_eq!(
-                statuses(&evaluation),
-                [(map_unit(), Status::NotEvaluated(causes.clone()))]
-            );
+            assert_eq!(statuses(&evaluation), []);
+            assert_eq!(evaluation.status(&map_unit()), None);
             assert_eq!(targets, Err(causes));
         });
     }

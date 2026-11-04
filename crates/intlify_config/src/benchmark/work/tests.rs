@@ -276,27 +276,27 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
         (
             R::Minimal,
             None,
-            join(all([3, 6, 3, 1, 18, 0, 0, 0]), undeclared(Some(1))),
+            join(all([3, 6, 3, 1, 20, 0, 0, 0]), undeclared(Some(1))),
         ),
         (
             R::Multi,
             None,
-            join(all([7, 23, 7, 4, 34, 0, 0, 0]), undeclared(Some(4))),
+            join(all([7, 23, 7, 4, 36, 0, 0, 0]), undeclared(Some(4))),
         ),
         (
             R::Aliased,
             None,
-            join(all([7, 23, 7, 4, 34, 0, 0, 5]), undeclared(Some(4))),
+            join(all([7, 23, 7, 4, 36, 0, 0, 5]), undeclared(Some(4))),
         ),
         (
             R::ExpandingAlias,
             None,
-            join(all([3, 36, 3, 1, 18, 0, 0, 2]), undeclared(Some(1))),
+            join(all([3, 36, 3, 1, 20, 0, 0, 2]), undeclared(Some(1))),
         ),
         (
             R::InvalidSource,
             None,
-            join(all([4, 11, 4, 1, 19, 0, 1, 0]), undeclared(Some(1))),
+            join(all([4, 11, 4, 1, 21, 0, 1, 0]), undeclared(Some(1))),
         ),
         // Without the requested set, the table and its comparisons wait.
         (
@@ -308,7 +308,7 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
                     Some(21),
                     Some(6),
                     None,
-                    Some(18),
+                    Some(20),
                     Some(5),
                     Some(3),
                     Some(1),
@@ -319,12 +319,12 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
         (
             R::DuplicateHeavy,
             None,
-            join(all([34, 68, 34, 1, 18, 0, 1, 0]), undeclared(Some(1))),
+            join(all([34, 68, 34, 1, 20, 0, 1, 0]), undeclared(Some(1))),
         ),
         (
             R::ExactDuplicate,
             None,
-            join(all([4, 8, 4, 1, 18, 0, 1, 0]), undeclared(Some(1))),
+            join(all([4, 8, 4, 1, 20, 0, 1, 0]), undeclared(Some(1))),
         ),
         // Over the occurrence bound, every spelling stands for itself and
         // waits on the bound; Phase 8 still counts what was declared, and its
@@ -338,7 +338,7 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
                     Some(23),
                     Some(0),
                     None,
-                    Some(22),
+                    Some(24),
                     Some(16),
                     Some(1),
                     Some(0),
@@ -349,7 +349,7 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
         (
             R::Multi,
             over(LimitKind::ResolutionRequestedLocales),
-            join(all([7, 23, 7, 4, 34, 0, 1, 0]), undeclared(Some(4))),
+            join(all([7, 23, 7, 4, 36, 0, 1, 0]), undeclared(Some(4))),
         ),
         (
             R::Minimal,
@@ -360,7 +360,7 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
                     Some(6),
                     Some(3),
                     None,
-                    Some(15),
+                    Some(17),
                     Some(6),
                     Some(3),
                     Some(0),
@@ -377,7 +377,7 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
                     Some(36),
                     Some(3),
                     None,
-                    Some(15),
+                    Some(17),
                     Some(5),
                     Some(2),
                     Some(0),
@@ -390,7 +390,7 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
         (
             R::EveryRole,
             None,
-            join(all([21, 57, 18, 3, 75, 0, 0, 0]), every_role(true)),
+            join(all([21, 57, 18, 3, 78, 0, 0, 0]), every_role(true)),
         ),
         // Phase 8 still counts what was declared and checks each Intent
         // source candidate and surface item: 12 of its 35 units run, and
@@ -404,7 +404,7 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
                     Some(57),
                     Some(0),
                     None,
-                    Some(63),
+                    Some(66),
                     Some(50),
                     Some(1),
                     Some(0),
@@ -415,36 +415,36 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
         (
             R::EveryRoleAliased,
             None,
-            join(all([21, 57, 18, 3, 75, 0, 0, 12]), every_role(true)),
+            join(all([21, 57, 18, 3, 78, 0, 0, 12]), every_role(true)),
         ),
         // The invalid alias key and destination, fallback source, and
         // literal leave six Phase 8 units unevaluated.
         (
             R::EveryRoleInvalid,
             None,
-            join(all([21, 78, 18, 3, 75, 7, 6, 0]), every_role(true)),
+            join(all([21, 78, 18, 3, 78, 7, 6, 0]), every_role(true)),
         ),
         (
             R::TargetDuplicate,
             None,
-            join(all([22, 62, 19, 3, 75, 0, 1, 1]), every_role(true)),
+            join(all([22, 62, 19, 3, 78, 0, 1, 1]), every_role(true)),
         ),
         // The rejected selector item leaves its rule without a domain, so
         // its two other units and the nine cells wait.
         (
             R::CoverageUncanonicalized,
             None,
-            join(all([21, 57, 18, 3, 74, 11, 1, 0]), every_role(true)),
+            join(all([21, 57, 18, 3, 77, 11, 1, 0]), every_role(true)),
         ),
         (
             R::ManyTargets,
             None,
-            join(all([34, 68, 34, 1, 80, 0, 0, 0]), undeclared(Some(1))),
+            join(all([34, 68, 34, 1, 113, 0, 0, 0]), undeclared(Some(1))),
         ),
         (
             R::EveryFixtureLocale,
             None,
-            join(all([27, 204, 27, 13, 102, 0, 0, 0]), undeclared(Some(13))),
+            join(all([27, 204, 27, 13, 104, 0, 0, 0]), undeclared(Some(13))),
         ),
     ] {
         let declaration = declarations()
@@ -480,17 +480,18 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
         }
     }
     // The ICU4X scales, through either engine: 256 targets of one locale,
-    // two units each beyond the first; and 128 locales requested by the
-    // project and its target, two units each in both sets and 384 cells.
+    // each with its ID's bound and two units for its locale, beyond the
+    // first and the map's bound; and 128 locales requested by the project
+    // and its target, two units each in both sets and 384 cells.
     for (input, expected) in [
         (
             R::OccurrenceScale,
-            join(all([258, 516, 258, 1, 528, 0, 0, 0]), undeclared(Some(1))),
+            join(all([258, 516, 258, 1, 785, 0, 0, 0]), undeclared(Some(1))),
         ),
         (
             R::CanonicalScale,
             join(
-                all([257, 514, 257, 128, 907, 0, 0, 0]),
+                all([257, 514, 257, 128, 909, 0, 0, 0]),
                 undeclared(Some(128)),
             ),
         ),

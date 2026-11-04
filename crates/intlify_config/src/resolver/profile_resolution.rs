@@ -285,7 +285,6 @@ where
     )?;
     let targets = resolve_targets(
         evaluation,
-        confirmed,
         Ok(&declaration.target_profiles),
         &locales,
         &results,

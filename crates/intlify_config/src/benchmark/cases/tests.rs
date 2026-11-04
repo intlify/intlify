@@ -231,7 +231,7 @@ fn every_finite_case_prepares_its_exact_result_and_work_including_all_limit_edge
         assert!(LogicalWork::observe(&candidate.prepared, &repeated)
             .unwrap()
             .matches_expected(&candidate.logical_work));
-        if let Some((_, edge)) = declaration.limit {
+        if let Some((kind, edge)) = declaration.limit {
             edges += 1;
             if edge == LimitEdge::FirstOver {
                 match &candidate.output {
@@ -271,6 +271,19 @@ fn every_finite_case_prepares_its_exact_result_and_work_including_all_limit_edge
                                 )
                             );
                         }
+                    }
+                    // The target bounds are Phase 7's, which runs before the
+                    // interval: nothing in it is blocked, and what needs the
+                    // targets waits.
+                    Output::TargetAndGroup(resolved)
+                        if matches!(kind, LimitKind::TargetProfiles | LimitKind::TargetIdBytes) =>
+                    {
+                        let evaluation = &resolved.evaluation;
+                        assert_eq!(evaluation.issues().count(), 0);
+                        assert!(evaluation.statuses().any(|(_, status)| matches!(
+                            status,
+                            crate::resolver::evaluation::Status::NotEvaluated(_)
+                        )));
                     }
                     Output::TargetAndGroup(resolved) => {
                         // Only the bound itself, one past its value.

@@ -119,7 +119,6 @@ impl PreparedHydration {
         .ok()?;
         let targets = resolve_targets(
             &mut preparation,
-            policy,
             Ok(&declaration.target_profiles),
             &locales,
             &references,
@@ -811,7 +810,7 @@ mod tests {
             let mut evaluation = Evaluation::default();
             let _ = evaluation
                 .check(
-                    target_unit(TargetSubject::Targets, Check::WithinBound),
+                    target_unit(TargetSubject::Target(target("ssr")), Check::ProjectSubset),
                     Ok(()),
                     |()| Ok::<(), Blocking>(()),
                 )
@@ -914,7 +913,7 @@ mod tests {
     fn only_hydration_units_frame_and_other_phases_only_as_causes() {
         let mut frame = Frame::new("hydration-relation-test");
         let foreign = [
-            target_unit(TargetSubject::Targets, Check::WithinBound),
+            target_unit(TargetSubject::Target(target("ssr")), Check::ProjectSubset),
             reference_unit(ReferenceField::Policy(PolicySlot::Trust)),
             Unit {
                 check: Check::KnownMember,
@@ -976,8 +975,12 @@ mod tests {
         // A cause frames as its own boundary frames it: Phase 13's, Phase 11
         // or 12's, Phase 7 or 8's, the collection's, or Phase 9's.
         let targets = blocked_unit(
-            target_unit(TargetSubject::Targets, Check::WithinBound),
-            Blocking::limit(exceeded(1, Actual::Exact(2))),
+            target_unit(TargetSubject::Target(target("ssr")), Check::ProjectSubset),
+            Blocking {
+                code: Code::TargetLocalesNotSubset,
+                reason: None,
+                details: None,
+            },
         )
         .1;
         let locale = phase_causes(TargetAndGroupRecipe::TargetLocaleInvalid);

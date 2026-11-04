@@ -385,8 +385,8 @@ fn a_prerequisite_failure_leaves_only_what_waits_on_it() {
     assert!(retained.partition.is_ok());
 }
 
-/// Each bound holds at its exact count, and one less blocks only its unit,
-/// with the bound, its value, and the total.
+/// Each Phase 12 bound holds at its exact count, and one less blocks only its
+/// unit, with the bound, its value, and the total.
 #[test]
 fn each_bound_holds_at_its_count_and_one_less_blocks_its_unit() {
     let bound = |name| BoundId {
@@ -394,20 +394,6 @@ fn each_bound_holds_at_its_count_and_one_less_blocks_its_unit() {
         name,
     };
     for (limit, recipe, name, count, unit) in [
-        (
-            LimitKind::TargetProfiles,
-            R::Storefront,
-            "maxTargetProfiles",
-            2,
-            target_unit(TargetSubject::Targets, Check::WithinBound),
-        ),
-        (
-            LimitKind::TargetIdBytes,
-            R::Storefront,
-            "maxTargetIdBytes",
-            7,
-            of_target("browser", Check::WithinBound),
-        ),
         (
             LimitKind::DeploymentGroups,
             R::ManyGroups,
@@ -465,6 +451,74 @@ fn each_bound_holds_at_its_count_and_one_less_blocks_its_unit() {
                 .collect::<Vec<_>>(),
             "{limit:?}"
         );
+    }
+}
+
+/// The two target bounds are Phase 7's, which runs before the interval: at
+/// the exact count nothing waits, and one less leaves each check of an
+/// over-bound target waiting on Phase 7's unit, with nothing blocked in the
+/// interval itself.
+#[test]
+fn the_target_bounds_are_phase_7_s_and_one_less_leaves_their_targets_waiting() {
+    use crate::resolver::locales::{unit as locale_unit, LocaleSubject};
+
+    let checks = [
+        Check::ProjectSubset,
+        Check::SupportedDefault,
+        Check::DirectedLocales,
+    ];
+    for (limit, cause, waiting, checked) in [
+        (
+            LimitKind::TargetProfiles,
+            locale_unit(LocaleSubject::TargetProfiles, Check::WithinBound),
+            vec!["browser", "ssr"],
+            vec![],
+        ),
+        // `browser` is seven bytes, `ssr` three.
+        (
+            LimitKind::TargetIdBytes,
+            locale_unit(
+                LocaleSubject::TargetId(target("browser")),
+                Check::WithinBound,
+            ),
+            vec!["browser"],
+            vec!["ssr"],
+        ),
+    ] {
+        let held = resolved(&edge(limit, LimitEdge::Exact));
+        assert!(held.evaluation.issues().next().is_none(), "{limit:?}");
+        assert!(held
+            .evaluation
+            .statuses()
+            .all(|(_, status)| *status == Status::Evaluated));
+        let over = resolved(&edge(limit, LimitEdge::FirstOver));
+        assert_eq!(issues(&over), [], "{limit:?}");
+        for id in waiting {
+            for check in checks {
+                let Some(Status::NotEvaluated(causes)) =
+                    over.evaluation.status(&of_target(id, check))
+                else {
+                    panic!("{limit:?} {id} {check:?} is checked");
+                };
+                assert_eq!(
+                    causes
+                        .keys()
+                        .map(|key| (key.unit().clone(), key.code()))
+                        .collect::<Vec<_>>(),
+                    [(cause.clone(), Code::ResourceLimitExceeded)],
+                    "{limit:?} {id} {check:?}"
+                );
+            }
+        }
+        for id in checked {
+            for check in checks {
+                assert_eq!(
+                    over.evaluation.status(&of_target(id, check)),
+                    Some(&Status::Evaluated),
+                    "{limit:?} {id} {check:?}"
+                );
+            }
+        }
     }
 }
 
@@ -536,36 +590,37 @@ fn the_work_counts_the_bounds_units_and_what_resolved() {
     for (declaration, expected) in [
         (
             case(R::Minimal),
-            ["1", "7", "1", "3", "1", "1", "12", "0", "0", "1", "1"],
+            ["1", "7", "1", "3", "1", "1", "10", "0", "0", "1", "1"],
         ),
         (
             case(R::Storefront),
-            ["2", "7", "1", "3", "2", "2", "19", "0", "0", "2", "1"],
+            ["2", "7", "1", "3", "2", "2", "16", "0", "0", "2", "1"],
         ),
         // 64 targets in one group, and 64 groups of one.
         (
             case(R::ManyTargets),
-            ["64", "9", "1", "3", "64", "64", "453", "0", "0", "64", "1"],
+            ["64", "9", "1", "3", "64", "64", "388", "0", "0", "64", "1"],
         ),
         (
             case(R::ManyGroups),
-            ["64", "9", "64", "8", "1", "64", "579", "0", "0", "64", "64"],
+            ["64", "9", "64", "8", "1", "64", "514", "0", "0", "64", "64"],
         ),
         // `tablet` is one more distinct member, which blocks the group.
         (
             case(R::MemberUnknown),
-            ["2", "7", "1", "3", "3", "3", "21", "0", "1", "2", "0"],
+            ["2", "7", "1", "3", "3", "3", "18", "0", "1", "2", "0"],
         ),
         // A repeated member is one more occurrence, but no more units.
         (
             case(R::MemberDuplicate),
-            ["2", "7", "1", "3", "3", "3", "19", "0", "1", "2", "0"],
+            ["2", "7", "1", "3", "3", "3", "16", "0", "1", "2", "0"],
         ),
-        // Each target's four checks wait on the map's bound, and so do the
-        // group's two member checks and each target's place.
+        // Each target's three checks wait on the map's bound, which Phase 7
+        // found before the interval, and so do the group's two member checks
+        // and each target's place; nothing in the interval is blocked.
         (
             edge(LimitKind::TargetProfiles, LimitEdge::FirstOver),
-            ["2", "7", "1", "3", "2", "2", "19", "12", "1", "0", "0"],
+            ["2", "7", "1", "3", "2", "2", "16", "10", "0", "0", "0"],
         ),
     ] {
         let work = work(&declaration);

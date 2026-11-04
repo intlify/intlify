@@ -2,7 +2,7 @@
 
 # Phase 4 fixtures
 
-Design 015's Phase 4, Target and Compatibility Groups, partitions the Target IDs into Deployment Compatibility Groups exactly, fixes the canonical order of targets, groups, members, and relations, validates the hydration relations, and hands design 020 the Group ID selection vectors. Its resolution phases are 11 to 13: `target-resolution`, `group-resolution`, and `hydration-validation`. Plan 023 implements them as crate-private semantic state on top of Phase 3's, and plan 024 completes them with 024's hydration roles and static compatibility and with 017's directions. This file maps the phase's coverage to the tests that check it, and names what other phases and designs own.
+Design 015's Phase 4, Target and Compatibility Groups, partitions the Target IDs into Deployment Compatibility Groups exactly, fixes the canonical order of targets, groups, members, and relations, validates the hydration relations, and hands design 020 the Group ID selection vectors. Its resolution phases are 11 to 13: `target-resolution`, `group-resolution`, and `hydration-validation`; `locale-resolution`, Phase 7, checks the target map's and Target IDs' bounds before them. Plan 023 implements them as crate-private semantic state on top of Phase 3's, and plan 024 completes them with 024's hydration roles and static compatibility and with 017's directions. This file maps the phase's coverage to the tests that check it, and names what other phases and designs own.
 
 Like Phase 3, Phase 4 produces no public `LocalizationProjectProfile`, outcome, Finding, or Evidence; Phase 5 builds those from this state. Where a row says a check is blocking, the resolver records a blocking result with 015's code and reason on the unit that found it, and the units that need its value are not evaluated, with that result as their cause.
 
@@ -74,6 +74,14 @@ Plan 024 adds six examples of 024's roles and compatibility and of 017's directi
 
 The rows come from design 015's [Coverage inventory](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#coverage-inventory), grouped by the resolution phase that checks them.
 
+### Target bounds (Phase 7)
+
+| Requirement | Checked by |
+| --- | --- |
+| `locale-resolution` checks `maxTargetProfiles` over the Target ID map and then `maxTargetIdBytes` over each Target ID key, each at its exact value and one more | `the_target_bounds_hold_at_their_limits_and_the_ids_wait_on_the_map`, `target_bounds_are_the_sections_target_grouping_bounds`, `the_map_holds_at_its_bound_and_one_target_more_leaves_every_target_unchecked`, `each_target_id_holds_at_its_bound_and_one_byte_more_blocks_only_that_target` |
+| A Target ID's bound waits on the map's, and both the canonicalization of the target's locales and each of its Phase 11 checks wait on its ID's | `the_target_bounds_hold_at_their_limits_and_the_ids_wait_on_the_map`, `a_target_whose_bounds_do_not_hold_keeps_its_spellings_as_they_are`, `the_map_holds_at_its_bound_and_one_target_more_leaves_every_target_unchecked`, `each_target_id_holds_at_its_bound_and_one_byte_more_blocks_only_that_target` |
+| Without a confirmed policy, neither bound is checked | `an_unconfirmed_policy_leaves_every_target_bound_not_evaluated` |
+
 ### Targets (Phase 11)
 
 | Requirement | Checked by |
@@ -83,9 +91,8 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 | A target excluding a project locale is valid | `each_target_resolves_its_subset_effective_default_and_target_profile` |
 | A target's locales are checked even when its Target Profile does not resolve, and a repeated locale leaves the target unresolved | `a_target_profile_phase_9_could_not_resolve_leaves_only_that_target_unresolved`, `a_repeated_target_locale_is_still_checked_but_leaves_the_target_unresolved`, `invalid_target_locales_leave_the_checks_that_need_them_not_evaluated` |
 | The Target Profile has a direction for each locale the target requests, by an entry spelled as its canonical form, and a missing one is blocking `project-profile-target-locale-direction-missing`. The check waits only on the target's locales and its Target Profile, and entries for other locales are unused | `a_requested_locale_without_a_direction_blocks_only_that_target`, `only_a_target_profiles_canonical_entry_directs_a_locale`, `a_target_profile_phase_9_could_not_resolve_leaves_only_that_target_unresolved`, `invalid_target_locales_leave_the_checks_that_need_them_not_evaluated` |
-| `maxTargetProfiles` and `maxTargetIdBytes` at their exact value and one more | `the_map_holds_at_its_bound_and_one_target_more_leaves_every_target_unchecked`, `each_target_id_holds_at_its_bound_and_one_byte_more_blocks_only_that_target` |
-| Without a confirmed policy, or a map structural admission did not admit, nothing more is checked | `without_a_confirmed_policy_no_target_is_checked`, `a_map_structural_admission_did_not_admit_records_only_its_bound` |
-| Target IDs order by their unsigned bytes | `subjects_order_the_map_first_then_each_target_after_every_phase_10_unit`, `reordering_targets_and_their_locales_changes_nothing_phase_11_records` |
+| Without a confirmed policy, or a map structural admission did not admit, nothing more is checked | `without_a_confirmed_policy_no_target_is_checked`, `a_map_structural_admission_did_not_admit_has_no_target_unit` |
+| Target IDs order by their unsigned bytes | `each_target_is_checked_after_its_bounds_in_phase_7_and_every_phase_10_unit`, `reordering_targets_and_their_locales_changes_nothing_phase_11_records` |
 
 ### Groups (Phase 12)
 
@@ -94,7 +101,7 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 | One Target Profile in one single-target group, and several partitioned exactly once | `one_target_in_one_group_is_a_partition`, `targets_partitioned_exactly_once_form_their_groups` |
 | Missing or empty groups and duplicate Group IDs are rejected before resolution | `each_required_declaration_member_rejects_omission`, `required_collections_and_present_selectors_are_nonempty`, `unicode_keys_are_decoded_before_scoped_duplicate_detection` |
 | Unknown or duplicate members, unassigned targets, and overlapping membership are blocking, with no inferred or partial group | `a_member_naming_no_target_is_unknown_and_leaves_no_partition`, `a_member_named_twice_in_its_group_is_one_duplicate`, `a_target_in_no_group_or_in_two_is_no_partition` |
-| A member waits on the target map's bounds, and a target's place only on its own Target ID | `a_member_waits_on_the_target_map_phase_11_bounds`, `a_place_waits_on_its_own_target_id_alone` |
+| A member waits on the target map's bounds, and a target's place only on its own Target ID | `a_member_waits_on_the_target_map_phase_7_bounds`, `a_place_waits_on_its_own_target_id_alone` |
 | `maxDeploymentGroups`, `maxGroupIdBytes`, `maxMembersPerGroup`, and `maxMembershipOccurrences` at their exact value and one more | `the_group_map_holds_at_its_bound_and_one_group_more_leaves_each_group_unchecked`, `every_member_occurrence_counts_toward_the_total_and_one_more_leaves_members_unchecked`, `each_group_id_and_member_count_holds_at_its_bound_and_one_more_blocks_that_group` |
 | Without a confirmed policy, or a map structural admission did not admit, nothing more is checked | `without_a_confirmed_policy_no_group_is_checked`, `a_group_map_structural_admission_did_not_admit_records_only_its_two_bounds` |
 | Group IDs and members order by their unsigned bytes | `subjects_order_the_two_bounds_then_groups_members_and_assignments`, `reordering_groups_and_members_changes_nothing_phase_12_records` |
@@ -109,7 +116,7 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 | Both endpoints have equal subsets and effective defaults, and a mismatch is never intersected | `endpoints_with_other_locales_or_defaults_are_incompatible_with_nothing_intersected` |
 | A statically known incompatibility of the two Target Profiles, by 024's closed rule, is blocking, and their physical dimensions never are | `a_statically_known_incompatibility_blocks_the_relation`, `physical_dimensions_never_make_a_pair_incompatible` |
 | Both endpoints share the project's negotiation profile by construction, so no endpoint-mismatch reason exists | `the_shared_negotiation_profile_is_kept_but_never_compared`, `the_relations_share_the_negotiation_profile_and_never_compare_it` |
-| Each check waits only on the facts it compares, and a relation with an unresolved target still checks its endpoints | `each_check_waits_only_on_the_facts_it_compares`, `a_relation_with_an_unresolved_target_still_checks_its_endpoints`, `an_endpoint_naming_a_target_waits_on_the_target_map_phase_11_bounds` |
+| Each check waits only on the facts it compares, and a relation with an unresolved target still checks its endpoints | `each_check_waits_only_on_the_facts_it_compares`, `a_relation_with_an_unresolved_target_still_checks_its_endpoints`, `an_endpoint_naming_a_target_waits_on_the_target_map_phase_7_bounds` |
 | `maxHydrationRelations` and the endpoints' `maxTargetIdBytes` at their exact value and one more | `the_relations_hold_at_their_bound_and_one_occurrence_more_leaves_every_relation_unchecked`, `each_endpoint_holds_at_the_target_id_bound_and_one_byte_more_blocks_its_relation` |
 | Without a confirmed policy, or a group map structural admission did not admit, nothing more is checked | `without_a_confirmed_policy_no_relation_is_checked`, `a_group_map_structural_admission_did_not_admit_records_only_the_bound` |
 | Relations order by `(server, client)` | `subjects_order_the_bound_then_relations_then_roles_after_every_phase_12_unit`, `reordering_relations_changes_nothing_phase_13_records` |
@@ -127,7 +134,7 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 
 | Requirement | Checked by |
 | --- | --- |
-| `profile_target_group_resolve / target_and_group_resolution` covers Phases 11 and 12 over 015's example, two scales, a reordering, each decision, the failures before them, and the six bounds' edges | `a_complete_case_resolves_every_target_and_partitions_them`, `each_blocked_recipe_reports_its_one_decision`, `a_prerequisite_failure_leaves_only_what_waits_on_it`, `each_bound_holds_at_its_count_and_one_less_blocks_its_unit`, `reordering_changes_neither_domain_nor_the_work`, `the_work_counts_the_bounds_units_and_what_resolved` |
+| `profile_target_group_resolve / target_and_group_resolution` covers Phases 11 and 12 over 015's example, two scales, a reordering, each decision, the failures before them, and the six bounds' edges, of which the two target bounds' fail in Phase 7 | `a_complete_case_resolves_every_target_and_partitions_them`, `each_blocked_recipe_reports_its_one_decision`, `a_prerequisite_failure_leaves_only_what_waits_on_it`, `each_bound_holds_at_its_count_and_one_less_blocks_its_unit`, `the_target_bounds_are_phase_7_s_and_one_less_leaves_their_targets_waiting`, `reordering_changes_neither_domain_nor_the_work`, `the_work_counts_the_bounds_units_and_what_resolved` |
 | `profile_target_group_resolve / hydration_relation_validation` covers Phase 13 over 015's relation, fans, a scale, a reordering, each code and reason, the failures before them, and the two bounds' edges, with each role declared in a Target Profile's body | `a_complete_case_keeps_every_declared_relation`, `each_admitted_target_profile_carries_what_its_body_declares`, `the_work_counts_relations_roles_units_and_what_was_checked`, `hydration_relation_descriptor_binds_the_configuration_and_the_collection` |
 | The rows before them stay byte for byte | `target_group_cases_keep_the_252_rows_and_append_after_them`, `hydration_cases_keep_the_281_rows_and_append_after_them` |
 

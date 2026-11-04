@@ -303,7 +303,7 @@ mod tests {
     use crate::resolver::exact_resolution::resolve_fields;
     use crate::resolver::limits::{fixture_limits, ResolutionLimits};
     use crate::resolver::locales::fixtures::{canonicalizer, stand_in, target, waits_on};
-    use crate::resolver::locales::{resolve_locales, LocaleFields};
+    use crate::resolver::locales::{self, resolve_locales, LocaleFields, LocaleSubject};
     use crate::resolver::resource_policy::DeclarationReferences;
     use crate::resolver::specification::Slot;
     use crate::resolver::targets::{self, resolve_targets, TargetSubject};
@@ -399,10 +399,12 @@ mod tests {
         fn resolve<R>(&self, inspect: impl FnOnce(Evaluation, Admitted<ResolvedGroups>) -> R) -> R {
             let declaration: Declaration = serde_json::from_value(self.app.clone()).unwrap();
             let confirmed = ConfirmedPolicy::fixture_owned(self.limits.clone());
+            let unconfirmed = self.policy.clone().err();
+            let policy = unconfirmed.as_ref().map_or(Ok(&confirmed), Err);
             let mut evaluation = Evaluation::default();
             let locales = resolve_locales(
                 &mut evaluation,
-                Ok(&confirmed),
+                policy,
                 Ok(&canonicalizer(64)),
                 &LocaleFields::declared(&declaration),
             )
@@ -424,11 +426,8 @@ mod tests {
                 },
             )
             .unwrap();
-            let unconfirmed = self.policy.clone().err();
-            let policy = unconfirmed.as_ref().map_or(Ok(&confirmed), Err);
             let targets = resolve_targets(
                 &mut evaluation,
-                policy,
                 Ok(&declaration.target_profiles),
                 &locales,
                 &references,
@@ -765,11 +764,11 @@ mod tests {
     }
 
     #[test]
-    fn a_member_waits_on_the_target_map_phase_11_bounds() {
+    fn a_member_waits_on_the_target_map_phase_7_bounds() {
         let mut inputs = Inputs::new();
         inputs.limits.target_grouping.max_target_profiles = bound(2);
         inputs.resolve(|evaluation, _| {
-            let map = targets::unit(TargetSubject::Targets, Check::WithinBound);
+            let map = locales::unit(LocaleSubject::TargetProfiles, Check::WithinBound);
             for (group_id, id) in [("jobs", "worker"), ("web", "browser"), ("web", "server")] {
                 assert_eq!(
                     waits_on(&evaluation, &member(group_id, id, Check::KnownMember)),
@@ -796,7 +795,10 @@ mod tests {
         // `browser` is seven bytes, the others six.
         inputs.limits.target_grouping.max_target_id_bytes = bound(6);
         inputs.resolve(|evaluation, groups| {
-            let id = targets::unit(TargetSubject::Target(target("browser")), Check::WithinBound);
+            let id = locales::unit(
+                LocaleSubject::TargetId(target("browser")),
+                Check::WithinBound,
+            );
             assert_eq!(
                 waits_on(&evaluation, &assignment("browser")),
                 Some(vec![id.clone()])
