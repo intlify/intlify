@@ -896,7 +896,7 @@ mod tests {
                 Check::CanonicalLocale,
             );
             let default = locales::unit(
-                LocaleSubject::TargetDefaultRequestedLocale(target("browser"), content("en_US")),
+                LocaleSubject::TargetDefaultRequestedLocale(target("browser")),
                 Check::CanonicalLocale,
             );
             for check in [Check::ProjectSubset, Check::DirectedLocales] {
@@ -929,7 +929,7 @@ mod tests {
         inputs.app["defaultRequestedLocale"] = json!("en_US");
         inputs.resolve(|evaluation, targets| {
             let project_default = locales::unit(
-                LocaleSubject::DefaultRequestedLocale(content("en_US")),
+                LocaleSubject::DefaultRequestedLocale,
                 Check::CanonicalLocale,
             );
             assert_eq!(

@@ -66,10 +66,9 @@ fn issues(evaluation: &Evaluation) -> Vec<(String, Code)> {
                 LocaleSubject::Occurrences => "occurrences".to_owned(),
                 LocaleSubject::RequestedLocale(locale) => format!("requested {}", key(locale)),
                 LocaleSubject::RequestedLocales => "requested set".to_owned(),
-                LocaleSubject::DefaultSourceLocale(locale) => format!("source {}", key(locale)),
-                LocaleSubject::DefaultRequestedLocale(locale) => {
-                    format!("default {}", key(locale))
-                }
+                // A single-valued field's subject is its path alone.
+                LocaleSubject::DefaultSourceLocale => "source".to_owned(),
+                LocaleSubject::DefaultRequestedLocale => "default".to_owned(),
                 other => panic!("no minimum fixture declares {other:?}"),
             };
             (subject, issue.code())
@@ -267,7 +266,7 @@ fn semantic_failures_keep_their_exact_subject_and_leave_no_project_locales() {
             Some("en_US"),
             vec!["en"],
             "en",
-            ("source en_US", Code::LocaleInvalid),
+            ("source", Code::LocaleInvalid),
         ),
         (
             None,
@@ -275,12 +274,7 @@ fn semantic_failures_keep_their_exact_subject_and_leave_no_project_locales() {
             "en",
             ("requested en_US", Code::LocaleInvalid),
         ),
-        (
-            None,
-            vec!["en"],
-            "en_US",
-            ("default en_US", Code::LocaleInvalid),
-        ),
+        (None, vec!["en"], "en_US", ("default", Code::LocaleInvalid)),
         (
             None,
             vec!["EN-us", "en-US"],
@@ -291,7 +285,7 @@ fn semantic_failures_keep_their_exact_subject_and_leave_no_project_locales() {
             None,
             vec!["en"],
             "ja",
-            ("default ja", Code::DefaultRequestedLocaleNotInProject),
+            ("default", Code::DefaultRequestedLocaleNotInProject),
         ),
     ] {
         let mut value = minimal_config();

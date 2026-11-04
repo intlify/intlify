@@ -87,6 +87,13 @@ fn default_must_belong_to_requested_locales() {
         "project-profile-default-requested-locale-not-in-project"
     ));
     assert!(result["locales"].is_null());
+    // The field's subject is its path; its spelling names the locale.
+    let issue = &result["diagnostics"][0];
+    assert_eq!(
+        issue["message"],
+        "Default locale ja is not one of the project's requested locales."
+    );
+    assert_eq!(issue["pointer"], "/profiles/app/defaultRequestedLocale");
 }
 
 #[test]

@@ -20,8 +20,8 @@ use crate::model::ProfileDeclaration;
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::resolver::evaluation::{Actual, Code, Evaluation, IssueKey, Subject};
 use crate::resolver::locales::{
-    fixture_policy, resolve_locales, LocaleFields, LocaleInvariant, LocaleKey, LocaleSubject,
-    Location, ResolvedLocales,
+    fixture_policy, resolve_locales, LocaleFields, LocaleInvariant, LocaleKey, Location,
+    ResolvedLocales,
 };
 
 use super::eval::IssueKind;
@@ -162,20 +162,8 @@ fn locale_pointer(profile: &str, declaration: &Declaration, location: &Location)
     format!("/profiles/{}/{field}", escape(profile))
 }
 
-/// The canonical locale a subject names, when it names one.
-fn canonical(subject: &LocaleSubject) -> Option<&str> {
-    let key = match subject {
-        LocaleSubject::Occurrences | LocaleSubject::RequestedLocales => return None,
-        LocaleSubject::RequestedLocale(key)
-        | LocaleSubject::DefaultSourceLocale(key)
-        | LocaleSubject::DefaultRequestedLocale(key)
-        | LocaleSubject::NegotiationAliasKey(key)
-        | LocaleSubject::NegotiationAliasValue(_, key)
-        | LocaleSubject::MessageFallbackKey(key)
-        | LocaleSubject::MessageFallbackCandidate(_, _, key)
-        | LocaleSubject::TargetRequestedLocale(_, key)
-        | LocaleSubject::TargetDefaultRequestedLocale(_, key) => key,
-    };
+/// The canonical locale a spelling's key names, when it names one.
+fn canonical(key: &LocaleKey) -> Option<&str> {
     match key {
         LocaleKey::Canonical(locale) => Some(locale.as_str()),
         LocaleKey::Content(_) => None,
@@ -194,17 +182,24 @@ fn locale_issue(
     let Subject::Locale(subject) = &issue.unit().subject else {
         return diagnostic(issue.code().as_str(), "Locale resolution failed.", None);
     };
-    let locations = resolved
+    let spellings = resolved
         .occurrences
         .iter()
         .filter(|occurrence| occurrence.subject == *subject)
+        .collect::<Vec<_>>();
+    let locations = spellings
+        .iter()
         .map(|occurrence| &occurrence.location)
         .collect::<Vec<_>>();
     let pointers = locations
         .iter()
         .map(|location| locale_pointer(profile, declaration, location))
         .collect::<Vec<_>>();
-    let locale = canonical(subject).unwrap_or("(none)");
+    // The spellings of one subject share its canonical locale, if any.
+    let locale = spellings
+        .iter()
+        .find_map(|occurrence| canonical(&occurrence.key))
+        .unwrap_or("(none)");
     let message = match issue.code() {
         Code::LocaleInvalid => {
             "This spelling is not a valid locale identifier in the finite example provider."
@@ -416,7 +411,7 @@ pub fn resolve(source: &[u8], selector: Option<&str>) -> Result<Value, String> {
         .map(|occurrence| json!({
             "pointer": locale_pointer(id, declaration, &occurrence.location),
             "target": target(&occurrence.location),
-            "replacement": canonical(&occurrence.subject)
+            "replacement": canonical(&occurrence.key)
         }))
         .collect::<Vec<_>>());
     let errors = evaluation

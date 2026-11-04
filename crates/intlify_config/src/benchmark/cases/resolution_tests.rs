@@ -59,8 +59,9 @@ fn describe(subject: &LocaleSubject) -> String {
         LocaleSubject::Occurrences => "occurrences".to_owned(),
         LocaleSubject::RequestedLocale(own) => format!("requested {}", key(own)),
         LocaleSubject::RequestedLocales => "requested set".to_owned(),
-        LocaleSubject::DefaultSourceLocale(own) => format!("source {}", key(own)),
-        LocaleSubject::DefaultRequestedLocale(own) => format!("default {}", key(own)),
+        // A single-valued field's subject is its path alone.
+        LocaleSubject::DefaultSourceLocale => "source".to_owned(),
+        LocaleSubject::DefaultRequestedLocale => "default".to_owned(),
         LocaleSubject::NegotiationAliasKey(own) => format!("alias {}", key(own)),
         LocaleSubject::NegotiationAliasValue(owner, own) => {
             format!("alias {} value {}", key(owner), key(own))
@@ -72,9 +73,7 @@ fn describe(subject: &LocaleSubject) -> String {
         LocaleSubject::TargetRequestedLocale(id, own) => {
             format!("{} requested {}", id.as_str(), key(own))
         }
-        LocaleSubject::TargetDefaultRequestedLocale(id, own) => {
-            format!("{} default {}", id.as_str(), key(own))
-        }
+        LocaleSubject::TargetDefaultRequestedLocale(id) => format!("{} default", id.as_str()),
     }
 }
 
@@ -529,12 +528,7 @@ fn blocked_recipes_keep_exact_subjects_codes_and_independent_checks() {
             Some(1),
             vec![("requested en", duplicate)],
         ),
-        (
-            R::InvalidSource,
-            4,
-            Some(1),
-            vec![("source en_US", invalid)],
-        ),
+        (R::InvalidSource, 4, Some(1), vec![("source", invalid)]),
         // Without the set, the default's membership waits instead of failing.
         (
             R::InvalidRequested,
@@ -542,12 +536,7 @@ fn blocked_recipes_keep_exact_subjects_codes_and_independent_checks() {
             None,
             vec![("requested zz", invalid)],
         ),
-        (
-            R::InvalidDefault,
-            3,
-            Some(1),
-            vec![("default en_US", invalid)],
-        ),
+        (R::InvalidDefault, 3, Some(1), vec![("default", invalid)]),
         (
             R::InvalidAndDuplicate,
             6,
@@ -555,7 +544,7 @@ fn blocked_recipes_keep_exact_subjects_codes_and_independent_checks() {
             vec![
                 ("requested en-US", duplicate),
                 ("requested zz", invalid),
-                ("source en_US", invalid),
+                ("source", invalid),
             ],
         ),
         (
@@ -565,14 +554,14 @@ fn blocked_recipes_keep_exact_subjects_codes_and_independent_checks() {
             vec![
                 ("requested en-US", duplicate),
                 ("requested zz", invalid),
-                ("source en_US", invalid),
+                ("source", invalid),
             ],
         ),
         (
             R::DefaultNotMember,
             3,
             Some(1),
-            vec![("default fr", Code::DefaultRequestedLocaleNotInProject)],
+            vec![("default", Code::DefaultRequestedLocaleNotInProject)],
         ),
         (
             R::EveryRoleInvalid,
@@ -584,7 +573,7 @@ fn blocked_recipes_keep_exact_subjects_codes_and_independent_checks() {
                 ("fallback en_US", invalid),
                 ("fallback en_US candidate 0 en-x-brand", invalid),
                 ("browser requested Latn", invalid),
-                ("browser default en-u-ca-madeup", invalid),
+                ("browser default", invalid),
             ],
         ),
         (
