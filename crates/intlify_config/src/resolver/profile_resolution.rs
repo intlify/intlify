@@ -361,6 +361,7 @@ pub(super) mod tests {
     use crate::resolver::locales::{self, LocaleKey, LocaleSubject, Location};
     use crate::resolver::resource_policy::{self, PolicySlot, PolicySubject, ReferenceField};
     use crate::resolver::specification::{Slot, VocabularyAssertion};
+    use crate::resolver::subject::SubjectKind;
     use crate::resolver::targets::{self, TargetSubject};
     use crate::structural::selection::{Selection, StringLengthFact};
     use crate::structural::AuthoringSchema;
@@ -965,6 +966,21 @@ pub(super) mod tests {
                 state.policy.selector_length,
                 Some(StringLengthFact::Exact(3))
             );
+        });
+    }
+
+    #[test]
+    fn a_complete_invocation_runs_every_check_of_every_kind() {
+        Inputs::complete().resolve(|evaluation, _| {
+            let ran: BTreeSet<(SubjectKind, Check)> = evaluation
+                .statuses()
+                .map(|(unit, _)| (unit.subject.kind(), unit.check))
+                .collect();
+            let listed: BTreeSet<(SubjectKind, Check)> = SubjectKind::ALL
+                .into_iter()
+                .flat_map(|kind| kind.checks().iter().map(move |&check| (kind, check)))
+                .collect();
+            assert_eq!(ran, listed);
         });
     }
 

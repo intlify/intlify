@@ -622,11 +622,15 @@ mod tests {
         assert!(apart(&framed));
         let (_, other_causes) = blocked_unit(
             Unit {
-                phase: Phase::ArtifactReferenceResolution,
+                phase: Phase::SpecificationAdmission,
                 subject: Subject::Vocabulary,
-                check: Check::VocabularyMember,
+                check: Check::IntactArtifact,
             },
-            mismatch(Some(Reason::NotFound), None),
+            Blocking {
+                code: Code::IntentSurfaceClassVocabularyNotAdmitted,
+                reason: Some(Reason::BodyIntegrityInvalid),
+                details: None,
+            },
         );
         assert_eq!(
             causes(&mut frame, &other_causes),

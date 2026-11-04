@@ -29,6 +29,7 @@ pub(crate) mod origin;
 pub(crate) mod profile_resolution;
 pub(crate) mod resource_policy;
 pub(crate) mod specification;
+pub(crate) mod subject;
 pub(crate) mod tally;
 pub(crate) mod targets;
 pub(crate) mod vocabulary;
