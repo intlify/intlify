@@ -12429,10 +12429,10 @@
       },
       "inputContext": "33dc006613c29d4d6c902854b8088cf5220de9ed13f678710815b93435c4d760",
       "result": {
-        "shared": "d442fcd9713a68b6d23e385f86b1ac4b02811f16e071661af5345e59d2d92ed1",
+        "shared": "5958fe17f3c6afa88a60451a4449ba8f25b4493a3d0e8d4a262bc11f9594a2b0",
         "entry": "fbb8fbceca90c296037d3c363708bb9403bef3153da56d0a9cd22cfe541e02a4"
       },
-      "logicalWork": "6be914649714b09f8148918527ecc38c7808e4bc19def031c10fe9530afc6aaa",
+      "logicalWork": "2e684b1c9b34de32dea5ce7b61ee98a29855a7fcfa1e0a98f39eb4232028ffe2",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -12480,7 +12480,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "20"
+              "value": "21"
             }
           },
           {
@@ -12598,10 +12598,10 @@
       },
       "inputContext": "cfe82b6b3a0e7438616c6436d0caa568029fdda35b77df84a850859bb84d1332",
       "result": {
-        "shared": "02fccda87abff738c84efe4d3534ee54949e396d1d3ef46515af2573d7c33d31",
+        "shared": "5ce487f766a243bbac1b7be8dfec435d2fe3bce5b6365067cc5d5b2360507920",
         "entry": "0c48b5879db8310451106adea9c476bf6623409eae44f32f5f454f3b24cd95d8"
       },
-      "logicalWork": "6773b2027738691557ab34241d331b85f8ec8c7e2d09de1b1550e91d156e6bb6",
+      "logicalWork": "681474097ab91517981d4980ab2654ecd0660ef7c75b297e4bf024b491386a00",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -12649,7 +12649,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "21"
+              "value": "22"
             }
           },
           {
@@ -12767,10 +12767,10 @@
       },
       "inputContext": "851c63755a4b996d19242c88ea02d3c85ef9264ecfaf433fb6c136db76d66dd1",
       "result": {
-        "shared": "b6567184e68ca35e66d25d668bb503ebc478ed8269df5d075c1d3e5751a7de54",
+        "shared": "7a4738866f30e29421e27e1337b82109dc04692c07f16393f8aadeaa618102d6",
         "entry": "0c48b5879db8310451106adea9c476bf6623409eae44f32f5f454f3b24cd95d8"
       },
-      "logicalWork": "def5d26b7ae5bfea2f5ddb77f955a607d7857d3e512ebb0417112ecc3c5b665a",
+      "logicalWork": "229860784f6156067b4769f6ccc35f5605d4e7d7da3369125fb942a0f6c458ad",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -12818,7 +12818,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "21"
+              "value": "22"
             }
           },
           {
@@ -12936,10 +12936,10 @@
       },
       "inputContext": "69c4349e97d1abdc60c4bd32c9e786e081db23fd582da489b2367b0910429ed0",
       "result": {
-        "shared": "5a169485e35afb7a290543db11c27fe6948ab237e0d0e159fa2a8d27a4da768d",
+        "shared": "16ba5cc67f594c3e0cf0f407038f3cbea8c28723d5dbdc5f662559480d5e706a",
         "entry": "e80b8e5f493eec48a9810f39701bd25e2348f37b26f305172e340ec3b030f15d"
       },
-      "logicalWork": "0931b4b34464553295916185fa3eb0ba538ae5376ef1b4bdcf53a066aaddf02c",
+      "logicalWork": "5f4a04fd10d29d60ffa99051a0b0cb2315afcdc4574ef8bc4bec07c22a0aeba4",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -12987,7 +12987,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "36"
+              "value": "37"
             }
           },
           {
@@ -13105,10 +13105,10 @@
       },
       "inputContext": "473b246f5f29bc0ed861b578e89bd46de0cafb5299d563f9a1eb0696d1f4699a",
       "result": {
-        "shared": "5a169485e35afb7a290543db11c27fe6948ab237e0d0e159fa2a8d27a4da768d",
+        "shared": "16ba5cc67f594c3e0cf0f407038f3cbea8c28723d5dbdc5f662559480d5e706a",
         "entry": "2b73f54cbd5c818c4a19e0d85eb29bcb218d1de1e33217d92fcda9567233f597"
       },
-      "logicalWork": "0931b4b34464553295916185fa3eb0ba538ae5376ef1b4bdcf53a066aaddf02c",
+      "logicalWork": "5f4a04fd10d29d60ffa99051a0b0cb2315afcdc4574ef8bc4bec07c22a0aeba4",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -13156,7 +13156,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "36"
+              "value": "37"
             }
           },
           {
@@ -13274,10 +13274,10 @@
       },
       "inputContext": "f1426ddeff6821e347e0c1f93a96351d45968910ad2f3e627531058b1623a554",
       "result": {
-        "shared": "3f89b7c700c6b217f36b9c285de0fef4f554a1cf1198d6af9ea7d8c7375a6fb1",
+        "shared": "23ba4bdf732f80c5807dcb989c4b3b1fb317a385b79ddd0f7cebdd1a6a2350cf",
         "entry": "ce48e3f98d80290bf8a93a500a6a9f6f1cc9e35ff6dfadfc5b63b80e4ce6489d"
       },
-      "logicalWork": "f662de5e794a795c8554c2dc7a1b98db249393e01632981710852c048097b026",
+      "logicalWork": "8e7136968acd43265cb8804dc424a7f6db0e1d8247c799013334d5e64c88e70a",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -13325,7 +13325,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "36"
+              "value": "37"
             }
           },
           {
@@ -13443,10 +13443,10 @@
       },
       "inputContext": "cd84c5f58cbef09b855c5d5fcbfe65cea36aeab4b47eb53b49deb69a22272051",
       "result": {
-        "shared": "465c9365443c653525874b0e68691a36125d1ebfe72976cdf26f60a4f16432a6",
+        "shared": "bbbc65e7dbfd93495f8194c1f53e61d411b47651256ffca0809be5f28b061b67",
         "entry": "594a593d420a77df8d96ec0e09e9086f427fd544129ebd3fc0053c5ec13ab012"
       },
-      "logicalWork": "b0dd91bb127d6fc34d3e2db51c9702132697b1e877e383c3eaa0a082eda0a0e0",
+      "logicalWork": "b5cc333d5e47ce4062f382f530b18b471aad5d0c65fa906f57b07aff5533b1b9",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -13494,7 +13494,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "26"
+              "value": "27"
             }
           },
           {
@@ -13612,10 +13612,10 @@
       },
       "inputContext": "9d90ba9428fd175dbd3d36bd9583aee9ebc6c7fe1248aa8ee14e7ac8d74fafa4",
       "result": {
-        "shared": "93f8501fbb7b6062ef7a07b19daf7f301790dc75237947ae852b963c7d127397",
+        "shared": "b6b3fb13d78b5fb82b7674051b11693fe01823999d60e17c4432457f0156f0f5",
         "entry": "e80b8e5f493eec48a9810f39701bd25e2348f37b26f305172e340ec3b030f15d"
       },
-      "logicalWork": "56abd117efe32b9fd5577c324ca46fe07f47e68bcce5a6cc04142eedcc327875",
+      "logicalWork": "16484bc7830dcc72b55911d67c1fa055126fc71aa159ae053d41c577af60f92f",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -13663,7 +13663,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "36"
+              "value": "37"
             }
           },
           {
@@ -13781,10 +13781,10 @@
       },
       "inputContext": "6eeee4c50dffe90b3272ac4cef5aaeaa2ef7bc1e5264d4af01d002498ce2fb2e",
       "result": {
-        "shared": "2ac854afddcd58154eeaeaf1c10c47622b062ebe15ef62290b6377edcdd91c1b",
+        "shared": "e5a60721e92d081a38a43cd4b19d9bf3cd677cfc8c2b991c2068c5cf4b4e6fe3",
         "entry": "e80b8e5f493eec48a9810f39701bd25e2348f37b26f305172e340ec3b030f15d"
       },
-      "logicalWork": "0931b4b34464553295916185fa3eb0ba538ae5376ef1b4bdcf53a066aaddf02c",
+      "logicalWork": "5f4a04fd10d29d60ffa99051a0b0cb2315afcdc4574ef8bc4bec07c22a0aeba4",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -13832,7 +13832,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "36"
+              "value": "37"
             }
           },
           {
@@ -13950,10 +13950,10 @@
       },
       "inputContext": "3e12e0dc2d4e65a0c3b4675e3dff6bd216627a3a552d5748578900628333acf5",
       "result": {
-        "shared": "0ddc83a64189f09c1210fc3dc8ec382e46ec0ac3a1184e217361056e38e84cc0",
+        "shared": "f46c593908fc13b5ed12cadb27ca50f015f8edbcca903221f1e2bbc4fcd35f24",
         "entry": "128ed70bc6476aaf0629d8bb9effe3295e97091e8bd80e3459d34212cfe1f9cf"
       },
-      "logicalWork": "42b4b36e2dcaf9227edb6051e7448550fa4bd77fb4052625fcc7404817561a9d",
+      "logicalWork": "11530da52c8c446e59f55617e46f6023cce6b1b4c0daec893d90c64bcd211f86",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -14001,7 +14001,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "35"
+              "value": "36"
             }
           },
           {
@@ -14119,10 +14119,10 @@
       },
       "inputContext": "ca16680c217a96476f465581696a1a2c479283ef6ef9c1dfe2a51f355865f871",
       "result": {
-        "shared": "e01d9ac52fb12096738304e5616b32538a3235e4afd942fdaf4af94c2df989d6",
+        "shared": "f9c5ce210a7fc648030b516df085ed1faa97f853e3b09008b127a9f0a9990f87",
         "entry": "5a34f4c6124853c42011cfd381987a6463e13afe03b16e89b7b3c0e67f9cab70"
       },
-      "logicalWork": "611d0654fbde6bb914acfeacb67142e1626d5952c447b43e02552f27c3ffce76",
+      "logicalWork": "68e0859d384873670f351074898b9c36dc4d48ee9233dbd066824142a29a952d",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -14170,7 +14170,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "20"
+              "value": "21"
             }
           },
           {
@@ -14288,10 +14288,10 @@
       },
       "inputContext": "27f61d6160a1059646978dc7c32e91c04fe07084279d9069219ee1d5c463e367",
       "result": {
-        "shared": "c3b74aeb9a50dc08071b8916445ebcb4b43a6b05c2d925326f3ad1035f8076ae",
+        "shared": "5a0e71ea2be6e9fb00787ce308eaae38f6c5bde0fb78e6e7d22c40c3f416d8d9",
         "entry": "08d6921ef4601a8789e496d9a8827dd128d2432e79c87adeebab6ec296c3168a"
       },
-      "logicalWork": "9b12f26d14834261ded1eb79d2a41a0efdadb41f2b778600b65c0229765fd6b2",
+      "logicalWork": "1c125427888357ce1e937411ef9e3064f54085d47833636743c31b36f59d492c",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -14339,7 +14339,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "20"
+              "value": "21"
             }
           },
           {
@@ -14457,10 +14457,10 @@
       },
       "inputContext": "2406999cfd45c239f87fb708b1ced36bb2ac3e638c340620ea2311886ddba61a",
       "result": {
-        "shared": "ae64eed510ec85566e7374aa14d70223e1d9cfcda203316da1fd7e952c68d1d1",
+        "shared": "01b933ee1df1ff48ee912896c20e5c033a819a635aa3ef43f158676b01a4a15c",
         "entry": "ee0a42f95c9c8ce85e90f98c21bcb82dbdf06d611fa75b277ee504d4e98752c3"
       },
-      "logicalWork": "8b07e8e29f4a58b4075238a69b35a2c57b681d2fbeb71f35938adf4817c16243",
+      "logicalWork": "d5114502973daaf0c7bc4b9b7600b6003997e9db04c5b42282de0d976706cb4f",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -14508,7 +14508,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "31"
+              "value": "32"
             }
           },
           {
@@ -14626,10 +14626,10 @@
       },
       "inputContext": "f3cc7a8b5b0ff67a00be4062687e3d96676d592e07254306d27383b7def38a97",
       "result": {
-        "shared": "3148a376d8d26dbb4d5c7abe392aec51670cef9153b491c2ad028534948ad2a0",
+        "shared": "09dc78be51f115bf288cd98ce4d29a469c4c376154d12410b3a4cfca7bc7328b",
         "entry": "8045256277ed716cca13c14735468ba28680906df65e2a7a4c3ad1d09f80456a"
       },
-      "logicalWork": "271a8e3fdcc89779e26d6ec410048d9bfc78642b145c54dac4366083854b49ee",
+      "logicalWork": "f049d609bd656a0b7e12cf40b96ee91a30b5afd28fffc9b07f3c268e4bb19236",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -14677,7 +14677,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "20"
+              "value": "21"
             }
           },
           {
@@ -14795,10 +14795,10 @@
       },
       "inputContext": "3c63f50d2a19542eadcecd1e312461dec85a3579f4214528205d0832ed2de3db",
       "result": {
-        "shared": "10bc36ecc7285902ea912d4dc0777b2d19a2a4bf041fb7c889ca1f3c0d4208ba",
+        "shared": "7a11504bcdd12be658f1d10f0f940530586a642c24361b3ed2079af241c42699",
         "entry": "0c48b5879db8310451106adea9c476bf6623409eae44f32f5f454f3b24cd95d8"
       },
-      "logicalWork": "b63dbe43ee8871a34f08ba91323af65c6b3d35a209399ba258378440df8745f8",
+      "logicalWork": "d29d0feeb75b55556f1e708fde643faf9f7747ca8aa3199efcd4909059c1a9d8",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -14846,7 +14846,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "21"
+              "value": "22"
             }
           },
           {
@@ -14964,10 +14964,10 @@
       },
       "inputContext": "e703bb8ff407ad15927c4395e951301f12384810e8e503f5abc5862d4ce0e38e",
       "result": {
-        "shared": "0ba3703d2867768ec39a4fda5312fa447955486263863e757514515696196ef3",
+        "shared": "547da94b3bbffd9e9a6f1c869d08c47dbc0112fa5588e78424babc729d460bc0",
         "entry": "c46447b29f8131b1761e7bc369d8e64fe9c1c961c61b4bae840e2d38712ea543"
       },
-      "logicalWork": "847492a64b021762745c6e16b78cf97216f43dff073963f62abd0082d63c7e87",
+      "logicalWork": "6ad36c8761f78e7286fc7733735a05b6b44b2c10e3584c0ffff1839ba7f92448",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -15015,7 +15015,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "17"
+              "value": "18"
             }
           },
           {
@@ -15024,7 +15024,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "5"
+              "value": "6"
             }
           },
           {
@@ -15133,10 +15133,10 @@
       },
       "inputContext": "3b47437eba0121e0f003e78a6f7a143b25925b858aceeaec8b4d88168d9d2007",
       "result": {
-        "shared": "c7ef52ff64d53a470755327b2a0959e3444dd168717df6b529bb9706a14cf1c4",
+        "shared": "e9c5052ebfd5644220d8e03921e4d037d7e41a34ff1274f326cb74ea38a13466",
         "entry": "fbb8fbceca90c296037d3c363708bb9403bef3153da56d0a9cd22cfe541e02a4"
       },
-      "logicalWork": "3a4de34b12e2bb42a77845bae607c13b2230cf09a37eaef417ef6613d0719eba",
+      "logicalWork": "9ec840e0c762bbdc50045489d4f32bac34471f348ef3e7aea11cc9ed6ba54eff",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -15184,7 +15184,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "20"
+              "value": "21"
             }
           },
           {
@@ -15302,10 +15302,10 @@
       },
       "inputContext": "f928efae8df6cc8d1b4a0328e3bc5b554a717741d076ca30ad7229fffe523531",
       "result": {
-        "shared": "e884414c9432b902d8fe4d8bdb5760abc7cd57da2d93b3e8c0a26acf619d6080",
+        "shared": "d9a538f1d5fffd3734e4023fa19e8dad369864aaa4728640c9681debd6f14e18",
         "entry": "34718d901983d79e26749baa57900f83fca90cf04270c5a04d01cef4eff4e1b0"
       },
-      "logicalWork": "e0a892f6903f85568e939bea0b341d9521cca7ac1a00a0d8b0b417cd34fd3db4",
+      "logicalWork": "61767552891fea69db8a3e509ffae5da2508958d8c174f44986ead9984e0f030",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -15353,7 +15353,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "20"
+              "value": "21"
             }
           },
           {
@@ -15362,7 +15362,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "5"
+              "value": "6"
             }
           },
           {
@@ -15471,10 +15471,10 @@
       },
       "inputContext": "bf8c6c11f9746905817d45f525518aba1da0f6ccc5bad418416b475869cf494b",
       "result": {
-        "shared": "05fb6228360995b1ee3284d915e96206249bb911f9446f44b9c6a787c5001252",
+        "shared": "e7c46ff301f942c23456b7e5b665dff034e3ededb51da004249aff32a8d6342d",
         "entry": "fbb8fbceca90c296037d3c363708bb9403bef3153da56d0a9cd22cfe541e02a4"
       },
-      "logicalWork": "8f47933ddb48d4ff6ed32aa8b734e9503693f155eaa899cbf7023b23abf718af",
+      "logicalWork": "d61294266e27942f07237857d61ec3da9acda3aac4610e4c9f15b14345caddf8",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -15522,7 +15522,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "20"
+              "value": "21"
             }
           },
           {
@@ -15640,10 +15640,10 @@
       },
       "inputContext": "60590bb4d4579d1fc55160824f3cf25c379b62b284412e2726699c77371f0b99",
       "result": {
-        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "shared": "90a483027c15dae409a8a4998ca6c4bcf771fcab11721adddc24d3ebb7127947",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
+      "logicalWork": "3bdf1561dc0ab593cae1866edfc4967aa51c952f10a621ad2b00a44cf454aaf7",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -15691,7 +15691,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -15809,10 +15809,10 @@
       },
       "inputContext": "bf55f2cecd37d9357b3f542ce61f51d122653bee543aa97d94f47fb70d1c9e72",
       "result": {
-        "shared": "d442fcd9713a68b6d23e385f86b1ac4b02811f16e071661af5345e59d2d92ed1",
+        "shared": "5958fe17f3c6afa88a60451a4449ba8f25b4493a3d0e8d4a262bc11f9594a2b0",
         "entry": "fbb8fbceca90c296037d3c363708bb9403bef3153da56d0a9cd22cfe541e02a4"
       },
-      "logicalWork": "6be914649714b09f8148918527ecc38c7808e4bc19def031c10fe9530afc6aaa",
+      "logicalWork": "2e684b1c9b34de32dea5ce7b61ee98a29855a7fcfa1e0a98f39eb4232028ffe2",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -15860,7 +15860,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "20"
+              "value": "21"
             }
           },
           {
@@ -15978,10 +15978,10 @@
       },
       "inputContext": "e70890ba713eab008a537cdb0337f5037843ff25d29b7d8e97413a0b4eb26bbd",
       "result": {
-        "shared": "ae64eed510ec85566e7374aa14d70223e1d9cfcda203316da1fd7e952c68d1d1",
+        "shared": "01b933ee1df1ff48ee912896c20e5c033a819a635aa3ef43f158676b01a4a15c",
         "entry": "c7c76fda3ed4135561239e45624ecc8a79468594b1810fa8fa8ec5ecda908eb5"
       },
-      "logicalWork": "8b07e8e29f4a58b4075238a69b35a2c57b681d2fbeb71f35938adf4817c16243",
+      "logicalWork": "d5114502973daaf0c7bc4b9b7600b6003997e9db04c5b42282de0d976706cb4f",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -16029,7 +16029,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "31"
+              "value": "32"
             }
           },
           {
@@ -16147,10 +16147,10 @@
       },
       "inputContext": "32828dbedd75be9265d5af9615ea816cedb490cb965476e68505bc20265548d3",
       "result": {
-        "shared": "e884414c9432b902d8fe4d8bdb5760abc7cd57da2d93b3e8c0a26acf619d6080",
+        "shared": "d9a538f1d5fffd3734e4023fa19e8dad369864aaa4728640c9681debd6f14e18",
         "entry": "9ec3f978e64b9db0f2f6984411e3e7fe4ee001509364fc7b8325a92547e3dce6"
       },
-      "logicalWork": "e0a892f6903f85568e939bea0b341d9521cca7ac1a00a0d8b0b417cd34fd3db4",
+      "logicalWork": "61767552891fea69db8a3e509ffae5da2508958d8c174f44986ead9984e0f030",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -16198,7 +16198,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "20"
+              "value": "21"
             }
           },
           {
@@ -16207,7 +16207,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "5"
+              "value": "6"
             }
           },
           {
@@ -16316,10 +16316,10 @@
       },
       "inputContext": "df2b7d6a48e55a9163ccbabfab97bdab53727db5d2d72af14044bf3c0d504b29",
       "result": {
-        "shared": "6f0fb42b26031d2eb9489eda35903da0c1b78fcdb85a4920a0104d28a95a7e79",
+        "shared": "c228cbd290010fcb176a7c4c9ea94c203c09d9c65b70f667da00a5d44f86fd65",
         "entry": "7ce1fe08179a2a3dac5d95229f8c7f093ce2b8be28c615e236be842f2f09249a"
       },
-      "logicalWork": "9c3b2be83b5857d44f46a3affdf2603e70d739c43978505887e2e3b114a0e8b8",
+      "logicalWork": "bfb0b39f067349cf700f58c1700a0b5ddeffb96985a4d71d2c4e6266722fdc39",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -16367,7 +16367,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "20"
+              "value": "21"
             }
           },
           {
@@ -16485,10 +16485,10 @@
       },
       "inputContext": "696c7bbf249e17778c0daa514aafaf81dca3c12460245ea39d4f04df00e5680d",
       "result": {
-        "shared": "49d341ed1553f90d61d9aefde0a7637a94e69ed7ea5e0b3936506393e18f3136",
+        "shared": "b0b0fdb5eb2c4dd2feb65a59816b4322404703d9fca7555dc0b3c02e45d8cca0",
         "entry": "3183055f2a50142633e2fc4a3c60607600ecaa7953af25d117dc648c1a3897f7"
       },
-      "logicalWork": "09415b1520f5bd88a6c389c6e735d50614267048a01cc31d9c7c7394ee40ad9e",
+      "logicalWork": "f147c0e216e6fadc0ebca1cdb088a9080ffe527e261c9743f0db20330226cd4c",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -16536,7 +16536,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "20"
+              "value": "21"
             }
           },
           {
@@ -16654,10 +16654,10 @@
       },
       "inputContext": "d1774ad81bb56f54e490bdaa2cabfd69e96df0621a45538e117eeeb657f48e9b",
       "result": {
-        "shared": "5a169485e35afb7a290543db11c27fe6948ab237e0d0e159fa2a8d27a4da768d",
+        "shared": "16ba5cc67f594c3e0cf0f407038f3cbea8c28723d5dbdc5f662559480d5e706a",
         "entry": "e80b8e5f493eec48a9810f39701bd25e2348f37b26f305172e340ec3b030f15d"
       },
-      "logicalWork": "0931b4b34464553295916185fa3eb0ba538ae5376ef1b4bdcf53a066aaddf02c",
+      "logicalWork": "5f4a04fd10d29d60ffa99051a0b0cb2315afcdc4574ef8bc4bec07c22a0aeba4",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -16705,7 +16705,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "36"
+              "value": "37"
             }
           },
           {
@@ -16823,10 +16823,10 @@
       },
       "inputContext": "2071baa68f383c3794b0b8251a1ffcf910e063d7163ab59f72c66ec9ad241c1f",
       "result": {
-        "shared": "68d9096180b13c33ff87e44abd0640ae7d62002794b61daee36019caa24e8895",
+        "shared": "684d8dc12fe4351426bb70d917fc4787b9729ff5f2f3abe77d33054689ab5638",
         "entry": "7c213f6e0d5ee2ced5380a5c44d6d268e98ecdba95cd4c63e933605e5ddc2025"
       },
-      "logicalWork": "955de8efe0d283733582175a2483eefcccfe13895c33a3e9337b8a90da1027f7",
+      "logicalWork": "8d32df5ef0f33d93237e6ddc3fda1577e4a824951c9732fca4ad6f2cf5d7fd75",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -16874,7 +16874,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "24"
+              "value": "25"
             }
           },
           {
@@ -16883,7 +16883,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "16"
+              "value": "17"
             }
           },
           {
@@ -16992,10 +16992,10 @@
       },
       "inputContext": "dc653d9b468964ea91680f456d81fd6de768f22f46f00e9e908c4b202375b700",
       "result": {
-        "shared": "5a169485e35afb7a290543db11c27fe6948ab237e0d0e159fa2a8d27a4da768d",
+        "shared": "16ba5cc67f594c3e0cf0f407038f3cbea8c28723d5dbdc5f662559480d5e706a",
         "entry": "e80b8e5f493eec48a9810f39701bd25e2348f37b26f305172e340ec3b030f15d"
       },
-      "logicalWork": "0931b4b34464553295916185fa3eb0ba538ae5376ef1b4bdcf53a066aaddf02c",
+      "logicalWork": "5f4a04fd10d29d60ffa99051a0b0cb2315afcdc4574ef8bc4bec07c22a0aeba4",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -17043,7 +17043,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "36"
+              "value": "37"
             }
           },
           {
@@ -17161,10 +17161,10 @@
       },
       "inputContext": "34943511b4bbb63f93de591acb0594908eefef96d6260f14d27eb0fae69024d7",
       "result": {
-        "shared": "e5ee529d4d33922dd57a2dd97a39e2b8ce2d2e3fc2af986e2bc4478cfca96d42",
+        "shared": "d432942720e830065aff72ca377989e6a9525c20baed4e569c8d501446c09736",
         "entry": "e80b8e5f493eec48a9810f39701bd25e2348f37b26f305172e340ec3b030f15d"
       },
-      "logicalWork": "dd50a0e60f02ddc2590f0a0673cb863b36730a19ca9e26141363a8caaaa22493",
+      "logicalWork": "554606755a3418e97ffaef184b7f11cf3bf8d185dbbe081d24d9eab34ee88781",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -17212,7 +17212,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "36"
+              "value": "37"
             }
           },
           {
@@ -17330,10 +17330,10 @@
       },
       "inputContext": "88b870a82a40aa21d2d67a4aacde6c90a9b160e57c02305202e10e2a96e75eaf",
       "result": {
-        "shared": "d442fcd9713a68b6d23e385f86b1ac4b02811f16e071661af5345e59d2d92ed1",
+        "shared": "5958fe17f3c6afa88a60451a4449ba8f25b4493a3d0e8d4a262bc11f9594a2b0",
         "entry": "fbb8fbceca90c296037d3c363708bb9403bef3153da56d0a9cd22cfe541e02a4"
       },
-      "logicalWork": "6be914649714b09f8148918527ecc38c7808e4bc19def031c10fe9530afc6aaa",
+      "logicalWork": "2e684b1c9b34de32dea5ce7b61ee98a29855a7fcfa1e0a98f39eb4232028ffe2",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -17381,7 +17381,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "20"
+              "value": "21"
             }
           },
           {
@@ -17499,10 +17499,10 @@
       },
       "inputContext": "a93736ddae593fa84a70365929c5ab53ea47976ecf0faa6e2eed22b1ac4d84d1",
       "result": {
-        "shared": "aa20eed001209f44ba09edb783cea1ef3f5977882b3182389c9dcd14ff5f3da6",
+        "shared": "6cc0e4cb6c14b080768c6cf065ac6ac99c63ce1eafd5cdf65ca603a9d552cee1",
         "entry": "bd194289532ea68a74a61821094f09003eadfea186d9e92a31d5b7aae3a47c0f"
       },
-      "logicalWork": "4534708b6d52896545b3ca170d67e6805ef8e23dc3d03934421954227b3c9393",
+      "logicalWork": "9d0968d44cff572738406f87fdd2a770bd2bc4974627b4931f36a344c696ebfb",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -17550,7 +17550,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "17"
+              "value": "18"
             }
           },
           {
@@ -17559,7 +17559,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "6"
+              "value": "7"
             }
           },
           {
@@ -17668,10 +17668,10 @@
       },
       "inputContext": "4d5a7bdade5059d31abdfb4b616dc212b9bbe39d85acb843d4b5673e95f18d1d",
       "result": {
-        "shared": "6f0fb42b26031d2eb9489eda35903da0c1b78fcdb85a4920a0104d28a95a7e79",
+        "shared": "c228cbd290010fcb176a7c4c9ea94c203c09d9c65b70f667da00a5d44f86fd65",
         "entry": "7ce1fe08179a2a3dac5d95229f8c7f093ce2b8be28c615e236be842f2f09249a"
       },
-      "logicalWork": "9c3b2be83b5857d44f46a3affdf2603e70d739c43978505887e2e3b114a0e8b8",
+      "logicalWork": "bfb0b39f067349cf700f58c1700a0b5ddeffb96985a4d71d2c4e6266722fdc39",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -17719,7 +17719,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "20"
+              "value": "21"
             }
           },
           {
@@ -17837,10 +17837,10 @@
       },
       "inputContext": "405a5dab68a9c0aa1230b6307323e0042da5e7af69078379234e5e5898108245",
       "result": {
-        "shared": "016cd03a328607bf6a4155ba816de93510c0d48d34a84eb90319394aac04ae5b",
+        "shared": "263ee0533fe6f225bf1e4c6f9f2a56a83f252ae3eb3153cfffa38cfd8d546ba1",
         "entry": "f8b5aa7333ca4232d089ab55759b9c1acef04a93ac8cff80d6857f40ce315dcb"
       },
-      "logicalWork": "7c714a3091b922243a6e0ef54d638b5de283dfa83248da10c5820f9588eecef9",
+      "logicalWork": "3f59a73f54d4522a91a539646c902c44e0376f72ef547794526498a1a2825bf7",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -17888,7 +17888,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "17"
+              "value": "18"
             }
           },
           {
@@ -17897,7 +17897,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "5"
+              "value": "6"
             }
           },
           {
@@ -19028,10 +19028,10 @@
       },
       "inputContext": "e73508cf5b634b7523220b1a03e01b3dd2f98a92706ff77b5abebeec447b1cc2",
       "result": {
-        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "shared": "90a483027c15dae409a8a4998ca6c4bcf771fcab11721adddc24d3ebb7127947",
         "entry": "e18915d6ae4de273451605c05f3280579d90e2e3299156a5d0b00c1f9a4acc35"
       },
-      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
+      "logicalWork": "3bdf1561dc0ab593cae1866edfc4967aa51c952f10a621ad2b00a44cf454aaf7",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -19079,7 +19079,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -19197,10 +19197,10 @@
       },
       "inputContext": "a28f927b34ff7722adeb50fe6dce47e026f0299f0aa41efe0d15beaac0d7a979",
       "result": {
-        "shared": "4d5cf4a43cb2fdec3fcf883e19de3b02baa2ba0ea0338185cad3c4137589f2c2",
+        "shared": "2ed11bac69c5bca800f99d61195c94c225fb4378419ebfc2af1b6a8b940a4833",
         "entry": "ddc263e71f0d500d05736cfa50ce3a8f0c82f5b1a4d43b83ac1a1a850b0e8f41"
       },
-      "logicalWork": "8362fe3a55080056a7bb6b5edd81d6a7fddd4bba010687629f68245296fbf863",
+      "logicalWork": "a0e11230641e055b94a0f74da56d838d3d4047572a066092090dc1e1301455e6",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -19248,7 +19248,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -19366,10 +19366,10 @@
       },
       "inputContext": "4d8c5e45ab7eed37cc53c7ca848a9af89ff108de5a05f4413c5b25215b43191a",
       "result": {
-        "shared": "16537a6c2d97c742cf66d1a4486cfbb7593cb63be07316ded6e02cc75e2d6b81",
+        "shared": "8584522c9226b12aca5bb8067a70e0056bdcaa23392d4aef79711918263c0459",
         "entry": "379fe577d6a175693f81fc85b422cdbe6370c32064fe1fdbfea7082776eeb98f"
       },
-      "logicalWork": "1c9afb6e039ce7c5189db6a6454c5573172dd7c00a1cd238370d6eaf5bf2994b",
+      "logicalWork": "7a28055c71e88958c4265f32719f1f1bb1ca91aafab59e5b526a063aac42229f",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -19417,7 +19417,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -19535,10 +19535,10 @@
       },
       "inputContext": "1c792ab193bd9fbf8c9d47e017c933099fb2bd8a3036b7a3af671321d5041a22",
       "result": {
-        "shared": "c37bb5628e300742e56cbedf8f60b7813c653d4e85faeef44217e1014951d35a",
+        "shared": "eb02a771e8c6524849ed7ea5a4940d47aa77656d5583448c3e222402b9634e69",
         "entry": "20584fb69c4d888a70a613b9d9e598052aeabca21a39836ffbb7f8713c6f9be8"
       },
-      "logicalWork": "e50f5b757ea51fa7ff4d0cac6f12e75d30eb3b3aa2a3d3db86ed27b63a8ac7d4",
+      "logicalWork": "6300c7037c6f40f31d6cddb00e292e12cd7f35e27f4351071d7ae220d1469da0",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -19586,7 +19586,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -19704,10 +19704,10 @@
       },
       "inputContext": "8d277c2d85b3cb47be766e2a62fb459a8cf9c9eb4c579ec3d433b905d8dbeb5e",
       "result": {
-        "shared": "58f66c5e262f9fd24c57847457a08a370ea987f474b2f78b543b3c14c1d40da9",
+        "shared": "d00608ced0dbf35a639b8744ac73b81b2836d9433af49102e8606d04c96a7267",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "03a7c69b928e49666382b9708b313e818d73399adb5069ded91f967a41201677",
+      "logicalWork": "14a6258b089d440e0cf662157d79ff3ea2aba9c8f94898fc4983fc5e92b974a4",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -19755,7 +19755,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "77"
+              "value": "81"
             }
           },
           {
@@ -19764,7 +19764,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "11"
+              "value": "13"
             }
           },
           {
@@ -19873,10 +19873,10 @@
       },
       "inputContext": "fb60229e94bcb8a173a635fb162d1a1a656d8a6c9f30d2180cd01e24349633e4",
       "result": {
-        "shared": "1dfe3478d5c2927685f7088070d6bcd54d8e4f02e064224cbecd5ef60fb85910",
+        "shared": "6826fec362bf27fa32d1fd2c7a9411bba550fd309068f8e41c642b217247989c",
         "entry": "3eda0ef0b6467db30e3c0f347105204178ffd1fea40ce0a31a41443512544891"
       },
-      "logicalWork": "d55e5ddbda8aec0218fd0bfafd49d8c86b127e2964d41279ce3e50add1a8f153",
+      "logicalWork": "8afb21e583ddc27abf3ab61d07991a18f784aeee9627c5682cede061914ddfc2",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -19924,7 +19924,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "113"
+              "value": "114"
             }
           },
           {
@@ -20042,10 +20042,10 @@
       },
       "inputContext": "508e10f4434952d9f7516c561de032df9e3e5d2a8e46823f5eccc4e94e67e9ae",
       "result": {
-        "shared": "98d8fea0cf18b0a5a19ab28d1e400c51c3f7f083dd24b97a70975bf799bc7d23",
+        "shared": "50a3e5a1222cf79571b694688e55e0bf4a42edf3c6be8ccef2112a8af4aa550c",
         "entry": "40a80d89a644704bfa2f2bd65ebd3416154f439919ad10f4dacb75eaab159279"
       },
-      "logicalWork": "c637346cfb9cba55541cdb4384771709d5a2c35204417ad9587c460167837c8e",
+      "logicalWork": "8e858c71e1214cd71188f731bc61565925b9c3a6cb97868884b051f783c27052",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -20093,7 +20093,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "104"
+              "value": "105"
             }
           },
           {
@@ -20211,10 +20211,10 @@
       },
       "inputContext": "689de298d7eec5b6bc7f7399594d427d5948b3501edfec3c0e29b4b7123db35d",
       "result": {
-        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "shared": "90a483027c15dae409a8a4998ca6c4bcf771fcab11721adddc24d3ebb7127947",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
+      "logicalWork": "3bdf1561dc0ab593cae1866edfc4967aa51c952f10a621ad2b00a44cf454aaf7",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -20262,7 +20262,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -20380,10 +20380,10 @@
       },
       "inputContext": "bb2cbce1c01682f823c20ae481326895843fe11a036b6ca32da9178f4467014f",
       "result": {
-        "shared": "80c2ef511cb2582b29386736df977e6316c32d25aaa94f43adefce37f029799b",
+        "shared": "470ee397f4ca980e2db2600d594ea64ceeb1cf390f465d669ab9130b45174f08",
         "entry": "3f4bef97adac20807a14b2a3affdefee06d57eac573b3d19fb96040377b45303"
       },
-      "logicalWork": "81c73c124471e47a333283cb2610f67bf9fe3cee6585580661d73ebf22bb057b",
+      "logicalWork": "035ff54937e9c97bd048ceb93c4cfa19a2ce45cdec66a367ac0de846fbac6525",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -20431,7 +20431,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "66"
+              "value": "70"
             }
           },
           {
@@ -20440,7 +20440,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "53"
+              "value": "57"
             }
           },
           {
@@ -20552,10 +20552,10 @@
       },
       "inputContext": "e8ce9849fdb0b57f35b1ac36d79b8fe6112bf6c32489fe1c21a26bd4fe35ac46",
       "result": {
-        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "shared": "90a483027c15dae409a8a4998ca6c4bcf771fcab11721adddc24d3ebb7127947",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
+      "logicalWork": "3bdf1561dc0ab593cae1866edfc4967aa51c952f10a621ad2b00a44cf454aaf7",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -20603,7 +20603,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -20724,10 +20724,10 @@
       },
       "inputContext": "90f54cbfd22cad0cba046f421d291a2e73909f1578d5e7a529c2dfe8d35c0c97",
       "result": {
-        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "shared": "90a483027c15dae409a8a4998ca6c4bcf771fcab11721adddc24d3ebb7127947",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
+      "logicalWork": "3bdf1561dc0ab593cae1866edfc4967aa51c952f10a621ad2b00a44cf454aaf7",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -20775,7 +20775,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -20896,10 +20896,10 @@
       },
       "inputContext": "a12c628d2f4352a2998a4bc22851e6fc0e83f825cc58b274e1a551e0887f325f",
       "result": {
-        "shared": "4d5cf4a43cb2fdec3fcf883e19de3b02baa2ba0ea0338185cad3c4137589f2c2",
+        "shared": "2ed11bac69c5bca800f99d61195c94c225fb4378419ebfc2af1b6a8b940a4833",
         "entry": "ddc263e71f0d500d05736cfa50ce3a8f0c82f5b1a4d43b83ac1a1a850b0e8f41"
       },
-      "logicalWork": "8362fe3a55080056a7bb6b5edd81d6a7fddd4bba010687629f68245296fbf863",
+      "logicalWork": "a0e11230641e055b94a0f74da56d838d3d4047572a066092090dc1e1301455e6",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -20947,7 +20947,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -21068,10 +21068,10 @@
       },
       "inputContext": "bc519a3fe290cb52887d7ada1c3f3ee419326c1ec8cf1da25ff0e6d76d451234",
       "result": {
-        "shared": "4d5cf4a43cb2fdec3fcf883e19de3b02baa2ba0ea0338185cad3c4137589f2c2",
+        "shared": "2ed11bac69c5bca800f99d61195c94c225fb4378419ebfc2af1b6a8b940a4833",
         "entry": "ddc263e71f0d500d05736cfa50ce3a8f0c82f5b1a4d43b83ac1a1a850b0e8f41"
       },
-      "logicalWork": "8362fe3a55080056a7bb6b5edd81d6a7fddd4bba010687629f68245296fbf863",
+      "logicalWork": "a0e11230641e055b94a0f74da56d838d3d4047572a066092090dc1e1301455e6",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -21119,7 +21119,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -21240,10 +21240,10 @@
       },
       "inputContext": "ff08c252c178917cd5b6ab744adc97e95dc3b37f66fdd1da0dff113f3ab1d736",
       "result": {
-        "shared": "16537a6c2d97c742cf66d1a4486cfbb7593cb63be07316ded6e02cc75e2d6b81",
+        "shared": "8584522c9226b12aca5bb8067a70e0056bdcaa23392d4aef79711918263c0459",
         "entry": "379fe577d6a175693f81fc85b422cdbe6370c32064fe1fdbfea7082776eeb98f"
       },
-      "logicalWork": "1c9afb6e039ce7c5189db6a6454c5573172dd7c00a1cd238370d6eaf5bf2994b",
+      "logicalWork": "7a28055c71e88958c4265f32719f1f1bb1ca91aafab59e5b526a063aac42229f",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -21291,7 +21291,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -21412,10 +21412,10 @@
       },
       "inputContext": "0951ee09ba215bfe437ffba208d5bf79842cdeaac65cbb229b5b0e852b0bcca9",
       "result": {
-        "shared": "16537a6c2d97c742cf66d1a4486cfbb7593cb63be07316ded6e02cc75e2d6b81",
+        "shared": "8584522c9226b12aca5bb8067a70e0056bdcaa23392d4aef79711918263c0459",
         "entry": "379fe577d6a175693f81fc85b422cdbe6370c32064fe1fdbfea7082776eeb98f"
       },
-      "logicalWork": "1c9afb6e039ce7c5189db6a6454c5573172dd7c00a1cd238370d6eaf5bf2994b",
+      "logicalWork": "7a28055c71e88958c4265f32719f1f1bb1ca91aafab59e5b526a063aac42229f",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -21463,7 +21463,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -21584,10 +21584,10 @@
       },
       "inputContext": "5dda1521baf1fd1be5cc5ebc8c0a5b957679d045016accdb7abfde00b3db13ff",
       "result": {
-        "shared": "360874ca598bbebe910f0efac2cdb5b53c3b53b7aaa9dc14e200da33e8663cbb",
+        "shared": "3a13203fb67fd4b311c70e11f5be089e0b08875e0243541a6b6d4fa9f618b325",
         "entry": "d716d4aa389e6c9d2b52ad7257bcde64ee8cd8ccb403babda709f3539ed24c27"
       },
-      "logicalWork": "4595243ed36cc4c38425a2f3cd74fe2b83e57fbac9a79606d91238f4ecad0270",
+      "logicalWork": "9870f38713685a69c67a3ec808263e8f72250deb831677ca434d54af1deb9790",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -21635,7 +21635,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "785"
+              "value": "786"
             }
           },
           {
@@ -21756,10 +21756,10 @@
       },
       "inputContext": "320e040af309b7726cdf04297c472adda45658fbb77f56d71ae370a9f8878a5b",
       "result": {
-        "shared": "360874ca598bbebe910f0efac2cdb5b53c3b53b7aaa9dc14e200da33e8663cbb",
+        "shared": "3a13203fb67fd4b311c70e11f5be089e0b08875e0243541a6b6d4fa9f618b325",
         "entry": "d716d4aa389e6c9d2b52ad7257bcde64ee8cd8ccb403babda709f3539ed24c27"
       },
-      "logicalWork": "4595243ed36cc4c38425a2f3cd74fe2b83e57fbac9a79606d91238f4ecad0270",
+      "logicalWork": "9870f38713685a69c67a3ec808263e8f72250deb831677ca434d54af1deb9790",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -21807,7 +21807,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "785"
+              "value": "786"
             }
           },
           {
@@ -21928,10 +21928,10 @@
       },
       "inputContext": "d0b02913aa7d0ecaa57efc4ed04f490ce7bb6597544367cdaa95c78e62481e7e",
       "result": {
-        "shared": "2daef55288c86379f4f13ec0035e653d34212de8724241832e93f2ac0e30763b",
+        "shared": "2828f785a0c91421ae6101a3e6cfc0fff17e2322164eef5f7659ce84e2157625",
         "entry": "417b6bd04ab50ce77bb41e5b0e96a2cefb21a3cd312410b359c25a3ef90a1707"
       },
-      "logicalWork": "a0d4bf8a456534ffa7b4886857d45b0f581813174f76d35df46324754a91a266",
+      "logicalWork": "7fce0536f22fd1000dc0144f3c1f3682ed672a95fe02bc26c835e5f01b7f1127",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -21979,7 +21979,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "909"
+              "value": "910"
             }
           },
           {
@@ -22100,10 +22100,10 @@
       },
       "inputContext": "b7c9a9800cb6256a2a0e967a0f15c182a5939da0e450085eb017ffd82a7807cf",
       "result": {
-        "shared": "2daef55288c86379f4f13ec0035e653d34212de8724241832e93f2ac0e30763b",
+        "shared": "2828f785a0c91421ae6101a3e6cfc0fff17e2322164eef5f7659ce84e2157625",
         "entry": "417b6bd04ab50ce77bb41e5b0e96a2cefb21a3cd312410b359c25a3ef90a1707"
       },
-      "logicalWork": "a0d4bf8a456534ffa7b4886857d45b0f581813174f76d35df46324754a91a266",
+      "logicalWork": "7fce0536f22fd1000dc0144f3c1f3682ed672a95fe02bc26c835e5f01b7f1127",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -22151,7 +22151,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "909"
+              "value": "910"
             }
           },
           {
@@ -27878,10 +27878,10 @@
       },
       "inputContext": "a041262fcdfefa1e78e0678d2afa1ed07110275b9654790862cc9125dfda5404",
       "result": {
-        "shared": "2a4d78c8eb937df4b3431bbe89978801ba91a483c1526e6fb4f4329b7cdacf1c",
+        "shared": "eb4ccfa07678756c47eb5377418112fa30c9a728e310bad6bb44108602118e83",
         "entry": "f8c4857b8930c49049bbc91b6e9f2554a159958b249d6a54db0d72ed08bd1359"
       },
-      "logicalWork": "ea1c5dc66a33477e0422551a88b5eeae5559341329204093c9f730f56b085c2d",
+      "logicalWork": "569bae12c2aa0653f1e2b3ee259685fac2bd9ac4dd5e73ca939d0079b12cacc1",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -27903,851 +27903,6 @@
             "observation": {
               "state": "exact",
               "value": "60"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-canonicalized-occurrences",
-            "unit": "locale-occurrence",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "16"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-canonical-requested-locales",
-            "unit": "canonical-locale-value",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "3"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-evaluation-units",
-            "unit": "evaluation-unit",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "76"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-not-evaluated-units",
-            "unit": "evaluation-unit",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "0"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-blocking-issues",
-            "unit": "retained-record",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "1"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-corrections",
-            "unit": "correction-suggestion",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "1"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-negotiation-aliases",
-            "unit": "negotiation-alias",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-fallback-sources",
-            "unit": "fallback-source",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-maximum-fallback-candidates",
-            "unit": "fallback-candidate",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-rules",
-            "unit": "coverage-rule",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "3"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-locale-selector-items",
-            "unit": "locale-occurrence",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "3"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-surface-selector-items",
-            "unit": "surface-class-occurrence",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-decision-cells",
-            "unit": "decision-cell",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "9"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-rule-cell-comparisons",
-            "unit": "rule-cell-comparison",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "27"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "declaration": {
-        "operation": "locale-policy-resolution",
-        "fixture": {
-          "locale-policy-resolution": "alias-repeated-keys"
-        },
-        "fixtureRevision": "0",
-        "limit": null,
-        "selector": "app",
-        "expectedKind": "locale-policy-resolution-blocked"
-      },
-      "inputContext": "bcbbfdf6c9320396cd8868ce0b4923cff3dc4e8497fd3bdc0d74484b7454ed66",
-      "result": {
-        "shared": "29c05edfcb9c50819e79a61910323d6ca72d7706c7bd714af3beecb4c2182c4b",
-        "entry": "0b70237aa4d01e199b27aa60b94985013c8834111a079c6ed9e8a87e1716a097"
-      },
-      "logicalWork": "875a4b8ffe3af19bae8915f4998f12b89444f0c450a30d96ca2b0d6d1ff5bac0",
-      "work": {
-        "profileIdentity": "intlify-config-locale-policy-resolution-work",
-        "profileRevision": "0",
-        "operation": "locale-policy-resolution",
-        "facts": [
-          {
-            "kind": "locale-policy-resolution-occurrences",
-            "unit": "locale-occurrence",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "21"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-raw-identifier-bytes",
-            "unit": "utf8-octet",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "60"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-canonicalized-occurrences",
-            "unit": "locale-occurrence",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "16"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-canonical-requested-locales",
-            "unit": "canonical-locale-value",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "3"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-evaluation-units",
-            "unit": "evaluation-unit",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "74"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-not-evaluated-units",
-            "unit": "evaluation-unit",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "0"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-blocking-issues",
-            "unit": "retained-record",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "1"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-corrections",
-            "unit": "correction-suggestion",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "1"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-negotiation-aliases",
-            "unit": "negotiation-alias",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-fallback-sources",
-            "unit": "fallback-source",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-maximum-fallback-candidates",
-            "unit": "fallback-candidate",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-rules",
-            "unit": "coverage-rule",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "3"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-locale-selector-items",
-            "unit": "locale-occurrence",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "3"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-surface-selector-items",
-            "unit": "surface-class-occurrence",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-decision-cells",
-            "unit": "decision-cell",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "9"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-rule-cell-comparisons",
-            "unit": "rule-cell-comparison",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "27"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "declaration": {
-        "operation": "locale-policy-resolution",
-        "fixture": {
-          "locale-policy-resolution": "alias-unrequested-destination"
-        },
-        "fixtureRevision": "0",
-        "limit": null,
-        "selector": "app",
-        "expectedKind": "locale-policy-resolution-blocked"
-      },
-      "inputContext": "6b9cbe7efe7581f6e99cf9e424d7673b9ed41781ac0d1e448634c5ab7456f02e",
-      "result": {
-        "shared": "80cd21550e6a8736dffbad0a24a7f3dac7411a41c22abf5b34ea8602c485b0a0",
-        "entry": "21d6fcf0182b90da662e0592cb2932448d51197868cbb7141cf01dc944787fad"
-      },
-      "logicalWork": "66ddab5f6723200edc19f3e174b9001b5ca7dc5dad5be59b788d47fdafd70265",
-      "work": {
-        "profileIdentity": "intlify-config-locale-policy-resolution-work",
-        "profileRevision": "0",
-        "operation": "locale-policy-resolution",
-        "facts": [
-          {
-            "kind": "locale-policy-resolution-occurrences",
-            "unit": "locale-occurrence",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "21"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-raw-identifier-bytes",
-            "unit": "utf8-octet",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "60"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-canonicalized-occurrences",
-            "unit": "locale-occurrence",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "16"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-canonical-requested-locales",
-            "unit": "canonical-locale-value",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "3"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-evaluation-units",
-            "unit": "evaluation-unit",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "78"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-not-evaluated-units",
-            "unit": "evaluation-unit",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "0"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-blocking-issues",
-            "unit": "retained-record",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "1"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-corrections",
-            "unit": "correction-suggestion",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "0"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-negotiation-aliases",
-            "unit": "negotiation-alias",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-fallback-sources",
-            "unit": "fallback-source",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-maximum-fallback-candidates",
-            "unit": "fallback-candidate",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-rules",
-            "unit": "coverage-rule",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "3"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-locale-selector-items",
-            "unit": "locale-occurrence",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "3"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-surface-selector-items",
-            "unit": "surface-class-occurrence",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-decision-cells",
-            "unit": "decision-cell",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "9"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-rule-cell-comparisons",
-            "unit": "rule-cell-comparison",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "27"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "declaration": {
-        "operation": "locale-policy-resolution",
-        "fixture": {
-          "locale-policy-resolution": "fallback-unrequested-source"
-        },
-        "fixtureRevision": "0",
-        "limit": null,
-        "selector": "app",
-        "expectedKind": "locale-policy-resolution-blocked"
-      },
-      "inputContext": "f059c7ba8cae227dac763aaab0e3240115324023cf11f4138ac61c90a1284e9e",
-      "result": {
-        "shared": "b39330e0d34b3d52b5cf40c3d0e4e9d7cdb21e3a378f30e6f2cc3595dd59810e",
-        "entry": "e253649317cf7c9d2303b7f09e9f1a7a4b178df5e6aced60c53f517d0fd99d9b"
-      },
-      "logicalWork": "a5e38d2e7ca96af76b4939c61292b9ac3ad3bae84640bc4944d7886c24f1c79b",
-      "work": {
-        "profileIdentity": "intlify-config-locale-policy-resolution-work",
-        "profileRevision": "0",
-        "operation": "locale-policy-resolution",
-        "facts": [
-          {
-            "kind": "locale-policy-resolution-occurrences",
-            "unit": "locale-occurrence",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "21"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-raw-identifier-bytes",
-            "unit": "utf8-octet",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "54"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-canonicalized-occurrences",
-            "unit": "locale-occurrence",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "16"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-canonical-requested-locales",
-            "unit": "canonical-locale-value",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "3"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-evaluation-units",
-            "unit": "evaluation-unit",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "78"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-not-evaluated-units",
-            "unit": "evaluation-unit",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "0"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-blocking-issues",
-            "unit": "retained-record",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "1"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-corrections",
-            "unit": "correction-suggestion",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "0"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-negotiation-aliases",
-            "unit": "negotiation-alias",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-fallback-sources",
-            "unit": "fallback-source",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-maximum-fallback-candidates",
-            "unit": "fallback-candidate",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-rules",
-            "unit": "coverage-rule",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "3"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-locale-selector-items",
-            "unit": "locale-occurrence",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "3"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-surface-selector-items",
-            "unit": "surface-class-occurrence",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-decision-cells",
-            "unit": "decision-cell",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "9"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-rule-cell-comparisons",
-            "unit": "rule-cell-comparison",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "27"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "declaration": {
-        "operation": "locale-policy-resolution",
-        "fixture": {
-          "locale-policy-resolution": "fallback-self-reference"
-        },
-        "fixtureRevision": "0",
-        "limit": null,
-        "selector": "app",
-        "expectedKind": "locale-policy-resolution-blocked"
-      },
-      "inputContext": "f6a15bb785cc7c0494f1aff87e23c3b136c06949434c55c92900dc1a39130303",
-      "result": {
-        "shared": "75804f381db925340c45b0a42aff713fd7e337fdd80697b984ff3c75df5f40c3",
-        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
-      },
-      "logicalWork": "66ddab5f6723200edc19f3e174b9001b5ca7dc5dad5be59b788d47fdafd70265",
-      "work": {
-        "profileIdentity": "intlify-config-locale-policy-resolution-work",
-        "profileRevision": "0",
-        "operation": "locale-policy-resolution",
-        "facts": [
-          {
-            "kind": "locale-policy-resolution-occurrences",
-            "unit": "locale-occurrence",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "21"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-raw-identifier-bytes",
-            "unit": "utf8-octet",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "60"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-canonicalized-occurrences",
-            "unit": "locale-occurrence",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "16"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-canonical-requested-locales",
-            "unit": "canonical-locale-value",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "3"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-evaluation-units",
-            "unit": "evaluation-unit",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "78"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-not-evaluated-units",
-            "unit": "evaluation-unit",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "0"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-blocking-issues",
-            "unit": "retained-record",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "1"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-corrections",
-            "unit": "correction-suggestion",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "0"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-negotiation-aliases",
-            "unit": "negotiation-alias",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-fallback-sources",
-            "unit": "fallback-source",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-maximum-fallback-candidates",
-            "unit": "fallback-candidate",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-rules",
-            "unit": "coverage-rule",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "3"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-locale-selector-items",
-            "unit": "locale-occurrence",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "3"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-surface-selector-items",
-            "unit": "surface-class-occurrence",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-decision-cells",
-            "unit": "decision-cell",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "9"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-coverage-rule-cell-comparisons",
-            "unit": "rule-cell-comparison",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "27"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "declaration": {
-        "operation": "locale-policy-resolution",
-        "fixture": {
-          "locale-policy-resolution": "fallback-repeated-literal"
-        },
-        "fixtureRevision": "0",
-        "limit": null,
-        "selector": "app",
-        "expectedKind": "locale-policy-resolution-blocked"
-      },
-      "inputContext": "60ae8d7b4292be50850a510efb57b6f480d62f8f396ae1f84c45048abd1d79f3",
-      "result": {
-        "shared": "75a50af8b87f13dd306bfc3b02e4d619c373b1a24191b33c884b50039064a1dd",
-        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
-      },
-      "logicalWork": "e5b0ef58c20b4861ee158556d16c101d5554edeeb17f554684deb09bedcdef88",
-      "work": {
-        "profileIdentity": "intlify-config-locale-policy-resolution-work",
-        "profileRevision": "0",
-        "operation": "locale-policy-resolution",
-        "facts": [
-          {
-            "kind": "locale-policy-resolution-occurrences",
-            "unit": "locale-occurrence",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "22"
-            }
-          },
-          {
-            "kind": "locale-policy-resolution-raw-identifier-bytes",
-            "unit": "utf8-octet",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "59"
             }
           },
           {
@@ -28883,6 +28038,851 @@
       "declaration": {
         "operation": "locale-policy-resolution",
         "fixture": {
+          "locale-policy-resolution": "alias-repeated-keys"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-policy-resolution-blocked"
+      },
+      "inputContext": "bcbbfdf6c9320396cd8868ce0b4923cff3dc4e8497fd3bdc0d74484b7454ed66",
+      "result": {
+        "shared": "e746f01a65a72fc447c4c9f5a99e3096421878a26c4c39e5effffd9b67d2a537",
+        "entry": "0b70237aa4d01e199b27aa60b94985013c8834111a079c6ed9e8a87e1716a097"
+      },
+      "logicalWork": "f17c093615fb40112aacc3b2c381a6530067805637a6248b927fcc51e5ce34f8",
+      "work": {
+        "profileIdentity": "intlify-config-locale-policy-resolution-work",
+        "profileRevision": "0",
+        "operation": "locale-policy-resolution",
+        "facts": [
+          {
+            "kind": "locale-policy-resolution-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "21"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-raw-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "60"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-canonicalized-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "16"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-canonical-requested-locales",
+            "unit": "canonical-locale-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "78"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-corrections",
+            "unit": "correction-suggestion",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-negotiation-aliases",
+            "unit": "negotiation-alias",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-fallback-sources",
+            "unit": "fallback-source",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-maximum-fallback-candidates",
+            "unit": "fallback-candidate",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-rules",
+            "unit": "coverage-rule",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-locale-selector-items",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-surface-selector-items",
+            "unit": "surface-class-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-decision-cells",
+            "unit": "decision-cell",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-rule-cell-comparisons",
+            "unit": "rule-cell-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "27"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "locale-policy-resolution",
+        "fixture": {
+          "locale-policy-resolution": "alias-unrequested-destination"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-policy-resolution-blocked"
+      },
+      "inputContext": "6b9cbe7efe7581f6e99cf9e424d7673b9ed41781ac0d1e448634c5ab7456f02e",
+      "result": {
+        "shared": "48eb450d991cbb64a7287e54ecea5e92ee031b8590aec68e9320fcf617c56034",
+        "entry": "21d6fcf0182b90da662e0592cb2932448d51197868cbb7141cf01dc944787fad"
+      },
+      "logicalWork": "9262f034edb592b365f5a7fb196e2871571f1d0751ee5e162362f42da72071fc",
+      "work": {
+        "profileIdentity": "intlify-config-locale-policy-resolution-work",
+        "profileRevision": "0",
+        "operation": "locale-policy-resolution",
+        "facts": [
+          {
+            "kind": "locale-policy-resolution-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "21"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-raw-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "60"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-canonicalized-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "16"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-canonical-requested-locales",
+            "unit": "canonical-locale-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "82"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-corrections",
+            "unit": "correction-suggestion",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-negotiation-aliases",
+            "unit": "negotiation-alias",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-fallback-sources",
+            "unit": "fallback-source",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-maximum-fallback-candidates",
+            "unit": "fallback-candidate",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-rules",
+            "unit": "coverage-rule",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-locale-selector-items",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-surface-selector-items",
+            "unit": "surface-class-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-decision-cells",
+            "unit": "decision-cell",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-rule-cell-comparisons",
+            "unit": "rule-cell-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "27"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "locale-policy-resolution",
+        "fixture": {
+          "locale-policy-resolution": "fallback-unrequested-source"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-policy-resolution-blocked"
+      },
+      "inputContext": "f059c7ba8cae227dac763aaab0e3240115324023cf11f4138ac61c90a1284e9e",
+      "result": {
+        "shared": "16eafd0e6a654ae6650b9d6fb2c6672af8f532457a139ea959f95aa38c8b9075",
+        "entry": "e253649317cf7c9d2303b7f09e9f1a7a4b178df5e6aced60c53f517d0fd99d9b"
+      },
+      "logicalWork": "b8ae50e051e9a552ceb5641d1217fa20899badcb09c736a0254591a445f47261",
+      "work": {
+        "profileIdentity": "intlify-config-locale-policy-resolution-work",
+        "profileRevision": "0",
+        "operation": "locale-policy-resolution",
+        "facts": [
+          {
+            "kind": "locale-policy-resolution-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "21"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-raw-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "54"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-canonicalized-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "16"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-canonical-requested-locales",
+            "unit": "canonical-locale-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "82"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-corrections",
+            "unit": "correction-suggestion",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-negotiation-aliases",
+            "unit": "negotiation-alias",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-fallback-sources",
+            "unit": "fallback-source",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-maximum-fallback-candidates",
+            "unit": "fallback-candidate",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-rules",
+            "unit": "coverage-rule",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-locale-selector-items",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-surface-selector-items",
+            "unit": "surface-class-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-decision-cells",
+            "unit": "decision-cell",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-rule-cell-comparisons",
+            "unit": "rule-cell-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "27"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "locale-policy-resolution",
+        "fixture": {
+          "locale-policy-resolution": "fallback-self-reference"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-policy-resolution-blocked"
+      },
+      "inputContext": "f6a15bb785cc7c0494f1aff87e23c3b136c06949434c55c92900dc1a39130303",
+      "result": {
+        "shared": "9a6d15c5f6b498a3f9cca63fc9a857e9b1e26f59c4c09e43acdc6e8ac1a85b33",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
+      },
+      "logicalWork": "9262f034edb592b365f5a7fb196e2871571f1d0751ee5e162362f42da72071fc",
+      "work": {
+        "profileIdentity": "intlify-config-locale-policy-resolution-work",
+        "profileRevision": "0",
+        "operation": "locale-policy-resolution",
+        "facts": [
+          {
+            "kind": "locale-policy-resolution-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "21"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-raw-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "60"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-canonicalized-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "16"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-canonical-requested-locales",
+            "unit": "canonical-locale-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "82"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-corrections",
+            "unit": "correction-suggestion",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-negotiation-aliases",
+            "unit": "negotiation-alias",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-fallback-sources",
+            "unit": "fallback-source",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-maximum-fallback-candidates",
+            "unit": "fallback-candidate",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-rules",
+            "unit": "coverage-rule",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-locale-selector-items",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-surface-selector-items",
+            "unit": "surface-class-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-decision-cells",
+            "unit": "decision-cell",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-rule-cell-comparisons",
+            "unit": "rule-cell-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "27"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "locale-policy-resolution",
+        "fixture": {
+          "locale-policy-resolution": "fallback-repeated-literal"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "locale-policy-resolution-blocked"
+      },
+      "inputContext": "60ae8d7b4292be50850a510efb57b6f480d62f8f396ae1f84c45048abd1d79f3",
+      "result": {
+        "shared": "7853a4542c2efae9402bd2af4a71c063174e33e3a15401c74d5093d9151041a2",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
+      },
+      "logicalWork": "e8a84bb47b648017984c76c9515145f9fd97ed6abe7a94f1a89e5b25eb6c00a6",
+      "work": {
+        "profileIdentity": "intlify-config-locale-policy-resolution-work",
+        "profileRevision": "0",
+        "operation": "locale-policy-resolution",
+        "facts": [
+          {
+            "kind": "locale-policy-resolution-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "22"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-raw-identifier-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "59"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-canonicalized-occurrences",
+            "unit": "locale-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "16"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-canonical-requested-locales",
+            "unit": "canonical-locale-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-evaluation-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "84"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-not-evaluated-units",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-blocking-issues",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-corrections",
+            "unit": "correction-suggestion",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-negotiation-aliases",
+            "unit": "negotiation-alias",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-fallback-sources",
+            "unit": "fallback-source",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-maximum-fallback-candidates",
+            "unit": "fallback-candidate",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-rules",
+            "unit": "coverage-rule",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-locale-selector-items",
+            "unit": "locale-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-surface-selector-items",
+            "unit": "surface-class-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-decision-cells",
+            "unit": "decision-cell",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "locale-policy-resolution-coverage-rule-cell-comparisons",
+            "unit": "rule-cell-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "27"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "locale-policy-resolution",
+        "fixture": {
           "locale-policy-resolution": "fallback-repeated-intent-source"
         },
         "fixtureRevision": "0",
@@ -28892,10 +28892,10 @@
       },
       "inputContext": "47cf556afa3d8f23afdd600f820bc99ffa4baa952c96cce1bd6e80a5ec8a4fbb",
       "result": {
-        "shared": "05f0d7fb5c604b6b811b7f4398d49d6095a5bef11218a63fc3c78949c95d9644",
+        "shared": "e261aea2c8e7d74b3e25694bb08c6ff2c257875e160182537161e853c58f6129",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "7226614c67b25bb383063ebb97ccebd161529d1d9818d13504100ccc1aee5f44",
+      "logicalWork": "f4f40d6a4f674cb206b5c5ec6c4ac7ad91e55c3ca1e19a6392e91325f51fe546",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -28943,7 +28943,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -29061,10 +29061,10 @@
       },
       "inputContext": "bc9ffa06b61fc7bd49fa40fd7fdcdb4c6d341fff93fbf072fed610ddcfa91ba0",
       "result": {
-        "shared": "b8811329f8ed77b0f0fd1a238992e8c485adb19937a3b7d700a652905f6cb036",
+        "shared": "5a8badc1ac7674fd50bf857ac2ee9cf092d79810e95a3d2a0fcf658497f23f99",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "f0a312b1e5b7f511846bc3c90dd30087b6be348b63a19ed35de120a61e81caf3",
+      "logicalWork": "e45d6b97738ffb503eb15e9931bbca679823ff6fd5436753fca897cfbdb21d34",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -29112,7 +29112,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "77"
+              "value": "81"
             }
           },
           {
@@ -29121,7 +29121,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "9"
+              "value": "11"
             }
           },
           {
@@ -29230,10 +29230,10 @@
       },
       "inputContext": "160b3bd0b06902c139517d4fd543a1bdff74f580b2da2f4630056a842299aec5",
       "result": {
-        "shared": "d55cfecbc6245c24f90ac3729ae08b3de1f355624713b152a87ca8b06de09f49",
+        "shared": "9e5445b0e1bdb11e1224f219badb22fb2780c263d5aed4602781fbd171040213",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "08e6d2f431dfe090ed82bbf0f2cacf4863cbc169fa4047e2d6c3bc3b58e74d74",
+      "logicalWork": "0807c158137c5fb484c09eed7a7d28a93528926487c19d1f4234cb6f634955bb",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -29281,7 +29281,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "77"
+              "value": "81"
             }
           },
           {
@@ -29290,7 +29290,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "9"
+              "value": "11"
             }
           },
           {
@@ -29399,10 +29399,10 @@
       },
       "inputContext": "7aedf85db965bbc3a4ec26b449d720a607710bc986d4b70879cd7f28289d60f3",
       "result": {
-        "shared": "97edfa2fbcfac4576680778d3631fc92c12d662ea14dea92012fc865e3301efd",
+        "shared": "9ec8d510d2671b6516b8ec6c86e8b577a25fba4b6564871387c4f6acb4f67dd9",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "b7130cd075fd9ef3191811fbc071a40b9b623b42c2700f34a2ed9b6219a9071f",
+      "logicalWork": "170e511f7bf70623537bd56b7326e386fcdb60090c222b1632942348ccfc1b26",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -29450,7 +29450,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "77"
+              "value": "81"
             }
           },
           {
@@ -29459,7 +29459,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "10"
+              "value": "12"
             }
           },
           {
@@ -29568,10 +29568,10 @@
       },
       "inputContext": "9357ba6479c42d19bc095510663e0c6c95fabab370a2708384e65873dd007729",
       "result": {
-        "shared": "362b2cd0e97dba05d7cb4d1c17824d6c4ac2498f53fdd1f36c9893f7a03471bf",
+        "shared": "1a595a8d2705313b67ecc878bd44678ca2728e558895006f4847cf1795f55dfc",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "b517c6168d8afe7c39f0009873b90a61e1174fac130a6eca348c08987663f4c7",
+      "logicalWork": "744b5f85e5caaeba0106f657f49a1cb66569306ef2342d1caa216656c552895a",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -29619,7 +29619,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "77"
+              "value": "81"
             }
           },
           {
@@ -29628,7 +29628,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "9"
+              "value": "11"
             }
           },
           {
@@ -29737,10 +29737,10 @@
       },
       "inputContext": "4a03416ac37a5934d7f5bb4433854884b192c7ca1e4840f696f3187ddb51ea7b",
       "result": {
-        "shared": "5752eac91723b96686f10b4cc5ae0cf43f8359cc5c843dec7e5512586b63820b",
+        "shared": "9fc28193383f28f6e80c22efa5a59236f1e4a2a3a8332229c8daba10dc71a92d",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "5e681d043983dca134d5af2f6de109ff788bad7625630bb6c5dc16655eb22294",
+      "logicalWork": "7e165ebaf5c6148ce5f66d03d085c960fd3c3179ba00f8ba162c3f0034cd2389",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -29788,7 +29788,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "87"
+              "value": "92"
             }
           },
           {
@@ -29797,7 +29797,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "9"
+              "value": "10"
             }
           },
           {
@@ -29906,10 +29906,10 @@
       },
       "inputContext": "43e6a4e99122b7d73f2150d704ac241dd524c81d861c7ffeec44e0a0fae8acee",
       "result": {
-        "shared": "0c85ab0e9774e19d8de3dedc33a65fde2882b88215cae4b5a27dd419313a5bd0",
+        "shared": "db09f12744c927497d0a0038932755d0b5cd2ef0ab07cc40bf6cc4da50f5cfa9",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "55b944cf1ad9e06f62555ab64ceefa24c31af46314786250e7ddbd0e27755e93",
+      "logicalWork": "f9e4369166d60d123e2664c3b5a31926b6e55808cb87f1932625a8609087cc91",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -29957,7 +29957,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "87"
+              "value": "92"
             }
           },
           {
@@ -29966,7 +29966,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "0"
+              "value": "1"
             }
           },
           {
@@ -30075,10 +30075,10 @@
       },
       "inputContext": "9ec6bdf303b3942d02c985df381e272861c855fca72d27c3d52c05c51bc761dd",
       "result": {
-        "shared": "8a437862dc86468d3db02cc5754ee36cc27775ec7e06da99e1dc5b10f42c0e7e",
+        "shared": "6fbe70f624c7f593a7c1e8c94b15492df4863ed8dfd5306cdc46934281c57c3a",
         "entry": "f8c4857b8930c49049bbc91b6e9f2554a159958b249d6a54db0d72ed08bd1359"
       },
-      "logicalWork": "7cd1dde5182dcbe738a010509a05fbfb0650a3260106145a44591b35e7fffddb",
+      "logicalWork": "9e8070f112e49cc8b5f489f7ff2a99749e993512afed2a3bafd596a148d070b2",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -30126,7 +30126,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "84"
+              "value": "89"
             }
           },
           {
@@ -30135,7 +30135,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "10"
+              "value": "12"
             }
           },
           {
@@ -30244,10 +30244,10 @@
       },
       "inputContext": "59cb0282861432098f612528030102c07540756b59f164db759e4fc2573a641b",
       "result": {
-        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "shared": "90a483027c15dae409a8a4998ca6c4bcf771fcab11721adddc24d3ebb7127947",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
+      "logicalWork": "3bdf1561dc0ab593cae1866edfc4967aa51c952f10a621ad2b00a44cf454aaf7",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -30295,7 +30295,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -30413,10 +30413,10 @@
       },
       "inputContext": "bc8accab7807a4b88dc8f5e560ad5b62aa2279491047eb61112ae39d393eab1f",
       "result": {
-        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "shared": "90a483027c15dae409a8a4998ca6c4bcf771fcab11721adddc24d3ebb7127947",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
+      "logicalWork": "3bdf1561dc0ab593cae1866edfc4967aa51c952f10a621ad2b00a44cf454aaf7",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -30464,7 +30464,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -30582,10 +30582,10 @@
       },
       "inputContext": "15a6816670c9c9a5c68242ae229bbda6d8fdb847d1b17e02ef21e7ba0fbb9d90",
       "result": {
-        "shared": "4c1e202b6e6f0b5426fb03801ebe50fa032e3ab04e1c80eb31ad811b77fa68c9",
+        "shared": "b48baeeb1fb203b7a649c1478061362d5872efca03d990745c2284b5632f94b2",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "d5899d9a1402baece329b66908b1f2c8cd50131c8404e0b411109322258b456a",
+      "logicalWork": "c0348058cdb1c7db568568f93a9c8365d4559ef73a49d25a04775f4e66fb3a67",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -30633,7 +30633,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -30751,10 +30751,10 @@
       },
       "inputContext": "4c5cea2656c3817318cf00477210cdae08ffabb7c416f8a24c62e3973ccd486d",
       "result": {
-        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "shared": "90a483027c15dae409a8a4998ca6c4bcf771fcab11721adddc24d3ebb7127947",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
+      "logicalWork": "3bdf1561dc0ab593cae1866edfc4967aa51c952f10a621ad2b00a44cf454aaf7",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -30802,7 +30802,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -30920,10 +30920,10 @@
       },
       "inputContext": "5378849d5f6deae755a38d54bee1d82eed85931c25be45da77308158f593bea3",
       "result": {
-        "shared": "618d77bda28cffb721f83ff4f84cf9ad9ec09b0409bda5dd62b0039e78e481c6",
+        "shared": "3c73d91204f174540450e9fc8d1547564f37170fe581b3a364ef95d7fa3b56f9",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "fa359f566b2e4936c245843df698a22090aadebd51eb9fffb03378ca17e6d1d9",
+      "logicalWork": "7138cf980859a60aa9cf8b7d30f37ca505cc8c41db3bd09d048b81aa77be0777",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -30971,7 +30971,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -31089,10 +31089,10 @@
       },
       "inputContext": "0d84bcd35954ae4967c79cf75549992be4ff678292143153f711fdf9a2834a49",
       "result": {
-        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "shared": "90a483027c15dae409a8a4998ca6c4bcf771fcab11721adddc24d3ebb7127947",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
+      "logicalWork": "3bdf1561dc0ab593cae1866edfc4967aa51c952f10a621ad2b00a44cf454aaf7",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -31140,7 +31140,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -31258,10 +31258,10 @@
       },
       "inputContext": "b2b480ad5ece3ac2d3abd022105496e0b5e289edc7171e234d955534b9e70079",
       "result": {
-        "shared": "5021adc260e6ecc36034c583945a4dce424a77f293aeb411ed674a11b01d2089",
+        "shared": "b17899f3ebb1421b0cb1ce3f2732138b3e2f61d7a7efa38c25eca094ae8240fc",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "d5899d9a1402baece329b66908b1f2c8cd50131c8404e0b411109322258b456a",
+      "logicalWork": "c0348058cdb1c7db568568f93a9c8365d4559ef73a49d25a04775f4e66fb3a67",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -31309,7 +31309,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -31427,10 +31427,10 @@
       },
       "inputContext": "6367258de98dce3724fefce7014f6e8db0e14034e16c9a9351d1fef1567b3d23",
       "result": {
-        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "shared": "90a483027c15dae409a8a4998ca6c4bcf771fcab11721adddc24d3ebb7127947",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
+      "logicalWork": "3bdf1561dc0ab593cae1866edfc4967aa51c952f10a621ad2b00a44cf454aaf7",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -31478,7 +31478,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -31596,10 +31596,10 @@
       },
       "inputContext": "e49dab565eb738f3946e6048c7f3364b61ddedbbeecf6ae547d250c4f4035777",
       "result": {
-        "shared": "4b90f4585ac39aad6f55447a3b1df930a480115c0bd457f2eb52f47b3a1ae401",
+        "shared": "13578dfc332858ec4f0f7345c2780e7553befd507d2ba60bcb0a3a44efab16ae",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "7de3ce6b22354c630fd59467f28c242eb47a44ddad7e43b8eabf7e01e01f0cc6",
+      "logicalWork": "71718d48ed8b2fce94aadbda2c4a5225660df14560374571945cb8cf8f04f6a2",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -31647,7 +31647,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "75"
+              "value": "79"
             }
           },
           {
@@ -31656,7 +31656,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "22"
+              "value": "26"
             }
           },
           {
@@ -31765,10 +31765,10 @@
       },
       "inputContext": "ce5ce5688efa26b2e9b6b3a360d28e83c7c834983da072b2cac73a81e97bdff5",
       "result": {
-        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "shared": "90a483027c15dae409a8a4998ca6c4bcf771fcab11721adddc24d3ebb7127947",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
+      "logicalWork": "3bdf1561dc0ab593cae1866edfc4967aa51c952f10a621ad2b00a44cf454aaf7",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -31816,7 +31816,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -31934,10 +31934,10 @@
       },
       "inputContext": "1110e8be4ccf03a733a6d2756359526554143c487c6faecbd72d82392a773376",
       "result": {
-        "shared": "5582b11f373f37643b3f1c7713b9d83c4724c1414a627ebdc4bacafae2d7f491",
+        "shared": "bd5e83edae59fcdf2ff7c9ea07bb91da2a67a31a75055354e68521d2ca15853f",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "8a3ed8dcbeddff426b792c750e5672ccbea3cdde380042c1e7db9ee7b2960293",
+      "logicalWork": "587a6423d142f12cfd407a50d24240228496ddf370b01d943b47d16e0201458d",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -31985,7 +31985,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "76"
+              "value": "80"
             }
           },
           {
@@ -31994,7 +31994,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "21"
             }
           },
           {
@@ -32103,10 +32103,10 @@
       },
       "inputContext": "7a50837149669c0c2fa9cdf83adbbebf0e9f3b70d093399ad5f1d2f7206b9f0e",
       "result": {
-        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "shared": "90a483027c15dae409a8a4998ca6c4bcf771fcab11721adddc24d3ebb7127947",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
+      "logicalWork": "3bdf1561dc0ab593cae1866edfc4967aa51c952f10a621ad2b00a44cf454aaf7",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -32154,7 +32154,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -32272,10 +32272,10 @@
       },
       "inputContext": "13e0277607e63fa6f275a00e329a6214edf13700122c6e960686d5bc32bff50f",
       "result": {
-        "shared": "3f1c50a4d79e9bd9c55283b1c19c20b9408f92e359f1f5abe3df59cbc0bf3145",
+        "shared": "4dddf4cbf4d5a173e24cbd9dd9d5c1744d0830f3f3b37477a4f81910b5113d6b",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "5983e3a09ceea499c7fdcbce3bace9241b43d9f15e0e76fd18021dea5c3f67b2",
+      "logicalWork": "d5afbfde14e2ba5f441d2d762b3c769d2ef5aed05039e4780ca47813ba494140",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -32323,7 +32323,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "76"
+              "value": "80"
             }
           },
           {
@@ -32332,7 +32332,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "13"
+              "value": "16"
             }
           },
           {
@@ -32441,10 +32441,10 @@
       },
       "inputContext": "c534f8a8500ea7d1050fe780d3958409c512b1b89610b668f3e303f4e47b91f3",
       "result": {
-        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "shared": "90a483027c15dae409a8a4998ca6c4bcf771fcab11721adddc24d3ebb7127947",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
+      "logicalWork": "3bdf1561dc0ab593cae1866edfc4967aa51c952f10a621ad2b00a44cf454aaf7",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -32492,7 +32492,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -32610,10 +32610,10 @@
       },
       "inputContext": "16c5796fab00bf8987a31e1acddd047728f9561068948a2f4b672dfdedde7cb2",
       "result": {
-        "shared": "2f92cab1ab7573b99181837276db124ffe6bfb3c8378c610d7b5afac5db9c2a2",
+        "shared": "43913f270f528e5ac89b308bc11f1a4ebc9fa8f9c09c7dc1e18367af39e5617c",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "d985743e82783073297b3e35c4b014a7178db8da57774aca2e94d753053d1fcc",
+      "logicalWork": "898f9db8a008f590c84c7e7e6a511f02bf1a0467e9f8842a69c3cdfd7ba2b6d5",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -32661,7 +32661,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "69"
+              "value": "73"
             }
           },
           {
@@ -32670,7 +32670,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "0"
+              "value": "1"
             }
           },
           {
@@ -32779,10 +32779,10 @@
       },
       "inputContext": "965f3582e65f95645dc3112a82fa78514e083553f577fc666ac75fc2576171c2",
       "result": {
-        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "shared": "90a483027c15dae409a8a4998ca6c4bcf771fcab11721adddc24d3ebb7127947",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
+      "logicalWork": "3bdf1561dc0ab593cae1866edfc4967aa51c952f10a621ad2b00a44cf454aaf7",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -32830,7 +32830,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -32948,10 +32948,10 @@
       },
       "inputContext": "af6283a3e9430b780c54bfbbe141846f2293036dc0f90b3a4da052aa4d901246",
       "result": {
-        "shared": "c90bfce0ae56af9afa24d4b3b80c1bc32fe67fcd81f46541d27f74639a9d7d6a",
+        "shared": "b83004605c9491dc9fcbd1fdaa4c6384fa01886ac358a890144cce67deb3fec4",
         "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "0d1a14bd5b8b6396756e75e256a241fa11ed62bd9837b05868988bda59aee45d",
+      "logicalWork": "3b0312316e6d51a7a74b96c5918dcfe193889c4b39f6c13cfe3dfae793db7b21",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -32999,7 +32999,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "78"
+              "value": "82"
             }
           },
           {
@@ -33008,7 +33008,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "9"
+              "value": "10"
             }
           },
           {
@@ -33120,10 +33120,10 @@
       },
       "inputContext": "4f097f74a91f73a7acd9b57cfda1460a0ad016cfaaa2f2e6669686cc3bfe7aab",
       "result": {
-        "shared": "1afebddeba5512bc6637ad540a12816c843af0c9c034cbb15781c8398b4e9544",
+        "shared": "4b4dfbf3cdd1fe0cdbabb8f532daef06f7fe8d12f3df13f7c2325082ba6ade01",
         "entry": "0d592c683cb3a4435ecc37851a129e296adc4653a1dd2419ec18d0caef301e75"
       },
-      "logicalWork": "f373aa6a3de8a07c46923385b9772f3188b8b53befd6b7e10331e1996e4de0c1",
+      "logicalWork": "07e9cb2d2e165bca14cf72e2495158ec1c85fa92cc16c129d9ab6fcfde2e39ad",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -33171,7 +33171,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "116"
+              "value": "117"
             }
           },
           {
@@ -33292,10 +33292,10 @@
       },
       "inputContext": "e8f6d188eb52834b814e27f170d5cf17a6062a7ea0f11a4b3734024ec340b22d",
       "result": {
-        "shared": "1afebddeba5512bc6637ad540a12816c843af0c9c034cbb15781c8398b4e9544",
+        "shared": "4b4dfbf3cdd1fe0cdbabb8f532daef06f7fe8d12f3df13f7c2325082ba6ade01",
         "entry": "0d592c683cb3a4435ecc37851a129e296adc4653a1dd2419ec18d0caef301e75"
       },
-      "logicalWork": "f373aa6a3de8a07c46923385b9772f3188b8b53befd6b7e10331e1996e4de0c1",
+      "logicalWork": "07e9cb2d2e165bca14cf72e2495158ec1c85fa92cc16c129d9ab6fcfde2e39ad",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -33343,7 +33343,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "116"
+              "value": "117"
             }
           },
           {
@@ -33464,10 +33464,10 @@
       },
       "inputContext": "ff6069ddfed62b06b57668d9201838ba087569c3420b58a7374534dfb4a45d16",
       "result": {
-        "shared": "e7ed39bc6266b6eef67cdbe60414a7ca7b9b85508449a0856b9de6076dba0f14",
+        "shared": "4854f5b05f8b9fc1860713f046710d720d64661da27010cda5881818e394d64d",
         "entry": "f6e9c56301f90a00cf01ec702d7553057fee22a562abda8aec7d07ad4340a9bc"
       },
-      "logicalWork": "1e1cb4e757c252ebc9dd40973a591a7448997fc171f3f9821a26e215cd37e56d",
+      "logicalWork": "4e1a45ac9d22b93a652d654c75756e4802b803ef0fc7d74b805c9830aebc9363",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -33515,7 +33515,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "495"
+              "value": "496"
             }
           },
           {
@@ -33636,10 +33636,10 @@
       },
       "inputContext": "40e3e2a4a0d7473e1c321645420523ca2d172fa29a25b61be41688c011d339ff",
       "result": {
-        "shared": "e7ed39bc6266b6eef67cdbe60414a7ca7b9b85508449a0856b9de6076dba0f14",
+        "shared": "4854f5b05f8b9fc1860713f046710d720d64661da27010cda5881818e394d64d",
         "entry": "f6e9c56301f90a00cf01ec702d7553057fee22a562abda8aec7d07ad4340a9bc"
       },
-      "logicalWork": "1e1cb4e757c252ebc9dd40973a591a7448997fc171f3f9821a26e215cd37e56d",
+      "logicalWork": "4e1a45ac9d22b93a652d654c75756e4802b803ef0fc7d74b805c9830aebc9363",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -33687,7 +33687,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "495"
+              "value": "496"
             }
           },
           {
@@ -33808,10 +33808,10 @@
       },
       "inputContext": "2d2f4e60aeaac21fc0cd4bc42e645608f1e2993a0cb1d145e25e6aef3161f5e6",
       "result": {
-        "shared": "9aa7c88739cf71b4fff2b94b8a172c1b00eb0cba2daf118b0b6dc1700861305b",
+        "shared": "d50aa37d4b0ea7a0fc3c2d2f5f1de369035adb5c722a3469c3c34347c4e2b079",
         "entry": "dfe4f4e99c630f0378eb62a3fb820e08bd7fe98902fd0043ff52bbbebe71ab81"
       },
-      "logicalWork": "559352077c0482d1ed44fe355f301d93da734b6aebfee3af7e9e767641c6476f",
+      "logicalWork": "5490cfbd230a4ac54320358b15d62083adab9ed970a45699ad8fd3d313c65c2f",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -33859,7 +33859,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "168"
+              "value": "169"
             }
           },
           {
@@ -33980,10 +33980,10 @@
       },
       "inputContext": "c2db3bb90158277df28c8c2b6d3d6e491fff5c4345a2e75feb388c309dc74f3c",
       "result": {
-        "shared": "9aa7c88739cf71b4fff2b94b8a172c1b00eb0cba2daf118b0b6dc1700861305b",
+        "shared": "d50aa37d4b0ea7a0fc3c2d2f5f1de369035adb5c722a3469c3c34347c4e2b079",
         "entry": "dfe4f4e99c630f0378eb62a3fb820e08bd7fe98902fd0043ff52bbbebe71ab81"
       },
-      "logicalWork": "559352077c0482d1ed44fe355f301d93da734b6aebfee3af7e9e767641c6476f",
+      "logicalWork": "5490cfbd230a4ac54320358b15d62083adab9ed970a45699ad8fd3d313c65c2f",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -34031,7 +34031,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "168"
+              "value": "169"
             }
           },
           {
@@ -34152,10 +34152,10 @@
       },
       "inputContext": "6cf465856eda8217d1aaaeece33d29250f22103e28e305ea4b4315c32ced288b",
       "result": {
-        "shared": "072aa3112e8ffdb0d3afaf8449f8ce9ae0cf635bd0092dfd55392af7f2c2ad76",
+        "shared": "26f185ae86a4e6c3123fb09fe62e9cea3c9f3e0feddb2b5fd2d9083096640a0c",
         "entry": "0f2e1994f39c69544d0e09fecd7215ecd5bf96569af31147a53f474b2ec35ec3"
       },
-      "logicalWork": "482cac7f2d8f79e74ea43155389a479915653992982e8d39d24f8f2cec0be1f2",
+      "logicalWork": "1296a3c6c828aa83c23d6450890d184a8d1c0442dd2e15e62179d1bd96232d38",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -34203,7 +34203,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "555"
+              "value": "616"
             }
           },
           {
@@ -34324,10 +34324,10 @@
       },
       "inputContext": "4a128ea348b7bbfc341dce1fea1c6468a90f827bd1e5e98b89e47ecf7841f3a3",
       "result": {
-        "shared": "072aa3112e8ffdb0d3afaf8449f8ce9ae0cf635bd0092dfd55392af7f2c2ad76",
+        "shared": "26f185ae86a4e6c3123fb09fe62e9cea3c9f3e0feddb2b5fd2d9083096640a0c",
         "entry": "0f2e1994f39c69544d0e09fecd7215ecd5bf96569af31147a53f474b2ec35ec3"
       },
-      "logicalWork": "482cac7f2d8f79e74ea43155389a479915653992982e8d39d24f8f2cec0be1f2",
+      "logicalWork": "1296a3c6c828aa83c23d6450890d184a8d1c0442dd2e15e62179d1bd96232d38",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -34375,7 +34375,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "555"
+              "value": "616"
             }
           },
           {

@@ -257,7 +257,9 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::EffectiveMode
         | Check::VocabularyMember
         | Check::UniqueSurfaceClass
+        | Check::NormalizedDomain
         | Check::UniqueDomain
+        | Check::CompleteTable
         | Check::AdmissibleMember
         | Check::SingleOccurrence
         | Check::ConsistentContent
@@ -480,7 +482,9 @@ mod tests {
             Check::EffectiveMode,
             Check::VocabularyMember,
             Check::UniqueSurfaceClass,
+            Check::NormalizedDomain,
             Check::UniqueDomain,
+            Check::CompleteTable,
             Check::AdmissibleMember,
             Check::SingleOccurrence,
             Check::ConsistentContent,

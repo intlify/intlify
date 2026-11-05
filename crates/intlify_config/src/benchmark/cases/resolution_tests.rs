@@ -674,7 +674,8 @@ fn the_occurrence_bound_counts_every_role_at_its_exact_value_and_first_over() {
             };
             policies[policy][usize::from(*status != Status::Evaluated)] += 1;
         }
-        assert_eq!(policies, [[1, 4], [1, 13], [7, 11]]);
+        // Coverage's rules and its table wait too.
+        assert_eq!(policies, [[1, 4], [1, 13], [7, 15]]);
     }
 }
 

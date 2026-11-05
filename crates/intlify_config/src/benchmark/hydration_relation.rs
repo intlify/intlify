@@ -349,7 +349,9 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::UniqueCandidate
         | Check::VocabularyMember
         | Check::UniqueSurfaceClass
+        | Check::NormalizedDomain
         | Check::UniqueDomain
+        | Check::CompleteTable
         | Check::EffectiveMode
         | Check::SupportedAssertion
         | Check::MatchingData
