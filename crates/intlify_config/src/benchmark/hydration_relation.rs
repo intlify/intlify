@@ -25,7 +25,9 @@ use crate::resolver::evaluation::{
 };
 use crate::resolver::exact_resolution::resolve_fields;
 use crate::resolver::groups::{resolve_groups, ResolvedGroups};
-use crate::resolver::hydration::{validate_hydration, HydrationSubject, ResolvedHydration};
+use crate::resolver::hydration::{
+    validate_hydration, EndpointField, HydrationSubject, ResolvedHydration,
+};
 use crate::resolver::limits::ConfirmedPolicy;
 use crate::resolver::locales::{resolve_locales, LocaleFields};
 use crate::resolver::negotiation::resolve_negotiation;
@@ -298,12 +300,22 @@ fn count(value: usize) -> Result<u64, OutputFailure> {
     u64::try_from(value).map_err(|_| OutputFailure::HydrationRelationValidationInvariant)
 }
 
-/// Only Phase 13's own units run in the interval: the bound, a relation, or a
-/// Target ID's roles, under one of its eleven checks.
+/// Only Phase 13's own units run in the interval: the bound, an endpoint, a
+/// relation, or a Target ID's roles, under one of its eleven checks.
 fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
     frame.text(unit.phase.id());
     match &unit.subject {
         Subject::Hydration(HydrationSubject::Relations) => frame.uint(0),
+        Subject::Hydration(HydrationSubject::Endpoint(group, server, client, field)) => {
+            frame.uint(3);
+            frame.text(group.as_str());
+            frame.text(server.as_str());
+            frame.text(client.as_str());
+            frame.uint(match field {
+                EndpointField::Client => 0,
+                EndpointField::Server => 1,
+            });
+        }
         Subject::Hydration(HydrationSubject::Relation(group, server, client)) => {
             frame.uint(1);
             frame.text(group.as_str());
@@ -602,6 +614,19 @@ mod tests {
         relation("web", "ssr", "browser", check)
     }
 
+    /// The bytes of the client's endpoint in the storefront's relation.
+    fn client_bytes() -> Unit {
+        hydration_unit(
+            HydrationSubject::Endpoint(
+                group("web"),
+                target("ssr"),
+                target("browser"),
+                EndpointField::Client,
+            ),
+            Check::WithinBound,
+        )
+    }
+
     const ID_BYTES: BoundId = BoundId {
         group: Group::TargetGrouping,
         name: "maxTargetIdBytes",
@@ -648,7 +673,7 @@ mod tests {
     /// The causes Phase 13's endpoint bound leaves.
     fn own_causes() -> Causes {
         blocked_unit(
-            storefront(Check::WithinBound),
+            client_bytes(),
             Blocking::limit(exceeded(6, Actual::Exact(7))),
         )
         .1
@@ -803,7 +828,7 @@ mod tests {
         assert!(observe(&resolved(R::RequestedLocales)).is_ok());
         assert!(observe(&resolved(R::StaticIncompatibility)).is_ok());
         assert!(observed(blocked(
-            storefront(Check::WithinBound),
+            client_bytes(),
             Code::ResourceLimitExceeded,
             None,
             limit(),
@@ -845,12 +870,7 @@ mod tests {
             ),
             (
                 "a bound without its details",
-                blocked(
-                    storefront(Check::WithinBound),
-                    Code::ResourceLimitExceeded,
-                    None,
-                    None,
-                ),
+                blocked(client_bytes(), Code::ResourceLimitExceeded, None, None),
             ),
             (
                 "a shortfall",
@@ -864,7 +884,7 @@ mod tests {
             (
                 "a reason on a bound",
                 blocked(
-                    storefront(Check::WithinBound),
+                    client_bytes(),
                     Code::ResourceLimitExceeded,
                     Some(Reason::UnknownEndpoint),
                     limit(),
@@ -931,15 +951,26 @@ mod tests {
             );
         }
         // Each subject frames apart, each endpoint and the group are part of
-        // a relation, and a Target ID's roles are by group.
+        // a relation, an endpoint is its relation's and its field's, and a
+        // Target ID's roles are by group.
         let roles = |group_id: &str, id: &str| {
             hydration_unit(
                 HydrationSubject::Roles(group(group_id), target(id)),
                 Check::WithinBound,
             )
         };
+        let endpoint = |server: &str, client: &str, field| {
+            hydration_unit(
+                HydrationSubject::Endpoint(group("web"), target(server), target(client), field),
+                Check::WithinBound,
+            )
+        };
         let subjects = [
             hydration_unit(HydrationSubject::Relations, Check::WithinBound),
+            endpoint("ssr", "browser", EndpointField::Client),
+            endpoint("ssr", "browser", EndpointField::Server),
+            endpoint("browser", "ssr", EndpointField::Client),
+            endpoint("ssr", "app", EndpointField::Client),
             relation("web", "ssr", "browser", Check::WithinBound),
             relation("web", "browser", "ssr", Check::WithinBound),
             relation("web", "ssr", "app", Check::WithinBound),

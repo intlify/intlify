@@ -9,8 +9,10 @@
 //! rendering server-side and the client's hydrating in the browser; both
 //! endpoints requesting the same locales with the same effective default; and
 //! nothing statically known making their Target Profiles incompatible. Within a
-//! group, no Target ID takes both roles. A relation is never inferred, and a
-//! mismatch is never narrowed to the locales both endpoints share.
+//! group, no Target ID takes both roles. Every check of a group waits on the
+//! group's own bounds, which Phase 12 checked, and each endpoint is checked
+//! on its own. A relation is never inferred, and a mismatch is never narrowed
+//! to the locales both endpoints share.
 //!
 //! The roles and the static compatibility are 024's: a Target Profile declares
 //! `ssr-renderer` and `browser-hydration-client` in its closed body, and two
@@ -74,16 +76,28 @@ fn statically_compatible(server: &AdmittedArtifact<'_>, client: &AdmittedArtifac
 }
 
 /// What one Phase 13 unit checks. The bound, which every relation waits on,
-/// comes first, then each relation, then each Target ID's roles.
+/// comes first, then each relation's endpoints, which its checks wait on, then
+/// each relation, then each Target ID's roles.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum HydrationSubject {
     /// Every relation occurrence of every group, under
     /// `maxHydrationRelations`.
     Relations,
+    /// One endpoint of one relation, by the relation's server and client
+    /// Target IDs and the field that names it, under `maxTargetIdBytes`.
+    Endpoint(DeploymentGroupId, TargetId, TargetId, EndpointField),
     /// One relation of one group, by its server and client Target IDs.
     Relation(DeploymentGroupId, TargetId, TargetId),
     /// A Target ID's roles among one group's relations.
     Roles(DeploymentGroupId, TargetId),
+}
+
+/// The field of a relation that names an endpoint, in the byte order of the
+/// field names: `client` before `server`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum EndpointField {
+    Client,
+    Server,
 }
 
 /// The unit Phase 13 records for `check` over `subject`.
@@ -137,8 +151,9 @@ impl ResolvedHydration {
 
 /// Phase 13 under the confirmed policy, over the declared groups' relations,
 /// the targets Phase 11 resolved, and the groups Phase 12 resolved. Every unit
-/// waits on the relations' bound. A relation's endpoint checks come first;
-/// its roles, locales, and compatibility are checked only between valid
+/// waits on the relations' bound, and every unit of a group on the group's
+/// bounds. Each endpoint's bytes come first, one unit for each endpoint; a
+/// relation's roles, locales, and compatibility are checked only between valid
 /// endpoints, and each waits on just the facts it compares.
 pub(crate) fn validate_hydration(
     evaluation: &mut Evaluation,
@@ -201,7 +216,8 @@ struct Shared<'a, 'p, 't, 's> {
 
 impl<'t, 's> Shared<'_, '_, 't, 's> {
     /// One group's relations, each pair once however often submitted, and
-    /// the roles of each Target ID among them.
+    /// the roles of each Target ID among them. Every check of the group waits
+    /// on the policy, the relations' bound, and the group's own bounds.
     fn group(
         &self,
         evaluation: &mut Evaluation,
@@ -214,6 +230,14 @@ impl<'t, 's> Shared<'_, '_, 't, 's> {
                 .entry((&relation.server, &relation.client))
                 .or_default() += 1;
         }
+        let bounds = self.groups.clone().and_then(|groups| {
+            groups
+                .bounds(id)
+                .expect("Phase 12 resolves every declared group")
+                .clone()
+        });
+        let gate = both(both(self.policy.clone(), self.bounded.clone()), bounds)
+            .map(|((policy, ()), ())| policy);
         let members = self.groups.clone().and_then(|groups| {
             groups
                 .get(id)
@@ -222,68 +246,29 @@ impl<'t, 's> Shared<'_, '_, 't, 's> {
                 .map_err(Causes::clone)
         });
         let mut holds = Ok(());
-        let mut endpoint_bytes = BTreeMap::new();
+        let mut taken: BTreeMap<&TargetId, Taken> = BTreeMap::new();
         for (&(server, client), &count) in &occurrences {
             let relation = Relation { id, server, client };
-            let (bytes, checked) = relation.check(evaluation, self, &members, count)?;
-            for endpoint in [server, client] {
-                let bound = endpoint_bytes.entry(endpoint).or_insert(Ok(()));
-                *bound = and(bound.clone(), bytes.clone());
+            let checked = relation.check(evaluation, self, &gate, &members, count)?;
+            // An equal-endpoint relation is its own failure and takes neither
+            // role.
+            if server != client {
+                let serving = taken.entry(server).or_default();
+                serving.serves = true;
+                serving.bytes = and(serving.bytes.clone(), checked.server);
+                let hydrating = taken.entry(client).or_default();
+                hydrating.hydrates = true;
+                hydrating.bytes = and(hydrating.bytes.clone(), checked.client);
             }
-            holds = and(holds, checked);
+            holds = and(holds, checked.holds);
         }
-        holds = and(
-            holds,
-            self.roles(evaluation, id, &occurrences, &endpoint_bytes)?,
-        );
+        holds = and(holds, single_roles(evaluation, id, &taken)?);
         Ok(holds.map(|()| {
             occurrences
                 .into_keys()
                 .map(|(server, client)| (server.clone(), client.clone()))
                 .collect()
         }))
-    }
-
-    /// Each Target ID that serves or hydrates between two distinct endpoints
-    /// takes one role in its group; an equal-endpoint relation is its own
-    /// failure and counts here for neither role.
-    fn roles(
-        &self,
-        evaluation: &mut Evaluation,
-        id: &DeploymentGroupId,
-        occurrences: &BTreeMap<(&TargetId, &TargetId), usize>,
-        endpoint_bytes: &BTreeMap<&TargetId, Admitted<()>>,
-    ) -> Result<Admitted<()>, EvaluationInvariant> {
-        let mut servers = BTreeSet::new();
-        let mut clients = BTreeSet::new();
-        for &(server, client) in occurrences.keys() {
-            if server != client {
-                servers.insert(server);
-                clients.insert(client);
-            }
-        }
-        let mut holds = Ok(());
-        for &target in servers.union(&clients) {
-            let single = evaluation.check(
-                unit(
-                    HydrationSubject::Roles(id.clone(), target.clone()),
-                    Check::SingleRole,
-                ),
-                endpoint_bytes
-                    .get(target)
-                    .cloned()
-                    .unwrap_or_else(|| self.bounded.clone()),
-                |()| {
-                    if servers.contains(target) && clients.contains(target) {
-                        Err(invalid(Reason::DualRole))
-                    } else {
-                        Ok(())
-                    }
-                },
-            )?;
-            holds = and(holds, single);
-        }
-        Ok(holds)
     }
 
     /// What Phase 11 established of a declared endpoint.
@@ -295,11 +280,66 @@ impl<'t, 's> Shared<'_, '_, 't, 's> {
     }
 }
 
+/// The roles one Target ID takes among its group's relations between
+/// distinct endpoints, and the bytes of each endpoint that names it there.
+struct Taken {
+    serves: bool,
+    hydrates: bool,
+    bytes: Admitted<()>,
+}
+
+impl Default for Taken {
+    fn default() -> Self {
+        Self {
+            serves: false,
+            hydrates: false,
+            bytes: Ok(()),
+        }
+    }
+}
+
+/// Each Target ID that serves or hydrates between two distinct endpoints
+/// takes one role in its group, waiting only on the bytes of the endpoints
+/// that name it there.
+fn single_roles(
+    evaluation: &mut Evaluation,
+    id: &DeploymentGroupId,
+    taken: &BTreeMap<&TargetId, Taken>,
+) -> Result<Admitted<()>, EvaluationInvariant> {
+    let mut holds = Ok(());
+    for (&target, roles) in taken {
+        let single = evaluation.check(
+            unit(
+                HydrationSubject::Roles(id.clone(), target.clone()),
+                Check::SingleRole,
+            ),
+            roles.bytes.clone(),
+            |()| {
+                if roles.serves && roles.hydrates {
+                    Err(invalid(Reason::DualRole))
+                } else {
+                    Ok(())
+                }
+            },
+        )?;
+        holds = and(holds, single);
+    }
+    Ok(holds)
+}
+
 /// One relation's checks.
 struct Relation<'a> {
     id: &'a DeploymentGroupId,
     server: &'a TargetId,
     client: &'a TargetId,
+}
+
+/// What one relation's checks leave its group: each endpoint's bytes, which
+/// the roles wait on, and whether every check of the relation held.
+struct Checked {
+    server: Admitted<()>,
+    client: Admitted<()>,
+    holds: Admitted<()>,
 }
 
 impl Relation<'_> {
@@ -310,25 +350,52 @@ impl Relation<'_> {
         )
     }
 
-    /// The endpoints' bytes, which the roles also need, and whether every
-    /// check of the relation held.
+    /// One endpoint's bytes, checked on its own after the group's gate.
+    fn endpoint(
+        &self,
+        evaluation: &mut Evaluation,
+        gate: &Admitted<&ConfirmedPolicy>,
+        field: EndpointField,
+    ) -> Result<Admitted<()>, EvaluationInvariant> {
+        let endpoint = match field {
+            EndpointField::Client => self.client,
+            EndpointField::Server => self.server,
+        };
+        evaluation.check(
+            unit(
+                HydrationSubject::Endpoint(
+                    self.id.clone(),
+                    self.server.clone(),
+                    self.client.clone(),
+                    field,
+                ),
+                Check::WithinBound,
+            ),
+            gate.clone(),
+            |policy| {
+                within(
+                    MAX_TARGET_ID_BYTES,
+                    policy.limits().target_grouping.max_target_id_bytes,
+                    endpoint.as_str().len(),
+                )
+            },
+        )
+    }
+
+    /// Each endpoint's bytes, and then every check of the relation, which
+    /// waits on both.
     fn check(
         &self,
         evaluation: &mut Evaluation,
         shared: &Shared<'_, '_, '_, '_>,
+        gate: &Admitted<&ConfirmedPolicy>,
         members: &Admitted<&BTreeSet<TargetId>>,
         count: usize,
-    ) -> Result<(Admitted<()>, Admitted<()>), EvaluationInvariant> {
+    ) -> Result<Checked, EvaluationInvariant> {
         let (server, client) = (self.server, self.client);
-        let bytes = evaluation.check(
-            self.unit(Check::WithinBound),
-            both(shared.policy.clone(), shared.bounded.clone()),
-            |(policy, ())| {
-                let limit = policy.limits().target_grouping.max_target_id_bytes;
-                within(MAX_TARGET_ID_BYTES, limit, server.as_str().len())?;
-                within(MAX_TARGET_ID_BYTES, limit, client.as_str().len())
-            },
-        )?;
+        let client_bytes = self.endpoint(evaluation, gate, EndpointField::Client)?;
+        let server_bytes = self.endpoint(evaluation, gate, EndpointField::Server)?;
+        let bytes = and(server_bytes.clone(), client_bytes.clone());
         let known = shared
             .targets
             .clone()
@@ -447,7 +514,11 @@ impl Relation<'_> {
             and(and(endpoints, once), and(serves, hydrates)),
             and(and(requested, default), compatible),
         );
-        Ok((bytes, checked))
+        Ok(Checked {
+            server: server_bytes,
+            client: client_bytes,
+            holds: checked,
+        })
     }
 }
 
@@ -724,13 +795,21 @@ mod tests {
         )
     }
 
+    /// The bytes of the endpoint `field` names in a relation of `group_id`.
+    fn endpoint(group_id: &str, server: &str, client: &str, field: EndpointField) -> Unit {
+        unit(
+            HydrationSubject::Endpoint(group(group_id), target(server), target(client), field),
+            Check::WithinBound,
+        )
+    }
+
     fn bound_unit() -> Unit {
         unit(HydrationSubject::Relations, Check::WithinBound)
     }
 
-    /// Every check of one relation, in rank order.
-    const CHECKS: [Check; 10] = [
-        Check::WithinBound,
+    /// Every check of one relation, in rank order; each endpoint has its own
+    /// unit before them.
+    const CHECKS: [Check; 9] = [
         Check::KnownEndpoints,
         Check::DistinctEndpoints,
         Check::SameGroupEndpoints,
@@ -774,10 +853,17 @@ mod tests {
     }
 
     #[test]
-    fn subjects_order_the_bound_then_relations_then_roles_after_every_phase_12_unit() {
-        let mut ordered = vec![bound_unit()];
+    fn subjects_order_the_bound_then_endpoints_relations_and_roles_after_every_phase_12_unit() {
+        // Every relation's endpoints, the client's field first, come before
+        // every relation's checks.
+        let mut ordered = vec![
+            bound_unit(),
+            endpoint("web", "ssr", "browser", EndpointField::Client),
+            endpoint("web", "ssr", "browser", EndpointField::Server),
+            endpoint("web", "ssr", "worker", EndpointField::Client),
+        ];
         ordered.extend(CHECKS.map(|check| relation("web", "ssr", "browser", check)));
-        ordered.push(relation("web", "ssr", "worker", Check::WithinBound));
+        ordered.push(relation("web", "ssr", "worker", Check::KnownEndpoints));
         ordered.push(roles("jobs", "browser"));
         ordered.push(roles("web", "browser"));
         assert!(ordered.windows(2).all(|pair| pair[0] < pair[1]));
@@ -790,7 +876,11 @@ mod tests {
     fn fifteens_example_relation_holds_and_keeps_its_pair() {
         Inputs::new().resolve(|evaluation, hydration| {
             assert_eq!(issues(&evaluation), []);
-            let mut expected = vec![bound_unit()];
+            let mut expected = vec![
+                bound_unit(),
+                endpoint("web", "ssr", "browser", EndpointField::Client),
+                endpoint("web", "ssr", "browser", EndpointField::Server),
+            ];
             expected.extend(CHECKS.map(|check| relation("web", "ssr", "browser", check)));
             expected.push(roles("web", "browser"));
             expected.push(roles("web", "ssr"));
@@ -896,7 +986,7 @@ mod tests {
             );
             // Between invalid endpoints, nothing else is compared.
             for (server, client, cause) in [("ssr", "phone", unknown), ("ssr", "worker", cross)] {
-                for check in &CHECKS[5..] {
+                for check in &CHECKS[4..] {
                     assert_eq!(
                         waits_on(&evaluation, &relation("web", server, client, *check)),
                         Some(vec![cause.clone()]),
@@ -956,13 +1046,15 @@ mod tests {
                 ),
                 Some(vec![map])
             );
-            for check in [
-                Check::WithinBound,
-                Check::DistinctEndpoints,
-                Check::UniqueRelation,
-            ] {
+            for check in [Check::DistinctEndpoints, Check::UniqueRelation] {
                 assert_eq!(
                     waits_on(&evaluation, &relation("web", "ssr", "browser", check)),
+                    None
+                );
+            }
+            for field in [EndpointField::Client, EndpointField::Server] {
+                assert_eq!(
+                    waits_on(&evaluation, &endpoint("web", "ssr", "browser", field)),
                     None
                 );
             }
@@ -1178,47 +1270,110 @@ mod tests {
     }
 
     #[test]
-    fn each_endpoint_holds_at_the_target_id_bound_and_one_byte_more_blocks_its_relation() {
-        // `browser` is seven bytes and `ssr` three.
-        for (limit, over) in [(7, false), (6, true)] {
+    fn each_endpoint_holds_at_the_target_id_bound_on_its_own_and_one_byte_more_blocks_its_relation()
+    {
+        // `browser` is seven bytes and `ssr` three: at 6 only the client's
+        // endpoint is over, at 2 both are, each its own result.
+        let client = endpoint("web", "ssr", "browser", EndpointField::Client);
+        let server = endpoint("web", "ssr", "browser", EndpointField::Server);
+        for (limit, over) in [
+            (7, vec![]),
+            (6, vec![(client.clone(), 7)]),
+            (2, vec![(client.clone(), 7), (server.clone(), 3)]),
+        ] {
             let mut inputs = Inputs::new();
             inputs.limits.target_grouping.max_target_id_bytes = bound(limit);
             inputs.resolve(|evaluation, _| {
-                let bytes = relation("web", "ssr", "browser", Check::WithinBound);
                 let found: Vec<Unit> = issues(&evaluation)
                     .into_iter()
                     .map(|(unit, _, _)| unit)
                     .collect();
-                if !over {
-                    assert_eq!(found, Vec::<Unit>::new());
+                let blocked: Vec<Unit> = over.iter().map(|(unit, _)| unit.clone()).collect();
+                assert_eq!(found, blocked, "{limit}");
+                for (unit, actual) in &over {
+                    let key = evaluation
+                        .issues()
+                        .find(|key| key.unit() == unit)
+                        .unwrap()
+                        .clone();
+                    assert_eq!(
+                        evaluation.limit(&key),
+                        Some(LimitExceeded {
+                            bound: MAX_TARGET_ID_BYTES,
+                            limit: bound(limit),
+                            actual: Actual::Exact(*actual),
+                        })
+                    );
+                }
+                if over.is_empty() {
                     return;
                 }
-                assert_eq!(found, std::slice::from_ref(&bytes));
-                let key = evaluation
-                    .issues()
-                    .find(|key| key.unit() == &bytes)
-                    .unwrap()
-                    .clone();
-                assert_eq!(
-                    evaluation.limit(&key),
-                    Some(LimitExceeded {
-                        bound: MAX_TARGET_ID_BYTES,
-                        limit: bound(6),
-                        actual: Actual::Exact(7),
-                    })
-                );
+                // The relation's checks wait on every endpoint over the
+                // bound, and each Target ID's roles on its own endpoint.
                 for check in [Check::DistinctEndpoints, Check::UniqueRelation] {
                     assert_eq!(
                         waits_on(&evaluation, &relation("web", "ssr", "browser", check)),
-                        Some(vec![bytes.clone()])
+                        Some(blocked.clone()),
+                        "{limit} {check:?}"
                     );
                 }
                 assert_eq!(
-                    waits_on(&evaluation, &roles("web", "ssr")),
-                    Some(vec![bytes.clone()])
+                    waits_on(&evaluation, &roles("web", "browser")),
+                    Some(vec![client.clone()])
                 );
+                let serving = (over.len() == 2).then(|| vec![server.clone()]);
+                assert_eq!(waits_on(&evaluation, &roles("web", "ssr")), serving);
             });
         }
+    }
+
+    #[test]
+    fn every_check_of_a_group_waits_on_its_id_bounds_and_only_membership_on_its_member_count() {
+        // `web` is three bytes and `jobs` four, and there are two groups;
+        // only `web` has a relation.
+        let id_bytes = groups::unit(GroupSubject::Group(group("web")), Check::WithinBound);
+        let map = groups::unit(GroupSubject::Groups, Check::WithinBound);
+        for (groups_bound, id_bound, cause) in [(100, 2, id_bytes), (1, 100, map)] {
+            let mut inputs = Inputs::new();
+            let grouping = &mut inputs.limits.target_grouping;
+            grouping.max_deployment_groups = bound(groups_bound);
+            grouping.max_group_id_bytes = bound(id_bound);
+            inputs.resolve(|evaluation, hydration| {
+                let recorded = statuses(&evaluation);
+                // The relations' bound, two endpoints, the relation's nine
+                // checks, and two Target IDs' roles.
+                assert_eq!(recorded.len(), 14);
+                assert_eq!(recorded[0], (bound_unit(), Status::Evaluated));
+                for (unit, _) in &recorded[1..] {
+                    assert_eq!(
+                        waits_on(&evaluation, unit),
+                        Some(vec![cause.clone()]),
+                        "{unit:?}"
+                    );
+                }
+                assert!(hydration.unwrap().get(&group("web")).unwrap().is_err());
+            });
+        }
+        // A group's member count is no bound of its relations: only the
+        // same-group check, which needs the members, waits on it.
+        let mut inputs = Inputs::new();
+        inputs.limits.target_grouping.max_members_per_group = bound(1);
+        inputs.resolve(|evaluation, _| {
+            let count = groups::unit(GroupSubject::Members(group("web")), Check::WithinBound);
+            for field in [EndpointField::Client, EndpointField::Server] {
+                assert_eq!(
+                    waits_on(&evaluation, &endpoint("web", "ssr", "browser", field)),
+                    None
+                );
+            }
+            assert_eq!(
+                waits_on(
+                    &evaluation,
+                    &relation("web", "ssr", "browser", Check::SameGroupEndpoints)
+                ),
+                Some(vec![count])
+            );
+        });
     }
 
     #[test]
@@ -1339,7 +1494,13 @@ mod tests {
                 TargetSubject::Target(target("browser")),
                 Check::ProjectSubset,
             );
-            for check in &CHECKS[..7] {
+            for field in [EndpointField::Client, EndpointField::Server] {
+                assert_eq!(
+                    waits_on(&evaluation, &endpoint("web", "ssr", "browser", field)),
+                    None
+                );
+            }
+            for check in &CHECKS[..6] {
                 assert_eq!(
                     waits_on(&evaluation, &relation("web", "ssr", "browser", *check)),
                     None,

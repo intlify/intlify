@@ -221,6 +221,8 @@ pub(crate) enum SubjectKind {
     // hydration-validation
     /// Every relation occurrence of every group.
     Relations,
+    /// One endpoint of one relation, under `maxTargetIdBytes`.
+    RelationEndpoint,
     /// One relation of one group.
     Relation,
     /// A Target ID's roles among one group's relations.
@@ -229,7 +231,7 @@ pub(crate) enum SubjectKind {
 
 impl SubjectKind {
     /// Every kind, phase by phase in rank order.
-    pub(crate) const ALL: [Self; 86] = [
+    pub(crate) const ALL: [Self; 87] = [
         Self::ProjectProfileSlot,
         Self::CapabilityArtifacts,
         Self::CapabilityPolicyArtifacts,
@@ -314,6 +316,7 @@ impl SubjectKind {
         Self::GroupMember,
         Self::Assignment,
         Self::Relations,
+        Self::RelationEndpoint,
         Self::Relation,
         Self::Roles,
     ];
@@ -404,7 +407,9 @@ impl SubjectKind {
             | Self::GroupMembers
             | Self::GroupMember
             | Self::Assignment => Phase::GroupResolution,
-            Self::Relations | Self::Relation | Self::Roles => Phase::HydrationValidation,
+            Self::Relations | Self::RelationEndpoint | Self::Relation | Self::Roles => {
+                Phase::HydrationValidation
+            }
         }
     }
 
@@ -463,7 +468,8 @@ impl SubjectKind {
             | Self::Memberships
             | Self::Group
             | Self::GroupMembers
-            | Self::Relations => &[Check::WithinBound],
+            | Self::Relations
+            | Self::RelationEndpoint => &[Check::WithinBound],
             Self::Vocabulary => &[Check::IntactArtifact, Check::AssertedArtifact],
             Self::CanonicalizationData => &[Check::MatchingData],
             Self::DeclarationField => &[Check::OpaqueIdentity],
@@ -504,7 +510,6 @@ impl SubjectKind {
             Self::GroupMember => &[Check::WithinBound, Check::KnownMember, Check::UniqueMember],
             Self::Assignment => &[Check::SingleGroup],
             Self::Relation => &[
-                Check::WithinBound,
                 Check::KnownEndpoints,
                 Check::DistinctEndpoints,
                 Check::SameGroupEndpoints,
@@ -654,6 +659,7 @@ impl Subject {
             },
             Self::Hydration(subject) => match subject {
                 HydrationSubject::Relations => SubjectKind::Relations,
+                HydrationSubject::Endpoint(..) => SubjectKind::RelationEndpoint,
                 HydrationSubject::Relation(..) => SubjectKind::Relation,
                 HydrationSubject::Roles(..) => SubjectKind::Roles,
             },
@@ -706,6 +712,7 @@ mod tests {
     use crate::model::{CoverageRule, DeploymentGroupId, ProfileId};
     use crate::resolver::artifact_resolution::ConflictKey;
     use crate::resolver::coverage::{RuleContent, SurfaceKey};
+    use crate::resolver::hydration::EndpointField;
     use crate::resolver::identity::DeclarationField;
     use crate::resolver::locales::fixtures::{canonical, content, key, target};
     use crate::resolver::resource_policy::PolicySlot;
@@ -834,6 +841,12 @@ mod tests {
             groups(GroupSubject::Member(group.clone(), target("browser"))),
             groups(GroupSubject::Assignment(target("browser"))),
             hydration(HydrationSubject::Relations),
+            hydration(HydrationSubject::Endpoint(
+                group.clone(),
+                target("server"),
+                target("browser"),
+                EndpointField::Client,
+            )),
             hydration(HydrationSubject::Relation(
                 group.clone(),
                 target("server"),
@@ -907,7 +920,7 @@ mod tests {
         }
         assert_eq!(SubjectKind::ProjectProfileSlot.rank(), 0);
         assert_eq!(SubjectKind::ResourceLimits.rank(), 9);
-        assert_eq!(SubjectKind::Roles.rank(), 2);
+        assert_eq!(SubjectKind::Roles.rank(), 3);
     }
 
     #[test]
