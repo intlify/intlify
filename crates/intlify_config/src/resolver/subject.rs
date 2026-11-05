@@ -213,7 +213,7 @@ pub(crate) enum SubjectKind {
     Group,
     /// One group's member occurrences.
     GroupMembers,
-    /// A member of one group.
+    /// A member of one group, under `maxTargetIdBytes`.
     GroupMember,
     /// A declared Target ID's place among the groups.
     Assignment,
@@ -501,7 +501,7 @@ impl SubjectKind {
                 Check::SupportedDefault,
                 Check::DirectedLocales,
             ],
-            Self::GroupMember => &[Check::KnownMember, Check::UniqueMember],
+            Self::GroupMember => &[Check::WithinBound, Check::KnownMember, Check::UniqueMember],
             Self::Assignment => &[Check::SingleGroup],
             Self::Relation => &[
                 Check::WithinBound,

@@ -10,6 +10,7 @@ use crate::benchmark::operation::{Output, Prepared};
 use crate::benchmark::work::LogicalWork;
 use crate::model::{DeploymentGroupId, TargetId};
 use crate::resolver::evaluation::{Actual, Check, Code, Reason, Status, Subject, Unit};
+use crate::resolver::groups::{unit as group_unit, GroupSubject};
 use crate::resolver::hydration::{unit as hydration_unit, HydrationSubject};
 use crate::resolver::limits::{BoundId, Group};
 
@@ -362,20 +363,39 @@ fn each_bound_holds_at_its_count_and_one_less_blocks_its_unit() {
         group: Group::TargetGrouping,
         name,
     };
-    for (limit, recipe, name, count, unit) in [
+    for (limit, recipe, name, count, unit, also) in [
         (
             LimitKind::HydrationRelations,
             R::FanOutFanIn,
             "maxHydrationRelations",
             3,
             hydration_unit(HydrationSubject::Relations, Check::WithinBound),
+            None,
         ),
+        // Phase 12, before the interval, checks the member `browser`'s own
+        // bytes, so the group holds no member set, and the same-group check
+        // and the checks that wait on it wait on that too.
         (
             LimitKind::HydrationEndpointBytes,
             R::Storefront,
             "maxTargetIdBytes",
             7,
             relation("ssr", "browser", Check::WithinBound),
+            Some((
+                [
+                    Check::SameGroupEndpoints,
+                    Check::ServerRole,
+                    Check::ClientRole,
+                    Check::SameRequestedLocales,
+                    Check::SameEffectiveDefault,
+                    Check::StaticCompatibility,
+                ]
+                .map(|check| relation("ssr", "browser", check)),
+                group_unit(
+                    GroupSubject::Member(group("web"), target("browser")),
+                    Check::WithinBound,
+                ),
+            )),
         ),
     ] {
         let exact = edge(limit, LimitEdge::Exact);
@@ -402,14 +422,22 @@ fn each_bound_holds_at_its_count_and_one_less_blocks_its_unit() {
                     *recorded == relations || *recorded == unit,
                     "{limit:?} {recorded:?}"
                 ),
-                Status::NotEvaluated(causes) => assert_eq!(
-                    causes
-                        .keys()
-                        .map(|key| key.unit().clone())
-                        .collect::<Vec<_>>(),
-                    std::slice::from_ref(&unit),
-                    "{limit:?} {recorded:?}"
-                ),
+                Status::NotEvaluated(causes) => {
+                    let mut expected = vec![unit.clone()];
+                    if let Some((waiting, member)) = &also {
+                        if waiting.contains(recorded) {
+                            expected.insert(0, member.clone());
+                        }
+                    }
+                    assert_eq!(
+                        causes
+                            .keys()
+                            .map(|key| key.unit().clone())
+                            .collect::<Vec<_>>(),
+                        expected,
+                        "{limit:?} {recorded:?}"
+                    );
+                }
             }
         }
     }

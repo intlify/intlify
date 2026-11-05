@@ -5,10 +5,11 @@
 //! Deployment Compatibility Groups: the Group ID map under
 //! `maxDeploymentGroups`, each Group ID under `maxGroupIdBytes`, each group's
 //! member occurrences under `maxMembersPerGroup` and every group's under
-//! `maxMembershipOccurrences`, each member naming a declared Target ID once in
-//! its group, and every declared Target ID in exactly one group. The groups
-//! form an exact partition or nothing: no group is cut short, no target is
-//! dropped or placed by inference, and no group is chosen first.
+//! `maxMembershipOccurrences`, each member under `maxTargetIdBytes` and naming
+//! a declared Target ID once in its group, and every declared Target ID in
+//! exactly one group. The groups form an exact partition or nothing: no group
+//! is cut short, no target is dropped or placed by inference, and no group is
+//! chosen first.
 //!
 //! Not the hydration relations, which Phase 13 checks within each group, and
 //! not the selection of one group, which 020 admits per compiler transaction.
@@ -47,6 +48,11 @@ const MAX_MEMBERSHIP_OCCURRENCES: BoundId = BoundId {
     name: "maxMembershipOccurrences",
 };
 
+const MAX_TARGET_ID_BYTES: BoundId = BoundId {
+    group: Group::TargetGrouping,
+    name: "maxTargetIdBytes",
+};
+
 /// What one Phase 12 unit checks. Kinds are declared so that each unit's
 /// prerequisites order before it: the two bounds over every group, each
 /// group's own bounds, its members, and then each Target ID's place.
@@ -61,7 +67,8 @@ pub(crate) enum GroupSubject {
     Group(DeploymentGroupId),
     /// One group's member occurrences, under `maxMembersPerGroup`.
     Members(DeploymentGroupId),
-    /// A member of one group, by the Target ID it spells.
+    /// A member of one group, by the Target ID it spells: under
+    /// `maxTargetIdBytes`, then known and unique.
     Member(DeploymentGroupId, TargetId),
     /// A declared Target ID's place among the groups.
     Assignment(TargetId),
@@ -106,10 +113,12 @@ impl ResolvedGroups {
 
 /// Phase 12 under the confirmed policy, over the declared groups and the
 /// targets Phase 11 resolved. The two bounds over every group are counted
-/// first; each group's checks wait on the map's bound, its members on the
-/// group's own bounds and the total, and a member's Target ID on the set of
-/// declared Target IDs Phase 11 admitted. A Target ID's place waits on its own
-/// admission and on every group's bounds, never on another group's members.
+/// first; each group's checks wait on the map's bound, its member count on its
+/// ID's bytes, and its members on the group's own bounds and the total. A
+/// member's other checks wait on its bytes, and whether it names a Target ID
+/// also on the set of declared Target IDs Phase 11 admitted. A Target ID's
+/// place waits on its own admission and on every group's bounds, never on
+/// another group's members.
 pub(crate) fn resolve_groups(
     evaluation: &mut Evaluation,
     policy: Result<&ConfirmedPolicy, &Causes>,
@@ -155,7 +164,7 @@ pub(crate) fn resolve_groups(
     for (id, group) in declared.iter() {
         let own = own_bounds(evaluation, &policy, &bounded, id, group)?;
         every_group = and(every_group, own.clone());
-        let gate = and(own, memberships.clone());
+        let gate = both(policy.clone(), and(own, memberships.clone())).map(|(policy, ())| policy);
         groups.insert(id.clone(), members(evaluation, &gate, &known, id, group)?);
     }
     let assignments = match targets {
@@ -172,8 +181,8 @@ pub(crate) fn resolve_groups(
     Ok(Ok(ResolvedGroups { groups, partition }))
 }
 
-/// One group's two bounds, after the map's: its ID's bytes and its member
-/// occurrences.
+/// One group's two bounds, after the map's: its ID's bytes, and then its
+/// member occurrences, which wait on them.
 fn own_bounds(
     evaluation: &mut Evaluation,
     policy: &Admitted<&ConfirmedPolicy>,
@@ -193,26 +202,26 @@ fn own_bounds(
             )
         },
     )?;
-    let occurrences = evaluation.check(
+    evaluation.check(
         unit(GroupSubject::Members(id.clone()), Check::WithinBound),
-        prerequisite,
-        |(policy, ())| {
+        both(prerequisite, bytes),
+        |((policy, ()), ())| {
             within(
                 MAX_MEMBERS_PER_GROUP,
                 policy.limits().target_grouping.max_members_per_group,
                 group.members.as_slice().len(),
             )
         },
-    )?;
-    Ok(and(bytes, occurrences))
+    )
 }
 
-/// The group's members by the Target ID each spells. Each must name a
-/// declared Target ID and occur once; repeated occurrences are one subject.
-/// The set exists only when every member holds.
+/// The group's members by the Target ID each spells. Each must be within
+/// `maxTargetIdBytes`, name a declared Target ID, and occur once; repeated
+/// occurrences are one subject, all spelling the same bytes. The set exists
+/// only when every member holds.
 fn members(
     evaluation: &mut Evaluation,
-    gate: &Admitted<()>,
+    gate: &Admitted<&ConfirmedPolicy>,
     known: &Admitted<&ResolvedTargets<'_>>,
     id: &DeploymentGroupId,
     group: &DeploymentGroup,
@@ -224,9 +233,20 @@ fn members(
     let mut holds = Ok(());
     for (&member, &count) in &occurrences {
         let subject = || GroupSubject::Member(id.clone(), member.clone());
+        let bytes = evaluation.check(
+            unit(subject(), Check::WithinBound),
+            gate.clone(),
+            |policy| {
+                within(
+                    MAX_TARGET_ID_BYTES,
+                    policy.limits().target_grouping.max_target_id_bytes,
+                    member.as_str().len(),
+                )
+            },
+        )?;
         let declared = evaluation.check(
             unit(subject(), Check::KnownMember),
-            both(gate.clone(), known.clone()),
+            both(bytes.clone(), known.clone()),
             |((), targets)| {
                 if targets.get(member).is_some() {
                     Ok(())
@@ -235,7 +255,7 @@ fn members(
                 }
             },
         )?;
-        let once = evaluation.check(unit(subject(), Check::UniqueMember), gate.clone(), |()| {
+        let once = evaluation.check(unit(subject(), Check::UniqueMember), bytes, |()| {
             if count == 1 {
                 Ok(())
             } else {
@@ -496,6 +516,7 @@ mod tests {
             ));
         }
         for (group_id, id) in [("jobs", "worker"), ("web", "browser"), ("web", "server")] {
+            units.push(member(group_id, id, Check::WithinBound));
             units.push(member(group_id, id, Check::KnownMember));
             units.push(member(group_id, id, Check::UniqueMember));
         }
@@ -750,6 +771,16 @@ mod tests {
                     GroupSubject::Group(_) => ("jobs", "web"),
                     _ => ("web", "jobs"),
                 };
+                if blocked == "jobs" {
+                    // The group's member count waits on its ID's bytes.
+                    assert_eq!(
+                        waits_on(
+                            &evaluation,
+                            &group_unit(GroupSubject::Members(group("jobs")), Check::WithinBound)
+                        ),
+                        Some(vec![own.clone()])
+                    );
+                }
                 let groups = groups.unwrap();
                 assert!(groups.get(&group(blocked)).unwrap().is_err());
                 assert!(groups.get(&group(other)).unwrap().is_ok());
@@ -787,7 +818,70 @@ mod tests {
                     Some(vec![map.clone()])
                 );
             }
+            // A member's bytes need no Target ID either.
+            assert_eq!(
+                waits_on(&evaluation, &member("web", "browser", Check::WithinBound)),
+                None
+            );
         });
+    }
+
+    #[test]
+    fn a_member_holds_at_the_target_id_bound_and_one_byte_more_leaves_its_other_checks() {
+        // `browser` is seven bytes and named twice: one subject, so one
+        // bound result, and its repeat waits on it.
+        for (limit, over) in [(7, false), (6, true)] {
+            let mut inputs = Inputs::new();
+            *inputs.members("web") = json!(["browser", "server", "browser"]);
+            inputs.limits.target_grouping.max_target_id_bytes = bound(limit);
+            inputs.resolve(|evaluation, groups| {
+                let bytes = member("web", "browser", Check::WithinBound);
+                // Phase 7 checks the Target ID key's own bytes as well.
+                let found: Vec<(Unit, Code)> = issues(&evaluation)
+                    .into_iter()
+                    .filter(|(unit, _)| unit.phase == Phase::GroupResolution)
+                    .collect();
+                if !over {
+                    assert_eq!(
+                        found,
+                        [(
+                            member("web", "browser", Check::UniqueMember),
+                            Code::GroupMemberDuplicate
+                        )]
+                    );
+                    return;
+                }
+                assert_eq!(found, [(bytes.clone(), Code::ResourceLimitExceeded)]);
+                let key = evaluation
+                    .issues()
+                    .find(|key| key.unit() == &bytes)
+                    .unwrap()
+                    .clone();
+                assert_eq!(
+                    evaluation.limit(&key),
+                    Some(LimitExceeded {
+                        bound: MAX_TARGET_ID_BYTES,
+                        limit: bound(6),
+                        actual: Actual::Exact(7),
+                    })
+                );
+                for check in [Check::KnownMember, Check::UniqueMember] {
+                    assert_eq!(
+                        waits_on(&evaluation, &member("web", "browser", check)),
+                        Some(vec![bytes.clone()]),
+                        "{check:?}"
+                    );
+                }
+                // The group's other member and the other group are checked.
+                assert_eq!(
+                    waits_on(&evaluation, &member("web", "server", Check::KnownMember)),
+                    None
+                );
+                let groups = groups.unwrap();
+                assert!(groups.get(&group("web")).unwrap().is_err());
+                assert!(groups.get(&group("jobs")).unwrap().is_ok());
+            });
+        }
     }
 
     #[test]
@@ -807,13 +901,11 @@ mod tests {
             for other in ["server", "worker"] {
                 assert_eq!(waits_on(&evaluation, &assignment(other)), None);
             }
-            // The member still names a declared Target ID.
-            assert_eq!(
-                waits_on(&evaluation, &member("web", "browser", Check::KnownMember)),
-                None
-            );
+            // The member is checked on its own rather than waiting on the
+            // key, and its group waits on it.
+            let bytes = member("web", "browser", Check::WithinBound);
+            assert_eq!(waits_on(&evaluation, &bytes), None);
             let groups = groups.unwrap();
-            assert!(groups.get(&group("web")).unwrap().is_ok());
             assert_eq!(
                 groups
                     .partition()
@@ -822,7 +914,7 @@ mod tests {
                     .keys()
                     .map(|key| key.unit().clone())
                     .collect::<Vec<_>>(),
-                [id]
+                [id, bytes]
             );
         });
     }

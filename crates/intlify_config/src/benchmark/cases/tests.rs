@@ -272,11 +272,12 @@ fn every_finite_case_prepares_its_exact_result_and_work_including_all_limit_edge
                             );
                         }
                     }
-                    // The target bounds are Phase 7's, which runs before the
-                    // interval: nothing in it is blocked, and what needs the
-                    // targets waits.
+                    // The target map's bound is Phase 7's, which runs before
+                    // the interval: nothing in it is blocked, and what needs
+                    // the targets waits. A Target ID key's bytes are Phase
+                    // 7's too, but Phase 12 checks each member's own, below.
                     Output::TargetAndGroup(resolved)
-                        if matches!(kind, LimitKind::TargetProfiles | LimitKind::TargetIdBytes) =>
+                        if matches!(kind, LimitKind::TargetProfiles) =>
                     {
                         let evaluation = &resolved.evaluation;
                         assert_eq!(evaluation.issues().count(), 0);
