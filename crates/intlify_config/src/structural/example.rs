@@ -31,7 +31,7 @@ use super::{AuthoringSchema, StructuralLimits};
 /// Example-owned capacity, not an admitted Resource Limit Policy or a product default.
 pub const MAX_FILE_BYTES: u64 = 1_000_000;
 
-const NOTICE: &str = "Developer example only: finite fixture locale data; not a LocalizationProjectProfile. Locale spellings are counted and, except coverage selectors, canonicalized; Policy/Target bodies, fallback, negotiation and coverage are not resolved.";
+const NOTICE: &str = "Developer example only: finite fixture locale data; not a LocalizationProjectProfile. Locale spellings are counted and, except fallback candidates and coverage selectors, canonicalized; Policy/Target bodies, fallback, negotiation and coverage are not resolved.";
 
 type Declaration = ProfileDeclaration<PolicyReference, TargetProfileReference>;
 
@@ -143,9 +143,6 @@ fn locale_pointer(profile: &str, declaration: &Declaration, location: &Location)
             format!("localeNegotiation/aliases/{}", alias(*rank))
         }
         Location::MessageFallbackKey(rank) => format!("messageFallback/{}", fallback(*rank)),
-        Location::MessageFallbackCandidate(rank, position) => {
-            format!("messageFallback/{}/{position}", fallback(*rank))
-        }
         Location::TargetRequestedLocale(id, index) => {
             format!(
                 "targetProfiles/{}/requestedLocales/{index}",

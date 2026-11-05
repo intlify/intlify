@@ -8,13 +8,13 @@
 //! ID map's bound and each Target ID key's bytes are checked here too, before
 //! any of a target's spellings, and every later phase's check of a target
 //! waits on them. Not the locale-policy checks Phase 8 makes over these values
-//! (alias and fallback keys, fallback sequences, and coverage selectors, which
-//! Phase 7 only counts), not a target's subset or effective default (Phase
-//! 11), and not a Finding, Evidence, or 015's Logical subject key strategy,
-//! which 015 Phase 5 owns. A subject in a set carries the locale's canonical
-//! identity, or its spelling when it has none, and a single-valued field's
-//! subject is its path; where each spelling sits is kept beside the units,
-//! never in their keys.
+//! (alias and fallback keys), not the fallback candidates and coverage
+//! selectors, which Phase 7 only counts and Phase 8 canonicalizes, not a
+//! target's subset or effective default (Phase 11), and not a Finding,
+//! Evidence, or 015's Logical subject key strategy, which 015 Phase 5 owns. A
+//! subject in a set carries the locale's canonical identity, or its spelling
+//! when it has none, and a single-valued field's subject is its path; where
+//! each spelling sits is kept beside the units, never in their keys.
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -93,9 +93,6 @@ pub(crate) enum LocaleSubject {
     NegotiationAliasValue(LocaleKey, LocaleKey),
     /// A key of `messageFallback`.
     MessageFallbackKey(LocaleKey),
-    /// A literal candidate, under its key's subject key at its position in
-    /// the sequence.
-    MessageFallbackCandidate(LocaleKey, usize, LocaleKey),
     /// The submitted Target ID map, under `maxTargetProfiles`.
     TargetProfiles,
     /// One Target ID key, under `maxTargetIdBytes`.
@@ -126,7 +123,6 @@ pub(crate) enum Location {
     NegotiationAliasKey(usize),
     NegotiationAliasValue(usize),
     MessageFallbackKey(usize),
-    MessageFallbackCandidate(usize, usize),
     TargetRequestedLocale(TargetId, usize),
     TargetDefaultRequestedLocale(TargetId),
 }
@@ -210,20 +206,6 @@ pub(crate) struct AliasLocales {
     pub(crate) value: Spelled,
 }
 
-/// A fallback candidate as Phase 7 left it, in its declared position.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum FallbackLocale {
-    Literal(Spelled),
-    IntentSource,
-}
-
-/// A fallback key and its whole sequence as Phase 7 left them.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct FallbackLocales {
-    pub(crate) key: Spelled,
-    pub(crate) candidates: Vec<FallbackLocale>,
-}
-
 /// One target's locales as Phase 7 left them. The set holds the canonical
 /// identities even when a member repeats, which only `distinct` records;
 /// Phase 11 checks the set and the default against the project's.
@@ -267,7 +249,8 @@ pub(crate) struct ResolvedLocales {
     /// The total the occurrence bound measured, when it measured one.
     pub(crate) occurrence_total: Option<Actual>,
     /// The occurrence bound's result, which canonicalizing any spelling waits
-    /// on: Phase 8 canonicalizes the coverage selectors Phase 7 only counted.
+    /// on: Phase 8 canonicalizes the fallback candidates and coverage
+    /// selectors Phase 7 only counted.
     pub(crate) occurrence_bound: Admitted<()>,
     /// Every spelling Phase 7 reached, in location order.
     pub(crate) occurrences: Vec<LocaleOccurrence>,
@@ -280,7 +263,9 @@ pub(crate) struct ResolvedLocales {
     pub(crate) requested_default: Admitted<CanonicalLocale>,
     pub(crate) project: Admitted<ProjectLocales>,
     pub(crate) negotiation_aliases: Admitted<Vec<AliasLocales>>,
-    pub(crate) message_fallback: Admitted<Vec<FallbackLocales>>,
+    /// Each `messageFallback` key, in the order the map holds them: Phase 8
+    /// checks the sequence of each.
+    pub(crate) fallback_keys: Admitted<Vec<Spelled>>,
     /// The Target ID map within `maxTargetProfiles`: a later check over the
     /// set of Target IDs waits on it.
     pub(crate) target_bound: Admitted<()>,
@@ -326,8 +311,8 @@ pub(crate) fn resolve_locales<P: Provider, Target>(
         Ok(negotiation) => Ok(pass.aliases(negotiation.and_then(|n| n.aliases.as_option()))?),
         Err(ref causes) => Err(causes.clone()),
     };
-    let message_fallback = match fields.message_fallback {
-        Ok(fallback) => Ok(pass.fallback(fallback)?),
+    let fallback_keys = match fields.message_fallback {
+        Ok(fallback) => Ok(pass.fallback_keys(fallback)?),
         Err(ref causes) => Err(causes.clone()),
     };
     let (target_bound, targets) = match fields.target_profiles {
@@ -345,7 +330,7 @@ pub(crate) fn resolve_locales<P: Provider, Target>(
         requested_default,
         project,
         negotiation_aliases,
-        message_fallback,
+        fallback_keys,
         target_bound,
         targets,
     })
@@ -734,9 +719,6 @@ mod tests {
             LocaleSubject::NegotiationAliasValue(key("de"), key("fr")),
             LocaleSubject::NegotiationAliasValue(key("en"), key("de")),
             LocaleSubject::MessageFallbackKey(key("ja")),
-            LocaleSubject::MessageFallbackCandidate(key("de"), 1, key("fr")),
-            LocaleSubject::MessageFallbackCandidate(key("ja"), 0, key("fr")),
-            LocaleSubject::MessageFallbackCandidate(key("ja"), 1, key("de")),
             LocaleSubject::TargetRequestedLocale(target("browser"), key("fr")),
             LocaleSubject::TargetRequestedLocale(target("server"), key("de")),
             LocaleSubject::TargetDefaultRequestedLocale(target("browser")),
@@ -759,8 +741,7 @@ mod tests {
             Location::NegotiationAliasKey(0),
             Location::NegotiationAliasValue(0),
             Location::MessageFallbackKey(0),
-            Location::MessageFallbackCandidate(0, 1),
-            Location::MessageFallbackCandidate(1, 0),
+            Location::MessageFallbackKey(1),
             Location::TargetRequestedLocale(target("browser"), 1),
             Location::TargetRequestedLocale(target("server"), 0),
             Location::TargetDefaultRequestedLocale(target("browser")),
@@ -810,11 +791,6 @@ mod tests {
                     key("fr-FR")
                 )),
                 canonical_unit(LocaleSubject::MessageFallbackKey(key("ja"))),
-                canonical_unit(LocaleSubject::MessageFallbackCandidate(
-                    key("ja"),
-                    0,
-                    key("en")
-                )),
                 unit(LocaleSubject::TargetProfiles, Check::WithinBound),
                 unit(
                     LocaleSubject::TargetId(target("browser")),
@@ -858,16 +834,7 @@ mod tests {
                 value: spelled("fr-FR"),
             }])
         );
-        assert_eq!(
-            resolved.message_fallback,
-            Ok(vec![FallbackLocales {
-                key: spelled("ja"),
-                candidates: vec![
-                    FallbackLocale::Literal(spelled("en")),
-                    FallbackLocale::IntentSource,
-                ],
-            }])
-        );
+        assert_eq!(resolved.fallback_keys, Ok(vec![spelled("ja")]));
         assert_eq!(resolved.target_bound, Ok(()));
         assert_eq!(
             resolved.targets,
@@ -888,8 +855,8 @@ mod tests {
                 },
             ])
         );
-        // 12 spellings are counted; the two coverage selector items wait for
-        // Phase 8's coverage bounds before anything reads them.
+        // 12 spellings are counted; the fallback candidate `en` and the two
+        // coverage selector items are Phase 8's to canonicalize.
         assert_eq!(resolved.occurrence_total, Some(Actual::Exact(12)));
         // In location order, though the default is spelled before the source.
         assert_eq!(
@@ -905,7 +872,6 @@ mod tests {
                 Location::NegotiationAliasKey(0),
                 Location::NegotiationAliasValue(0),
                 Location::MessageFallbackKey(0),
-                Location::MessageFallbackCandidate(0, 0),
                 Location::TargetRequestedLocale(target("browser"), 0),
                 Location::TargetRequestedLocale(target("server"), 0),
                 Location::TargetDefaultRequestedLocale(target("browser")),
@@ -1123,7 +1089,7 @@ mod tests {
             .into_iter()
             .filter(|(unit, _)| unit != &occurrence_unit() && !target_bound(unit))
             .collect();
-        assert_eq!(waiting.len(), 15);
+        assert_eq!(waiting.len(), 14);
         assert!(waiting.iter().all(|(_, status)| matches!(
             status,
             Status::NotEvaluated(causes) if units(causes) == [occurrence_unit()]
@@ -1141,7 +1107,6 @@ mod tests {
                         | LocaleSubject::NegotiationAliasKey(LocaleKey::Content(_))
                         | LocaleSubject::NegotiationAliasValue(_, LocaleKey::Content(_))
                         | LocaleSubject::MessageFallbackKey(LocaleKey::Content(_))
-                        | LocaleSubject::MessageFallbackCandidate(_, _, LocaleKey::Content(_))
                         | LocaleSubject::TargetRequestedLocale(_, LocaleKey::Content(_))
                         | LocaleSubject::TargetDefaultRequestedLocale(_)
                 )
@@ -1254,7 +1219,7 @@ mod tests {
             Err(source.union(requested).union(default))
         );
         assert_eq!(resolved.negotiation_aliases, Err(negotiation));
-        assert_eq!(resolved.message_fallback, Err(fallback));
+        assert_eq!(resolved.fallback_keys, Err(fallback));
         assert_eq!(resolved.target_bound, Err(targets.clone()));
         assert_eq!(resolved.targets, Err(targets));
         assert_eq!(resolved.occurrences, []);

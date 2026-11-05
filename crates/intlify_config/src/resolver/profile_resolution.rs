@@ -253,7 +253,9 @@ where
         evaluation,
         confirmed,
         &admitted.message_locale_fallback,
+        canonicalizer,
         &locales,
+        fields.message_fallback.clone(),
     )?;
     let coverage = resolve_coverage(
         evaluation,

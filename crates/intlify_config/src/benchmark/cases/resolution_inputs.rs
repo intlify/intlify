@@ -344,7 +344,9 @@ impl LocalePolicyResolutionRecipe {
                 app["targetProfiles"]["browser"]["requestedLocales"] = json!(["ja", "EN"]);
                 app["targetProfiles"]["server"]["requestedLocales"] = json!(["iw-IL", "EN"]);
             }
-            // An invalid spelling in each role beyond the project's own.
+            // An invalid spelling in each role beyond the project's own. The
+            // fallback key has no identity, so Phase 8 never checks its
+            // candidate.
             Self::EveryRoleInvalid => {
                 app["localeNegotiation"] = json!({"aliases": {"root": "zz", "fr": "en"}});
                 app["messageFallback"] = json!({

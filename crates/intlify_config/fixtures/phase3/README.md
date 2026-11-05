@@ -113,7 +113,7 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 
 | Requirement | Checked by |
 | --- | --- |
-| Every locale occurrence of the selected declaration is counted, and every one outside the coverage selectors is canonicalized | `the_complete_blueprint_resolves_every_locale`, `every_role_counts_toward_the_occurrence_bound`, `subjects_order_so_that_every_prerequisite_comes_first` |
+| Every locale occurrence of the selected declaration is counted, and every one outside the fallback candidates and coverage selectors is canonicalized | `the_complete_blueprint_resolves_every_locale`, `every_role_counts_toward_the_occurrence_bound`, `subjects_order_so_that_every_prerequisite_comes_first`, `alias_destinations_sit_under_their_keys_and_fallback_keys_are_spelled_alone` |
 | Spellings of one locale share a unit, and a differing spelling gets a non-blocking correction that changes no value | `spellings_of_one_locale_share_a_unit_and_a_differing_one_is_corrected`, `aliases_add_suggestions_and_never_change_a_value_or_unit` |
 | Exact duplicates and aliases of one locale are one blocking duplicate naming every occurrence, with no first-wins | `a_locale_two_spellings_name_is_a_duplicate_whether_equal_or_aliases`, `two_spellings_of_one_requested_locale_are_a_duplicate_keeping_both`, `repeats_size_and_membership_are_reported_together` |
 | One locale in independent roles or sets is valid, and each target keeps its own set and default | `each_target_keeps_its_own_set_and_default`, `the_complete_blueprint_resolves_every_locale` |
@@ -135,8 +135,9 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 | Omitted and empty fallback are one empty policy | `omission_and_an_empty_mapping_are_one_empty_policy` |
 | A sequence keeps its declared order and never expands through another source's sequence | `sequences_keep_their_declared_order_while_sources_and_literals_form_sorted_sets`, `a_sequence_is_never_expanded_through_another_sources_sequence` |
 | A source must be requested; a literal may name any locale | `a_literal_may_name_any_locale_but_a_source_must_be_requested` |
-| A self-reference, a repeated literal, and a repeated Intent source are blocking with their own reasons | `each_sequence_defect_is_an_issue_with_its_own_reason` |
-| Two spellings of one source are a locale duplicate, and each sequence is counted alone | `two_keys_naming_one_source_are_a_locale_duplicate_and_each_sequence_counts_alone` |
+| A literal candidate is validated and canonicalized after the key collisions, once Phase 7's `maxLocaleOccurrences` holds and within `maxLocaleIdentifierBytes`, its own checks keyed by its position and its repeat check by its canonical identity | `each_literal_is_canonicalized_at_its_position_and_a_differing_spelling_corrected`, `a_literal_waits_on_the_canonicalizer_and_phase_7_s_count_and_is_bounded_in_bytes`, `subjects_order_the_bound_then_keys_sequences_candidates_and_repeats` |
+| A self-reference at each position, a repeated literal, and a repeated Intent source are blocking with their own reasons | `each_sequence_defect_is_an_issue_with_its_own_reason`, `each_position_naming_its_source_is_its_own_self_reference` |
+| Two spellings of one source are a locale duplicate, and neither the sequences of colliding keys nor that of a key without an identity is measured or checked | `two_keys_naming_one_source_are_a_duplicate_whose_sequences_are_never_checked`, `a_key_without_an_identity_leaves_its_sequence_never_checked` |
 | `maxNegotiationAliases`, `maxFallbackSources`, and `maxFallbackCandidatesPerSource` count every submitted entry before any duplicate check | `the_alias_bound_counts_every_submitted_entry_before_any_collision`, `the_source_bound_counts_every_submitted_key_before_any_collision`, `the_candidate_bound_counts_both_kinds_before_any_duplicate_check` |
 | Negotiation and fallback are separate policies under their own slots | `each_phase_resolves_its_own_field_under_its_own_slot`, `every_role_hands_each_locale_policy_input_to_phase_8_which_resolves_each_policy` |
 

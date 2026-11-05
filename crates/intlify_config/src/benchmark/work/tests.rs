@@ -385,16 +385,17 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
                 undeclared(None),
             ),
         ),
-        // Three of the 21 spellings are coverage selectors, which Phase 8
-        // canonicalizes: 47 Phase 8 units, nine of them cells.
+        // Two of the 21 spellings are fallback candidates and three coverage
+        // selectors, which Phase 8 canonicalizes: 49 Phase 8 units, nine of
+        // them cells.
         (
             R::EveryRole,
             None,
-            join(all([21, 57, 18, 3, 78, 0, 0, 0]), every_role(true)),
+            join(all([21, 57, 16, 3, 78, 0, 0, 0]), every_role(true)),
         ),
-        // Phase 8 still counts what was declared and checks each Intent
-        // source candidate and surface item: 12 of its 35 units run, and
-        // every unit needing a canonical locale waits on the bound.
+        // Phase 8 still counts what was declared and checks each surface item:
+        // 9 of its 37 units run, and every unit needing a canonical locale
+        // waits on the bound, a fallback key's whole sequence included.
         (
             R::EveryRole,
             over(LimitKind::ResolutionLocaleOccurrences),
@@ -405,7 +406,7 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
                     Some(0),
                     None,
                     Some(66),
-                    Some(50),
+                    Some(53),
                     Some(1),
                     Some(0),
                 ],
@@ -415,26 +416,27 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
         (
             R::EveryRoleAliased,
             None,
-            join(all([21, 57, 18, 3, 78, 0, 0, 12]), every_role(true)),
+            join(all([21, 57, 16, 3, 78, 0, 0, 12]), every_role(true)),
         ),
-        // The invalid alias key and destination, fallback source, and
-        // literal leave six Phase 8 units unevaluated.
+        // The invalid alias key and destination and the invalid fallback key
+        // leave eight Phase 8 units unevaluated, the key's whole sequence
+        // among them, so its invalid literal is never read.
         (
             R::EveryRoleInvalid,
             None,
-            join(all([21, 78, 18, 3, 78, 7, 6, 0]), every_role(true)),
+            join(all([21, 78, 16, 3, 78, 9, 5, 0]), every_role(true)),
         ),
         (
             R::TargetDuplicate,
             None,
-            join(all([22, 62, 19, 3, 78, 0, 1, 1]), every_role(true)),
+            join(all([22, 62, 17, 3, 78, 0, 1, 1]), every_role(true)),
         ),
         // The rejected selector item leaves its rule without a domain, so
         // its two other units and the nine cells wait.
         (
             R::CoverageUncanonicalized,
             None,
-            join(all([21, 57, 18, 3, 77, 11, 1, 0]), every_role(true)),
+            join(all([21, 57, 16, 3, 77, 11, 1, 0]), every_role(true)),
         ),
         (
             R::ManyTargets,

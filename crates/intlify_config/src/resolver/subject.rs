@@ -134,8 +134,6 @@ pub(crate) enum SubjectKind {
     NegotiationAliasValue,
     /// A key of `messageFallback`.
     MessageFallbackKey,
-    /// A literal fallback candidate.
-    MessageFallbackCandidate,
     /// The submitted Target ID map.
     TargetProfiles,
     /// One Target ID key.
@@ -156,6 +154,10 @@ pub(crate) enum SubjectKind {
     FallbackSources,
     /// A fallback mapping key.
     FallbackSource,
+    /// The sequence of one fallback mapping key.
+    FallbackSequence,
+    /// A candidate at its position in its key's sequence.
+    FallbackCandidate,
     /// A literal candidate's locale in its source's sequence.
     FallbackLiteral,
     /// The Intent source-locale candidate in its source's sequence.
@@ -223,7 +225,7 @@ pub(crate) enum SubjectKind {
 
 impl SubjectKind {
     /// Every kind, phase by phase in rank order.
-    pub(crate) const ALL: [Self; 83] = [
+    pub(crate) const ALL: [Self; 84] = [
         Self::ProjectProfileSlot,
         Self::CapabilityArtifacts,
         Self::CapabilityPolicyArtifacts,
@@ -271,7 +273,6 @@ impl SubjectKind {
         Self::NegotiationAliasKey,
         Self::NegotiationAliasValue,
         Self::MessageFallbackKey,
-        Self::MessageFallbackCandidate,
         Self::TargetProfiles,
         Self::TargetId,
         Self::TargetRequestedLocale,
@@ -281,6 +282,8 @@ impl SubjectKind {
         Self::NegotiationDestination,
         Self::FallbackSources,
         Self::FallbackSource,
+        Self::FallbackSequence,
+        Self::FallbackCandidate,
         Self::FallbackLiteral,
         Self::FallbackIntentSource,
         Self::CoverageRules,
@@ -359,7 +362,6 @@ impl SubjectKind {
             | Self::NegotiationAliasKey
             | Self::NegotiationAliasValue
             | Self::MessageFallbackKey
-            | Self::MessageFallbackCandidate
             | Self::TargetProfiles
             | Self::TargetId
             | Self::TargetRequestedLocale
@@ -369,6 +371,8 @@ impl SubjectKind {
             | Self::NegotiationDestination
             | Self::FallbackSources
             | Self::FallbackSource
+            | Self::FallbackSequence
+            | Self::FallbackCandidate
             | Self::FallbackLiteral
             | Self::FallbackIntentSource
             | Self::CoverageRules
@@ -439,6 +443,7 @@ impl SubjectKind {
             | Self::RequestedLocales
             | Self::NegotiationAliases
             | Self::FallbackSources
+            | Self::FallbackSequence
             | Self::CoverageRules
             | Self::CoverageLocaleSelectors
             | Self::CoverageSurfaceSelectors
@@ -461,18 +466,13 @@ impl SubjectKind {
             | Self::NegotiationAliasKey
             | Self::NegotiationAliasValue
             | Self::MessageFallbackKey
-            | Self::MessageFallbackCandidate
             | Self::TargetDefaultRequestedLocale => &[Check::CanonicalLocale],
             Self::DefaultRequestedLocale => &[Check::CanonicalLocale, Check::RequestedMember],
             Self::NegotiationKey => &[Check::UniqueLocale],
             Self::NegotiationDestination => &[Check::RequestedMember],
-            Self::FallbackSource => &[
-                Check::WithinBound,
-                Check::UniqueLocale,
-                Check::RequestedMember,
-            ],
-            Self::FallbackLiteral => &[Check::DistinctFromSource, Check::UniqueCandidate],
-            Self::FallbackIntentSource => &[Check::UniqueCandidate],
+            Self::FallbackSource => &[Check::UniqueLocale, Check::RequestedMember],
+            Self::FallbackCandidate => &[Check::CanonicalLocale, Check::DistinctFromSource],
+            Self::FallbackLiteral | Self::FallbackIntentSource => &[Check::UniqueCandidate],
             Self::CoverageLocale => &[
                 Check::CanonicalLocale,
                 Check::UniqueLocale,
@@ -589,9 +589,6 @@ impl Subject {
                 LocaleSubject::NegotiationAliasKey(_) => SubjectKind::NegotiationAliasKey,
                 LocaleSubject::NegotiationAliasValue(..) => SubjectKind::NegotiationAliasValue,
                 LocaleSubject::MessageFallbackKey(_) => SubjectKind::MessageFallbackKey,
-                LocaleSubject::MessageFallbackCandidate(..) => {
-                    SubjectKind::MessageFallbackCandidate
-                }
                 LocaleSubject::TargetProfiles => SubjectKind::TargetProfiles,
                 LocaleSubject::TargetId(_) => SubjectKind::TargetId,
                 LocaleSubject::TargetRequestedLocale(..) => SubjectKind::TargetRequestedLocale,
@@ -607,6 +604,8 @@ impl Subject {
             Self::Fallback(subject) => match subject {
                 FallbackSubject::Sources => SubjectKind::FallbackSources,
                 FallbackSubject::Source(_) => SubjectKind::FallbackSource,
+                FallbackSubject::Sequence(_) => SubjectKind::FallbackSequence,
+                FallbackSubject::Candidate(..) => SubjectKind::FallbackCandidate,
                 FallbackSubject::Literal(..) => SubjectKind::FallbackLiteral,
                 FallbackSubject::IntentSource(_) => SubjectKind::FallbackIntentSource,
             },
@@ -774,11 +773,6 @@ mod tests {
                 key("fr-FR"),
             )),
             locale(LocaleSubject::MessageFallbackKey(key("ja"))),
-            locale(LocaleSubject::MessageFallbackCandidate(
-                key("ja"),
-                0,
-                key("en"),
-            )),
             locale(LocaleSubject::TargetProfiles),
             locale(LocaleSubject::TargetId(target("browser"))),
             locale(LocaleSubject::TargetRequestedLocale(
@@ -793,6 +787,8 @@ mod tests {
             Subject::Negotiation(NegotiationSubject::Destination(key("fr"), key("fr-FR"))),
             Subject::Fallback(FallbackSubject::Sources),
             Subject::Fallback(FallbackSubject::Source(key("ja"))),
+            Subject::Fallback(FallbackSubject::Sequence(key("ja"))),
+            Subject::Fallback(FallbackSubject::Candidate(key("ja"), 0)),
             Subject::Fallback(FallbackSubject::Literal(key("ja"), key("en"))),
             Subject::Fallback(FallbackSubject::IntentSource(key("ja"))),
             coverage(CoverageSubject::Rules),

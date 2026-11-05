@@ -15640,10 +15640,10 @@
       },
       "inputContext": "60590bb4d4579d1fc55160824f3cf25c379b62b284412e2726699c77371f0b99",
       "result": {
-        "shared": "43d4c0c488a14ea75bae15b39d413b111a5f7ef466caec8685c81a34fd21cffd",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "c23acc7fda6518a96c1fb86165bc17c9f4b806978ad37f6dd69262ba0c6ddd68",
+      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -15673,7 +15673,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -19028,10 +19028,10 @@
       },
       "inputContext": "e73508cf5b634b7523220b1a03e01b3dd2f98a92706ff77b5abebeec447b1cc2",
       "result": {
-        "shared": "43d4c0c488a14ea75bae15b39d413b111a5f7ef466caec8685c81a34fd21cffd",
-        "entry": "1c821e1e6d40de05d279206bf352f3b62a52c003b6d2f6d51dd92060e8bfdec1"
+        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "entry": "e18915d6ae4de273451605c05f3280579d90e2e3299156a5d0b00c1f9a4acc35"
       },
-      "logicalWork": "c23acc7fda6518a96c1fb86165bc17c9f4b806978ad37f6dd69262ba0c6ddd68",
+      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -19061,7 +19061,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -19197,10 +19197,10 @@
       },
       "inputContext": "a28f927b34ff7722adeb50fe6dce47e026f0299f0aa41efe0d15beaac0d7a979",
       "result": {
-        "shared": "c50864cdd91088c4790d4531265bfad06cb016a4ab91d39a0309ef5692918fe8",
-        "entry": "bfd7d54911a9c82a9f3cd17f617d3c3929a22c2d18fd2936acdb53e03bf8e36c"
+        "shared": "4d5cf4a43cb2fdec3fcf883e19de3b02baa2ba0ea0338185cad3c4137589f2c2",
+        "entry": "ddc263e71f0d500d05736cfa50ce3a8f0c82f5b1a4d43b83ac1a1a850b0e8f41"
       },
-      "logicalWork": "0e727ca6308609779db04432a9be6dd52da6248f2ab44d5289cef7ed2c71e3b1",
+      "logicalWork": "8362fe3a55080056a7bb6b5edd81d6a7fddd4bba010687629f68245296fbf863",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -19230,7 +19230,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -19366,10 +19366,10 @@
       },
       "inputContext": "4d8c5e45ab7eed37cc53c7ca848a9af89ff108de5a05f4413c5b25215b43191a",
       "result": {
-        "shared": "9c78c0b40927b2e8d9b57799c25137fb8b78f46d04a47975f5a4325583f47b70",
-        "entry": "b8f4fb5fcc40f93a3f86307aa7aaa5cbadaebe6848298280fb0fd0be9eea521f"
+        "shared": "16537a6c2d97c742cf66d1a4486cfbb7593cb63be07316ded6e02cc75e2d6b81",
+        "entry": "379fe577d6a175693f81fc85b422cdbe6370c32064fe1fdbfea7082776eeb98f"
       },
-      "logicalWork": "a56f443b35b31e30150a7b74ad64b60c309e342811b62c3571cbb3a529d1f573",
+      "logicalWork": "1c9afb6e039ce7c5189db6a6454c5573172dd7c00a1cd238370d6eaf5bf2994b",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -19399,7 +19399,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -19426,7 +19426,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "7"
+              "value": "9"
             }
           },
           {
@@ -19435,7 +19435,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "6"
+              "value": "5"
             }
           },
           {
@@ -19535,10 +19535,10 @@
       },
       "inputContext": "1c792ab193bd9fbf8c9d47e017c933099fb2bd8a3036b7a3af671321d5041a22",
       "result": {
-        "shared": "b02b8d9f8e5c7ce36acd6bc2affdac2777a524eeea909a833d310c62d3d485e4",
-        "entry": "0087d60f32b47396566cf41f75ff1318494f3c83b5c9892bc3cafdf0f961cdac"
+        "shared": "c37bb5628e300742e56cbedf8f60b7813c653d4e85faeef44217e1014951d35a",
+        "entry": "20584fb69c4d888a70a613b9d9e598052aeabca21a39836ffbb7f8713c6f9be8"
       },
-      "logicalWork": "ce9a8587b2a1d9422b021ce5a8c91338fa70a61fb8fe6be073afcfbf0d25bf71",
+      "logicalWork": "e50f5b757ea51fa7ff4d0cac6f12e75d30eb3b3aa2a3d3db86ed27b63a8ac7d4",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -19568,7 +19568,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "19"
+              "value": "17"
             }
           },
           {
@@ -19704,10 +19704,10 @@
       },
       "inputContext": "8d277c2d85b3cb47be766e2a62fb459a8cf9c9eb4c579ec3d433b905d8dbeb5e",
       "result": {
-        "shared": "e6267f5a7cdf8f436940cd1d9b7c776de1fe4c22587c233a93d60ca62c1e4048",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "58f66c5e262f9fd24c57847457a08a370ea987f474b2f78b543b3c14c1d40da9",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "282b59bd56e7292371e6ca6aa79064d1d1785a6b123ca2699372dee31b5c3655",
+      "logicalWork": "03a7c69b928e49666382b9708b313e818d73399adb5069ded91f967a41201677",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -19737,7 +19737,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -20211,10 +20211,10 @@
       },
       "inputContext": "689de298d7eec5b6bc7f7399594d427d5948b3501edfec3c0e29b4b7123db35d",
       "result": {
-        "shared": "43d4c0c488a14ea75bae15b39d413b111a5f7ef466caec8685c81a34fd21cffd",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "c23acc7fda6518a96c1fb86165bc17c9f4b806978ad37f6dd69262ba0c6ddd68",
+      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -20244,7 +20244,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -20380,10 +20380,10 @@
       },
       "inputContext": "bb2cbce1c01682f823c20ae481326895843fe11a036b6ca32da9178f4467014f",
       "result": {
-        "shared": "5d5a3505264186327b72127ed8c37f3e65b66fcd2278697ca74d869c1f491a09",
-        "entry": "6c86b12a1f2000d0c1a11c1b4c39553a5fcbff033ff6b02519954d30a41de745"
+        "shared": "80c2ef511cb2582b29386736df977e6316c32d25aaa94f43adefce37f029799b",
+        "entry": "3f4bef97adac20807a14b2a3affdefee06d57eac573b3d19fb96040377b45303"
       },
-      "logicalWork": "b492fa1566a938da490a999870d130f283aaa9b630d13a3a962b701e6c4567ac",
+      "logicalWork": "81c73c124471e47a333283cb2610f67bf9fe3cee6585580661d73ebf22bb057b",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -20440,7 +20440,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "50"
+              "value": "53"
             }
           },
           {
@@ -20552,10 +20552,10 @@
       },
       "inputContext": "e8ce9849fdb0b57f35b1ac36d79b8fe6112bf6c32489fe1c21a26bd4fe35ac46",
       "result": {
-        "shared": "43d4c0c488a14ea75bae15b39d413b111a5f7ef466caec8685c81a34fd21cffd",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "c23acc7fda6518a96c1fb86165bc17c9f4b806978ad37f6dd69262ba0c6ddd68",
+      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -20585,7 +20585,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -20724,10 +20724,10 @@
       },
       "inputContext": "90f54cbfd22cad0cba046f421d291a2e73909f1578d5e7a529c2dfe8d35c0c97",
       "result": {
-        "shared": "43d4c0c488a14ea75bae15b39d413b111a5f7ef466caec8685c81a34fd21cffd",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "c23acc7fda6518a96c1fb86165bc17c9f4b806978ad37f6dd69262ba0c6ddd68",
+      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -20757,7 +20757,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -20896,10 +20896,10 @@
       },
       "inputContext": "a12c628d2f4352a2998a4bc22851e6fc0e83f825cc58b274e1a551e0887f325f",
       "result": {
-        "shared": "c50864cdd91088c4790d4531265bfad06cb016a4ab91d39a0309ef5692918fe8",
-        "entry": "bfd7d54911a9c82a9f3cd17f617d3c3929a22c2d18fd2936acdb53e03bf8e36c"
+        "shared": "4d5cf4a43cb2fdec3fcf883e19de3b02baa2ba0ea0338185cad3c4137589f2c2",
+        "entry": "ddc263e71f0d500d05736cfa50ce3a8f0c82f5b1a4d43b83ac1a1a850b0e8f41"
       },
-      "logicalWork": "0e727ca6308609779db04432a9be6dd52da6248f2ab44d5289cef7ed2c71e3b1",
+      "logicalWork": "8362fe3a55080056a7bb6b5edd81d6a7fddd4bba010687629f68245296fbf863",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -20929,7 +20929,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -21068,10 +21068,10 @@
       },
       "inputContext": "bc519a3fe290cb52887d7ada1c3f3ee419326c1ec8cf1da25ff0e6d76d451234",
       "result": {
-        "shared": "c50864cdd91088c4790d4531265bfad06cb016a4ab91d39a0309ef5692918fe8",
-        "entry": "bfd7d54911a9c82a9f3cd17f617d3c3929a22c2d18fd2936acdb53e03bf8e36c"
+        "shared": "4d5cf4a43cb2fdec3fcf883e19de3b02baa2ba0ea0338185cad3c4137589f2c2",
+        "entry": "ddc263e71f0d500d05736cfa50ce3a8f0c82f5b1a4d43b83ac1a1a850b0e8f41"
       },
-      "logicalWork": "0e727ca6308609779db04432a9be6dd52da6248f2ab44d5289cef7ed2c71e3b1",
+      "logicalWork": "8362fe3a55080056a7bb6b5edd81d6a7fddd4bba010687629f68245296fbf863",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -21101,7 +21101,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -21240,10 +21240,10 @@
       },
       "inputContext": "ff08c252c178917cd5b6ab744adc97e95dc3b37f66fdd1da0dff113f3ab1d736",
       "result": {
-        "shared": "9c78c0b40927b2e8d9b57799c25137fb8b78f46d04a47975f5a4325583f47b70",
-        "entry": "b8f4fb5fcc40f93a3f86307aa7aaa5cbadaebe6848298280fb0fd0be9eea521f"
+        "shared": "16537a6c2d97c742cf66d1a4486cfbb7593cb63be07316ded6e02cc75e2d6b81",
+        "entry": "379fe577d6a175693f81fc85b422cdbe6370c32064fe1fdbfea7082776eeb98f"
       },
-      "logicalWork": "a56f443b35b31e30150a7b74ad64b60c309e342811b62c3571cbb3a529d1f573",
+      "logicalWork": "1c9afb6e039ce7c5189db6a6454c5573172dd7c00a1cd238370d6eaf5bf2994b",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -21273,7 +21273,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -21300,7 +21300,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "7"
+              "value": "9"
             }
           },
           {
@@ -21309,7 +21309,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "6"
+              "value": "5"
             }
           },
           {
@@ -21412,10 +21412,10 @@
       },
       "inputContext": "0951ee09ba215bfe437ffba208d5bf79842cdeaac65cbb229b5b0e852b0bcca9",
       "result": {
-        "shared": "9c78c0b40927b2e8d9b57799c25137fb8b78f46d04a47975f5a4325583f47b70",
-        "entry": "b8f4fb5fcc40f93a3f86307aa7aaa5cbadaebe6848298280fb0fd0be9eea521f"
+        "shared": "16537a6c2d97c742cf66d1a4486cfbb7593cb63be07316ded6e02cc75e2d6b81",
+        "entry": "379fe577d6a175693f81fc85b422cdbe6370c32064fe1fdbfea7082776eeb98f"
       },
-      "logicalWork": "a56f443b35b31e30150a7b74ad64b60c309e342811b62c3571cbb3a529d1f573",
+      "logicalWork": "1c9afb6e039ce7c5189db6a6454c5573172dd7c00a1cd238370d6eaf5bf2994b",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -21445,7 +21445,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -21472,7 +21472,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "7"
+              "value": "9"
             }
           },
           {
@@ -21481,7 +21481,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "6"
+              "value": "5"
             }
           },
           {
@@ -27878,10 +27878,10 @@
       },
       "inputContext": "a041262fcdfefa1e78e0678d2afa1ed07110275b9654790862cc9125dfda5404",
       "result": {
-        "shared": "a2f1394d6f2585d75ab0fffcaf0b091b29c94fa74f4a1c54b8ada80605a7907e",
-        "entry": "e7ecf0cd0895b15f5c8bd3b1562ec9d2e5292b4a417a2505db504879d3881575"
+        "shared": "2a4d78c8eb937df4b3431bbe89978801ba91a483c1526e6fb4f4329b7cdacf1c",
+        "entry": "f8c4857b8930c49049bbc91b6e9f2554a159958b249d6a54db0d72ed08bd1359"
       },
-      "logicalWork": "1af6d3c1b728b6af5154f16132bccf6dcdaa822fde77dbc7dccbb6d773e618b7",
+      "logicalWork": "ea1c5dc66a33477e0422551a88b5eeae5559341329204093c9f730f56b085c2d",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -27911,7 +27911,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -28047,10 +28047,10 @@
       },
       "inputContext": "bcbbfdf6c9320396cd8868ce0b4923cff3dc4e8497fd3bdc0d74484b7454ed66",
       "result": {
-        "shared": "560071208617db03e5b66462c70d76c993e66796ba7127683a5fa506093ec324",
-        "entry": "0746a939d9249c4e7f75b296bdff1c2a896855185f4c781db75d88dfc86794b8"
+        "shared": "29c05edfcb9c50819e79a61910323d6ca72d7706c7bd714af3beecb4c2182c4b",
+        "entry": "0b70237aa4d01e199b27aa60b94985013c8834111a079c6ed9e8a87e1716a097"
       },
-      "logicalWork": "807204dcafdde9f33e48797630f12f3b44666f5b950d78fe96fa4414321c4146",
+      "logicalWork": "875a4b8ffe3af19bae8915f4998f12b89444f0c450a30d96ca2b0d6d1ff5bac0",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -28080,7 +28080,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -28216,10 +28216,10 @@
       },
       "inputContext": "6b9cbe7efe7581f6e99cf9e424d7673b9ed41781ac0d1e448634c5ab7456f02e",
       "result": {
-        "shared": "692d22b23845477a6cfef55849c1afdd6a4a07b29b8aef03eaf7fdc56bb5499f",
-        "entry": "86c44c505b33e19137c0ed293d50c9b6a7ad89fc27c367ac3945d6a80315b5e5"
+        "shared": "80cd21550e6a8736dffbad0a24a7f3dac7411a41c22abf5b34ea8602c485b0a0",
+        "entry": "21d6fcf0182b90da662e0592cb2932448d51197868cbb7141cf01dc944787fad"
       },
-      "logicalWork": "2bb4b7a78f59484cefa449b47cd49cf08f698b2af7d9e44723ab4dd77af66430",
+      "logicalWork": "66ddab5f6723200edc19f3e174b9001b5ca7dc5dad5be59b788d47fdafd70265",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -28249,7 +28249,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -28385,10 +28385,10 @@
       },
       "inputContext": "f059c7ba8cae227dac763aaab0e3240115324023cf11f4138ac61c90a1284e9e",
       "result": {
-        "shared": "655dd0d3ee9a23c49c6aa032ba1269cd51f746c72f6f6fa0e1b1270ad5ee15e6",
-        "entry": "5c188023ae585cab9638153af3b9ae2bac735157f1e1b3425d8e09ed07a6b510"
+        "shared": "b39330e0d34b3d52b5cf40c3d0e4e9d7cdb21e3a378f30e6f2cc3595dd59810e",
+        "entry": "e253649317cf7c9d2303b7f09e9f1a7a4b178df5e6aced60c53f517d0fd99d9b"
       },
-      "logicalWork": "b1392c7ca9f6abcbd96e200666ca25f10ebfdb432e3ae9c6216c9c29aeac638b",
+      "logicalWork": "a5e38d2e7ca96af76b4939c61292b9ac3ad3bae84640bc4944d7886c24f1c79b",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -28418,7 +28418,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -28554,10 +28554,10 @@
       },
       "inputContext": "f6a15bb785cc7c0494f1aff87e23c3b136c06949434c55c92900dc1a39130303",
       "result": {
-        "shared": "cc6dd126d02f6e1ee4f57fb0ac89285fb2641a152b7cabe8006e2023c63c9649",
-        "entry": "a676944a74c28c8c62e6e4db66066c7710872cd2e346df30518dae5affa47671"
+        "shared": "75804f381db925340c45b0a42aff713fd7e337fdd80697b984ff3c75df5f40c3",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "2bb4b7a78f59484cefa449b47cd49cf08f698b2af7d9e44723ab4dd77af66430",
+      "logicalWork": "66ddab5f6723200edc19f3e174b9001b5ca7dc5dad5be59b788d47fdafd70265",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -28587,7 +28587,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -28723,10 +28723,10 @@
       },
       "inputContext": "60ae8d7b4292be50850a510efb57b6f480d62f8f396ae1f84c45048abd1d79f3",
       "result": {
-        "shared": "143737645e83a601bd65c897c5a73ae01dededc1b8d610351d881cd903a7891a",
-        "entry": "b05ebbdcc85930772f486142eccb23687835a8d46ce989b0c1b0f2c6122f8c71"
+        "shared": "75a50af8b87f13dd306bfc3b02e4d619c373b1a24191b33c884b50039064a1dd",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "cc00679c8dc1a8369c3cbbf717f53f0b8154a891db1360f6ccb4fc2ccf41ab98",
+      "logicalWork": "e5b0ef58c20b4861ee158556d16c101d5554edeeb17f554684deb09bedcdef88",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -28756,7 +28756,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "19"
+              "value": "16"
             }
           },
           {
@@ -28774,7 +28774,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "79"
+              "value": "80"
             }
           },
           {
@@ -28892,10 +28892,10 @@
       },
       "inputContext": "47cf556afa3d8f23afdd600f820bc99ffa4baa952c96cce1bd6e80a5ec8a4fbb",
       "result": {
-        "shared": "7737568ec92abe06c1a50f6a441eb49c2e871b031b66ea92b091e64dfacaa6ab",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "05f0d7fb5c604b6b811b7f4398d49d6095a5bef11218a63fc3c78949c95d9644",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "e7908c7b4352872850bfae1ac4b0579adc1ca02463b559fc4d9a074a5f539bc8",
+      "logicalWork": "7226614c67b25bb383063ebb97ccebd161529d1d9818d13504100ccc1aee5f44",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -28925,7 +28925,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -29061,10 +29061,10 @@
       },
       "inputContext": "bc9ffa06b61fc7bd49fa40fd7fdcdb4c6d341fff93fbf072fed610ddcfa91ba0",
       "result": {
-        "shared": "fd3fecc30948fe23836e4807eaf7c50095f064f205cf5aa5dd50e4a951e126c0",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "b8811329f8ed77b0f0fd1a238992e8c485adb19937a3b7d700a652905f6cb036",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "5f75bba890e3ea37299fa49f62772968713dfef1109855417d985f3975035f5c",
+      "logicalWork": "f0a312b1e5b7f511846bc3c90dd30087b6be348b63a19ed35de120a61e81caf3",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -29094,7 +29094,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -29230,10 +29230,10 @@
       },
       "inputContext": "160b3bd0b06902c139517d4fd543a1bdff74f580b2da2f4630056a842299aec5",
       "result": {
-        "shared": "9eaa861066bb0a9653e0fa7a3daacca1b76422528e054ef680f97217c3fc577d",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "d55cfecbc6245c24f90ac3729ae08b3de1f355624713b152a87ca8b06de09f49",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "3530f48c82d58af569ed4b7e7150561b14e31d491f9aad7230b74cc063b29da1",
+      "logicalWork": "08e6d2f431dfe090ed82bbf0f2cacf4863cbc169fa4047e2d6c3bc3b58e74d74",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -29263,7 +29263,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -29399,10 +29399,10 @@
       },
       "inputContext": "7aedf85db965bbc3a4ec26b449d720a607710bc986d4b70879cd7f28289d60f3",
       "result": {
-        "shared": "f318708ae1debf6cdefe01cfeb559eca34fe51fd4e19b06373a1955ab620594d",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "97edfa2fbcfac4576680778d3631fc92c12d662ea14dea92012fc865e3301efd",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "07e963992504954605cc2f03015dc47f152c104ea9a26a87a2788540091545a8",
+      "logicalWork": "b7130cd075fd9ef3191811fbc071a40b9b623b42c2700f34a2ed9b6219a9071f",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -29432,7 +29432,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -29568,10 +29568,10 @@
       },
       "inputContext": "9357ba6479c42d19bc095510663e0c6c95fabab370a2708384e65873dd007729",
       "result": {
-        "shared": "07256d5d53ac3dcb9f7b57fae0802987d59e9ccf5ccf89cabd235467a3e58e3f",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "362b2cd0e97dba05d7cb4d1c17824d6c4ac2498f53fdd1f36c9893f7a03471bf",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "32268890a0b5942cc8b5c7ae0afddda4bea16e3807712f0d3896f0b9fc7c5be8",
+      "logicalWork": "b517c6168d8afe7c39f0009873b90a61e1174fac130a6eca348c08987663f4c7",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -29601,7 +29601,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -29737,10 +29737,10 @@
       },
       "inputContext": "4a03416ac37a5934d7f5bb4433854884b192c7ca1e4840f696f3187ddb51ea7b",
       "result": {
-        "shared": "a08c89e1f306b38451d0adcae8b547c0a45b20fab390c77a4e25fe60c73dd6a8",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "5752eac91723b96686f10b4cc5ae0cf43f8359cc5c843dec7e5512586b63820b",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "d162a914a9d3cae211e39b513f65989e2158f36c678524df9ca510b46e63d98a",
+      "logicalWork": "5e681d043983dca134d5af2f6de109ff788bad7625630bb6c5dc16655eb22294",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -29770,7 +29770,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -29906,10 +29906,10 @@
       },
       "inputContext": "43e6a4e99122b7d73f2150d704ac241dd524c81d861c7ffeec44e0a0fae8acee",
       "result": {
-        "shared": "759ebe8f8beff3cc975b924b727287414a2203a5425ff4566fe97c94bc4dca2b",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "0c85ab0e9774e19d8de3dedc33a65fde2882b88215cae4b5a27dd419313a5bd0",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "c69e2e7d844f2ab0079a227012517a1b497261c9f2f44cfeb159efdf8c8b1b73",
+      "logicalWork": "55b944cf1ad9e06f62555ab64ceefa24c31af46314786250e7ddbd0e27755e93",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -29939,7 +29939,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -30075,10 +30075,10 @@
       },
       "inputContext": "9ec6bdf303b3942d02c985df381e272861c855fca72d27c3d52c05c51bc761dd",
       "result": {
-        "shared": "ee821ed8032492e0308dec9afd398c71cb1b326de0feec261a4a35a9eecaa325",
-        "entry": "495c861c10a88e2e5894fa1601f41247d486bda6c886cf22977de94b54151e5c"
+        "shared": "8a437862dc86468d3db02cc5754ee36cc27775ec7e06da99e1dc5b10f42c0e7e",
+        "entry": "f8c4857b8930c49049bbc91b6e9f2554a159958b249d6a54db0d72ed08bd1359"
       },
-      "logicalWork": "4d35fbe7787252bf6d73fd5fe5ac26ccd8189ab891fae7053a55630f5276c76f",
+      "logicalWork": "7cd1dde5182dcbe738a010509a05fbfb0650a3260106145a44591b35e7fffddb",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -30108,7 +30108,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -30244,10 +30244,10 @@
       },
       "inputContext": "59cb0282861432098f612528030102c07540756b59f164db759e4fc2573a641b",
       "result": {
-        "shared": "43d4c0c488a14ea75bae15b39d413b111a5f7ef466caec8685c81a34fd21cffd",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "c23acc7fda6518a96c1fb86165bc17c9f4b806978ad37f6dd69262ba0c6ddd68",
+      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -30277,7 +30277,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -30413,10 +30413,10 @@
       },
       "inputContext": "bc8accab7807a4b88dc8f5e560ad5b62aa2279491047eb61112ae39d393eab1f",
       "result": {
-        "shared": "43d4c0c488a14ea75bae15b39d413b111a5f7ef466caec8685c81a34fd21cffd",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "c23acc7fda6518a96c1fb86165bc17c9f4b806978ad37f6dd69262ba0c6ddd68",
+      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -30446,7 +30446,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -30582,10 +30582,10 @@
       },
       "inputContext": "15a6816670c9c9a5c68242ae229bbda6d8fdb847d1b17e02ef21e7ba0fbb9d90",
       "result": {
-        "shared": "f501501abf08cbe23d4068abbe74ade0968e8e308ec959fdef043d2ff29dfd4e",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "4c1e202b6e6f0b5426fb03801ebe50fa032e3ab04e1c80eb31ad811b77fa68c9",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "c3e97377005a45df15b95c15557dcbb217bbec2c8059d7830e602abcc6aab81d",
+      "logicalWork": "d5899d9a1402baece329b66908b1f2c8cd50131c8404e0b411109322258b456a",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -30615,7 +30615,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -30751,10 +30751,10 @@
       },
       "inputContext": "4c5cea2656c3817318cf00477210cdae08ffabb7c416f8a24c62e3973ccd486d",
       "result": {
-        "shared": "43d4c0c488a14ea75bae15b39d413b111a5f7ef466caec8685c81a34fd21cffd",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "c23acc7fda6518a96c1fb86165bc17c9f4b806978ad37f6dd69262ba0c6ddd68",
+      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -30784,7 +30784,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -30920,10 +30920,10 @@
       },
       "inputContext": "5378849d5f6deae755a38d54bee1d82eed85931c25be45da77308158f593bea3",
       "result": {
-        "shared": "303c6bee28493dded98162011dc5dc87c97004bda97049288ff360c19e8597b7",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "618d77bda28cffb721f83ff4f84cf9ad9ec09b0409bda5dd62b0039e78e481c6",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "f139bb6aafafdac4fcb108432273cdcafdfcf146c9517e20be555598cee1a41a",
+      "logicalWork": "fa359f566b2e4936c245843df698a22090aadebd51eb9fffb03378ca17e6d1d9",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -30953,7 +30953,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -30980,7 +30980,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "11"
+              "value": "13"
             }
           },
           {
@@ -31089,10 +31089,10 @@
       },
       "inputContext": "0d84bcd35954ae4967c79cf75549992be4ff678292143153f711fdf9a2834a49",
       "result": {
-        "shared": "43d4c0c488a14ea75bae15b39d413b111a5f7ef466caec8685c81a34fd21cffd",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "c23acc7fda6518a96c1fb86165bc17c9f4b806978ad37f6dd69262ba0c6ddd68",
+      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -31122,7 +31122,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -31258,10 +31258,10 @@
       },
       "inputContext": "b2b480ad5ece3ac2d3abd022105496e0b5e289edc7171e234d955534b9e70079",
       "result": {
-        "shared": "b328c771a28d8e31cc0b17f247be6b0dc02bfedf8411be80d67fcbefb7579193",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "5021adc260e6ecc36034c583945a4dce424a77f293aeb411ed674a11b01d2089",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "a2d87c966240e243c7f9ed16ad392b54cc4488f2449b7677d46815615cfcdd56",
+      "logicalWork": "d5899d9a1402baece329b66908b1f2c8cd50131c8404e0b411109322258b456a",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -31291,7 +31291,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -31318,7 +31318,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "3"
+              "value": "4"
             }
           },
           {
@@ -31427,10 +31427,10 @@
       },
       "inputContext": "6367258de98dce3724fefce7014f6e8db0e14034e16c9a9351d1fef1567b3d23",
       "result": {
-        "shared": "43d4c0c488a14ea75bae15b39d413b111a5f7ef466caec8685c81a34fd21cffd",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "c23acc7fda6518a96c1fb86165bc17c9f4b806978ad37f6dd69262ba0c6ddd68",
+      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -31460,7 +31460,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -31596,10 +31596,10 @@
       },
       "inputContext": "e49dab565eb738f3946e6048c7f3364b61ddedbbeecf6ae547d250c4f4035777",
       "result": {
-        "shared": "ce9c0eb3c6fb7d82d58cc6294eedde365b55f3baf7ca7e8dd47f3b2aed32c760",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "4b90f4585ac39aad6f55447a3b1df930a480115c0bd457f2eb52f47b3a1ae401",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "ba6234587adf6e9a3cf95d232bebd36bfff001aef551e1e37de2614371a88766",
+      "logicalWork": "7de3ce6b22354c630fd59467f28c242eb47a44ddad7e43b8eabf7e01e01f0cc6",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -31629,7 +31629,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -31765,10 +31765,10 @@
       },
       "inputContext": "ce5ce5688efa26b2e9b6b3a360d28e83c7c834983da072b2cac73a81e97bdff5",
       "result": {
-        "shared": "43d4c0c488a14ea75bae15b39d413b111a5f7ef466caec8685c81a34fd21cffd",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "c23acc7fda6518a96c1fb86165bc17c9f4b806978ad37f6dd69262ba0c6ddd68",
+      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -31798,7 +31798,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -31934,10 +31934,10 @@
       },
       "inputContext": "1110e8be4ccf03a733a6d2756359526554143c487c6faecbd72d82392a773376",
       "result": {
-        "shared": "b99fcd36c2cb495a44034f568cdc66a8c09e574a122d8165bbf7de447e48758f",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "5582b11f373f37643b3f1c7713b9d83c4724c1414a627ebdc4bacafae2d7f491",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "d103daf199d60dc60ce67a33d3f90818fe6a40b2c653d02e4d91990af271c60e",
+      "logicalWork": "8a3ed8dcbeddff426b792c750e5672ccbea3cdde380042c1e7db9ee7b2960293",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -31967,7 +31967,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -32103,10 +32103,10 @@
       },
       "inputContext": "7a50837149669c0c2fa9cdf83adbbebf0e9f3b70d093399ad5f1d2f7206b9f0e",
       "result": {
-        "shared": "43d4c0c488a14ea75bae15b39d413b111a5f7ef466caec8685c81a34fd21cffd",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "c23acc7fda6518a96c1fb86165bc17c9f4b806978ad37f6dd69262ba0c6ddd68",
+      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -32136,7 +32136,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -32272,10 +32272,10 @@
       },
       "inputContext": "13e0277607e63fa6f275a00e329a6214edf13700122c6e960686d5bc32bff50f",
       "result": {
-        "shared": "af7d21c24608e9b7645c14cdfe98546b443b3bd9f485491011150b83fb7dddd7",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "3f1c50a4d79e9bd9c55283b1c19c20b9408f92e359f1f5abe3df59cbc0bf3145",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "c02ad5952ef3ddeacb30f3163046128b07d69adf1a3881b77921114f33ca1aaf",
+      "logicalWork": "5983e3a09ceea499c7fdcbce3bace9241b43d9f15e0e76fd18021dea5c3f67b2",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -32305,7 +32305,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -32441,10 +32441,10 @@
       },
       "inputContext": "c534f8a8500ea7d1050fe780d3958409c512b1b89610b668f3e303f4e47b91f3",
       "result": {
-        "shared": "43d4c0c488a14ea75bae15b39d413b111a5f7ef466caec8685c81a34fd21cffd",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "c23acc7fda6518a96c1fb86165bc17c9f4b806978ad37f6dd69262ba0c6ddd68",
+      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -32474,7 +32474,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -32610,10 +32610,10 @@
       },
       "inputContext": "16c5796fab00bf8987a31e1acddd047728f9561068948a2f4b672dfdedde7cb2",
       "result": {
-        "shared": "645988814991d5f9fbf08b963b43413f0a94a5099c15f2678a877855385dc0d9",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "2f92cab1ab7573b99181837276db124ffe6bfb3c8378c610d7b5afac5db9c2a2",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "ce619362e6422053b00001ab0fb6048ce29e176ec753c094aeb42d340464a859",
+      "logicalWork": "d985743e82783073297b3e35c4b014a7178db8da57774aca2e94d753053d1fcc",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -32643,7 +32643,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -32779,10 +32779,10 @@
       },
       "inputContext": "965f3582e65f95645dc3112a82fa78514e083553f577fc666ac75fc2576171c2",
       "result": {
-        "shared": "43d4c0c488a14ea75bae15b39d413b111a5f7ef466caec8685c81a34fd21cffd",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "51a5e1426b10e0810cb91ea04ee47a82f754f50c82b7543f28b1d75026c1b672",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "c23acc7fda6518a96c1fb86165bc17c9f4b806978ad37f6dd69262ba0c6ddd68",
+      "logicalWork": "fe7e8eaf64031b2991b586dbb9b73606ec8373f0684cb63c8868c85330df6c84",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -32812,7 +32812,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -32948,10 +32948,10 @@
       },
       "inputContext": "af6283a3e9430b780c54bfbbe141846f2293036dc0f90b3a4da052aa4d901246",
       "result": {
-        "shared": "5e035974de810114428023355204a92745ae0048cd53089f3095f4f97a11fd78",
-        "entry": "196a0563c719992adaa6a48934f42f2728c786b76efcd8030d2a23df427fd1d8"
+        "shared": "c90bfce0ae56af9afa24d4b3b80c1bc32fe67fcd81f46541d27f74639a9d7d6a",
+        "entry": "aca31c554539b6fddc7938a21208317a58ee1b6548595c2a4b3b5ebc5acc1bdf"
       },
-      "logicalWork": "1bd57774ebf26270d97131cec71f92e9928a837a2090fc4ae4c3f488e328c257",
+      "logicalWork": "0d1a14bd5b8b6396756e75e256a241fa11ed62bd9837b05868988bda59aee45d",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -32981,7 +32981,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "18"
+              "value": "16"
             }
           },
           {
@@ -33464,10 +33464,10 @@
       },
       "inputContext": "ff6069ddfed62b06b57668d9201838ba087569c3420b58a7374534dfb4a45d16",
       "result": {
-        "shared": "ec975867bfc87f2918fd59fdb53d002b9e57294cdc78b3d60d9d075be828054c",
-        "entry": "840e8238816a2cee094d52a6458bd7f5176a50653171ca5379b507a36e766294"
+        "shared": "e7ed39bc6266b6eef67cdbe60414a7ca7b9b85508449a0856b9de6076dba0f14",
+        "entry": "f6e9c56301f90a00cf01ec702d7553057fee22a562abda8aec7d07ad4340a9bc"
       },
-      "logicalWork": "baa59ca227877576916ba0d50cdbf4d121cbfc8454783c1cce2ecaad59320f5a",
+      "logicalWork": "1e1cb4e757c252ebc9dd40973a591a7448997fc171f3f9821a26e215cd37e56d",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -33497,7 +33497,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "122"
+              "value": "82"
             }
           },
           {
@@ -33636,10 +33636,10 @@
       },
       "inputContext": "40e3e2a4a0d7473e1c321645420523ca2d172fa29a25b61be41688c011d339ff",
       "result": {
-        "shared": "ec975867bfc87f2918fd59fdb53d002b9e57294cdc78b3d60d9d075be828054c",
-        "entry": "840e8238816a2cee094d52a6458bd7f5176a50653171ca5379b507a36e766294"
+        "shared": "e7ed39bc6266b6eef67cdbe60414a7ca7b9b85508449a0856b9de6076dba0f14",
+        "entry": "f6e9c56301f90a00cf01ec702d7553057fee22a562abda8aec7d07ad4340a9bc"
       },
-      "logicalWork": "baa59ca227877576916ba0d50cdbf4d121cbfc8454783c1cce2ecaad59320f5a",
+      "logicalWork": "1e1cb4e757c252ebc9dd40973a591a7448997fc171f3f9821a26e215cd37e56d",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -33669,7 +33669,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "122"
+              "value": "82"
             }
           },
           {
@@ -33808,10 +33808,10 @@
       },
       "inputContext": "2d2f4e60aeaac21fc0cd4bc42e645608f1e2993a0cb1d145e25e6aef3161f5e6",
       "result": {
-        "shared": "8a69c189500c3c20f43803aa1f52a25de4c9c325bfa81d6b5073c16588633904",
-        "entry": "5237836e52294f1f801fe6805c4e79007953dab8733a74a3f13b5e4ea5b7f141"
+        "shared": "9aa7c88739cf71b4fff2b94b8a172c1b00eb0cba2daf118b0b6dc1700861305b",
+        "entry": "dfe4f4e99c630f0378eb62a3fb820e08bd7fe98902fd0043ff52bbbebe71ab81"
       },
-      "logicalWork": "f1389db5df2a8bba6e980c5f6e093a1ea03786a3684cec81e25b7e9f65f9596f",
+      "logicalWork": "559352077c0482d1ed44fe355f301d93da734b6aebfee3af7e9e767641c6476f",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -33841,7 +33841,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "52"
+              "value": "4"
             }
           },
           {
@@ -33980,10 +33980,10 @@
       },
       "inputContext": "c2db3bb90158277df28c8c2b6d3d6e491fff5c4345a2e75feb388c309dc74f3c",
       "result": {
-        "shared": "8a69c189500c3c20f43803aa1f52a25de4c9c325bfa81d6b5073c16588633904",
-        "entry": "5237836e52294f1f801fe6805c4e79007953dab8733a74a3f13b5e4ea5b7f141"
+        "shared": "9aa7c88739cf71b4fff2b94b8a172c1b00eb0cba2daf118b0b6dc1700861305b",
+        "entry": "dfe4f4e99c630f0378eb62a3fb820e08bd7fe98902fd0043ff52bbbebe71ab81"
       },
-      "logicalWork": "f1389db5df2a8bba6e980c5f6e093a1ea03786a3684cec81e25b7e9f65f9596f",
+      "logicalWork": "559352077c0482d1ed44fe355f301d93da734b6aebfee3af7e9e767641c6476f",
       "work": {
         "profileIdentity": "intlify-config-locale-policy-resolution-work",
         "profileRevision": "0",
@@ -34013,7 +34013,7 @@
             "stage": "operation-result",
             "observation": {
               "state": "exact",
-              "value": "52"
+              "value": "4"
             }
           },
           {
