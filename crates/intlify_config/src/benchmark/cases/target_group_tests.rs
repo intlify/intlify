@@ -457,7 +457,8 @@ fn each_bound_holds_at_its_count_and_one_less_blocks_its_unit() {
 /// The two target bounds are Phase 7's, which runs before the interval: at
 /// the exact count nothing waits, and one less leaves each check of an
 /// over-bound target waiting on Phase 7's unit, with nothing blocked in the
-/// interval itself. Phase 9, before the interval too, leaves the target's
+/// interval itself but an over-bound Target ID's member, whose bytes Phase 12
+/// checks on its own. Phase 9, before the interval too, leaves the target's
 /// Target Profile reference waiting on the same unit, so the target retains
 /// no Target Profile.
 #[test]
@@ -469,11 +470,12 @@ fn the_target_bounds_are_phase_7_s_and_one_less_leaves_their_targets_waiting() {
         Check::SupportedDefault,
         Check::DirectedLocales,
     ];
-    for (limit, cause, waiting, checked) in [
+    for (limit, cause, waiting, checked, blocked) in [
         (
             LimitKind::TargetProfiles,
             locale_unit(LocaleSubject::TargetProfiles, Check::WithinBound),
             vec!["browser", "ssr"],
+            vec![],
             vec![],
         ),
         // `browser` is seven bytes, `ssr` three.
@@ -485,6 +487,14 @@ fn the_target_bounds_are_phase_7_s_and_one_less_leaves_their_targets_waiting() {
             ),
             vec!["browser"],
             vec!["ssr"],
+            vec![(
+                group_unit(
+                    GroupSubject::Member(group("web"), target("browser")),
+                    Check::WithinBound,
+                ),
+                Code::ResourceLimitExceeded,
+                None,
+            )],
         ),
     ] {
         let held = resolved(&edge(limit, LimitEdge::Exact));
@@ -494,7 +504,7 @@ fn the_target_bounds_are_phase_7_s_and_one_less_leaves_their_targets_waiting() {
             .statuses()
             .all(|(_, status)| *status == Status::Evaluated));
         let over = resolved(&edge(limit, LimitEdge::FirstOver));
-        assert_eq!(issues(&over), [], "{limit:?}");
+        assert_eq!(issues(&over), blocked, "{limit:?}");
         let profiles = |resolved: &Resolved| {
             let Ok(Ok(retained)) = &resolved.result else {
                 panic!("{limit:?}: no targets");
@@ -621,37 +631,38 @@ fn the_work_counts_the_bounds_units_and_what_resolved() {
     for (declaration, expected) in [
         (
             case(R::Minimal),
-            ["1", "7", "1", "3", "1", "1", "10", "0", "0", "1", "1"],
+            ["1", "7", "1", "3", "1", "1", "11", "0", "0", "1", "1"],
         ),
         (
             case(R::Storefront),
-            ["2", "7", "1", "3", "2", "2", "16", "0", "0", "2", "1"],
+            ["2", "7", "1", "3", "2", "2", "18", "0", "0", "2", "1"],
         ),
         // 64 targets in one group, and 64 groups of one.
         (
             case(R::ManyTargets),
-            ["64", "9", "1", "3", "64", "64", "388", "0", "0", "64", "1"],
+            ["64", "9", "1", "3", "64", "64", "452", "0", "0", "64", "1"],
         ),
         (
             case(R::ManyGroups),
-            ["64", "9", "64", "8", "1", "64", "514", "0", "0", "64", "64"],
+            ["64", "9", "64", "8", "1", "64", "578", "0", "0", "64", "64"],
         ),
         // `tablet` is one more distinct member, which blocks the group.
         (
             case(R::MemberUnknown),
-            ["2", "7", "1", "3", "3", "3", "18", "0", "1", "2", "0"],
+            ["2", "7", "1", "3", "3", "3", "21", "0", "1", "2", "0"],
         ),
         // A repeated member is one more occurrence, but no more units.
         (
             case(R::MemberDuplicate),
-            ["2", "7", "1", "3", "3", "3", "16", "0", "1", "2", "0"],
+            ["2", "7", "1", "3", "3", "3", "18", "0", "1", "2", "0"],
         ),
         // Each target's three checks wait on the map's bound, which Phase 7
-        // found before the interval, and so do the group's two member checks
-        // and each target's place; nothing in the interval is blocked.
+        // found before the interval, and so do whether each of the group's
+        // two members names a Target ID and each target's place; nothing in
+        // the interval is blocked.
         (
             edge(LimitKind::TargetProfiles, LimitEdge::FirstOver),
-            ["2", "7", "1", "3", "2", "2", "16", "10", "0", "0", "0"],
+            ["2", "7", "1", "3", "2", "2", "18", "10", "0", "0", "0"],
         ),
     ] {
         let work = work(&declaration);

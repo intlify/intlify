@@ -21,12 +21,12 @@ fn sum(mut values: impl Iterator<Item = usize>) -> Result<usize, WorkFailure> {
 }
 
 /// Phase 11's three units for each target, whose bounds Phase 7 checked, and
-/// Phase 12's two over every group, two for each group and for each of a
+/// Phase 12's two over every group, two for each group, three for each of a
 /// group's distinct members, and one for each target's place.
 fn units(targets: usize, groups: usize, members: usize) -> Option<usize> {
     let targets = targets.checked_mul(4)?;
     let groups = groups.checked_mul(2)?;
-    let members = members.checked_mul(2)?;
+    let members = members.checked_mul(3)?;
     2_usize
         .checked_add(targets)?
         .checked_add(groups)?
@@ -141,8 +141,8 @@ mod tests {
     #[test]
     fn the_units_follow_the_targets_groups_and_distinct_members() {
         // The storefront: two targets in one group of two.
-        assert_eq!(units(2, 1, 2), Some(16));
-        assert_eq!(units(1, 1, 1), Some(10));
+        assert_eq!(units(2, 1, 2), Some(18));
+        assert_eq!(units(1, 1, 1), Some(11));
         assert_eq!(units(usize::MAX, 1, 1), None);
         assert_eq!(units(1, usize::MAX, 1), None);
         assert_eq!(units(1, 1, usize::MAX), None);
