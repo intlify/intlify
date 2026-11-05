@@ -415,6 +415,39 @@ fn each_bound_holds_at_its_count_and_one_less_blocks_its_unit() {
     }
 }
 
+/// Phase 9 runs before the interval as the entry runs it: in the endpoint
+/// bound's first-over case, Phase 7 finds `browser` over `maxTargetIdBytes`,
+/// so the targets the interval reads hold no Target Profile for it, waiting
+/// on that unit, while every other target keeps its own.
+#[test]
+fn the_interval_reads_targets_whose_references_waited_on_their_bounds() {
+    use crate::resolver::locales::{unit as locale_unit, LocaleSubject};
+
+    let declaration = edge(LimitKind::HydrationEndpointBytes, LimitEdge::FirstOver);
+    let Prepared::Hydration(prepared) = prepare(&declaration).unwrap().prepared else {
+        panic!("wrong owner boundary")
+    };
+    let set = prepared.set().unwrap();
+    let inputs = prepared.inputs(&set).unwrap();
+    let id = locale_unit(
+        LocaleSubject::TargetId(target("browser")),
+        Check::WithinBound,
+    );
+    let mut checked = 0;
+    for (target_id, facts) in inputs.targets.as_ref().unwrap().iter() {
+        let waits = facts.profile.as_ref().err().map(|causes| {
+            causes
+                .keys()
+                .map(|key| key.unit().clone())
+                .collect::<Vec<_>>()
+        });
+        let over = target_id.as_str() == "browser";
+        assert_eq!(waits, over.then(|| vec![id.clone()]), "{target_id:?}");
+        checked += 1;
+    }
+    assert!(checked > 1);
+}
+
 #[test]
 fn reordering_changes_neither_domain_nor_the_work() {
     let fan = prepare(&case(R::FanOutFanIn)).unwrap();

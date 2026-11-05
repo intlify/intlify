@@ -4,10 +4,14 @@
 //! 015 Phase 9's ordinary exact resolution of the selected declaration's
 //! references against the Profile Resolution Artifact Set, and the Resolved
 //! Profile Artifact Bindings it makes, under a fixture-owned confirmed policy.
-//! The configuration is complete and selected, and the collection is admitted
-//! into the Set before the interval, so the interval resolves each present
-//! reference and binds the distinct ones. Neither the result nor its
-//! observation is a Profile or a shared artifact.
+//! The configuration is complete and selected, and before the interval
+//! Phase 7 runs through the finite fixture provider, for the target bounds a
+//! Target Profile reference waits on, and the collection is admitted into the
+//! Set. The interval then resolves each present reference and binds the
+//! distinct ones. Neither the result nor its observation is a Profile or a
+//! shared artifact.
+
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
@@ -20,51 +24,59 @@ use crate::resolver::evaluation::{
 };
 use crate::resolver::exact_resolution::{resolve_references, ArtifactBindings, ResolvedReferences};
 use crate::resolver::limits::ConfirmedPolicy;
+use crate::resolver::locales::{resolve_locales, LocaleFields, TargetLocales};
 use crate::resolver::resource_policy::{DeclarationReferences, ReferenceField};
 
-use super::artifact_collection;
 use super::observation::{Frame, Observation};
 use super::operation::{Analysis, Config, OutputFailure};
 use super::quantity::Quantity;
+use super::{artifact_collection, locale};
 
 /// A case's complete configuration and selected declaration, the confirmed
-/// policy Phase 9 runs under, and the collection past 015's pre-invocation
-/// boundary.
+/// policy every phase runs under, the finite provider Phase 7 canonicalizes
+/// through, and the collection past 015's pre-invocation boundary.
 pub(super) struct PreparedBindings {
     pub(super) analysis: Analysis,
     pub(super) config: Config,
     pub(super) selected: ProfileId,
     pub(super) policy: ConfirmedPolicy,
+    pub(super) canonicalizer: Arc<locale::Core>,
     pub(super) collection: FormalCollection,
 }
 
 /// What the interval borrows, built before it: the selected declaration's
-/// references, and the Set the collection admission built or why there is
-/// none. The admission's own record is no part of the interval's.
+/// references, each target's bounds as Phase 7 checked them, and the Set the
+/// collection admission built or why there is none. The record of Phase 7
+/// and of the admission is no part of the interval's.
 pub(super) struct BindingInputs<'a> {
     pub(super) references: DeclarationReferences<'a>,
+    pub(super) targets: Admitted<Vec<TargetLocales>>,
     pub(super) set: Admitted<ArtifactSet<'a>>,
 }
 
 impl PreparedBindings {
-    /// The inputs, when the configuration is complete and the collection
-    /// admission runs without a defect.
+    /// The inputs, when the configuration is complete and Phase 7 and the
+    /// collection admission run without a defect.
     pub(super) fn inputs(&self) -> Option<BindingInputs<'_>> {
         if !self.analysis.is_complete() {
             return None;
         }
         let declaration = self.config.profiles().get(&self.selected)?;
-        let set = admit_collection(
-            &mut Evaluation::default(),
+        let mut preparation = Evaluation::default();
+        let locales = resolve_locales(
+            &mut preparation,
             Ok(&self.policy),
-            &self.collection,
+            Ok(&*self.canonicalizer),
+            &LocaleFields::declared(declaration),
         )
         .ok()?;
+        let set = admit_collection(&mut preparation, Ok(&self.policy), &self.collection).ok()?;
         Some(BindingInputs {
             references: DeclarationReferences {
                 policies: Ok(&declaration.policies),
                 target_profiles: Ok(&declaration.target_profiles),
             },
+            targets: locales.targets,
             set,
         })
     }
@@ -87,14 +99,18 @@ pub(super) struct Construction<'s> {
 /// what every timed invocation runs.
 pub(super) fn construct<'s>(inputs: &'s BindingInputs<'s>) -> Construction<'s> {
     let mut evaluation = Evaluation::default();
-    let result = resolve_references(&mut evaluation, inputs.set.as_ref(), &inputs.references).map(
-        |resolved| {
-            resolved.map(|resolved| {
-                let bindings = ArtifactBindings::bind(&resolved);
-                (resolved, bindings)
-            })
-        },
-    );
+    let result = resolve_references(
+        &mut evaluation,
+        inputs.set.as_ref(),
+        &inputs.references,
+        inputs.targets.as_deref(),
+    )
+    .map(|resolved| {
+        resolved.map(|resolved| {
+            let bindings = ArtifactBindings::bind(&resolved);
+            (resolved, bindings)
+        })
+    });
     Construction { evaluation, result }
 }
 
@@ -163,11 +179,14 @@ impl InputFacts {
             submitted_members: Quantity::new(
                 u64::try_from(prepared.collection.members().len()).unwrap_or(u64::MAX),
             ),
-            prerequisites: "complete-configuration-selected-declaration-and-set-or-its-causes"
-                .into(),
-            input_storage: "borrowed-selected-references-and-set-over-resident-collection".into(),
+            prerequisites:
+                "complete-configuration-selected-declaration-phase-7-target-bounds-and-set-or-its-causes"
+                    .into(),
+            input_storage:
+                "borrowed-selected-references-phase-7-targets-and-set-over-resident-collection"
+                    .into(),
             structural_preparation:
-                "complete-model-selection-and-collection-admission-before-interval".into(),
+                "complete-model-selection-phase-7-and-collection-admission-before-interval".into(),
             ordinary_output:
                 "fresh-evaluation-with-references-and-bindings-copied-after-end-read-or-resolver-defect"
                     .into(),
@@ -180,7 +199,9 @@ impl InputFacts {
 /// resolution evaluates every reference when the Set exists and leaves every
 /// one waiting on the Set's causes when it does not; it finds blocking results
 /// without details, and no other result, so anything else is a defect too.
-/// Logical work uses this screen.
+/// Every case's targets are within the fixture-owned policy's target bounds,
+/// so no Target Profile reference waits on Phase 7. Logical work uses this
+/// screen.
 pub(super) fn require_observable(
     resolved: &Resolved,
 ) -> Result<&Admitted<Retained>, OutputFailure> {
@@ -354,6 +375,7 @@ mod tests {
     };
     use crate::resolver::exact_resolution::unit as reference_unit;
     use crate::resolver::limits::{BoundId, Group};
+    use crate::resolver::locales::{unit as locale_unit, LocaleSubject};
     use crate::resolver::resource_policy::PolicySlot;
 
     fn prepared(recipe: ResolvedBindingRecipe) -> PreparedBindings {
@@ -460,6 +482,49 @@ mod tests {
             assert_eq!(artifact.member.canonical_body(), body.as_slice());
         }
         assert_eq!(prepared.resolve().unwrap().result, Ok(Ok(retained)));
+    }
+
+    /// The interval reads the target bounds Phase 7 checked before it: under
+    /// a policy one target short of the recipe's two, each Target Profile
+    /// reference waits on the map's unit, and every policy's reference
+    /// resolves. No case runs under such a policy, so the screen rejects the
+    /// result.
+    #[test]
+    fn the_interval_waits_on_the_target_bounds_phase_7_checked_before_it() {
+        let mut prepared = prepared(ResolvedBindingRecipe::EveryReference);
+        let mut limits = prepared.policy.limits().clone();
+        limits.target_grouping.max_target_profiles = Bound::new(1).unwrap();
+        prepared.policy = ConfirmedPolicy::fixture_owned(limits);
+        let inputs = prepared.inputs().unwrap();
+        let construction = construct(&inputs);
+        let map = locale_unit(LocaleSubject::TargetProfiles, Check::WithinBound);
+        let mut waiting = Vec::new();
+        for (recorded, status) in construction.evaluation.statuses() {
+            let Subject::ArtifactReference(field) = &recorded.subject else {
+                panic!("{recorded:?}");
+            };
+            match (field, status) {
+                (ReferenceField::Policy(_), Status::Evaluated) => {}
+                (ReferenceField::TargetProfile(_), Status::NotEvaluated(causes)) => {
+                    assert_eq!(
+                        causes
+                            .keys()
+                            .map(|key| key.unit().clone())
+                            .collect::<Vec<_>>(),
+                        std::slice::from_ref(&map),
+                        "{field:?}"
+                    );
+                    waiting.push(field.clone());
+                }
+                other => panic!("{other:?}"),
+            }
+        }
+        assert_eq!(waiting, [target("browser"), target("server")]);
+        assert_eq!(construction.evaluation.statuses().count(), 9);
+        assert_eq!(
+            require_observable(&Resolved::retain(construction)).err(),
+            Some(OutputFailure::ResolvedBindingInvariant)
+        );
     }
 
     #[test]

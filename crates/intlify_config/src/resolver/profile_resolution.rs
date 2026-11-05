@@ -270,8 +270,13 @@ where
         invocation.collection,
     )?);
     // Each reference keeps its own result, which a target reads; the
-    // bindings need every one.
-    let results = resolve_fields(evaluation, set.as_ref(), &declared)?;
+    // bindings need every one. A target's reference waits on its bounds.
+    let results = resolve_fields(
+        evaluation,
+        set.as_ref(),
+        &declared,
+        locales.targets.as_deref(),
+    )?;
     let references = results.all();
     let bindings = references
         .as_ref()
@@ -1359,6 +1364,57 @@ pub(super) mod tests {
                 BTreeSet::from([key])
             );
             assert_eq!(absent(&state), ["references", "bindings"]);
+        });
+    }
+
+    /// 015 checks the Target ID map's `maxTargetProfiles` in Phase 7, before
+    /// every later check of a target. One target more than it allows leaves
+    /// each Target Profile reference waiting on it in Phase 9, while every
+    /// policy's reference resolves.
+    #[test]
+    fn a_target_map_over_its_bound_leaves_every_target_profile_reference_waiting() {
+        let mut inputs = Inputs::complete();
+        let mut limits = policy_limits();
+        limits.target_grouping.max_target_profiles = bound(1);
+        inputs.select_policy(resource_limit_policy(&limits));
+        inputs.resolve(|evaluation, state| {
+            let key = only_issue(&evaluation);
+            assert_eq!(
+                key.unit(),
+                &locales::unit(LocaleSubject::TargetProfiles, Check::WithinBound)
+            );
+            let mut evaluated = Vec::new();
+            let mut waiting = Vec::new();
+            for (unit, status) in evaluation.statuses() {
+                let Subject::ArtifactReference(field) = &unit.subject else {
+                    continue;
+                };
+                match status {
+                    Status::Evaluated => evaluated.push(field.clone()),
+                    Status::NotEvaluated(causes) => {
+                        assert_eq!(keys(causes), BTreeSet::from([key.clone()]), "{field:?}");
+                        waiting.push(field.clone());
+                    }
+                }
+            }
+            assert_eq!(evaluated.len(), 7);
+            assert!(evaluated
+                .iter()
+                .all(|field| matches!(field, ReferenceField::Policy(_))));
+            assert_eq!(
+                waiting,
+                TARGETS.map(|(id, _)| {
+                    ReferenceField::TargetProfile(serde_json::from_value(json!(id)).unwrap())
+                })
+            );
+            assert_eq!(
+                keys(state.references.as_ref().unwrap_err()),
+                BTreeSet::from([key])
+            );
+            assert_eq!(
+                absent(&state),
+                ["references", "bindings", "targets", "groups", "hydration"]
+            );
         });
     }
 

@@ -461,6 +461,7 @@ mod tests {
                     policies: Err(stand_in(Slot::ProjectProfile)),
                     target_profiles: Ok(&declaration.target_profiles),
                 },
+                locales.targets.as_deref(),
             )
             .unwrap();
             let targets =
@@ -485,6 +486,11 @@ mod tests {
     /// Phase 7's unit over one Target ID key.
     fn id_unit(id: &str) -> Unit {
         locales::unit(LocaleSubject::TargetId(target(id)), Check::WithinBound)
+    }
+
+    /// Phase 9's unit over the target's Target Profile reference.
+    fn reference_unit(id: &str) -> Unit {
+        exact_resolution::unit(ReferenceField::TargetProfile(target(id)))
     }
 
     const fn grouping_bound(name: &'static str) -> BoundId {
@@ -754,7 +760,8 @@ mod tests {
                     assert_eq!(issues(&evaluation), [], "{limit}");
                     return;
                 }
-                // Phase 7 finds it, and every check of a target waits on it.
+                // Phase 7 finds it, and every check of a target waits on it,
+                // Phase 9's resolution of its Target Profile reference too.
                 let key = evaluation.issues().next().unwrap().clone();
                 assert_eq!(
                     issues(&evaluation),
@@ -768,10 +775,12 @@ mod tests {
                         actual: Actual::Exact(2),
                     })
                 );
-                for unit in every_unit()
-                    .iter()
-                    .chain(&[id_unit("browser"), id_unit("server")])
-                {
+                for unit in every_unit().iter().chain(&[
+                    id_unit("browser"),
+                    id_unit("server"),
+                    reference_unit("browser"),
+                    reference_unit("server"),
+                ]) {
                     assert_eq!(
                         waits_on(&evaluation, unit),
                         Some(vec![map_unit()]),
@@ -780,10 +789,14 @@ mod tests {
                 }
                 let targets = targets.unwrap();
                 for id in ["browser", "server"] {
-                    assert_eq!(
-                        keys(facts(&targets, id).admitted.as_ref().unwrap_err()),
-                        BTreeSet::from([key.clone()])
-                    );
+                    let facts = facts(&targets, id);
+                    let profile = facts.profile.clone().map(|_| ());
+                    for fact in [&facts.admitted, &profile] {
+                        assert_eq!(
+                            keys(fact.as_ref().unwrap_err()),
+                            BTreeSet::from([key.clone()])
+                        );
+                    }
                 }
             });
         }
@@ -825,6 +838,12 @@ mod tests {
                     );
                     assert_eq!(waits_on(&evaluation, &target_unit("server", check)), None);
                 }
+                // Phase 9 resolves only the server's Target Profile reference.
+                assert_eq!(
+                    waits_on(&evaluation, &reference_unit("browser")),
+                    Some(vec![id.clone()])
+                );
+                assert_eq!(waits_on(&evaluation, &reference_unit("server")), None);
                 // Phase 7 canonicalizes none of the browser's spellings, which
                 // stand for themselves and wait on its ID, and the server's
                 // as ever.
@@ -1005,6 +1024,15 @@ mod tests {
         inputs.resolve(|evaluation, targets| {
             assert_eq!(statuses(&evaluation), []);
             assert_eq!(evaluation.status(&map_unit()), None);
+            // Phase 7 bounds no target, so a Target Profile reference Phase 9
+            // still sees waits on why.
+            for id in ["browser", "server"] {
+                assert_eq!(
+                    waits_on(&evaluation, &reference_unit(id)),
+                    Some(causes.keys().map(|key| key.unit().clone()).collect()),
+                    "{id}"
+                );
+            }
             assert_eq!(targets, Err(causes));
         });
     }

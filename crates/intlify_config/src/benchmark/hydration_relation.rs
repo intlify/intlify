@@ -115,6 +115,7 @@ impl PreparedHydration {
                 policies: Ok(&declaration.policies),
                 target_profiles: Ok(&declaration.target_profiles),
             },
+            locales.targets.as_deref(),
         )
         .ok()?;
         let targets = resolve_targets(
