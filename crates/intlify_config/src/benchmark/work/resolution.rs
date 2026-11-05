@@ -51,7 +51,8 @@ impl LogicalWork {
             .ok_or(WorkFailure::InvalidOrdinaryResult)?;
         // Every spelling 015's maxLocaleOccurrences counts, read from the
         // declaration itself rather than from the resolver under test. The
-        // coverage selectors are counted, but Phase 7 leaves them to Phase 8.
+        // literal fallback candidates and the coverage selectors are counted,
+        // but Phase 7 leaves them to Phase 8.
         let mut spellings = declaration
             .requested_locales
             .as_slice()
@@ -76,6 +77,7 @@ impl LogicalWork {
                 spellings.extend([key.as_str(), value.as_str()]);
             }
         }
+        let mut literals = 0;
         for (key, candidates) in declaration
             .message_fallback
             .as_option()
@@ -83,12 +85,14 @@ impl LogicalWork {
             .flatten()
         {
             spellings.push(key);
+            let before = spellings.len();
             spellings.extend(candidates.as_slice().iter().filter_map(
                 |candidate| match candidate {
                     FallbackCandidate::Locale(locale) => Some(locale.as_str()),
                     FallbackCandidate::IntentSource(_) => None,
                 },
             ));
+            literals += spellings.len() - before;
         }
         let mut selectors = 0;
         let rules = declaration
@@ -123,9 +127,9 @@ impl LogicalWork {
         if locales.occurrence_total != Some(Actual::Exact(occurrences)) {
             return Err(WorkFailure::InvalidOrdinaryResult);
         }
-        // A spelling reached the provider when its subject's unit was evaluated:
-        // none of them over the occurrence bound, every one but the selectors
-        // within it.
+        // A spelling reached Phase 7's provider when its subject's unit was
+        // evaluated: none of them over the occurrence bound, every one Phase 7
+        // spells within it.
         let evaluation = &resolved.evaluation;
         let canonicalized = count(
             locales
@@ -137,7 +141,9 @@ impl LogicalWork {
                 })
                 .count(),
         )?;
-        if canonicalized != 0 && Some(canonicalized) != occurrences.checked_sub(count(selectors)?) {
+        if canonicalized != 0
+            && Some(canonicalized) != occurrences.checked_sub(count(literals + selectors)?)
+        {
             return Err(WorkFailure::InvalidOrdinaryResult);
         }
         for (kind, value) in [
@@ -374,7 +380,7 @@ mod tests {
             match change {
                 0 => locales.occurrence_total = Some(Actual::Exact(22)),
                 1 => locales.occurrence_total = Some(Actual::AtLeast(21)),
-                // 17 spellings reached the provider, not 0 or 21 - 3.
+                // 15 spellings reached Phase 7's provider, not 0 or 21 - 2 - 3.
                 _ => {
                     locales.occurrences.pop();
                 }

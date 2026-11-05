@@ -31,9 +31,8 @@ use crate::resolver::fallback::{
 };
 use crate::resolver::limits::ConfirmedPolicy;
 use crate::resolver::locales::{
-    resolve_locales, AliasLocales, Content, FallbackLocale, FallbackLocales, LocaleFields,
-    LocaleInvariant, LocaleKey, LocaleSet, LocaleSubject, Location, ProjectLocales,
-    ResolvedLocales, TargetLocales,
+    resolve_locales, AliasLocales, Content, LocaleFields, LocaleInvariant, LocaleKey, LocaleSet,
+    LocaleSubject, Location, ProjectLocales, ResolvedLocales, Spelled, TargetLocales,
 };
 use crate::resolver::negotiation::{resolve_negotiation, NegotiationProfile, NegotiationSubject};
 use crate::resolver::vocabulary::SurfaceVocabulary;
@@ -163,7 +162,14 @@ fn policies<P: Provider>(
 ) -> Result<Policies, LocaleInvariant> {
     let locales = resolve_locales(evaluation, Ok(policy), Ok(canonicalizer), fields)?;
     let negotiation = resolve_negotiation(evaluation, Ok(policy), &inputs.negotiation, &locales)?;
-    let fallback = resolve_fallback(evaluation, Ok(policy), &inputs.fallback, &locales)?;
+    let fallback = resolve_fallback(
+        evaluation,
+        Ok(policy),
+        &inputs.fallback,
+        Ok(canonicalizer),
+        &locales,
+        fields.message_fallback.clone(),
+    )?;
     let coverage = resolve_coverage(
         evaluation,
         Ok(policy),
@@ -307,7 +313,7 @@ fn key(frame: &mut Frame, key: &LocaleKey) {
     }
 }
 
-fn subject(frame: &mut Frame, subject: &LocaleSubject) -> Result<(), OutputFailure> {
+fn subject(frame: &mut Frame, subject: &LocaleSubject) {
     match subject {
         LocaleSubject::Occurrences => frame.uint(0),
         LocaleSubject::RequestedLocale(own) => {
@@ -330,12 +336,6 @@ fn subject(frame: &mut Frame, subject: &LocaleSubject) -> Result<(), OutputFailu
             frame.uint(7);
             key(frame, own);
         }
-        LocaleSubject::MessageFallbackCandidate(owner, position, own) => {
-            frame.uint(8);
-            key(frame, owner);
-            frame.uint(count(*position)?);
-            key(frame, own);
-        }
         LocaleSubject::TargetProfiles => frame.uint(11),
         LocaleSubject::TargetId(id) => {
             frame.uint(12);
@@ -351,7 +351,6 @@ fn subject(frame: &mut Frame, subject: &LocaleSubject) -> Result<(), OutputFailu
             frame.text(id.as_str());
         }
     }
-    Ok(())
 }
 
 fn negotiation_subject(frame: &mut Frame, subject: &NegotiationSubject) {
@@ -369,12 +368,21 @@ fn negotiation_subject(frame: &mut Frame, subject: &NegotiationSubject) {
     }
 }
 
-fn fallback_subject(frame: &mut Frame, subject: &FallbackSubject) {
+fn fallback_subject(frame: &mut Frame, subject: &FallbackSubject) -> Result<(), OutputFailure> {
     match subject {
         FallbackSubject::Sources => frame.uint(0),
         FallbackSubject::Source(own) => {
             frame.uint(1);
             key(frame, own);
+        }
+        FallbackSubject::Sequence(owner) => {
+            frame.uint(4);
+            key(frame, owner);
+        }
+        FallbackSubject::Candidate(owner, position) => {
+            frame.uint(5);
+            key(frame, owner);
+            frame.uint(count(*position)?);
         }
         FallbackSubject::Literal(owner, own) => {
             frame.uint(2);
@@ -386,6 +394,7 @@ fn fallback_subject(frame: &mut Frame, subject: &FallbackSubject) {
             key(frame, owner);
         }
     }
+    Ok(())
 }
 
 fn mode(frame: &mut Frame, mode: CoverageMode) {
@@ -483,7 +492,7 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
     match &unit.subject {
         Subject::Locale(own) => {
             frame.uint(0);
-            subject(frame, own)?;
+            subject(frame, own);
         }
         Subject::Negotiation(own) => {
             frame.uint(1);
@@ -491,7 +500,7 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         }
         Subject::Fallback(own) => {
             frame.uint(2);
-            fallback_subject(frame, own);
+            fallback_subject(frame, own)?;
         }
         Subject::Coverage(own) => {
             frame.uint(3);
@@ -650,20 +659,11 @@ fn aliases(frame: &mut Frame, aliases: &[AliasLocales]) -> Result<(), OutputFail
     Ok(())
 }
 
-fn fallback(frame: &mut Frame, sources: &[FallbackLocales]) -> Result<(), OutputFailure> {
-    frame.uint(count(sources.len())?);
-    for source in sources {
-        admitted(frame, &source.key.locale, locale)?;
-        frame.uint(count(source.candidates.len())?);
-        for candidate in &source.candidates {
-            match candidate {
-                FallbackLocale::Literal(literal) => {
-                    frame.uint(0);
-                    admitted(frame, &literal.locale, locale)?;
-                }
-                FallbackLocale::IntentSource => frame.uint(1),
-            }
-        }
+/// The fallback keys Phase 7 spelled: their sequences are Phase 8's.
+fn fallback_keys(frame: &mut Frame, keys: &[Spelled]) -> Result<(), OutputFailure> {
+    frame.uint(count(keys.len())?);
+    for own in keys {
+        admitted(frame, &own.locale, locale)?;
     }
     Ok(())
 }
@@ -768,11 +768,6 @@ fn location(frame: &mut Frame, location: &Location) -> Result<(), OutputFailure>
             frame.uint(5);
             frame.uint(count(*rank)?);
         }
-        Location::MessageFallbackCandidate(rank, position) => {
-            frame.uint(6);
-            frame.uint(count(*rank)?);
-            frame.uint(count(*position)?);
-        }
         Location::TargetRequestedLocale(id, index) => {
             frame.uint(7);
             frame.text(id.as_str());
@@ -786,13 +781,16 @@ fn location(frame: &mut Frame, location: &Location) -> Result<(), OutputFailure>
     Ok(())
 }
 
-/// The shared domain is what Phases 7 and 8 decided, none of it positional:
-/// every unit's status, the blocking results with their details, the
-/// suggestions, the occurrence total, the values Phase 7 hands Phase 8, and
-/// Phase 8's three policies. The entry domain is where each spelling sits, its
-/// subject, and whether it was corrected, so reordering a set changes the
-/// entry domain alone. Phase 8 names every subject by content, so it adds
-/// nothing to the entry domain.
+/// The shared domain is what Phases 7 and 8 decided, nothing of where a
+/// spelling sits: every unit's status, the blocking results with their
+/// details, the suggestions, the occurrence total, the values Phase 7 hands
+/// Phase 8, and Phase 8's three policies. A fallback candidate's position is
+/// no such place: its sequence's order is semantic. The entry domain is where
+/// each spelling Phase 7 reached sits, its subject, and whether it was
+/// corrected, so reordering a set changes the entry domain alone. Phase 8 adds
+/// nothing to it: a coverage subject is named by content, and a fallback
+/// candidate Phase 8 checks is the one spelling at its position under a key
+/// Phase 7 placed, its correction a suggestion.
 pub(super) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure> {
     let policies = require_observable(resolved)?;
     let locales = &policies.locales;
@@ -827,8 +825,8 @@ pub(super) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure>
     admitted(&mut shared, &locales.negotiation_aliases, |frame, list| {
         aliases(frame, list)
     })?;
-    admitted(&mut shared, &locales.message_fallback, |frame, list| {
-        fallback(frame, list)
+    admitted(&mut shared, &locales.fallback_keys, |frame, list| {
+        fallback_keys(frame, list)
     })?;
     admitted(&mut shared, &locales.target_bound, |_, ()| Ok(()))?;
     admitted(&mut shared, &locales.targets, |frame, list| {
@@ -843,7 +841,7 @@ pub(super) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure>
     entry.uint(count(locales.occurrences.len())?);
     for occurrence in &locales.occurrences {
         location(&mut entry, &occurrence.location)?;
-        subject(&mut entry, &occurrence.subject)?;
+        subject(&mut entry, &occurrence.subject);
         entry.flag(occurrence.corrected);
     }
     Ok(Observation {
@@ -1007,6 +1005,19 @@ mod tests {
             ),
             fallback_unit(FallbackSubject::Sources, Check::WithinBound),
             fallback_unit(FallbackSubject::Source(key("en")), Check::UniqueLocale),
+            fallback_unit(FallbackSubject::Sequence(key("en")), Check::WithinBound),
+            fallback_unit(
+                FallbackSubject::Candidate(key("en"), 0),
+                Check::CanonicalLocale,
+            ),
+            fallback_unit(
+                FallbackSubject::Candidate(key("en"), 1),
+                Check::CanonicalLocale,
+            ),
+            fallback_unit(
+                FallbackSubject::Candidate(key("ja"), 0),
+                Check::CanonicalLocale,
+            ),
             fallback_unit(
                 FallbackSubject::Literal(key("en"), key("ja")),
                 Check::UniqueCandidate,

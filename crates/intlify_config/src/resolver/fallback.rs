@@ -2,27 +2,34 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! 015's Phase 8 for the selected declaration's message fallback: the mapping
-//! under `maxFallbackSources`, each sequence under
-//! `maxFallbackCandidatesPerSource`, a source two keys name, a source outside
-//! the project's requested locales, and a sequence that names its own source,
-//! repeats a literal, or repeats the Intent source-locale candidate, all under
-//! the admitted Message Locale Fallback Specification. A sequence keeps the
-//! order it was declared in: nothing here deduplicates, reorders, or expands it
-//! through another source's sequence. Not the Linker's probing of definitions,
-//! which 020 owns, and not the canonicalization of sources and literals, which
-//! Phase 7 did.
+//! under `maxFallbackSources`, a source two keys name, and a source outside
+//! the project's requested locales; then, for each key with an identity no
+//! other key shares, its sequence under `maxFallbackCandidatesPerSource`,
+//! each literal candidate validated and canonicalized, and a sequence that
+//! names its own source, repeats a literal, or repeats the Intent
+//! source-locale candidate, all under the admitted Message Locale Fallback
+//! Specification. A candidate's own checks name it by its position in its
+//! key's sequence, and the repeat checks by its canonical identity or, for
+//! the Intent source-locale candidate, by its fixed kind. Colliding keys and
+//! a key without an identity leave their sequences unchecked: one position
+//! under such a key would merge distinct candidates. A sequence keeps the
+//! order it was declared in: nothing here deduplicates, reorders, or expands
+//! it through another source's sequence. Not the Linker's probing of
+//! definitions, which 020 owns, and not the canonicalization of the keys,
+//! which Phase 7 did.
 
 use std::collections::BTreeMap;
 
-use crate::locale::{CanonicalLocale, VersionedIdentity};
+use crate::locale::{CanonicalLocale, Canonicalizer, Provider, VersionedIdentity};
+use crate::model::{FallbackCandidate, NonEmptyVec};
 
 use super::evaluation::{
-    both, within, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Phase,
-    Reason, Subject, Unit,
+    and, both, within, Admitted, Blocking, Causes, Check, Code, Evaluation, Phase, Reason, Subject,
+    Unit,
 };
 use super::limits::{BoundId, ConfirmedPolicy, Group};
 use super::locales::{
-    FallbackLocale, FallbackLocales, LocaleKey, LocaleSet, ResolvedLocales, Spelled,
+    canonicalize, Content, LocaleInvariant, LocaleKey, LocaleSet, ResolvedLocales, Spelled,
 };
 
 const MAX_FALLBACK_SOURCES: BoundId = BoundId {
@@ -35,17 +42,22 @@ const MAX_FALLBACK_CANDIDATES_PER_SOURCE: BoundId = BoundId {
 };
 
 /// What one fallback unit checks. Kinds are declared so that each unit's
-/// prerequisites come first: the mapping's bound, then each source with its
-/// sequence's bound, then the candidates that wait on it.
+/// prerequisites come first: the mapping's bound, each key, its sequence's
+/// bound, each literal candidate at its position, then the repeats, which
+/// need the candidates' identities.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum FallbackSubject {
     /// The submitted mapping, under `maxFallbackSources`.
     Sources,
     /// A mapping key: the source its sequence falls back from.
     Source(LocaleKey),
-    /// A literal candidate's locale, in its source's sequence.
+    /// A key's sequence, under `maxFallbackCandidatesPerSource`.
+    Sequence(LocaleKey),
+    /// A literal candidate at its position in its key's sequence.
+    Candidate(LocaleKey, usize),
+    /// A literal candidate's locale, in its key's sequence.
     Literal(LocaleKey, LocaleKey),
-    /// The Intent source-locale candidate, in its source's sequence.
+    /// The Intent source-locale candidate, in its key's sequence.
     IntentSource(LocaleKey),
 }
 
@@ -101,58 +113,58 @@ impl<Id> MessageFallbackPolicy<Id> {
     }
 }
 
-/// Phase 8's fallback checks over what Phase 7 resolved. Every unit waits on
-/// the mapping's bound, and every candidate on its sequence's; the policy
-/// exists only when every unit passed.
-pub(crate) fn resolve_fallback<Id: Clone>(
+/// A submitted key as Phase 7 spelled it, with its sequence as submitted.
+struct Entry<'a> {
+    key: &'a Spelled,
+    candidates: &'a [FallbackCandidate],
+}
+
+/// Phase 8's fallback checks over the keys Phase 7 spelled from `fallback`
+/// and the sequences `fallback` holds, with the canonicalizer Phase 5 bound.
+/// Every unit waits on the mapping's bound; a sequence's units wait on its
+/// key holding alone with an identity, and its candidates on the sequence's
+/// bound. The policy exists only when every unit passed.
+pub(crate) fn resolve_fallback<Id: Clone, P: Provider>(
     evaluation: &mut Evaluation,
     policy: Result<&ConfirmedPolicy, &Causes>,
     specification: &Admitted<VersionedIdentity<Id>>,
+    canonicalizer: Result<&Canonicalizer<P>, &Causes>,
     locales: &ResolvedLocales,
-) -> Result<Admitted<MessageFallbackPolicy<Id>>, EvaluationInvariant> {
+    fallback: Admitted<Option<&BTreeMap<String, NonEmptyVec<FallbackCandidate>>>>,
+) -> Result<Admitted<MessageFallbackPolicy<Id>>, LocaleInvariant> {
     let policy = policy.map_err(Causes::clone);
-    let sources = locales.message_fallback.as_ref().map_err(Causes::clone);
+    let keys = locales.fallback_keys.as_ref().map_err(Causes::clone);
     let bounded = evaluation.check(
         unit(FallbackSubject::Sources, Check::WithinBound),
-        both(both(policy.clone(), specification.clone()), sources.clone()),
-        |((policy, _), sources)| {
+        both(both(policy.clone(), specification.clone()), keys.clone()),
+        |((policy, _), keys)| {
             within(
                 MAX_FALLBACK_SOURCES,
                 policy.limits().locale_resolution.max_fallback_sources,
-                sources.len(),
+                keys.len(),
             )
         },
     )?;
-    let entries = sources.map_or(&[][..], Vec::as_slice);
+    let entries = entries(keys.map_or(&[][..], Vec::as_slice), fallback);
+    // As in Phase 7, nothing is canonicalized unless the occurrence bound,
+    // which counts every literal candidate, holds.
+    let spelling = both(
+        canonicalizer.map_err(Causes::clone),
+        locales.occurrence_bound.clone(),
+    )
+    .map(|(canonicalizer, ())| canonicalizer);
     let requested = locales.requested_set.as_ref().map_err(Causes::clone);
     let mut checked = bounded.clone();
-    for (key, sharing) in by_source(entries) {
+    let mut sequences = Ok(BTreeMap::new());
+    for (key, sharing) in by_source(&entries) {
         // Entries under one subject share their key's result.
-        let source = &sharing[0].key;
-        let sequence = evaluation.check(
-            unit(FallbackSubject::Source(key.clone()), Check::WithinBound),
-            both(bounded.clone(), policy.clone()),
-            |((), policy)| {
-                let longest = sharing
-                    .iter()
-                    .map(|entry| entry.candidates.len())
-                    .fold(0, usize::max);
-                within(
-                    MAX_FALLBACK_CANDIDATES_PER_SOURCE,
-                    policy
-                        .limits()
-                        .locale_resolution
-                        .max_fallback_candidates_per_source,
-                    longest,
-                )
-            },
-        )?;
-        let unique = evaluation.check(
+        let spelled = sharing[0].key;
+        let alone = evaluation.check(
             unit(FallbackSubject::Source(key.clone()), Check::UniqueLocale),
-            both(bounded.clone(), source.locale.clone()),
-            |_| {
+            both(bounded.clone(), spelled.locale.clone()),
+            |((), locale)| {
                 if sharing.len() == 1 {
-                    Ok(())
+                    Ok(locale)
                 } else {
                     Err(issue(Code::LocaleDuplicate, None))
                 }
@@ -161,7 +173,7 @@ pub(crate) fn resolve_fallback<Id: Clone>(
         let member = evaluation.check(
             unit(FallbackSubject::Source(key.clone()), Check::RequestedMember),
             both(
-                both(bounded.clone(), source.locale.clone()),
+                both(bounded.clone(), spelled.locale.clone()),
                 requested.clone(),
             ),
             |(((), locale), requested)| {
@@ -172,16 +184,25 @@ pub(crate) fn resolve_fallback<Id: Clone>(
                 }
             },
         )?;
-        let candidates = candidates(evaluation, &sequence, source, &sharing)?;
-        checked = both(
-            both(checked, sequence),
-            both(both(unique, member), candidates),
-        )
-        .map(|_| ());
-    }
-    let mut sequences = Ok(BTreeMap::new());
-    for entry in entries {
-        sequences = both(sequences, both(entry.key.locale.clone(), resolved(entry))).map(
+        // A key holding alone has one sequence, the one its bound measures.
+        let sequence = evaluation.check(
+            unit(FallbackSubject::Sequence(key.clone()), Check::WithinBound),
+            both(alone.clone(), policy.clone()),
+            |(source, policy)| {
+                within(
+                    MAX_FALLBACK_CANDIDATES_PER_SOURCE,
+                    policy
+                        .limits()
+                        .locale_resolution
+                        .max_fallback_candidates_per_source,
+                    sharing[0].candidates.len(),
+                )
+                .map(|()| source)
+            },
+        )?;
+        let (candidates, resolved) = candidates(evaluation, &spelling, key, &sequence, &sharing)?;
+        checked = and(and(checked, and(alone.map(|_| ()), member)), candidates);
+        sequences = both(sequences, both(sequence, resolved)).map(
             |(mut sequences, (source, candidates))| {
                 sequences.insert(source, candidates);
                 sequences
@@ -196,8 +217,29 @@ pub(crate) fn resolve_fallback<Id: Clone>(
     ))
 }
 
+/// Each key Phase 7 spelled with its sequence as submitted, in the map's
+/// order: Phase 7 spelled the keys of this same map.
+fn entries<'a>(
+    keys: &'a [Spelled],
+    fallback: Admitted<Option<&'a BTreeMap<String, NonEmptyVec<FallbackCandidate>>>>,
+) -> Vec<Entry<'a>> {
+    let sequences: Vec<&'a [FallbackCandidate]> =
+        fallback.ok().flatten().map_or_else(Vec::new, |map| {
+            map.values().map(NonEmptyVec::as_slice).collect()
+        });
+    assert_eq!(
+        keys.len(),
+        sequences.len(),
+        "Phase 7 spelled every key of the map"
+    );
+    keys.iter()
+        .zip(sequences)
+        .map(|(key, candidates)| Entry { key, candidates })
+        .collect()
+}
+
 /// The submitted entries grouped by their key's subject, in subject order.
-fn by_source(entries: &[FallbackLocales]) -> BTreeMap<&LocaleKey, Vec<&FallbackLocales>> {
+fn by_source<'e, 'a>(entries: &'e [Entry<'a>]) -> BTreeMap<&'a LocaleKey, Vec<&'e Entry<'a>>> {
     let mut sources: BTreeMap<_, Vec<_>> = BTreeMap::new();
     for entry in entries {
         sources.entry(&entry.key.key).or_default().push(entry);
@@ -205,79 +247,151 @@ fn by_source(entries: &[FallbackLocales]) -> BTreeMap<&LocaleKey, Vec<&FallbackL
     sources
 }
 
-/// The units over one source's candidates, which wait on its sequence's
-/// bound: each literal's identity, never its source and never repeated, and
-/// the Intent source-locale candidate, never repeated. A repeat counts within
-/// one sequence, even when two keys name the source.
-fn candidates(
+/// The units over one key's candidates, which wait on its sequence: each
+/// literal canonicalized at its position and never its source, and each
+/// literal identity and the Intent source-locale candidate never repeated. A
+/// key several entries share has no sequence checked, so its positions merge
+/// their candidates into units none of which is evaluated. Returns whether
+/// every unit passed and the sequence as checked candidates.
+fn candidates<P: Provider>(
     evaluation: &mut Evaluation,
-    sequence: &Admitted<()>,
-    source: &Spelled,
-    sharing: &[&FallbackLocales],
-) -> Result<Admitted<()>, EvaluationInvariant> {
-    // Each literal's subject with the most times one sequence holds it.
-    let mut literals: BTreeMap<&LocaleKey, (&Spelled, usize)> = BTreeMap::new();
-    let mut intent_sources: Option<usize> = None;
+    spelling: &Admitted<&Canonicalizer<P>>,
+    key: &LocaleKey,
+    sequence: &Admitted<CanonicalLocale>,
+    sharing: &[&Entry<'_>],
+) -> Result<(Admitted<()>, Admitted<Vec<Candidate>>), LocaleInvariant> {
+    let canonicalizing =
+        both(spelling.clone(), sequence.clone()).map(|(canonicalizer, _)| canonicalizer);
+    let after = sequence.clone().map(|_| ());
+    // The literals at each position, and the Intent source-locale candidates.
+    let mut positions: BTreeMap<usize, Vec<&str>> = BTreeMap::new();
+    let mut intents = 0;
     for entry in sharing {
-        let mut counted: BTreeMap<&LocaleKey, (&Spelled, usize)> = BTreeMap::new();
-        let mut intent = 0;
-        for candidate in &entry.candidates {
+        for (position, candidate) in entry.candidates.iter().enumerate() {
             match candidate {
-                FallbackLocale::Literal(literal) => {
-                    counted.entry(&literal.key).or_insert((literal, 0)).1 += 1;
-                }
-                FallbackLocale::IntentSource => intent += 1,
+                FallbackCandidate::Locale(raw) => positions.entry(position).or_default().push(raw),
+                FallbackCandidate::IntentSource(_) => intents += 1,
             }
         }
-        for (key, (literal, count)) in counted {
-            let most = &mut literals.entry(key).or_insert((literal, 0)).1;
-            *most = (*most).max(count);
-        }
-        if intent > 0 {
-            intent_sources = Some(intent_sources.map_or(intent, |most| most.max(intent)));
-        }
     }
-    let mut checked = sequence.clone();
-    for (key, (literal, most)) in literals {
-        let subject = FallbackSubject::Literal(source.key.clone(), key.clone());
-        let distinct = evaluation.check(
-            unit(subject.clone(), Check::DistinctFromSource),
-            both(
-                both(sequence.clone(), source.locale.clone()),
-                literal.locale.clone(),
-            ),
-            |(((), source), literal)| {
-                if literal == source {
-                    Err(sequence_invalid(Reason::LiteralSelfReference))
-                } else {
-                    Ok(())
-                }
-            },
-        )?;
-        let once = evaluation.check(
-            unit(subject, Check::UniqueCandidate),
-            both(sequence.clone(), literal.locale.clone()),
-            |_| repeated(most, Reason::LiteralDuplicate),
-        )?;
-        checked = both(checked, both(distinct, once)).map(|_| ());
+    let mut checked = after.clone();
+    let mut found = BTreeMap::new();
+    // Each literal's subject key, what its repeat check waits on, and how
+    // many candidates hold it: the one sequence's, whenever the check runs.
+    let mut literals: BTreeMap<LocaleKey, (Admitted<()>, usize)> = BTreeMap::new();
+    for (position, raws) in positions {
+        let subject = FallbackSubject::Candidate(key.clone(), position);
+        let at = literal_at(evaluation, &canonicalizing, &subject, &raws, sequence)?;
+        let identified = at.locale.clone().map(|_| ());
+        for identity in at.identities {
+            let (waits, holding) = literals.entry(identity).or_insert((Ok(()), 0));
+            *waits = and(waits.clone(), identified.clone());
+            *holding += 1;
+        }
+        checked = and(checked, at.checked);
+        found.insert(position, at.locale);
     }
-    if let Some(most) = intent_sources {
+    for (identity, (waits, holding)) in literals {
         let once = evaluation.check(
             unit(
-                FallbackSubject::IntentSource(source.key.clone()),
+                FallbackSubject::Literal(key.clone(), identity),
                 Check::UniqueCandidate,
             ),
-            sequence.clone(),
-            |()| repeated(most, Reason::IntentSourceDuplicate),
+            and(after.clone(), waits),
+            |()| repeated(holding, Reason::LiteralDuplicate),
         )?;
-        checked = both(checked, once).map(|_| ());
+        checked = and(checked, once);
     }
-    Ok(checked)
+    if intents > 0 {
+        let once = evaluation.check(
+            unit(
+                FallbackSubject::IntentSource(key.clone()),
+                Check::UniqueCandidate,
+            ),
+            after,
+            |()| repeated(intents, Reason::IntentSourceDuplicate),
+        )?;
+        checked = and(checked, once);
+    }
+    let resolved = match sharing {
+        [entry] => resolved(entry, &found),
+        // Keys several entries share check no sequence.
+        _ => sequence.clone().map(|_| Vec::new()),
+    };
+    Ok((checked, resolved))
+}
+
+/// What the units at one position found.
+struct LiteralAt {
+    /// The literal's canonical locale, or why it has none.
+    locale: Admitted<CanonicalLocale>,
+    /// Whether both units passed.
+    checked: Admitted<()>,
+    /// The subject keys the repeat check names the position's literals by:
+    /// the canonical identity, or each spelling when it has none.
+    identities: Vec<LocaleKey>,
+}
+
+/// The two units at one position: the literal canonicalized, its canonical
+/// form suggested when it is spelled otherwise, then compared with its
+/// source. They are evaluated only under a key holding alone, which has one
+/// literal at the position.
+fn literal_at<P: Provider>(
+    evaluation: &mut Evaluation,
+    canonicalizing: &Admitted<&Canonicalizer<P>>,
+    subject: &FallbackSubject,
+    raws: &[&str],
+    sequence: &Admitted<CanonicalLocale>,
+) -> Result<LiteralAt, LocaleInvariant> {
+    let attempt = match canonicalizing {
+        Ok(canonicalizer) => {
+            let &[raw] = raws else {
+                unreachable!("a key holding alone has one sequence");
+            };
+            Ok(canonicalize(canonicalizer, raw)?)
+        }
+        Err(causes) => Err(causes.clone()),
+    };
+    let (identities, corrected) = match &attempt {
+        Ok(Ok((locale, corrected))) => (vec![LocaleKey::Canonical(locale.clone())], *corrected),
+        // A literal without a canonical locale stands for itself.
+        _ => (
+            raws.iter()
+                .map(|raw| LocaleKey::Content(Content::new(raw)))
+                .collect(),
+            false,
+        ),
+    };
+    let own = |check| unit(subject.clone(), check);
+    let locale = evaluation.check(
+        own(Check::CanonicalLocale),
+        attempt.map(|attempt| attempt.map(|(locale, _)| locale)),
+        |attempt| attempt,
+    )?;
+    if corrected {
+        evaluation.notice(own(Check::CanonicalLocale), Code::LocaleNonCanonical)?;
+    }
+    let distinct = evaluation.check(
+        own(Check::DistinctFromSource),
+        both(locale.clone(), sequence.clone()),
+        |(literal, source)| {
+            if literal == source {
+                Err(sequence_invalid(Reason::LiteralSelfReference))
+            } else {
+                Ok(())
+            }
+        },
+    )?;
+    Ok(LiteralAt {
+        checked: and(locale.clone().map(|_| ()), distinct),
+        locale,
+        identities,
+    })
 }
 
 /// A candidate's issue when one sequence holds it more than once.
-fn repeated(most: usize, reason: Reason) -> Result<(), Blocking> {
-    if most > 1 {
+fn repeated(holding: usize, reason: Reason) -> Result<(), Blocking> {
+    if holding > 1 {
         Err(sequence_invalid(reason))
     } else {
         Ok(())
@@ -285,12 +399,15 @@ fn repeated(most: usize, reason: Reason) -> Result<(), Blocking> {
 }
 
 /// One entry's sequence as checked candidates, in its declared order.
-fn resolved(entry: &FallbackLocales) -> Admitted<Vec<Candidate>> {
+fn resolved(
+    entry: &Entry<'_>,
+    found: &BTreeMap<usize, Admitted<CanonicalLocale>>,
+) -> Admitted<Vec<Candidate>> {
     let mut candidates = Ok(Vec::with_capacity(entry.candidates.len()));
-    for candidate in &entry.candidates {
+    for (position, candidate) in entry.candidates.iter().enumerate() {
         let checked = match candidate {
-            FallbackLocale::Literal(literal) => literal.locale.clone().map(Candidate::Literal),
-            FallbackLocale::IntentSource => Ok(Candidate::IntentSource),
+            FallbackCandidate::Locale(_) => found[&position].clone().map(Candidate::Literal),
+            FallbackCandidate::IntentSource(_) => Ok(Candidate::IntentSource),
         };
         candidates = both(candidates, checked).map(|(mut candidates, candidate)| {
             candidates.push(candidate);
@@ -321,8 +438,8 @@ mod tests {
     use crate::input_limits::Bound;
     use crate::resolver::evaluation::{Actual, LimitExceeded, Status};
     use crate::resolver::locales::fixtures::{
-        canonical, canonicalizer, content, declaration, key, limits, stand_in, units, waits_on,
-        Declaration,
+        canonical, canonicalizer, content, declaration, key, limits, notices, stand_in, units,
+        waits_on, Declaration,
     };
     use crate::resolver::locales::{self, resolve_locales, LocaleFields, LocaleSubject};
     use crate::resolver::specification::Slot;
@@ -363,23 +480,60 @@ mod tests {
         policy: Admitted<MessageFallbackPolicy<Id>>,
     }
 
+    /// What Phase 8 canonicalizes candidates under: the finite provider's
+    /// identifier bound, which Phase 7 shares, and the causes standing in for
+    /// an unavailable canonicalizer or for an occurrence bound Phase 7 found
+    /// exceeded, when a test gives them.
+    struct Spelling<'c> {
+        identifier_bytes: u64,
+        unbound: Option<&'c Causes>,
+        uncounted: Option<&'c Causes>,
+    }
+
+    const ROOM: Spelling<'static> = Spelling {
+        identifier_bytes: 64,
+        unbound: None,
+        uncounted: None,
+    };
+
     /// Phase 7 over `fields` under a policy with room for them, then Phase 8's
     /// fallback under `policy` and `specification`, into one evaluation.
+    fn resolve_with(
+        fields: &LocaleFields<'_, FixtureTargetReference>,
+        policy: Result<&ConfirmedPolicy, &Causes>,
+        specification: &Admitted<VersionedIdentity<Id>>,
+        spelling: &Spelling<'_>,
+    ) -> Resolved {
+        let mut evaluation = Evaluation::default();
+        let canonicalizer = canonicalizer(spelling.identifier_bytes);
+        let mut locales = resolve_locales(
+            &mut evaluation,
+            Ok(&self::policy(100, 100)),
+            Ok(&canonicalizer),
+            fields,
+        )
+        .unwrap();
+        if let Some(uncounted) = spelling.uncounted {
+            locales.occurrence_bound = Err(uncounted.clone());
+        }
+        let policy = resolve_fallback(
+            &mut evaluation,
+            policy,
+            specification,
+            spelling.unbound.map_or(Ok(&canonicalizer), Err),
+            &locales,
+            fields.message_fallback.clone(),
+        )
+        .unwrap();
+        Resolved { evaluation, policy }
+    }
+
     fn resolve_fields(
         fields: &LocaleFields<'_, FixtureTargetReference>,
         policy: Result<&ConfirmedPolicy, &Causes>,
         specification: &Admitted<VersionedIdentity<Id>>,
     ) -> Resolved {
-        let mut evaluation = Evaluation::default();
-        let locales = resolve_locales(
-            &mut evaluation,
-            Ok(&self::policy(100, 100)),
-            Ok(&canonicalizer(64)),
-            fields,
-        )
-        .unwrap();
-        let policy = resolve_fallback(&mut evaluation, policy, specification, &locales).unwrap();
-        Resolved { evaluation, policy }
+        resolve_with(fields, policy, specification, &ROOM)
     }
 
     fn resolve_under(declaration: &Declaration, sources: u64, candidates: u64) -> Resolved {
@@ -418,6 +572,14 @@ mod tests {
             .collect()
     }
 
+    fn evaluated(units: &[&[Unit]]) -> Vec<(Unit, Status)> {
+        units
+            .concat()
+            .into_iter()
+            .map(|unit| (unit, Status::Evaluated))
+            .collect()
+    }
+
     fn sources_unit() -> Unit {
         unit(FallbackSubject::Sources, Check::WithinBound)
     }
@@ -426,8 +588,19 @@ mod tests {
         unit(FallbackSubject::Source(source), check)
     }
 
-    fn literal_unit(source: LocaleKey, literal: LocaleKey, check: Check) -> Unit {
-        unit(FallbackSubject::Literal(source, literal), check)
+    fn sequence_unit(source: LocaleKey) -> Unit {
+        unit(FallbackSubject::Sequence(source), Check::WithinBound)
+    }
+
+    fn candidate_unit(source: LocaleKey, position: usize, check: Check) -> Unit {
+        unit(FallbackSubject::Candidate(source, position), check)
+    }
+
+    fn literal_unit(source: LocaleKey, literal: LocaleKey) -> Unit {
+        unit(
+            FallbackSubject::Literal(source, literal),
+            Check::UniqueCandidate,
+        )
     }
 
     fn intent_unit(source: LocaleKey) -> Unit {
@@ -437,20 +610,16 @@ mod tests {
         )
     }
 
-    /// Every unit one source records with no candidates after it.
-    fn source_units(source: &str) -> [Unit; 3] {
-        [
-            Check::WithinBound,
-            Check::UniqueLocale,
-            Check::RequestedMember,
-        ]
-        .map(|check| source_unit(key(source), check))
+    /// Both units of one key.
+    fn source_units(source: &str) -> [Unit; 2] {
+        [Check::UniqueLocale, Check::RequestedMember].map(|check| source_unit(key(source), check))
     }
 
-    /// The two units of one literal.
-    fn literal_units(source: &str, literal: &str) -> [Unit; 2] {
-        [Check::DistinctFromSource, Check::UniqueCandidate]
-            .map(|check| literal_unit(key(source), key(literal), check))
+    /// Both units of the literal candidate at `position` in `source`'s
+    /// sequence.
+    fn candidate_units(source: &LocaleKey, position: usize) -> [Unit; 2] {
+        [Check::CanonicalLocale, Check::DistinctFromSource]
+            .map(|check| candidate_unit(source.clone(), position, check))
     }
 
     /// Each source's sequence as spelled, sources in their order.
@@ -474,12 +643,19 @@ mod tests {
     }
 
     #[test]
-    fn subjects_order_the_bound_first_then_sources_then_their_candidates() {
+    fn subjects_order_the_bound_then_keys_sequences_candidates_and_repeats() {
         let ordered = [
             FallbackSubject::Sources,
             FallbackSubject::Source(key("de")),
             FallbackSubject::Source(key("ja")),
             FallbackSubject::Source(content("zz")),
+            FallbackSubject::Sequence(key("ja")),
+            FallbackSubject::Sequence(content("zz")),
+            FallbackSubject::Candidate(key("de"), 1),
+            FallbackSubject::Candidate(key("ja"), 0),
+            FallbackSubject::Candidate(key("ja"), 2),
+            // A position is a number, not its decimal spelling.
+            FallbackSubject::Candidate(key("ja"), 10),
             FallbackSubject::Literal(key("de"), key("ja")),
             FallbackSubject::Literal(key("ja"), key("de")),
             FallbackSubject::Literal(key("ja"), key("en")),
@@ -487,9 +663,15 @@ mod tests {
             FallbackSubject::IntentSource(key("ja")),
         ];
         assert!(ordered.windows(2).all(|pair| pair[0] < pair[1]));
-        // A sequence's bound runs before the checks of its source's key.
+        // A key's collision check runs before its membership, and a
+        // candidate's identity before the comparison with its source.
         let source = FallbackSubject::Source(key("ja"));
-        assert!(unit(source.clone(), Check::WithinBound) < unit(source, Check::UniqueLocale));
+        assert!(unit(source.clone(), Check::UniqueLocale) < unit(source, Check::RequestedMember));
+        let candidate = FallbackSubject::Candidate(key("ja"), 0);
+        assert!(
+            unit(candidate.clone(), Check::CanonicalLocale)
+                < unit(candidate, Check::DistinctFromSource)
+        );
         // Negotiation's units commit before fallback's.
         assert!(
             crate::resolver::negotiation::unit(
@@ -566,66 +748,152 @@ mod tests {
         );
         assert_eq!(
             statuses(&resolved.evaluation),
-            [
-                [sources_unit()].as_slice(),
+            evaluated(&[
+                &[sources_unit()],
                 &source_units("fr"),
-                &literal_units("fr", "de"),
-            ]
-            .concat()
-            .into_iter()
-            .map(|unit| (unit, Status::Evaluated))
-            .collect::<Vec<_>>()
+                &[sequence_unit(key("fr"))],
+                &candidate_units(&key("fr"), 0),
+                &[literal_unit(key("fr"), key("de"))],
+            ])
         );
         assert_eq!(units(&resolved.policy.unwrap_err()), [outside]);
     }
 
     #[test]
-    fn two_keys_naming_one_source_are_a_locale_duplicate_and_each_sequence_counts_alone() {
-        // `de` and the Intent source once in each sequence are no repeat; the
-        // longer sequence is the one its source's bound measures.
+    fn each_literal_is_canonicalized_at_its_position_and_a_differing_spelling_corrected() {
+        let resolved = resolve(&declared(
+            &["ja"],
+            json!({"ja": ["EN", intent(), "de", "EN-us"]}),
+        ));
+        assert_eq!(issues(&resolved.evaluation), []);
+        // The Intent source at position 1 spells no locale, so the position
+        // has no unit; the repeat checks name each literal by its identity.
+        assert_eq!(
+            statuses(&resolved.evaluation),
+            evaluated(&[
+                &[sources_unit()],
+                &source_units("ja"),
+                &[sequence_unit(key("ja"))],
+                &candidate_units(&key("ja"), 0),
+                &candidate_units(&key("ja"), 2),
+                &candidate_units(&key("ja"), 3),
+                &[
+                    literal_unit(key("ja"), key("de")),
+                    literal_unit(key("ja"), key("en")),
+                    literal_unit(key("ja"), key("en-US")),
+                    intent_unit(key("ja")),
+                ],
+            ])
+        );
+        assert_eq!(
+            notices(&resolved.evaluation),
+            [0, 3].map(|position| candidate_unit(key("ja"), position, Check::CanonicalLocale))
+        );
+        assert_eq!(
+            sequences(&resolved.policy.unwrap()),
+            [("ja", vec!["en", "(intent source)", "de", "en-US"])]
+        );
+    }
+
+    #[test]
+    fn two_keys_naming_one_source_are_a_duplicate_whose_sequences_are_never_checked() {
+        // The longer sequence is over its bound, and `de` sits in both, but
+        // neither sequence is measured or checked: one position under the
+        // shared key would merge the candidates of two sequences.
         let declaration = declared(
             &["en"],
             json!({"EN": ["de", intent()], "en": ["fr", "de", intent()]}),
         );
-        let duplicate = (
-            source_unit(key("en"), Check::UniqueLocale),
-            "project-profile-locale-duplicate",
-            None,
-        );
-        let resolved = resolve_under(&declaration, 100, 3);
-        assert_eq!(
-            issues(&resolved.evaluation),
-            std::slice::from_ref(&duplicate)
-        );
-        assert_eq!(
-            units(&resolved.policy.unwrap_err()),
-            std::slice::from_ref(&duplicate.0)
-        );
-
+        let duplicate = source_unit(key("en"), Check::UniqueLocale);
         let resolved = resolve_under(&declaration, 100, 2);
-        let sequence = source_unit(key("en"), Check::WithinBound);
         assert_eq!(
             issues(&resolved.evaluation),
-            [
-                (
-                    sequence.clone(),
-                    "project-profile-resource-limit-exceeded",
-                    None
-                ),
-                duplicate,
-            ]
+            [(duplicate.clone(), "project-profile-locale-duplicate", None)]
         );
-        let found = resolved
-            .evaluation
-            .issues()
-            .find(|key| key.unit() == &sequence);
+        // Position 0 holds `de` and `fr`, position 1 `de`, and position 2 only
+        // the Intent source. No literal has an identity, so each stands for
+        // its spelling.
+        let waiting = [
+            [sequence_unit(key("en"))].as_slice(),
+            &candidate_units(&key("en"), 0),
+            &candidate_units(&key("en"), 1),
+            &[
+                literal_unit(key("en"), content("de")),
+                literal_unit(key("en"), content("fr")),
+                intent_unit(key("en")),
+            ],
+        ]
+        .concat();
+        for unit in &waiting {
+            assert_eq!(
+                waits_on(&resolved.evaluation, unit),
+                Some(vec![duplicate.clone()]),
+                "{unit:?}"
+            );
+        }
+        // The mapping, the key's two, and every unit that waits.
+        assert_eq!(statuses(&resolved.evaluation).len(), 3 + waiting.len());
         assert_eq!(
-            resolved.evaluation.limit(found.unwrap()),
-            Some(LimitExceeded {
-                bound: MAX_FALLBACK_CANDIDATES_PER_SOURCE,
-                limit: Bound::new(2).unwrap(),
-                actual: Actual::Exact(3),
-            })
+            waits_on(
+                &resolved.evaluation,
+                &source_unit(key("en"), Check::RequestedMember)
+            ),
+            None
+        );
+        assert_eq!(units(&resolved.policy.unwrap_err()), [duplicate]);
+    }
+
+    #[test]
+    fn a_key_without_an_identity_leaves_its_sequence_never_checked() {
+        let resolved = resolve(&declared(
+            &["ja"],
+            json!({"zz": ["de", "de"], "ja": ["zz"]}),
+        ));
+        let invalid_key = locales::unit(
+            LocaleSubject::MessageFallbackKey(content("zz")),
+            Check::CanonicalLocale,
+        );
+        // The repeated `de` is never found: one position under a key without
+        // an identity could merge the candidates of distinct keys.
+        for waiting in [
+            source_unit(content("zz"), Check::UniqueLocale),
+            source_unit(content("zz"), Check::RequestedMember),
+            sequence_unit(content("zz")),
+            candidate_unit(content("zz"), 0, Check::CanonicalLocale),
+            candidate_unit(content("zz"), 0, Check::DistinctFromSource),
+            candidate_unit(content("zz"), 1, Check::CanonicalLocale),
+            candidate_unit(content("zz"), 1, Check::DistinctFromSource),
+            literal_unit(content("zz"), content("de")),
+        ] {
+            assert_eq!(
+                waits_on(&resolved.evaluation, &waiting),
+                Some(vec![invalid_key.clone()]),
+                "{waiting:?}"
+            );
+        }
+        // A literal without an identity is Phase 8's issue, and only what
+        // needs its identity waits on it.
+        let invalid_literal = candidate_unit(key("ja"), 0, Check::CanonicalLocale);
+        assert_eq!(
+            issues(&resolved.evaluation),
+            [(
+                invalid_literal.clone(),
+                "project-profile-locale-invalid",
+                None
+            )]
+        );
+        for waiting in [
+            candidate_unit(key("ja"), 0, Check::DistinctFromSource),
+            literal_unit(key("ja"), content("zz")),
+        ] {
+            assert_eq!(
+                waits_on(&resolved.evaluation, &waiting),
+                Some(vec![invalid_literal.clone()])
+            );
+        }
+        assert_eq!(
+            waits_on(&resolved.evaluation, &sequence_unit(key("ja"))),
+            None
         );
     }
 
@@ -640,14 +908,14 @@ mod tests {
             issues(&resolved.evaluation),
             [
                 (
-                    literal_unit(key("ja"), key("en"), Check::UniqueCandidate),
-                    invalid,
-                    Some("literal-duplicate")
-                ),
-                (
-                    literal_unit(key("ja"), key("ja"), Check::DistinctFromSource),
+                    candidate_unit(key("ja"), 0, Check::DistinctFromSource),
                     invalid,
                     Some("literal-self-reference")
+                ),
+                (
+                    literal_unit(key("ja"), key("en")),
+                    invalid,
+                    Some("literal-duplicate")
                 ),
                 (
                     intent_unit(key("ja")),
@@ -656,14 +924,47 @@ mod tests {
                 ),
             ]
         );
-        // `ja` names its source once; `en` is not the source.
+        // `ja` is named once, and neither `en` nor `EN` is the source.
         for evaluated in [
-            literal_unit(key("ja"), key("ja"), Check::UniqueCandidate),
-            literal_unit(key("ja"), key("en"), Check::DistinctFromSource),
+            literal_unit(key("ja"), key("ja")),
+            candidate_unit(key("ja"), 1, Check::DistinctFromSource),
+            candidate_unit(key("ja"), 2, Check::DistinctFromSource),
         ] {
             assert_eq!(waits_on(&resolved.evaluation, &evaluated), None);
         }
+        assert_eq!(
+            notices(&resolved.evaluation),
+            [candidate_unit(key("ja"), 2, Check::CanonicalLocale)]
+        );
         assert_eq!(units(&resolved.policy.unwrap_err()).len(), 3);
+    }
+
+    #[test]
+    fn each_position_naming_its_source_is_its_own_self_reference() {
+        // Two spellings of the source: a self-reference at each position,
+        // and one repeat of the literal they share.
+        let resolved = resolve(&declared(&["en"], json!({"en": ["en", "EN"]})));
+        let invalid = "project-profile-message-fallback-sequence-invalid";
+        assert_eq!(
+            issues(&resolved.evaluation),
+            [
+                (
+                    candidate_unit(key("en"), 0, Check::DistinctFromSource),
+                    invalid,
+                    Some("literal-self-reference")
+                ),
+                (
+                    candidate_unit(key("en"), 1, Check::DistinctFromSource),
+                    invalid,
+                    Some("literal-self-reference")
+                ),
+                (
+                    literal_unit(key("en"), key("en")),
+                    invalid,
+                    Some("literal-duplicate")
+                ),
+            ]
+        );
     }
 
     #[test]
@@ -700,7 +1001,8 @@ mod tests {
         );
         let over = resolved.policy.unwrap_err();
         assert_eq!(units(&over), [sources_unit()]);
-        // The source's three units and two for each of its literals wait.
+        // The key's two units, its sequence, the two of the position both
+        // literals share, and a repeat check for each literal's spelling wait.
         let recorded = statuses(&resolved.evaluation);
         assert_eq!(recorded.len(), 8);
         assert!(recorded[1..]
@@ -715,14 +1017,14 @@ mod tests {
         assert_eq!(
             issues(&resolved.evaluation),
             [(
-                literal_unit(key("ja"), key("en"), Check::UniqueCandidate),
+                literal_unit(key("ja"), key("en")),
                 "project-profile-message-fallback-sequence-invalid",
                 Some("literal-duplicate")
             )]
         );
 
         let resolved = resolve_under(&declaration, 100, 2);
-        let sequence = source_unit(key("ja"), Check::WithinBound);
+        let sequence = sequence_unit(key("ja"));
         assert_eq!(
             issues(&resolved.evaluation),
             [(
@@ -733,17 +1035,25 @@ mod tests {
         );
         let found = resolved.evaluation.issues().last().unwrap();
         assert_eq!(
-            resolved
-                .evaluation
-                .limit(found)
-                .map(|exceeded| exceeded.actual),
-            Some(Actual::Exact(3))
+            resolved.evaluation.limit(found),
+            Some(LimitExceeded {
+                bound: MAX_FALLBACK_CANDIDATES_PER_SOURCE,
+                limit: Bound::new(2).unwrap(),
+                actual: Actual::Exact(3),
+            })
         );
+        // Nothing past the bound is canonicalized, so `en` stands for its
+        // spelling.
         for candidate in [
-            literal_unit(key("ja"), key("en"), Check::DistinctFromSource),
-            literal_unit(key("ja"), key("en"), Check::UniqueCandidate),
-            intent_unit(key("ja")),
-        ] {
+            &candidate_units(&key("ja"), 0)[..],
+            &candidate_units(&key("ja"), 2),
+            &[
+                literal_unit(key("ja"), content("en")),
+                intent_unit(key("ja")),
+            ],
+        ]
+        .concat()
+        {
             assert_eq!(
                 waits_on(&resolved.evaluation, &candidate),
                 Some(vec![sequence.clone()])
@@ -759,61 +1069,106 @@ mod tests {
     }
 
     #[test]
-    fn an_invalid_spelling_leaves_only_the_units_needing_its_identity_not_evaluated() {
-        let resolved = resolve(&declared(
-            &["ja"],
-            json!({"zz": ["de", "de"], "ja": ["zz"]}),
-        ));
-        let invalid_source = locales::unit(
-            LocaleSubject::MessageFallbackKey(content("zz")),
-            Check::CanonicalLocale,
-        );
-        let invalid_literal = locales::unit(
-            LocaleSubject::MessageFallbackCandidate(key("ja"), 0, content("zz")),
-            Check::CanonicalLocale,
-        );
-        for (waiting, cause) in [
+    fn a_literal_waits_on_the_canonicalizer_and_phase_7_s_count_and_is_bounded_in_bytes() {
+        let declaration = declared(&["ja"], json!({"ja": ["en-US", intent(), "en"]}));
+        let fields = LocaleFields::declared(&declaration);
+        let confirmed = policy(100, 100);
+        let unbound = stand_in(Slot::LocaleCanonicalization);
+        // Phase 7's occurrence bound, exceeded in another run.
+        let uncounted = resolve_locales(
+            &mut Evaluation::default(),
+            Ok(&locales::fixtures::policy(64, 1, 100)),
+            Ok(&canonicalizer(64)),
+            &fields,
+        )
+        .unwrap()
+        .occurrence_bound
+        .unwrap_err();
+        for (spelling, causes) in [
             (
-                source_unit(content("zz"), Check::UniqueLocale),
-                &invalid_source,
+                Spelling {
+                    unbound: Some(&unbound),
+                    ..ROOM
+                },
+                &unbound,
             ),
             (
-                source_unit(content("zz"), Check::RequestedMember),
-                &invalid_source,
-            ),
-            (
-                literal_unit(content("zz"), key("de"), Check::DistinctFromSource),
-                &invalid_source,
-            ),
-            (
-                literal_unit(key("ja"), content("zz"), Check::DistinctFromSource),
-                &invalid_literal,
-            ),
-            (
-                literal_unit(key("ja"), content("zz"), Check::UniqueCandidate),
-                &invalid_literal,
+                Spelling {
+                    uncounted: Some(&uncounted),
+                    ..ROOM
+                },
+                &uncounted,
             ),
         ] {
-            assert_eq!(
-                waits_on(&resolved.evaluation, &waiting),
-                Some(vec![cause.clone()])
-            );
+            let resolved = resolve_with(&fields, Ok(&confirmed), &Ok(SPECIFICATION), &spelling);
+            for literal in [
+                &candidate_units(&key("ja"), 0)[..],
+                &candidate_units(&key("ja"), 2),
+                &[
+                    literal_unit(key("ja"), content("en-US")),
+                    literal_unit(key("ja"), content("en")),
+                ],
+            ]
+            .concat()
+            {
+                assert_eq!(
+                    waits_on(&resolved.evaluation, &literal),
+                    Some(units(causes)),
+                    "{literal:?}"
+                );
+            }
+            // The key, its sequence, and the Intent source need no locale
+            // read.
+            for evaluated in [
+                source_unit(key("ja"), Check::UniqueLocale),
+                sequence_unit(key("ja")),
+                intent_unit(key("ja")),
+            ] {
+                assert_eq!(waits_on(&resolved.evaluation, &evaluated), None);
+            }
+            assert_eq!(resolved.policy, Err(causes.clone()));
         }
-        // A sequence's bound and a repeat need no source identity.
+        // Each literal is measured in bytes before the provider reads it.
+        let short = resolve_with(
+            &fields,
+            Ok(&confirmed),
+            &Ok(SPECIFICATION),
+            &Spelling {
+                identifier_bytes: 4,
+                ..ROOM
+            },
+        );
+        let long = candidate_unit(key("ja"), 0, Check::CanonicalLocale);
         assert_eq!(
-            waits_on(
-                &resolved.evaluation,
-                &source_unit(content("zz"), Check::WithinBound)
-            ),
-            None
+            issues(&short.evaluation),
+            [(
+                long.clone(),
+                "project-profile-resource-limit-exceeded",
+                None
+            )]
+        );
+        let found = short.evaluation.issues().last().unwrap();
+        assert_eq!(
+            short.evaluation.limit(found),
+            Some(LimitExceeded {
+                bound: BoundId {
+                    group: Group::LocaleResolution,
+                    name: "maxLocaleIdentifierBytes",
+                },
+                limit: Bound::new(4).unwrap(),
+                actual: Actual::Exact(5),
+            })
         );
         assert_eq!(
-            issues(&resolved.evaluation),
-            [(
-                literal_unit(content("zz"), key("de"), Check::UniqueCandidate),
-                "project-profile-message-fallback-sequence-invalid",
-                Some("literal-duplicate")
-            )]
+            waits_on(
+                &short.evaluation,
+                &literal_unit(key("ja"), content("en-US"))
+            ),
+            Some(vec![long])
+        );
+        assert_eq!(
+            waits_on(&short.evaluation, &literal_unit(key("ja"), key("en"))),
+            None
         );
     }
 
@@ -880,9 +1235,10 @@ mod tests {
             let resolved = resolve_fields(&fields, policy, &specification);
             assert_eq!(issues(&resolved.evaluation), []);
             let recorded = statuses(&resolved.evaluation);
-            // The mapping, the source's three, the literal's two, the Intent
-            // source's one.
-            assert_eq!(recorded.len(), 7);
+            // The mapping, the key's two, its sequence, the two of its
+            // literal's position, the literal's repeat, and the Intent
+            // source's.
+            assert_eq!(recorded.len(), 8);
             assert!(recorded
                 .iter()
                 .all(|(_, status)| status == &Status::NotEvaluated(causes.clone())));

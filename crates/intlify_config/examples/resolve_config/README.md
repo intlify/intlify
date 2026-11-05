@@ -4,7 +4,7 @@ Edit a project-profile configuration and inspect its normalized locales or valid
 
 > [!IMPORTANT]
 >
-> This is not a complete project-profile resolver. It uses a **finite test locale provider**, does not fetch policy or target-profile bodies, and does not produce a `LocalizationProjectProfile`. A successful run means only that structural validation, profile selection, and locale resolution succeeded: every locale spelling of the profile was counted, every spelling outside the coverage rules was canonicalized, no requested-locale set names a locale twice, and the default requested locale is one of the requested locales.
+> This is not a complete project-profile resolver. It uses a **finite test locale provider**, does not fetch policy or target-profile bodies, and does not produce a `LocalizationProjectProfile`. A successful run means only that structural validation, profile selection, and locale resolution succeeded: every locale spelling of the profile was counted, every spelling outside the fallback sequences and coverage rules was canonicalized, no requested-locale set names a locale twice, and the default requested locale is one of the requested locales.
 
 ## Run the example
 
@@ -49,7 +49,7 @@ Try these changes **one at a time** under `profiles.app`, starting from the supp
 | Set `requestedLocales` to `["en", "EN"]` and `defaultRequestedLocale` to `"en"` | `project-profile-locale-duplicate`, with both occurrence paths. Duplicates are not silently removed. |
 | Set `defaultRequestedLocale` to `"fr"` | `project-profile-default-requested-locale-not-in-project`, because `fr` is not in the requested set. |
 | Set `defaultRequestedLocale` to `"en_US"` | `project-profile-locale-invalid`. |
-| Add `"messageFallback": {"ja": ["EN"]}` | A suggested correction for the fallback candidate: spellings beyond the project's own are canonicalized too. |
+| Add `"messageFallback": {"EN-us": ["ja"]}` | A suggested correction for the fallback key, `(key) -> en-US`: spellings beyond the project's own are canonicalized too. The key's candidates are left to locale-policy resolution, which this example does not run. |
 | Add `"localeNegotiation": {"aliases": {"iw-IL": "EN"}}` | Two suggested corrections for one alias: `(key) -> he-IL` renames the key, and `-> en` replaces its value. |
 | Set `defaultRequestedLocale` to `"pt-BR"` | `UnsupportedLocaleInput`: the fixture lacks this locale; this does **not** mean the locale is invalid. Resolution stops there, so this diagnostic has no pointer. |
 | Remove `policies.glossarySet` | `RequiredFieldMissing`. This field must be present, even when its value is `null`. |

@@ -20,8 +20,8 @@ use super::super::evaluation::{
 };
 use super::bound::MAX_LOCALE_IDENTIFIER_BYTES;
 use super::{
-    issue, unit, AliasLocales, Content, FallbackLocale, FallbackLocales, LocaleInvariant,
-    LocaleKey, LocaleOccurrence, LocaleSet, LocaleSubject, Location, Spelled, TargetLocales,
+    issue, unit, AliasLocales, Content, LocaleInvariant, LocaleKey, LocaleOccurrence, LocaleSet,
+    LocaleSubject, Location, Spelled, TargetLocales,
 };
 
 /// Where a spelling sits before its own key is known: its subject's kind and
@@ -33,7 +33,6 @@ pub(super) enum Scope {
     NegotiationAliasKey,
     NegotiationAliasValue(LocaleKey),
     MessageFallbackKey,
-    MessageFallbackCandidate(LocaleKey, usize),
     TargetRequestedLocale(TargetId),
     TargetDefaultRequestedLocale(TargetId),
 }
@@ -49,9 +48,6 @@ impl Scope {
             Self::NegotiationAliasKey => LocaleSubject::NegotiationAliasKey(key),
             Self::NegotiationAliasValue(owner) => LocaleSubject::NegotiationAliasValue(owner, key),
             Self::MessageFallbackKey => LocaleSubject::MessageFallbackKey(key),
-            Self::MessageFallbackCandidate(owner, position) => {
-                LocaleSubject::MessageFallbackCandidate(owner, position, key)
-            }
             Self::TargetRequestedLocale(id) => LocaleSubject::TargetRequestedLocale(id, key),
             Self::TargetDefaultRequestedLocale(id) => {
                 LocaleSubject::TargetDefaultRequestedLocale(id)
@@ -202,16 +198,17 @@ impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
             .collect())
     }
 
-    /// Fallback keys, then each literal candidate under its key's subject key
-    /// at its position. A sequence keeps its declared order.
-    pub(super) fn fallback(
+    /// Fallback keys, in the order the map holds them. Their candidates are
+    /// Phase 8's: it checks a key's sequence only once the key has an
+    /// identity no other key shares.
+    pub(super) fn fallback_keys(
         &mut self,
         fallback: Option<&BTreeMap<String, NonEmptyVec<FallbackCandidate>>>,
-    ) -> Result<Vec<FallbackLocales>, LocaleInvariant> {
+    ) -> Result<Vec<Spelled>, LocaleInvariant> {
         let Some(fallback) = fallback else {
             return Ok(Vec::new());
         };
-        let keys = self.spell(
+        self.spell(
             fallback
                 .keys()
                 .enumerate()
@@ -223,37 +220,7 @@ impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
                     )
                 })
                 .collect(),
-        )?;
-        let mut literals = Vec::new();
-        for (rank, (sequence, key)) in fallback.values().zip(&keys).enumerate() {
-            for (position, candidate) in sequence.as_slice().iter().enumerate() {
-                if let FallbackCandidate::Locale(raw) = candidate {
-                    literals.push((
-                        Location::MessageFallbackCandidate(rank, position),
-                        Scope::MessageFallbackCandidate(key.key.clone(), position),
-                        raw.as_str(),
-                    ));
-                }
-            }
-        }
-        let mut literals = self.spell(literals)?.into_iter();
-        Ok(fallback
-            .values()
-            .zip(keys)
-            .map(|(sequence, key)| FallbackLocales {
-                key,
-                candidates: sequence
-                    .as_slice()
-                    .iter()
-                    .map(|candidate| match candidate {
-                        FallbackCandidate::Locale(_) => FallbackLocale::Literal(
-                            literals.next().expect("one result per literal"),
-                        ),
-                        FallbackCandidate::IntentSource(_) => FallbackLocale::IntentSource,
-                    })
-                    .collect(),
-            })
-            .collect())
+        )
     }
 
     /// Each target's requested locales, checked for a locale named twice, and
@@ -664,7 +631,7 @@ mod tests {
     }
 
     #[test]
-    fn alias_destinations_and_fallback_candidates_sit_under_their_keys() {
+    fn alias_destinations_sit_under_their_keys_and_fallback_keys_are_spelled_alone() {
         let canonicalizer = canonicalizer(64);
         let mut evaluation = Evaluation::default();
         let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer));
@@ -695,26 +662,16 @@ mod tests {
                 "zz": ["en"]
             }))
             .unwrap();
-        let fallback = pass.fallback(Some(&sequences)).unwrap();
+        let keys = pass.fallback_keys(Some(&sequences)).unwrap();
         assert_eq!(pass.aliases(None).unwrap(), []);
-        assert_eq!(pass.fallback(None).unwrap(), []);
+        assert_eq!(pass.fallback_keys(None).unwrap(), []);
         let occurrences = pass.into_occurrences();
-        assert_eq!(fallback.len(), 2);
-        assert_eq!(fallback[0].key, spelled("ja"));
-        assert_eq!(
-            fallback[0].candidates,
-            [
-                FallbackLocale::Literal(spelled("en")),
-                FallbackLocale::IntentSource,
-                FallbackLocale::Literal(spelled("de")),
-            ]
-        );
-        assert_eq!(fallback[1].key.key, content("zz"));
-        assert!(fallback[1].key.locale.is_err());
-        assert_eq!(
-            fallback[1].candidates,
-            [FallbackLocale::Literal(spelled("en"))]
-        );
+        assert_eq!(keys.len(), 2);
+        assert_eq!(keys[0], spelled("ja"));
+        assert_eq!(keys[1].key, content("zz"));
+        assert!(keys[1].locale.is_err());
+        // The candidates are Phase 8's: none is spelled here, not even `EN`,
+        // which differs from its canonical form.
         assert_eq!(
             occurrences
                 .iter()
@@ -755,34 +712,15 @@ mod tests {
                     LocaleSubject::MessageFallbackKey(content("zz")),
                     false
                 ),
-                (
-                    Location::MessageFallbackCandidate(0, 0),
-                    LocaleSubject::MessageFallbackCandidate(key("ja"), 0, key("en")),
-                    true
-                ),
-                (
-                    Location::MessageFallbackCandidate(0, 2),
-                    LocaleSubject::MessageFallbackCandidate(key("ja"), 2, key("de")),
-                    false
-                ),
-                (
-                    Location::MessageFallbackCandidate(1, 0),
-                    LocaleSubject::MessageFallbackCandidate(content("zz"), 0, key("en")),
-                    false
-                ),
             ]
         );
         assert_eq!(
             notices(&evaluation),
-            [
-                canonical_unit(LocaleSubject::NegotiationAliasKey(key("en"))),
-                canonical_unit(LocaleSubject::MessageFallbackCandidate(
-                    key("ja"),
-                    0,
-                    key("en")
-                )),
-            ]
+            [canonical_unit(LocaleSubject::NegotiationAliasKey(key(
+                "en"
+            )))]
         );
+        assert_eq!(evaluation.statuses().count(), 6);
     }
 
     #[test]

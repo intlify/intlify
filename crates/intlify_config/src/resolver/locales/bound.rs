@@ -45,7 +45,7 @@ const MAX_TARGET_ID_BYTES: BoundId = grouping_bound("maxTargetIdBytes");
 /// Each field's locale spellings as `maxLocaleOccurrences` counts them: an
 /// alias key and its destination, a fallback key and its literal candidates
 /// (not the Intent source-locale marker), and every coverage locale selector
-/// item, though Phase 7 canonicalizes no selector.
+/// item, though Phase 7 canonicalizes neither a candidate nor a selector.
 fn field_tallies<'f, Target>(
     fields: &'f LocaleFields<'_, Target>,
 ) -> [Result<Tally, &'f Causes>; 7] {
@@ -304,7 +304,8 @@ mod tests {
                 |app| app["localeNegotiation"] = json!({"aliases": {"de": "de-DE", "fr": "fr-FR"}}),
                 8,
             ),
-            // A key and its literals, never the Intent source-locale marker.
+            // A key and its literals, never the Intent source-locale marker,
+            // though Phase 7 canonicalizes no literal.
             (
                 |app| {
                     app["messageFallback"] =

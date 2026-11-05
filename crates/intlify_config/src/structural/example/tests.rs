@@ -120,7 +120,9 @@ fn every_locale_role_points_at_its_own_spelling() {
     let mut config = minimal_config();
     let app = &mut config["profiles"]["app"];
     // Each corrected spelling sits second in its map or set. A key's pointer
-    // names its member, so its target tells it from the member's value.
+    // names its member, so its target tells it from the member's value. The
+    // fallback candidate `EN` is locale-policy resolution's, which the example
+    // does not run, so it gets no correction.
     app["localeNegotiation"] = json!({"aliases": {"fr": "fr-FR", "iw-IL": "EN"}});
     app["messageFallback"] = json!({
         "EN-us": ["en"],
@@ -136,7 +138,6 @@ fn every_locale_role_points_at_its_own_spelling() {
             {"pointer": "/profiles/app/localeNegotiation/aliases/iw-IL", "target": "key", "replacement": "he-IL"},
             {"pointer": "/profiles/app/localeNegotiation/aliases/iw-IL", "target": "value", "replacement": "en"},
             {"pointer": "/profiles/app/messageFallback/EN-us", "target": "key", "replacement": "en-US"},
-            {"pointer": "/profiles/app/messageFallback/ja/1", "target": "value", "replacement": "en"},
             {"pointer": "/profiles/app/targetProfiles/browser/requestedLocales/1", "target": "value", "replacement": "en"},
             {"pointer": "/profiles/app/targetProfiles/browser/defaultRequestedLocale", "target": "value", "replacement": "en"}
         ])

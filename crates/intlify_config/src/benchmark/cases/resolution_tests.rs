@@ -9,9 +9,9 @@ use crate::benchmark::operation::Output;
 use crate::locale::CanonicalLocale;
 use crate::model::CoverageMode;
 use crate::resolver::coverage::{CoverageSubject, Decision};
-use crate::resolver::evaluation::{Actual, Admitted, Check, Code, Status, Subject};
+use crate::resolver::evaluation::{Actual, Admitted, Code, Status, Subject};
 use crate::resolver::fallback::{Candidate, FallbackSubject};
-use crate::resolver::locales::{FallbackLocale, LocaleKey, LocaleSubject, ResolvedLocales};
+use crate::resolver::locales::{LocaleKey, LocaleSubject, ResolvedLocales};
 use crate::resolver::negotiation::NegotiationSubject;
 
 use LocalePolicyResolutionRecipe as R;
@@ -67,9 +67,6 @@ fn describe(subject: &LocaleSubject) -> String {
             format!("alias {} value {}", key(owner), key(own))
         }
         LocaleSubject::MessageFallbackKey(own) => format!("fallback {}", key(own)),
-        LocaleSubject::MessageFallbackCandidate(owner, position, own) => {
-            format!("fallback {} candidate {position} {}", key(owner), key(own))
-        }
         LocaleSubject::TargetProfiles => "targets".to_owned(),
         LocaleSubject::TargetId(id) => format!("{} id", id.as_str()),
         LocaleSubject::TargetRequestedLocale(id, own) => {
@@ -177,10 +174,12 @@ fn set_and_member_order_change_only_the_entry_domain() {
 
 #[test]
 fn aliases_add_suggestions_and_never_change_a_value_or_unit() {
-    for (canonical, aliased, corrected) in [
-        (R::Multi, R::Aliased, 5),
-        (R::ExpandedAlias, R::ExpandingAlias, 2),
-        (R::EveryRole, R::EveryRoleAliased, 12),
+    // Each corrected unit suggests once, and Phase 7 places all but the two
+    // fallback candidates, which Phase 8 canonicalizes.
+    for (canonical, aliased, corrected, placed) in [
+        (R::Multi, R::Aliased, 5, 5),
+        (R::ExpandedAlias, R::ExpandingAlias, 2, 2),
+        (R::EveryRole, R::EveryRoleAliased, 12, 10),
     ] {
         let observed = |recipe| prepare(&case(recipe)).unwrap().observation;
         assert_ne!(observed(canonical).shared, observed(aliased).shared);
@@ -189,7 +188,7 @@ fn aliases_add_suggestions_and_never_change_a_value_or_unit() {
         assert_eq!(left.requested_set, right.requested_set);
         assert_eq!(left.project, right.project);
         assert_eq!(left.negotiation_aliases, right.negotiation_aliases);
-        assert_eq!(left.message_fallback, right.message_fallback);
+        assert_eq!(left.fallback_keys, right.fallback_keys);
         assert_eq!(left.targets, right.targets);
         let (before, after) = (
             canonical.result.as_ref().unwrap(),
@@ -210,7 +209,7 @@ fn aliases_add_suggestions_and_never_change_a_value_or_unit() {
                 .iter()
                 .filter(|occurrence| occurrence.corrected)
                 .count(),
-            corrected
+            placed
         );
     }
 }
@@ -309,7 +308,8 @@ fn complete_recipes_have_independent_value_and_correction_expectations() {
             R::ChangedSource => (Some("fr"), &multi, "en-US", 7, 0),
             R::AbsentSource => (None, &multi, "en-US", 6, 0),
             R::EveryRole | R::EveryRoleReordered => (Some("en"), &every, "ja", 21, 0),
-            R::EveryRoleAliased => (Some("en"), &every, "ja", 21, 12),
+            // Phase 8 corrects the two fallback candidates.
+            R::EveryRoleAliased => (Some("en"), &every, "ja", 21, 10),
             R::ExpandingAlias => (None, &expanded, expanded[0], 3, 2),
             R::ExpandedAlias => (None, &expanded, expanded[0], 3, 0),
             R::ManyTargets => (None, &["en"], "en", 34, 0),
@@ -362,30 +362,15 @@ fn every_role_hands_each_locale_policy_input_to_phase_8_which_resolves_each_poli
         .map(|alias| (canonical(&alias.key.locale), canonical(&alias.value.locale)))
         .collect::<Vec<_>>();
     assert_eq!(aliases, [("en-US", "en"), ("fr", "en")]);
-    let fallback = locales
-        .message_fallback
+    // Phase 7 spells the fallback keys; their sequences are Phase 8's.
+    let keys = locales
+        .fallback_keys
         .as_ref()
         .unwrap()
         .iter()
-        .map(|source| {
-            let candidates = source
-                .candidates
-                .iter()
-                .map(|candidate| match candidate {
-                    FallbackLocale::Literal(literal) => canonical(&literal.locale),
-                    FallbackLocale::IntentSource => "intent-source-locale",
-                })
-                .collect::<Vec<_>>();
-            (canonical(&source.key.locale), candidates)
-        })
+        .map(|own| canonical(&own.locale))
         .collect::<Vec<_>>();
-    assert_eq!(
-        fallback,
-        [
-            ("he-IL", vec!["en"]),
-            ("ja", vec!["en", "intent-source-locale"])
-        ]
-    );
+    assert_eq!(keys, ["he-IL", "ja"]);
     let targets = locales
         .targets
         .as_ref()
@@ -572,8 +557,8 @@ fn blocked_recipes_keep_exact_subjects_codes_and_independent_checks() {
             vec![
                 ("alias root", invalid),
                 ("alias root value zz", invalid),
+                // The key has no identity, so its candidate is never checked.
                 ("fallback en_US", invalid),
-                ("fallback en_US candidate 0 en-x-brand", invalid),
                 ("browser requested Latn", invalid),
                 ("browser default", invalid),
             ],
@@ -645,10 +630,10 @@ fn the_occurrence_bound_counts_every_role_at_its_exact_value_and_first_over() {
             ("maxLocaleOccurrences", 20, Actual::Exact(21))
         );
         // Nothing past the bound is canonicalized or checked. Phase 7's
-        // target bounds and Phase 8's bounds over what was declared, the
-        // Intent source candidate, and the two surface items naming a
-        // vocabulary member need no canonical locale, so they still run;
-        // every other unit waits on the bound.
+        // target bounds, Phase 8's bounds over what was declared, and the two
+        // surface items naming a vocabulary member need no canonical locale,
+        // so they still run; every other unit waits on the bound, a fallback
+        // sequence's whole on its key's identity.
         let runs = |unit: &crate::resolver::evaluation::Unit| match &unit.subject {
             Subject::Locale(subject) => matches!(
                 subject,
@@ -657,14 +642,13 @@ fn the_occurrence_bound_counts_every_role_at_its_exact_value_and_first_over() {
                     | LocaleSubject::TargetId(_)
             ),
             Subject::Negotiation(NegotiationSubject::Aliases)
-            | Subject::Fallback(FallbackSubject::Sources | FallbackSubject::IntentSource(_))
+            | Subject::Fallback(FallbackSubject::Sources)
             | Subject::Coverage(
                 CoverageSubject::Rules
                 | CoverageSubject::LocaleSelectors
                 | CoverageSubject::SurfaceSelectors
                 | CoverageSubject::SurfaceClass(..),
             ) => true,
-            Subject::Fallback(FallbackSubject::Source(_)) => unit.check == Check::WithinBound,
             _ => false,
         };
         assert!(resolved
@@ -677,7 +661,7 @@ fn the_occurrence_bound_counts_every_role_at_its_exact_value_and_first_over() {
                 .statuses()
                 .filter(|(unit, _)| runs(unit))
                 .count(),
-            16
+            13
         );
         // Evaluated and waiting, per policy.
         let mut policies = [[0; 2]; 3];
@@ -690,7 +674,7 @@ fn the_occurrence_bound_counts_every_role_at_its_exact_value_and_first_over() {
             };
             policies[policy][usize::from(*status != Status::Evaluated)] += 1;
         }
-        assert_eq!(policies, [[1, 4], [4, 8], [7, 11]]);
+        assert_eq!(policies, [[1, 4], [1, 13], [7, 11]]);
     }
 }
 
@@ -898,6 +882,10 @@ fn describe_policy(subject: &Subject) -> String {
         }
         Subject::Fallback(F::Sources) => "fallback sources".to_owned(),
         Subject::Fallback(F::Source(own)) => format!("fallback {}", key(own)),
+        Subject::Fallback(F::Sequence(owner)) => format!("fallback {} sequence", key(owner)),
+        Subject::Fallback(F::Candidate(owner, position)) => {
+            format!("fallback {} candidate {position}", key(owner))
+        }
         Subject::Fallback(F::Literal(owner, own)) => {
             format!("fallback {} literal {}", key(owner), key(own))
         }
@@ -983,7 +971,7 @@ fn phase_8_workloads_block_exactly_the_check_each_change_names() {
         (
             R::FallbackSelfReference,
             vec![(
-                "fallback he-IL literal he-IL",
+                "fallback he-IL candidate 0",
                 sequence,
                 Some(Reason::LiteralSelfReference),
             )],
@@ -1045,7 +1033,7 @@ fn phase_8_workloads_block_exactly_the_check_each_change_names() {
                     Some(Reason::ConflictingDestination),
                 ),
                 (
-                    "fallback he-IL literal he-IL",
+                    "fallback he-IL candidate 0",
                     sequence,
                     Some(Reason::LiteralSelfReference),
                 ),
