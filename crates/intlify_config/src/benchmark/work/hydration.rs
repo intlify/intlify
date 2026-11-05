@@ -13,12 +13,12 @@ fn count(value: usize) -> Result<u64, WorkFailure> {
     u64::try_from(value).map_err(|_| WorkFailure::UnrepresentableCounter)
 }
 
-/// The relations' unit, eleven for each distinct relation (one for each of
-/// its two endpoints and nine for the relation), and one for each Target ID
-/// that takes a role between distinct endpoints in its group.
+/// The relations' unit, thirteen for each distinct relation (four for each
+/// of its two endpoints and five for the relation), and one for each Target
+/// ID that takes a role between distinct endpoints in its group.
 fn units(relations: usize, roles: usize) -> Option<usize> {
     relations
-        .checked_mul(11)?
+        .checked_mul(13)?
         .checked_add(roles)?
         .checked_add(1)
 }
@@ -178,10 +178,10 @@ mod tests {
     #[test]
     fn the_units_follow_the_relations_and_the_roles() {
         // 015's example: one relation, and two Target IDs with a role.
-        assert_eq!(units(1, 2), Some(14));
+        assert_eq!(units(1, 2), Some(16));
         assert_eq!(units(0, 0), Some(1));
         assert_eq!(units(usize::MAX, 0), None);
-        assert_eq!(units(usize::MAX / 11, usize::MAX), None);
+        assert_eq!(units(usize::MAX / 13, usize::MAX), None);
         assert_eq!(units(0, usize::MAX), None);
     }
 

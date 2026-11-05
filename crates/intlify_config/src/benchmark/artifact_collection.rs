@@ -208,12 +208,11 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::KnownMember
         | Check::UniqueMember
         | Check::SingleGroup
-        | Check::KnownEndpoints
+        | Check::KnownEndpoint
         | Check::DistinctEndpoints
-        | Check::SameGroupEndpoints
+        | Check::SameGroupEndpoint
         | Check::UniqueRelation
-        | Check::ServerRole
-        | Check::ClientRole
+        | Check::EndpointRole
         | Check::SameRequestedLocales
         | Check::SameEffectiveDefault
         | Check::StaticCompatibility

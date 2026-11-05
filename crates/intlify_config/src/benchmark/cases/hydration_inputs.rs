@@ -71,7 +71,9 @@ impl HydrationRecipe {
         Self::NegotiationUnavailable,
     ];
 
-    /// Whether every group's relations hold.
+    /// Whether every group's relations hold. A member Phase 12 finds naming
+    /// no target leaves the group's relations whole: membership reads the
+    /// Target IDs the members name, whatever each member's own checks found.
     pub(in crate::benchmark) const fn completes(self) -> bool {
         matches!(
             self,
@@ -80,6 +82,7 @@ impl HydrationRecipe {
                 | Self::FanOutFanIn
                 | Self::FanReordered
                 | Self::ManyRelations
+                | Self::GroupMembersUnresolved
         )
     }
 

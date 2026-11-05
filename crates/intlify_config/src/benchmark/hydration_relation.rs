@@ -301,7 +301,7 @@ fn count(value: usize) -> Result<u64, OutputFailure> {
 }
 
 /// Only Phase 13's own units run in the interval: the bound, an endpoint, a
-/// relation, or a Target ID's roles, under one of its eleven checks.
+/// relation, or a Target ID's roles, under one of its ten checks.
 fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
     frame.text(unit.phase.id());
     match &unit.subject {
@@ -344,12 +344,11 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
     }
     frame.uint(match unit.check {
         Check::WithinBound => 0,
-        Check::KnownEndpoints => 1,
+        Check::KnownEndpoint => 1,
         Check::DistinctEndpoints => 2,
-        Check::SameGroupEndpoints => 3,
+        Check::SameGroupEndpoint => 3,
         Check::UniqueRelation => 4,
-        Check::ServerRole => 5,
-        Check::ClientRole => 6,
+        Check::EndpointRole => 5,
         Check::SameRequestedLocales => 7,
         Check::SameEffectiveDefault => 8,
         Check::StaticCompatibility => 9,
@@ -614,8 +613,8 @@ mod tests {
         relation("web", "ssr", "browser", check)
     }
 
-    /// The bytes of the client's endpoint in the storefront's relation.
-    fn client_bytes() -> Unit {
+    /// A check of the client's endpoint in the storefront's relation.
+    fn client_endpoint(check: Check) -> Unit {
         hydration_unit(
             HydrationSubject::Endpoint(
                 group("web"),
@@ -623,8 +622,13 @@ mod tests {
                 target("browser"),
                 EndpointField::Client,
             ),
-            Check::WithinBound,
+            check,
         )
+    }
+
+    /// The bytes of the client's endpoint in the storefront's relation.
+    fn client_bytes() -> Unit {
+        client_endpoint(Check::WithinBound)
     }
 
     const ID_BYTES: BoundId = BoundId {
@@ -853,7 +857,7 @@ mod tests {
         let noticed = {
             let mut evaluation = resolved(R::Storefront).evaluation;
             evaluation
-                .notice(storefront(Check::KnownEndpoints), invalid)
+                .notice(client_endpoint(Check::KnownEndpoint), invalid)
                 .unwrap();
             evaluation
         };
@@ -862,7 +866,7 @@ mod tests {
             (
                 "details beside another check",
                 blocked(
-                    storefront(Check::KnownEndpoints),
+                    client_endpoint(Check::KnownEndpoint),
                     invalid,
                     Some(Reason::UnknownEndpoint),
                     limit(),
@@ -875,7 +879,7 @@ mod tests {
             (
                 "a shortfall",
                 blocked(
-                    storefront(Check::KnownEndpoints),
+                    client_endpoint(Check::KnownEndpoint),
                     invalid,
                     Some(Reason::UnknownEndpoint),
                     Some(shortfall),
@@ -901,7 +905,7 @@ mod tests {
             ),
             (
                 "another check without its reason",
-                blocked(storefront(Check::KnownEndpoints), invalid, None, None),
+                blocked(client_endpoint(Check::KnownEndpoint), invalid, None, None),
             ),
             ("notice", noticed),
         ] {
@@ -981,16 +985,15 @@ mod tests {
         ]
         .map(|recorded| digest(|frame| unit(frame, &recorded).unwrap()));
         assert!(apart(&subjects));
-        // Each of the eleven checks frames apart, and the phase is part of
-        // the unit.
+        // Each of the ten checks frames apart, and the phase is part of the
+        // unit.
         let checks = [
             Check::WithinBound,
-            Check::KnownEndpoints,
+            Check::KnownEndpoint,
             Check::DistinctEndpoints,
-            Check::SameGroupEndpoints,
+            Check::SameGroupEndpoint,
             Check::UniqueRelation,
-            Check::ServerRole,
-            Check::ClientRole,
+            Check::EndpointRole,
             Check::SameRequestedLocales,
             Check::SameEffectiveDefault,
             Check::StaticCompatibility,

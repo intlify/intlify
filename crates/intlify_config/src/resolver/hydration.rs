@@ -3,16 +3,18 @@
 
 //! 015's Phase 13 (`hydration-validation`) over each group's explicit hydration
 //! relations, `SSR Target ID -> Browser hydration-client Target ID`: every
-//! relation occurrence under `maxHydrationRelations` and each endpoint under
-//! `maxTargetIdBytes`; each relation's endpoints declared, distinct, and members
-//! of its group; each relation once in its group; the server's Target Profile
-//! rendering server-side and the client's hydrating in the browser; both
-//! endpoints requesting the same locales with the same effective default; and
-//! nothing statically known making their Target Profiles incompatible. Within a
-//! group, no Target ID takes both roles. Every check of a group waits on the
-//! group's own bounds, which Phase 12 checked, and each endpoint is checked
-//! on its own. A relation is never inferred, and a mismatch is never narrowed
-//! to the locales both endpoints share.
+//! relation occurrence under `maxHydrationRelations`; each endpoint on its own
+//! under `maxTargetIdBytes`, declared, a member of its relation's group, and
+//! taking its field's role, the server's Target Profile rendering server-side
+//! and the client's hydrating in the browser; each relation's endpoints
+//! distinct, the relation once in its group, both endpoints requesting the
+//! same locales with the same effective default, and nothing statically known
+//! making their Target Profiles incompatible. Within a group, no Target ID
+//! takes both roles. Every check of a group waits on the group's own bounds,
+//! which Phase 12 checked, and otherwise only on the facts it needs, so one
+//! failure never hides another that does not depend on it. A relation is
+//! never inferred, and a mismatch is never narrowed to the locales both
+//! endpoints share.
 //!
 //! The roles and the static compatibility are 024's: a Target Profile declares
 //! `ssr-renderer` and `browser-hydration-client` in its closed body, and two
@@ -152,9 +154,10 @@ impl ResolvedHydration {
 /// Phase 13 under the confirmed policy, over the declared groups' relations,
 /// the targets Phase 11 resolved, and the groups Phase 12 resolved. Every unit
 /// waits on the relations' bound, and every unit of a group on the group's
-/// bounds. Each endpoint's bytes come first, one unit for each endpoint; a
-/// relation's roles, locales, and compatibility are checked only between valid
-/// endpoints, and each waits on just the facts it compares.
+/// bounds. Each endpoint's checks wait on that endpoint alone, and each check
+/// of a relation on just the facts it compares (D15:2359): a relation between
+/// equal endpoints, or with an endpoint outside its group, still compares
+/// their locales and Target Profiles.
 pub(crate) fn validate_hydration(
     evaluation: &mut Evaluation,
     policy: Result<&ConfirmedPolicy, &Causes>,
@@ -214,10 +217,9 @@ struct Shared<'a, 'p, 't, 's> {
     groups: Admitted<&'t ResolvedGroups>,
 }
 
-impl<'t, 's> Shared<'_, '_, 't, 's> {
+impl<'p, 't, 's> Shared<'_, 'p, 't, 's> {
     /// One group's relations, each pair once however often submitted, and
-    /// the roles of each Target ID among them. Every check of the group waits
-    /// on the policy, the relations' bound, and the group's own bounds.
+    /// the roles of each Target ID among them.
     fn group(
         &self,
         evaluation: &mut Evaluation,
@@ -230,26 +232,12 @@ impl<'t, 's> Shared<'_, '_, 't, 's> {
                 .entry((&relation.server, &relation.client))
                 .or_default() += 1;
         }
-        let bounds = self.groups.clone().and_then(|groups| {
-            groups
-                .bounds(id)
-                .expect("Phase 12 resolves every declared group")
-                .clone()
-        });
-        let gate = both(both(self.policy.clone(), self.bounded.clone()), bounds)
-            .map(|((policy, ()), ())| policy);
-        let members = self.groups.clone().and_then(|groups| {
-            groups
-                .get(id)
-                .expect("Phase 12 resolves every declared group")
-                .as_ref()
-                .map_err(Causes::clone)
-        });
+        let gate = self.gate(id);
         let mut holds = Ok(());
         let mut taken: BTreeMap<&TargetId, Taken> = BTreeMap::new();
         for (&(server, client), &count) in &occurrences {
             let relation = Relation { id, server, client };
-            let checked = relation.check(evaluation, self, &gate, &members, count)?;
+            let checked = relation.check(evaluation, self, &gate, count)?;
             // An equal-endpoint relation is its own failure and takes neither
             // role.
             if server != client {
@@ -271,6 +259,34 @@ impl<'t, 's> Shared<'_, '_, 't, 's> {
         }))
     }
 
+    /// What every endpoint of one group reads: the policy once the relations'
+    /// bound and the group's own bounds hold, the Target IDs the group's
+    /// members name, and the declared Target IDs.
+    fn gate(&self, id: &DeploymentGroupId) -> Gate<'p, 't, 's> {
+        let bounds = self.groups.clone().and_then(|groups| {
+            groups
+                .bounds(id)
+                .expect("Phase 12 resolves every declared group")
+                .clone()
+        });
+        let named = self.groups.clone().and_then(|groups| {
+            groups
+                .named(id)
+                .expect("Phase 12 resolves every declared group")
+                .as_ref()
+                .map_err(Causes::clone)
+        });
+        Gate {
+            policy: both(both(self.policy.clone(), self.bounded.clone()), bounds)
+                .map(|((policy, ()), ())| policy),
+            named,
+            known: self
+                .targets
+                .clone()
+                .and_then(|targets| targets.bounded().clone().map(|()| targets)),
+        }
+    }
+
     /// What Phase 11 established of a declared endpoint.
     fn facts(&self, id: &TargetId) -> Admitted<&'t TargetFacts<'s>> {
         let targets: &'t ResolvedTargets<'s> = self.targets.clone()?;
@@ -278,6 +294,13 @@ impl<'t, 's> Shared<'_, '_, 't, 's> {
             .get(id)
             .expect("Phase 13 reads only the endpoints it found declared"))
     }
+}
+
+/// What every endpoint of one group reads.
+struct Gate<'p, 't, 's> {
+    policy: Admitted<&'p ConfirmedPolicy>,
+    named: Admitted<&'t BTreeSet<TargetId>>,
+    known: Admitted<&'t ResolvedTargets<'s>>,
 }
 
 /// The roles one Target ID takes among its group's relations between
@@ -342,6 +365,14 @@ struct Checked {
     holds: Admitted<()>,
 }
 
+/// What one endpoint's checks established: its bytes, what Phase 11 found of
+/// it once it names a declared Target ID, and whether all of its checks held.
+struct Endpoint<'t, 's> {
+    bytes: Admitted<()>,
+    facts: Admitted<&'t TargetFacts<'s>>,
+    holds: Admitted<()>,
+}
+
 impl Relation<'_> {
     fn unit(&self, check: Check) -> Unit {
         unit(
@@ -350,28 +381,37 @@ impl Relation<'_> {
         )
     }
 
-    /// One endpoint's bytes, checked on its own after the group's gate.
-    fn endpoint(
+    fn endpoint_unit(&self, field: EndpointField, check: Check) -> Unit {
+        unit(
+            HydrationSubject::Endpoint(
+                self.id.clone(),
+                self.server.clone(),
+                self.client.clone(),
+                field,
+            ),
+            check,
+        )
+    }
+
+    /// One endpoint's checks, on its own: its bytes after the group's gate;
+    /// then whether it names a declared Target ID, and whether the group's
+    /// members name it, each after its bytes alone; and whether its Target
+    /// Profile takes the role its field names, after what Phase 11 found of
+    /// it.
+    fn endpoint<'t, 's>(
         &self,
         evaluation: &mut Evaluation,
-        gate: &Admitted<&ConfirmedPolicy>,
+        shared: &Shared<'_, '_, 't, 's>,
+        gate: &Gate<'_, 't, 's>,
         field: EndpointField,
-    ) -> Result<Admitted<()>, EvaluationInvariant> {
+    ) -> Result<Endpoint<'t, 's>, EvaluationInvariant> {
         let endpoint = match field {
             EndpointField::Client => self.client,
             EndpointField::Server => self.server,
         };
-        evaluation.check(
-            unit(
-                HydrationSubject::Endpoint(
-                    self.id.clone(),
-                    self.server.clone(),
-                    self.client.clone(),
-                    field,
-                ),
-                Check::WithinBound,
-            ),
-            gate.clone(),
+        let bytes = evaluation.check(
+            self.endpoint_unit(field, Check::WithinBound),
+            gate.policy.clone(),
             |policy| {
                 within(
                     MAX_TARGET_ID_BYTES,
@@ -379,93 +419,81 @@ impl Relation<'_> {
                     endpoint.as_str().len(),
                 )
             },
-        )
-    }
-
-    /// Each endpoint's bytes, and then every check of the relation, which
-    /// waits on both.
-    fn check(
-        &self,
-        evaluation: &mut Evaluation,
-        shared: &Shared<'_, '_, '_, '_>,
-        gate: &Admitted<&ConfirmedPolicy>,
-        members: &Admitted<&BTreeSet<TargetId>>,
-        count: usize,
-    ) -> Result<Checked, EvaluationInvariant> {
-        let (server, client) = (self.server, self.client);
-        let client_bytes = self.endpoint(evaluation, gate, EndpointField::Client)?;
-        let server_bytes = self.endpoint(evaluation, gate, EndpointField::Server)?;
-        let bytes = and(server_bytes.clone(), client_bytes.clone());
-        let known = shared
-            .targets
-            .clone()
-            .and_then(|targets| targets.bounded().clone().map(|()| targets));
+        )?;
         let declared = evaluation.check(
-            self.unit(Check::KnownEndpoints),
-            both(bytes.clone(), known),
+            self.endpoint_unit(field, Check::KnownEndpoint),
+            both(bytes.clone(), gate.known.clone()),
             |((), targets)| {
-                if targets.get(server).is_some() && targets.get(client).is_some() {
+                if targets.get(endpoint).is_some() {
                     Ok(())
                 } else {
                     Err(invalid(Reason::UnknownEndpoint))
                 }
             },
         )?;
-        let distinct =
-            evaluation.check(self.unit(Check::DistinctEndpoints), bytes.clone(), |()| {
-                if server == client {
-                    Err(invalid(Reason::EqualEndpoint))
-                } else {
-                    Ok(())
-                }
-            })?;
-        let same_group = evaluation.check(
-            self.unit(Check::SameGroupEndpoints),
-            both(declared.clone(), members.clone()),
-            |((), members)| {
-                if members.contains(server) && members.contains(client) {
+        let member = evaluation.check(
+            self.endpoint_unit(field, Check::SameGroupEndpoint),
+            both(bytes.clone(), gate.named.clone()),
+            |((), named)| {
+                if named.contains(endpoint) {
                     Ok(())
                 } else {
                     Err(invalid(Reason::CrossGroup))
                 }
             },
         )?;
-        let once = evaluation.check(self.unit(Check::UniqueRelation), bytes.clone(), |()| {
+        let facts = declared.clone().and_then(|()| shared.facts(endpoint));
+        let role = evaluation.check(
+            self.endpoint_unit(field, Check::EndpointRole),
+            facts.clone().and_then(|facts| facts.profile.clone()),
+            |(_, profile)| {
+                let taken = roles(profile);
+                match field {
+                    EndpointField::Client if taken.browser_hydration_client => Ok(()),
+                    EndpointField::Client => Err(invalid(Reason::ClientCapabilityMissing)),
+                    EndpointField::Server if taken.ssr_renderer => Ok(()),
+                    EndpointField::Server => Err(invalid(Reason::ServerCapabilityMissing)),
+                }
+            },
+        )?;
+        Ok(Endpoint {
+            bytes,
+            facts,
+            holds: and(and(declared, member), role),
+        })
+    }
+
+    /// Each endpoint's checks, client then server as their fields order them,
+    /// and then the relation's: its endpoints distinct and the relation once,
+    /// after both endpoints' bytes; the same locales and effective default,
+    /// after what Phase 11 found of both; and static compatibility, after both
+    /// Target Profiles. No check of the relation waits on another's failure.
+    fn check(
+        &self,
+        evaluation: &mut Evaluation,
+        shared: &Shared<'_, '_, '_, '_>,
+        gate: &Gate<'_, '_, '_>,
+        count: usize,
+    ) -> Result<Checked, EvaluationInvariant> {
+        let client = self.endpoint(evaluation, shared, gate, EndpointField::Client)?;
+        let server = self.endpoint(evaluation, shared, gate, EndpointField::Server)?;
+        let bytes = and(server.bytes.clone(), client.bytes.clone());
+        let distinct =
+            evaluation.check(self.unit(Check::DistinctEndpoints), bytes.clone(), |()| {
+                if self.server == self.client {
+                    Err(invalid(Reason::EqualEndpoint))
+                } else {
+                    Ok(())
+                }
+            })?;
+        let once = evaluation.check(self.unit(Check::UniqueRelation), bytes, |()| {
             if count == 1 {
                 Ok(())
             } else {
                 Err(invalid(Reason::DuplicateRelation))
             }
         })?;
-        let endpoints = and(and(declared, distinct), same_group);
-        let facts = endpoints
-            .clone()
-            .and_then(|()| both(shared.facts(server), shared.facts(client)));
-        let profiles = facts
-            .clone()
-            .and_then(|(server, client)| both(server.profile.clone(), client.profile.clone()));
-        let serves = evaluation.check(
-            self.unit(Check::ServerRole),
-            profiles.clone().map(|(server, _)| server),
-            |(_, profile)| {
-                if roles(profile).ssr_renderer {
-                    Ok(())
-                } else {
-                    Err(invalid(Reason::ServerCapabilityMissing))
-                }
-            },
-        )?;
-        let hydrates = evaluation.check(
-            self.unit(Check::ClientRole),
-            profiles.clone().map(|(_, client)| client),
-            |(_, profile)| {
-                if roles(profile).browser_hydration_client {
-                    Ok(())
-                } else {
-                    Err(invalid(Reason::ClientCapabilityMissing))
-                }
-            },
-        )?;
+        let facts = both(server.facts, client.facts);
         let requested = evaluation.check(
             self.unit(Check::SameRequestedLocales),
             facts.clone().and_then(|(server, client)| {
@@ -481,7 +509,7 @@ impl Relation<'_> {
         )?;
         let default = evaluation.check(
             self.unit(Check::SameEffectiveDefault),
-            facts.and_then(|(server, client)| {
+            facts.clone().and_then(|(server, client)| {
                 both(
                     server.effective_default.clone(),
                     client.effective_default.clone(),
@@ -497,8 +525,8 @@ impl Relation<'_> {
         )?;
         let compatible = evaluation.check(
             self.unit(Check::StaticCompatibility),
-            both(and(serves.clone(), hydrates.clone()), profiles),
-            |((), ((_, server), (_, client)))| {
+            facts.and_then(|(server, client)| both(server.profile.clone(), client.profile.clone())),
+            |((_, server), (_, client))| {
                 if statically_compatible(server, client) {
                     Ok(())
                 } else {
@@ -510,14 +538,14 @@ impl Relation<'_> {
                 }
             },
         )?;
-        let checked = and(
-            and(and(endpoints, once), and(serves, hydrates)),
+        let holds = and(
+            and(and(server.holds, client.holds), and(distinct, once)),
             and(and(requested, default), compatible),
         );
         Ok(Checked {
-            server: server_bytes,
-            client: client_bytes,
-            holds: checked,
+            server: server.bytes,
+            client: client.bytes,
+            holds,
         })
     }
 }
@@ -795,31 +823,59 @@ mod tests {
         )
     }
 
-    /// The bytes of the endpoint `field` names in a relation of `group_id`.
-    fn endpoint(group_id: &str, server: &str, client: &str, field: EndpointField) -> Unit {
+    /// One check of the endpoint `field` names in a relation of `group_id`.
+    fn on_endpoint(
+        group_id: &str,
+        server: &str,
+        client: &str,
+        field: EndpointField,
+        check: Check,
+    ) -> Unit {
         unit(
             HydrationSubject::Endpoint(group(group_id), target(server), target(client), field),
-            Check::WithinBound,
+            check,
         )
+    }
+
+    /// The bytes of the endpoint `field` names in a relation of `group_id`.
+    fn endpoint(group_id: &str, server: &str, client: &str, field: EndpointField) -> Unit {
+        on_endpoint(group_id, server, client, field, Check::WithinBound)
     }
 
     fn bound_unit() -> Unit {
         unit(HydrationSubject::Relations, Check::WithinBound)
     }
 
-    /// Every check of one relation, in rank order; each endpoint has its own
-    /// unit before them.
-    const CHECKS: [Check; 9] = [
-        Check::KnownEndpoints,
+    /// Every check of one endpoint, in rank order.
+    const ENDPOINT_CHECKS: [Check; 4] = [
+        Check::WithinBound,
+        Check::KnownEndpoint,
+        Check::SameGroupEndpoint,
+        Check::EndpointRole,
+    ];
+
+    /// Every check of one relation, in rank order; its endpoints' checks
+    /// come before them.
+    const CHECKS: [Check; 5] = [
         Check::DistinctEndpoints,
-        Check::SameGroupEndpoints,
         Check::UniqueRelation,
-        Check::ServerRole,
-        Check::ClientRole,
         Check::SameRequestedLocales,
         Check::SameEffectiveDefault,
         Check::StaticCompatibility,
     ];
+
+    /// Every unit of one relation of `web`, in 015's order: each endpoint's
+    /// checks, the client's field first, then the relation's.
+    fn relation_units(server: &str, client: &str) -> Vec<Unit> {
+        let mut units = Vec::new();
+        for field in [EndpointField::Client, EndpointField::Server] {
+            units.extend(
+                ENDPOINT_CHECKS.map(|check| on_endpoint("web", server, client, field, check)),
+            );
+        }
+        units.extend(CHECKS.map(|check| relation("web", server, client, check)));
+        units
+    }
 
     /// Phase 13's units and their statuses, in 015's order.
     fn statuses(evaluation: &Evaluation) -> Vec<(Unit, Status)> {
@@ -856,14 +912,15 @@ mod tests {
     fn subjects_order_the_bound_then_endpoints_relations_and_roles_after_every_phase_12_unit() {
         // Every relation's endpoints, the client's field first, come before
         // every relation's checks.
-        let mut ordered = vec![
-            bound_unit(),
-            endpoint("web", "ssr", "browser", EndpointField::Client),
-            endpoint("web", "ssr", "browser", EndpointField::Server),
-            endpoint("web", "ssr", "worker", EndpointField::Client),
-        ];
+        let mut ordered = vec![bound_unit()];
+        for field in [EndpointField::Client, EndpointField::Server] {
+            ordered.extend(
+                ENDPOINT_CHECKS.map(|check| on_endpoint("web", "ssr", "browser", field, check)),
+            );
+        }
+        ordered.push(endpoint("web", "ssr", "worker", EndpointField::Client));
         ordered.extend(CHECKS.map(|check| relation("web", "ssr", "browser", check)));
-        ordered.push(relation("web", "ssr", "worker", Check::KnownEndpoints));
+        ordered.push(relation("web", "ssr", "worker", Check::DistinctEndpoints));
         ordered.push(roles("jobs", "browser"));
         ordered.push(roles("web", "browser"));
         assert!(ordered.windows(2).all(|pair| pair[0] < pair[1]));
@@ -876,12 +933,8 @@ mod tests {
     fn fifteens_example_relation_holds_and_keeps_its_pair() {
         Inputs::new().resolve(|evaluation, hydration| {
             assert_eq!(issues(&evaluation), []);
-            let mut expected = vec![
-                bound_unit(),
-                endpoint("web", "ssr", "browser", EndpointField::Client),
-                endpoint("web", "ssr", "browser", EndpointField::Server),
-            ];
-            expected.extend(CHECKS.map(|check| relation("web", "ssr", "browser", check)));
+            let mut expected = vec![bound_unit()];
+            expected.extend(relation_units("ssr", "browser"));
             expected.push(roles("web", "browser"));
             expected.push(roles("web", "ssr"));
             assert_eq!(
@@ -953,6 +1006,27 @@ mod tests {
                 "project-profile-hydration-relation-invalid",
                 Some("duplicate-relation")
             )));
+            // Between the equal endpoints the locales and the Target Profiles
+            // are still compared, and each field's role is still checked:
+            // `ssr`'s Target Profile does not hydrate.
+            assert!(found.contains(&(
+                on_endpoint(
+                    "web",
+                    "ssr",
+                    "ssr",
+                    EndpointField::Client,
+                    Check::EndpointRole
+                ),
+                "project-profile-hydration-relation-invalid",
+                Some("client-capability-missing")
+            )));
+            for check in &CHECKS[2..] {
+                assert_eq!(
+                    waits_on(&evaluation, &relation("web", "ssr", "ssr", *check)),
+                    None,
+                    "{check:?}"
+                );
+            }
             // The equal-endpoint relation is no second role for `ssr`.
             assert_eq!(waits_on(&evaluation, &roles("web", "ssr")), None);
             assert!(!found
@@ -967,32 +1041,60 @@ mod tests {
         let mut inputs = Inputs::new();
         inputs.relate("web", &[("ssr", "phone"), ("ssr", "worker")]);
         inputs.resolve(|evaluation, hydration| {
-            let unknown = relation("web", "ssr", "phone", Check::KnownEndpoints);
-            let cross = relation("web", "ssr", "worker", Check::SameGroupEndpoints);
+            let phone = |check| on_endpoint("web", "ssr", "phone", EndpointField::Client, check);
+            let worker = |check| on_endpoint("web", "ssr", "worker", EndpointField::Client, check);
+            let invalid = "project-profile-hydration-relation-invalid";
+            // `phone` names no Target ID and no member of `web`. `worker` is
+            // `jobs`'s member, its Target Profile does not hydrate, and it
+            // requests other locales than `ssr`. Each failure is its own.
             assert_eq!(
                 issues(&evaluation),
                 [
                     (
-                        unknown.clone(),
-                        "project-profile-hydration-relation-invalid",
+                        phone(Check::KnownEndpoint),
+                        invalid,
                         Some("unknown-endpoint")
                     ),
                     (
-                        cross.clone(),
-                        "project-profile-hydration-relation-invalid",
+                        phone(Check::SameGroupEndpoint),
+                        invalid,
                         Some("cross-group")
+                    ),
+                    (
+                        worker(Check::SameGroupEndpoint),
+                        invalid,
+                        Some("cross-group")
+                    ),
+                    (
+                        worker(Check::EndpointRole),
+                        invalid,
+                        Some("client-capability-missing")
+                    ),
+                    (
+                        relation("web", "ssr", "worker", Check::SameRequestedLocales),
+                        "project-profile-hydration-locale-policy-incompatible",
+                        Some("requested-locales")
                     ),
                 ]
             );
-            // Between invalid endpoints, nothing else is compared.
-            for (server, client, cause) in [("ssr", "phone", unknown), ("ssr", "worker", cross)] {
-                for check in &CHECKS[4..] {
-                    assert_eq!(
-                        waits_on(&evaluation, &relation("web", server, client, *check)),
-                        Some(vec![cause.clone()]),
-                        "{server} {client} {check:?}"
-                    );
-                }
+            // Only what needs `phone`'s facts waits on it, and the endpoints
+            // outside the group are still compared.
+            let unknown = vec![phone(Check::KnownEndpoint)];
+            assert_eq!(
+                waits_on(&evaluation, &phone(Check::EndpointRole)),
+                Some(unknown.clone())
+            );
+            for check in &CHECKS[2..] {
+                assert_eq!(
+                    waits_on(&evaluation, &relation("web", "ssr", "phone", *check)),
+                    Some(unknown.clone()),
+                    "{check:?}"
+                );
+                assert_eq!(
+                    waits_on(&evaluation, &relation("web", "ssr", "worker", *check)),
+                    None,
+                    "{check:?}"
+                );
             }
             assert!(hydration.unwrap().complete().is_err());
         });
@@ -1039,22 +1141,20 @@ mod tests {
         inputs.limits.target_grouping.max_target_profiles = bound(2);
         inputs.resolve(|evaluation, _| {
             let map = locales::unit(LocaleSubject::TargetProfiles, Check::WithinBound);
-            assert_eq!(
-                waits_on(
-                    &evaluation,
-                    &relation("web", "ssr", "browser", Check::KnownEndpoints)
-                ),
-                Some(vec![map])
-            );
+            for field in [EndpointField::Client, EndpointField::Server] {
+                let at = |check| on_endpoint("web", "ssr", "browser", field, check);
+                assert_eq!(
+                    waits_on(&evaluation, &at(Check::KnownEndpoint)),
+                    Some(vec![map.clone()])
+                );
+                // Neither the bytes nor the membership needs a Target ID.
+                for check in [Check::WithinBound, Check::SameGroupEndpoint] {
+                    assert_eq!(waits_on(&evaluation, &at(check)), None, "{check:?}");
+                }
+            }
             for check in [Check::DistinctEndpoints, Check::UniqueRelation] {
                 assert_eq!(
                     waits_on(&evaluation, &relation("web", "ssr", "browser", check)),
-                    None
-                );
-            }
-            for field in [EndpointField::Client, EndpointField::Server] {
-                assert_eq!(
-                    waits_on(&evaluation, &endpoint("web", "ssr", "browser", field)),
                     None
                 );
             }
@@ -1066,31 +1166,15 @@ mod tests {
         let mut inputs = Inputs::new();
         inputs.roles = Roles::default();
         inputs.resolve(|evaluation, _| {
-            assert_eq!(
-                issues(&evaluation),
-                [
-                    (
-                        relation("web", "ssr", "browser", Check::ServerRole),
-                        "project-profile-hydration-relation-invalid",
-                        Some("server-capability-missing")
-                    ),
-                    (
-                        relation("web", "ssr", "browser", Check::ClientRole),
-                        "project-profile-hydration-relation-invalid",
-                        Some("client-capability-missing")
-                    ),
-                ]
-            );
-            // Compatibility is a question only between the two roles.
+            assert_eq!(issues(&evaluation), both_roles_missing());
+            // Compatibility compares the two Target Profiles whatever roles
+            // they declare.
             assert_eq!(
                 waits_on(
                     &evaluation,
                     &relation("web", "ssr", "browser", Check::StaticCompatibility)
                 ),
-                Some(vec![
-                    relation("web", "ssr", "browser", Check::ServerRole),
-                    relation("web", "ssr", "browser", Check::ClientRole),
-                ])
+                None
             );
         });
     }
@@ -1124,22 +1208,26 @@ mod tests {
         inputs.roles.renders = BTreeSet::from([profile_identity("browser")]);
         inputs.roles.hydrates = BTreeSet::from([profile_identity("ssr")]);
         inputs.resolve(|evaluation, _| {
-            assert_eq!(
-                issues(&evaluation),
-                [
-                    (
-                        relation("web", "ssr", "browser", Check::ServerRole),
-                        "project-profile-hydration-relation-invalid",
-                        Some("server-capability-missing")
-                    ),
-                    (
-                        relation("web", "ssr", "browser", Check::ClientRole),
-                        "project-profile-hydration-relation-invalid",
-                        Some("client-capability-missing")
-                    ),
-                ]
-            );
+            assert_eq!(issues(&evaluation), both_roles_missing());
         });
+    }
+
+    /// Each endpoint of `ssr -> browser` missing its role, the client's field
+    /// first.
+    fn both_roles_missing() -> Vec<(Unit, &'static str, Option<&'static str>)> {
+        [
+            (EndpointField::Client, "client-capability-missing"),
+            (EndpointField::Server, "server-capability-missing"),
+        ]
+        .into_iter()
+        .map(|(field, reason)| {
+            (
+                on_endpoint("web", "ssr", "browser", field, Check::EndpointRole),
+                "project-profile-hydration-relation-invalid",
+                Some(reason),
+            )
+        })
+        .collect()
     }
 
     /// An artifact that is no Target Profile declares no role and is
@@ -1340,9 +1428,9 @@ mod tests {
             grouping.max_group_id_bytes = bound(id_bound);
             inputs.resolve(|evaluation, hydration| {
                 let recorded = statuses(&evaluation);
-                // The relations' bound, two endpoints, the relation's nine
-                // checks, and two Target IDs' roles.
-                assert_eq!(recorded.len(), 14);
+                // The relations' bound, two endpoints' four checks each, the
+                // relation's five, and two Target IDs' roles.
+                assert_eq!(recorded.len(), 16);
                 assert_eq!(recorded[0], (bound_unit(), Status::Evaluated));
                 for (unit, _) in &recorded[1..] {
                     assert_eq!(
@@ -1354,25 +1442,16 @@ mod tests {
                 assert!(hydration.unwrap().get(&group("web")).unwrap().is_err());
             });
         }
-        // A group's member count is no bound of its relations: only the
-        // same-group check, which needs the members, waits on it.
+        // A group's member count is no bound of its relations: only each
+        // endpoint's same-group check, which needs the members, waits on it.
         let mut inputs = Inputs::new();
         inputs.limits.target_grouping.max_members_per_group = bound(1);
         inputs.resolve(|evaluation, _| {
             let count = groups::unit(GroupSubject::Members(group("web")), Check::WithinBound);
-            for field in [EndpointField::Client, EndpointField::Server] {
-                assert_eq!(
-                    waits_on(&evaluation, &endpoint("web", "ssr", "browser", field)),
-                    None
-                );
+            for unit in relation_units("ssr", "browser") {
+                let waits = (unit.check == Check::SameGroupEndpoint).then(|| vec![count.clone()]);
+                assert_eq!(waits_on(&evaluation, &unit), waits, "{unit:?}");
             }
-            assert_eq!(
-                waits_on(
-                    &evaluation,
-                    &relation("web", "ssr", "browser", Check::SameGroupEndpoints)
-                ),
-                Some(vec![count])
-            );
         });
     }
 
@@ -1385,17 +1464,36 @@ mod tests {
             let reference = crate::resolver::exact_resolution::unit(
                 crate::resolver::resource_policy::ReferenceField::TargetProfile(target("ssr")),
             );
-            for check in [
-                Check::ServerRole,
-                Check::ClientRole,
-                Check::StaticCompatibility,
+            for unit in [
+                on_endpoint(
+                    "web",
+                    "ssr",
+                    "browser",
+                    EndpointField::Server,
+                    Check::EndpointRole,
+                ),
+                relation("web", "ssr", "browser", Check::StaticCompatibility),
             ] {
                 assert_eq!(
-                    waits_on(&evaluation, &relation("web", "ssr", "browser", check)),
+                    waits_on(&evaluation, &unit),
                     Some(vec![reference.clone()]),
-                    "{check:?}"
+                    "{unit:?}"
                 );
             }
+            // The client's role reads only the client's Target Profile.
+            assert_eq!(
+                waits_on(
+                    &evaluation,
+                    &on_endpoint(
+                        "web",
+                        "ssr",
+                        "browser",
+                        EndpointField::Client,
+                        Check::EndpointRole
+                    )
+                ),
+                None
+            );
             for check in [Check::SameRequestedLocales, Check::SameEffectiveDefault] {
                 assert_eq!(
                     waits_on(&evaluation, &relation("web", "ssr", "browser", check)),
@@ -1494,18 +1592,8 @@ mod tests {
                 TargetSubject::Target(target("browser")),
                 Check::ProjectSubset,
             );
-            for field in [EndpointField::Client, EndpointField::Server] {
-                assert_eq!(
-                    waits_on(&evaluation, &endpoint("web", "ssr", "browser", field)),
-                    None
-                );
-            }
-            for check in &CHECKS[..6] {
-                assert_eq!(
-                    waits_on(&evaluation, &relation("web", "ssr", "browser", *check)),
-                    None,
-                    "{check:?}"
-                );
+            for unit in &relation_units("ssr", "browser")[..10] {
+                assert_eq!(waits_on(&evaluation, unit), None, "{unit:?}");
             }
             assert_eq!(
                 waits_on(

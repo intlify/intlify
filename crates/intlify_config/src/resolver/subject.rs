@@ -221,7 +221,8 @@ pub(crate) enum SubjectKind {
     // hydration-validation
     /// Every relation occurrence of every group.
     Relations,
-    /// One endpoint of one relation, under `maxTargetIdBytes`.
+    /// One endpoint of one relation: under `maxTargetIdBytes`, declared, in
+    /// the relation's group, and taking its field's role.
     RelationEndpoint,
     /// One relation of one group.
     Relation,
@@ -468,8 +469,7 @@ impl SubjectKind {
             | Self::Memberships
             | Self::Group
             | Self::GroupMembers
-            | Self::Relations
-            | Self::RelationEndpoint => &[Check::WithinBound],
+            | Self::Relations => &[Check::WithinBound],
             Self::Vocabulary => &[Check::IntactArtifact, Check::AssertedArtifact],
             Self::CanonicalizationData => &[Check::MatchingData],
             Self::DeclarationField => &[Check::OpaqueIdentity],
@@ -509,13 +509,15 @@ impl SubjectKind {
             ],
             Self::GroupMember => &[Check::WithinBound, Check::KnownMember, Check::UniqueMember],
             Self::Assignment => &[Check::SingleGroup],
+            Self::RelationEndpoint => &[
+                Check::WithinBound,
+                Check::KnownEndpoint,
+                Check::SameGroupEndpoint,
+                Check::EndpointRole,
+            ],
             Self::Relation => &[
-                Check::KnownEndpoints,
                 Check::DistinctEndpoints,
-                Check::SameGroupEndpoints,
                 Check::UniqueRelation,
-                Check::ServerRole,
-                Check::ClientRole,
                 Check::SameRequestedLocales,
                 Check::SameEffectiveDefault,
                 Check::StaticCompatibility,

@@ -83,13 +83,14 @@ pub(crate) fn unit(subject: GroupSubject, check: Check) -> Unit {
     }
 }
 
-/// What Phase 12 established for later phases: each group's own bounds, its
-/// members once the group's own checks held, and whether the groups partition
-/// the targets.
+/// What Phase 12 established for later phases: each group's own bounds, the
+/// Target IDs its members name, its members once the group's own checks held,
+/// and whether the groups partition the targets.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ResolvedGroups {
     groups: BTreeMap<DeploymentGroupId, Admitted<BTreeSet<TargetId>>>,
     bounds: BTreeMap<DeploymentGroupId, Admitted<()>>,
+    named: BTreeMap<DeploymentGroupId, Admitted<BTreeSet<TargetId>>>,
     partition: Admitted<()>,
 }
 
@@ -98,6 +99,13 @@ impl ResolvedGroups {
     /// bound and the group's own ID bytes, or why either does not hold.
     pub(crate) fn bounds(&self, id: &DeploymentGroupId) -> Option<&Admitted<()>> {
         self.bounds.get(id)
+    }
+
+    /// The Target IDs one group's members name, once its member count holds:
+    /// what a later membership check reads, whatever each member's own checks
+    /// found.
+    pub(crate) fn named(&self, id: &DeploymentGroupId) -> Option<&Admitted<BTreeSet<TargetId>>> {
+        self.named.get(id)
     }
 
     /// One group's members in Target ID order, or why they are unavailable.
@@ -169,10 +177,16 @@ pub(crate) fn resolve_groups(
         .and_then(|targets| targets.bounded().clone().map(|()| targets));
     let mut groups = BTreeMap::new();
     let mut bounds = BTreeMap::new();
+    let mut named = BTreeMap::new();
     let mut every_group = memberships.clone();
     for (id, group) in declared.iter() {
         let (identified, own) = own_bounds(evaluation, &policy, &bounded, id, group)?;
         bounds.insert(id.clone(), identified);
+        named.insert(
+            id.clone(),
+            own.clone()
+                .map(|()| group.members.as_slice().iter().cloned().collect()),
+        );
         every_group = and(every_group, own.clone());
         let gate = both(policy.clone(), and(own, memberships.clone())).map(|(policy, ())| policy);
         groups.insert(id.clone(), members(evaluation, &gate, &known, id, group)?);
@@ -191,6 +205,7 @@ pub(crate) fn resolve_groups(
     Ok(Ok(ResolvedGroups {
         groups,
         bounds,
+        named,
         partition,
     }))
 }
