@@ -83,15 +83,23 @@ pub(crate) fn unit(subject: GroupSubject, check: Check) -> Unit {
     }
 }
 
-/// What Phase 12 established for later phases: each group's members, once the
-/// group's own checks held, and whether the groups partition the targets.
+/// What Phase 12 established for later phases: each group's own bounds, its
+/// members once the group's own checks held, and whether the groups partition
+/// the targets.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ResolvedGroups {
     groups: BTreeMap<DeploymentGroupId, Admitted<BTreeSet<TargetId>>>,
+    bounds: BTreeMap<DeploymentGroupId, Admitted<()>>,
     partition: Admitted<()>,
 }
 
 impl ResolvedGroups {
+    /// What every later check of one group waits on: the Group ID map's
+    /// bound and the group's own ID bytes, or why either does not hold.
+    pub(crate) fn bounds(&self, id: &DeploymentGroupId) -> Option<&Admitted<()>> {
+        self.bounds.get(id)
+    }
+
     /// One group's members in Target ID order, or why they are unavailable.
     pub(crate) fn get(&self, id: &DeploymentGroupId) -> Option<&Admitted<BTreeSet<TargetId>>> {
         self.groups.get(id)
@@ -160,9 +168,11 @@ pub(crate) fn resolve_groups(
         .clone()
         .and_then(|targets| targets.bounded().clone().map(|()| targets));
     let mut groups = BTreeMap::new();
+    let mut bounds = BTreeMap::new();
     let mut every_group = memberships.clone();
     for (id, group) in declared.iter() {
-        let own = own_bounds(evaluation, &policy, &bounded, id, group)?;
+        let (identified, own) = own_bounds(evaluation, &policy, &bounded, id, group)?;
+        bounds.insert(id.clone(), identified);
         every_group = and(every_group, own.clone());
         let gate = both(policy.clone(), and(own, memberships.clone())).map(|(policy, ())| policy);
         groups.insert(id.clone(), members(evaluation, &gate, &known, id, group)?);
@@ -178,18 +188,23 @@ pub(crate) fn resolve_groups(
             members.as_ref().map(|_| ()).map_err(Causes::clone),
         );
     }
-    Ok(Ok(ResolvedGroups { groups, partition }))
+    Ok(Ok(ResolvedGroups {
+        groups,
+        bounds,
+        partition,
+    }))
 }
 
-/// One group's two bounds, after the map's: its ID's bytes, and then its
-/// member occurrences, which wait on them.
+/// One group's two bounds, after the map's: its ID's bytes, which every later
+/// check of the group waits on, and then its member occurrences, which wait
+/// on them too.
 fn own_bounds(
     evaluation: &mut Evaluation,
     policy: &Admitted<&ConfirmedPolicy>,
     bounded: &Admitted<()>,
     id: &DeploymentGroupId,
     group: &DeploymentGroup,
-) -> Result<Admitted<()>, EvaluationInvariant> {
+) -> Result<(Admitted<()>, Admitted<()>), EvaluationInvariant> {
     let prerequisite = both(policy.clone(), bounded.clone());
     let bytes = evaluation.check(
         unit(GroupSubject::Group(id.clone()), Check::WithinBound),
@@ -202,9 +217,9 @@ fn own_bounds(
             )
         },
     )?;
-    evaluation.check(
+    let occurrences = evaluation.check(
         unit(GroupSubject::Members(id.clone()), Check::WithinBound),
-        both(prerequisite, bytes),
+        both(prerequisite, bytes.clone()),
         |((policy, ()), ())| {
             within(
                 MAX_MEMBERS_PER_GROUP,
@@ -212,7 +227,8 @@ fn own_bounds(
                 group.members.as_slice().len(),
             )
         },
-    )
+    )?;
+    Ok((bytes, occurrences))
 }
 
 /// The group's members by the Target ID each spells. Each must be within

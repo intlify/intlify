@@ -11,7 +11,7 @@ use crate::benchmark::work::LogicalWork;
 use crate::model::{DeploymentGroupId, TargetId};
 use crate::resolver::evaluation::{Actual, Check, Code, Reason, Status, Subject, Unit};
 use crate::resolver::groups::{unit as group_unit, GroupSubject};
-use crate::resolver::hydration::{unit as hydration_unit, HydrationSubject};
+use crate::resolver::hydration::{unit as hydration_unit, EndpointField, HydrationSubject};
 use crate::resolver::limits::{BoundId, Group};
 
 use HydrationRecipe as R;
@@ -57,6 +57,14 @@ fn relation(server: &str, client: &str, check: Check) -> Unit {
     hydration_unit(
         HydrationSubject::Relation(group("web"), target(server), target(client)),
         check,
+    )
+}
+
+/// The bytes of the endpoint `field` names in a relation of `web`.
+fn endpoint(server: &str, client: &str, field: EndpointField) -> Unit {
+    hydration_unit(
+        HydrationSubject::Endpoint(group("web"), target(server), target(client), field),
+        Check::WithinBound,
     )
 }
 
@@ -363,24 +371,31 @@ fn each_bound_holds_at_its_count_and_one_less_blocks_its_unit() {
         group: Group::TargetGrouping,
         name,
     };
-    for (limit, recipe, name, count, unit, also) in [
+    for (limit, recipe, name, count, unit, checked, also) in [
         (
             LimitKind::HydrationRelations,
             R::FanOutFanIn,
             "maxHydrationRelations",
             3,
             hydration_unit(HydrationSubject::Relations, Check::WithinBound),
+            vec![],
             None,
         ),
-        // Phase 12, before the interval, checks the member `browser`'s own
-        // bytes, so the group holds no member set, and the same-group check
-        // and the checks that wait on it wait on that too.
+        // The client's endpoint is over, while the server's and the roles of
+        // `ssr`, which do not need it, are checked. Phase 12, before the
+        // interval, checks the member `browser`'s own bytes, so the group
+        // holds no member set, and the same-group check and the checks that
+        // wait on it wait on that too.
         (
             LimitKind::HydrationEndpointBytes,
             R::Storefront,
             "maxTargetIdBytes",
             7,
-            relation("ssr", "browser", Check::WithinBound),
+            endpoint("ssr", "browser", EndpointField::Client),
+            vec![
+                endpoint("ssr", "browser", EndpointField::Server),
+                roles("ssr"),
+            ],
             Some((
                 [
                     Check::SameGroupEndpoints,
@@ -413,13 +428,13 @@ fn each_bound_holds_at_its_count_and_one_less_blocks_its_unit() {
         assert_eq!(exceeded.bound, bound(name), "{limit:?}");
         assert_eq!(exceeded.limit.get(), count - 1, "{limit:?}");
         assert_eq!(exceeded.actual, Actual::Exact(count), "{limit:?}");
-        // Only the relations' bound and the blocked unit were checked, and
-        // every other unit waits on the blocked one.
+        // Only the relations' bound, the blocked unit, and what does not
+        // need it were checked, and every other unit waits on the blocked one.
         let relations = hydration_unit(HydrationSubject::Relations, Check::WithinBound);
         for (recorded, status) in over.evaluation.statuses() {
             match status {
                 Status::Evaluated => assert!(
-                    *recorded == relations || *recorded == unit,
+                    *recorded == relations || *recorded == unit || checked.contains(recorded),
                     "{limit:?} {recorded:?}"
                 ),
                 Status::NotEvaluated(causes) => {
@@ -547,32 +562,32 @@ fn the_work_counts_relations_roles_units_and_what_was_checked() {
         ),
         (
             case(R::Storefront),
-            ["1", "1", "7", "2", "13", "0", "0", "1", "1"],
+            ["1", "1", "7", "2", "14", "0", "0", "1", "1"],
         ),
         (
             case(R::FanOutFanIn),
-            ["3", "3", "7", "4", "35", "0", "0", "3", "1"],
+            ["3", "3", "7", "4", "38", "0", "0", "3", "1"],
         ),
         // Eight servers each related to each of eight clients.
         (
             case(R::ManyRelations),
-            ["64", "64", "8", "16", "657", "0", "0", "64", "1"],
+            ["64", "64", "8", "16", "721", "0", "0", "64", "1"],
         ),
         // A repeated pair is one relation with its units.
         (
             case(R::DuplicateRelation),
-            ["2", "1", "7", "2", "13", "0", "1", "0", "0"],
+            ["2", "1", "7", "2", "14", "0", "1", "0", "0"],
         ),
         // Between equal endpoints the five comparisons wait, and no role is
         // taken.
         (
             case(R::EqualEndpoint),
-            ["2", "2", "7", "2", "23", "5", "1", "0", "0"],
+            ["2", "2", "7", "2", "25", "5", "1", "0", "0"],
         ),
         // Every unit but the bound waits on it.
         (
             edge(LimitKind::HydrationRelations, LimitEdge::FirstOver),
-            ["3", "3", "7", "4", "35", "34", "1", "0", "0"],
+            ["3", "3", "7", "4", "38", "37", "1", "0", "0"],
         ),
     ] {
         let work = work(&declaration);
