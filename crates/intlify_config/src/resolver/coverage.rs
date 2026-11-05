@@ -6,14 +6,17 @@
 //! `maxCoverageLocaleSelectorOccurrences` and
 //! `maxCoverageSurfaceSelectorOccurrences`; each locale item canonicalized,
 //! named once in its selector, and a requested locale; each surface item a
-//! member of the admitted vocabulary, named once in its selector; each rule's
-//! normalized domain held by no other rule; and the decision table over every
-//! requested locale and surface class, under `maxCoverageDecisionCells` and
-//! `maxCoverageRuleCellComparisons`, with each cell's effective mode and
-//! Coverage Decision Basis. All of it is under the admitted Coverage
-//! Specification, and the order rules or items were authored in never decides
-//! anything. Not Coverage Decision Evidence, which maps a Basis to its sources
-//! through Evidence 015 Phase 5 owns, and not the vocabulary's admission.
+//! member of the admitted vocabulary, named once in its selector; each rule
+//! normalized to a domain no other rule holds; each cell of the decision table
+//! over every requested locale and surface class, under
+//! `maxCoverageDecisionCells` and `maxCoverageRuleCellComparisons`, decided
+//! with its effective mode and Coverage Decision Basis; and the table, once
+//! every cell is decided, which owns every Basis. All of it is under the
+//! admitted Coverage Specification, and the order rules or items were authored
+//! in never decides anything. A rule and its items are named by the rule's
+//! raw content until a Subject content projection replaces it. Not Coverage
+//! Decision Evidence, which maps a Basis to its sources through Evidence 015
+//! Phase 5 owns, and not the vocabulary's admission.
 
 use std::collections::BTreeMap;
 
@@ -141,8 +144,8 @@ fn subset<T: Ord>(inner: &[T], outer: &[T]) -> bool {
 
 /// What one coverage unit checks. Kinds are declared so that each unit's
 /// prerequisites come first: the three counts of what was submitted, each
-/// rule's selector items, the normalized domains, then the decision table's
-/// two bounds and its cells.
+/// rule's selector items, each rule normalized from its items, the normalized
+/// domains, then the decision table's two bounds, its cells, and the table.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum CoverageSubject {
     /// The submitted rules, under `maxCoverageRules`.
@@ -156,6 +159,8 @@ pub(crate) enum CoverageSubject {
     Locale(RuleContent, LocaleKey),
     /// A surface class one rule's selector names.
     SurfaceClass(RuleContent, SurfaceKey),
+    /// A rule, the parent of its selector items, normalized to its domain.
+    Rule(RuleContent),
     /// A rule's normalized domain.
     Domain(Domain),
     /// The decision table's cells, under `maxCoverageDecisionCells`.
@@ -165,6 +170,9 @@ pub(crate) enum CoverageSubject {
     Comparisons,
     /// One cell of the decision table: a requested locale and a surface class.
     Cell(CanonicalLocale, Token),
+    /// The decision table, complete once every cell is decided: the owner of
+    /// every cell's Coverage Decision Basis.
+    Table,
 }
 
 /// The unit Phase 8 records for `check` over `subject`.
@@ -360,8 +368,15 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
         }
         Err(causes) => Err(causes),
     };
+    // The table owns every cell's Basis, so no Basis exists unless every cell
+    // is decided.
+    let table = evaluation.check(
+        unit(CoverageSubject::Table, Check::CompleteTable),
+        cells,
+        Ok,
+    )?;
     Ok(
-        both(both(specification.clone(), checked), cells).map(|((specification, ()), cells)| {
+        both(both(specification.clone(), checked), table).map(|((specification, ()), cells)| {
             CoveragePolicy {
                 specification,
                 cells,
@@ -397,10 +412,10 @@ struct Selectors<'a, P: Provider> {
     vocabulary: Admitted<&'a SurfaceVocabulary>,
 }
 
-/// Each distinct rule's selector units and normalized domain, then one unit
-/// per domain: no two rule occurrences may share one. Returns whether every
-/// rule normalized with a domain of its own, and each domain with how many
-/// rules hold it and the mode of the first.
+/// Each distinct rule's selector units and its unit normalizing them to a
+/// domain, then one unit per domain: no two rule occurrences may share one.
+/// Returns whether every rule normalized with a domain of its own, and each
+/// domain with how many rules hold it and the mode of the first.
 fn normalize<P: Provider>(
     evaluation: &mut Evaluation,
     selectors: &Selectors<'_, P>,
@@ -427,17 +442,24 @@ fn normalize<P: Provider>(
                 .clone()
                 .map(|vocabulary| vocabulary.members().to_vec()),
         };
-        match both(locales, surfaces) {
-            Ok((locales, surfaces)) => {
-                domains
-                    .entry(Domain { locales, surfaces })
-                    .or_insert((0, rule.mode()))
-                    .0 += occurrences;
+        let domain = evaluation.check(
+            unit(
+                CoverageSubject::Rule(content.clone()),
+                Check::NormalizedDomain,
+            ),
+            both(locales, surfaces),
+            |(locales, surfaces)| Ok(Domain { locales, surfaces }),
+        )?;
+        match domain {
+            Ok(domain) => {
+                domains.entry(domain).or_insert((0, rule.mode())).0 += occurrences;
             }
             Err(causes) => normalized = both(normalized, Err::<(), _>(causes)).map(|_| ()),
         }
     }
     for (domain, &(occurrences, _)) in &domains {
+        // Only a rule that normalized holds a domain, so what the domain waits
+        // on, those rules' units, has passed.
         let unique = evaluation.check(
             unit(CoverageSubject::Domain(domain.clone()), Check::UniqueDomain),
             Ok(()),
@@ -912,8 +934,19 @@ mod tests {
         )
     }
 
+    fn rule_unit(owner: &RuleContent) -> Unit {
+        unit(
+            CoverageSubject::Rule(owner.clone()),
+            Check::NormalizedDomain,
+        )
+    }
+
     fn domain_unit(domain: Domain) -> Unit {
         unit(CoverageSubject::Domain(domain), Check::UniqueDomain)
+    }
+
+    fn table_unit() -> Unit {
+        unit(CoverageSubject::Table, Check::CompleteTable)
     }
 
     fn cell_unit(locale: &str, surface: &str) -> Unit {
@@ -962,15 +995,23 @@ mod tests {
             CoverageSubject::SurfaceSelectors,
             CoverageSubject::Locale(surface_only.clone(), key("fr")),
             CoverageSubject::Locale(locale_only.clone(), key("fr")),
-            CoverageSubject::Locale(locale_only, content("zz")),
+            CoverageSubject::Locale(locale_only.clone(), content("zz")),
             CoverageSubject::SurfaceClass(surface_only.clone(), SurfaceKey::Member(token("nav"))),
-            CoverageSubject::SurfaceClass(surface_only, SurfaceKey::Content(Content::new("help"))),
+            CoverageSubject::SurfaceClass(
+                surface_only.clone(),
+                SurfaceKey::Content(Content::new("help")),
+            ),
+            // A rule waits on its items, and a domain on the rules holding it.
+            CoverageSubject::Rule(surface_only),
+            CoverageSubject::Rule(locale_only),
             CoverageSubject::Domain(domain(&["en", "fr"], &[])),
             CoverageSubject::Domain(domain(&["fr"], &["nav"])),
             CoverageSubject::Cells,
             CoverageSubject::Comparisons,
             CoverageSubject::Cell(canonical("en"), token("nav")),
             CoverageSubject::Cell(canonical("fr"), token("checkout")),
+            // The table waits on every cell.
+            CoverageSubject::Table,
         ];
         assert!(ordered.windows(2).all(|pair| pair[0] < pair[1]));
         // Fallback's units commit before coverage's.
@@ -1201,6 +1242,18 @@ mod tests {
             ]
             .map(|check| locale_unit(&owner, key("fr"), check))
         );
+        // The two occurrences share one rule unit, which normalizes them to
+        // the domain they both hold.
+        assert_eq!(
+            statuses(&resolved.evaluation)
+                .into_iter()
+                .filter(|(unit, _)| matches!(
+                    &unit.subject,
+                    Subject::Coverage(CoverageSubject::Rule(_))
+                ))
+                .collect::<Vec<_>>(),
+            [(rule_unit(&owner), Status::Evaluated)]
+        );
         assert_eq!(
             issues(&resolved.evaluation),
             [(
@@ -1271,7 +1324,8 @@ mod tests {
                 None
             );
         }
-        // An invalid rule has no domain, and every cell waits on it.
+        // An invalid rule has no domain: its unit waits on its items, and
+        // every cell, so the table, waits on them too.
         let causes = found.map(|(unit, ..)| unit).to_vec();
         assert!(statuses(&resolved.evaluation)
             .iter()
@@ -1279,8 +1333,12 @@ mod tests {
                 unit.subject,
                 Subject::Coverage(CoverageSubject::Domain(_))
             )));
-        for cell in cell_units() {
-            assert_eq!(waits_on(&resolved.evaluation, &cell), Some(causes.clone()));
+        assert_eq!(
+            waits_on(&resolved.evaluation, &rule_unit(&owner)),
+            Some(causes.clone())
+        );
+        for cell in cell_units().iter().chain([&table_unit()]) {
+            assert_eq!(waits_on(&resolved.evaluation, cell), Some(causes.clone()));
         }
         assert_eq!(units(&resolved.policy.unwrap_err()), causes);
     }
@@ -1352,6 +1410,11 @@ mod tests {
         assert!(cell_units()
             .iter()
             .all(|cell| resolved.evaluation.status(cell) == Some(&Status::Evaluated)));
+        // The table is not complete, so no cell keeps its Basis.
+        assert_eq!(
+            waits_on(&resolved.evaluation, &table_unit()),
+            Some(vec![conflict.clone()])
+        );
         assert_eq!(units(&resolved.policy.unwrap_err()), [conflict]);
         // A rule over just the overlap is narrower than both and decides it.
         let resolved = resolve(&declared(json!({"rules": [
@@ -1360,6 +1423,7 @@ mod tests {
             {"requestedLocales": ["fr"], "intentSurfaceClasses": ["checkout"], "mode": "fallback-allowed"}
         ]})));
         assert_eq!(issues(&resolved.evaluation), []);
+        assert_eq!(waits_on(&resolved.evaluation, &table_unit()), None);
         let policy = resolved.policy.unwrap();
         assert_eq!(
             basis_of(&policy, "fr", "checkout"),
@@ -1508,6 +1572,7 @@ mod tests {
     fn the_cell_bound_measures_locales_times_classes_and_no_cell_is_named_past_it() {
         let declaration = declared(json!({}));
         let at = resolve_under(&declaration, Bounds { cells: 9, ..ROOM }, &vocabulary());
+        assert_eq!(waits_on(&at.evaluation, &table_unit()), None);
         assert_eq!(at.policy.unwrap().basis().len(), 9);
         let over = resolve_under(&declaration, Bounds { cells: 8, ..ROOM }, &vocabulary());
         let cells = count_unit(CoverageSubject::Cells);
@@ -1518,6 +1583,10 @@ mod tests {
         assert!(!statuses(&over.evaluation)
             .iter()
             .any(|(unit, _)| names_a_cell(unit)));
+        assert_eq!(
+            waits_on(&over.evaluation, &table_unit()),
+            Some(vec![cells.clone()])
+        );
         assert_eq!(units(&over.policy.unwrap_err()), [cells]);
     }
 
@@ -1607,7 +1676,12 @@ mod tests {
             unknown_unit(&owner, "nav", Check::VocabularyMember),
             unknown_unit(&owner, "nav", Check::UniqueSurfaceClass),
         ];
-        let table = [CoverageSubject::Cells, CoverageSubject::Comparisons].map(count_unit);
+        let table = [
+            count_unit(CoverageSubject::Cells),
+            count_unit(CoverageSubject::Comparisons),
+            table_unit(),
+        ];
+        let rules = [rule_unit(&owner)];
         let slot = stand_in(Slot::Coverage);
         let unconfirmed = stand_in(Slot::LocaleCanonicalization);
         let field = stand_in(Slot::DeliveryGraph);
@@ -1623,7 +1697,7 @@ mod tests {
                     ..setup(ROOM, &vocabulary)
                 },
                 &slot,
-                [counts.as_slice(), &items, &table].concat(),
+                [counts.as_slice(), &items, &rules, &table].concat(),
             ),
             (
                 &declared_fields,
@@ -1632,7 +1706,7 @@ mod tests {
                     ..setup(ROOM, &vocabulary)
                 },
                 &unconfirmed,
-                [counts.as_slice(), &items, &table].concat(),
+                [counts.as_slice(), &items, &rules, &table].concat(),
             ),
             // Without the field no rule can be named, and Phase 7 cannot
             // count its selectors, so not even the requested set forms.
@@ -1659,7 +1733,12 @@ mod tests {
     fn a_missing_vocabulary_or_requested_set_leaves_only_what_needs_it_not_evaluated() {
         let selector = json!({"requestedLocales": ["fr"], "intentSurfaceClasses": ["nav"], "mode": "fallback-allowed"});
         let owner = rule(&selector);
-        let table = [CoverageSubject::Cells, CoverageSubject::Comparisons].map(count_unit);
+        let table = [
+            count_unit(CoverageSubject::Cells),
+            count_unit(CoverageSubject::Comparisons),
+            rule_unit(&owner),
+            table_unit(),
+        ];
         let missing = stand_in(Slot::IntentSurfaceClassVocabulary);
         let declaration = declared(json!({"rules": [selector]}));
         let resolved = resolve_fields(
@@ -1718,6 +1797,60 @@ mod tests {
             );
         }
         assert_eq!(units(&resolved.policy.unwrap_err()), [invalid]);
+    }
+
+    #[test]
+    fn a_rule_omitting_a_selector_waits_on_the_set_it_stands_for() {
+        let surface_only = json!({"intentSurfaceClasses": ["nav"], "mode": "fallback-allowed"});
+        let locale_only = json!({"requestedLocales": ["fr"], "mode": "fallback-allowed"});
+        // The omitted locale selector stands for a requested set Phase 7 could
+        // not form, while the surface item needs no locale.
+        let resolved = resolve(&requesting(|app| {
+            app["requestedLocales"] = json!(["en", "fr", "ja", "zz"]);
+            app["coverage"] = json!({"rules": [surface_only]});
+        }));
+        let owner = rule(&surface_only);
+        let invalid = locales::unit(
+            LocaleSubject::RequestedLocale(content("zz")),
+            Check::CanonicalLocale,
+        );
+        assert_eq!(
+            waits_on(
+                &resolved.evaluation,
+                &member_unit(&owner, "nav", Check::UniqueSurfaceClass)
+            ),
+            None
+        );
+        assert_eq!(
+            waits_on(&resolved.evaluation, &rule_unit(&owner)),
+            Some(vec![invalid])
+        );
+        // The omitted surface selector stands for the vocabulary, which is
+        // missing, while the locale item needs no vocabulary.
+        let missing = stand_in(Slot::IntentSurfaceClassVocabulary);
+        let declaration = declared(json!({"rules": [locale_only]}));
+        let resolved = resolve_fields(
+            &LocaleFields::declared(&declaration),
+            &Setup {
+                vocabulary: Err(&missing),
+                ..setup(ROOM, &vocabulary())
+            },
+        );
+        let owner = rule(&locale_only);
+        for check in [
+            Check::CanonicalLocale,
+            Check::UniqueLocale,
+            Check::RequestedMember,
+        ] {
+            assert_eq!(
+                waits_on(&resolved.evaluation, &locale_unit(&owner, key("fr"), check)),
+                None
+            );
+        }
+        assert_eq!(
+            waits_on(&resolved.evaluation, &rule_unit(&owner)),
+            Some(units(&missing))
+        );
     }
 
     #[test]
@@ -1801,6 +1934,8 @@ mod tests {
             &empty,
         );
         assert_eq!(issues(&resolved.evaluation), []);
+        // With no cell to decide, the table is complete at once.
+        assert_eq!(waits_on(&resolved.evaluation, &table_unit()), None);
         assert!(resolved.policy.unwrap().basis().is_empty());
         let selector = json!({"intentSurfaceClasses": ["checkout"], "mode": "fallback-allowed"});
         let resolved = resolve_under(&declared(json!({"rules": [selector]})), ROOM, &empty);
@@ -1813,7 +1948,13 @@ mod tests {
                 Some("surface-class-unknown")
             )]
         );
-        // With no cell to wait on it, the rule still blocks the policy.
+        // With no cell to wait on it, the rule still blocks the policy, though
+        // the empty table is complete.
+        assert_eq!(waits_on(&resolved.evaluation, &table_unit()), None);
+        assert_eq!(
+            waits_on(&resolved.evaluation, &rule_unit(&rule(&selector))),
+            Some(vec![unknown.clone()])
+        );
         assert_eq!(units(&resolved.policy.unwrap_err()), [unknown]);
     }
 }

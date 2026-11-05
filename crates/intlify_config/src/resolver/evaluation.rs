@@ -172,8 +172,15 @@ pub(crate) enum Check {
     VocabularyMember,
     /// No other item in the same selector names the same surface class.
     UniqueSurfaceClass,
+    /// The coverage rule's selectors normalize to its domain: every item
+    /// admitted, and an omitted selector standing for every requested locale
+    /// or vocabulary member.
+    NormalizedDomain,
     /// No other rule normalizes to the same domain.
     UniqueDomain,
+    /// Every cell of the coverage decision table is decided, so the table and
+    /// its Coverage Decision Basis exist.
+    CompleteTable,
     /// Exactly one submitted artifact is the Resource Limit Policy the
     /// reference names, and its body is admitted.
     BootstrapCandidate,

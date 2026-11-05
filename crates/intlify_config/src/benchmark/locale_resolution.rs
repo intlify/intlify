@@ -470,6 +470,10 @@ fn coverage_subject(frame: &mut Frame, subject: &CoverageSubject) -> Result<(), 
                 }
             }
         }
+        CoverageSubject::Rule(own) => {
+            frame.uint(9);
+            rule(frame, own)?;
+        }
         CoverageSubject::Domain(own) => {
             frame.uint(5);
             domain(frame, own)?;
@@ -481,6 +485,7 @@ fn coverage_subject(frame: &mut Frame, subject: &CoverageSubject) -> Result<(), 
             frame.text(locale.as_str());
             frame.text(surface.as_str());
         }
+        CoverageSubject::Table => frame.uint(10),
     }
     Ok(())
 }
@@ -529,6 +534,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         Check::UniqueSurfaceClass => 7,
         Check::UniqueDomain => 8,
         Check::EffectiveMode => 9,
+        Check::NormalizedDomain => 10,
+        Check::CompleteTable => 11,
         Check::SupportedAssertion
         | Check::MatchingData
         | Check::IntactArtifact
@@ -972,6 +979,8 @@ mod tests {
             Check::UniqueSurfaceClass,
             Check::UniqueDomain,
             Check::EffectiveMode,
+            Check::NormalizedDomain,
+            Check::CompleteTable,
         ]
         .map(|check| {
             digest(|frame| {
@@ -1052,12 +1061,15 @@ mod tests {
                 ),
                 Check::VocabularyMember,
             ),
+            coverage_unit(CoverageSubject::Rule(rule("ja")), Check::NormalizedDomain),
+            coverage_unit(CoverageSubject::Rule(rule("en")), Check::NormalizedDomain),
             coverage_unit(CoverageSubject::Cells, Check::WithinBound),
             coverage_unit(CoverageSubject::Comparisons, Check::WithinBound),
             coverage_unit(
                 CoverageSubject::Cell(canonical("ja"), token("nav")),
                 Check::EffectiveMode,
             ),
+            coverage_unit(CoverageSubject::Table, Check::CompleteTable),
         ]
         .map(|recorded| digest(|frame| unit(frame, &recorded).unwrap()));
         distinct(&units);

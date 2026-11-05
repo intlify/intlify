@@ -172,6 +172,8 @@ pub(crate) enum SubjectKind {
     CoverageLocale,
     /// A surface class one rule's selector names.
     CoverageSurfaceClass,
+    /// A rule, normalized from its selector items.
+    CoverageRule,
     /// A rule's normalized domain.
     CoverageDomain,
     /// The decision table's cells.
@@ -180,6 +182,8 @@ pub(crate) enum SubjectKind {
     CoverageComparisons,
     /// One cell of the decision table.
     CoverageCell,
+    /// The complete decision table.
+    CoverageTable,
 
     // artifact-reference-resolution
     /// The submitted bodies of one member key of the collection.
@@ -225,7 +229,7 @@ pub(crate) enum SubjectKind {
 
 impl SubjectKind {
     /// Every kind, phase by phase in rank order.
-    pub(crate) const ALL: [Self; 84] = [
+    pub(crate) const ALL: [Self; 86] = [
         Self::ProjectProfileSlot,
         Self::CapabilityArtifacts,
         Self::CapabilityPolicyArtifacts,
@@ -291,10 +295,12 @@ impl SubjectKind {
         Self::CoverageSurfaceSelectors,
         Self::CoverageLocale,
         Self::CoverageSurfaceClass,
+        Self::CoverageRule,
         Self::CoverageDomain,
         Self::CoverageCells,
         Self::CoverageComparisons,
         Self::CoverageCell,
+        Self::CoverageTable,
         Self::CollectionMember,
         Self::CollectionGroup,
         Self::ResolvedPolicyReference,
@@ -380,10 +386,12 @@ impl SubjectKind {
             | Self::CoverageSurfaceSelectors
             | Self::CoverageLocale
             | Self::CoverageSurfaceClass
+            | Self::CoverageRule
             | Self::CoverageDomain
             | Self::CoverageCells
             | Self::CoverageComparisons
-            | Self::CoverageCell => Phase::LocalePolicyResolution,
+            | Self::CoverageCell
+            | Self::CoverageTable => Phase::LocalePolicyResolution,
             Self::CollectionMember
             | Self::CollectionGroup
             | Self::ResolvedPolicyReference
@@ -479,8 +487,10 @@ impl SubjectKind {
                 Check::RequestedMember,
             ],
             Self::CoverageSurfaceClass => &[Check::VocabularyMember, Check::UniqueSurfaceClass],
+            Self::CoverageRule => &[Check::NormalizedDomain],
             Self::CoverageDomain => &[Check::UniqueDomain],
             Self::CoverageCell | Self::DeliveryPlacement => &[Check::EffectiveMode],
+            Self::CoverageTable => &[Check::CompleteTable],
             Self::CollectionMember => &[Check::AdmissibleMember, Check::SingleOccurrence],
             Self::CollectionGroup => &[Check::ConsistentContent],
             Self::ResolvedPolicyReference | Self::ResolvedTargetProfileReference => {
@@ -615,10 +625,12 @@ impl Subject {
                 CoverageSubject::SurfaceSelectors => SubjectKind::CoverageSurfaceSelectors,
                 CoverageSubject::Locale(..) => SubjectKind::CoverageLocale,
                 CoverageSubject::SurfaceClass(..) => SubjectKind::CoverageSurfaceClass,
+                CoverageSubject::Rule(_) => SubjectKind::CoverageRule,
                 CoverageSubject::Domain(_) => SubjectKind::CoverageDomain,
                 CoverageSubject::Cells => SubjectKind::CoverageCells,
                 CoverageSubject::Comparisons => SubjectKind::CoverageComparisons,
                 CoverageSubject::Cell(..) => SubjectKind::CoverageCell,
+                CoverageSubject::Table => SubjectKind::CoverageTable,
             },
             Self::ArtifactCollection(subject) => match subject {
                 CollectionSubject::Member(_) => SubjectKind::CollectionMember,
@@ -796,12 +808,14 @@ mod tests {
             coverage(CoverageSubject::SurfaceSelectors),
             coverage(CoverageSubject::Locale(rule.clone(), content("JA!"))),
             coverage(CoverageSubject::SurfaceClass(
-                rule,
+                rule.clone(),
                 SurfaceKey::Member(surface.clone()),
             )),
+            coverage(CoverageSubject::Rule(rule)),
             coverage(CoverageSubject::Cells),
             coverage(CoverageSubject::Comparisons),
             coverage(CoverageSubject::Cell(canonical("ja"), surface)),
+            coverage(CoverageSubject::Table),
             Subject::ArtifactCollection(CollectionSubject::Member(member)),
             Subject::ArtifactCollection(CollectionSubject::Group(ConflictKey {
                 kind: ArtifactKind::TrustPolicy,

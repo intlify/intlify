@@ -196,7 +196,9 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::EffectiveMode
         | Check::VocabularyMember
         | Check::UniqueSurfaceClass
+        | Check::NormalizedDomain
         | Check::UniqueDomain
+        | Check::CompleteTable
         | Check::BootstrapCandidate
         | Check::CompatiblePolicy
         | Check::ResolvedReference
@@ -563,7 +565,9 @@ mod tests {
             Check::EffectiveMode,
             Check::VocabularyMember,
             Check::UniqueSurfaceClass,
+            Check::NormalizedDomain,
             Check::UniqueDomain,
+            Check::CompleteTable,
             Check::BootstrapCandidate,
             Check::CompatiblePolicy,
             Check::ResolvedReference,
