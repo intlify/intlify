@@ -1082,6 +1082,8 @@ pub(super) mod tests {
         });
     }
 
+    /// Every check of every kind but the kinds declared only, of which no
+    /// invocation records a unit yet.
     #[test]
     fn a_complete_invocation_runs_every_check_of_every_kind() {
         Inputs::complete().resolve(|evaluation, _| {
@@ -1091,6 +1093,7 @@ pub(super) mod tests {
                 .collect();
             let listed: BTreeSet<(SubjectKind, Check)> = SubjectKind::ALL
                 .into_iter()
+                .filter(|kind| !kind.declared_only())
                 .flat_map(|kind| kind.checks().iter().map(move |&check| (kind, check)))
                 .collect();
             assert_eq!(ran, listed);

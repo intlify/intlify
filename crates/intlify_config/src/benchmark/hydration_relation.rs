@@ -383,7 +383,30 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::KnownMember
         | Check::UniqueMember
         | Check::SingleGroup
-        | Check::EstablishedGroup => return defect(),
+        | Check::EstablishedGroup
+        | Check::EstablishedSlots
+        | Check::WithinFileBytes
+        | Check::WithinParserTokens
+        | Check::WellFormedJson
+        | Check::UniqueMembers
+        | Check::JsonCompatible
+        | Check::WithinNodes
+        | Check::WithinDepth
+        | Check::WithinCollectionEntries
+        | Check::WithinTotalStringBytes
+        | Check::WithinSingleStringBytes
+        | Check::ObjectRoot
+        | Check::PresentSchemaVersion
+        | Check::StringSchemaVersion
+        | Check::SupportedSchemaVersion
+        | Check::RequiredField
+        | Check::FieldType
+        | Check::FieldValue
+        | Check::KnownField
+        | Check::RequiredSelector
+        | Check::ValidSelector
+        | Check::DeclaredSelector
+        | Check::CompleteReporting => return defect(),
     });
     Ok(())
 }
