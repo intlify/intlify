@@ -13,7 +13,8 @@
 //! `src/construction/root.rs`, and the authorities' in
 //! `src/construction/profile.rs`, `src/construction/authority_set.rs`, and
 //! `src/construction/capability.rs`, and the registries' in
-//! `src/construction/registry/safe_origin.rs`.
+//! `src/construction/registry/safe_origin.rs` and
+//! `src/construction/registry/check.rs`.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -101,6 +102,14 @@ fn main() -> ExitCode {
         println!(
             "pinned Safe Origin Kind Registry digest: {}",
             registry_pins.safe_origin_kind_registry
+        );
+        println!(
+            "pinned Check Registry schema digest: {}",
+            registry_pins.check_registry_schema
+        );
+        println!(
+            "pinned Check Registry digest: {}",
+            registry_pins.check_registry
         );
     }
     if stale {

@@ -13,6 +13,9 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
 use crate::input_limits::Bound;
 
 use super::artifact_resolution::CollectionSubject;
@@ -29,8 +32,11 @@ use super::resource_policy::{PolicySubject, ReferenceField};
 use super::specification::Slot;
 use super::targets::TargetSubject;
 
-/// 015's resolution phases, declared in rank order.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+/// 015's resolution phases, declared in rank order, each spelled as its ID.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
 pub(crate) enum Phase {
     ResolverBootstrapAdmission,
     EntryAdmission,
