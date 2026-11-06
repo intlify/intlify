@@ -1,0 +1,1980 @@
+{
+  "rows": [
+    {
+      "checkId": "specification.project-profile.supported",
+      "phaseId": "resolver-bootstrap-admission",
+      "ruleId": "015.specification.project-profile.supported",
+      "subjectKind": "project-profile-slot",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "project-profile-slot",
+      "subjectKindRank": "0",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "dependency.entry.established-slots",
+      "phaseId": "entry-admission",
+      "ruleId": "015.dependency.entry.established-slots",
+      "subjectKind": "entry-dependencies",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "entry-dependencies",
+      "subjectKindRank": "0",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "entry.input.within-file-bytes",
+      "phaseId": "entry-admission",
+      "ruleId": "015.entry.input.within-file-bytes",
+      "subjectKind": "complete-input",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "complete-input",
+      "subjectKindRank": "1",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "entry.input.within-parser-tokens",
+      "phaseId": "entry-admission",
+      "ruleId": "015.entry.input.within-parser-tokens",
+      "subjectKind": "complete-input",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "complete-input",
+      "subjectKindRank": "1",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "entry.input.well-formed-json",
+      "phaseId": "entry-admission",
+      "ruleId": "015.entry.input.well-formed-json",
+      "subjectKind": "complete-input",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "complete-input",
+      "subjectKindRank": "1",
+      "checkRank": "2"
+    },
+    {
+      "checkId": "entry.input.unique-members",
+      "phaseId": "entry-admission",
+      "ruleId": "015.entry.input.unique-members",
+      "subjectKind": "complete-input",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "complete-input",
+      "subjectKindRank": "1",
+      "checkRank": "3"
+    },
+    {
+      "checkId": "entry.input.json-compatible",
+      "phaseId": "entry-admission",
+      "ruleId": "015.entry.input.json-compatible",
+      "subjectKind": "complete-input",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "complete-input",
+      "subjectKindRank": "1",
+      "checkRank": "4"
+    },
+    {
+      "checkId": "entry.input.within-nodes",
+      "phaseId": "entry-admission",
+      "ruleId": "015.entry.input.within-nodes",
+      "subjectKind": "complete-input",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "complete-input",
+      "subjectKindRank": "1",
+      "checkRank": "5"
+    },
+    {
+      "checkId": "entry.input.within-depth",
+      "phaseId": "entry-admission",
+      "ruleId": "015.entry.input.within-depth",
+      "subjectKind": "complete-input",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "complete-input",
+      "subjectKindRank": "1",
+      "checkRank": "6"
+    },
+    {
+      "checkId": "entry.input.within-collection-entries",
+      "phaseId": "entry-admission",
+      "ruleId": "015.entry.input.within-collection-entries",
+      "subjectKind": "complete-input",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "complete-input",
+      "subjectKindRank": "1",
+      "checkRank": "7"
+    },
+    {
+      "checkId": "entry.input.within-total-string-bytes",
+      "phaseId": "entry-admission",
+      "ruleId": "015.entry.input.within-total-string-bytes",
+      "subjectKind": "complete-input",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "complete-input",
+      "subjectKindRank": "1",
+      "checkRank": "8"
+    },
+    {
+      "checkId": "entry.input.within-single-string-bytes",
+      "phaseId": "entry-admission",
+      "ruleId": "015.entry.input.within-single-string-bytes",
+      "subjectKind": "complete-input",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "complete-input",
+      "subjectKindRank": "1",
+      "checkRank": "9"
+    },
+    {
+      "checkId": "dependency.materialized.established-slots",
+      "phaseId": "structural-admission",
+      "ruleId": "015.dependency.materialized.established-slots",
+      "subjectKind": "materialized-dependencies",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "materialized-dependencies",
+      "subjectKindRank": "0",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "structural.schema-selection.object-root",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.schema-selection.object-root",
+      "subjectKind": "configuration-schema-selection",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "configuration-schema-selection",
+      "subjectKindRank": "1",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "structural.schema-selection.present-schema-version",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.schema-selection.present-schema-version",
+      "subjectKind": "configuration-schema-selection",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "configuration-schema-selection",
+      "subjectKindRank": "1",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "structural.schema-selection.string-schema-version",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.schema-selection.string-schema-version",
+      "subjectKind": "configuration-schema-selection",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "configuration-schema-selection",
+      "subjectKindRank": "1",
+      "checkRank": "2"
+    },
+    {
+      "checkId": "structural.schema-selection.supported-schema-version",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.schema-selection.supported-schema-version",
+      "subjectKind": "configuration-schema-selection",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "configuration-schema-selection",
+      "subjectKindRank": "1",
+      "checkRank": "3"
+    },
+    {
+      "checkId": "structural.analysis.within-capability",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.analysis.within-capability",
+      "subjectKind": "capability-structural-analysis",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "capability-structural-analysis",
+      "subjectKindRank": "2",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "structural.root.required-field",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.root.required-field",
+      "subjectKind": "root-field",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "root",
+      "subjectKindRank": "3",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "structural.root.field-type",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.root.field-type",
+      "subjectKind": "root-field",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "root",
+      "subjectKindRank": "3",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "structural.root.field-value",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.root.field-value",
+      "subjectKind": "root-field",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "root",
+      "subjectKindRank": "3",
+      "checkRank": "2"
+    },
+    {
+      "checkId": "structural.root.known-field",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.root.known-field",
+      "subjectKind": "root-field",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "root",
+      "subjectKindRank": "3",
+      "checkRank": "3"
+    },
+    {
+      "checkId": "structural.profile-key.field-value",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.profile-key.field-value",
+      "subjectKind": "profile-key",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "profiles",
+      "subjectKindRank": "4",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "structural.profile.required-field",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.profile.required-field",
+      "subjectKind": "profile-field",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "profile",
+      "parentSubject": {
+        "phaseId": "structural-admission",
+        "subjectKind": "profile-key"
+      },
+      "subjectKindRank": "5",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "structural.profile.field-type",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.profile.field-type",
+      "subjectKind": "profile-field",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "profile",
+      "parentSubject": {
+        "phaseId": "structural-admission",
+        "subjectKind": "profile-key"
+      },
+      "subjectKindRank": "5",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "structural.profile.field-value",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.profile.field-value",
+      "subjectKind": "profile-field",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "profile",
+      "parentSubject": {
+        "phaseId": "structural-admission",
+        "subjectKind": "profile-key"
+      },
+      "subjectKindRank": "5",
+      "checkRank": "2"
+    },
+    {
+      "checkId": "structural.profile.known-field",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.profile.known-field",
+      "subjectKind": "profile-field",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "profile",
+      "parentSubject": {
+        "phaseId": "structural-admission",
+        "subjectKind": "profile-key"
+      },
+      "subjectKindRank": "5",
+      "checkRank": "3"
+    },
+    {
+      "checkId": "structural.target-key.field-value",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.target-key.field-value",
+      "subjectKind": "target-profile-key",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "target-profiles",
+      "parentSubject": {
+        "phaseId": "structural-admission",
+        "subjectKind": "profile-key"
+      },
+      "subjectKindRank": "6",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "structural.target.required-field",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.target.required-field",
+      "subjectKind": "target-field",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "target",
+      "parentSubject": {
+        "phaseId": "structural-admission",
+        "subjectKind": "target-profile-key"
+      },
+      "subjectKindRank": "7",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "structural.target.field-type",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.target.field-type",
+      "subjectKind": "target-field",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "target",
+      "parentSubject": {
+        "phaseId": "structural-admission",
+        "subjectKind": "target-profile-key"
+      },
+      "subjectKindRank": "7",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "structural.target.field-value",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.target.field-value",
+      "subjectKind": "target-field",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "target",
+      "parentSubject": {
+        "phaseId": "structural-admission",
+        "subjectKind": "target-profile-key"
+      },
+      "subjectKindRank": "7",
+      "checkRank": "2"
+    },
+    {
+      "checkId": "structural.target.known-field",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.target.known-field",
+      "subjectKind": "target-field",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "target",
+      "parentSubject": {
+        "phaseId": "structural-admission",
+        "subjectKind": "target-profile-key"
+      },
+      "subjectKindRank": "7",
+      "checkRank": "3"
+    },
+    {
+      "checkId": "structural.group-key.field-value",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.group-key.field-value",
+      "subjectKind": "deployment-group-key",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "deployment-groups",
+      "parentSubject": {
+        "phaseId": "structural-admission",
+        "subjectKind": "profile-key"
+      },
+      "subjectKindRank": "8",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "structural.group.required-field",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.group.required-field",
+      "subjectKind": "group-field",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "group",
+      "parentSubject": {
+        "phaseId": "structural-admission",
+        "subjectKind": "deployment-group-key"
+      },
+      "subjectKindRank": "9",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "structural.group.field-type",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.group.field-type",
+      "subjectKind": "group-field",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "group",
+      "parentSubject": {
+        "phaseId": "structural-admission",
+        "subjectKind": "deployment-group-key"
+      },
+      "subjectKindRank": "9",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "structural.group.field-value",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.group.field-value",
+      "subjectKind": "group-field",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "group",
+      "parentSubject": {
+        "phaseId": "structural-admission",
+        "subjectKind": "deployment-group-key"
+      },
+      "subjectKindRank": "9",
+      "checkRank": "2"
+    },
+    {
+      "checkId": "structural.group.known-field",
+      "phaseId": "structural-admission",
+      "ruleId": "015.structural.group.known-field",
+      "subjectKind": "group-field",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "group",
+      "parentSubject": {
+        "phaseId": "structural-admission",
+        "subjectKind": "deployment-group-key"
+      },
+      "subjectKindRank": "9",
+      "checkRank": "3"
+    },
+    {
+      "checkId": "dependency.profile-specification.established",
+      "phaseId": "structural-admission",
+      "ruleId": "015.dependency.profile-specification.established",
+      "subjectKind": "profile-specification-dependency",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "profile-specification-dependency",
+      "subjectKindRank": "10",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "selection.profiles.within-capability",
+      "phaseId": "profile-selection",
+      "ruleId": "015.selection.profiles.within-capability",
+      "subjectKind": "capability-profiles",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "capability-profiles",
+      "subjectKindRank": "0",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "selection.profile-id.within-capability",
+      "phaseId": "profile-selection",
+      "ruleId": "015.selection.profile-id.within-capability",
+      "subjectKind": "capability-profile-id",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "profiles",
+      "subjectKindRank": "1",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "selection.selector.within-capability",
+      "phaseId": "profile-selection",
+      "ruleId": "015.selection.selector.within-capability",
+      "subjectKind": "profile-selector",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "profile-selector",
+      "subjectKindRank": "2",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "selection.selector.required",
+      "phaseId": "profile-selection",
+      "ruleId": "015.selection.selector.required",
+      "subjectKind": "profile-selector",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "profile-selector",
+      "subjectKindRank": "2",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "selection.selector.valid",
+      "phaseId": "profile-selection",
+      "ruleId": "015.selection.selector.valid",
+      "subjectKind": "profile-selector",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "profile-selector",
+      "subjectKindRank": "2",
+      "checkRank": "2"
+    },
+    {
+      "checkId": "selection.selector.declared",
+      "phaseId": "profile-selection",
+      "ruleId": "015.selection.selector.declared",
+      "subjectKind": "profile-selector",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "profile-selector",
+      "subjectKindRank": "2",
+      "checkRank": "3"
+    },
+    {
+      "checkId": "resource-policy.artifacts.within-capability",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.artifacts.within-capability",
+      "subjectKind": "capability-artifacts",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "capability-artifacts",
+      "subjectKindRank": "0",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.policy-artifacts.within-capability",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.policy-artifacts.within-capability",
+      "subjectKind": "capability-policy-artifacts",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "capability-policy-artifacts",
+      "subjectKindRank": "1",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.target-profile-artifacts.within-capability",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.target-profile-artifacts.within-capability",
+      "subjectKind": "capability-target-profile-artifacts",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "capability-target-profile-artifacts",
+      "subjectKindRank": "2",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.references.within-capability",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.references.within-capability",
+      "subjectKind": "capability-references",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "capability-references",
+      "subjectKindRank": "3",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.artifact.within-capability",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.artifact.within-capability",
+      "subjectKind": "capability-artifact",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "artifact-collection",
+      "subjectKindRank": "4",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.artifact-bytes.within-capability",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.artifact-bytes.within-capability",
+      "subjectKind": "capability-artifact-bytes",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "capability-artifact-bytes",
+      "subjectKindRank": "5",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.policy-reference.within-capability",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.policy-reference.within-capability",
+      "subjectKind": "capability-policy-reference",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "declaration",
+      "subjectKindRank": "6",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.target-profile-reference.within-capability",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.target-profile-reference.within-capability",
+      "subjectKind": "capability-target-profile-reference",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "target-profile-references",
+      "subjectKindRank": "7",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.reference-bytes.within-capability",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.reference-bytes.within-capability",
+      "subjectKind": "capability-reference-bytes",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "capability-reference-bytes",
+      "subjectKindRank": "8",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.resource-limits.bootstrap-candidate",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.resource-limits.bootstrap-candidate",
+      "subjectKind": "resource-limits",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "resource-limits",
+      "subjectKindRank": "9",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.resource-limits.compatible",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.resource-limits.compatible",
+      "subjectKind": "resource-limits",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "resource-limits",
+      "subjectKindRank": "9",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "resource-policy.root-nodes.within-bound",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.root-nodes.within-bound",
+      "subjectKind": "root-nodes",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "root-nodes",
+      "subjectKindRank": "10",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.root-depth.within-bound",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.root-depth.within-bound",
+      "subjectKind": "root-depth",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "root-depth",
+      "subjectKindRank": "11",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.root-collection-entries.within-bound",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.root-collection-entries.within-bound",
+      "subjectKind": "root-collection-entries",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "root-collection-entries",
+      "subjectKindRank": "12",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.root-string-bytes.within-bound",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.root-string-bytes.within-bound",
+      "subjectKind": "root-string-bytes",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "root-string-bytes",
+      "subjectKindRank": "13",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.root-longest-string.within-bound",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.root-longest-string.within-bound",
+      "subjectKind": "root-longest-string",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "root-longest-string",
+      "subjectKindRank": "14",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.profiles.within-bound",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.profiles.within-bound",
+      "subjectKind": "profiles",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "profiles",
+      "subjectKindRank": "15",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.profile-id.within-bound",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.profile-id.within-bound",
+      "subjectKind": "profile-id",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "profiles",
+      "subjectKindRank": "16",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.selector.within-bound",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.selector.within-bound",
+      "subjectKind": "selector",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "selector",
+      "subjectKindRank": "17",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.structural-analysis.within-bound",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.structural-analysis.within-bound",
+      "subjectKind": "structural-analysis",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "structural-analysis",
+      "subjectKindRank": "18",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.artifacts.within-bound",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.artifacts.within-bound",
+      "subjectKind": "artifacts",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "artifacts",
+      "subjectKindRank": "19",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.policy-artifacts.within-bound",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.policy-artifacts.within-bound",
+      "subjectKind": "policy-artifacts",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "policy-artifacts",
+      "subjectKindRank": "20",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.target-profile-artifacts.within-bound",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.target-profile-artifacts.within-bound",
+      "subjectKind": "target-profile-artifacts",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "target-profile-artifacts",
+      "subjectKindRank": "21",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.references.within-bound",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.references.within-bound",
+      "subjectKind": "references",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "references",
+      "subjectKindRank": "22",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.artifact.within-bound",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.artifact.within-bound",
+      "subjectKind": "artifact",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "artifact-collection",
+      "subjectKindRank": "23",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.artifact-bytes.within-bound",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.artifact-bytes.within-bound",
+      "subjectKind": "artifact-bytes",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "artifact-bytes",
+      "subjectKindRank": "24",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.policy-reference.within-bound",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.policy-reference.within-bound",
+      "subjectKind": "policy-reference",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "declaration",
+      "subjectKindRank": "25",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.target-profile-reference.within-bound",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.target-profile-reference.within-bound",
+      "subjectKind": "target-profile-reference",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "target-profile-references",
+      "subjectKindRank": "26",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "resource-policy.reference-bytes.within-bound",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.reference-bytes.within-bound",
+      "subjectKind": "reference-bytes",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "reference-bytes",
+      "subjectKindRank": "27",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "specification.locale-canonicalization.supported",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.locale-canonicalization.supported",
+      "subjectKind": "locale-canonicalization-slot",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "locale-canonicalization-slot",
+      "subjectKindRank": "0",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "specification.locale-negotiation.supported",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.locale-negotiation.supported",
+      "subjectKind": "locale-negotiation-slot",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "locale-negotiation-slot",
+      "subjectKindRank": "1",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "specification.message-locale-fallback.supported",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.message-locale-fallback.supported",
+      "subjectKind": "message-locale-fallback-slot",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "message-locale-fallback-slot",
+      "subjectKindRank": "2",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "specification.coverage.supported",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.coverage.supported",
+      "subjectKind": "coverage-slot",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "coverage-slot",
+      "subjectKindRank": "3",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "specification.intent-surface-class-vocabulary.supported",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.intent-surface-class-vocabulary.supported",
+      "subjectKind": "intent-surface-class-vocabulary-slot",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "intent-surface-class-vocabulary-slot",
+      "subjectKindRank": "4",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "specification.delivery-graph.supported",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.delivery-graph.supported",
+      "subjectKind": "delivery-graph-slot",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "delivery-graph-slot",
+      "subjectKindRank": "5",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "specification.delivery-placement.supported",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.delivery-placement.supported",
+      "subjectKind": "delivery-placement-slot",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "delivery-placement-slot",
+      "subjectKindRank": "6",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "specification.vocabulary.intact",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.vocabulary.intact",
+      "subjectKind": "vocabulary",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "vocabulary",
+      "subjectKindRank": "7",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "specification.vocabulary.asserted",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.vocabulary.asserted",
+      "subjectKind": "vocabulary",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "vocabulary",
+      "subjectKindRank": "7",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "specification.locale-data.matching",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.locale-data.matching",
+      "subjectKind": "canonicalization-data",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "canonicalization-data",
+      "subjectKindRank": "8",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "dependency.locale-canonicalization.established",
+      "phaseId": "specification-admission",
+      "ruleId": "015.dependency.locale-canonicalization.established",
+      "subjectKind": "locale-canonicalization-dependency",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "locale-canonicalization-dependency",
+      "subjectKindRank": "9",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "identity.declaration-field.opaque",
+      "phaseId": "project-identity-resolution",
+      "ruleId": "015.identity.declaration-field.opaque",
+      "subjectKind": "declaration-field",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "declaration",
+      "subjectKindRank": "0",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "dependency.project-identity.established",
+      "phaseId": "project-identity-resolution",
+      "ruleId": "015.dependency.project-identity.established",
+      "subjectKind": "project-identity-dependency",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "project-identity-dependency",
+      "subjectKindRank": "1",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "locale.occurrences.within-bound",
+      "phaseId": "locale-resolution",
+      "ruleId": "015.locale.occurrences.within-bound",
+      "subjectKind": "locale-occurrences",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "locale-occurrences",
+      "subjectKindRank": "0",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "locale.requested.canonical",
+      "phaseId": "locale-resolution",
+      "ruleId": "015.locale.requested.canonical",
+      "subjectKind": "requested-locale",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "requested-locales",
+      "subjectKindRank": "1",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "locale.requested.unique",
+      "phaseId": "locale-resolution",
+      "ruleId": "015.locale.requested.unique",
+      "subjectKind": "requested-locale",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "requested-locales",
+      "subjectKindRank": "1",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "locale.requested-set.within-bound",
+      "phaseId": "locale-resolution",
+      "ruleId": "015.locale.requested-set.within-bound",
+      "subjectKind": "requested-locales",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "declaration",
+      "subjectKindRank": "2",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "locale.default-source.canonical",
+      "phaseId": "locale-resolution",
+      "ruleId": "015.locale.default-source.canonical",
+      "subjectKind": "default-source-locale",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "declaration",
+      "subjectKindRank": "3",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "locale.default-requested.canonical",
+      "phaseId": "locale-resolution",
+      "ruleId": "015.locale.default-requested.canonical",
+      "subjectKind": "default-requested-locale",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "declaration",
+      "subjectKindRank": "4",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "locale.default-requested.member",
+      "phaseId": "locale-resolution",
+      "ruleId": "015.locale.default-requested.member",
+      "subjectKind": "default-requested-locale",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "declaration",
+      "subjectKindRank": "4",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "locale.alias-key.canonical",
+      "phaseId": "locale-resolution",
+      "ruleId": "015.locale.alias-key.canonical",
+      "subjectKind": "negotiation-alias-key",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "negotiation-aliases",
+      "subjectKindRank": "5",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "locale.alias-destination.canonical",
+      "phaseId": "locale-resolution",
+      "ruleId": "015.locale.alias-destination.canonical",
+      "subjectKind": "negotiation-alias-value",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "negotiation-destinations",
+      "parentSubject": {
+        "phaseId": "locale-resolution",
+        "subjectKind": "negotiation-alias-key"
+      },
+      "subjectKindRank": "6",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "locale.fallback-key.canonical",
+      "phaseId": "locale-resolution",
+      "ruleId": "015.locale.fallback-key.canonical",
+      "subjectKind": "message-fallback-key",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "message-fallback",
+      "subjectKindRank": "7",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "locale.target-profiles.within-bound",
+      "phaseId": "locale-resolution",
+      "ruleId": "015.locale.target-profiles.within-bound",
+      "subjectKind": "target-profiles",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "declaration",
+      "subjectKindRank": "8",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "locale.target-id.within-bound",
+      "phaseId": "locale-resolution",
+      "ruleId": "015.locale.target-id.within-bound",
+      "subjectKind": "target-id",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "target-profiles",
+      "subjectKindRank": "9",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "locale.target-requested.canonical",
+      "phaseId": "locale-resolution",
+      "ruleId": "015.locale.target-requested.canonical",
+      "subjectKind": "target-requested-locale",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "target-requested-locales",
+      "parentSubject": {
+        "phaseId": "locale-resolution",
+        "subjectKind": "target-id"
+      },
+      "subjectKindRank": "10",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "locale.target-requested.unique",
+      "phaseId": "locale-resolution",
+      "ruleId": "015.locale.target-requested.unique",
+      "subjectKind": "target-requested-locale",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "target-requested-locales",
+      "parentSubject": {
+        "phaseId": "locale-resolution",
+        "subjectKind": "target-id"
+      },
+      "subjectKindRank": "10",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "locale.target-default-requested.canonical",
+      "phaseId": "locale-resolution",
+      "ruleId": "015.locale.target-default-requested.canonical",
+      "subjectKind": "target-default-requested-locale",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "target",
+      "parentSubject": {
+        "phaseId": "locale-resolution",
+        "subjectKind": "target-id"
+      },
+      "subjectKindRank": "11",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "dependency.project-locales.established",
+      "phaseId": "locale-resolution",
+      "ruleId": "015.dependency.project-locales.established",
+      "subjectKind": "project-locales-dependency",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "project-locales-dependency",
+      "subjectKindRank": "12",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "negotiation.aliases.within-bound",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.negotiation.aliases.within-bound",
+      "subjectKind": "negotiation-aliases",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "declaration",
+      "subjectKindRank": "0",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "negotiation.alias-key.unique",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.negotiation.alias-key.unique",
+      "subjectKind": "negotiation-key",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "negotiation-aliases",
+      "subjectKindRank": "1",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "negotiation.destination.member",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.negotiation.destination.member",
+      "subjectKind": "negotiation-destination",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "negotiation-destinations",
+      "parentSubject": {
+        "phaseId": "locale-policy-resolution",
+        "subjectKind": "negotiation-key"
+      },
+      "subjectKindRank": "2",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "fallback.sources.within-bound",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.fallback.sources.within-bound",
+      "subjectKind": "fallback-sources",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "declaration",
+      "subjectKindRank": "3",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "fallback.source.unique",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.fallback.source.unique",
+      "subjectKind": "fallback-source",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "message-fallback",
+      "subjectKindRank": "4",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "fallback.source.member",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.fallback.source.member",
+      "subjectKind": "fallback-source",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "message-fallback",
+      "subjectKindRank": "4",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "fallback.sequence.within-bound",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.fallback.sequence.within-bound",
+      "subjectKind": "fallback-sequence",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "fallback-entry",
+      "parentSubject": {
+        "phaseId": "locale-policy-resolution",
+        "subjectKind": "fallback-source"
+      },
+      "subjectKindRank": "5",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "fallback.candidate.canonical",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.fallback.candidate.canonical",
+      "subjectKind": "fallback-candidate",
+      "subjectKeyStrategy": "semantic-position",
+      "subjectContentProjection": "none",
+      "owningScope": "fallback-candidates",
+      "parentSubject": {
+        "phaseId": "locale-policy-resolution",
+        "subjectKind": "fallback-source"
+      },
+      "subjectKindRank": "6",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "fallback.candidate.distinct-from-source",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.fallback.candidate.distinct-from-source",
+      "subjectKind": "fallback-candidate",
+      "subjectKeyStrategy": "semantic-position",
+      "subjectContentProjection": "none",
+      "owningScope": "fallback-candidates",
+      "parentSubject": {
+        "phaseId": "locale-policy-resolution",
+        "subjectKind": "fallback-source"
+      },
+      "subjectKindRank": "6",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "fallback.literal.unique",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.fallback.literal.unique",
+      "subjectKind": "fallback-literal",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "fallback-literals",
+      "parentSubject": {
+        "phaseId": "locale-policy-resolution",
+        "subjectKind": "fallback-source"
+      },
+      "subjectKindRank": "7",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "fallback.intent-source.unique",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.fallback.intent-source.unique",
+      "subjectKind": "fallback-intent-source",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "fallback-intent-sources",
+      "parentSubject": {
+        "phaseId": "locale-policy-resolution",
+        "subjectKind": "fallback-source"
+      },
+      "subjectKindRank": "8",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "coverage.rules.within-bound",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.coverage.rules.within-bound",
+      "subjectKind": "coverage-rules",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "declaration",
+      "subjectKindRank": "9",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "coverage.locale-selectors.within-bound",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.coverage.locale-selectors.within-bound",
+      "subjectKind": "coverage-locale-selectors",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "coverage-locale-selectors",
+      "subjectKindRank": "10",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "coverage.surface-selectors.within-bound",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.coverage.surface-selectors.within-bound",
+      "subjectKind": "coverage-surface-selectors",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "coverage-surface-selectors",
+      "subjectKindRank": "11",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "coverage.locale.canonical",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.coverage.locale.canonical",
+      "subjectKind": "coverage-locale",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "coverage-locales",
+      "parentSubject": {
+        "phaseId": "locale-policy-resolution",
+        "subjectKind": "coverage-rule"
+      },
+      "subjectKindRank": "12",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "coverage.locale.unique",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.coverage.locale.unique",
+      "subjectKind": "coverage-locale",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "coverage-locales",
+      "parentSubject": {
+        "phaseId": "locale-policy-resolution",
+        "subjectKind": "coverage-rule"
+      },
+      "subjectKindRank": "12",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "coverage.locale.member",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.coverage.locale.member",
+      "subjectKind": "coverage-locale",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "coverage-locales",
+      "parentSubject": {
+        "phaseId": "locale-policy-resolution",
+        "subjectKind": "coverage-rule"
+      },
+      "subjectKindRank": "12",
+      "checkRank": "2"
+    },
+    {
+      "checkId": "coverage.surface-class.vocabulary-member",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.coverage.surface-class.vocabulary-member",
+      "subjectKind": "coverage-surface-class",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "coverage-surface-classes",
+      "parentSubject": {
+        "phaseId": "locale-policy-resolution",
+        "subjectKind": "coverage-rule"
+      },
+      "subjectKindRank": "13",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "coverage.surface-class.unique",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.coverage.surface-class.unique",
+      "subjectKind": "coverage-surface-class",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "coverage-surface-classes",
+      "parentSubject": {
+        "phaseId": "locale-policy-resolution",
+        "subjectKind": "coverage-rule"
+      },
+      "subjectKindRank": "13",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "coverage.rule.normalized-domain",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.coverage.rule.normalized-domain",
+      "subjectKind": "coverage-rule",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "coverage-rules",
+      "subjectKindRank": "14",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "coverage.domain.unique",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.coverage.domain.unique",
+      "subjectKind": "coverage-domain",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "coverage-domains",
+      "subjectKindRank": "15",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "coverage.cells.within-bound",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.coverage.cells.within-bound",
+      "subjectKind": "coverage-cells",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "coverage-cells",
+      "subjectKindRank": "16",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "coverage.comparisons.within-bound",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.coverage.comparisons.within-bound",
+      "subjectKind": "coverage-comparisons",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "coverage-comparisons",
+      "subjectKindRank": "17",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "coverage.cell.effective-mode",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.coverage.cell.effective-mode",
+      "subjectKind": "coverage-cell",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "coverage-cells",
+      "subjectKindRank": "18",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "coverage.table.complete",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.coverage.table.complete",
+      "subjectKind": "coverage-table",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "coverage-table",
+      "subjectKindRank": "19",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "dependency.locale-negotiation.established",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.dependency.locale-negotiation.established",
+      "subjectKind": "locale-negotiation-dependency",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "locale-negotiation-dependency",
+      "subjectKindRank": "20",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "dependency.message-fallback.established",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.dependency.message-fallback.established",
+      "subjectKind": "message-fallback-dependency",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "message-fallback-dependency",
+      "subjectKindRank": "21",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "dependency.coverage.established",
+      "phaseId": "locale-policy-resolution",
+      "ruleId": "015.dependency.coverage.established",
+      "subjectKind": "coverage-dependency",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "coverage-dependency",
+      "subjectKindRank": "22",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "artifact.member.admissible",
+      "phaseId": "artifact-reference-resolution",
+      "ruleId": "015.artifact.member.admissible",
+      "subjectKind": "collection-member",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "artifact-collection",
+      "subjectKindRank": "0",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "artifact.member.single-occurrence",
+      "phaseId": "artifact-reference-resolution",
+      "ruleId": "015.artifact.member.single-occurrence",
+      "subjectKind": "collection-member",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "artifact-collection",
+      "subjectKindRank": "0",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "artifact.conflict-group.consistent-content",
+      "phaseId": "artifact-reference-resolution",
+      "ruleId": "015.artifact.conflict-group.consistent-content",
+      "subjectKind": "collection-group",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "artifact-conflict-groups",
+      "subjectKindRank": "1",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "artifact.policy-reference.resolved",
+      "phaseId": "artifact-reference-resolution",
+      "ruleId": "015.artifact.policy-reference.resolved",
+      "subjectKind": "resolved-policy-reference",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "declaration",
+      "subjectKindRank": "2",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "artifact.target-profile-reference.resolved",
+      "phaseId": "artifact-reference-resolution",
+      "ruleId": "015.artifact.target-profile-reference.resolved",
+      "subjectKind": "resolved-target-profile-reference",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "target-profile-references",
+      "subjectKindRank": "3",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "dependency.required-policies.established",
+      "phaseId": "artifact-reference-resolution",
+      "ruleId": "015.dependency.required-policies.established",
+      "subjectKind": "required-policies-dependency",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "required-policies-dependency",
+      "subjectKindRank": "4",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "dependency.optional-policies.established",
+      "phaseId": "artifact-reference-resolution",
+      "ruleId": "015.dependency.optional-policies.established",
+      "subjectKind": "optional-policies-dependency",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "optional-policies-dependency",
+      "subjectKindRank": "5",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "delivery.placement.effective-mode",
+      "phaseId": "delivery-resolution",
+      "ruleId": "015.delivery.placement.effective-mode",
+      "subjectKind": "delivery-placement",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "declaration",
+      "subjectKindRank": "0",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "dependency.delivery.established",
+      "phaseId": "delivery-resolution",
+      "ruleId": "015.dependency.delivery.established",
+      "subjectKind": "delivery-dependency",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "delivery-dependency",
+      "subjectKindRank": "1",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "target.requested-locales.project-subset",
+      "phaseId": "target-resolution",
+      "ruleId": "015.target.requested-locales.project-subset",
+      "subjectKind": "target",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "target-profiles",
+      "subjectKindRank": "0",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "target.effective-default.supported",
+      "phaseId": "target-resolution",
+      "ruleId": "015.target.effective-default.supported",
+      "subjectKind": "target",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "target-profiles",
+      "subjectKindRank": "0",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "target.requested-locales.directed",
+      "phaseId": "target-resolution",
+      "ruleId": "015.target.requested-locales.directed",
+      "subjectKind": "target",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "target-profiles",
+      "subjectKindRank": "0",
+      "checkRank": "2"
+    },
+    {
+      "checkId": "dependency.targets.established",
+      "phaseId": "target-resolution",
+      "ruleId": "015.dependency.targets.established",
+      "subjectKind": "targets-dependency",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "targets-dependency",
+      "subjectKindRank": "1",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "group.groups.within-bound",
+      "phaseId": "group-resolution",
+      "ruleId": "015.group.groups.within-bound",
+      "subjectKind": "groups",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "declaration",
+      "subjectKindRank": "0",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "group.memberships.within-bound",
+      "phaseId": "group-resolution",
+      "ruleId": "015.group.memberships.within-bound",
+      "subjectKind": "memberships",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "memberships",
+      "subjectKindRank": "1",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "group.group-id.within-bound",
+      "phaseId": "group-resolution",
+      "ruleId": "015.group.group-id.within-bound",
+      "subjectKind": "group",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "deployment-groups",
+      "subjectKindRank": "2",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "group.members.within-bound",
+      "phaseId": "group-resolution",
+      "ruleId": "015.group.members.within-bound",
+      "subjectKind": "group-members",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "group",
+      "parentSubject": {
+        "phaseId": "group-resolution",
+        "subjectKind": "group"
+      },
+      "subjectKindRank": "3",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "group.member.within-bound",
+      "phaseId": "group-resolution",
+      "ruleId": "015.group.member.within-bound",
+      "subjectKind": "group-member",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "group-members",
+      "parentSubject": {
+        "phaseId": "group-resolution",
+        "subjectKind": "group"
+      },
+      "subjectKindRank": "4",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "group.member.known",
+      "phaseId": "group-resolution",
+      "ruleId": "015.group.member.known",
+      "subjectKind": "group-member",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "group-members",
+      "parentSubject": {
+        "phaseId": "group-resolution",
+        "subjectKind": "group"
+      },
+      "subjectKindRank": "4",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "group.member.unique",
+      "phaseId": "group-resolution",
+      "ruleId": "015.group.member.unique",
+      "subjectKind": "group-member",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "group-members",
+      "parentSubject": {
+        "phaseId": "group-resolution",
+        "subjectKind": "group"
+      },
+      "subjectKindRank": "4",
+      "checkRank": "2"
+    },
+    {
+      "checkId": "group.target.single-group",
+      "phaseId": "group-resolution",
+      "ruleId": "015.group.target.single-group",
+      "subjectKind": "assignment",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "target-profiles",
+      "subjectKindRank": "5",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "hydration.relations.within-bound",
+      "phaseId": "hydration-validation",
+      "ruleId": "015.hydration.relations.within-bound",
+      "subjectKind": "relations",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "relations",
+      "subjectKindRank": "0",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "hydration.endpoint.within-bound",
+      "phaseId": "hydration-validation",
+      "ruleId": "015.hydration.endpoint.within-bound",
+      "subjectKind": "relation-endpoint",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "relation",
+      "parentSubject": {
+        "phaseId": "hydration-validation",
+        "subjectKind": "relation"
+      },
+      "subjectKindRank": "1",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "hydration.endpoint.known",
+      "phaseId": "hydration-validation",
+      "ruleId": "015.hydration.endpoint.known",
+      "subjectKind": "relation-endpoint",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "relation",
+      "parentSubject": {
+        "phaseId": "hydration-validation",
+        "subjectKind": "relation"
+      },
+      "subjectKindRank": "1",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "hydration.endpoint.same-group",
+      "phaseId": "hydration-validation",
+      "ruleId": "015.hydration.endpoint.same-group",
+      "subjectKind": "relation-endpoint",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "relation",
+      "parentSubject": {
+        "phaseId": "hydration-validation",
+        "subjectKind": "relation"
+      },
+      "subjectKindRank": "1",
+      "checkRank": "2"
+    },
+    {
+      "checkId": "hydration.endpoint.role",
+      "phaseId": "hydration-validation",
+      "ruleId": "015.hydration.endpoint.role",
+      "subjectKind": "relation-endpoint",
+      "subjectKeyStrategy": "logical-field",
+      "subjectContentProjection": "none",
+      "owningScope": "relation",
+      "parentSubject": {
+        "phaseId": "hydration-validation",
+        "subjectKind": "relation"
+      },
+      "subjectKindRank": "1",
+      "checkRank": "3"
+    },
+    {
+      "checkId": "hydration.relation.distinct-endpoints",
+      "phaseId": "hydration-validation",
+      "ruleId": "015.hydration.relation.distinct-endpoints",
+      "subjectKind": "relation",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "hydration-relations",
+      "parentSubject": {
+        "phaseId": "group-resolution",
+        "subjectKind": "group"
+      },
+      "subjectKindRank": "2",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "hydration.relation.unique",
+      "phaseId": "hydration-validation",
+      "ruleId": "015.hydration.relation.unique",
+      "subjectKind": "relation",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "hydration-relations",
+      "parentSubject": {
+        "phaseId": "group-resolution",
+        "subjectKind": "group"
+      },
+      "subjectKindRank": "2",
+      "checkRank": "1"
+    },
+    {
+      "checkId": "hydration.relation.same-requested-locales",
+      "phaseId": "hydration-validation",
+      "ruleId": "015.hydration.relation.same-requested-locales",
+      "subjectKind": "relation",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "hydration-relations",
+      "parentSubject": {
+        "phaseId": "group-resolution",
+        "subjectKind": "group"
+      },
+      "subjectKindRank": "2",
+      "checkRank": "2"
+    },
+    {
+      "checkId": "hydration.relation.same-effective-default",
+      "phaseId": "hydration-validation",
+      "ruleId": "015.hydration.relation.same-effective-default",
+      "subjectKind": "relation",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "hydration-relations",
+      "parentSubject": {
+        "phaseId": "group-resolution",
+        "subjectKind": "group"
+      },
+      "subjectKindRank": "2",
+      "checkRank": "3"
+    },
+    {
+      "checkId": "hydration.relation.static-compatibility",
+      "phaseId": "hydration-validation",
+      "ruleId": "015.hydration.relation.static-compatibility",
+      "subjectKind": "relation",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "hydration-relations",
+      "parentSubject": {
+        "phaseId": "group-resolution",
+        "subjectKind": "group"
+      },
+      "subjectKindRank": "2",
+      "checkRank": "4"
+    },
+    {
+      "checkId": "hydration.target.single-role",
+      "phaseId": "hydration-validation",
+      "ruleId": "015.hydration.target.single-role",
+      "subjectKind": "roles",
+      "subjectKeyStrategy": "canonical-identity-or-content",
+      "subjectContentProjection": "redacted-structure",
+      "owningScope": "hydration-roles",
+      "parentSubject": {
+        "phaseId": "group-resolution",
+        "subjectKind": "group"
+      },
+      "subjectKindRank": "3",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "dependency.deployment-groups.established",
+      "phaseId": "hydration-validation",
+      "ruleId": "015.dependency.deployment-groups.established",
+      "subjectKind": "deployment-groups-dependency",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "deployment-groups-dependency",
+      "subjectKindRank": "4",
+      "checkRank": "0"
+    },
+    {
+      "checkId": "reporting.diagnostic-domain.complete",
+      "phaseId": "reporting-finalization",
+      "ruleId": "015.reporting.diagnostic-domain.complete",
+      "subjectKind": "diagnostic-domain",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "diagnostic-domain",
+      "subjectKindRank": "0",
+      "checkRank": "0"
+    }
+  ]
+}

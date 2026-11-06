@@ -18,10 +18,13 @@
 //! then reads the registries and checks that they form the required closed
 //! graph.
 //!
-//! The Safe Origin Kind Registry is written here ([`safe_origin`]). The Check
-//! and Finding Registries, their schemas, and the container come with their
-//! own stages, and so do the checks of the graph they take part in.
+//! The Safe Origin Kind Registry and the Check Registry are written here
+//! ([`safe_origin`], [`check`]). The Finding Registry, its schema, and the
+//! container come with their own stages. Construction reads the Check
+//! Registry's rows, and checks the graph they take part in, with the next
+//! stage.
 
+pub(crate) mod check;
 pub(crate) mod safe_origin;
 
 use std::collections::BTreeMap;

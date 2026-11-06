@@ -1,0 +1,257 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CheckRegistry",
+  "description": "The registry's body.",
+  "type": "object",
+  "properties": {
+    "rows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CheckRow"
+      },
+      "minItems": 1
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "rows"
+  ],
+  "definitions": {
+    "CheckRow": {
+      "description": "One row: one check of one subject kind in one phase.",
+      "type": "object",
+      "properties": {
+        "checkId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*\\.[a-z][a-z0-9]*(-[a-z0-9]+)*\\.[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+        },
+        "phaseId": {
+          "$ref": "#/definitions/Phase"
+        },
+        "ruleId": {
+          "type": "string",
+          "pattern": "^015\\.[a-z][a-z0-9]*(-[a-z0-9]+)*\\.[a-z][a-z0-9]*(-[a-z0-9]+)*\\.[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+        },
+        "subjectKind": {
+          "$ref": "#/definitions/SubjectKind"
+        },
+        "subjectKeyStrategy": {
+          "$ref": "#/definitions/KeyStrategy"
+        },
+        "subjectContentProjection": {
+          "$ref": "#/definitions/ContentProjection"
+        },
+        "owningScope": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+        },
+        "parentSubject": {
+          "description": "Absent for an unscoped subject.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ParentSubject"
+            }
+          ]
+        },
+        "subjectKindRank": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "checkRank": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "checkId",
+        "phaseId",
+        "ruleId",
+        "subjectKind",
+        "subjectKeyStrategy",
+        "subjectContentProjection",
+        "owningScope",
+        "subjectKindRank",
+        "checkRank"
+      ]
+    },
+    "Phase": {
+      "description": "015's resolution phases, declared in rank order, each spelled as its ID.",
+      "type": "string",
+      "enum": [
+        "resolver-bootstrap-admission",
+        "entry-admission",
+        "structural-admission",
+        "profile-selection",
+        "resource-policy-admission",
+        "specification-admission",
+        "project-identity-resolution",
+        "locale-resolution",
+        "locale-policy-resolution",
+        "artifact-reference-resolution",
+        "delivery-resolution",
+        "target-resolution",
+        "group-resolution",
+        "hydration-validation",
+        "profile-projection",
+        "reporting-finalization"
+      ]
+    },
+    "SubjectKind": {
+      "type": "string",
+      "enum": [
+        "project-profile-slot",
+        "entry-dependencies",
+        "complete-input",
+        "materialized-dependencies",
+        "configuration-schema-selection",
+        "capability-structural-analysis",
+        "root-field",
+        "profile-key",
+        "profile-field",
+        "target-profile-key",
+        "target-field",
+        "deployment-group-key",
+        "group-field",
+        "profile-specification-dependency",
+        "capability-profiles",
+        "capability-profile-id",
+        "profile-selector",
+        "capability-artifacts",
+        "capability-policy-artifacts",
+        "capability-target-profile-artifacts",
+        "capability-references",
+        "capability-artifact",
+        "capability-artifact-bytes",
+        "capability-policy-reference",
+        "capability-target-profile-reference",
+        "capability-reference-bytes",
+        "resource-limits",
+        "root-nodes",
+        "root-depth",
+        "root-collection-entries",
+        "root-string-bytes",
+        "root-longest-string",
+        "profiles",
+        "profile-id",
+        "selector",
+        "structural-analysis",
+        "artifacts",
+        "policy-artifacts",
+        "target-profile-artifacts",
+        "references",
+        "artifact",
+        "artifact-bytes",
+        "policy-reference",
+        "target-profile-reference",
+        "reference-bytes",
+        "locale-canonicalization-slot",
+        "locale-negotiation-slot",
+        "message-locale-fallback-slot",
+        "coverage-slot",
+        "intent-surface-class-vocabulary-slot",
+        "delivery-graph-slot",
+        "delivery-placement-slot",
+        "vocabulary",
+        "canonicalization-data",
+        "locale-canonicalization-dependency",
+        "declaration-field",
+        "project-identity-dependency",
+        "locale-occurrences",
+        "requested-locale",
+        "requested-locales",
+        "default-source-locale",
+        "default-requested-locale",
+        "negotiation-alias-key",
+        "negotiation-alias-value",
+        "message-fallback-key",
+        "target-profiles",
+        "target-id",
+        "target-requested-locale",
+        "target-default-requested-locale",
+        "project-locales-dependency",
+        "negotiation-aliases",
+        "negotiation-key",
+        "negotiation-destination",
+        "fallback-sources",
+        "fallback-source",
+        "fallback-sequence",
+        "fallback-candidate",
+        "fallback-literal",
+        "fallback-intent-source",
+        "coverage-rules",
+        "coverage-locale-selectors",
+        "coverage-surface-selectors",
+        "coverage-locale",
+        "coverage-surface-class",
+        "coverage-rule",
+        "coverage-domain",
+        "coverage-cells",
+        "coverage-comparisons",
+        "coverage-cell",
+        "coverage-table",
+        "locale-negotiation-dependency",
+        "message-fallback-dependency",
+        "coverage-dependency",
+        "collection-member",
+        "collection-group",
+        "resolved-policy-reference",
+        "resolved-target-profile-reference",
+        "required-policies-dependency",
+        "optional-policies-dependency",
+        "delivery-placement",
+        "delivery-dependency",
+        "target",
+        "targets-dependency",
+        "groups",
+        "memberships",
+        "group",
+        "group-members",
+        "group-member",
+        "assignment",
+        "relations",
+        "relation-endpoint",
+        "relation",
+        "roles",
+        "deployment-groups-dependency",
+        "diagnostic-domain"
+      ]
+    },
+    "KeyStrategy": {
+      "description": "015's four subject-key strategies.",
+      "type": "string",
+      "enum": [
+        "singleton",
+        "logical-field",
+        "canonical-identity-or-content",
+        "semantic-position"
+      ]
+    },
+    "ContentProjection": {
+      "description": "015's Subject content projections: `none` for a kind keyed by no identity\nor content, and one closed projection otherwise.",
+      "type": "string",
+      "enum": [
+        "none",
+        "non-secret-content",
+        "redacted-structure"
+      ]
+    },
+    "ParentSubject": {
+      "description": "The kind whose subjects scope a row's subjects.",
+      "type": "object",
+      "properties": {
+        "phaseId": {
+          "$ref": "#/definitions/Phase"
+        },
+        "subjectKind": {
+          "$ref": "#/definitions/SubjectKind"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "phaseId",
+        "subjectKind"
+      ]
+    }
+  }
+}

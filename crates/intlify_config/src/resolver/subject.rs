@@ -6,13 +6,19 @@
 //! rows. Kinds are declared phase by phase in rank order, so a kind's place
 //! among its phase's kinds is its rank, and subjects order by kind before key.
 //! A kind names the checks it runs, in check order. Not the registry itself:
-//! no kind has a registry ID, a key strategy, or a projection here yet, and
-//! a later change may split or merge kinds as 015's subject-key rules require.
+//! a kind's registry ID is its name in kebab case, and the Check Registry
+//! gives it its key strategy, owning scope, parent, and projection. A later
+//! change may split or merge kinds as 015's subject-key rules require.
 //! The kinds of entry admission, structural admission, profile selection, and
 //! reporting finalization are declared for the registry before the resolver
 //! records their units ([`SubjectKind::declared_only`]).
 
+use std::borrow::Cow;
 use std::cmp::Ordering;
+
+use schemars::{JsonSchema, Schema, SchemaGenerator};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use super::artifact_resolution::CollectionSubject;
 use super::coverage::CoverageSubject;
@@ -27,8 +33,10 @@ use super::resource_policy::{ArtifactSubject, PolicySubject, ReferenceField};
 use super::specification::Slot;
 use super::targets::TargetSubject;
 
-/// The kind of a unit's subject, declared phase by phase in rank order.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+/// The kind of a unit's subject, declared phase by phase in rank order. Its
+/// registry ID is its name in kebab case.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub(crate) enum SubjectKind {
     // resolver-bootstrap-admission
     /// The `project-profile` slot of the Profile Resolution Specification
@@ -745,6 +753,22 @@ impl SubjectKind {
             .filter(|kind| kind.phase() == self.phase())
             .position(|&kind| kind == self)
             .expect("every kind is listed")
+    }
+}
+
+/// A kind's schema is the closed list of its registry IDs, in rank order,
+/// without the variants' documentation.
+impl JsonSchema for SubjectKind {
+    fn schema_name() -> Cow<'static, str> {
+        "SubjectKind".into()
+    }
+
+    fn json_schema(_: &mut SchemaGenerator) -> Schema {
+        let ids: Vec<Value> = Self::ALL
+            .iter()
+            .filter_map(|kind| serde_json::to_value(kind).ok())
+            .collect();
+        schemars::json_schema!({ "type": "string", "enum": ids })
     }
 }
 
