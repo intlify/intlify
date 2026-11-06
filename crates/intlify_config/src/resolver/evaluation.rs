@@ -146,6 +146,50 @@ pub(crate) enum Subject {
 pub(crate) enum Check {
     /// The slot holds an assertion the resolver supports.
     SupportedAssertion,
+    /// The unit records the dependency of each slot whose identity is
+    /// established: the owner of entry or materialized dependencies, which
+    /// waits on no check.
+    EstablishedSlots,
+    /// The raw file stays within `bootstrapOnly.rawInput.maxFileBytes`.
+    WithinFileBytes,
+    /// Strict parsing stays within `bootstrapOnly.rawInput.maxParserTokens`.
+    WithinParserTokens,
+    /// The file is valid UTF-8 and strict JSON.
+    WellFormedJson,
+    /// No object of the file repeats a member name.
+    UniqueMembers,
+    /// Every string, member name, and number lies in the portable
+    /// JSON-compatible domain.
+    JsonCompatible,
+    /// The materialized root's logical values stay within `maxNodes`.
+    WithinNodes,
+    /// The root's deepest value level stays within `maxDepth`.
+    WithinDepth,
+    /// The root's object members and array elements stay within
+    /// `maxCollectionEntries`.
+    WithinCollectionEntries,
+    /// The bytes of the root's strings and object keys stay within
+    /// `maxTotalStringBytes`.
+    WithinTotalStringBytes,
+    /// Each string and object key of the root stays within
+    /// `maxSingleStringBytes`.
+    WithinSingleStringBytes,
+    /// The materialized root is an object.
+    ObjectRoot,
+    /// The root has a `schemaVersion` member.
+    PresentSchemaVersion,
+    /// The `schemaVersion` member is a string.
+    StringSchemaVersion,
+    /// The construction authority has a schema for the `schemaVersion`.
+    SupportedSchemaVersion,
+    /// Every member the schema requires at the path is present.
+    RequiredField,
+    /// The value at the path has the type the schema declares.
+    FieldType,
+    /// The value, or the map key, is one the schema admits.
+    FieldValue,
+    /// The object at the path has no member the schema does not declare.
+    KnownField,
     /// The data is the dataset the admitted specification admits.
     MatchingData,
     /// The artifact's integrity holds and its members are valid, unique, and
@@ -158,6 +202,12 @@ pub(crate) enum Check {
     /// A counted or measured total stays within the capability's value of its
     /// bound, before a Resource Limit Policy is admitted.
     WithinCapability,
+    /// More than one declaration needs a selector, and one is given.
+    RequiredSelector,
+    /// The selector is a valid Profile ID.
+    ValidSelector,
+    /// The selector names a declaration.
+    DeclaredSelector,
     /// A counted or measured total stays within its bound.
     WithinBound,
     /// The spelling is a valid locale and has a canonical form.
@@ -235,6 +285,9 @@ pub(crate) enum Check {
     /// Every check that establishes the semantic group held, so the unit owns
     /// the group's semantic dependency record. It finds nothing of its own.
     EstablishedGroup,
+    /// Each diagnostic domain's reporting stays within its bounds. The check's
+    /// status is a domain's terminal state, which its Finding's reason names.
+    CompleteReporting,
 }
 
 /// One atomic evaluation unit. Units order as 015 evaluates and commits them:
@@ -246,11 +299,23 @@ pub(crate) struct Unit {
     pub(crate) check: Check,
 }
 
-/// The 015 Finding codes of the resolver's checks: all of 015's registry but
-/// the entry, schema, and selection codes, which structural admission reports
-/// in its own terms until the Findings are built.
+/// The 015 Finding codes of the resolver's checks: every code of 015's
+/// registry. Structural admission still reports the entry, schema, and
+/// selection codes in its own terms; their checks are declared, and their
+/// units come with the Findings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Code {
+    JsonInvalid,
+    JsonMemberDuplicate,
+    InputNotJsonCompatible,
+    SchemaVersionUnsupported,
+    RequiredFieldMissing,
+    FieldTypeInvalid,
+    FieldValueInvalid,
+    UnknownField,
+    SelectorRequired,
+    SelectorInvalid,
+    SelectorUnknown,
     SpecificationInputIncomplete,
     SpecificationNotAdmitted,
     LocaleSpecificationNotAdmitted,
@@ -293,6 +358,17 @@ pub(crate) enum Code {
 impl Code {
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
+            Self::JsonInvalid => "project-profile-json-invalid",
+            Self::JsonMemberDuplicate => "project-profile-json-member-duplicate",
+            Self::InputNotJsonCompatible => "project-profile-input-not-json-compatible",
+            Self::SchemaVersionUnsupported => "project-profile-schema-version-unsupported",
+            Self::RequiredFieldMissing => "project-profile-required-field-missing",
+            Self::FieldTypeInvalid => "project-profile-field-type-invalid",
+            Self::FieldValueInvalid => "project-profile-field-value-invalid",
+            Self::UnknownField => "project-profile-unknown-field",
+            Self::SelectorRequired => "project-profile-selector-required",
+            Self::SelectorInvalid => "project-profile-selector-invalid",
+            Self::SelectorUnknown => "project-profile-selector-unknown",
             Self::SpecificationInputIncomplete => "project-profile-specification-input-incomplete",
             Self::SpecificationNotAdmitted => "project-profile-specification-not-admitted",
             Self::LocaleSpecificationNotAdmitted => {
@@ -369,6 +445,8 @@ impl Code {
 /// The stable `details.reason` values of those codes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Reason {
+    InvalidUnicode,
+    NonPortableNumber,
     MissingRequiredSlot,
     Unsupported,
     Incompatible,
@@ -417,6 +495,8 @@ pub(crate) enum Reason {
 impl Reason {
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
+            Self::InvalidUnicode => "invalid-unicode",
+            Self::NonPortableNumber => "non-portable-number",
             Self::MissingRequiredSlot => "missing-required-slot",
             Self::Unsupported => "unsupported",
             Self::Incompatible => "incompatible",
@@ -825,6 +905,17 @@ mod tests {
     fn codes_and_reasons_are_spelled_as_015_registers_them() {
         assert_eq!(
             [
+                Code::JsonInvalid,
+                Code::JsonMemberDuplicate,
+                Code::InputNotJsonCompatible,
+                Code::SchemaVersionUnsupported,
+                Code::RequiredFieldMissing,
+                Code::FieldTypeInvalid,
+                Code::FieldValueInvalid,
+                Code::UnknownField,
+                Code::SelectorRequired,
+                Code::SelectorInvalid,
+                Code::SelectorUnknown,
                 Code::SpecificationInputIncomplete,
                 Code::SpecificationNotAdmitted,
                 Code::LocaleSpecificationNotAdmitted,
@@ -865,6 +956,17 @@ mod tests {
             ]
             .map(Code::as_str),
             [
+                "project-profile-json-invalid",
+                "project-profile-json-member-duplicate",
+                "project-profile-input-not-json-compatible",
+                "project-profile-schema-version-unsupported",
+                "project-profile-required-field-missing",
+                "project-profile-field-type-invalid",
+                "project-profile-field-value-invalid",
+                "project-profile-unknown-field",
+                "project-profile-selector-required",
+                "project-profile-selector-invalid",
+                "project-profile-selector-unknown",
                 "project-profile-specification-input-incomplete",
                 "project-profile-specification-not-admitted",
                 "project-profile-locale-specification-not-admitted",
@@ -906,6 +1008,8 @@ mod tests {
         );
         assert_eq!(
             [
+                Reason::InvalidUnicode,
+                Reason::NonPortableNumber,
                 Reason::MissingRequiredSlot,
                 Reason::Unsupported,
                 Reason::Incompatible,
@@ -952,6 +1056,8 @@ mod tests {
             ]
             .map(Reason::as_str),
             [
+                "invalid-unicode",
+                "non-portable-number",
                 "missing-required-slot",
                 "unsupported",
                 "incompatible",

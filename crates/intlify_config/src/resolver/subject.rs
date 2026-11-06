@@ -8,6 +8,9 @@
 //! A kind names the checks it runs, in check order. Not the registry itself:
 //! no kind has a registry ID, a key strategy, or a projection here yet, and
 //! a later change may split or merge kinds as 015's subject-key rules require.
+//! The kinds of entry admission, structural admission, profile selection, and
+//! reporting finalization are declared for the registry before the resolver
+//! records their units ([`SubjectKind::declared_only`]).
 
 use std::cmp::Ordering;
 
@@ -32,10 +35,46 @@ pub(crate) enum SubjectKind {
     /// Input.
     ProjectProfileSlot,
 
+    // entry-admission
+    /// The owner of the entry dependencies: the entry sources, the selector,
+    /// and the inputs' origins.
+    EntryDependencies,
+    /// The complete input of the entry, and the root it materializes.
+    CompleteInput,
+
     // structural-admission
+    /// The owner of the materialized dependencies, one for each slot whose
+    /// identity was established.
+    MaterializedDependencies,
+    /// The Configuration Schema Selection the root's `schemaVersion` makes.
+    ConfigurationSchemaSelection,
+    /// The schema-guided structural analysis, under the capability.
+    CapabilityStructuralAnalysis,
+    /// A field of the root, by its path.
+    RootField,
+    /// A key of `profiles`.
+    ProfileKey,
+    /// A field of one profile, by its path in the profile.
+    ProfileField,
+    /// A key of one profile's `targetProfiles`.
+    TargetProfileKey,
+    /// A field of one Target ID entry.
+    TargetField,
+    /// A key of one profile's `deploymentGroups`.
+    DeploymentGroupKey,
+    /// A field of one Group ID entry.
+    GroupField,
     /// The `profileSpecification` group, which Phase 0 establishes: its unit
     /// owns the group's semantic dependency.
     ProfileSpecificationDependency,
+
+    // profile-selection
+    /// The root `profiles` object's declarations, under the capability.
+    CapabilityProfiles,
+    /// One declared Profile ID, under the capability.
+    CapabilityProfileId,
+    /// The normalized External Profile Selector Input.
+    ProfileSelector,
 
     // resource-policy-admission
     /// Every submitted artifact occurrence, under the capability.
@@ -264,13 +303,33 @@ pub(crate) enum SubjectKind {
     /// The `deploymentGroups` group: its unit owns the group's semantic
     /// dependency.
     DeploymentGroupsDependency,
+
+    // reporting-finalization
+    /// The diagnostic reporting domains, a singleton: a terminal Finding's
+    /// reason names the domain it exhausted.
+    DiagnosticDomain,
 }
 
 impl SubjectKind {
     /// Every kind, phase by phase in rank order.
-    pub(crate) const ALL: [Self; 99] = [
+    pub(crate) const ALL: [Self; 115] = [
         Self::ProjectProfileSlot,
+        Self::EntryDependencies,
+        Self::CompleteInput,
+        Self::MaterializedDependencies,
+        Self::ConfigurationSchemaSelection,
+        Self::CapabilityStructuralAnalysis,
+        Self::RootField,
+        Self::ProfileKey,
+        Self::ProfileField,
+        Self::TargetProfileKey,
+        Self::TargetField,
+        Self::DeploymentGroupKey,
+        Self::GroupField,
         Self::ProfileSpecificationDependency,
+        Self::CapabilityProfiles,
+        Self::CapabilityProfileId,
+        Self::ProfileSelector,
         Self::CapabilityArtifacts,
         Self::CapabilityPolicyArtifacts,
         Self::CapabilityTargetProfileArtifacts,
@@ -368,13 +427,28 @@ impl SubjectKind {
         Self::Relation,
         Self::Roles,
         Self::DeploymentGroupsDependency,
+        Self::DiagnosticDomain,
     ];
 
     /// The phase whose units have subjects of this kind.
     pub(crate) const fn phase(self) -> Phase {
         match self {
             Self::ProjectProfileSlot => Phase::ResolverBootstrapAdmission,
-            Self::ProfileSpecificationDependency => Phase::StructuralAdmission,
+            Self::EntryDependencies | Self::CompleteInput => Phase::EntryAdmission,
+            Self::MaterializedDependencies
+            | Self::ConfigurationSchemaSelection
+            | Self::CapabilityStructuralAnalysis
+            | Self::RootField
+            | Self::ProfileKey
+            | Self::ProfileField
+            | Self::TargetProfileKey
+            | Self::TargetField
+            | Self::DeploymentGroupKey
+            | Self::GroupField
+            | Self::ProfileSpecificationDependency => Phase::StructuralAdmission,
+            Self::CapabilityProfiles | Self::CapabilityProfileId | Self::ProfileSelector => {
+                Phase::ProfileSelection
+            }
             Self::CapabilityArtifacts
             | Self::CapabilityPolicyArtifacts
             | Self::CapabilityTargetProfileArtifacts
@@ -471,6 +545,7 @@ impl SubjectKind {
             | Self::Relation
             | Self::Roles
             | Self::DeploymentGroupsDependency => Phase::HydrationValidation,
+            Self::DiagnosticDomain => Phase::ReportingFinalization,
         }
     }
 
@@ -493,7 +568,10 @@ impl SubjectKind {
             | Self::CapabilityArtifactBytes
             | Self::CapabilityPolicyReference
             | Self::CapabilityTargetProfileReference
-            | Self::CapabilityReferenceBytes => &[Check::WithinCapability],
+            | Self::CapabilityReferenceBytes
+            | Self::CapabilityStructuralAnalysis
+            | Self::CapabilityProfiles
+            | Self::CapabilityProfileId => &[Check::WithinCapability],
             Self::ResourceLimits => &[Check::BootstrapCandidate, Check::CompatiblePolicy],
             Self::RootNodes
             | Self::RootDepth
@@ -595,7 +673,69 @@ impl SubjectKind {
             | Self::DeliveryDependency
             | Self::TargetsDependency
             | Self::DeploymentGroupsDependency => &[Check::EstablishedGroup],
+            Self::EntryDependencies | Self::MaterializedDependencies => &[Check::EstablishedSlots],
+            Self::CompleteInput => &[
+                Check::WithinFileBytes,
+                Check::WithinParserTokens,
+                Check::WellFormedJson,
+                Check::UniqueMembers,
+                Check::JsonCompatible,
+                Check::WithinNodes,
+                Check::WithinDepth,
+                Check::WithinCollectionEntries,
+                Check::WithinTotalStringBytes,
+                Check::WithinSingleStringBytes,
+            ],
+            Self::ConfigurationSchemaSelection => &[
+                Check::ObjectRoot,
+                Check::PresentSchemaVersion,
+                Check::StringSchemaVersion,
+                Check::SupportedSchemaVersion,
+            ],
+            Self::RootField | Self::ProfileField | Self::TargetField | Self::GroupField => &[
+                Check::RequiredField,
+                Check::FieldType,
+                Check::FieldValue,
+                Check::KnownField,
+            ],
+            Self::ProfileKey | Self::TargetProfileKey | Self::DeploymentGroupKey => {
+                &[Check::FieldValue]
+            }
+            Self::ProfileSelector => &[
+                Check::WithinCapability,
+                Check::RequiredSelector,
+                Check::ValidSelector,
+                Check::DeclaredSelector,
+            ],
+            Self::DiagnosticDomain => &[Check::CompleteReporting],
         }
+    }
+
+    /// Whether the kind is declared for the Check Registry while the resolver
+    /// records no unit of it yet: entry admission, structural admission, and
+    /// profile selection build their units with their Findings, and reporting
+    /// finalization with the outcome. Of these phases, only the owner of the
+    /// `profileSpecification` group, which waits on Phase 0 alone, is recorded.
+    pub(crate) const fn declared_only(self) -> bool {
+        matches!(
+            self,
+            Self::EntryDependencies
+                | Self::CompleteInput
+                | Self::MaterializedDependencies
+                | Self::ConfigurationSchemaSelection
+                | Self::CapabilityStructuralAnalysis
+                | Self::RootField
+                | Self::ProfileKey
+                | Self::ProfileField
+                | Self::TargetProfileKey
+                | Self::TargetField
+                | Self::DeploymentGroupKey
+                | Self::GroupField
+                | Self::CapabilityProfiles
+                | Self::CapabilityProfileId
+                | Self::ProfileSelector
+                | Self::DiagnosticDomain
+        )
     }
 
     /// The kind's place among its phase's kinds.
@@ -809,7 +949,8 @@ mod tests {
     use crate::resolver::resource_policy::PolicySlot;
 
     /// One subject of every kind but the normalized coverage domain, which
-    /// only coverage can build, in the order of [`SubjectKind::ALL`].
+    /// only coverage can build, and the kinds declared only, which have no
+    /// subject yet, in the order of [`SubjectKind::ALL`].
     fn samples() -> Vec<Subject> {
         let group: DeploymentGroupId = serde_json::from_value(json!("web")).unwrap();
         let rule: CoverageRule =
@@ -966,7 +1107,7 @@ mod tests {
         let kinds: Vec<SubjectKind> = samples.iter().map(Subject::kind).collect();
         let listed: Vec<SubjectKind> = SubjectKind::ALL
             .into_iter()
-            .filter(|&kind| kind != SubjectKind::CoverageDomain)
+            .filter(|&kind| kind != SubjectKind::CoverageDomain && !kind.declared_only())
             .collect();
         assert_eq!(kinds, listed);
         // Every pair of distinct kinds orders as the kinds do, whatever the
@@ -998,7 +1139,9 @@ mod tests {
             phases,
             [
                 Phase::ResolverBootstrapAdmission,
+                Phase::EntryAdmission,
                 Phase::StructuralAdmission,
+                Phase::ProfileSelection,
                 Phase::ResourcePolicyAdmission,
                 Phase::SpecificationAdmission,
                 Phase::ProjectIdentityResolution,
@@ -1009,6 +1152,7 @@ mod tests {
                 Phase::TargetResolution,
                 Phase::GroupResolution,
                 Phase::HydrationValidation,
+                Phase::ReportingFinalization,
             ]
         );
     }
@@ -1026,6 +1170,115 @@ mod tests {
         assert_eq!(SubjectKind::ProjectProfileSlot.rank(), 0);
         assert_eq!(SubjectKind::ResourceLimits.rank(), 9);
         assert_eq!(SubjectKind::Roles.rank(), 3);
+        // The owners of the entry and materialized dependencies rank first,
+        // and Configuration Schema Selection before every structural kind.
+        assert_eq!(SubjectKind::EntryDependencies.rank(), 0);
+        assert_eq!(SubjectKind::MaterializedDependencies.rank(), 0);
+        assert_eq!(SubjectKind::ConfigurationSchemaSelection.rank(), 1);
+    }
+
+    #[test]
+    fn the_kinds_declared_only_are_those_of_the_phases_without_units() {
+        for kind in SubjectKind::ALL {
+            let unrecorded = matches!(
+                kind.phase(),
+                Phase::EntryAdmission
+                    | Phase::StructuralAdmission
+                    | Phase::ProfileSelection
+                    | Phase::ReportingFinalization
+            ) && kind != SubjectKind::ProfileSpecificationDependency;
+            assert_eq!(kind.declared_only(), unrecorded, "{kind:?}");
+        }
+    }
+
+    /// The declared kinds in rank order, each with the checks 015 gives it.
+    #[test]
+    fn the_declared_kinds_run_the_checks_015_gives_them() {
+        let declared: Vec<(SubjectKind, &[Check])> = SubjectKind::ALL
+            .into_iter()
+            .filter(|kind| kind.declared_only())
+            .map(|kind| (kind, kind.checks()))
+            .collect();
+        // Each scope level runs the four keyword classes (D15:2167).
+        let fields: &[Check] = &[
+            Check::RequiredField,
+            Check::FieldType,
+            Check::FieldValue,
+            Check::KnownField,
+        ];
+        let key: &[Check] = &[Check::FieldValue];
+        let capability: &[Check] = &[Check::WithinCapability];
+        assert_eq!(
+            declared,
+            [
+                // The owners rank first in their phases (D15:2510).
+                (
+                    SubjectKind::EntryDependencies,
+                    &[Check::EstablishedSlots][..]
+                ),
+                // The bootstrap bounds before the checks they protect, then
+                // the five root-value bounds in table order (D15:1870,
+                // 1993, 2000, 2350).
+                (
+                    SubjectKind::CompleteInput,
+                    &[
+                        Check::WithinFileBytes,
+                        Check::WithinParserTokens,
+                        Check::WellFormedJson,
+                        Check::UniqueMembers,
+                        Check::JsonCompatible,
+                        Check::WithinNodes,
+                        Check::WithinDepth,
+                        Check::WithinCollectionEntries,
+                        Check::WithinTotalStringBytes,
+                        Check::WithinSingleStringBytes,
+                    ][..],
+                ),
+                (
+                    SubjectKind::MaterializedDependencies,
+                    &[Check::EstablishedSlots][..]
+                ),
+                // Before every structural kind (D15:2124, 2167).
+                (
+                    SubjectKind::ConfigurationSchemaSelection,
+                    &[
+                        Check::ObjectRoot,
+                        Check::PresentSchemaVersion,
+                        Check::StringSchemaVersion,
+                        Check::SupportedSchemaVersion,
+                    ][..],
+                ),
+                (SubjectKind::CapabilityStructuralAnalysis, capability),
+                // The scope levels and the identity maps' keys, parents first
+                // (D15:2167, 3340).
+                (SubjectKind::RootField, fields),
+                (SubjectKind::ProfileKey, key),
+                (SubjectKind::ProfileField, fields),
+                (SubjectKind::TargetProfileKey, key),
+                (SubjectKind::TargetField, fields),
+                (SubjectKind::DeploymentGroupKey, key),
+                (SubjectKind::GroupField, fields),
+                // The declarations and each declared ID, then the selector,
+                // checked apart from the IDs (D15:1879, 1880, 1984).
+                (SubjectKind::CapabilityProfiles, capability),
+                (SubjectKind::CapabilityProfileId, capability),
+                (
+                    SubjectKind::ProfileSelector,
+                    &[
+                        Check::WithinCapability,
+                        Check::RequiredSelector,
+                        Check::ValidSelector,
+                        Check::DeclaredSelector,
+                    ][..],
+                ),
+                // One singleton whose Finding's reason names the domain
+                // (D15:2353, 2402).
+                (
+                    SubjectKind::DiagnosticDomain,
+                    &[Check::CompleteReporting][..]
+                ),
+            ]
+        );
     }
 
     #[test]
