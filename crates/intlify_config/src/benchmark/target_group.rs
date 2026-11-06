@@ -408,12 +408,11 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::SingleOccurrence
         | Check::ConsistentContent
         | Check::ResolvedReference
-        | Check::KnownEndpoints
+        | Check::KnownEndpoint
         | Check::DistinctEndpoints
-        | Check::SameGroupEndpoints
+        | Check::SameGroupEndpoint
         | Check::UniqueRelation
-        | Check::ServerRole
-        | Check::ClientRole
+        | Check::EndpointRole
         | Check::SameRequestedLocales
         | Check::SameEffectiveDefault
         | Check::StaticCompatibility
@@ -973,7 +972,7 @@ mod tests {
                 ..target_unit(TargetSubject::Target(target("web")), Check::ProjectSubset)
             },
             Unit {
-                check: Check::KnownEndpoints,
+                check: Check::KnownEndpoint,
                 ..group_unit(GroupSubject::Groups, Check::WithinBound)
             },
         ];

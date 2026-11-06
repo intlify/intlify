@@ -209,18 +209,17 @@ pub(crate) enum Check {
     UniqueMember,
     /// The Target ID is a member of exactly one group.
     SingleGroup,
-    /// Both endpoints of the relation name declared Target IDs.
-    KnownEndpoints,
+    /// The endpoint names a declared Target ID.
+    KnownEndpoint,
     /// The relation's endpoints are two Target IDs.
     DistinctEndpoints,
-    /// Both endpoints are members of the relation's group.
-    SameGroupEndpoints,
+    /// The endpoint is a member of the relation's group.
+    SameGroupEndpoint,
     /// The relation occurs once in its group.
     UniqueRelation,
-    /// The server endpoint's Target Profile renders server-side.
-    ServerRole,
-    /// The client endpoint's Target Profile hydrates in the browser.
-    ClientRole,
+    /// The endpoint's Target Profile takes the role its field names: the
+    /// server's renders server-side and the client's hydrates in the browser.
+    EndpointRole,
     /// Both endpoints request the same locales.
     SameRequestedLocales,
     /// Both endpoints have the same effective default.

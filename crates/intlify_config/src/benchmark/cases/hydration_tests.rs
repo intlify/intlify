@@ -10,7 +10,6 @@ use crate::benchmark::operation::{Output, Prepared};
 use crate::benchmark::work::LogicalWork;
 use crate::model::{DeploymentGroupId, TargetId};
 use crate::resolver::evaluation::{Actual, Check, Code, Reason, Status, Subject, Unit};
-use crate::resolver::groups::{unit as group_unit, GroupSubject};
 use crate::resolver::hydration::{unit as hydration_unit, EndpointField, HydrationSubject};
 use crate::resolver::limits::{BoundId, Group};
 
@@ -60,12 +59,17 @@ fn relation(server: &str, client: &str, check: Check) -> Unit {
     )
 }
 
-/// The bytes of the endpoint `field` names in a relation of `web`.
-fn endpoint(server: &str, client: &str, field: EndpointField) -> Unit {
+/// One check of the endpoint `field` names in a relation of `web`.
+fn on_endpoint(server: &str, client: &str, field: EndpointField, check: Check) -> Unit {
     hydration_unit(
         HydrationSubject::Endpoint(group("web"), target(server), target(client), field),
-        Check::WithinBound,
+        check,
     )
+}
+
+/// The bytes of the endpoint `field` names in a relation of `web`.
+fn endpoint(server: &str, client: &str, field: EndpointField) -> Unit {
+    on_endpoint(server, client, field, Check::WithinBound)
 }
 
 fn roles(id: &str) -> Unit {
@@ -197,94 +201,119 @@ fn a_complete_case_keeps_every_declared_relation() {
     }
 }
 
-/// Each change of the example reaches the one decision its name says.
+/// Each change of the example reaches the decision its name says, and any
+/// other failure it proves on its own (D15:2359): `ssr` as a client lacks the
+/// client's role, and `phone` and `worker` are no members of `web`, whose
+/// Target Profiles declare no role.
 #[test]
-fn each_blocked_recipe_reports_its_one_decision() {
+fn each_blocked_recipe_reports_its_decision_and_what_else_it_proves() {
     use Code::{
         HydrationCapabilityIncompatible as Capability, HydrationLocalePolicyIncompatible as Locale,
         HydrationRelationInvalid as Invalid,
     };
+    use EndpointField::{Client, Server};
 
     for (recipe, expected) in [
         (
             R::EqualEndpoint,
-            (
-                relation("ssr", "ssr", Check::DistinctEndpoints),
-                Invalid,
-                Some(Reason::EqualEndpoint),
-            ),
+            vec![
+                (
+                    on_endpoint("ssr", "ssr", Client, Check::EndpointRole),
+                    Invalid,
+                    Some(Reason::ClientCapabilityMissing),
+                ),
+                (
+                    relation("ssr", "ssr", Check::DistinctEndpoints),
+                    Invalid,
+                    Some(Reason::EqualEndpoint),
+                ),
+            ],
         ),
         (
             R::UnknownEndpoint,
-            (
-                relation("ssr", "phone", Check::KnownEndpoints),
-                Invalid,
-                Some(Reason::UnknownEndpoint),
-            ),
+            vec![
+                (
+                    on_endpoint("ssr", "phone", Client, Check::KnownEndpoint),
+                    Invalid,
+                    Some(Reason::UnknownEndpoint),
+                ),
+                (
+                    on_endpoint("ssr", "phone", Client, Check::SameGroupEndpoint),
+                    Invalid,
+                    Some(Reason::CrossGroup),
+                ),
+            ],
         ),
         (
             R::CrossGroup,
-            (
-                relation("ssr", "worker", Check::SameGroupEndpoints),
-                Invalid,
-                Some(Reason::CrossGroup),
-            ),
+            vec![
+                (
+                    on_endpoint("ssr", "worker", Client, Check::SameGroupEndpoint),
+                    Invalid,
+                    Some(Reason::CrossGroup),
+                ),
+                (
+                    on_endpoint("ssr", "worker", Client, Check::EndpointRole),
+                    Invalid,
+                    Some(Reason::ClientCapabilityMissing),
+                ),
+            ],
         ),
         (
             R::DuplicateRelation,
-            (
+            vec![(
                 relation("ssr", "browser", Check::UniqueRelation),
                 Invalid,
                 Some(Reason::DuplicateRelation),
-            ),
+            )],
         ),
         (
             R::ServerCapabilityMissing,
-            (
-                relation("ssr", "browser", Check::ServerRole),
+            vec![(
+                on_endpoint("ssr", "browser", Server, Check::EndpointRole),
                 Invalid,
                 Some(Reason::ServerCapabilityMissing),
-            ),
+            )],
         ),
         (
             R::ClientCapabilityMissing,
-            (
-                relation("ssr", "browser", Check::ClientRole),
+            vec![(
+                on_endpoint("ssr", "browser", Client, Check::EndpointRole),
                 Invalid,
                 Some(Reason::ClientCapabilityMissing),
-            ),
+            )],
         ),
         (
             R::DualRole,
-            (roles("browser"), Invalid, Some(Reason::DualRole)),
+            vec![(roles("browser"), Invalid, Some(Reason::DualRole))],
         ),
         (
             R::RequestedLocales,
-            (
+            vec![(
                 relation("ssr", "browser", Check::SameRequestedLocales),
                 Locale,
                 Some(Reason::RequestedLocales),
-            ),
+            )],
         ),
         (
             R::EffectiveDefault,
-            (
+            vec![(
                 relation("ssr", "browser", Check::SameEffectiveDefault),
                 Locale,
                 Some(Reason::EffectiveDefault),
-            ),
+            )],
         ),
         (
             R::StaticIncompatibility,
-            (
+            vec![(
                 relation("ssr", "browser", Check::StaticCompatibility),
                 Capability,
                 None,
-            ),
+            )],
         ),
     ] {
         let resolved = resolved(&case(recipe));
-        assert_eq!(issues(&resolved), [expected], "{recipe:?}");
+        assert_eq!(issues(&resolved), expected, "{recipe:?}");
         // Only `web` declares relations, and it has none checked.
         let retained = resolved.result.unwrap().unwrap();
         for group in &retained.groups {
@@ -313,37 +342,28 @@ fn a_prerequisite_failure_leaves_only_what_waits_on_it() {
         .1
         .iter()
         .all(|subject| matches!(subject, Subject::Target(_))));
-    // Phase 12 finds `tablet` names no target: the group's members wait, and
-    // every comparison between endpoints with them.
+    // Phase 12 finds `tablet` names no target, so the group holds no member
+    // set, but its members still name `ssr` and `browser`: nothing waits,
+    // and the relation holds.
     let members = resolved(&case(R::GroupMembersUnresolved));
     assert!(members.evaluation.issues().next().is_none());
-    let found = waiting(&members);
-    assert_eq!(
-        checks(&found),
-        [
-            Check::SameGroupEndpoints,
-            Check::ServerRole,
-            Check::ClientRole,
-            Check::SameRequestedLocales,
-            Check::SameEffectiveDefault,
-            Check::StaticCompatibility,
-        ]
-    );
-    assert!(found
-        .iter()
-        .flat_map(|(_, subjects)| subjects)
-        .all(|subject| matches!(subject, Subject::Group(_))));
-    // Phase 9 resolves no Target Profile for `ssr`: the roles and the
-    // compatibility wait, and the locales are still compared.
+    assert!(waiting(&members).is_empty());
+    let retained = members.result.unwrap().unwrap();
+    assert!(retained.groups.iter().all(|group| group.relations.is_ok()));
+    // Phase 9 resolves no Target Profile for `ssr`: the server's role and the
+    // compatibility wait, and the client's role and the locales are still
+    // checked.
     let missing = resolved(&case(R::TargetProfileMissing));
     assert!(missing.evaluation.issues().next().is_none());
     let found = waiting(&missing);
     assert_eq!(
-        checks(&found),
+        found
+            .iter()
+            .map(|(unit, _)| unit.clone())
+            .collect::<Vec<_>>(),
         [
-            Check::ServerRole,
-            Check::ClientRole,
-            Check::StaticCompatibility
+            on_endpoint("ssr", "browser", EndpointField::Server, Check::EndpointRole),
+            relation("ssr", "browser", Check::StaticCompatibility),
         ]
     );
     assert!(found
@@ -371,7 +391,7 @@ fn each_bound_holds_at_its_count_and_one_less_blocks_its_unit() {
         group: Group::TargetGrouping,
         name,
     };
-    for (limit, recipe, name, count, unit, checked, also) in [
+    for (limit, recipe, name, count, unit, checked) in [
         (
             LimitKind::HydrationRelations,
             R::FanOutFanIn,
@@ -379,38 +399,28 @@ fn each_bound_holds_at_its_count_and_one_less_blocks_its_unit() {
             3,
             hydration_unit(HydrationSubject::Relations, Check::WithinBound),
             vec![],
-            None,
         ),
-        // The client's endpoint is over, while the server's and the roles of
-        // `ssr`, which do not need it, are checked. Phase 12, before the
-        // interval, checks the member `browser`'s own bytes, so the group
-        // holds no member set, and the same-group check and the checks that
-        // wait on it wait on that too.
+        // The client's endpoint is over, while the server's endpoint and the
+        // roles of `ssr`, which do not need it, are checked. Phase 12, before
+        // the interval, finds the member `browser` over the bound too, but
+        // membership reads the Target IDs the members name, so nothing here
+        // waits on that.
         (
             LimitKind::HydrationEndpointBytes,
             R::Storefront,
             "maxTargetIdBytes",
             7,
             endpoint("ssr", "browser", EndpointField::Client),
-            vec![
-                endpoint("ssr", "browser", EndpointField::Server),
-                roles("ssr"),
-            ],
-            Some((
-                [
-                    Check::SameGroupEndpoints,
-                    Check::ServerRole,
-                    Check::ClientRole,
-                    Check::SameRequestedLocales,
-                    Check::SameEffectiveDefault,
-                    Check::StaticCompatibility,
-                ]
-                .map(|check| relation("ssr", "browser", check)),
-                group_unit(
-                    GroupSubject::Member(group("web"), target("browser")),
-                    Check::WithinBound,
-                ),
-            )),
+            [
+                Check::WithinBound,
+                Check::KnownEndpoint,
+                Check::SameGroupEndpoint,
+                Check::EndpointRole,
+            ]
+            .map(|check| on_endpoint("ssr", "browser", EndpointField::Server, check))
+            .into_iter()
+            .chain([roles("ssr")])
+            .collect::<Vec<_>>(),
         ),
     ] {
         let exact = edge(limit, LimitEdge::Exact);
@@ -438,18 +448,12 @@ fn each_bound_holds_at_its_count_and_one_less_blocks_its_unit() {
                     "{limit:?} {recorded:?}"
                 ),
                 Status::NotEvaluated(causes) => {
-                    let mut expected = vec![unit.clone()];
-                    if let Some((waiting, member)) = &also {
-                        if waiting.contains(recorded) {
-                            expected.insert(0, member.clone());
-                        }
-                    }
                     assert_eq!(
                         causes
                             .keys()
                             .map(|key| key.unit().clone())
                             .collect::<Vec<_>>(),
-                        expected,
+                        std::slice::from_ref(&unit),
                         "{limit:?} {recorded:?}"
                     );
                 }
@@ -507,10 +511,19 @@ fn reordering_changes_neither_domain_nor_the_work() {
 
 #[test]
 fn every_other_case_has_its_own_shared_domain() {
+    // Phase 12's failure never reaches Phase 13: membership reads the Target
+    // IDs the members name, so the case observes as the storefront does.
+    assert_eq!(
+        prepare(&case(R::GroupMembersUnresolved))
+            .unwrap()
+            .observation,
+        prepare(&case(R::Storefront)).unwrap().observation
+    );
     let mut seen = Vec::new();
     for declaration in declarations().into_iter().filter(|case| {
         case.operation == Operation::HydrationRelationValidation
             && case.fixture != Recipe::Hydration(R::FanReordered)
+            && case.fixture != Recipe::Hydration(R::GroupMembersUnresolved)
             // An exact edge validates as its recipe does.
             && !matches!(case.limit, Some((_, LimitEdge::Exact)))
     }) {
@@ -522,7 +535,7 @@ fn every_other_case_has_its_own_shared_domain() {
         );
         seen.push(observation.shared);
     }
-    assert_eq!(seen.len(), 18 + 2);
+    assert_eq!(seen.len(), 17 + 2);
 }
 
 #[test]
@@ -562,32 +575,32 @@ fn the_work_counts_relations_roles_units_and_what_was_checked() {
         ),
         (
             case(R::Storefront),
-            ["1", "1", "7", "2", "14", "0", "0", "1", "1"],
+            ["1", "1", "7", "2", "16", "0", "0", "1", "1"],
         ),
         (
             case(R::FanOutFanIn),
-            ["3", "3", "7", "4", "38", "0", "0", "3", "1"],
+            ["3", "3", "7", "4", "44", "0", "0", "3", "1"],
         ),
         // Eight servers each related to each of eight clients.
         (
             case(R::ManyRelations),
-            ["64", "64", "8", "16", "721", "0", "0", "64", "1"],
+            ["64", "64", "8", "16", "849", "0", "0", "64", "1"],
         ),
         // A repeated pair is one relation with its units.
         (
             case(R::DuplicateRelation),
-            ["2", "1", "7", "2", "14", "0", "1", "0", "0"],
+            ["2", "1", "7", "2", "16", "0", "1", "0", "0"],
         ),
-        // Between equal endpoints the five comparisons wait, and no role is
-        // taken.
+        // Between equal endpoints every comparison is still made and the
+        // client's role fails too, and no role is taken.
         (
             case(R::EqualEndpoint),
-            ["2", "2", "7", "2", "25", "5", "1", "0", "0"],
+            ["2", "2", "7", "2", "29", "0", "2", "0", "0"],
         ),
         // Every unit but the bound waits on it.
         (
             edge(LimitKind::HydrationRelations, LimitEdge::FirstOver),
-            ["3", "3", "7", "4", "38", "37", "1", "0", "0"],
+            ["3", "3", "7", "4", "44", "43", "1", "0", "0"],
         ),
     ] {
         let work = work(&declaration);
