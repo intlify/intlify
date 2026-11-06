@@ -183,8 +183,8 @@ catalogs:
       specifier: ^0.55.1
       version: 0.55.1
     pkg-pr-new:
-      specifier: 0.0.88
-      version: 0.0.88
+      specifier: 0.0.92
+      version: 0.0.92
     typescript:
       specifier: ^6.0.0
       version: 6.0.3
@@ -222,7 +222,7 @@ importers:
         version: 2.0.2
       pkg-pr-new:
         specifier: 'catalog:'
-        version: 0.0.88
+        version: 0.0.92
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -4176,8 +4176,8 @@ packages:
     resolution: {integrity: sha512-QP88BAKvMam/3NxH6vj2o21R6MjxZUAd6nlwAS/pnGvN9IVLocLHxGYIzFhg6fUQ+5th6P4dv4eW9jX3DSIj7A==}
     engines: {node: '>=12'}
 
-  pkg-pr-new@0.0.88:
-    resolution: {integrity: sha512-Xc6PMJ2gher0WZP+rtjefFk26hIb7V1PTLL30bmy1Z2vsRmSvqiss7Ag1XUdyplTGYzIlFNJp4L3vMNmK44N6g==}
+  pkg-pr-new@0.0.92:
+    resolution: {integrity: sha512-l9HE4y0LmS5n3pw9vKby7m9O+SBzjWF5HXGH6Z8jdPWW7OW7hFMKsFOrgubc0JuPz8gYEuIw1mLaU3GEmPuukQ==}
     hasBin: true
 
   pngjs@7.0.0:
@@ -7509,7 +7509,7 @@ snapshots:
 
   picomatch@4.0.4: {}
 
-  pkg-pr-new@0.0.88: {}
+  pkg-pr-new@0.0.92: {}
 
   pngjs@7.0.0: {}
 
