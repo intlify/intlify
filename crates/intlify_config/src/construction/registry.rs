@@ -19,10 +19,9 @@
 //! graph.
 //!
 //! The Safe Origin Kind Registry and the Check Registry are written here
-//! ([`safe_origin`], [`check`]). The Finding Registry, its schema, and the
-//! container come with their own stages. Construction reads the Check
-//! Registry's rows, and checks the graph they take part in, with the next
-//! stage.
+//! ([`safe_origin`], [`check`]), and row 41 reads each of them and checks its
+//! own graph. The Finding Registry, its schema, the container, and the
+//! references between registries come with their own stages.
 
 pub(crate) mod check;
 pub(crate) mod safe_origin;
@@ -39,6 +38,7 @@ use super::failure::{Check, Component};
 use super::root::ConstructionRoot;
 use super::validator::schema::Schema;
 
+use self::check::CheckRegistry;
 use self::safe_origin::SafeOriginKindRegistry;
 
 /// The package's identity.
@@ -133,9 +133,8 @@ pub(crate) struct AdmittedPackage {
     pub(crate) declared: Declared,
     /// The Safe Origin Kind Registry.
     pub(crate) safe_origin_kinds: SafeOriginKindRegistry,
-    /// The Check Registry, valid against its admitted schema; it is read when
-    /// its own stage comes.
-    pub(crate) check_registry: Value,
+    /// The Check Registry.
+    pub(crate) checks: CheckRegistry,
     /// The Finding Registry, valid against its admitted schema; it is read
     /// when its own stage comes.
     pub(crate) finding_registry: Value,
@@ -176,10 +175,12 @@ pub(crate) fn admit(
     let safe_origin_kinds =
         SafeOriginKindRegistry::read(registry(RegistryRole::SafeOriginKindRegistry))
             .ok_or(CROSS_REFERENCES_ROW)?;
+    let checks =
+        CheckRegistry::read(registry(RegistryRole::CheckRegistry)).ok_or(CROSS_REFERENCES_ROW)?;
     Ok(AdmittedPackage {
         declared: checked.declared,
         safe_origin_kinds,
-        check_registry: registry(RegistryRole::CheckRegistry).clone(),
+        checks,
         finding_registry: registry(RegistryRole::FindingRegistry).clone(),
     })
 }
@@ -262,9 +263,11 @@ mod tests {
         include_bytes!("../../conformance/registries/safe-origin-kind-v0.schema.json");
     const SAFE_ORIGINS: &[u8] =
         include_bytes!("../../conformance/registries/safe-origin-kind-v0.json");
+    const CHECK_SCHEMA: &[u8] = include_bytes!("../../conformance/registries/check-v0.schema.json");
+    const CHECKS: &[u8] = include_bytes!("../../conformance/registries/check-v0.json");
 
-    /// A registry schema that admits any container of rows, for the members
-    /// whose own schemas come with their own stages.
+    /// A registry schema that admits any container of rows, for the Finding
+    /// Registry, whose own schema comes with its own stage.
     const ROWS_SCHEMA: &[u8] = br#"{
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -278,15 +281,16 @@ mod tests {
         ConstructionRoot::built_in().unwrap()
     }
 
-    /// Each member's bytes: the committed Safe Origin Kind Registry and its
-    /// schema, and an empty registry of rows for the other two.
+    /// Each member's bytes: the committed Safe Origin Kind and Check
+    /// Registries and their schemas, and an empty registry of rows for the
+    /// Finding Registry.
     fn members() -> Vec<(RegistryRole, Vec<u8>)> {
         vec![
             (R::SafeOriginKindRegistrySchema, SAFE_ORIGIN_SCHEMA.to_vec()),
-            (R::CheckRegistrySchema, ROWS_SCHEMA.to_vec()),
+            (R::CheckRegistrySchema, CHECK_SCHEMA.to_vec()),
             (R::FindingRegistrySchema, ROWS_SCHEMA.to_vec()),
             (R::SafeOriginKindRegistry, SAFE_ORIGINS.to_vec()),
-            (R::CheckRegistry, NO_ROWS.to_vec()),
+            (R::CheckRegistry, CHECKS.to_vec()),
             (R::FindingRegistry, NO_ROWS.to_vec()),
         ]
     }
@@ -400,14 +404,14 @@ mod tests {
     }
 
     #[test]
-    fn construction_admits_a_package_with_the_committed_safe_origin_kind_registry() {
+    fn construction_admits_a_package_with_the_committed_registries() {
         let admitted = admit(root(), Some(&package(&members()))).unwrap();
         assert_eq!(admitted.declared.identity, IDENTITY);
         assert_eq!(
             admitted.safe_origin_kinds,
             SafeOriginKindRegistry::revision_zero()
         );
-        assert_eq!(admitted.check_registry, json!({ "rows": [] }));
+        assert_eq!(admitted.checks, CheckRegistry::revision_zero());
         assert_eq!(admitted.finding_registry, json!({ "rows": [] }));
     }
 
@@ -573,6 +577,31 @@ mod tests {
                 checked(&package(&members_with(R::SafeOriginKindRegistry, &bytes))),
                 Some(41),
                 "{field}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_check_registry_must_form_a_closed_graph() {
+        let committed: Value = serde_json::from_slice(CHECKS).unwrap();
+        // A repeated check ID, and a relation that scopes itself.
+        let mut repeated = committed.clone();
+        repeated["rows"][1]["checkId"] = committed["rows"][0]["checkId"].clone();
+        repeated["rows"][1]["ruleId"] = committed["rows"][0]["ruleId"].clone();
+        let mut circular = committed;
+        for row in circular["rows"].as_array_mut().unwrap() {
+            if row["subjectKind"] == "relation" {
+                row["parentSubject"] =
+                    json!({ "phaseId": "hydration-validation", "subjectKind": "relation" });
+            }
+        }
+        for (case, registry) in [("repeated", repeated), ("circular", circular)] {
+            let bytes = serde_json::to_vec_pretty(&registry).unwrap();
+            // The schema admits it; the graph does not.
+            assert_eq!(
+                checked(&package(&members_with(R::CheckRegistry, &bytes))),
+                Some(41),
+                "{case}"
             );
         }
     }
