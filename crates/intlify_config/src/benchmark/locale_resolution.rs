@@ -521,7 +521,10 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Subject::DeliveryPlacement
         | Subject::Target(_)
         | Subject::Group(_)
-        | Subject::Hydration(_) => return Err(OutputFailure::LocalePolicyResolutionInvariant),
+        | Subject::Hydration(_)
+        | Subject::SemanticDependency(_) => {
+            return Err(OutputFailure::LocalePolicyResolutionInvariant)
+        }
     }
     frame.uint(match unit.check {
         Check::WithinBound => 0,
@@ -562,7 +565,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::SameRequestedLocales
         | Check::SameEffectiveDefault
         | Check::StaticCompatibility
-        | Check::SingleRole => return Err(OutputFailure::LocalePolicyResolutionInvariant),
+        | Check::SingleRole
+        | Check::EstablishedGroup => return Err(OutputFailure::LocalePolicyResolutionInvariant),
     });
     Ok(())
 }

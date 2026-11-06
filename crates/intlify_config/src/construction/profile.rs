@@ -33,6 +33,7 @@ use intlify_shared_json::token::{IntegrityDigest, ID_PATTERN};
 
 use crate::input_limits::Bound;
 use crate::locale::{Supported, VersionedIdentity};
+use crate::resolver::dependency::SemanticGroup;
 use crate::resolver::evaluation::Phase;
 use crate::resolver::limits::ResolutionLimits;
 
@@ -78,23 +79,6 @@ const MESSAGE_LOCALE_FALLBACK: &str = "intlify-message-locale-fallback";
 const COVERAGE: &str = "intlify-localization-coverage";
 const DELIVERY_GRAPH: &str = "intlify-delivery-graph";
 const DELIVERY_PLACEMENT: &str = "intlify-delivery-placement";
-
-/// The profile view's members, one per semantic group, in the order of 015's
-/// semantic inventory.
-pub(crate) const SEMANTIC_GROUPS: [&str; 12] = [
-    "profileSpecification",
-    "projectIdentity",
-    "localeCanonicalization",
-    "projectLocales",
-    "localeNegotiation",
-    "messageFallback",
-    "coverage",
-    "requiredPolicies",
-    "optionalPolicies",
-    "targets",
-    "deploymentGroups",
-    "delivery",
-];
 
 /// The domain separator of a Redacted subject token.
 pub(crate) const SUBJECT_TOKEN_DOMAIN: &str = "intlify.project-profile.subject";
@@ -324,7 +308,7 @@ impl ProjectProfileSpecification {
                 semantic_digest: pins.dataset.semantic_digest.to_owned(),
             },
             phases: strings(&Phase::ALL.map(Phase::id)),
-            semantic_groups: strings(&SEMANTIC_GROUPS),
+            semantic_groups: strings(&SemanticGroup::ALL.map(SemanticGroup::id)),
             resource_bounds: bounds
                 .iter()
                 .map(|(id, _)| format!("{}.{}", id.group.path(), id.name))

@@ -6,14 +6,17 @@
 //! evaluation. Each phase takes the values the earlier ones admitted, or the
 //! causes of their absence, and evaluates every check whose prerequisites were
 //! admitted, so a blocking result leaves only the checks that depend on it not
-//! evaluated. The entry adds no check of its own.
+//! evaluated. Once the phases that establish a semantic group have run, the
+//! entry records the unit that owns the group's semantic dependency, which
+//! waits on what they established (D15:2510). The `profileSpecification`
+//! group's owner is a unit of Phase 2 that waits on Phase 0 alone.
 //!
-//! Phases 1 to 3 record no units yet, so the entry starts from their complete
-//! results: a configuration structural admission admitted whole, and the
-//! declaration Phase 3 provisionally selected in it. What the entry returns is
-//! crate-private semantic state, not a `LocalizationProjectProfile`, a checked
-//! or blocked outcome, or Resolution Evidence. The profile projection is 015's
-//! Implementation Phase 5.
+//! Phases 1 to 3 record no other units yet, so the entry starts from their
+//! complete results: a configuration structural admission admitted whole, and
+//! the declaration Phase 3 provisionally selected in it. What the entry
+//! returns is crate-private semantic state, not a `LocalizationProjectProfile`,
+//! a checked or blocked outcome, or Resolution Evidence. The profile
+//! projection is 015's Implementation Phase 5.
 
 use crate::artifacts::collection::FormalCollection;
 use crate::artifacts::vocabulary::FormalVocabulary;
@@ -28,7 +31,8 @@ use super::artifact_resolution::{admit_collection, ArtifactSet};
 use super::bootstrap::VerificationInput;
 use super::coverage::{resolve_coverage, CoveragePolicy};
 use super::delivery::{resolve_delivery, DeliveryPolicy};
-use super::evaluation::{Admitted, Causes, Evaluation, EvaluationInvariant};
+use super::dependency::{own, SemanticGroup, OPTIONAL_POLICIES, REQUIRED_POLICIES};
+use super::evaluation::{and, Admitted, Causes, Evaluation, EvaluationInvariant};
 use super::exact_resolution::{resolve_fields, ArtifactBindings, ResolvedReferences};
 use super::fallback::{resolve_fallback, MessageFallbackPolicy};
 use super::groups::{resolve_groups, ResolvedGroups};
@@ -197,9 +201,10 @@ impl From<LocaleInvariant> for ResolverInvariant {
 }
 
 /// Phase 0 and Phases 4 to 13 of one invocation over `evaluation`, in 015's
-/// order. `data` is the canonicalization data Phase 5 binds. The Profile
-/// Resolution Artifact Set Phase 9 admits is kept in `set`, which the resolved
-/// references and the bindings borrow.
+/// order, with each semantic group's owner once the phases that establish
+/// the group have run. `data` is the canonicalization data Phase 5 binds. The
+/// Profile Resolution Artifact Set Phase 9 admits is kept in `set`, which the
+/// resolved references and the bindings borrow.
 pub(crate) fn resolve_profile<'s, P>(
     evaluation: &mut Evaluation,
     configuration: &CompleteConfiguration<'_>,
@@ -213,9 +218,15 @@ where
 {
     let declaration = configuration.declaration;
     let declared = configuration.references();
-    // The assertion never selects semantics, so nothing waits on Phase 0.
+    // The assertion never selects semantics: only the owner of the group it
+    // establishes waits on Phase 0.
     let project_profile =
         admit_project_profile(evaluation, invocation.supported, invocation.specifications)?;
+    own(
+        evaluation,
+        SemanticGroup::ProfileSpecification,
+        held(project_profile.as_ref()),
+    )?;
     let policy = admit_resource_policy(
         evaluation,
         invocation.capability,
@@ -235,19 +246,39 @@ where
         data,
     )?;
     let canonicalizer = admitted.canonicalizer.as_ref();
+    own(
+        evaluation,
+        SemanticGroup::LocaleCanonicalization,
+        held(canonicalizer),
+    )?;
     let identity = resolve_project_identity(
         evaluation,
         confirmed,
         Ok(declaration.project_id.clone()),
         Ok(declaration.selection_scope.clone()),
     )?;
+    own(
+        evaluation,
+        SemanticGroup::ProjectIdentity,
+        held(identity.as_ref()),
+    )?;
     let fields = LocaleFields::declared(declaration);
     let locales = resolve_locales(evaluation, confirmed, canonicalizer, &fields)?;
+    own(
+        evaluation,
+        SemanticGroup::ProjectLocales,
+        held(locales.project.as_ref()),
+    )?;
     let negotiation = resolve_negotiation(
         evaluation,
         confirmed,
         &admitted.locale_negotiation,
         &locales,
+    )?;
+    own(
+        evaluation,
+        SemanticGroup::LocaleNegotiation,
+        held(negotiation.as_ref()),
     )?;
     let fallback = resolve_fallback(
         evaluation,
@@ -256,6 +287,11 @@ where
         canonicalizer,
         &locales,
         fields.message_fallback.clone(),
+    )?;
+    own(
+        evaluation,
+        SemanticGroup::MessageFallback,
+        held(fallback.as_ref()),
     )?;
     let coverage = resolve_coverage(
         evaluation,
@@ -266,6 +302,7 @@ where
         &locales,
         fields.coverage.clone(),
     )?;
+    own(evaluation, SemanticGroup::Coverage, held(coverage.as_ref()))?;
     let set = &*set.insert(admit_collection(
         evaluation,
         confirmed,
@@ -279,6 +316,19 @@ where
         &declared,
         locales.targets.as_deref(),
     )?;
+    // Both policy groups are the confirmed declaration's, and the required
+    // one also holds the confirmed policy's bounds.
+    let policies = and(held(confirmed), held(declared.policies.as_ref()));
+    own(
+        evaluation,
+        SemanticGroup::RequiredPolicies,
+        and(policies.clone(), results.policies(&REQUIRED_POLICIES)),
+    )?;
+    own(
+        evaluation,
+        SemanticGroup::OptionalPolicies,
+        and(policies, results.policies(&OPTIONAL_POLICIES)),
+    )?;
     let references = results.all();
     let bindings = references
         .as_ref()
@@ -290,11 +340,19 @@ where
         &admitted.delivery_placement,
         Ok(declaration.delivery.as_option()),
     )?;
+    own(evaluation, SemanticGroup::Delivery, held(delivery.as_ref()))?;
     let targets = resolve_targets(
         evaluation,
         Ok(&declaration.target_profiles),
         &locales,
         &results,
+    )?;
+    own(
+        evaluation,
+        SemanticGroup::Targets,
+        targets
+            .as_ref()
+            .map_or_else(|causes| Err(causes.clone()), ResolvedTargets::complete),
     )?;
     let groups = resolve_groups(
         evaluation,
@@ -310,6 +368,21 @@ where
         targets.as_ref(),
         groups.as_ref(),
         negotiation.as_ref().map(|_| ()).map_err(Causes::clone),
+    )?;
+    // The groups' members and partition, and their checked relations; the
+    // negotiation profile the relations share is `localeNegotiation`'s.
+    own(
+        evaluation,
+        SemanticGroup::DeploymentGroups,
+        and(
+            groups.as_ref().map_or_else(
+                |causes| Err(causes.clone()),
+                |groups| groups.partition().clone(),
+            ),
+            hydration
+                .as_ref()
+                .map_or_else(|causes| Err(causes.clone()), ResolvedHydration::complete),
+        ),
     )?;
     Ok(SemanticState {
         specifications: SpecificationSet::new(&project_profile, &admitted),
@@ -327,6 +400,12 @@ where
         groups,
         hydration,
     })
+}
+
+/// Whether a phase established `result`, or the causes of its absence: what
+/// a semantic group's owner waits on.
+fn held<T>(result: Result<T, &Causes>) -> Admitted<()> {
+    result.map(|_| ()).map_err(Causes::clone)
 }
 
 // `handoff`'s tests resolve the same inputs.
@@ -350,6 +429,7 @@ pub(super) mod tests {
     use crate::model::CoverageMode;
     use crate::profile_fixtures::complete_config;
     use crate::resolver::delivery::PlacementMode;
+    use crate::resolver::dependency::{self, SemanticGroup};
     use crate::resolver::evaluation::{
         Check, Code, IssueKey, Phase, Reason, Status, Subject, Unit,
     };
@@ -862,6 +942,35 @@ pub(super) mod tests {
             })
     }
 
+    /// The semantic groups whose owner waits, in the inventory's order: the
+    /// groups the invocation did not establish. Every group has its owner.
+    fn unestablished(evaluation: &Evaluation) -> Vec<SemanticGroup> {
+        SemanticGroup::ALL
+            .into_iter()
+            .filter(|&group| match evaluation.status(&dependency::unit(group)) {
+                Some(Status::Evaluated) => false,
+                Some(Status::NotEvaluated(_)) => true,
+                None => panic!("{group:?} has no owner"),
+            })
+            .collect()
+    }
+
+    /// Every group but `profileSpecification`, which Phase 0 alone
+    /// establishes: what an unconfirmed policy leaves unestablished.
+    const AFTER_POLICY: [SemanticGroup; 11] = [
+        SemanticGroup::ProjectIdentity,
+        SemanticGroup::LocaleCanonicalization,
+        SemanticGroup::ProjectLocales,
+        SemanticGroup::LocaleNegotiation,
+        SemanticGroup::MessageFallback,
+        SemanticGroup::Coverage,
+        SemanticGroup::RequiredPolicies,
+        SemanticGroup::OptionalPolicies,
+        SemanticGroup::Targets,
+        SemanticGroup::DeploymentGroups,
+        SemanticGroup::Delivery,
+    ];
+
     fn spellings(locales: &[CanonicalLocale]) -> Vec<&str> {
         locales.iter().map(CanonicalLocale::as_str).collect()
     }
@@ -890,9 +999,13 @@ pub(super) mod tests {
             assert!(evaluation
                 .statuses()
                 .all(|(_, status)| *status == Status::Evaluated));
+            // Phase 2 records only the `profileSpecification` group's owner.
             let phases: BTreeSet<Phase> =
                 evaluation.statuses().map(|(unit, _)| unit.phase).collect();
-            assert_eq!(phases, BTreeSet::from(PHASES));
+            let mut ran = BTreeSet::from(PHASES);
+            ran.insert(Phase::StructuralAdmission);
+            assert_eq!(phases, ran);
+            assert_eq!(unestablished(&evaluation), []);
             let project = state.locales.project.as_ref().unwrap();
             assert_eq!(spellings(project.requested().as_slice()), ["en", "ja"]);
             assert_eq!(project.requested_default().as_str(), "en");
@@ -1093,6 +1206,7 @@ pub(super) mod tests {
                 ]
             );
             assert_eq!(absent(&state), EVERY);
+            assert_eq!(unestablished(&evaluation), AFTER_POLICY);
             assert_eq!(
                 state.policy.selector_length,
                 Some(StringLengthFact::OverLimit)
@@ -1130,6 +1244,7 @@ pub(super) mod tests {
                 BTreeSet::from([key])
             );
             assert_eq!(absent(&state), ["locales"]);
+            assert_eq!(unestablished(&evaluation), [SemanticGroup::ProjectLocales]);
         });
     }
 
@@ -1152,8 +1267,10 @@ pub(super) mod tests {
                 )]
             );
             assert_eq!(absent(&state), EVERY);
-            // Every unit of Phases 5 to 10, and Phase 4's after the decision,
-            // waits on the decision alone; Phase 0 does not.
+            // Every unit of Phases 5 to 13, and Phase 4's after the decision,
+            // waits on the decision alone; neither Phase 0 nor the owner of
+            // the group it establishes does.
+            assert_eq!(unestablished(&evaluation), AFTER_POLICY);
             assert_eq!(
                 suppressed(&evaluation),
                 (
@@ -1235,6 +1352,15 @@ pub(super) mod tests {
                 keys(state.bindings.as_ref().unwrap_err()),
                 BTreeSet::from([key])
             );
+            assert_eq!(
+                unestablished(&evaluation),
+                [
+                    SemanticGroup::RequiredPolicies,
+                    SemanticGroup::OptionalPolicies,
+                    SemanticGroup::Targets,
+                    SemanticGroup::DeploymentGroups
+                ]
+            );
         });
     }
 
@@ -1287,7 +1413,7 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn a_missing_project_profile_slot_blocks_phase_0_and_nothing_waits_on_it() {
+    fn a_missing_project_profile_slot_leaves_only_its_groups_owner_waiting() {
         let mut inputs = Inputs::complete();
         inputs.specifications.project_profile = None;
         inputs.resolve(|evaluation, state| {
@@ -1299,9 +1425,20 @@ pub(super) mod tests {
                     Some(Reason::MissingRequiredSlot)
                 )]
             );
+            // No semantic check waits on Phase 0: only the owner of the group
+            // it establishes does.
+            let owner = dependency::unit(SemanticGroup::ProfileSpecification);
+            let Some(Status::NotEvaluated(causes)) = evaluation.status(&owner) else {
+                panic!("the owner was evaluated");
+            };
+            assert_eq!(keys(causes), BTreeSet::from([only_issue(&evaluation)]));
             assert!(evaluation
                 .statuses()
-                .all(|(_, status)| *status == Status::Evaluated));
+                .all(|(unit, status)| *unit == owner || *status == Status::Evaluated));
+            assert_eq!(
+                unestablished(&evaluation),
+                [SemanticGroup::ProfileSpecification]
+            );
             // Only the Set, which needs all eight slots, is missing.
             assert_eq!(
                 keys(state.specifications.as_ref().unwrap_err()),
@@ -1326,6 +1463,7 @@ pub(super) mod tests {
                 [(comparison, Code::ResourcePolicyCapabilityIncompatible, None)]
             );
             assert_eq!(absent(&state), EVERY);
+            assert_eq!(unestablished(&evaluation), AFTER_POLICY);
             assert!(later_phases_wait_on(&evaluation, &only_issue(&evaluation)));
             assert_eq!(
                 suppressed(&evaluation),
@@ -1352,11 +1490,23 @@ pub(super) mod tests {
                 )]
             );
             // Every other reference was resolved, the targets' among them;
-            // only the bindings, which need every reference, are missing.
-            assert!(evaluation
-                .statuses()
-                .all(|(_, status)| *status == Status::Evaluated));
+            // only the bindings, which need every reference, are missing, and
+            // only the owner of the required policies waits.
             let key = only_issue(&evaluation);
+            let waiting: Vec<(&Unit, BTreeSet<IssueKey>)> = evaluation
+                .statuses()
+                .filter_map(|(unit, status)| match status {
+                    Status::NotEvaluated(causes) => Some((unit, keys(causes))),
+                    Status::Evaluated => None,
+                })
+                .collect();
+            assert_eq!(
+                waiting,
+                [(
+                    &dependency::unit(SemanticGroup::RequiredPolicies),
+                    BTreeSet::from([key.clone()])
+                )]
+            );
             assert_eq!(
                 keys(state.references.as_ref().unwrap_err()),
                 BTreeSet::from([key.clone()])
@@ -1417,6 +1567,11 @@ pub(super) mod tests {
                 absent(&state),
                 ["references", "bindings", "targets", "groups", "hydration"]
             );
+            // The policy groups need no Target Profile reference.
+            assert_eq!(
+                unestablished(&evaluation),
+                [SemanticGroup::Targets, SemanticGroup::DeploymentGroups]
+            );
         });
     }
 
@@ -1432,7 +1587,8 @@ pub(super) mod tests {
                 issues(&evaluation),
                 [(subset.clone(), Code::TargetLocalesNotSubset, None)]
             );
-            // Only the relation's comparison of the two locale sets waits.
+            // Only the relation's comparison of the two locale sets waits, and
+            // the owners of the two groups the target belongs to.
             let compared = hydration::unit(
                 HydrationSubject::Relation(
                     serde_json::from_value(json!("web")).unwrap(),
@@ -1446,7 +1602,14 @@ pub(super) mod tests {
                 .filter(|(_, status)| **status != Status::Evaluated)
                 .map(|(unit, _)| unit)
                 .collect();
-            assert_eq!(waiting, [&compared]);
+            assert_eq!(
+                waiting,
+                [
+                    &dependency::unit(SemanticGroup::Targets),
+                    &compared,
+                    &dependency::unit(SemanticGroup::DeploymentGroups)
+                ]
+            );
             assert_eq!(absent(&state), ["targets", "hydration"]);
         });
     }
@@ -1467,6 +1630,79 @@ pub(super) mod tests {
                 BTreeSet::from([key])
             );
             assert_eq!(absent(&state), ["negotiation"]);
+            // The deployment groups are established without it.
+            assert_eq!(
+                unestablished(&evaluation),
+                [SemanticGroup::LocaleNegotiation]
+            );
+        });
+    }
+
+    /// The dataset is part of the `localeCanonicalization` group, so data that
+    /// disagrees with the admitted specification leaves the group, and every
+    /// group a canonical locale is part of, unestablished; the slot itself was
+    /// admitted.
+    #[test]
+    fn data_disagreeing_with_its_specification_leaves_the_canonicalization_group_waiting() {
+        Inputs::complete().prepared(|configuration, invocation| {
+            let mut pins = fixture_pins();
+            pins.dataset.semantic_digest = "test-only-other-content-pin";
+            let supported =
+                SupportedSpecifications::revision_zero(ACTIVE, Supported::new(vec![pins]).unwrap());
+            let invocation = Invocation {
+                supported: &supported,
+                ..*invocation
+            };
+            let mut evaluation = Evaluation::default();
+            let mut set = None;
+            resolve_profile(
+                &mut evaluation,
+                configuration,
+                &invocation,
+                FixtureProvider::new(),
+                &mut set,
+            )
+            .unwrap();
+            assert_eq!(only_issue(&evaluation).code(), Code::LocaleDataNotAdmitted);
+            assert_eq!(
+                unestablished(&evaluation),
+                [
+                    SemanticGroup::LocaleCanonicalization,
+                    SemanticGroup::ProjectLocales,
+                    SemanticGroup::LocaleNegotiation,
+                    SemanticGroup::MessageFallback,
+                    SemanticGroup::Coverage,
+                    SemanticGroup::Targets,
+                    SemanticGroup::DeploymentGroups
+                ]
+            );
+        });
+    }
+
+    /// The optional policies are the confirmed declaration's even when both
+    /// are `null`, which no reference check reads: the group waits on the
+    /// confirmed policy alone.
+    #[test]
+    fn null_optional_policies_are_established_once_the_policy_is_confirmed() {
+        let mut inputs = Inputs::complete();
+        for slot in ["providerRouting", "glossarySet"] {
+            inputs.declaration()["policies"][slot] = Value::Null;
+        }
+        inputs.resolve(|evaluation, _| {
+            assert_eq!(issues(&evaluation), []);
+            assert_eq!(unestablished(&evaluation), []);
+        });
+        let mut limits = policy_limits();
+        let capability = capability_limits().locale_resolution.max_requested_locales;
+        limits.locale_resolution.max_requested_locales = bound(capability.get() + 1);
+        inputs.select_policy(resource_limit_policy(&limits));
+        inputs.resolve(|evaluation, _| {
+            let owner = dependency::unit(SemanticGroup::OptionalPolicies);
+            let Some(Status::NotEvaluated(causes)) = evaluation.status(&owner) else {
+                panic!("the owner was evaluated");
+            };
+            assert_eq!(keys(causes), BTreeSet::from([only_issue(&evaluation)]));
+            assert_eq!(unestablished(&evaluation), AFTER_POLICY);
         });
     }
 
@@ -1485,6 +1721,10 @@ pub(super) mod tests {
                 )
             );
             assert_eq!(absent(&state), ["hydration"]);
+            assert_eq!(
+                unestablished(&evaluation),
+                [SemanticGroup::DeploymentGroups]
+            );
         });
     }
 
@@ -1501,6 +1741,10 @@ pub(super) mod tests {
                 [(placed, Code::TargetUnassigned, None)]
             );
             assert_eq!(absent(&state), ["groups"]);
+            assert_eq!(
+                unestablished(&evaluation),
+                [SemanticGroup::DeploymentGroups]
+            );
         });
     }
 

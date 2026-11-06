@@ -57,7 +57,7 @@ Plan 022 fixes nine examples of the integrated path.
 | A `resourceLimits` candidate differing only in its digest | The bootstrap's digest mismatch, with no other policy selected | `a_selected_reference_differing_only_in_its_digest_selects_no_other_policy` |
 | Two envelopes of the same exact reference | The bootstrap's duplicate envelope | `a_second_envelope_of_the_selected_policy_is_the_bootstraps_duplicate` |
 | Two bodies sharing kind, identity, revision, and specification revision but not the digest | Conflicting content | `two_bodies_sharing_all_but_the_digest_are_conflicting_content` |
-| No `project-profile` slot | Phase 0 blocks; the independent phases go on | `a_missing_project_profile_slot_blocks_phase_0_and_nothing_waits_on_it` |
+| No `project-profile` slot | Phase 0 blocks; the independent phases go on, and only the owner of the `profileSpecification` group waits | `a_missing_project_profile_slot_leaves_only_its_groups_owner_waiting` |
 | A policy needing more than `policyComparable` allows | Incompatible with the capability; the selection is not confirmed | `a_policy_needing_more_than_the_capability_leaves_the_selection_unconfirmed` |
 | A `trust` reference without its artifact | Not found; the other references resolve | `a_trust_reference_without_its_artifact_is_not_found_and_the_rest_resolve` |
 | Locale sets, objects, and the collection reordered | An equal semantic state, compared by value; its byte projection is Phase 5's profile projection | `reordering_sets_objects_and_the_collection_changes_no_semantic_state` |
@@ -82,7 +82,7 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 | Requirement | Checked by |
 | --- | --- |
 | One typed Profile Resolution Specification Input with eight fixed slots in 015's order, forming one Set only when every slot is present and compatible | `slots_are_named_and_ordered_as_015_lists_them`, `a_complete_input_admits_every_slot_and_forms_the_set`, `a_set_missing_several_members_names_every_cause` |
-| A missing slot, `project-profile` and `locale-canonicalization` included, is `missing-required-slot` and names its slot | `a_missing_slot_is_incomplete_and_names_its_slot`, `a_missing_project_profile_slot_blocks_phase_0_and_nothing_waits_on_it` |
+| A missing slot, `project-profile` and `locale-canonicalization` included, is `missing-required-slot` and names its slot | `a_missing_slot_is_incomplete_and_names_its_slot`, `a_missing_project_profile_slot_leaves_only_its_groups_owner_waiting` |
 | Another identity is unsupported and another revision incompatible in every slot, with no host fallback for canonicalization | `another_identity_is_unsupported_and_another_revision_incompatible_in_every_specification_slot`, `data_naming_another_specification_or_dataset_is_not_admitted` |
 | The configuration `schemaVersion` and the specification revisions are separate version domains | `the_configuration_version_and_the_specification_revisions_are_separate_domains` |
 | Phase 0 suppresses nothing itself; a unit needing a slot waits on it | `phase_0_suppresses_nothing_but_keeps_the_set_from_forming`, `the_canonicalization_data_waits_for_its_slot`, `a_missing_slot_hides_only_the_comparison` |

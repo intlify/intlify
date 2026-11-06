@@ -375,7 +375,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Subject::ArtifactCollection(_)
         | Subject::ArtifactReference(_)
         | Subject::DeliveryPlacement
-        | Subject::Hydration(_) => return defect(),
+        | Subject::Hydration(_)
+        | Subject::SemanticDependency(_) => return defect(),
     }
     frame.uint(match unit.check {
         Check::WithinBound => 0,
@@ -416,7 +417,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::SameRequestedLocales
         | Check::SameEffectiveDefault
         | Check::StaticCompatibility
-        | Check::SingleRole => return defect(),
+        | Check::SingleRole
+        | Check::EstablishedGroup => return defect(),
     });
     Ok(())
 }
@@ -466,7 +468,8 @@ fn causes(frame: &mut Frame, causes: &Causes) -> Result<(), OutputFailure> {
             | Subject::Fallback(_)
             | Subject::Coverage(_)
             | Subject::DeliveryPlacement
-            | Subject::Hydration(_) => return defect(),
+            | Subject::Hydration(_)
+            | Subject::SemanticDependency(_) => return defect(),
         };
         framed.map_err(|_| OutputFailure::TargetAndGroupResolutionInvariant)?;
     }

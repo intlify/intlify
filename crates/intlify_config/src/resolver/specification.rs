@@ -196,8 +196,9 @@ fn specification_slot<Id: Clone + Eq>(
 }
 
 /// Phase 0: the `project-profile` assertion must be the Active Project Profile
-/// Specification. The assertion never selects semantics and no later check
-/// depends on it, so a failure blocks the outcome without suppressing anything.
+/// Specification. The assertion never selects semantics and no semantic check
+/// depends on it, so a failure blocks the outcome and leaves only the owner of
+/// the `profileSpecification` group, which the assertion establishes, waiting.
 pub(crate) fn admit_project_profile<Id: Clone + Eq>(
     evaluation: &mut Evaluation,
     supported: &SupportedSpecifications<Id>,
