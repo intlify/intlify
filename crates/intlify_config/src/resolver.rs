@@ -15,6 +15,7 @@ pub(crate) mod bootstrap;
 pub(crate) mod capability;
 pub(crate) mod coverage;
 pub(crate) mod delivery;
+pub(crate) mod dependency;
 pub(crate) mod evaluation;
 pub(crate) mod exact_resolution;
 pub(crate) mod fallback;

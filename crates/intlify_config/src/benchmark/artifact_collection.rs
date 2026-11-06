@@ -216,7 +216,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::SameRequestedLocales
         | Check::SameEffectiveDefault
         | Check::StaticCompatibility
-        | Check::SingleRole => return Err(OutputFailure::ArtifactCollectionInvariant),
+        | Check::SingleRole
+        | Check::EstablishedGroup => return Err(OutputFailure::ArtifactCollectionInvariant),
     });
     Ok(())
 }

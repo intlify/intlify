@@ -13,6 +13,7 @@ use std::cmp::Ordering;
 
 use super::artifact_resolution::CollectionSubject;
 use super::coverage::CoverageSubject;
+use super::dependency::SemanticGroup;
 use super::evaluation::{Check, Phase, Subject};
 use super::fallback::FallbackSubject;
 use super::groups::GroupSubject;
@@ -30,6 +31,11 @@ pub(crate) enum SubjectKind {
     /// The `project-profile` slot of the Profile Resolution Specification
     /// Input.
     ProjectProfileSlot,
+
+    // structural-admission
+    /// The `profileSpecification` group, which Phase 0 establishes: its unit
+    /// owns the group's semantic dependency.
+    ProfileSpecificationDependency,
 
     // resource-policy-admission
     /// Every submitted artifact occurrence, under the capability.
@@ -112,10 +118,16 @@ pub(crate) enum SubjectKind {
     Vocabulary,
     /// The Locale Canonicalization Data Artifact.
     CanonicalizationData,
+    /// The `localeCanonicalization` group: its unit owns the group's semantic
+    /// dependency.
+    LocaleCanonicalizationDependency,
 
     // project-identity-resolution
     /// `projectId` or `selectionScope`.
     DeclarationField,
+    /// The `projectIdentity` group: its unit owns the group's semantic
+    /// dependency.
+    ProjectIdentityDependency,
 
     // locale-resolution
     /// Every locale spelling of the declaration.
@@ -142,6 +154,9 @@ pub(crate) enum SubjectKind {
     TargetRequestedLocale,
     /// One target's `defaultRequestedLocale`.
     TargetDefaultRequestedLocale,
+    /// The `projectLocales` group: its unit owns the group's semantic
+    /// dependency.
+    ProjectLocalesDependency,
 
     // locale-policy-resolution
     /// The submitted alias map.
@@ -184,6 +199,14 @@ pub(crate) enum SubjectKind {
     CoverageCell,
     /// The complete decision table.
     CoverageTable,
+    /// The `localeNegotiation` group: its unit owns the group's semantic
+    /// dependency.
+    LocaleNegotiationDependency,
+    /// The `messageFallback` group: its unit owns the group's semantic
+    /// dependency.
+    MessageFallbackDependency,
+    /// The `coverage` group: its unit owns the group's semantic dependency.
+    CoverageDependency,
 
     // artifact-reference-resolution
     /// The submitted bodies of one member key of the collection.
@@ -195,14 +218,24 @@ pub(crate) enum SubjectKind {
     ResolvedPolicyReference,
     /// One Target ID's Target Profile reference, resolved against the Set.
     ResolvedTargetProfileReference,
+    /// The `requiredPolicies` group: its unit owns the group's semantic
+    /// dependency.
+    RequiredPoliciesDependency,
+    /// The `optionalPolicies` group: its unit owns the group's semantic
+    /// dependency.
+    OptionalPoliciesDependency,
 
     // delivery-resolution
     /// The declaration's delivery placement.
     DeliveryPlacement,
+    /// The `delivery` group: its unit owns the group's semantic dependency.
+    DeliveryDependency,
 
     // target-resolution
     /// One Target ID.
     Target,
+    /// The `targets` group: its unit owns the group's semantic dependency.
+    TargetsDependency,
 
     // group-resolution
     /// The submitted Group ID map.
@@ -228,12 +261,16 @@ pub(crate) enum SubjectKind {
     Relation,
     /// A Target ID's roles among one group's relations.
     Roles,
+    /// The `deploymentGroups` group: its unit owns the group's semantic
+    /// dependency.
+    DeploymentGroupsDependency,
 }
 
 impl SubjectKind {
     /// Every kind, phase by phase in rank order.
-    pub(crate) const ALL: [Self; 87] = [
+    pub(crate) const ALL: [Self; 99] = [
         Self::ProjectProfileSlot,
+        Self::ProfileSpecificationDependency,
         Self::CapabilityArtifacts,
         Self::CapabilityPolicyArtifacts,
         Self::CapabilityTargetProfileArtifacts,
@@ -271,7 +308,9 @@ impl SubjectKind {
         Self::DeliveryPlacementSlot,
         Self::Vocabulary,
         Self::CanonicalizationData,
+        Self::LocaleCanonicalizationDependency,
         Self::DeclarationField,
+        Self::ProjectIdentityDependency,
         Self::LocaleOccurrences,
         Self::RequestedLocale,
         Self::RequestedLocales,
@@ -284,6 +323,7 @@ impl SubjectKind {
         Self::TargetId,
         Self::TargetRequestedLocale,
         Self::TargetDefaultRequestedLocale,
+        Self::ProjectLocalesDependency,
         Self::NegotiationAliases,
         Self::NegotiationKey,
         Self::NegotiationDestination,
@@ -304,12 +344,19 @@ impl SubjectKind {
         Self::CoverageComparisons,
         Self::CoverageCell,
         Self::CoverageTable,
+        Self::LocaleNegotiationDependency,
+        Self::MessageFallbackDependency,
+        Self::CoverageDependency,
         Self::CollectionMember,
         Self::CollectionGroup,
         Self::ResolvedPolicyReference,
         Self::ResolvedTargetProfileReference,
+        Self::RequiredPoliciesDependency,
+        Self::OptionalPoliciesDependency,
         Self::DeliveryPlacement,
+        Self::DeliveryDependency,
         Self::Target,
+        Self::TargetsDependency,
         Self::Groups,
         Self::Memberships,
         Self::Group,
@@ -320,12 +367,14 @@ impl SubjectKind {
         Self::RelationEndpoint,
         Self::Relation,
         Self::Roles,
+        Self::DeploymentGroupsDependency,
     ];
 
     /// The phase whose units have subjects of this kind.
     pub(crate) const fn phase(self) -> Phase {
         match self {
             Self::ProjectProfileSlot => Phase::ResolverBootstrapAdmission,
+            Self::ProfileSpecificationDependency => Phase::StructuralAdmission,
             Self::CapabilityArtifacts
             | Self::CapabilityPolicyArtifacts
             | Self::CapabilityTargetProfileArtifacts
@@ -362,8 +411,11 @@ impl SubjectKind {
             | Self::DeliveryGraphSlot
             | Self::DeliveryPlacementSlot
             | Self::Vocabulary
-            | Self::CanonicalizationData => Phase::SpecificationAdmission,
-            Self::DeclarationField => Phase::ProjectIdentityResolution,
+            | Self::CanonicalizationData
+            | Self::LocaleCanonicalizationDependency => Phase::SpecificationAdmission,
+            Self::DeclarationField | Self::ProjectIdentityDependency => {
+                Phase::ProjectIdentityResolution
+            }
             Self::LocaleOccurrences
             | Self::RequestedLocale
             | Self::RequestedLocales
@@ -375,7 +427,8 @@ impl SubjectKind {
             | Self::TargetProfiles
             | Self::TargetId
             | Self::TargetRequestedLocale
-            | Self::TargetDefaultRequestedLocale => Phase::LocaleResolution,
+            | Self::TargetDefaultRequestedLocale
+            | Self::ProjectLocalesDependency => Phase::LocaleResolution,
             Self::NegotiationAliases
             | Self::NegotiationKey
             | Self::NegotiationDestination
@@ -395,22 +448,29 @@ impl SubjectKind {
             | Self::CoverageCells
             | Self::CoverageComparisons
             | Self::CoverageCell
-            | Self::CoverageTable => Phase::LocalePolicyResolution,
+            | Self::CoverageTable
+            | Self::LocaleNegotiationDependency
+            | Self::MessageFallbackDependency
+            | Self::CoverageDependency => Phase::LocalePolicyResolution,
             Self::CollectionMember
             | Self::CollectionGroup
             | Self::ResolvedPolicyReference
-            | Self::ResolvedTargetProfileReference => Phase::ArtifactReferenceResolution,
-            Self::DeliveryPlacement => Phase::DeliveryResolution,
-            Self::Target => Phase::TargetResolution,
+            | Self::ResolvedTargetProfileReference
+            | Self::RequiredPoliciesDependency
+            | Self::OptionalPoliciesDependency => Phase::ArtifactReferenceResolution,
+            Self::DeliveryPlacement | Self::DeliveryDependency => Phase::DeliveryResolution,
+            Self::Target | Self::TargetsDependency => Phase::TargetResolution,
             Self::Groups
             | Self::Memberships
             | Self::Group
             | Self::GroupMembers
             | Self::GroupMember
             | Self::Assignment => Phase::GroupResolution,
-            Self::Relations | Self::RelationEndpoint | Self::Relation | Self::Roles => {
-                Phase::HydrationValidation
-            }
+            Self::Relations
+            | Self::RelationEndpoint
+            | Self::Relation
+            | Self::Roles
+            | Self::DeploymentGroupsDependency => Phase::HydrationValidation,
         }
     }
 
@@ -523,6 +583,18 @@ impl SubjectKind {
                 Check::StaticCompatibility,
             ],
             Self::Roles => &[Check::SingleRole],
+            Self::ProfileSpecificationDependency
+            | Self::LocaleCanonicalizationDependency
+            | Self::ProjectIdentityDependency
+            | Self::ProjectLocalesDependency
+            | Self::LocaleNegotiationDependency
+            | Self::MessageFallbackDependency
+            | Self::CoverageDependency
+            | Self::RequiredPoliciesDependency
+            | Self::OptionalPoliciesDependency
+            | Self::DeliveryDependency
+            | Self::TargetsDependency
+            | Self::DeploymentGroupsDependency => &[Check::EstablishedGroup],
         }
     }
 
@@ -665,6 +737,22 @@ impl Subject {
                 HydrationSubject::Relation(..) => SubjectKind::Relation,
                 HydrationSubject::Roles(..) => SubjectKind::Roles,
             },
+            Self::SemanticDependency(group) => match group {
+                SemanticGroup::ProfileSpecification => SubjectKind::ProfileSpecificationDependency,
+                SemanticGroup::ProjectIdentity => SubjectKind::ProjectIdentityDependency,
+                SemanticGroup::LocaleCanonicalization => {
+                    SubjectKind::LocaleCanonicalizationDependency
+                }
+                SemanticGroup::ProjectLocales => SubjectKind::ProjectLocalesDependency,
+                SemanticGroup::LocaleNegotiation => SubjectKind::LocaleNegotiationDependency,
+                SemanticGroup::MessageFallback => SubjectKind::MessageFallbackDependency,
+                SemanticGroup::Coverage => SubjectKind::CoverageDependency,
+                SemanticGroup::RequiredPolicies => SubjectKind::RequiredPoliciesDependency,
+                SemanticGroup::OptionalPolicies => SubjectKind::OptionalPoliciesDependency,
+                SemanticGroup::Targets => SubjectKind::TargetsDependency,
+                SemanticGroup::DeploymentGroups => SubjectKind::DeploymentGroupsDependency,
+                SemanticGroup::Delivery => SubjectKind::DeliveryDependency,
+            },
         }
     }
 }
@@ -692,7 +780,8 @@ impl Ord for Subject {
                 (Self::Hydration(own), Self::Hydration(theirs)) => own.cmp(theirs),
                 (Self::Vocabulary, Self::Vocabulary)
                 | (Self::CanonicalizationData, Self::CanonicalizationData)
-                | (Self::DeliveryPlacement, Self::DeliveryPlacement) => Ordering::Equal,
+                | (Self::DeliveryPlacement, Self::DeliveryPlacement)
+                | (Self::SemanticDependency(_), Self::SemanticDependency(_)) => Ordering::Equal,
                 _ => unreachable!("subjects of one kind share one variant"),
             })
     }
@@ -743,8 +832,10 @@ mod tests {
         let coverage = |subject| Subject::Coverage(subject);
         let groups = |subject| Subject::Group(subject);
         let hydration = |subject| Subject::Hydration(subject);
+        let owner = |group| Subject::SemanticDependency(group);
         vec![
             Subject::Slot(Slot::ProjectProfile),
+            owner(SemanticGroup::ProfileSpecification),
             capability(ArtifactSubject::Artifacts),
             capability(ArtifactSubject::PolicyArtifacts),
             capability(ArtifactSubject::TargetProfileArtifacts),
@@ -782,7 +873,9 @@ mod tests {
             Subject::Slot(Slot::DeliveryPlacement),
             Subject::Vocabulary,
             Subject::CanonicalizationData,
+            owner(SemanticGroup::LocaleCanonicalization),
             Subject::DeclarationField(DeclarationField::ProjectId),
+            owner(SemanticGroup::ProjectIdentity),
             locale(LocaleSubject::Occurrences),
             locale(LocaleSubject::RequestedLocale(key("en"))),
             locale(LocaleSubject::RequestedLocales),
@@ -803,6 +896,7 @@ mod tests {
             locale(LocaleSubject::TargetDefaultRequestedLocale(target(
                 "browser",
             ))),
+            owner(SemanticGroup::ProjectLocales),
             Subject::Negotiation(NegotiationSubject::Aliases),
             Subject::Negotiation(NegotiationSubject::Key(key("fr"))),
             Subject::Negotiation(NegotiationSubject::Destination(key("fr"), key("fr-FR"))),
@@ -825,6 +919,9 @@ mod tests {
             coverage(CoverageSubject::Comparisons),
             coverage(CoverageSubject::Cell(canonical("ja"), surface)),
             coverage(CoverageSubject::Table),
+            owner(SemanticGroup::LocaleNegotiation),
+            owner(SemanticGroup::MessageFallback),
+            owner(SemanticGroup::Coverage),
             Subject::ArtifactCollection(CollectionSubject::Member(member)),
             Subject::ArtifactCollection(CollectionSubject::Group(ConflictKey {
                 kind: ArtifactKind::TrustPolicy,
@@ -834,8 +931,12 @@ mod tests {
             })),
             Subject::ArtifactReference(ReferenceField::Policy(PolicySlot::Trust)),
             Subject::ArtifactReference(ReferenceField::TargetProfile(target("browser"))),
+            owner(SemanticGroup::RequiredPolicies),
+            owner(SemanticGroup::OptionalPolicies),
             Subject::DeliveryPlacement,
+            owner(SemanticGroup::Delivery),
             Subject::Target(TargetSubject::Target(target("browser"))),
+            owner(SemanticGroup::Targets),
             groups(GroupSubject::Groups),
             groups(GroupSubject::Memberships),
             groups(GroupSubject::Group(group.clone())),
@@ -855,6 +956,7 @@ mod tests {
                 target("browser"),
             )),
             hydration(HydrationSubject::Roles(group, target("browser"))),
+            owner(SemanticGroup::DeploymentGroups),
         ]
     }
 
@@ -896,6 +998,7 @@ mod tests {
             phases,
             [
                 Phase::ResolverBootstrapAdmission,
+                Phase::StructuralAdmission,
                 Phase::ResourcePolicyAdmission,
                 Phase::SpecificationAdmission,
                 Phase::ProjectIdentityResolution,

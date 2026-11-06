@@ -17,6 +17,7 @@ use crate::input_limits::Bound;
 
 use super::artifact_resolution::CollectionSubject;
 use super::coverage::CoverageSubject;
+use super::dependency::SemanticGroup;
 use super::fallback::FallbackSubject;
 use super::groups::GroupSubject;
 use super::hydration::HydrationSubject;
@@ -135,6 +136,9 @@ pub(crate) enum Subject {
     /// The declaration's hydration relations, one relation, or a Target ID's
     /// roles within one group.
     Hydration(HydrationSubject),
+    /// One semantic group of the profile view, whose unit owns the group's
+    /// semantic dependency record: each group is a singleton kind.
+    SemanticDependency(SemanticGroup),
 }
 
 /// The check a unit runs, declared in rank order within a subject kind.
@@ -228,6 +232,9 @@ pub(crate) enum Check {
     StaticCompatibility,
     /// The Target ID takes one role within its group's relations.
     SingleRole,
+    /// Every check that establishes the semantic group held, so the unit owns
+    /// the group's semantic dependency record. It finds nothing of its own.
+    EstablishedGroup,
 }
 
 /// One atomic evaluation unit. Units order as 015 evaluates and commits them:

@@ -32,7 +32,7 @@ use super::evaluation::{
     Subject, Unit,
 };
 use super::locales::TargetLocales;
-use super::resource_policy::{DeclarationReferences, ReferenceField};
+use super::resource_policy::{DeclarationReferences, PolicySlot, ReferenceField};
 
 /// The unit Phase 9 records for the reference at `field`.
 pub(crate) const fn unit(field: ReferenceField) -> Unit {
@@ -131,6 +131,20 @@ impl<'s> ReferenceResults<'s> {
             }
         }
         holds.map(|()| ResolvedReferences(resolved))
+    }
+
+    /// Whether the present reference at each of the policy `slots` resolved:
+    /// what a semantic group of policies needs of this phase. An explicit
+    /// `null` holds, and so does a field structural admission did not admit,
+    /// whose causes the caller has.
+    pub(crate) fn policies(&self, slots: &[PolicySlot]) -> Admitted<()> {
+        let mut holds = Ok(());
+        for slot in slots {
+            if let Some(found) = self.found.get(&ReferenceField::Policy(*slot)) {
+                holds = and(holds, found.as_ref().map(|_| ()).map_err(Causes::clone));
+            }
+        }
+        holds
     }
 }
 

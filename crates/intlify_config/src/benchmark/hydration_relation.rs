@@ -340,7 +340,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Subject::ArtifactReference(_)
         | Subject::DeliveryPlacement
         | Subject::Target(_)
-        | Subject::Group(_) => return defect(),
+        | Subject::Group(_)
+        | Subject::SemanticDependency(_) => return defect(),
     }
     frame.uint(match unit.check {
         Check::WithinBound => 0,
@@ -381,7 +382,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::DirectedLocales
         | Check::KnownMember
         | Check::UniqueMember
-        | Check::SingleGroup => return defect(),
+        | Check::SingleGroup
+        | Check::EstablishedGroup => return defect(),
     });
     Ok(())
 }
@@ -432,7 +434,8 @@ fn causes(frame: &mut Frame, causes: &Causes) -> Result<(), OutputFailure> {
             | Subject::DeclarationField(_)
             | Subject::Fallback(_)
             | Subject::Coverage(_)
-            | Subject::DeliveryPlacement => return defect(),
+            | Subject::DeliveryPlacement
+            | Subject::SemanticDependency(_) => return defect(),
         };
         framed.map_err(|_| OutputFailure::HydrationRelationValidationInvariant)?;
     }

@@ -278,7 +278,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::SameRequestedLocales
         | Check::SameEffectiveDefault
         | Check::StaticCompatibility
-        | Check::SingleRole => return Err(OutputFailure::ResourcePolicyInvariant),
+        | Check::SingleRole
+        | Check::EstablishedGroup => return Err(OutputFailure::ResourcePolicyInvariant),
     });
     Ok(())
 }
