@@ -23,7 +23,15 @@
 //! checks its own graph, and reads the Finding Registry against the Check
 //! Registry, so that a code's checks are exactly the rows that list it. The
 //! rows' occurrence Evidence and its references to the Safe Origin Kind
-//! Registry, and the container's own artifact, come with their own stages.
+//! Registry come with the Evidence stages.
+//!
+//! The container is written here too ([`container`]): under each role, in
+//! role order, the tuple of the member this crate writes for it (D15:2260).
+//! The resolver's dispatch tables write every member, so the committed
+//! bytes and the file digests compiled in keep the tables and the package
+//! the same (D15:2273). Construction's last row, which comes with the
+//! construction flow, is to compare the package it admitted with those
+//! digests.
 
 pub(crate) mod check;
 pub(crate) mod finding;
@@ -31,11 +39,11 @@ pub(crate) mod safe_origin;
 
 use std::collections::BTreeMap;
 
-use serde_json::Value;
+use serde_json::{json, Map, Value};
 
 use intlify_shared_json::decode;
 
-use super::admission::{Admitted, RegistryMembers};
+use super::admission::{Admitted, ConstructionAdmission, RegistryMembers};
 use super::component::{self, Artifact, Declared, Refusal, Rows, Submitted};
 use super::failure::{Check, Component};
 use super::root::ConstructionRoot;
@@ -50,6 +58,13 @@ pub(crate) const IDENTITY: &str = "intlify-project-profile-resolver-registry-pac
 
 /// The package's revision.
 pub(crate) const REVISION: &str = "0";
+
+/// The container's path below the conformance suite's root.
+pub(crate) const PATH: &str = "registries/package-v0.json";
+
+/// The container's file digest, which the resolver is compiled from.
+pub(crate) const DIGEST: &str =
+    "sha256:3ddc84fa7aa9392cf4d87b0be10087687ffb263559ea25ff50405d968d4bc645";
 
 /// A rank's spelling in a registry: a shortest decimal string.
 pub(crate) const RANK_PATTERN: &str = "^(0|[1-9][0-9]*)$";
@@ -155,7 +170,7 @@ pub(crate) fn admit(
         ROWS,
         admission,
         submitted.map(|package| &package.component),
-        container,
+        read_container,
     )?;
     let supplied = submitted.map(|package| &package.members);
     let mut schemas = BTreeMap::new();
@@ -235,9 +250,30 @@ fn admit_member<'a>(
     .ok_or(MEMBER_SCHEMA_ROW)
 }
 
+/// The package's container, given each member's bytes in role order: under
+/// each role, in role order, the identity and revision the Root Package
+/// admits for the role and the file digest of its member's bytes
+/// (D15:2260).
+pub(crate) fn container(members: [&[u8]; 6]) -> Value {
+    let admission = ConstructionAdmission::revision_zero();
+    let mut listed = Map::new();
+    for (role, bytes) in RegistryRole::ALL.into_iter().zip(members) {
+        let admitted = role.admitted(&admission.registry_members);
+        listed.insert(
+            role.name().to_owned(),
+            json!({
+                "identity": admitted.identity,
+                "revision": admitted.revisions.first(),
+                "digest": component::file_digest(bytes).as_str()
+            }),
+        );
+    }
+    json!({ "members": listed })
+}
+
 /// Read a container its envelope schema admitted: the six roles in role
 /// order, each with its member's declared tuple.
-fn container(value: &Value) -> Option<[Declared; 6]> {
+fn read_container(value: &Value) -> Option<[Declared; 6]> {
     let members = value.get("members")?.as_object()?;
     if !members
         .keys()
@@ -273,6 +309,7 @@ mod tests {
     const FINDING_SCHEMA: &[u8] =
         include_bytes!("../../conformance/registries/finding-v0.schema.json");
     const FINDINGS: &[u8] = include_bytes!("../../conformance/registries/finding-v0.json");
+    const PACKAGE: &[u8] = include_bytes!("../../conformance/registries/package-v0.json");
     const NO_ROWS: &[u8] = br#"{"rows": []}"#;
     const OPEN_SCHEMA: &[u8] = br#"{"$schema": "http://json-schema.org/draft-07/schema#"}"#;
 
@@ -409,6 +446,43 @@ mod tests {
             SafeOriginKindRegistry::revision_zero()
         );
         assert_eq!(admitted.checks, CheckRegistry::revision_zero());
+        assert_eq!(admitted.findings, FindingRegistry::revision_zero());
+    }
+
+    /// The committed container lists each member's tuple, as construction
+    /// admits it, in role order (D15:2260).
+    #[test]
+    fn the_container_lists_each_members_tuple_in_role_order() {
+        let members = members();
+        let bytes: Vec<&[u8]> = members.iter().map(|(_, bytes)| bytes.as_slice()).collect();
+        let written = container(bytes.try_into().unwrap());
+        let committed = serde_json::from_slice::<Value>(PACKAGE).unwrap();
+        assert_eq!(written, container_of(&members));
+        assert_eq!(committed, written);
+        // A map's equality ignores its order, so the roles' is checked apart.
+        let roles = |container: &Value| -> Vec<String> {
+            container["members"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect()
+        };
+        assert_eq!(roles(&written), RegistryRole::ALL.map(RegistryRole::name));
+        assert_eq!(roles(&committed), RegistryRole::ALL.map(RegistryRole::name));
+    }
+
+    #[test]
+    fn construction_admits_the_committed_package() {
+        let package = SubmittedPackage {
+            component: submitted(IDENTITY, REVISION, PACKAGE),
+            members: members()
+                .into_iter()
+                .map(|(role, bytes)| (role, Artifact::read(bytes)))
+                .collect(),
+        };
+        let admitted = admit(root(), Some(&package)).unwrap();
+        assert_eq!(admitted.declared.digest, DIGEST);
         assert_eq!(admitted.findings, FindingRegistry::revision_zero());
     }
 

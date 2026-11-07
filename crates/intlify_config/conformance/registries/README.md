@@ -2,9 +2,9 @@
 
 # Registry Package
 
-Design 015's [Normative Resolver Registry Package](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#normative-resolver-registry-package) is the fifth authority resolver construction is given. It has six members in fixed roles: three closed schemas, and the Safe Origin Kind, Check, and Finding Registries they admit. This directory holds the revision `"0"` members at the paths 015's Suite Index example uses below the conformance suite's root, `conformance/`. So far it holds the three registries and their schemas, the Finding Registry's rows as far as each code's checks, severity, blocking state, subject kinds, reasons, and suggestion kind go. The rows' occurrence Evidence fields and the package's container come with their own stages.
+Design 015's [Normative Resolver Registry Package](../../../../design/015-intlify-project-profile-and-locale-policy-design.md#normative-resolver-registry-package) is the fifth authority resolver construction is given. It has six members in fixed roles: three closed schemas, and the Safe Origin Kind, Check, and Finding Registries they admit. This directory holds the revision `"0"` members at the paths 015's Suite Index example uses below the conformance suite's root, `conformance/`. It holds the package's container, the three registries, and their schemas, the Finding Registry's rows as far as each code's checks, severity, blocking state, subject kinds, reasons, and suggestion kind go. The rows' occurrence Evidence fields come with their own stages.
 
-This crate writes every member from its own values, and compiles in only their file digests, which construction compares with the members it is given, as the last row of the construction-failure precedence.
+This crate writes every member and the container from its own values, and compiles in only their file digests, which construction is to compare with the package it is given, as the last row of the construction-failure precedence.
 
 A file digest covers every byte, so these files are kept out of the repository formatter and out of line-ending conversion. Change them only by changing the values and rewriting them.
 
@@ -14,8 +14,9 @@ A file digest covers every byte, so these files are kept out of the repository f
 # every unit test, including the committed bytes and the pinned digests
 cargo test -p intlify_config --all-features --lib construction
 
-# rewrite the members after changing a value; it prints the digests to pin
-# in src/construction/registry/safe_origin.rs, check.rs, and finding.rs
+# rewrite the members and the container after changing a value; it prints
+# the digests to pin in src/construction/registry.rs and in
+# src/construction/registry/safe_origin.rs, check.rs, and finding.rs
 cargo run -p intlify_config --features vectors --example generate_construction_artifacts -- --write
 
 # the committed bytes, and the independent Node checks
@@ -26,6 +27,7 @@ vp run construction:check
 
 | File | Role and identity | Contents |
 | --- | --- | --- |
+| `package-v0.json` | The package, `intlify-project-profile-resolver-registry-package` | The container: under each of the six roles, in role order, the identity, revision, and file digest of the role's member below |
 | `safe-origin-kind-v0.schema.json` | `safe-origin-kind-registry-schema`, `intlify-project-profile-safe-origin-kind-registry-schema` | The Draft 7 schema of the registry's container and rows, generated from the registry's types |
 | `safe-origin-kind-v0.json` | `safe-origin-kind-registry`, `intlify-project-profile-safe-origin-kind-registry` | 015's ten Safe Origin Kinds in rank order, each with its ID, its rank, and the evidence kinds it permits |
 | `check-v0.schema.json` | `check-registry-schema`, `intlify-project-profile-check-registry-schema` | The Draft 7 schema of the registry's container and rows, generated from the registry's types |
@@ -33,7 +35,7 @@ vp run construction:check
 | `finding-v0.schema.json` | `finding-registry-schema`, `intlify-project-profile-finding-registry-schema` | The Draft 7 schema of the registry's container and rows, generated from the registry's types |
 | `finding-v0.json` | `finding-registry`, `intlify-project-profile-finding-registry` | One row for each of 015's 48 codes, in the order of its tables |
 
-Every member is at revision `"0"`.
+The package and every member are at revision `"0"`.
 
 ## The Safe Origin Kind Registry
 
@@ -64,6 +66,13 @@ The Node checker does not rebuild the rows. It checks that they agree with each 
 - **Closed graph.** Construction reads the registry it admitted with the row of the registry cross-references, after the Check Registry, and refuses one it cannot read as its type or whose rows do not relate to the Check Registry's as 015 requires: every code has exactly one row; a code's checks are exactly the Check Registry rows that list it, so that check-to-Finding and Finding-to-check relate symmetrically; and its subject kinds and reasons are exactly those of its checks. The order of a row's checks, kinds, and reasons is the registry's convention, not part of the graph.
 
 The Node checker builds the rows' severity, blocking state, suggestion kind, and reasons from its own copy of 015's code tables, and their checks and subject kinds from the Check Registry: one row for each code in table order, a code's checks the rows that list it in row order, its kinds theirs in the order they first appear, and its reasons 015's in their order. It checks that the schema closes the container, every row, and the five vocabularies, and compares both members' file digests with the ones pinned in `src/construction/registry/finding.rs`.
+
+## The container
+
+- **Values.** The container is `{ members: { <role>: { identity, revision, digest } } }`, with the six roles in role order. Under each role it lists the member this crate writes for it: the identity and revision the built-in Root Package admits for the role, `intlify-project-profile-<role>` and `"0"`, and the file digest of the member's bytes. This is the tuple 015 gives each role, which the Resolver Construction Input Set and the Suite Index repeat.
+- **Pin.** The container's file digest is compiled in, in `src/construction/registry.rs`, as each member's is in its own module. The resolver's dispatch tables, such as a kind's checks, a check's codes, and a code's reasons, are what write the members, so the committed bytes and the pinned digests keep the tables and the package the same. The Suite Index, which pins these digests in 015, comes with a later phase; until then the compiled-in digests stand for it. Construction's last row, which comes with the construction flow, is to compare the package it admitted with them.
+
+The Node checker builds the container from its own copy of the six roles and the members' committed bytes, and compares it, key order included, with the committed container, and its file digest with the one pinned in `src/construction/registry.rs`.
 
 ## Construction's checks
 
@@ -108,4 +117,5 @@ The unit tests are at the end of each source file, named here by their function.
 | Every blocking code is an error and the non-canonical spelling a warning that suggests its canonical replacement, and every result blocks exactly when its code does | `finding.rs`: `every_blocking_code_is_an_error_and_only_the_non_canonical_spelling_suggests`. `src/resolver/evaluation.rs`: `a_test_evaluation_records_a_blocking_code_only_as_a_blocking_result`, `a_test_evaluation_records_a_non_blocking_code_only_as_a_notice`, and every evaluation a test runs. Node: the Finding Registry |
 | Construction reads the Finding Registry against the Check Registry: every code has exactly one row, a code's checks are exactly the rows that list it, and its kinds and reasons are theirs | `finding.rs`: `construction_reads_the_registry_against_the_check_registry`, `every_code_has_exactly_one_row`, `a_codes_checks_and_the_checks_codes_are_symmetric`, `a_codes_subject_kinds_and_reasons_are_its_checks`. `registry.rs`: `construction_admits_a_package_with_the_committed_registries`, `the_finding_registry_must_relate_to_the_check_registry`. Node: the Finding Registry |
 | The Finding Registry's schema closes the container, every row, and the vocabularies | `finding.rs`: `the_schema_closes_the_container_every_row_and_the_vocabularies`. Node: the Finding Registry's schema |
+| The container lists each role's member tuple in role order, and construction admits the committed package with the committed members | `registry.rs`: `the_container_lists_each_members_tuple_in_role_order`, `construction_admits_the_committed_package`. Node: the container |
 | The committed bytes are the ones this crate writes, and the pinned digests are theirs | `src/construction/generate.rs`: `the_committed_registries_are_the_ones_this_crate_writes`, `the_pinned_registry_digests_are_the_ones_the_registries_make`, `every_artifact_ends_with_one_newline_and_has_no_carriage_return`. Node: every digest |
