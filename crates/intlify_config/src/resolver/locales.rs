@@ -589,7 +589,7 @@ pub(crate) mod fixtures {
     /// with `code` stands in for theirs.
     pub(crate) fn earlier(code: Code) -> Causes {
         let subject = Subject::Slot(Slot::ProjectProfile);
-        Evaluation::default()
+        Evaluation::fabricated()
             .check(
                 Unit {
                     phase: subject.kind().phase(),

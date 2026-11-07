@@ -62,6 +62,58 @@ const STRATEGIES = [
 ]
 const PROJECTIONS = ['none', 'non-secret-content', 'redacted-structure']
 
+/** Design 015's forty-eight Finding codes, in the order of its tables. */
+const CODES = [
+  'project-profile-json-invalid',
+  'project-profile-json-member-duplicate',
+  'project-profile-input-not-json-compatible',
+  'project-profile-schema-version-unsupported',
+  'project-profile-required-field-missing',
+  'project-profile-field-type-invalid',
+  'project-profile-field-value-invalid',
+  'project-profile-unknown-field',
+  'project-profile-selector-required',
+  'project-profile-selector-invalid',
+  'project-profile-selector-unknown',
+  'project-profile-specification-input-incomplete',
+  'project-profile-specification-not-admitted',
+  'project-profile-locale-specification-not-admitted',
+  'project-profile-locale-data-not-admitted',
+  'project-profile-negotiation-specification-not-admitted',
+  'project-profile-message-fallback-specification-not-admitted',
+  'project-profile-coverage-specification-not-admitted',
+  'project-profile-delivery-specification-not-admitted',
+  'project-profile-intent-surface-class-vocabulary-not-admitted',
+  'project-profile-locale-invalid',
+  'project-profile-locale-non-canonical',
+  'project-profile-locale-duplicate',
+  'project-profile-default-requested-locale-not-in-project',
+  'project-profile-target-locales-not-subset',
+  'project-profile-target-default-locale-not-supported',
+  'project-profile-target-locale-direction-missing',
+  'project-profile-negotiation-alias-duplicate',
+  'project-profile-negotiation-alias-destination-not-requested',
+  'project-profile-message-fallback-source-not-requested',
+  'project-profile-message-fallback-sequence-invalid',
+  'project-profile-coverage-rule-invalid',
+  'project-profile-coverage-rule-duplicate',
+  'project-profile-coverage-rule-conflict',
+  'project-profile-artifact-reference-not-admitted',
+  'project-profile-artifact-collection-not-admitted',
+  'project-profile-group-member-unknown',
+  'project-profile-group-member-duplicate',
+  'project-profile-target-unassigned',
+  'project-profile-target-assigned-to-multiple-groups',
+  'project-profile-hydration-relation-invalid',
+  'project-profile-hydration-locale-policy-incompatible',
+  'project-profile-hydration-capability-incompatible',
+  'project-profile-resource-policy-not-admitted',
+  'project-profile-resource-policy-capability-incompatible',
+  'project-profile-bootstrap-limit-exceeded',
+  'project-profile-resource-limit-exceeded',
+  'project-profile-reporting-limit-exceeded'
+]
+
 /**
  * Design 015's five example check IDs, each with the phase and subject kind of
  * the check it names.
@@ -424,6 +476,26 @@ for (const [index, row] of checkRows.entries()) {
   }
   requirements.set(row.checkId, new Set([...reached, ...listed]))
 }
+// A row's Finding codes are 015's, each once and in the order of its tables,
+// and every code is some row's.
+const reportedCodes = new Set()
+for (const row of checkRows) {
+  const places = (row.possibleFindingCodes ?? []).map(code => CODES.indexOf(code))
+  if (places.some(place => place < 0)) {
+    fail(`check registry: ${row.checkId}: a code is not one of 015's`)
+  }
+  if (places.some((place, at) => at > 0 && place <= places[at - 1])) {
+    fail(`check registry: ${row.checkId}: the codes are not in 015's order, each once`)
+  }
+  for (const code of row.possibleFindingCodes ?? []) {
+    reportedCodes.add(code)
+  }
+}
+for (const code of CODES) {
+  if (!reportedCodes.has(code)) {
+    fail(`check registry: no row reports ${code}`)
+  }
+}
 // Every phase but profile projection has rows.
 const expectedPhases = PHASES.filter(phase => phase !== 'profile-projection')
 if (!isDeepStrictEqual([...phasesWithRows], expectedPhases)) {
@@ -468,7 +540,8 @@ const required = [
   'owningScope',
   'subjectKindRank',
   'checkRank',
-  'prerequisiteCheckIds'
+  'prerequisiteCheckIds',
+  'possibleFindingCodes'
 ]
 const members = [...required.slice(0, 7), 'parentSubject', ...required.slice(7)]
 if (
@@ -517,6 +590,14 @@ const kindIds = vocabulary(property('subjectKind')) ?? []
 if (!isDeepStrictEqual(new Set(kindIds), new Set(kinds.keys())) || kindIds.length !== kinds.size) {
   fail('check registry schema: the kinds are not the ones the rows name, each once')
 }
+const findingCodes = property('possibleFindingCodes')
+if (
+  findingCodes?.type !== 'array' ||
+  findingCodes.uniqueItems !== true ||
+  !isDeepStrictEqual(vocabulary(findingCodes.items), CODES)
+) {
+  fail("check registry schema: the codes are not 015's forty-eight, each once")
+}
 const parentSchema = follow(checkSchema, property('parentSubject')?.allOf?.[0])
 if (!closes(parentSchema, ['phaseId', 'subjectKind'])) {
   fail('check registry schema: a parent is not closed')
@@ -535,5 +616,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `registries agree: ${expected.rows.length} safe origin kinds, ${EVIDENCE_KINDS.length} evidence kinds, ${checkRows.length} checks of ${kinds.size} subject kinds with ${prerequisiteCount} prerequisites`
+  `registries agree: ${expected.rows.length} safe origin kinds, ${EVIDENCE_KINDS.length} evidence kinds, ${checkRows.length} checks of ${kinds.size} subject kinds with ${prerequisiteCount} prerequisites, reporting ${reportedCodes.size} codes`
 )

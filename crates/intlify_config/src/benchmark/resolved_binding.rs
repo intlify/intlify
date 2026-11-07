@@ -425,7 +425,7 @@ mod tests {
     /// An evaluation whose one unit, `recorded`, `blocking` blocks, and the
     /// causes that leaves.
     fn blocked_unit(recorded: Unit, blocking: Blocking) -> (Evaluation, Causes) {
-        let mut evaluation = Evaluation::default();
+        let mut evaluation = Evaluation::fabricated();
         let Err(causes) = evaluation
             .check(recorded, Ok(()), |()| Err::<(), _>(blocking))
             .unwrap()
