@@ -500,6 +500,117 @@ impl Code {
             Self::ReportingLimitExceeded => "project-profile-reporting-limit-exceeded",
         }
     }
+
+    /// The stable reasons 015's tables give the code, in the order they list
+    /// them; none for a code without stable reasons.
+    pub(crate) const fn reasons(self) -> &'static [Reason] {
+        use Reason as R;
+        match self {
+            Self::InputNotJsonCompatible => &[
+                R::UnsupportedType,
+                R::NonFiniteNumber,
+                R::NonPortableNumber,
+                R::InvalidUnicode,
+                R::NonStringKey,
+                R::DynamicContainer,
+                R::DynamicProperty,
+                R::SparseArray,
+                R::Cycle,
+            ],
+            Self::SpecificationInputIncomplete => &[R::MissingRequiredSlot],
+            Self::SpecificationNotAdmitted
+            | Self::LocaleSpecificationNotAdmitted
+            | Self::NegotiationSpecificationNotAdmitted
+            | Self::MessageFallbackSpecificationNotAdmitted
+            | Self::CoverageSpecificationNotAdmitted
+            | Self::DeliverySpecificationNotAdmitted => &[R::Unsupported, R::Incompatible],
+            Self::IntentSurfaceClassVocabularyNotAdmitted => &[
+                R::BodyIntegrityInvalid,
+                R::MemberInvalid,
+                R::MemberDuplicate,
+                R::NonCanonicalOrder,
+                R::IdentityMismatch,
+                R::RevisionMismatch,
+                R::DigestMismatch,
+            ],
+            Self::TargetDefaultLocaleNotSupported => {
+                &[R::ExplicitOverride, R::InheritedProjectDefault]
+            }
+            Self::NegotiationAliasDuplicate => &[R::SameDestination, R::ConflictingDestination],
+            Self::MessageFallbackSequenceInvalid => &[
+                R::LiteralSelfReference,
+                R::LiteralDuplicate,
+                R::IntentSourceDuplicate,
+            ],
+            Self::CoverageRuleInvalid => &[
+                R::LocaleNotRequested,
+                R::SurfaceClassUnknown,
+                R::SurfaceClassDuplicate,
+            ],
+            Self::ArtifactReferenceNotAdmitted => &[
+                R::NotFound,
+                R::KindMismatch,
+                R::IdentityMismatch,
+                R::RevisionMismatch,
+                R::SpecificationRevisionMismatch,
+                R::SpecificationRevisionUnsupported,
+                R::RoleKindMismatch,
+                R::DigestMismatch,
+            ],
+            Self::ArtifactCollectionNotAdmitted => &[
+                R::EnvelopeInvalid,
+                R::KindUnsupported,
+                R::DuplicateEnvelope,
+                R::ConflictingContent,
+            ],
+            Self::HydrationRelationInvalid => &[
+                R::EqualEndpoint,
+                R::UnknownEndpoint,
+                R::CrossGroup,
+                R::DuplicateRelation,
+                R::ServerCapabilityMissing,
+                R::ClientCapabilityMissing,
+                R::DualRole,
+            ],
+            Self::HydrationLocalePolicyIncompatible => &[R::RequestedLocales, R::EffectiveDefault],
+            Self::ResourcePolicyNotAdmitted => &[
+                R::BodyIntegrityInvalid,
+                R::BodySchemaInvalid,
+                R::ProjectProfileResolutionMissing,
+                R::ProjectProfileResolutionInvalid,
+            ],
+            Self::ReportingLimitExceeded => &[R::Entry, R::Shared],
+            Self::JsonInvalid
+            | Self::JsonMemberDuplicate
+            | Self::SchemaVersionUnsupported
+            | Self::RequiredFieldMissing
+            | Self::FieldTypeInvalid
+            | Self::FieldValueInvalid
+            | Self::UnknownField
+            | Self::SelectorRequired
+            | Self::SelectorInvalid
+            | Self::SelectorUnknown
+            | Self::LocaleDataNotAdmitted
+            | Self::LocaleInvalid
+            | Self::LocaleNonCanonical
+            | Self::LocaleDuplicate
+            | Self::DefaultRequestedLocaleNotInProject
+            | Self::TargetLocalesNotSubset
+            | Self::TargetLocaleDirectionMissing
+            | Self::NegotiationAliasDestinationNotRequested
+            | Self::MessageFallbackSourceNotRequested
+            | Self::CoverageRuleDuplicate
+            | Self::CoverageRuleConflict
+            | Self::GroupMemberUnknown
+            | Self::GroupMemberDuplicate
+            | Self::TargetUnassigned
+            | Self::TargetAssignedToMultipleGroups
+            | Self::HydrationCapabilityIncompatible
+            | Self::ResourcePolicyCapabilityIncompatible
+            | Self::BootstrapLimitExceeded
+            | Self::ResourceLimitExceeded => &[],
+        }
+    }
 }
 
 /// A code reads and writes as 015 spells it.
@@ -531,11 +642,19 @@ impl JsonSchema for Code {
     }
 }
 
-/// The stable `details.reason` values of those codes.
+/// The stable `details.reason` values of those codes, in the order of
+/// 015's tables, each where it first appears.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Reason {
-    InvalidUnicode,
+    UnsupportedType,
+    NonFiniteNumber,
     NonPortableNumber,
+    InvalidUnicode,
+    NonStringKey,
+    DynamicContainer,
+    DynamicProperty,
+    SparseArray,
+    Cycle,
     MissingRequiredSlot,
     Unsupported,
     Incompatible,
@@ -546,6 +665,8 @@ pub(crate) enum Reason {
     IdentityMismatch,
     RevisionMismatch,
     DigestMismatch,
+    ExplicitOverride,
+    InheritedProjectDefault,
     SameDestination,
     ConflictingDestination,
     LiteralSelfReference,
@@ -554,20 +675,15 @@ pub(crate) enum Reason {
     LocaleNotRequested,
     SurfaceClassUnknown,
     SurfaceClassDuplicate,
-    RoleKindMismatch,
-    SpecificationRevisionUnsupported,
-    SpecificationRevisionMismatch,
-    KindMismatch,
     NotFound,
-    ConflictingContent,
-    DuplicateEnvelope,
-    BodySchemaInvalid,
-    ProjectProfileResolutionMissing,
-    ProjectProfileResolutionInvalid,
+    KindMismatch,
+    SpecificationRevisionMismatch,
+    SpecificationRevisionUnsupported,
+    RoleKindMismatch,
     EnvelopeInvalid,
     KindUnsupported,
-    ExplicitOverride,
-    InheritedProjectDefault,
+    DuplicateEnvelope,
+    ConflictingContent,
     EqualEndpoint,
     UnknownEndpoint,
     CrossGroup,
@@ -577,15 +693,82 @@ pub(crate) enum Reason {
     DualRole,
     RequestedLocales,
     EffectiveDefault,
+    BodySchemaInvalid,
+    ProjectProfileResolutionMissing,
+    ProjectProfileResolutionInvalid,
     Entry,
     Shared,
 }
 
 impl Reason {
+    /// Every reason, in the order of 015's tables, each where it first
+    /// appears.
+    pub(crate) const ALL: [Self; 52] = [
+        Self::UnsupportedType,
+        Self::NonFiniteNumber,
+        Self::NonPortableNumber,
+        Self::InvalidUnicode,
+        Self::NonStringKey,
+        Self::DynamicContainer,
+        Self::DynamicProperty,
+        Self::SparseArray,
+        Self::Cycle,
+        Self::MissingRequiredSlot,
+        Self::Unsupported,
+        Self::Incompatible,
+        Self::BodyIntegrityInvalid,
+        Self::MemberInvalid,
+        Self::MemberDuplicate,
+        Self::NonCanonicalOrder,
+        Self::IdentityMismatch,
+        Self::RevisionMismatch,
+        Self::DigestMismatch,
+        Self::ExplicitOverride,
+        Self::InheritedProjectDefault,
+        Self::SameDestination,
+        Self::ConflictingDestination,
+        Self::LiteralSelfReference,
+        Self::LiteralDuplicate,
+        Self::IntentSourceDuplicate,
+        Self::LocaleNotRequested,
+        Self::SurfaceClassUnknown,
+        Self::SurfaceClassDuplicate,
+        Self::NotFound,
+        Self::KindMismatch,
+        Self::SpecificationRevisionMismatch,
+        Self::SpecificationRevisionUnsupported,
+        Self::RoleKindMismatch,
+        Self::EnvelopeInvalid,
+        Self::KindUnsupported,
+        Self::DuplicateEnvelope,
+        Self::ConflictingContent,
+        Self::EqualEndpoint,
+        Self::UnknownEndpoint,
+        Self::CrossGroup,
+        Self::DuplicateRelation,
+        Self::ServerCapabilityMissing,
+        Self::ClientCapabilityMissing,
+        Self::DualRole,
+        Self::RequestedLocales,
+        Self::EffectiveDefault,
+        Self::BodySchemaInvalid,
+        Self::ProjectProfileResolutionMissing,
+        Self::ProjectProfileResolutionInvalid,
+        Self::Entry,
+        Self::Shared,
+    ];
+
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
-            Self::InvalidUnicode => "invalid-unicode",
+            Self::UnsupportedType => "unsupported-type",
+            Self::NonFiniteNumber => "non-finite-number",
             Self::NonPortableNumber => "non-portable-number",
+            Self::InvalidUnicode => "invalid-unicode",
+            Self::NonStringKey => "non-string-key",
+            Self::DynamicContainer => "dynamic-container",
+            Self::DynamicProperty => "dynamic-property",
+            Self::SparseArray => "sparse-array",
+            Self::Cycle => "cycle",
             Self::MissingRequiredSlot => "missing-required-slot",
             Self::Unsupported => "unsupported",
             Self::Incompatible => "incompatible",
@@ -596,6 +779,8 @@ impl Reason {
             Self::IdentityMismatch => "identity-mismatch",
             Self::RevisionMismatch => "revision-mismatch",
             Self::DigestMismatch => "digest-mismatch",
+            Self::ExplicitOverride => "explicit-override",
+            Self::InheritedProjectDefault => "inherited-project-default",
             Self::SameDestination => "same-destination",
             Self::ConflictingDestination => "conflicting-destination",
             Self::LiteralSelfReference => "literal-self-reference",
@@ -604,20 +789,15 @@ impl Reason {
             Self::LocaleNotRequested => "locale-not-requested",
             Self::SurfaceClassUnknown => "surface-class-unknown",
             Self::SurfaceClassDuplicate => "surface-class-duplicate",
-            Self::RoleKindMismatch => "role-kind-mismatch",
-            Self::SpecificationRevisionUnsupported => "specification-revision-unsupported",
-            Self::SpecificationRevisionMismatch => "specification-revision-mismatch",
-            Self::KindMismatch => "kind-mismatch",
             Self::NotFound => "not-found",
-            Self::ConflictingContent => "conflicting-content",
-            Self::DuplicateEnvelope => "duplicate-envelope",
-            Self::BodySchemaInvalid => "body-schema-invalid",
-            Self::ProjectProfileResolutionMissing => "project-profile-resolution-missing",
-            Self::ProjectProfileResolutionInvalid => "project-profile-resolution-invalid",
+            Self::KindMismatch => "kind-mismatch",
+            Self::SpecificationRevisionMismatch => "specification-revision-mismatch",
+            Self::SpecificationRevisionUnsupported => "specification-revision-unsupported",
+            Self::RoleKindMismatch => "role-kind-mismatch",
             Self::EnvelopeInvalid => "envelope-invalid",
             Self::KindUnsupported => "kind-unsupported",
-            Self::ExplicitOverride => "explicit-override",
-            Self::InheritedProjectDefault => "inherited-project-default",
+            Self::DuplicateEnvelope => "duplicate-envelope",
+            Self::ConflictingContent => "conflicting-content",
             Self::EqualEndpoint => "equal-endpoint",
             Self::UnknownEndpoint => "unknown-endpoint",
             Self::CrossGroup => "cross-group",
@@ -627,9 +807,41 @@ impl Reason {
             Self::DualRole => "dual-role",
             Self::RequestedLocales => "requested-locales",
             Self::EffectiveDefault => "effective-default",
+            Self::BodySchemaInvalid => "body-schema-invalid",
+            Self::ProjectProfileResolutionMissing => "project-profile-resolution-missing",
+            Self::ProjectProfileResolutionInvalid => "project-profile-resolution-invalid",
             Self::Entry => "entry",
             Self::Shared => "shared",
         }
+    }
+}
+
+/// A reason reads and writes as 015 spells it.
+impl Serialize for Reason {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for Reason {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let spelled = Cow::<str>::deserialize(deserializer)?;
+        Self::ALL
+            .into_iter()
+            .find(|reason| reason.as_str() == spelled)
+            .ok_or_else(|| de::Error::custom(format!("no Finding reason {spelled}")))
+    }
+}
+
+/// A reason's schema is the closed list of 015's spellings, in table order.
+impl JsonSchema for Reason {
+    fn schema_name() -> Cow<'static, str> {
+        "FindingReason".into()
+    }
+
+    fn json_schema(_: &mut SchemaGenerator) -> Schema {
+        let reasons: Vec<&str> = Self::ALL.iter().map(|reason| reason.as_str()).collect();
+        schemars::json_schema!({ "type": "string", "enum": reasons })
     }
 }
 
@@ -884,7 +1096,8 @@ impl Evaluation {
 
     /// Asserts that `unit`'s Check Registry row lists `code`, and that the
     /// result carries what the row's payload strategy gives the code: a
-    /// reason exactly when its details have one, a bound's or a shortfall's
+    /// reason exactly when its details have one, and then one the row lists
+    /// for the code, a bound's or a shortfall's
     /// details exactly when they have its members, and past a bound an exact
     /// total only under a key that names one value, and otherwise the
     /// smallest witness `limit + 1`. Unless a test made the result up or made
@@ -915,6 +1128,14 @@ impl Evaluation {
             "{unit:?} reports {} with {reason:?}, against its payload strategy",
             code.as_str()
         );
+        if let Some(reason) = reason {
+            assert!(
+                testing::reasons(kind, unit.check, code).contains(&reason),
+                "{unit:?} reports {} with {}, which its Check Registry row does not list",
+                code.as_str(),
+                reason.as_str()
+            );
+        }
         let carried = match details {
             Some(Details::Limit(exceeded)) => {
                 let limit = exceeded.limit.get();
@@ -1180,57 +1401,17 @@ mod tests {
             ]
         );
         assert_eq!(
+            Reason::ALL.map(Reason::as_str),
             [
-                Reason::InvalidUnicode,
-                Reason::NonPortableNumber,
-                Reason::MissingRequiredSlot,
-                Reason::Unsupported,
-                Reason::Incompatible,
-                Reason::BodyIntegrityInvalid,
-                Reason::MemberInvalid,
-                Reason::MemberDuplicate,
-                Reason::NonCanonicalOrder,
-                Reason::IdentityMismatch,
-                Reason::RevisionMismatch,
-                Reason::DigestMismatch,
-                Reason::SameDestination,
-                Reason::ConflictingDestination,
-                Reason::LiteralSelfReference,
-                Reason::LiteralDuplicate,
-                Reason::IntentSourceDuplicate,
-                Reason::LocaleNotRequested,
-                Reason::SurfaceClassUnknown,
-                Reason::SurfaceClassDuplicate,
-                Reason::RoleKindMismatch,
-                Reason::SpecificationRevisionUnsupported,
-                Reason::SpecificationRevisionMismatch,
-                Reason::KindMismatch,
-                Reason::NotFound,
-                Reason::ConflictingContent,
-                Reason::DuplicateEnvelope,
-                Reason::BodySchemaInvalid,
-                Reason::ProjectProfileResolutionMissing,
-                Reason::ProjectProfileResolutionInvalid,
-                Reason::EnvelopeInvalid,
-                Reason::KindUnsupported,
-                Reason::ExplicitOverride,
-                Reason::InheritedProjectDefault,
-                Reason::EqualEndpoint,
-                Reason::UnknownEndpoint,
-                Reason::CrossGroup,
-                Reason::DuplicateRelation,
-                Reason::ServerCapabilityMissing,
-                Reason::ClientCapabilityMissing,
-                Reason::DualRole,
-                Reason::RequestedLocales,
-                Reason::EffectiveDefault,
-                Reason::Entry,
-                Reason::Shared,
-            ]
-            .map(Reason::as_str),
-            [
-                "invalid-unicode",
+                "unsupported-type",
+                "non-finite-number",
                 "non-portable-number",
+                "invalid-unicode",
+                "non-string-key",
+                "dynamic-container",
+                "dynamic-property",
+                "sparse-array",
+                "cycle",
                 "missing-required-slot",
                 "unsupported",
                 "incompatible",
@@ -1241,6 +1422,8 @@ mod tests {
                 "identity-mismatch",
                 "revision-mismatch",
                 "digest-mismatch",
+                "explicit-override",
+                "inherited-project-default",
                 "same-destination",
                 "conflicting-destination",
                 "literal-self-reference",
@@ -1249,20 +1432,15 @@ mod tests {
                 "locale-not-requested",
                 "surface-class-unknown",
                 "surface-class-duplicate",
-                "role-kind-mismatch",
-                "specification-revision-unsupported",
-                "specification-revision-mismatch",
-                "kind-mismatch",
                 "not-found",
-                "conflicting-content",
-                "duplicate-envelope",
-                "body-schema-invalid",
-                "project-profile-resolution-missing",
-                "project-profile-resolution-invalid",
+                "kind-mismatch",
+                "specification-revision-mismatch",
+                "specification-revision-unsupported",
+                "role-kind-mismatch",
                 "envelope-invalid",
                 "kind-unsupported",
-                "explicit-override",
-                "inherited-project-default",
+                "duplicate-envelope",
+                "conflicting-content",
                 "equal-endpoint",
                 "unknown-endpoint",
                 "cross-group",
@@ -1272,10 +1450,83 @@ mod tests {
                 "dual-role",
                 "requested-locales",
                 "effective-default",
+                "body-schema-invalid",
+                "project-profile-resolution-missing",
+                "project-profile-resolution-invalid",
                 "entry",
                 "shared",
             ]
         );
+    }
+
+    #[test]
+    fn a_reason_reads_and_writes_as_015_spells_it() {
+        for reason in Reason::ALL {
+            let value = serde_json::to_value(reason).unwrap();
+            assert_eq!(value, reason.as_str());
+            assert_eq!(serde_json::from_value::<Reason>(value).unwrap(), reason);
+        }
+        assert!(serde_json::from_value::<Reason>(serde_json::json!("missing")).is_err());
+    }
+
+    /// 015's tables list each code's stable reasons; every reason is some
+    /// code's, and the reasons are ordered where each first appears.
+    #[test]
+    fn each_codes_reasons_are_the_ones_015_lists() {
+        assert_eq!(
+            Code::InputNotJsonCompatible
+                .reasons()
+                .iter()
+                .map(|reason| reason.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "unsupported-type",
+                "non-finite-number",
+                "non-portable-number",
+                "invalid-unicode",
+                "non-string-key",
+                "dynamic-container",
+                "dynamic-property",
+                "sparse-array",
+                "cycle"
+            ]
+        );
+        assert_eq!(
+            Code::ArtifactReferenceNotAdmitted
+                .reasons()
+                .iter()
+                .map(|reason| reason.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "not-found",
+                "kind-mismatch",
+                "identity-mismatch",
+                "revision-mismatch",
+                "specification-revision-mismatch",
+                "specification-revision-unsupported",
+                "role-kind-mismatch",
+                "digest-mismatch"
+            ]
+        );
+        assert_eq!(
+            Code::ReportingLimitExceeded.reasons(),
+            [Reason::Entry, Reason::Shared]
+        );
+        assert!(Code::LocaleDataNotAdmitted.reasons().is_empty());
+        let mut first: Vec<Reason> = Vec::new();
+        for code in Code::ALL {
+            for &reason in code.reasons() {
+                if !first.contains(&reason) {
+                    first.push(reason);
+                }
+            }
+        }
+        assert_eq!(first, Reason::ALL);
+        let reasoned = Code::ALL
+            .into_iter()
+            .filter(|code| !code.reasons().is_empty())
+            .count();
+        assert_eq!(reasoned, 19);
     }
 
     #[test]
@@ -1414,6 +1665,18 @@ mod tests {
         let mut evaluation = evaluation.fabricating();
         evaluation.notice(data(), Code::LocaleNonCanonical).unwrap();
         assert_eq!(evaluation.notices().count(), 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "which its Check Registry row does not list")]
+    fn a_test_evaluation_records_only_reasons_the_units_row_lists() {
+        let mut evaluation = Evaluation::default();
+        let _ = evaluation.check(slot(Slot::Coverage), Ok(()), |()| {
+            Err::<(), _>(Blocking {
+                code: Code::CoverageSpecificationNotAdmitted,
+                ..MISSING
+            })
+        });
     }
 
     /// The data's check reports a code without details.

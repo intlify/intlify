@@ -30,12 +30,19 @@
             "members": [
               "reason",
               "slot"
+            ],
+            "reasons": [
+              "missing-required-slot"
             ]
           },
           {
             "code": "project-profile-specification-not-admitted",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "unsupported",
+              "incompatible"
             ]
           }
         ]
@@ -112,7 +119,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -149,7 +157,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -181,7 +190,8 @@
         "details": [
           {
             "code": "project-profile-json-invalid",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -213,7 +223,8 @@
         "details": [
           {
             "code": "project-profile-json-member-duplicate",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -247,6 +258,17 @@
             "code": "project-profile-input-not-json-compatible",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "unsupported-type",
+              "non-finite-number",
+              "non-portable-number",
+              "invalid-unicode",
+              "non-string-key",
+              "dynamic-container",
+              "dynamic-property",
+              "sparse-array",
+              "cycle"
             ]
           }
         ]
@@ -286,7 +308,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -325,7 +348,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -364,7 +388,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -403,7 +428,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -442,7 +468,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -530,7 +557,8 @@
             "code": "project-profile-field-type-invalid",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -563,7 +591,8 @@
             "code": "project-profile-required-field-missing",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -596,7 +625,8 @@
             "code": "project-profile-field-type-invalid",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -627,7 +657,8 @@
         "details": [
           {
             "code": "project-profile-schema-version-unsupported",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -665,7 +696,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -698,7 +730,8 @@
             "code": "project-profile-required-field-missing",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -731,7 +764,8 @@
             "code": "project-profile-field-type-invalid",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -764,7 +798,8 @@
             "code": "project-profile-field-value-invalid",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -797,7 +832,8 @@
             "code": "project-profile-unknown-field",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -830,7 +866,8 @@
             "code": "project-profile-field-value-invalid",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -867,7 +904,8 @@
             "code": "project-profile-required-field-missing",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -904,7 +942,8 @@
             "code": "project-profile-field-type-invalid",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -941,7 +980,8 @@
             "code": "project-profile-field-value-invalid",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -978,7 +1018,8 @@
             "code": "project-profile-unknown-field",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1015,7 +1056,8 @@
             "code": "project-profile-field-value-invalid",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1052,7 +1094,8 @@
             "code": "project-profile-required-field-missing",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1089,7 +1132,8 @@
             "code": "project-profile-field-type-invalid",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1126,7 +1170,8 @@
             "code": "project-profile-field-value-invalid",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1163,7 +1208,8 @@
             "code": "project-profile-unknown-field",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1200,7 +1246,8 @@
             "code": "project-profile-field-value-invalid",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1237,7 +1284,8 @@
             "code": "project-profile-required-field-missing",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1274,7 +1322,8 @@
             "code": "project-profile-field-type-invalid",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1311,7 +1360,8 @@
             "code": "project-profile-field-value-invalid",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1348,7 +1398,8 @@
             "code": "project-profile-unknown-field",
             "members": [
               "field"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1415,7 +1466,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1453,7 +1505,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1491,7 +1544,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1522,7 +1576,8 @@
         "details": [
           {
             "code": "project-profile-selector-required",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -1553,7 +1608,8 @@
         "details": [
           {
             "code": "project-profile-selector-invalid",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -1584,7 +1640,8 @@
         "details": [
           {
             "code": "project-profile-selector-unknown",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -1622,7 +1679,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1660,7 +1718,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1698,7 +1757,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1736,7 +1796,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1774,7 +1835,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1812,7 +1874,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1850,7 +1913,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1888,7 +1952,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1926,7 +1991,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -1968,18 +2034,38 @@
             "code": "project-profile-artifact-reference-not-admitted",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "not-found",
+              "kind-mismatch",
+              "identity-mismatch",
+              "revision-mismatch",
+              "specification-revision-mismatch",
+              "specification-revision-unsupported",
+              "role-kind-mismatch",
+              "digest-mismatch"
             ]
           },
           {
             "code": "project-profile-artifact-collection-not-admitted",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "duplicate-envelope",
+              "conflicting-content"
             ]
           },
           {
             "code": "project-profile-resource-policy-not-admitted",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "body-integrity-invalid",
+              "body-schema-invalid",
+              "project-profile-resolution-missing",
+              "project-profile-resolution-invalid"
             ]
           }
         ]
@@ -2018,7 +2104,8 @@
               "bound",
               "required",
               "available"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -2058,7 +2145,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -2098,7 +2186,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -2138,7 +2227,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -2178,7 +2268,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -2218,7 +2309,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -2258,7 +2350,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -2298,7 +2391,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -2338,7 +2432,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -2378,7 +2473,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -2418,7 +2514,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -2458,7 +2555,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -2498,7 +2596,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -2538,7 +2637,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -2578,7 +2678,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -2618,7 +2719,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -2658,7 +2760,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -2698,7 +2801,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -2738,7 +2842,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -2792,12 +2897,19 @@
             "members": [
               "reason",
               "slot"
+            ],
+            "reasons": [
+              "missing-required-slot"
             ]
           },
           {
             "code": "project-profile-locale-specification-not-admitted",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "unsupported",
+              "incompatible"
             ]
           }
         ]
@@ -2852,12 +2964,19 @@
             "members": [
               "reason",
               "slot"
+            ],
+            "reasons": [
+              "missing-required-slot"
             ]
           },
           {
             "code": "project-profile-negotiation-specification-not-admitted",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "unsupported",
+              "incompatible"
             ]
           }
         ]
@@ -2912,12 +3031,19 @@
             "members": [
               "reason",
               "slot"
+            ],
+            "reasons": [
+              "missing-required-slot"
             ]
           },
           {
             "code": "project-profile-message-fallback-specification-not-admitted",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "unsupported",
+              "incompatible"
             ]
           }
         ]
@@ -2972,12 +3098,19 @@
             "members": [
               "reason",
               "slot"
+            ],
+            "reasons": [
+              "missing-required-slot"
             ]
           },
           {
             "code": "project-profile-coverage-specification-not-admitted",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "unsupported",
+              "incompatible"
             ]
           }
         ]
@@ -3031,6 +3164,9 @@
             "members": [
               "reason",
               "slot"
+            ],
+            "reasons": [
+              "missing-required-slot"
             ]
           }
         ]
@@ -3085,6 +3221,9 @@
             "members": [
               "reason",
               "slot"
+            ],
+            "reasons": [
+              "missing-required-slot"
             ]
           },
           {
@@ -3092,6 +3231,10 @@
             "members": [
               "reason",
               "component"
+            ],
+            "reasons": [
+              "unsupported",
+              "incompatible"
             ]
           }
         ]
@@ -3146,6 +3289,9 @@
             "members": [
               "reason",
               "slot"
+            ],
+            "reasons": [
+              "missing-required-slot"
             ]
           },
           {
@@ -3153,6 +3299,10 @@
             "members": [
               "reason",
               "component"
+            ],
+            "reasons": [
+              "unsupported",
+              "incompatible"
             ]
           }
         ]
@@ -3205,6 +3355,12 @@
             "code": "project-profile-intent-surface-class-vocabulary-not-admitted",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "body-integrity-invalid",
+              "member-invalid",
+              "member-duplicate",
+              "non-canonical-order"
             ]
           }
         ]
@@ -3241,6 +3397,11 @@
             "code": "project-profile-intent-surface-class-vocabulary-not-admitted",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "identity-mismatch",
+              "revision-mismatch",
+              "digest-mismatch"
             ]
           }
         ]
@@ -3274,7 +3435,8 @@
         "details": [
           {
             "code": "project-profile-locale-data-not-admitted",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -3429,7 +3591,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -3465,11 +3628,13 @@
         "details": [
           {
             "code": "project-profile-locale-invalid",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-locale-non-canonical",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-resource-limit-exceeded",
@@ -3480,7 +3645,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -3513,7 +3679,8 @@
         "details": [
           {
             "code": "project-profile-locale-duplicate",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -3553,7 +3720,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -3589,11 +3757,13 @@
         "details": [
           {
             "code": "project-profile-locale-invalid",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-locale-non-canonical",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-resource-limit-exceeded",
@@ -3604,7 +3774,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -3640,11 +3811,13 @@
         "details": [
           {
             "code": "project-profile-locale-invalid",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-locale-non-canonical",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-resource-limit-exceeded",
@@ -3655,7 +3828,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -3689,7 +3863,8 @@
         "details": [
           {
             "code": "project-profile-default-requested-locale-not-in-project",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -3725,11 +3900,13 @@
         "details": [
           {
             "code": "project-profile-locale-invalid",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-locale-non-canonical",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-resource-limit-exceeded",
@@ -3740,7 +3917,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -3780,11 +3958,13 @@
         "details": [
           {
             "code": "project-profile-locale-invalid",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-locale-non-canonical",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-resource-limit-exceeded",
@@ -3795,7 +3975,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -3831,11 +4012,13 @@
         "details": [
           {
             "code": "project-profile-locale-invalid",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-locale-non-canonical",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-resource-limit-exceeded",
@@ -3846,7 +4029,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -3903,7 +4087,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -3943,7 +4128,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -3984,11 +4170,13 @@
         "details": [
           {
             "code": "project-profile-locale-invalid",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-locale-non-canonical",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-resource-limit-exceeded",
@@ -3999,7 +4187,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -4036,7 +4225,8 @@
         "details": [
           {
             "code": "project-profile-locale-duplicate",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -4077,11 +4267,13 @@
         "details": [
           {
             "code": "project-profile-locale-invalid",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-locale-non-canonical",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-resource-limit-exceeded",
@@ -4092,7 +4284,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -4164,7 +4357,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -4200,6 +4394,10 @@
             "code": "project-profile-negotiation-alias-duplicate",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "same-destination",
+              "conflicting-destination"
             ]
           }
         ]
@@ -4239,7 +4437,8 @@
         "details": [
           {
             "code": "project-profile-negotiation-alias-destination-not-requested",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -4279,7 +4478,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -4313,7 +4513,8 @@
         "details": [
           {
             "code": "project-profile-locale-duplicate",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -4348,7 +4549,8 @@
         "details": [
           {
             "code": "project-profile-message-fallback-source-not-requested",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -4392,7 +4594,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -4431,11 +4634,13 @@
         "details": [
           {
             "code": "project-profile-locale-invalid",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-locale-non-canonical",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-resource-limit-exceeded",
@@ -4446,7 +4651,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -4485,6 +4691,9 @@
             "code": "project-profile-message-fallback-sequence-invalid",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "literal-self-reference"
             ]
           }
         ]
@@ -4524,6 +4733,9 @@
             "code": "project-profile-message-fallback-sequence-invalid",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "literal-duplicate"
             ]
           }
         ]
@@ -4563,6 +4775,9 @@
             "code": "project-profile-message-fallback-sequence-invalid",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "intent-source-duplicate"
             ]
           }
         ]
@@ -4603,7 +4818,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -4643,7 +4859,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -4683,7 +4900,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -4725,11 +4943,13 @@
         "details": [
           {
             "code": "project-profile-locale-invalid",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-locale-non-canonical",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-resource-limit-exceeded",
@@ -4740,7 +4960,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -4777,7 +4998,8 @@
         "details": [
           {
             "code": "project-profile-locale-duplicate",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -4817,6 +5039,9 @@
             "code": "project-profile-coverage-rule-invalid",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "locale-not-requested"
             ]
           }
         ]
@@ -4858,6 +5083,9 @@
             "code": "project-profile-coverage-rule-invalid",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "surface-class-unknown"
             ]
           }
         ]
@@ -4897,6 +5125,9 @@
             "code": "project-profile-coverage-rule-invalid",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "surface-class-duplicate"
             ]
           }
         ]
@@ -4955,7 +5186,8 @@
         "details": [
           {
             "code": "project-profile-coverage-rule-duplicate",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -4997,7 +5229,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -5039,7 +5272,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -5074,7 +5308,8 @@
         "details": [
           {
             "code": "project-profile-coverage-rule-conflict",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -5242,6 +5477,10 @@
             "code": "project-profile-artifact-collection-not-admitted",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "envelope-invalid",
+              "kind-unsupported"
             ]
           }
         ]
@@ -5294,6 +5533,9 @@
             "code": "project-profile-artifact-collection-not-admitted",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "duplicate-envelope"
             ]
           }
         ]
@@ -5346,6 +5588,9 @@
             "code": "project-profile-artifact-collection-not-admitted",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "conflicting-content"
             ]
           }
         ]
@@ -5383,6 +5628,15 @@
             "code": "project-profile-artifact-reference-not-admitted",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "not-found",
+              "kind-mismatch",
+              "identity-mismatch",
+              "revision-mismatch",
+              "specification-revision-unsupported",
+              "role-kind-mismatch",
+              "digest-mismatch"
             ]
           }
         ]
@@ -5421,6 +5675,15 @@
             "code": "project-profile-artifact-reference-not-admitted",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "not-found",
+              "kind-mismatch",
+              "identity-mismatch",
+              "revision-mismatch",
+              "specification-revision-unsupported",
+              "role-kind-mismatch",
+              "digest-mismatch"
             ]
           }
         ]
@@ -5566,7 +5829,8 @@
         "details": [
           {
             "code": "project-profile-target-locales-not-subset",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -5603,6 +5867,10 @@
             "code": "project-profile-target-default-locale-not-supported",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "explicit-override",
+              "inherited-project-default"
             ]
           }
         ]
@@ -5637,7 +5905,8 @@
         "details": [
           {
             "code": "project-profile-target-locale-direction-missing",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -5726,7 +5995,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -5783,7 +6053,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -5823,7 +6094,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -5867,7 +6139,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -5912,7 +6185,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -5950,7 +6224,8 @@
         "details": [
           {
             "code": "project-profile-group-member-unknown",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -5987,7 +6262,8 @@
         "details": [
           {
             "code": "project-profile-group-member-duplicate",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -6023,11 +6299,13 @@
         "details": [
           {
             "code": "project-profile-target-unassigned",
-            "members": []
+            "members": [],
+            "reasons": []
           },
           {
             "code": "project-profile-target-assigned-to-multiple-groups",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -6084,7 +6362,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -6129,7 +6408,8 @@
               "limit",
               "actual",
               "actualRelation"
-            ]
+            ],
+            "reasons": []
           }
         ]
       }
@@ -6169,6 +6449,9 @@
             "code": "project-profile-hydration-relation-invalid",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "unknown-endpoint"
             ]
           }
         ]
@@ -6209,6 +6492,9 @@
             "code": "project-profile-hydration-relation-invalid",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "cross-group"
             ]
           }
         ]
@@ -6249,6 +6535,10 @@
             "code": "project-profile-hydration-relation-invalid",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "server-capability-missing",
+              "client-capability-missing"
             ]
           }
         ]
@@ -6288,6 +6578,9 @@
             "code": "project-profile-hydration-relation-invalid",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "equal-endpoint"
             ]
           }
         ]
@@ -6327,6 +6620,9 @@
             "code": "project-profile-hydration-relation-invalid",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "duplicate-relation"
             ]
           }
         ]
@@ -6367,6 +6663,9 @@
             "code": "project-profile-hydration-locale-policy-incompatible",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "requested-locales"
             ]
           }
         ]
@@ -6407,6 +6706,9 @@
             "code": "project-profile-hydration-locale-policy-incompatible",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "effective-default"
             ]
           }
         ]
@@ -6445,7 +6747,8 @@
         "details": [
           {
             "code": "project-profile-hydration-capability-incompatible",
-            "members": []
+            "members": [],
+            "reasons": []
           }
         ]
       }
@@ -6484,6 +6787,9 @@
             "code": "project-profile-hydration-relation-invalid",
             "members": [
               "reason"
+            ],
+            "reasons": [
+              "dual-role"
             ]
           }
         ]
@@ -6552,6 +6858,10 @@
             "members": [
               "reason",
               "bound"
+            ],
+            "reasons": [
+              "entry",
+              "shared"
             ]
           }
         ]

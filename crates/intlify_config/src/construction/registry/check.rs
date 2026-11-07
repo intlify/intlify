@@ -55,7 +55,10 @@
 //! `limit + 1` even for one value (Decision 015-157). Elsewhere its key names
 //! one value, whose exact total it reports (D15:2000). The strategy also
 //! names, for each code the row may report, the members of the code's
-//! `details` from 015's closed vocabulary (D15:2225). Severity, blocking
+//! `details` from 015's closed vocabulary (D15:2225), and the stable reasons
+//! the row may report the code with. Where several checks report one code,
+//! each lists only the reasons it decides, so every check, code, and reason
+//! the registry allows is one a check reaches (D15:2271). Severity, blocking
 //! state, and suggestion kind are each code's own and come with the Finding
 //! Registry. Every evaluation a test runs asserts that each result carries
 //! what its row's strategy gives its code.
@@ -89,7 +92,7 @@ use serde_json::Value;
 use intlify_shared_json::decode;
 
 use crate::resolver::dependency::{EntrySlot, MaterializedSlot, SemanticGroup};
-use crate::resolver::evaluation::{Check, Code, Phase, Subject};
+use crate::resolver::evaluation::{Check, Code, Phase, Reason, Subject};
 use crate::resolver::subject::SubjectKind;
 
 use super::RANK_PATTERN;
@@ -111,11 +114,11 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:02c4dccaadbabd3a2c71f76fe40e0e64fd5ae2aebc7652264160bdf033b858b2";
+    "sha256:e21bc6383192951745c88f936c5cf7a709c626dc227c217578c76d44965de51d";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
-    "sha256:72ab90f3e21e9d07af1e8cbdb2d1b2783a792c44c39a51c061882c6b52990237";
+    "sha256:5f6261c1b6b7db6da5c7040c45b971c6ae38f4a2ede3906f6d8c1644d3cc0b90";
 
 /// A check ID: three kebab-case segments joined by dots.
 pub(crate) const CHECK_ID_PATTERN: &str =
@@ -235,7 +238,8 @@ pub(crate) enum DetailsMember {
     ActualRelation,
 }
 
-/// The `details` members of one code a row may report.
+/// The `details` members of one code a row may report, and the stable
+/// reasons the row may report it with.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct CodeDetails {
@@ -243,6 +247,10 @@ pub(crate) struct CodeDetails {
     /// In 015's order, each once.
     #[schemars(extend("uniqueItems" = true))]
     pub(crate) members: Vec<DetailsMember>,
+    /// In the order 015 lists the code's reasons, each once; none for a code
+    /// without stable reasons.
+    #[schemars(extend("uniqueItems" = true))]
+    pub(crate) reasons: Vec<Reason>,
 }
 
 /// How a row's Finding payloads derive, and the `details` members of each
@@ -1593,7 +1601,7 @@ fn record_kinds(kind: SubjectKind, codes: &[Code], owned: &[OwnedDependency]) ->
 }
 
 /// A row's payload strategy: what its payloads derive from, and the details
-/// members of each code it may report.
+/// members and stable reasons of each code it may report.
 fn payload_strategy(kind: SubjectKind, check: Check, codes: &[Code]) -> PayloadStrategy {
     PayloadStrategy {
         derivation: derivation(kind, check),
@@ -1602,8 +1610,85 @@ fn payload_strategy(kind: SubjectKind, check: Check, codes: &[Code]) -> PayloadS
             .map(|&code| CodeDetails {
                 code,
                 members: details_members(code).to_vec(),
+                reasons: reasons(kind, check, code).to_vec(),
             })
             .collect(),
+    }
+}
+
+/// The stable reasons each check may report each of its codes with, in the
+/// order 015 lists the code's reasons (D15:2225). A code one check reports
+/// takes all of its reasons there. A code several checks report splits its
+/// reasons among them, each check reporting the subcondition it decides: the
+/// vocabulary's body and then its assertion, a fallback candidate's self
+/// reference and the two duplicates, a coverage item's three, the artifact
+/// references and collection members of bootstrap and of Phase 9, and the
+/// hydration relations' and their endpoints'. Phase 9 never finds a
+/// specification revision mismatch: every member of its Set has the
+/// supported revision, which a reference is checked to request first
+/// (D15:2330).
+const fn reasons(kind: SubjectKind, check: Check, code: Code) -> &'static [Reason] {
+    use Check as K;
+    use Code as C;
+    use Reason as R;
+    match code {
+        C::IntentSurfaceClassVocabularyNotAdmitted => match check {
+            K::IntactArtifact => &[
+                R::BodyIntegrityInvalid,
+                R::MemberInvalid,
+                R::MemberDuplicate,
+                R::NonCanonicalOrder,
+            ],
+            K::AssertedArtifact => &[R::IdentityMismatch, R::RevisionMismatch, R::DigestMismatch],
+            _ => &[],
+        },
+        C::MessageFallbackSequenceInvalid => match (kind, check) {
+            (SubjectKind::FallbackCandidate, K::DistinctFromSource) => &[R::LiteralSelfReference],
+            (SubjectKind::FallbackLiteral, K::UniqueCandidate) => &[R::LiteralDuplicate],
+            (SubjectKind::FallbackIntentSource, K::UniqueCandidate) => &[R::IntentSourceDuplicate],
+            _ => &[],
+        },
+        C::CoverageRuleInvalid => match check {
+            K::RequestedMember => &[R::LocaleNotRequested],
+            K::VocabularyMember => &[R::SurfaceClassUnknown],
+            K::UniqueSurfaceClass => &[R::SurfaceClassDuplicate],
+            _ => &[],
+        },
+        C::ArtifactReferenceNotAdmitted => match check {
+            K::BootstrapCandidate => code.reasons(),
+            K::ResolvedReference => &[
+                R::NotFound,
+                R::KindMismatch,
+                R::IdentityMismatch,
+                R::RevisionMismatch,
+                R::SpecificationRevisionUnsupported,
+                R::RoleKindMismatch,
+                R::DigestMismatch,
+            ],
+            _ => &[],
+        },
+        C::ArtifactCollectionNotAdmitted => match check {
+            K::BootstrapCandidate => &[R::DuplicateEnvelope, R::ConflictingContent],
+            K::AdmissibleMember => &[R::EnvelopeInvalid, R::KindUnsupported],
+            K::SingleOccurrence => &[R::DuplicateEnvelope],
+            K::ConsistentContent => &[R::ConflictingContent],
+            _ => &[],
+        },
+        C::HydrationRelationInvalid => match check {
+            K::KnownEndpoint => &[R::UnknownEndpoint],
+            K::SameGroupEndpoint => &[R::CrossGroup],
+            K::EndpointRole => &[R::ServerCapabilityMissing, R::ClientCapabilityMissing],
+            K::DistinctEndpoints => &[R::EqualEndpoint],
+            K::UniqueRelation => &[R::DuplicateRelation],
+            K::SingleRole => &[R::DualRole],
+            _ => &[],
+        },
+        C::HydrationLocalePolicyIncompatible => match check {
+            K::SameRequestedLocales => &[R::RequestedLocales],
+            K::SameEffectiveDefault => &[R::EffectiveDefault],
+            _ => &[],
+        },
+        _ => code.reasons(),
     }
 }
 
@@ -1836,7 +1921,7 @@ pub(crate) mod testing {
 
     use crate::resolver::evaluation::Code;
 
-    use super::{check_ids, finding_codes, CheckRegistry, Derivation, DetailsMember};
+    use super::{check_ids, finding_codes, CheckRegistry, Derivation, DetailsMember, Reason};
 
     /// The Finding codes `check` of `kind` may report.
     pub(crate) fn possible_codes(kind: SubjectKind, check: Check) -> &'static [Code] {
@@ -1851,6 +1936,11 @@ pub(crate) mod testing {
     /// The members of `code`'s details.
     pub(crate) const fn details_members(code: Code) -> &'static [DetailsMember] {
         super::details_members(code)
+    }
+
+    /// The stable reasons `check` of `kind` may report `code` with.
+    pub(crate) const fn reasons(kind: SubjectKind, check: Check, code: Code) -> &'static [Reason] {
+        super::reasons(kind, check, code)
     }
 
     /// The place of `check` among the checks of `kind`.
@@ -2143,7 +2233,8 @@ mod tests {
                     "derivation": "exact",
                     "details": [{
                         "code": "project-profile-hydration-relation-invalid",
-                        "members": ["reason"]
+                        "members": ["reason"],
+                        "reasons": ["unknown-endpoint"]
                     }]
                 }
             })
@@ -2733,6 +2824,182 @@ mod tests {
             serde_json::to_value([Derivation::KeyOnly, Derivation::Exact]).unwrap(),
             json!(["key-only", "exact"])
         );
+    }
+
+    /// The stable reasons `check` of `kind` may report `code` with.
+    fn listed(kind: SubjectKind, check: Check, code: Code) -> Vec<Reason> {
+        row(kind, check)
+            .finding_payload_strategy
+            .details
+            .into_iter()
+            .find(|details| details.code == code)
+            .unwrap()
+            .reasons
+    }
+
+    /// Where several checks report one code, each lists the reasons it
+    /// decides (D15:2271); Phase 9 never finds a specification revision
+    /// mismatch (D15:2330).
+    #[test]
+    fn a_row_lists_the_reasons_its_check_may_report_each_code_with() {
+        use Code as C;
+        use Reason as R;
+        use SubjectKind as K;
+        assert_eq!(
+            listed(
+                K::RelationEndpoint,
+                Check::KnownEndpoint,
+                C::HydrationRelationInvalid
+            ),
+            [R::UnknownEndpoint]
+        );
+        assert_eq!(
+            listed(
+                K::RelationEndpoint,
+                Check::EndpointRole,
+                C::HydrationRelationInvalid
+            ),
+            [R::ServerCapabilityMissing, R::ClientCapabilityMissing]
+        );
+        assert_eq!(
+            listed(K::Roles, Check::SingleRole, C::HydrationRelationInvalid),
+            [R::DualRole]
+        );
+        assert_eq!(
+            listed(
+                K::ResourceLimits,
+                Check::BootstrapCandidate,
+                C::ArtifactReferenceNotAdmitted
+            ),
+            C::ArtifactReferenceNotAdmitted.reasons()
+        );
+        for kind in [
+            K::ResolvedPolicyReference,
+            K::ResolvedTargetProfileReference,
+        ] {
+            let phase_9 = listed(
+                kind,
+                Check::ResolvedReference,
+                C::ArtifactReferenceNotAdmitted,
+            );
+            assert_eq!(phase_9.len(), 7, "{kind:?}");
+            assert!(!phase_9.contains(&R::SpecificationRevisionMismatch));
+        }
+        assert_eq!(
+            listed(
+                K::ResourceLimits,
+                Check::BootstrapCandidate,
+                C::ArtifactCollectionNotAdmitted
+            ),
+            [R::DuplicateEnvelope, R::ConflictingContent]
+        );
+        assert_eq!(
+            listed(
+                K::CollectionMember,
+                Check::AdmissibleMember,
+                C::ArtifactCollectionNotAdmitted
+            ),
+            [R::EnvelopeInvalid, R::KindUnsupported]
+        );
+        assert_eq!(
+            listed(
+                K::Vocabulary,
+                Check::IntactArtifact,
+                C::IntentSurfaceClassVocabularyNotAdmitted
+            ),
+            [
+                R::BodyIntegrityInvalid,
+                R::MemberInvalid,
+                R::MemberDuplicate,
+                R::NonCanonicalOrder
+            ]
+        );
+        assert_eq!(
+            listed(
+                K::FallbackLiteral,
+                Check::UniqueCandidate,
+                C::MessageFallbackSequenceInvalid
+            ),
+            [R::LiteralDuplicate]
+        );
+        assert_eq!(
+            listed(
+                K::FallbackIntentSource,
+                Check::UniqueCandidate,
+                C::MessageFallbackSequenceInvalid
+            ),
+            [R::IntentSourceDuplicate]
+        );
+        assert_eq!(
+            listed(
+                K::CoverageSurfaceClass,
+                Check::UniqueSurfaceClass,
+                C::CoverageRuleInvalid
+            ),
+            [R::SurfaceClassDuplicate]
+        );
+        // A code one check reports takes all of its reasons there.
+        assert_eq!(
+            listed(
+                K::CompleteInput,
+                Check::JsonCompatible,
+                C::InputNotJsonCompatible
+            ),
+            C::InputNotJsonCompatible.reasons()
+        );
+        assert_eq!(
+            listed(
+                K::DiagnosticDomain,
+                Check::CompleteReporting,
+                C::ReportingLimitExceeded
+            ),
+            [R::Entry, R::Shared]
+        );
+    }
+
+    /// Every reason 015 gives a code is some row's, each row lists a code's
+    /// reasons in 015's order, and a row lists reasons for a code exactly
+    /// when the code's details carry one.
+    #[test]
+    fn every_reason_015_gives_a_code_is_some_rows_in_its_order() {
+        let rows = registry().rows;
+        for code in Code::ALL {
+            let mut reached = BTreeSet::new();
+            for row in &rows {
+                let Some(details) = row
+                    .finding_payload_strategy
+                    .details
+                    .iter()
+                    .find(|details| details.code == code)
+                else {
+                    continue;
+                };
+                let places: Vec<usize> = details
+                    .reasons
+                    .iter()
+                    .map(|reason| code.reasons().iter().position(|own| own == reason).unwrap())
+                    .collect();
+                assert!(
+                    places.windows(2).all(|pair| pair[0] < pair[1]),
+                    "{}",
+                    row.check_id
+                );
+                assert_eq!(
+                    details.reasons.is_empty(),
+                    !details.members.contains(&DetailsMember::Reason),
+                    "{} {}",
+                    row.check_id,
+                    code.as_str()
+                );
+                reached.extend(places);
+            }
+            assert_eq!(
+                reached,
+                (0..code.reasons().len()).collect(),
+                "{}",
+                code.as_str()
+            );
+        }
     }
 
     /// What `check` of `kind`'s payloads derive from.
@@ -3483,6 +3750,29 @@ mod tests {
                 changed(&|value| {
                     value["rows"][0]["findingPayloadStrategy"]["details"][0]["note"] =
                         json!("note");
+                }),
+            ),
+            (
+                "details without their reasons",
+                changed(&|value| {
+                    value["rows"][0]["findingPayloadStrategy"]["details"][0]
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("reasons");
+                }),
+            ),
+            (
+                "a reason outside 015's vocabulary",
+                changed(&|value| {
+                    value["rows"][0]["findingPayloadStrategy"]["details"][0]["reasons"] =
+                        json!(["missing"]);
+                }),
+            ),
+            (
+                "a reason twice",
+                changed(&|value| {
+                    value["rows"][0]["findingPayloadStrategy"]["details"][0]["reasons"] =
+                        json!(["unsupported", "unsupported"]);
                 }),
             ),
         ] {
