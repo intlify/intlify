@@ -17,9 +17,8 @@
 //! ([`capability`]). The implementation compiles in only their digests, which
 //! construction compares with the authorities it is given.
 //!
-//! The Registry Package's members are checked in below
-//! `conformance/registries/` in the same way ([`registry`]); revision `"0"`
-//! writes the Safe Origin Kind Registry and its schema so far.
+//! The Registry Package's six members and its container are checked in
+//! below `conformance/registries/` in the same way ([`registry`]).
 //!
 //! Construction checks the authorities it is given in the order of the
 //! construction-failure precedence, each check refusing with its row: the
