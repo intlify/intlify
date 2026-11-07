@@ -90,8 +90,9 @@ pub(crate) struct SpecificationInput<Id> {
 /// What one resolver admits in each slot: the Active Project Profile
 /// Specification, the canonicalization specifications with the dataset each
 /// admits, and one value for every other specification slot. The vocabulary
-/// slot has no fixed value. Construction fixes these in 015 Phase 5; until then
-/// only tests build them.
+/// slot has no fixed value. Construction builds these from the Profile
+/// Specification it admitted; tests also build fixture values.
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct SupportedSpecifications<Id> {
     project_profile: VersionedIdentity<Id>,
     locale_canonicalization: Supported<Id>,
@@ -102,26 +103,25 @@ pub(crate) struct SupportedSpecifications<Id> {
     delivery_placement: VersionedIdentity<Id>,
 }
 
-impl<Id: From<&'static str>> SupportedSpecifications<Id> {
-    /// Revision "0": 015-135 names the toolchain-supplied specifications, all at
-    /// revision "0", around the active profile specification and the
-    /// canonicalization specifications construction supplies.
-    pub(crate) fn revision_zero(
+impl<Id> SupportedSpecifications<Id> {
+    /// What a resolver supports, slot by slot.
+    pub(crate) const fn new(
         project_profile: VersionedIdentity<Id>,
         locale_canonicalization: Supported<Id>,
+        locale_negotiation: VersionedIdentity<Id>,
+        message_locale_fallback: VersionedIdentity<Id>,
+        coverage: VersionedIdentity<Id>,
+        delivery_graph: VersionedIdentity<Id>,
+        delivery_placement: VersionedIdentity<Id>,
     ) -> Self {
-        let revision_zero = |identity: &'static str| VersionedIdentity {
-            identity: identity.into(),
-            revision: "0".into(),
-        };
         Self {
             project_profile,
             locale_canonicalization,
-            locale_negotiation: revision_zero("intlify-locale-negotiation"),
-            message_locale_fallback: revision_zero("intlify-message-locale-fallback"),
-            coverage: revision_zero("intlify-localization-coverage"),
-            delivery_graph: revision_zero("intlify-delivery-graph"),
-            delivery_placement: revision_zero("intlify-delivery-placement"),
+            locale_negotiation,
+            message_locale_fallback,
+            coverage,
+            delivery_graph,
+            delivery_placement,
         }
     }
 }
@@ -402,6 +402,32 @@ impl<Id: Clone> SpecificationSet<Id> {
                 delivery_placement,
             },
         )
+    }
+}
+
+#[cfg(test)]
+impl<Id: From<&'static str>> SupportedSpecifications<Id> {
+    /// Revision "0" around a fixture's active profile specification and
+    /// canonicalization specifications: 015-135 names the toolchain-supplied
+    /// specifications, all at revision "0". A resolver built from the
+    /// committed input supports the same values.
+    pub(crate) fn revision_zero(
+        project_profile: VersionedIdentity<Id>,
+        locale_canonicalization: Supported<Id>,
+    ) -> Self {
+        let revision_zero = |identity: &'static str| VersionedIdentity {
+            identity: identity.into(),
+            revision: "0".into(),
+        };
+        Self {
+            project_profile,
+            locale_canonicalization,
+            locale_negotiation: revision_zero("intlify-locale-negotiation"),
+            message_locale_fallback: revision_zero("intlify-message-locale-fallback"),
+            coverage: revision_zero("intlify-localization-coverage"),
+            delivery_graph: revision_zero("intlify-delivery-graph"),
+            delivery_placement: revision_zero("intlify-delivery-placement"),
+        }
     }
 }
 
