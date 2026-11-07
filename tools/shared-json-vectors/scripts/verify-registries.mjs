@@ -1,12 +1,14 @@
 /**
  * Check the committed Registry Package members against this implementation.
  *
- * The Rust crate writes the Safe Origin Kind Registry, the Check Registry, and
- * their schemas, and compiles in their file digests. This script shares no
+ * The Rust crate writes the Safe Origin Kind, Check, and Finding Registries
+ * and their schemas, and compiles in their file digests. This script shares no
  * code with it. It builds the Safe Origin Kind Registry from its own copy of
  * design 015's table. It checks that the Check Registry's rows agree with each
  * other the way 015's registry rules require and carry 015's five example
- * check IDs, without rebuilding the rows. It checks that each schema closes
+ * check IDs, without rebuilding the rows, and that the Finding Registry's rows
+ * agree with them and with its own copy of 015's code tables. It checks that
+ * each schema closes
  * its container, every row, and its vocabularies, hashes every artifact, and
  * reads the pinned digests out of the crate's source. It does not read the
  * design document.
@@ -446,8 +448,11 @@ const schemaBytes = read('safe-origin-kind-v0.schema.json')
 const registryBytes = read('safe-origin-kind-v0.json')
 const checkSchemaBytes = read('check-v0.schema.json')
 const checkRegistryBytes = read('check-v0.json')
+const findingSchemaBytes = read('finding-v0.schema.json')
+const findingRegistryBytes = read('finding-v0.json')
 const source = readFileSync(resolve(crate, 'src/construction/registry/safe_origin.rs'), 'utf8')
 const checkSource = readFileSync(resolve(crate, 'src/construction/registry/check.rs'), 'utf8')
+const findingSource = readFileSync(resolve(crate, 'src/construction/registry/finding.rs'), 'utf8')
 
 for (const [name, bytes] of [
   ['safe-origin-kind-v0.schema.json', schemaBytes],
@@ -1062,6 +1067,121 @@ if (fileDigest(checkSchemaBytes) !== pinned(checkSource, 'SCHEMA_DIGEST')) {
   )
 }
 
+// The Finding Registry: one row for each of 015's codes, in table order, whose
+// checks are exactly the Check Registry rows that list the code, in row order,
+// whose subject kinds are those rows' kinds, in the order they first appear,
+// and whose reasons are the ones 015's tables give the code, in their order.
+// Every code but the non-canonical spelling blocks and is an error; the
+// non-canonical spelling is a warning that suggests its canonical replacement,
+// and no other code suggests anything.
+const NON_CANONICAL = 'project-profile-locale-non-canonical'
+const findingRegistry = JSON.parse(findingRegistryBytes.toString('utf8'))
+const findingRows = findingRegistry.rows ?? []
+if (
+  !isDeepStrictEqual(
+    findingRows.map(row => row.code),
+    CODES
+  )
+) {
+  fail("finding registry: the rows are not one for each of 015's codes, in table order")
+}
+for (const row of findingRows) {
+  const where = `finding registry: ${row.code}`
+  const listing = checkRows.filter(check => (check.possibleFindingCodes ?? []).includes(row.code))
+  if (
+    !isDeepStrictEqual(
+      row.allowedCheckIds,
+      listing.map(check => check.checkId)
+    )
+  ) {
+    fail(`${where}: the checks are not the rows that list the code, in row order`)
+  }
+  const kinds = [...new Set(listing.map(check => check.subjectKind))]
+  if (!isDeepStrictEqual(row.allowedSubjectKinds, kinds)) {
+    fail(`${where}: the subject kinds are not those of its checks, in the order they first appear`)
+  }
+  if (!isDeepStrictEqual(row.allowedReasons, CODE_REASONS[row.code] ?? [])) {
+    fail(`${where}: the reasons are not the ones 015 gives the code, in its order`)
+  }
+  const warning = row.code === NON_CANONICAL
+  if (row.blocking !== !warning || row.severity !== (warning ? 'warning' : 'error')) {
+    fail(`${where}: the code does not block and report as 015 assigns it`)
+  }
+  if (row.suggestionKind !== (warning ? 'canonical-locale-replacement' : 'none')) {
+    fail(`${where}: the suggestion kind is not 015's`)
+  }
+}
+if (fileDigest(findingRegistryBytes) !== pinned(findingSource, 'DIGEST')) {
+  fail(
+    `finding registry: the file digest ${fileDigest(findingRegistryBytes)} is not the pinned ${pinned(findingSource, 'DIGEST')}`
+  )
+}
+
+// The Finding Registry's schema: Draft 7, closing the container and every row,
+// and the vocabularies of codes, severities, subject kinds, reasons, and
+// suggestion kinds.
+const findingSchema = JSON.parse(findingSchemaBytes.toString('utf8'))
+const findingVocabulary = node => {
+  const definition = follow(findingSchema, node)
+  return definition?.type === 'string' ? definition.enum : undefined
+}
+if (findingSchema.$schema !== DRAFT_7) {
+  fail(`finding registry schema: $schema ${findingSchema.$schema}`)
+}
+if (!closes(findingSchema, ['rows'])) {
+  fail('finding registry schema: the container is not closed')
+}
+const findingRowsSchema = findingSchema.properties?.rows
+if (findingRowsSchema?.type !== 'array' || findingRowsSchema.minItems !== 1) {
+  fail('finding registry schema: the rows are not a non-empty array')
+}
+const findingRow = follow(findingSchema, findingRowsSchema?.items)
+if (
+  !closes(findingRow, [
+    'code',
+    'allowedCheckIds',
+    'severity',
+    'blocking',
+    'allowedSubjectKinds',
+    'allowedReasons',
+    'suggestionKind'
+  ])
+) {
+  fail('finding registry schema: a row is not closed')
+}
+const findingProperty = name => findingRow?.properties?.[name]
+const allowedChecks = findingProperty('allowedCheckIds')
+const allowedKinds = findingProperty('allowedSubjectKinds')
+const allowedReasons = findingProperty('allowedReasons')
+if (
+  !isDeepStrictEqual(findingVocabulary(findingProperty('code')), CODES) ||
+  allowedChecks?.type !== 'array' ||
+  allowedChecks.minItems !== 1 ||
+  allowedChecks.uniqueItems !== true ||
+  allowedChecks.items?.type !== 'string' ||
+  allowedChecks.items?.pattern !== CHECK_ID_PATTERN ||
+  !isDeepStrictEqual(findingVocabulary(findingProperty('severity')), ['error', 'warning']) ||
+  findingProperty('blocking')?.type !== 'boolean' ||
+  allowedKinds?.type !== 'array' ||
+  allowedKinds.minItems !== 1 ||
+  allowedKinds.uniqueItems !== true ||
+  !isDeepStrictEqual(findingVocabulary(allowedKinds.items), kindIds) ||
+  allowedReasons?.type !== 'array' ||
+  allowedReasons.uniqueItems !== true ||
+  !isDeepStrictEqual(findingVocabulary(allowedReasons.items), REASONS) ||
+  !isDeepStrictEqual(findingVocabulary(findingProperty('suggestionKind')), [
+    'none',
+    'canonical-locale-replacement'
+  ])
+) {
+  fail("finding registry schema: a row's members are not closed over 015's vocabularies")
+}
+if (fileDigest(findingSchemaBytes) !== pinned(findingSource, 'SCHEMA_DIGEST')) {
+  fail(
+    `finding registry schema: the file digest ${fileDigest(findingSchemaBytes)} is not the pinned ${pinned(findingSource, 'SCHEMA_DIGEST')}`
+  )
+}
+
 if (failures.length > 0) {
   for (const message of failures) {
     console.error(message)
@@ -1070,5 +1190,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `registries agree: ${expected.rows.length} safe origin kinds, ${EVIDENCE_KINDS.length} evidence kinds, ${checkRows.length} checks of ${kinds.size} subject kinds with ${prerequisiteCount} prerequisites, reporting ${reportedCodes.size} codes with ${new Set([...reachedReasons.values()].flatMap(reached => [...reached])).size} reasons, owning ${owners.size} dependency records, and deriving ${keyOnlyRows} rows' payloads from their keys alone`
+  `registries agree: ${expected.rows.length} safe origin kinds, ${EVIDENCE_KINDS.length} evidence kinds, ${checkRows.length} checks of ${kinds.size} subject kinds with ${prerequisiteCount} prerequisites, reporting ${reportedCodes.size} codes with ${new Set([...reachedReasons.values()].flatMap(reached => [...reached])).size} reasons, owning ${owners.size} dependency records, and deriving ${keyOnlyRows} rows' payloads from their keys alone; ${findingRows.length} Finding Registry rows agree with them`
 )

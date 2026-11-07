@@ -1094,8 +1094,10 @@ impl Evaluation {
         }
     }
 
-    /// Asserts that `unit`'s Check Registry row lists `code`, and that the
-    /// result carries what the row's payload strategy gives the code: a
+    /// Asserts that `unit`'s Check Registry row lists `code`, that the code
+    /// blocks exactly when the result does, as its Finding Registry row says,
+    /// and that the result carries what the row's payload strategy gives the
+    /// code: a
     /// reason exactly when its details have one, and then one the row lists
     /// for the code, a bound's or a shortfall's
     /// details exactly when they have its members, and past a bound an exact
@@ -1109,6 +1111,7 @@ impl Evaluation {
         code: Code,
         reason: Option<Reason>,
         details: Option<Details>,
+        blocking: bool,
     ) {
         use crate::construction::registry::check::{testing, Derivation, DetailsMember};
         if self.fabricated || self.blocked.as_ref() == Some(unit) {
@@ -1120,6 +1123,13 @@ impl Evaluation {
             listed.contains(&code),
             "{unit:?} reports {}, which its Check Registry row does not list",
             code.as_str()
+        );
+        assert_eq!(
+            crate::construction::registry::finding::testing::blocking(code),
+            blocking,
+            "{unit:?} reports {} {}, against its Finding Registry row",
+            code.as_str(),
+            if blocking { "blocking" } else { "as a notice" }
         );
         let members = testing::details_members(code);
         assert_eq!(
@@ -1212,7 +1222,7 @@ impl Evaluation {
                     details,
                 }) => {
                     #[cfg(test)]
-                    self.registered(&unit, code, reason, details);
+                    self.registered(&unit, code, reason, details, true);
                     let key = IssueKey {
                         unit: unit.clone(),
                         code,
@@ -1234,7 +1244,7 @@ impl Evaluation {
             return Err(EvaluationInvariant::NoticeWithoutEvaluation(unit));
         }
         #[cfg(test)]
-        self.registered(&unit, code, None, None);
+        self.registered(&unit, code, None, None, false);
         self.notices.insert(IssueKey {
             unit,
             code,
@@ -1675,6 +1685,27 @@ mod tests {
             Err::<(), _>(Blocking {
                 code: Code::CoverageSpecificationNotAdmitted,
                 ..MISSING
+            })
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "against its Finding Registry row")]
+    fn a_test_evaluation_records_a_blocking_code_only_as_a_blocking_result() {
+        let mut evaluation = Evaluation::default();
+        let _ = evaluation.check(data(), Ok(()), |()| Ok::<(), Blocking>(()));
+        let _ = evaluation.notice(data(), Code::LocaleDataNotAdmitted);
+    }
+
+    #[test]
+    #[should_panic(expected = "against its Finding Registry row")]
+    fn a_test_evaluation_records_a_non_blocking_code_only_as_a_notice() {
+        let mut evaluation = Evaluation::default();
+        let _ = evaluation.check(spelled(), Ok(()), |()| {
+            Err::<(), _>(Blocking {
+                code: Code::LocaleNonCanonical,
+                reason: None,
+                details: None,
             })
         });
     }
