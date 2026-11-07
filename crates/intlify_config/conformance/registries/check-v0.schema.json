@@ -77,6 +77,22 @@
             "$ref": "#/definitions/FindingCode"
           },
           "uniqueItems": true
+        },
+        "possibleEvidenceRecordKinds": {
+          "description": "The ordinary Evidence record kinds the row's units may own.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RecordKind"
+          },
+          "uniqueItems": true
+        },
+        "ownedDependencies": {
+          "description": "The dependency records the row's units own.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OwnedDependency"
+          },
+          "uniqueItems": true
         }
       },
       "additionalProperties": false,
@@ -91,7 +107,9 @@
         "subjectKindRank",
         "checkRank",
         "prerequisiteCheckIds",
-        "possibleFindingCodes"
+        "possibleFindingCodes",
+        "possibleEvidenceRecordKinds",
+        "ownedDependencies"
       ]
     },
     "Phase": {
@@ -323,6 +341,122 @@
         "project-profile-bootstrap-limit-exceeded",
         "project-profile-resource-limit-exceeded",
         "project-profile-reporting-limit-exceeded"
+      ]
+    },
+    "RecordKind": {
+      "description": "015's twelve ordinary Evidence record kinds, the Entry domain's first, in\n015's order.",
+      "type": "string",
+      "enum": [
+        "entry-finding",
+        "entry-evaluation-status",
+        "finding-occurrence",
+        "coverage-decision-evidence",
+        "evidence-index",
+        "entry-dependency",
+        "shared-unavailability-cause",
+        "shared-finding",
+        "shared-evaluation-status",
+        "coverage-decision-basis",
+        "semantic-dependency",
+        "materialized-dependency"
+      ]
+    },
+    "OwnedDependency": {
+      "description": "A dependency record a row's units own, as its record kind and ID.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "recordKind": {
+              "type": "string",
+              "const": "semantic-dependency"
+            },
+            "id": {
+              "$ref": "#/definitions/SemanticGroup"
+            }
+          },
+          "required": [
+            "recordKind",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "recordKind": {
+              "type": "string",
+              "const": "materialized-dependency"
+            },
+            "id": {
+              "$ref": "#/definitions/MaterializedSlot"
+            }
+          },
+          "required": [
+            "recordKind",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "recordKind": {
+              "type": "string",
+              "const": "entry-dependency"
+            },
+            "id": {
+              "$ref": "#/definitions/EntrySlot"
+            }
+          },
+          "required": [
+            "recordKind",
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SemanticGroup": {
+      "description": "One semantic group of the profile view, in the order of 015's semantic\ninventory. It reads and writes as its semantic group ID.",
+      "type": "string",
+      "enum": [
+        "profileSpecification",
+        "projectIdentity",
+        "localeCanonicalization",
+        "projectLocales",
+        "localeNegotiation",
+        "messageFallback",
+        "coverage",
+        "requiredPolicies",
+        "optionalPolicies",
+        "targets",
+        "deploymentGroups",
+        "delivery"
+      ]
+    },
+    "MaterializedSlot": {
+      "description": "A common or materialized input slot, which a materialized dependency\nnames. Each reads and writes as its slot ID.",
+      "type": "string",
+      "enum": [
+        "specification-input",
+        "intent-surface-class-vocabulary",
+        "locale-canonicalization-data",
+        "artifact-collection",
+        "verification-input",
+        "implementation-capability",
+        "configuration-value",
+        "profile-selector"
+      ]
+    },
+    "EntrySlot": {
+      "description": "An entry input slot, which an entry dependency names. Each reads and\nwrites as its slot ID.",
+      "type": "string",
+      "enum": [
+        "entry-source",
+        "call-site-source",
+        "profile-selector",
+        "origins"
       ]
     }
   }

@@ -9,7 +9,12 @@
 //! `resolver-bootstrap-admission` establishes, is owned in
 //! `structural-admission`, because a semantic dependency is a Shared record.
 //! An owner finds nothing of its own, and nothing waits on it. Not the records
-//! themselves: Resolution Evidence builds them, each under its owner.
+//! themselves: Resolution Evidence builds them, each under its owner. The
+//! materialized and entry dependencies name the closed input slots 015 lists
+//! (D15:2501), [`MaterializedSlot`] and [`EntrySlot`].
+
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 use super::evaluation::{
     Admitted, Blocking, Check, Evaluation, EvaluationInvariant, Subject, Unit,
@@ -17,8 +22,11 @@ use super::evaluation::{
 use super::resource_policy::PolicySlot;
 
 /// One semantic group of the profile view, in the order of 015's semantic
-/// inventory.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+/// inventory. It reads and writes as its semantic group ID.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "camelCase")]
 pub(crate) enum SemanticGroup {
     ProfileSpecification,
     ProjectIdentity,
@@ -70,6 +78,60 @@ impl SemanticGroup {
     }
 }
 
+/// A common or materialized input slot, which a materialized dependency
+/// names. Each reads and writes as its slot ID.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum MaterializedSlot {
+    SpecificationInput,
+    IntentSurfaceClassVocabulary,
+    LocaleCanonicalizationData,
+    ArtifactCollection,
+    VerificationInput,
+    ImplementationCapability,
+    ConfigurationValue,
+    ProfileSelector,
+}
+
+impl MaterializedSlot {
+    /// Every slot, the six common ones first, in 015's order.
+    pub(crate) const ALL: [Self; 8] = [
+        Self::SpecificationInput,
+        Self::IntentSurfaceClassVocabulary,
+        Self::LocaleCanonicalizationData,
+        Self::ArtifactCollection,
+        Self::VerificationInput,
+        Self::ImplementationCapability,
+        Self::ConfigurationValue,
+        Self::ProfileSelector,
+    ];
+}
+
+/// An entry input slot, which an entry dependency names. Each reads and
+/// writes as its slot ID.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum EntrySlot {
+    EntrySource,
+    CallSiteSource,
+    ProfileSelector,
+    Origins,
+}
+
+impl EntrySlot {
+    /// Every slot, in 015's order.
+    pub(crate) const ALL: [Self; 4] = [
+        Self::EntrySource,
+        Self::CallSiteSource,
+        Self::ProfileSelector,
+        Self::Origins,
+    ];
+}
+
 /// The `policies` slots whose references the `requiredPolicies` group holds.
 pub(crate) const REQUIRED_POLICIES: [PolicySlot; 5] = [
     PolicySlot::ResourceLimits,
@@ -114,6 +176,40 @@ mod tests {
     use crate::resolver::evaluation::{Code, Phase, Status};
     use crate::resolver::subject::SubjectKind;
     use crate::resolver::targets::{self, TargetSubject};
+
+    #[test]
+    fn groups_and_slots_read_and_write_as_015_spells_them() {
+        for group in SemanticGroup::ALL {
+            let value = serde_json::to_value(group).unwrap();
+            assert_eq!(value, group.id());
+            assert_eq!(
+                serde_json::from_value::<SemanticGroup>(value).unwrap(),
+                group
+            );
+        }
+        assert_eq!(
+            serde_json::to_value(MaterializedSlot::ALL).unwrap(),
+            json!([
+                "specification-input",
+                "intent-surface-class-vocabulary",
+                "locale-canonicalization-data",
+                "artifact-collection",
+                "verification-input",
+                "implementation-capability",
+                "configuration-value",
+                "profile-selector"
+            ])
+        );
+        assert_eq!(
+            serde_json::to_value(EntrySlot::ALL).unwrap(),
+            json!([
+                "entry-source",
+                "call-site-source",
+                "profile-selector",
+                "origins"
+            ])
+        );
+    }
 
     #[test]
     fn each_group_is_owned_in_the_phase_of_its_last_establishing_check() {

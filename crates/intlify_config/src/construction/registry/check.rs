@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! The Check Registry and its schema, as far as each row's identity, subject
-//! kind, prerequisites, and Finding codes go.
+//! kind, prerequisites, Finding codes, Evidence records, and dependencies go.
 //!
 //! Design 015's Check Registry has one row for each `(phase, subject kind,
 //! check)` the resolver evaluates (D15:2167). Revision `"0"` writes the rows
@@ -10,9 +10,9 @@
 //! [`SubjectKind::ALL`], the kinds declared only included, in phase, kind-rank,
 //! and check-rank order. A row names its check ID, phase, rule ID, subject
 //! kind, key strategy, content projection, owning scope, parent subject, its
-//! two ranks, its prerequisites, and the Finding codes it may report. The
-//! Evidence record kinds a row may produce, the dependencies it owns, and its
-//! payload strategy come with their own stages.
+//! two ranks, its prerequisites, the Finding codes it may report, the ordinary
+//! Evidence record kinds its units may own, and the dependency records they
+//! own. Its payload strategy comes with its own stage.
 //!
 //! 015 leaves the IDs of kinds, scopes, and checks to the registry (D15:2167,
 //! 2169). A kind's ID is its name in kebab case. A singleton's owning scope is
@@ -39,6 +39,14 @@
 //! asserts that each code it records is one its unit's row lists. Whether a
 //! code names a Finding Registry row comes with that registry.
 //!
+//! A row's record kinds follow 015's rules for who owns which ordinary
+//! Evidence record, since the records themselves come with Resolution
+//! Evidence: every unit owns its evaluation status, a check that reports
+//! codes owns Findings with their occurrences and evidence index, the
+//! decision table owns both coverage decision records, and the first kinds
+//! of entry and structural admission and each semantic group's owner own the
+//! dependency records (D15:2510).
+//!
 //! Construction reads the registry it admitted with the registry
 //! cross-references (row 41), and refuses one this type cannot read or whose
 //! rows do not relate as 015 requires: a check ID names one row, under its own
@@ -47,14 +55,15 @@
 //! kind (D15:2193, 2195); only a kind keyed by an identity or content names a
 //! projection (D15:2182); a singleton is unscoped; a parent is a kind with
 //! rows in the same or an earlier phase (D15:2169), from which following
-//! parents ends at an unscoped kind; and a prerequisite names a row once,
-//! never one of a later phase or of a kind its phase ranks later, and
-//! following prerequisites never comes back to a row (D15:2269). A row of the
-//! same kind may be an earlier subject's check (D15:2143), so its rank is not
-//! compared. Ranks are compared as the shortest decimal strings the schema
-//! spells them as. Whether the rows are this resolver's own kinds and checks
-//! is not part of the graph: a closed registry that is not the one compiled in
-//! fails the implemented-authority row (43) by its file digest.
+//! parents ends at an unscoped kind; a prerequisite names a row once, never
+//! one of a later phase or of a kind its phase ranks later, and following
+//! prerequisites never comes back to a row; and every dependency record is
+//! owned by exactly one row, which lists its record kind (D15:2269). A row of
+//! the same kind may be an earlier subject's check (D15:2143), so its rank is
+//! not compared. Ranks are compared as the shortest decimal strings the
+//! schema spells them as. Whether the rows are this resolver's own kinds and
+//! checks is not part of the graph: a closed registry that is not the one
+//! compiled in fails the implemented-authority row (43) by its file digest.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -64,7 +73,8 @@ use serde_json::Value;
 
 use intlify_shared_json::decode;
 
-use crate::resolver::evaluation::{Code, Phase};
+use crate::resolver::dependency::{EntrySlot, MaterializedSlot, SemanticGroup};
+use crate::resolver::evaluation::{Code, Phase, Subject};
 use crate::resolver::subject::SubjectKind;
 
 use super::RANK_PATTERN;
@@ -86,11 +96,11 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:c431e07178156ac5e32a3f5294550be92b486a8dbffaf7964517d338d5dc165e";
+    "sha256:7d9214e104b268947ec0d997f99b80074db9df844c24d121aa317f7e70a95c13";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
-    "sha256:d00f55a9afb0d0654bfdcbc7aab09d55c35b0023fe384b53c36391f997d58d52";
+    "sha256:c105ce7fa39c9f7dbe0107b540b047df6a5201a177a59979b4b57b01e5addd93";
 
 /// A check ID: three kebab-case segments joined by dots.
 pub(crate) const CHECK_ID_PATTERN: &str =
@@ -130,6 +140,52 @@ pub(crate) struct ParentSubject {
     pub(crate) subject_kind: SubjectKind,
 }
 
+/// 015's twelve ordinary Evidence record kinds, the Entry domain's first, in
+/// 015's order.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum RecordKind {
+    EntryFinding,
+    EntryEvaluationStatus,
+    FindingOccurrence,
+    CoverageDecisionEvidence,
+    EvidenceIndex,
+    EntryDependency,
+    SharedUnavailabilityCause,
+    SharedFinding,
+    SharedEvaluationStatus,
+    CoverageDecisionBasis,
+    SemanticDependency,
+    MaterializedDependency,
+}
+
+/// A dependency record a row's units own, as its record kind and ID.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(tag = "recordKind", content = "id", deny_unknown_fields)]
+pub(crate) enum OwnedDependency {
+    #[serde(rename = "semantic-dependency")]
+    Semantic(SemanticGroup),
+    #[serde(rename = "materialized-dependency")]
+    Materialized(MaterializedSlot),
+    #[serde(rename = "entry-dependency")]
+    Entry(EntrySlot),
+}
+
+impl OwnedDependency {
+    /// The record kind of the dependency record.
+    pub(crate) const fn record_kind(self) -> RecordKind {
+        match self {
+            Self::Semantic(_) => RecordKind::SemanticDependency,
+            Self::Materialized(_) => RecordKind::MaterializedDependency,
+            Self::Entry(_) => RecordKind::EntryDependency,
+        }
+    }
+}
+
 /// One row: one check of one subject kind in one phase.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -158,6 +214,12 @@ pub(crate) struct CheckRow {
     /// The Finding codes the row's units may report, in 015's table order.
     #[schemars(extend("uniqueItems" = true))]
     pub(crate) possible_finding_codes: Vec<Code>,
+    /// The ordinary Evidence record kinds the row's units may own.
+    #[schemars(extend("uniqueItems" = true))]
+    pub(crate) possible_evidence_record_kinds: Vec<RecordKind>,
+    /// The dependency records the row's units own.
+    #[schemars(extend("uniqueItems" = true))]
+    pub(crate) owned_dependencies: Vec<OwnedDependency>,
 }
 
 /// The registry's body.
@@ -178,6 +240,7 @@ impl CheckRegistry {
             let ids = check_ids(kind);
             let prerequisites = prerequisite_ids(kind);
             let codes = finding_codes(kind);
+            let owned = owned_dependencies(kind);
             debug_assert_eq!(ids.len(), kind.checks().len(), "{kind:?}");
             debug_assert_eq!(prerequisites.len(), ids.len(), "{kind:?}");
             debug_assert_eq!(codes.len(), ids.len(), "{kind:?}");
@@ -203,6 +266,8 @@ impl CheckRegistry {
                         .map(|&prerequisite| prerequisite.to_owned())
                         .collect(),
                     possible_finding_codes: codes.to_vec(),
+                    possible_evidence_record_kinds: record_kinds(kind, codes, &owned),
+                    owned_dependencies: owned.clone(),
                 });
             }
         }
@@ -220,8 +285,8 @@ impl CheckRegistry {
     /// Whether the rows relate as 015 requires: each check ID is one row's,
     /// under its own rule ID; every row's key shape is sound and agrees with
     /// the other rows of its kind; kinds rank uniquely within a phase and
-    /// checks within a kind; every chain of parents ends; and so does every
-    /// chain of prerequisites.
+    /// checks within a kind; every chain of parents ends; so does every chain
+    /// of prerequisites; and every dependency record has one owner.
     fn is_closed(&self) -> bool {
         let mut domains = BTreeMap::new();
         for row in &self.rows {
@@ -254,6 +319,7 @@ impl CheckRegistry {
             && kind_ranks.len() == domains.len()
             && parents_end(&domains)
             && prerequisites_end(&self.rows)
+            && dependencies_owned_once(&self.rows)
     }
 }
 
@@ -357,6 +423,24 @@ fn prerequisites_end(rows: &[CheckRow]) -> bool {
         }
     }
     count == pending.len()
+}
+
+/// Whether every dependency record is owned by exactly one row, which lists
+/// its record kind among those it may own (D15:2269).
+fn dependencies_owned_once(rows: &[CheckRow]) -> bool {
+    let mut owned = BTreeSet::new();
+    for row in rows {
+        for dependency in &row.owned_dependencies {
+            if !owned.insert(*dependency)
+                || !row
+                    .possible_evidence_record_kinds
+                    .contains(&dependency.record_kind())
+            {
+                return false;
+            }
+        }
+    }
+    owned.len() == SemanticGroup::ALL.len() + MaterializedSlot::ALL.len() + EntrySlot::ALL.len()
 }
 
 /// Whether `prerequisite`'s units follow all of `dependent`'s in canonical
@@ -1358,6 +1442,70 @@ const fn finding_codes(kind: SubjectKind) -> &'static [&'static [Code]] {
     }
 }
 
+/// The dependency records a kind's one check owns (D15:2510): entry
+/// admission's first kind owns every entry slot's, structural admission's
+/// first every common and materialized slot's, and each semantic group's
+/// owner its group's.
+fn owned_dependencies(kind: SubjectKind) -> Vec<OwnedDependency> {
+    match kind {
+        SubjectKind::EntryDependencies => EntrySlot::ALL.map(OwnedDependency::Entry).to_vec(),
+        SubjectKind::MaterializedDependencies => MaterializedSlot::ALL
+            .map(OwnedDependency::Materialized)
+            .to_vec(),
+        _ => SemanticGroup::ALL
+            .into_iter()
+            .filter(|&group| Subject::SemanticDependency(group).kind() == kind)
+            .map(OwnedDependency::Semantic)
+            .collect(),
+    }
+}
+
+/// The ordinary Evidence record kinds a check's units may own, by 015's
+/// rules: every unit's evaluation status, in the Entry domain for phases 0
+/// and 1 and the Shared one after (D15:177, 1169); where the check reports
+/// codes, a Finding in that domain, its Entry-owned occurrences, and the
+/// evidence index they refer to (D15:2201, 2379), and in entry admission
+/// also the causes of a Shared projection that cannot materialize
+/// (D15:1163); both coverage decision records for the decision table
+/// (Decision 015-161); and the dependency records the check owns. Reporting
+/// finalization owns no ordinary record: its domains' terminal Finding and
+/// state take their reserved slots (D15:2402).
+fn record_kinds(kind: SubjectKind, codes: &[Code], owned: &[OwnedDependency]) -> Vec<RecordKind> {
+    use RecordKind as R;
+    let phase = kind.phase();
+    if phase == Phase::ReportingFinalization {
+        return Vec::new();
+    }
+    let entry = phase <= Phase::EntryAdmission;
+    let mut kinds: BTreeSet<RecordKind> = owned
+        .iter()
+        .map(|dependency| dependency.record_kind())
+        .collect();
+    kinds.insert(if entry {
+        R::EntryEvaluationStatus
+    } else {
+        R::SharedEvaluationStatus
+    });
+    if !codes.is_empty() {
+        kinds.extend([
+            if entry {
+                R::EntryFinding
+            } else {
+                R::SharedFinding
+            },
+            R::FindingOccurrence,
+            R::EvidenceIndex,
+        ]);
+        if phase == Phase::EntryAdmission {
+            kinds.insert(R::SharedUnavailabilityCause);
+        }
+    }
+    if kind == SubjectKind::CoverageTable {
+        kinds.extend([R::CoverageDecisionEvidence, R::CoverageDecisionBasis]);
+    }
+    kinds.into_iter().collect()
+}
+
 /// Helpers for the tests that compare the resolver with the registry.
 #[cfg(test)]
 pub(crate) mod testing {
@@ -1654,7 +1802,14 @@ mod tests {
                     "locale.target-profiles.within-bound",
                     "hydration.endpoint.within-bound"
                 ],
-                "possibleFindingCodes": ["project-profile-hydration-relation-invalid"]
+                "possibleFindingCodes": ["project-profile-hydration-relation-invalid"],
+                "possibleEvidenceRecordKinds": [
+                    "finding-occurrence",
+                    "evidence-index",
+                    "shared-finding",
+                    "shared-evaluation-status"
+                ],
+                "ownedDependencies": []
             })
         );
         // An unscoped row has no parent member at all.
@@ -1954,6 +2109,144 @@ mod tests {
             reported.extend(places);
         }
         assert_eq!(reported, (0..Code::ALL.len()).collect());
+    }
+
+    /// The record kinds `check` of `kind` may own.
+    fn records(kind: SubjectKind, check: Check) -> Vec<RecordKind> {
+        row(kind, check).possible_evidence_record_kinds
+    }
+
+    #[test]
+    fn each_dependency_record_has_one_owner_where_015_puts_it() {
+        use OwnedDependency as D;
+        let rows = registry().rows;
+        let owners: Vec<(&CheckRow, &OwnedDependency)> = rows
+            .iter()
+            .flat_map(|row| row.owned_dependencies.iter().map(move |owned| (row, owned)))
+            .collect();
+        assert_eq!(owners.len(), 24);
+        let owned: BTreeSet<&OwnedDependency> = owners.iter().map(|&(_, owned)| owned).collect();
+        assert_eq!(owned.len(), 24);
+        // The first kinds of entry and structural admission own the slots'.
+        for (owner, phase, dependencies) in [
+            (
+                SubjectKind::EntryDependencies,
+                Phase::EntryAdmission,
+                EntrySlot::ALL.map(D::Entry).to_vec(),
+            ),
+            (
+                SubjectKind::MaterializedDependencies,
+                Phase::StructuralAdmission,
+                MaterializedSlot::ALL.map(D::Materialized).to_vec(),
+            ),
+        ] {
+            assert_eq!((owner.phase(), owner.rank()), (phase, 0), "{owner:?}");
+            assert_eq!(shape(owner).strategy, KeyStrategy::Singleton);
+            assert_eq!(
+                row(owner, Check::EstablishedSlots).owned_dependencies,
+                dependencies
+            );
+        }
+        // Each semantic group's owner owns its group's.
+        for group in SemanticGroup::ALL {
+            let owner = Subject::SemanticDependency(group).kind();
+            assert_eq!(
+                row(owner, Check::EstablishedGroup).owned_dependencies,
+                [D::Semantic(group)],
+                "{group:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_row_may_own_the_records_015_gives_its_check() {
+        use RecordKind as R;
+        use SubjectKind as K;
+        // A semantic check that reports codes: its Shared Finding and status,
+        // and the occurrences and evidence index the Entry domain keeps.
+        assert_eq!(
+            records(K::GroupMember, Check::KnownMember),
+            [
+                R::FindingOccurrence,
+                R::EvidenceIndex,
+                R::SharedFinding,
+                R::SharedEvaluationStatus
+            ]
+        );
+        // Phase 0 is in the Entry domain, and entry admission's blocking
+        // Findings also explain a Shared projection that cannot materialize.
+        assert_eq!(
+            records(K::ProjectProfileSlot, Check::SupportedAssertion),
+            [
+                R::EntryFinding,
+                R::EntryEvaluationStatus,
+                R::FindingOccurrence,
+                R::EvidenceIndex
+            ]
+        );
+        assert_eq!(
+            records(K::CompleteInput, Check::WellFormedJson),
+            [
+                R::EntryFinding,
+                R::EntryEvaluationStatus,
+                R::FindingOccurrence,
+                R::EvidenceIndex,
+                R::SharedUnavailabilityCause
+            ]
+        );
+        // The decision table owns both coverage decision records.
+        assert_eq!(
+            records(K::CoverageTable, Check::CompleteTable),
+            [
+                R::CoverageDecisionEvidence,
+                R::SharedEvaluationStatus,
+                R::CoverageDecisionBasis
+            ]
+        );
+        // An owner owns its dependency records and its status.
+        assert_eq!(
+            records(K::EntryDependencies, Check::EstablishedSlots),
+            [R::EntryEvaluationStatus, R::EntryDependency]
+        );
+        assert_eq!(
+            records(K::CoverageDependency, Check::EstablishedGroup),
+            [R::SharedEvaluationStatus, R::SemanticDependency]
+        );
+        // Reporting finalization's records are its domains' reserved ones.
+        assert!(records(K::DiagnosticDomain, Check::CompleteReporting).is_empty());
+    }
+
+    #[test]
+    fn every_record_kind_has_an_owner_check_and_each_row_its_domains_status() {
+        use RecordKind as R;
+        let rows = registry().rows;
+        let owned: BTreeSet<RecordKind> = rows
+            .iter()
+            .flat_map(|row| row.possible_evidence_record_kinds.iter().copied())
+            .collect();
+        assert_eq!(owned.len(), 12);
+        for row in &rows {
+            let kinds = &row.possible_evidence_record_kinds;
+            assert!(
+                kinds.windows(2).all(|pair| pair[0] < pair[1]),
+                "{}",
+                row.check_id
+            );
+            if row.phase_id == Phase::ReportingFinalization {
+                continue;
+            }
+            let entry = row.phase_id <= Phase::EntryAdmission;
+            let (status, finding) = if entry {
+                (R::EntryEvaluationStatus, R::EntryFinding)
+            } else {
+                (R::SharedEvaluationStatus, R::SharedFinding)
+            };
+            assert!(kinds.contains(&status), "{}", row.check_id);
+            let reports = !row.possible_finding_codes.is_empty();
+            for kind in [finding, R::FindingOccurrence, R::EvidenceIndex] {
+                assert_eq!(kinds.contains(&kind), reports, "{} {kind:?}", row.check_id);
+            }
+        }
     }
 
     #[test]
@@ -2257,6 +2550,35 @@ mod tests {
     }
 
     #[test]
+    fn each_dependency_record_is_owned_by_one_row_that_lists_its_kind() {
+        let coverage = json!({ "recordKind": "semantic-dependency", "id": "coverage" });
+        let owner = "dependency.coverage.established";
+        for (case, value) in [
+            (
+                "a second owner",
+                changed(of_check("dependency.targets.established"), |row| {
+                    row["ownedDependencies"]
+                        .as_array_mut()
+                        .unwrap()
+                        .insert(0, coverage.clone());
+                }),
+            ),
+            (
+                "no owner",
+                changed(of_check(owner), |row| row["ownedDependencies"] = json!([])),
+            ),
+            (
+                "an owner that may not own its kind",
+                changed(of_check(owner), |row| {
+                    row["possibleEvidenceRecordKinds"] = json!(["shared-evaluation-status"]);
+                }),
+            ),
+        ] {
+            assert_eq!(CheckRegistry::read(&value), None, "{case}");
+        }
+    }
+
+    #[test]
     fn the_registry_names_what_construction_admits() {
         let admission = ConstructionAdmission::revision_zero();
         let members = &admission.registry_members;
@@ -2390,6 +2712,61 @@ mod tests {
                 "a code 015 does not register",
                 changed(&|value| {
                     value["rows"][0]["possibleFindingCodes"] = json!(["project-profile-unknown"]);
+                }),
+            ),
+            (
+                "a row without its record kinds",
+                changed(&|value| {
+                    value["rows"][0]
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("possibleEvidenceRecordKinds");
+                }),
+            ),
+            (
+                "a record kind 015 does not register",
+                changed(&|value| {
+                    value["rows"][0]["possibleEvidenceRecordKinds"] = json!(["terminal-state"]);
+                }),
+            ),
+            (
+                "a record kind twice",
+                changed(&|value| {
+                    value["rows"][0]["possibleEvidenceRecordKinds"] =
+                        json!(["evidence-index", "evidence-index"]);
+                }),
+            ),
+            (
+                "a row without its dependencies",
+                changed(&|value| {
+                    value["rows"][0]
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("ownedDependencies");
+                }),
+            ),
+            (
+                "a dependency on another kind's slot",
+                changed(&|value| {
+                    value["rows"][0]["ownedDependencies"] =
+                        json!([{ "recordKind": "semantic-dependency", "id": "entry-source" }]);
+                }),
+            ),
+            (
+                "a dependency without its ID",
+                changed(&|value| {
+                    value["rows"][0]["ownedDependencies"] =
+                        json!([{ "recordKind": "entry-dependency" }]);
+                }),
+            ),
+            (
+                "a dependency's other member",
+                changed(&|value| {
+                    value["rows"][0]["ownedDependencies"] = json!([{
+                        "recordKind": "entry-dependency",
+                        "id": "origins",
+                        "note": "note"
+                    }]);
                 }),
             ),
         ] {
