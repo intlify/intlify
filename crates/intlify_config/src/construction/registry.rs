@@ -584,13 +584,14 @@ mod tests {
     #[test]
     fn the_check_registry_must_form_a_closed_graph() {
         let committed: Value = serde_json::from_slice(CHECKS).unwrap();
-        // A repeated check ID, a relation that scopes itself, and a check
-        // that waits on itself.
+        // A repeated check ID, a relation that scopes itself, a check that
+        // waits on itself, and a dependency record with two owners.
         let mut repeated = committed.clone();
         repeated["rows"][1]["checkId"] = committed["rows"][0]["checkId"].clone();
         repeated["rows"][1]["ruleId"] = committed["rows"][0]["ruleId"].clone();
         let mut circular = committed.clone();
-        let mut waiting = committed;
+        let mut waiting = committed.clone();
+        let mut shared = committed;
         for row in circular["rows"].as_array_mut().unwrap() {
             if row["subjectKind"] == "relation" {
                 row["parentSubject"] =
@@ -602,10 +603,19 @@ mod tests {
                 row["prerequisiteCheckIds"] = json!(["hydration.relation.unique"]);
             }
         }
+        for row in shared["rows"].as_array_mut().unwrap() {
+            if row["checkId"] == "dependency.targets.established" {
+                row["ownedDependencies"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!({ "recordKind": "semantic-dependency", "id": "coverage" }));
+            }
+        }
         for (case, registry) in [
             ("repeated", repeated),
             ("circular", circular),
             ("waiting on itself", waiting),
+            ("owned twice", shared),
         ] {
             let bytes = serde_json::to_vec_pretty(&registry).unwrap();
             // The schema admits it; the graph does not.

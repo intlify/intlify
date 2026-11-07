@@ -62,6 +62,60 @@ const STRATEGIES = [
 ]
 const PROJECTIONS = ['none', 'non-secret-content', 'redacted-structure']
 
+/** Design 015's twelve ordinary Evidence record kinds, the Entry domain's first. */
+const RECORD_KINDS = [
+  'entry-finding',
+  'entry-evaluation-status',
+  'finding-occurrence',
+  'coverage-decision-evidence',
+  'evidence-index',
+  'entry-dependency',
+  'shared-unavailability-cause',
+  'shared-finding',
+  'shared-evaluation-status',
+  'coverage-decision-basis',
+  'semantic-dependency',
+  'materialized-dependency'
+]
+
+/** Design 015's twelve semantic group IDs, in the order of its inventory. */
+const SEMANTIC_GROUPS = [
+  'profileSpecification',
+  'projectIdentity',
+  'localeCanonicalization',
+  'projectLocales',
+  'localeNegotiation',
+  'messageFallback',
+  'coverage',
+  'requiredPolicies',
+  'optionalPolicies',
+  'targets',
+  'deploymentGroups',
+  'delivery'
+]
+
+/** Design 015's common and materialized input slots, the common ones first. */
+const MATERIALIZED_SLOTS = [
+  'specification-input',
+  'intent-surface-class-vocabulary',
+  'locale-canonicalization-data',
+  'artifact-collection',
+  'verification-input',
+  'implementation-capability',
+  'configuration-value',
+  'profile-selector'
+]
+
+/** Design 015's entry input slots. */
+const ENTRY_SLOTS = ['entry-source', 'call-site-source', 'profile-selector', 'origins']
+
+/** The IDs each dependency record kind names. */
+const DEPENDENCY_IDS = {
+  'semantic-dependency': SEMANTIC_GROUPS,
+  'materialized-dependency': MATERIALIZED_SLOTS,
+  'entry-dependency': ENTRY_SLOTS
+}
+
 /** Design 015's forty-eight Finding codes, in the order of its tables. */
 const CODES = [
   'project-profile-json-invalid',
@@ -496,6 +550,115 @@ for (const code of CODES) {
     fail(`check registry: no row reports ${code}`)
   }
 }
+// A row's record kinds are 015's, each once and in its order, exactly those
+// 015's ownership rules give its check, and every kind is some row's. Every
+// dependency record has exactly one owner, which lists its record kind and
+// is where 015 puts it.
+const ownedKinds = new Set()
+const owners = new Map()
+const ENTRY_PHASES = ['resolver-bootstrap-admission', 'entry-admission']
+
+/**
+ * The ordinary Evidence record kinds 015 lets a check's units own, in its
+ * order: none in reporting finalization, whose terminal records take reserved
+ * slots; otherwise the check's status in its phase's domain, and where it
+ * reports codes a Finding in that domain with the Entry domain's occurrences
+ * and evidence index, in entry admission also the causes of a Shared
+ * projection that cannot materialize; both coverage decision records for the
+ * decision table; and the kinds of the dependency records the check owns.
+ *
+ * @param row - A Check Registry row.
+ * @returns The record kinds, in 015's order.
+ */
+function expectedRecordKinds(row) {
+  if (row.phaseId === 'reporting-finalization') {
+    return []
+  }
+  const entry = ENTRY_PHASES.includes(row.phaseId)
+  const expected = new Set([entry ? 'entry-evaluation-status' : 'shared-evaluation-status'])
+  if ((row.possibleFindingCodes ?? []).length > 0) {
+    expected.add(entry ? 'entry-finding' : 'shared-finding')
+    expected.add('finding-occurrence')
+    expected.add('evidence-index')
+    if (row.phaseId === 'entry-admission') {
+      expected.add('shared-unavailability-cause')
+    }
+  }
+  if (row.subjectKind === 'coverage-table') {
+    expected.add('coverage-decision-evidence')
+    expected.add('coverage-decision-basis')
+  }
+  for (const owned of row.ownedDependencies ?? []) {
+    expected.add(owned.recordKind)
+  }
+  return RECORD_KINDS.filter(kind => expected.has(kind))
+}
+
+/** The phase whose first kind, a singleton, owns each slot's dependency records. */
+const SLOT_OWNERS = {
+  'entry-dependency': 'entry-admission',
+  'materialized-dependency': 'structural-admission'
+}
+for (const row of checkRows) {
+  const where = `check registry: ${row.checkId}`
+  const kinds = row.possibleEvidenceRecordKinds ?? []
+  const places = kinds.map(kind => RECORD_KINDS.indexOf(kind))
+  if (places.some(place => place < 0)) {
+    fail(`${where}: a record kind is not one of 015's`)
+  }
+  if (places.some((place, at) => at > 0 && place <= places[at - 1])) {
+    fail(`${where}: the record kinds are not in 015's order, each once`)
+  }
+  for (const kind of kinds) {
+    ownedKinds.add(kind)
+  }
+  if (!isDeepStrictEqual(kinds, expectedRecordKinds(row))) {
+    fail(`${where}: the record kinds are not the ones 015 gives its check`)
+  }
+  for (const owned of row.ownedDependencies ?? []) {
+    const ids = DEPENDENCY_IDS[owned.recordKind]
+    if (ids === undefined || !ids.includes(owned.id)) {
+      fail(`${where}: owns ${JSON.stringify(owned)}, which is no dependency record of 015's`)
+      continue
+    }
+    const key = `${owned.recordKind} ${owned.id}`
+    if (owners.has(key)) {
+      fail(`${where}: owns ${key}, which ${owners.get(key)} owns`)
+    }
+    owners.set(key, row.checkId)
+    if (!kinds.includes(owned.recordKind)) {
+      fail(`${where}: owns ${key} but may not own its kind`)
+    }
+    const singleton = row.subjectKeyStrategy === 'singleton'
+    const slotOwner = SLOT_OWNERS[owned.recordKind]
+    if (
+      slotOwner !== undefined &&
+      (row.phaseId !== slotOwner || row.subjectKindRank !== '0' || !singleton)
+    ) {
+      fail(`${where}: owns ${key}, which the first kind of ${slotOwner} owns`)
+    }
+    if (
+      owned.recordKind === 'semantic-dependency' &&
+      (ENTRY_PHASES.includes(row.phaseId) ||
+        !singleton ||
+        (row.prerequisiteCheckIds ?? []).length === 0)
+    ) {
+      fail(`${where}: owns ${key}, which a Shared singleton waiting on its group's checks owns`)
+    }
+  }
+}
+for (const kind of RECORD_KINDS) {
+  if (!ownedKinds.has(kind)) {
+    fail(`check registry: no row may own ${kind}`)
+  }
+}
+for (const [recordKind, ids] of Object.entries(DEPENDENCY_IDS)) {
+  for (const id of ids) {
+    if (!owners.has(`${recordKind} ${id}`)) {
+      fail(`check registry: no row owns ${recordKind} ${id}`)
+    }
+  }
+}
 // Every phase but profile projection has rows.
 const expectedPhases = PHASES.filter(phase => phase !== 'profile-projection')
 if (!isDeepStrictEqual([...phasesWithRows], expectedPhases)) {
@@ -541,7 +704,9 @@ const required = [
   'subjectKindRank',
   'checkRank',
   'prerequisiteCheckIds',
-  'possibleFindingCodes'
+  'possibleFindingCodes',
+  'possibleEvidenceRecordKinds',
+  'ownedDependencies'
 ]
 const members = [...required.slice(0, 7), 'parentSubject', ...required.slice(7)]
 if (
@@ -598,6 +763,28 @@ if (
 ) {
   fail("check registry schema: the codes are not 015's forty-eight, each once")
 }
+const recordKinds = property('possibleEvidenceRecordKinds')
+if (
+  recordKinds?.type !== 'array' ||
+  recordKinds.uniqueItems !== true ||
+  !isDeepStrictEqual(vocabulary(recordKinds.items), RECORD_KINDS)
+) {
+  fail("check registry schema: the record kinds are not 015's twelve, each once")
+}
+const ownedDependencies = property('ownedDependencies')
+const dependency = follow(checkSchema, ownedDependencies?.items)
+const variants = (dependency?.oneOf ?? []).map(variant => [
+  variant.properties?.recordKind?.const,
+  closes(variant, ['recordKind', 'id']) ? vocabulary(variant.properties?.id) : undefined
+])
+if (
+  ownedDependencies?.type !== 'array' ||
+  ownedDependencies.uniqueItems !== true ||
+  !isDeepStrictEqual(Object.fromEntries(variants), DEPENDENCY_IDS) ||
+  variants.length !== Object.keys(DEPENDENCY_IDS).length
+) {
+  fail("check registry schema: the dependencies are not 015's three kinds of record, each closed")
+}
 const parentSchema = follow(checkSchema, property('parentSubject')?.allOf?.[0])
 if (!closes(parentSchema, ['phaseId', 'subjectKind'])) {
   fail('check registry schema: a parent is not closed')
@@ -616,5 +803,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `registries agree: ${expected.rows.length} safe origin kinds, ${EVIDENCE_KINDS.length} evidence kinds, ${checkRows.length} checks of ${kinds.size} subject kinds with ${prerequisiteCount} prerequisites, reporting ${reportedCodes.size} codes`
+  `registries agree: ${expected.rows.length} safe origin kinds, ${EVIDENCE_KINDS.length} evidence kinds, ${checkRows.length} checks of ${kinds.size} subject kinds with ${prerequisiteCount} prerequisites, reporting ${reportedCodes.size} codes and owning ${owners.size} dependency records`
 )
