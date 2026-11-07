@@ -550,13 +550,55 @@ for (const code of CODES) {
     fail(`check registry: no row reports ${code}`)
   }
 }
-// A row's record kinds are 015's, each once and in its order, and every kind
-// is some row's. Each row but reporting finalization's owns its status in its
-// phase's domain. Every dependency record has exactly one owner, which lists
-// its record kind.
+// A row's record kinds are 015's, each once and in its order, exactly those
+// 015's ownership rules give its check, and every kind is some row's. Every
+// dependency record has exactly one owner, which lists its record kind and
+// is where 015 puts it.
 const ownedKinds = new Set()
 const owners = new Map()
 const ENTRY_PHASES = ['resolver-bootstrap-admission', 'entry-admission']
+
+/**
+ * The ordinary Evidence record kinds 015 lets a check's units own, in its
+ * order: none in reporting finalization, whose terminal records take reserved
+ * slots; otherwise the check's status in its phase's domain, and where it
+ * reports codes a Finding in that domain with the Entry domain's occurrences
+ * and evidence index, in entry admission also the causes of a Shared
+ * projection that cannot materialize; both coverage decision records for the
+ * decision table; and the kinds of the dependency records the check owns.
+ *
+ * @param row - A Check Registry row.
+ * @returns The record kinds, in 015's order.
+ */
+function expectedRecordKinds(row) {
+  if (row.phaseId === 'reporting-finalization') {
+    return []
+  }
+  const entry = ENTRY_PHASES.includes(row.phaseId)
+  const expected = new Set([entry ? 'entry-evaluation-status' : 'shared-evaluation-status'])
+  if ((row.possibleFindingCodes ?? []).length > 0) {
+    expected.add(entry ? 'entry-finding' : 'shared-finding')
+    expected.add('finding-occurrence')
+    expected.add('evidence-index')
+    if (row.phaseId === 'entry-admission') {
+      expected.add('shared-unavailability-cause')
+    }
+  }
+  if (row.subjectKind === 'coverage-table') {
+    expected.add('coverage-decision-evidence')
+    expected.add('coverage-decision-basis')
+  }
+  for (const owned of row.ownedDependencies ?? []) {
+    expected.add(owned.recordKind)
+  }
+  return RECORD_KINDS.filter(kind => expected.has(kind))
+}
+
+/** The phase whose first kind, a singleton, owns each slot's dependency records. */
+const SLOT_OWNERS = {
+  'entry-dependency': 'entry-admission',
+  'materialized-dependency': 'structural-admission'
+}
 for (const row of checkRows) {
   const where = `check registry: ${row.checkId}`
   const kinds = row.possibleEvidenceRecordKinds ?? []
@@ -570,14 +612,8 @@ for (const row of checkRows) {
   for (const kind of kinds) {
     ownedKinds.add(kind)
   }
-  if (row.phaseId !== 'reporting-finalization') {
-    const status = ENTRY_PHASES.includes(row.phaseId)
-      ? 'entry-evaluation-status'
-      : 'shared-evaluation-status'
-    const statuses = kinds.filter(kind => kind.endsWith('-evaluation-status'))
-    if (!isDeepStrictEqual(statuses, [status])) {
-      fail(`${where}: its status is not its phase's domain's`)
-    }
+  if (!isDeepStrictEqual(kinds, expectedRecordKinds(row))) {
+    fail(`${where}: the record kinds are not the ones 015 gives its check`)
   }
   for (const owned of row.ownedDependencies ?? []) {
     const ids = DEPENDENCY_IDS[owned.recordKind]
@@ -592,6 +628,22 @@ for (const row of checkRows) {
     owners.set(key, row.checkId)
     if (!kinds.includes(owned.recordKind)) {
       fail(`${where}: owns ${key} but may not own its kind`)
+    }
+    const singleton = row.subjectKeyStrategy === 'singleton'
+    const slotOwner = SLOT_OWNERS[owned.recordKind]
+    if (
+      slotOwner !== undefined &&
+      (row.phaseId !== slotOwner || row.subjectKindRank !== '0' || !singleton)
+    ) {
+      fail(`${where}: owns ${key}, which the first kind of ${slotOwner} owns`)
+    }
+    if (
+      owned.recordKind === 'semantic-dependency' &&
+      (ENTRY_PHASES.includes(row.phaseId) ||
+        !singleton ||
+        (row.prerequisiteCheckIds ?? []).length === 0)
+    ) {
+      fail(`${where}: owns ${key}, which a Shared singleton waiting on its group's checks owns`)
     }
   }
 }
