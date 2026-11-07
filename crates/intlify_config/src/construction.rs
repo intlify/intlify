@@ -28,13 +28,16 @@
 //! construction-root bounds to the whole input ([`bounds`]), then takes the
 //! five components in that order, then applies the cross-authority rules
 //! ([`rules`]), and ends by checking that every admitted authority is the one
-//! the resolver is compiled from. A successful construction's Resolver
-//! Construction Identity is derived after it ([`identity`]).
+//! the resolver is compiled from. A successful construction keeps its input
+//! in an immutable resolver ([`resolver`]), whose Resolver Construction
+//! Identity is derived after it ([`identity`]).
 
 pub(crate) mod admission;
 pub(crate) mod authority_set;
 pub(crate) mod bounds;
 pub(crate) mod capability;
+#[cfg(any(test, feature = "benchmark"))]
+pub(crate) mod committed;
 pub(crate) mod component;
 pub(crate) mod envelope;
 pub(crate) mod failure;
@@ -43,6 +46,7 @@ pub(crate) mod identity;
 pub(crate) mod meta_schema;
 pub(crate) mod profile;
 pub(crate) mod registry;
+pub(crate) mod resolver;
 pub(crate) mod root;
 pub(crate) mod rules;
 pub(crate) mod scan;

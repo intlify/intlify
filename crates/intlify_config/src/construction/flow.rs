@@ -120,41 +120,16 @@ fn implemented(admitted: &AdmittedAuthorities) -> bool {
 /// Helpers for tests that construct from the committed input.
 #[cfg(test)]
 pub(crate) mod testing {
-    use std::collections::BTreeMap;
-
-    use serde_json::{json, Value};
+    use serde_json::Value;
 
     use super::ConstructionInput;
-    use crate::construction::authority_set::{self, SubmittedSet};
-    use crate::construction::capability;
-    use crate::construction::component::testing::submitted;
-    use crate::construction::component::{self, Artifact, Submitted};
-    use crate::construction::profile;
-    use crate::construction::registry::{self, RegistryRole, SubmittedPackage};
-    use crate::model::CONFIGURATION_SCHEMA_VERSION;
+    use crate::construction::{committed, component};
 
-    pub(crate) const PROFILE_SPECIFICATION_SCHEMA: &[u8] = include_bytes!(
-        "../../conformance/authorities/project-profile-specification-v0.schema.json"
-    );
-    pub(crate) const PROFILE_SPECIFICATION: &[u8] =
-        include_bytes!("../../conformance/authorities/project-profile-specification-v0.json");
-    pub(crate) const AUTHORITY_SET: &[u8] =
-        include_bytes!("../../conformance/authorities/configuration-schema-authority-set-v0.json");
-    pub(crate) const CONFIGURATION_SCHEMA: &[u8] =
-        include_bytes!("../../conformance/authorities/configuration-v0.schema.json");
-    pub(crate) const CAPABILITY: &[u8] =
-        include_bytes!("../../conformance/authorities/resolver-capability-v0.json");
-    pub(crate) const PACKAGE: &[u8] =
-        include_bytes!("../../conformance/registries/package-v0.json");
-    /// The six registry members, in role order.
-    pub(crate) const REGISTRY_MEMBERS: [&[u8]; 6] = [
-        include_bytes!("../../conformance/registries/safe-origin-kind-v0.schema.json"),
-        include_bytes!("../../conformance/registries/check-v0.schema.json"),
-        include_bytes!("../../conformance/registries/finding-v0.schema.json"),
-        include_bytes!("../../conformance/registries/safe-origin-kind-v0.json"),
-        include_bytes!("../../conformance/registries/check-v0.json"),
-        include_bytes!("../../conformance/registries/finding-v0.json"),
-    ];
+    pub(crate) use crate::construction::committed::{
+        authority_set, package, profile_specification, AUTHORITY_SET, CAPABILITY,
+        CONFIGURATION_SCHEMA, PACKAGE, PROFILE_SPECIFICATION, PROFILE_SPECIFICATION_SCHEMA,
+        REGISTRY_MEMBERS,
+    };
 
     /// An artifact's value, read as construction reads it.
     pub(crate) fn value(bytes: &[u8]) -> Value {
@@ -167,59 +142,10 @@ pub(crate) mod testing {
         serde_json::to_vec(value).unwrap()
     }
 
-    /// A Profile Specification that declares the identity and revision
-    /// construction admits, the file digest of `bytes`, and their semantic
-    /// digest.
-    pub(crate) fn profile_specification(bytes: &[u8]) -> Submitted {
-        let mut submitted = submitted(profile::IDENTITY, profile::REVISION, bytes);
-        let semantic = profile::semantic_digest(&value(bytes)).unwrap();
-        submitted.tuple["semanticDigest"] = json!(semantic.as_str());
-        submitted
-    }
-
-    /// A set that declares the identity and revision construction admits and
-    /// the file digest of `bytes`, and maps the committed schema.
-    pub(crate) fn authority_set(bytes: &[u8]) -> SubmittedSet {
-        SubmittedSet {
-            component: submitted(authority_set::IDENTITY, authority_set::REVISION, bytes),
-            members: BTreeMap::from([(
-                CONFIGURATION_SCHEMA_VERSION.to_owned(),
-                Artifact::read(CONFIGURATION_SCHEMA.to_vec()),
-            )]),
-        }
-    }
-
-    /// A package of this container, declared as construction admits it, and
-    /// these members, by role.
-    pub(crate) fn package(container: &[u8], members: [&[u8]; 6]) -> SubmittedPackage {
-        SubmittedPackage {
-            component: submitted(registry::IDENTITY, registry::REVISION, container),
-            members: RegistryRole::ALL
-                .into_iter()
-                .zip(members)
-                .map(|(role, bytes)| (role, Artifact::read(bytes.to_vec())))
-                .collect(),
-        }
-    }
-
     /// The committed input: every committed authority and member, each
     /// declared as construction admits it.
     pub(crate) fn committed() -> ConstructionInput {
-        ConstructionInput {
-            profile_specification_schema: Some(submitted(
-                profile::SCHEMA_IDENTITY,
-                profile::REVISION,
-                PROFILE_SPECIFICATION_SCHEMA,
-            )),
-            profile_specification: Some(profile_specification(PROFILE_SPECIFICATION)),
-            configuration_schema_authority_set: Some(authority_set(AUTHORITY_SET)),
-            resolver_capability_specification: Some(submitted(
-                capability::IDENTITY,
-                capability::REVISION,
-                CAPABILITY,
-            )),
-            registry_package: Some(package(PACKAGE, REGISTRY_MEMBERS)),
-        }
+        committed::input()
     }
 }
 

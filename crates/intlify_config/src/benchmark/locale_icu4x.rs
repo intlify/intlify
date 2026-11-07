@@ -14,7 +14,7 @@ use intlify_locale_icu4x::{ConformanceLimits, ReadLimits};
 
 use crate::input_limits::Bound;
 use crate::locale::icu4x::Icu4xProvider;
-use crate::locale::{Canonicalizer, ProviderBinding, Supported, VersionedIdentity};
+use crate::locale::{Canonicalizer, ProviderBinding, VersionedIdentity};
 
 use super::cases::Engine;
 use super::locale::VersionedPin;
@@ -62,7 +62,8 @@ pub(super) struct Unavailable;
 /// Admits the committed artifact and binds it where revision "0" is asserted.
 fn admit(limit: Bound) -> Result<Core, Unavailable> {
     let provider = Icu4xProvider::admit(MANIFEST, acquire, &LIMITS).map_err(|_| Unavailable)?;
-    let supported = Supported::revision_zero();
+    // What the resolver the committed construction input builds supports.
+    let supported = crate::construction::resolver::committed().locale_canonicalization();
     let expected = supported
         .expected(&VersionedIdentity {
             identity: "intlify-locale-canonicalization".into(),
@@ -232,6 +233,7 @@ mod tests {
     use serde_json::{json, Value};
 
     use super::*;
+    use crate::locale::Supported;
 
     fn bound(bytes: u64) -> Bound {
         Bound::new(bytes).unwrap()

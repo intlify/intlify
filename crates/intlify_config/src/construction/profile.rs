@@ -32,7 +32,6 @@ use intlify_shared_json::encoding::{hash, Domain, EncodingFailure};
 use intlify_shared_json::token::{IntegrityDigest, ID_PATTERN};
 
 use crate::input_limits::Bound;
-use crate::locale::{Supported, VersionedIdentity};
 use crate::resolver::dependency::SemanticGroup;
 use crate::resolver::evaluation::Phase;
 use crate::resolver::limits::ResolutionLimits;
@@ -74,6 +73,16 @@ pub(crate) const SEMANTIC_DIGEST: &str =
 pub(crate) const SEMANTIC_DOMAIN: &str = "project-profile-specification-semantic-digest";
 
 const LOCALE_CANONICALIZATION: &str = "intlify-locale-canonicalization";
+
+/// The dataset the canonicalization specification admits at revision `"0"`:
+/// CLDR 48.2.0's, at the semantic digest the reference adapter's generated
+/// artifact records. The body is written from it, and a resolver built from
+/// the body supports it.
+const DATASET: &str = "intlify-locale-canonicalization-cldr-48.2.0";
+
+/// The semantic digest of [`DATASET`].
+const DATASET_SEMANTIC_DIGEST: &str =
+    "sha256:6182421172339b8c416890e20b3121ab40e412a896df6316d8e991c756505e16";
 const LOCALE_NEGOTIATION: &str = "intlify-locale-negotiation";
 const MESSAGE_LOCALE_FALLBACK: &str = "intlify-message-locale-fallback";
 const COVERAGE: &str = "intlify-localization-coverage";
@@ -280,13 +289,6 @@ impl ProjectProfileSpecification {
     /// Panics when this crate's own inventories disagree with one another,
     /// which the tests rule out.
     pub(crate) fn revision_zero() -> Self {
-        let canonicalization = Supported::<&'static str>::revision_zero();
-        let pins = canonicalization
-            .expected(&VersionedIdentity {
-                identity: LOCALE_CANONICALIZATION,
-                revision: REVISION,
-            })
-            .expect("revision \"0\" admits its canonicalization specification");
         let one = Bound::new(1).expect("one is a bound");
         let bounds = ResolutionLimits::from_bounds(|_| Some(one))
             .expect("every bound is supplied")
@@ -304,8 +306,8 @@ impl ProjectProfileSpecification {
                 delivery_placement: pinned(DELIVERY_PLACEMENT),
             },
             locale_canonicalization_dataset: Dataset {
-                identity: pins.dataset.identity.to_owned(),
-                semantic_digest: pins.dataset.semantic_digest.to_owned(),
+                identity: DATASET.to_owned(),
+                semantic_digest: DATASET_SEMANTIC_DIGEST.to_owned(),
             },
             phases: strings(&Phase::ALL.map(Phase::id)),
             semantic_groups: strings(&SemanticGroup::ALL.map(SemanticGroup::id)),
@@ -447,6 +449,7 @@ mod tests {
     use crate::construction::component::testing::{row, submitted};
     use crate::construction::component::Artifact;
     use crate::construction::meta_schema::DRAFT_7_META_SCHEMA;
+    use crate::locale::{Supported, VersionedIdentity};
     use crate::resolver::capability::CapabilityBound;
     use crate::resolver::specification::Slot;
 

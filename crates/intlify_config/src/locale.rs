@@ -77,8 +77,9 @@ pub(crate) struct ProviderBinding<Id> {
 }
 
 /// The specifications a resolver supports, each with the one dataset it admits.
-/// Construction authority supplies them in 015 Phase 5; until then only tests
-/// and fixtures do.
+/// Construction builds them from the Profile Specification it admitted; tests
+/// and fixtures also build them.
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Supported<Id> {
     entries: Vec<SemanticPins<Id>>,
 }
@@ -121,11 +122,13 @@ impl<Id: Eq> Supported<Id> {
     }
 }
 
+#[cfg(test)]
 impl<Id: Eq + From<&'static str>> Supported<Id> {
     /// Revision "0" of 015's Locale Canonicalization Specification, which
     /// admits one dataset: CLDR 48.2.0's, at the semantic digest the reference
     /// adapter's generated artifact records. That artifact is the authority for
-    /// the digest; a test admits it and binds it to this entry.
+    /// the digest; a test admits it and binds it to this entry. A resolver
+    /// built from the committed input supports the same entry.
     pub(crate) fn revision_zero() -> Self {
         Self {
             entries: vec![SemanticPins {
