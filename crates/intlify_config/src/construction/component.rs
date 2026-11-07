@@ -19,7 +19,9 @@
 //! Construction applies the construction-root bounds to the whole input before
 //! any of these checks, so reading an artifact applies no capacity of its own:
 //! a reader capacity below those bounds would refuse input the bounds admit,
-//! at a later row and with another reason.
+//! at a later row and with another reason. Reading also scans the bytes
+//! without recursion ([`scan`](super::scan)), for what they count in those
+//! bounds' units.
 
 use serde::Deserialize;
 use serde_json::Value;
@@ -32,26 +34,44 @@ use intlify_shared_json::token::IntegrityDigest;
 use super::admission::{ComponentAdmission, DRAFT_7};
 use super::failure::{Check, Component, ConstructionFailure, PRECEDENCE};
 use super::root::ConstructionRoot;
+use super::scan::{self, JsonCounts};
 use super::validator::schema::Schema;
 
-/// One artifact of the input: its exact bytes, and their value when they are
-/// strict UTF-8 JSON.
+/// One artifact of the input: its exact bytes, what they count when they are
+/// strict UTF-8 JSON, and their value when the shared decoder reads them.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Artifact {
     bytes: Vec<u8>,
+    counts: Option<JsonCounts>,
     value: Option<Value>,
 }
 
 impl Artifact {
     /// Read an artifact's bytes, once.
+    ///
+    /// The scan and the shared decoder read the same strict UTF-8 JSON, but
+    /// the decoder recurses and stops at its recursion limit: a strict
+    /// artifact deeper than that has counts and no value, and the depth bound
+    /// refuses it before any check reads a value.
     pub(crate) fn read(bytes: Vec<u8>) -> Self {
+        let counts = scan::scan(&bytes);
         let value = strict_json(&bytes);
-        Self { bytes, value }
+        Self {
+            bytes,
+            counts,
+            value,
+        }
     }
 
     /// The artifact's exact bytes.
     pub(crate) fn bytes(&self) -> &[u8] {
         &self.bytes
+    }
+
+    /// What the bytes count in the construction-root bounds' units, when
+    /// they are strict UTF-8 JSON.
+    pub(crate) const fn counts(&self) -> Option<JsonCounts> {
+        self.counts
     }
 
     /// The bytes' value, when they are strict UTF-8 JSON.
@@ -370,9 +390,31 @@ mod tests {
         let artifact = Artifact::read(b" {\"a\": \"b\"} ".to_vec());
         assert_eq!(artifact.bytes(), b" {\"a\": \"b\"} ");
         assert_eq!(artifact.value(), Some(&json!({ "a": "b" })));
+        assert_eq!(
+            artifact.counts(),
+            Some(JsonCounts {
+                depth: 2,
+                nodes: 2,
+                entries: 1,
+                string_bytes: 2,
+                longest_string: 1,
+            })
+        );
         let unread = Artifact::read(b"{".to_vec());
         assert_eq!(unread.bytes(), b"{");
         assert_eq!(unread.value(), None);
+        assert_eq!(unread.counts(), None);
+    }
+
+    /// A strict artifact deeper than the shared decoder's recursion limit
+    /// keeps its counts, for the depth bound, and no value.
+    #[test]
+    fn an_artifact_too_deep_for_the_decoder_still_counts() {
+        let levels = 200;
+        let deep = format!("{}{}", "[".repeat(levels), "]".repeat(levels));
+        let artifact = Artifact::read(deep.into_bytes());
+        assert_eq!(artifact.value(), None);
+        assert_eq!(artifact.counts().map(|counts| counts.depth), Some(200));
     }
 
     #[test]

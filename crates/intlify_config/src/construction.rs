@@ -41,6 +41,7 @@ pub(crate) mod profile;
 pub(crate) mod registry;
 pub(crate) mod root;
 pub(crate) mod rules;
+pub(crate) mod scan;
 pub(crate) mod validator;
 
 #[cfg(any(test, feature = "vectors"))]
