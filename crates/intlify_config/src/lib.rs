@@ -105,7 +105,8 @@ mod references;
 #[allow(dead_code)]
 mod artifacts;
 
-// 015's built-in Resolver Construction Root Package; construction will read it.
+// 015's resolver construction under its built-in Root Package; nothing builds a
+// resolver from it yet.
 #[allow(dead_code)]
 mod construction;
 

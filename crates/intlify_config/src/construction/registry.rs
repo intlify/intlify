@@ -29,9 +29,8 @@
 //! role order, the tuple of the member this crate writes for it (D15:2260).
 //! The resolver's dispatch tables write every member, so the committed
 //! bytes and the file digests compiled in keep the tables and the package
-//! the same (D15:2273). Construction's last row, which comes with the
-//! construction flow, is to compare the package it admitted with those
-//! digests.
+//! the same (D15:2273). Construction's last row compares the package it
+//! admitted with those digests.
 
 pub(crate) mod check;
 pub(crate) mod finding;
@@ -115,6 +114,19 @@ impl RegistryRole {
         }
     }
 
+    /// The file digest of the member the resolver is compiled from for the
+    /// role.
+    pub(crate) const fn implemented(self) -> &'static str {
+        match self {
+            Self::SafeOriginKindRegistrySchema => safe_origin::SCHEMA_DIGEST,
+            Self::CheckRegistrySchema => check::SCHEMA_DIGEST,
+            Self::FindingRegistrySchema => finding::SCHEMA_DIGEST,
+            Self::SafeOriginKindRegistry => safe_origin::DIGEST,
+            Self::CheckRegistry => check::DIGEST,
+            Self::FindingRegistry => finding::DIGEST,
+        }
+    }
+
     /// What the Root Package admits for the role.
     pub(crate) const fn admitted(self, members: &RegistryMembers) -> &Admitted {
         match self {
@@ -150,6 +162,8 @@ pub(crate) struct SubmittedPackage {
 pub(crate) struct AdmittedPackage {
     /// What its tuple declares.
     pub(crate) declared: Declared,
+    /// What its container declares for each member, in role order.
+    pub(crate) members: [Declared; 6],
     /// The Safe Origin Kind Registry.
     pub(crate) safe_origin_kinds: SafeOriginKindRegistry,
     /// The Check Registry.
@@ -173,13 +187,14 @@ pub(crate) fn admit(
         read_container,
     )?;
     let supplied = submitted.map(|package| &package.members);
+    let members = checked.read;
     let mut schemas = BTreeMap::new();
     let mut registries = BTreeMap::new();
-    for (role, declared) in RegistryRole::ALL.into_iter().zip(checked.read) {
+    for (role, declared) in RegistryRole::ALL.into_iter().zip(&members) {
         let artifact = supplied
             .and_then(|members| members.get(&role))
             .ok_or(MEMBER_PRESENCE_ROW)?;
-        match admit_member(root, role, &declared, artifact, &schemas)? {
+        match admit_member(root, role, declared, artifact, &schemas)? {
             Member::Schema(schema) => {
                 schemas.insert(role, schema);
             }
@@ -199,6 +214,7 @@ pub(crate) fn admit(
         .ok_or(CROSS_REFERENCES_ROW)?;
     Ok(AdmittedPackage {
         declared: checked.declared,
+        members,
         safe_origin_kinds,
         checks,
         findings,
@@ -484,6 +500,33 @@ mod tests {
         let admitted = admit(root(), Some(&package)).unwrap();
         assert_eq!(admitted.declared.digest, DIGEST);
         assert_eq!(admitted.findings, FindingRegistry::revision_zero());
+    }
+
+    /// Each role's pin is the file digest of the member this crate commits
+    /// for it, and construction keeps what the container declares for each
+    /// member, for the last row to compare.
+    #[test]
+    fn each_role_implements_its_committed_member() {
+        let members = members();
+        for (role, bytes) in &members {
+            assert_eq!(
+                role.implemented(),
+                component::file_digest(bytes).as_str(),
+                "{role:?}"
+            );
+        }
+        let admitted = admit(root(), Some(&package(&members))).unwrap();
+        for (role, member) in RegistryRole::ALL.into_iter().zip(&admitted.members) {
+            assert_eq!(
+                member,
+                &Declared {
+                    identity: format!("intlify-project-profile-{}", role.name()),
+                    revision: REVISION.to_owned(),
+                    digest: role.implemented().to_owned(),
+                    semantic_digest: None,
+                }
+            );
+        }
     }
 
     #[test]
