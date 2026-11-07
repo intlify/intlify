@@ -1,0 +1,956 @@
+{
+  "rows": [
+    {
+      "code": "project-profile-json-invalid",
+      "allowedCheckIds": [
+        "entry.input.well-formed-json"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "complete-input"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-json-member-duplicate",
+      "allowedCheckIds": [
+        "entry.input.unique-members"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "complete-input"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-input-not-json-compatible",
+      "allowedCheckIds": [
+        "entry.input.json-compatible"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "complete-input"
+      ],
+      "allowedReasons": [
+        "unsupported-type",
+        "non-finite-number",
+        "non-portable-number",
+        "invalid-unicode",
+        "non-string-key",
+        "dynamic-container",
+        "dynamic-property",
+        "sparse-array",
+        "cycle"
+      ],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-schema-version-unsupported",
+      "allowedCheckIds": [
+        "structural.schema-selection.supported-schema-version"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "configuration-schema-selection"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-required-field-missing",
+      "allowedCheckIds": [
+        "structural.schema-selection.present-schema-version",
+        "structural.root.required-field",
+        "structural.profile.required-field",
+        "structural.target.required-field",
+        "structural.group.required-field"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "configuration-schema-selection",
+        "root-field",
+        "profile-field",
+        "target-field",
+        "group-field"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-field-type-invalid",
+      "allowedCheckIds": [
+        "structural.schema-selection.object-root",
+        "structural.schema-selection.string-schema-version",
+        "structural.root.field-type",
+        "structural.profile.field-type",
+        "structural.target.field-type",
+        "structural.group.field-type"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "configuration-schema-selection",
+        "root-field",
+        "profile-field",
+        "target-field",
+        "group-field"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-field-value-invalid",
+      "allowedCheckIds": [
+        "structural.root.field-value",
+        "structural.profile-key.field-value",
+        "structural.profile.field-value",
+        "structural.target-key.field-value",
+        "structural.target.field-value",
+        "structural.group-key.field-value",
+        "structural.group.field-value"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "root-field",
+        "profile-key",
+        "profile-field",
+        "target-profile-key",
+        "target-field",
+        "deployment-group-key",
+        "group-field"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-unknown-field",
+      "allowedCheckIds": [
+        "structural.root.known-field",
+        "structural.profile.known-field",
+        "structural.target.known-field",
+        "structural.group.known-field"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "root-field",
+        "profile-field",
+        "target-field",
+        "group-field"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-selector-required",
+      "allowedCheckIds": [
+        "selection.selector.required"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "profile-selector"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-selector-invalid",
+      "allowedCheckIds": [
+        "selection.selector.valid"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "profile-selector"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-selector-unknown",
+      "allowedCheckIds": [
+        "selection.selector.declared"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "profile-selector"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-specification-input-incomplete",
+      "allowedCheckIds": [
+        "specification.project-profile.supported",
+        "specification.locale-canonicalization.supported",
+        "specification.locale-negotiation.supported",
+        "specification.message-locale-fallback.supported",
+        "specification.coverage.supported",
+        "specification.intent-surface-class-vocabulary.supported",
+        "specification.delivery-graph.supported",
+        "specification.delivery-placement.supported"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "project-profile-slot",
+        "locale-canonicalization-slot",
+        "locale-negotiation-slot",
+        "message-locale-fallback-slot",
+        "coverage-slot",
+        "intent-surface-class-vocabulary-slot",
+        "delivery-graph-slot",
+        "delivery-placement-slot"
+      ],
+      "allowedReasons": [
+        "missing-required-slot"
+      ],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-specification-not-admitted",
+      "allowedCheckIds": [
+        "specification.project-profile.supported"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "project-profile-slot"
+      ],
+      "allowedReasons": [
+        "unsupported",
+        "incompatible"
+      ],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-locale-specification-not-admitted",
+      "allowedCheckIds": [
+        "specification.locale-canonicalization.supported"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "locale-canonicalization-slot"
+      ],
+      "allowedReasons": [
+        "unsupported",
+        "incompatible"
+      ],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-locale-data-not-admitted",
+      "allowedCheckIds": [
+        "specification.locale-data.matching"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "canonicalization-data"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-negotiation-specification-not-admitted",
+      "allowedCheckIds": [
+        "specification.locale-negotiation.supported"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "locale-negotiation-slot"
+      ],
+      "allowedReasons": [
+        "unsupported",
+        "incompatible"
+      ],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-message-fallback-specification-not-admitted",
+      "allowedCheckIds": [
+        "specification.message-locale-fallback.supported"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "message-locale-fallback-slot"
+      ],
+      "allowedReasons": [
+        "unsupported",
+        "incompatible"
+      ],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-coverage-specification-not-admitted",
+      "allowedCheckIds": [
+        "specification.coverage.supported"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "coverage-slot"
+      ],
+      "allowedReasons": [
+        "unsupported",
+        "incompatible"
+      ],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-delivery-specification-not-admitted",
+      "allowedCheckIds": [
+        "specification.delivery-graph.supported",
+        "specification.delivery-placement.supported"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "delivery-graph-slot",
+        "delivery-placement-slot"
+      ],
+      "allowedReasons": [
+        "unsupported",
+        "incompatible"
+      ],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-intent-surface-class-vocabulary-not-admitted",
+      "allowedCheckIds": [
+        "specification.vocabulary.intact",
+        "specification.vocabulary.asserted"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "vocabulary"
+      ],
+      "allowedReasons": [
+        "body-integrity-invalid",
+        "member-invalid",
+        "member-duplicate",
+        "non-canonical-order",
+        "identity-mismatch",
+        "revision-mismatch",
+        "digest-mismatch"
+      ],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-locale-invalid",
+      "allowedCheckIds": [
+        "locale.requested.canonical",
+        "locale.default-source.canonical",
+        "locale.default-requested.canonical",
+        "locale.alias-key.canonical",
+        "locale.alias-destination.canonical",
+        "locale.fallback-key.canonical",
+        "locale.target-requested.canonical",
+        "locale.target-default-requested.canonical",
+        "fallback.candidate.canonical",
+        "coverage.locale.canonical"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "requested-locale",
+        "default-source-locale",
+        "default-requested-locale",
+        "negotiation-alias-key",
+        "negotiation-alias-value",
+        "message-fallback-key",
+        "target-requested-locale",
+        "target-default-requested-locale",
+        "fallback-candidate",
+        "coverage-locale"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-locale-non-canonical",
+      "allowedCheckIds": [
+        "locale.requested.canonical",
+        "locale.default-source.canonical",
+        "locale.default-requested.canonical",
+        "locale.alias-key.canonical",
+        "locale.alias-destination.canonical",
+        "locale.fallback-key.canonical",
+        "locale.target-requested.canonical",
+        "locale.target-default-requested.canonical",
+        "fallback.candidate.canonical",
+        "coverage.locale.canonical"
+      ],
+      "severity": "warning",
+      "blocking": false,
+      "allowedSubjectKinds": [
+        "requested-locale",
+        "default-source-locale",
+        "default-requested-locale",
+        "negotiation-alias-key",
+        "negotiation-alias-value",
+        "message-fallback-key",
+        "target-requested-locale",
+        "target-default-requested-locale",
+        "fallback-candidate",
+        "coverage-locale"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "canonical-locale-replacement"
+    },
+    {
+      "code": "project-profile-locale-duplicate",
+      "allowedCheckIds": [
+        "locale.requested.unique",
+        "locale.target-requested.unique",
+        "fallback.source.unique",
+        "coverage.locale.unique"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "requested-locale",
+        "target-requested-locale",
+        "fallback-source",
+        "coverage-locale"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-default-requested-locale-not-in-project",
+      "allowedCheckIds": [
+        "locale.default-requested.member"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "default-requested-locale"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-target-locales-not-subset",
+      "allowedCheckIds": [
+        "target.requested-locales.project-subset"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "target"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-target-default-locale-not-supported",
+      "allowedCheckIds": [
+        "target.effective-default.supported"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "target"
+      ],
+      "allowedReasons": [
+        "explicit-override",
+        "inherited-project-default"
+      ],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-target-locale-direction-missing",
+      "allowedCheckIds": [
+        "target.requested-locales.directed"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "target"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-negotiation-alias-duplicate",
+      "allowedCheckIds": [
+        "negotiation.alias-key.unique"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "negotiation-key"
+      ],
+      "allowedReasons": [
+        "same-destination",
+        "conflicting-destination"
+      ],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-negotiation-alias-destination-not-requested",
+      "allowedCheckIds": [
+        "negotiation.destination.member"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "negotiation-destination"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-message-fallback-source-not-requested",
+      "allowedCheckIds": [
+        "fallback.source.member"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "fallback-source"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-message-fallback-sequence-invalid",
+      "allowedCheckIds": [
+        "fallback.candidate.distinct-from-source",
+        "fallback.literal.unique",
+        "fallback.intent-source.unique"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "fallback-candidate",
+        "fallback-literal",
+        "fallback-intent-source"
+      ],
+      "allowedReasons": [
+        "literal-self-reference",
+        "literal-duplicate",
+        "intent-source-duplicate"
+      ],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-coverage-rule-invalid",
+      "allowedCheckIds": [
+        "coverage.locale.member",
+        "coverage.surface-class.vocabulary-member",
+        "coverage.surface-class.unique"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "coverage-locale",
+        "coverage-surface-class"
+      ],
+      "allowedReasons": [
+        "locale-not-requested",
+        "surface-class-unknown",
+        "surface-class-duplicate"
+      ],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-coverage-rule-duplicate",
+      "allowedCheckIds": [
+        "coverage.domain.unique"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "coverage-domain"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-coverage-rule-conflict",
+      "allowedCheckIds": [
+        "coverage.cell.effective-mode"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "coverage-cell"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-artifact-reference-not-admitted",
+      "allowedCheckIds": [
+        "resource-policy.resource-limits.bootstrap-candidate",
+        "artifact.policy-reference.resolved",
+        "artifact.target-profile-reference.resolved"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "resource-limits",
+        "resolved-policy-reference",
+        "resolved-target-profile-reference"
+      ],
+      "allowedReasons": [
+        "not-found",
+        "kind-mismatch",
+        "identity-mismatch",
+        "revision-mismatch",
+        "specification-revision-mismatch",
+        "specification-revision-unsupported",
+        "role-kind-mismatch",
+        "digest-mismatch"
+      ],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-artifact-collection-not-admitted",
+      "allowedCheckIds": [
+        "resource-policy.resource-limits.bootstrap-candidate",
+        "artifact.member.admissible",
+        "artifact.member.single-occurrence",
+        "artifact.conflict-group.consistent-content"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "resource-limits",
+        "collection-member",
+        "collection-group"
+      ],
+      "allowedReasons": [
+        "envelope-invalid",
+        "kind-unsupported",
+        "duplicate-envelope",
+        "conflicting-content"
+      ],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-group-member-unknown",
+      "allowedCheckIds": [
+        "group.member.known"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "group-member"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-group-member-duplicate",
+      "allowedCheckIds": [
+        "group.member.unique"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "group-member"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-target-unassigned",
+      "allowedCheckIds": [
+        "group.target.single-group"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "assignment"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-target-assigned-to-multiple-groups",
+      "allowedCheckIds": [
+        "group.target.single-group"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "assignment"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-hydration-relation-invalid",
+      "allowedCheckIds": [
+        "hydration.endpoint.known",
+        "hydration.endpoint.same-group",
+        "hydration.endpoint.role",
+        "hydration.relation.distinct-endpoints",
+        "hydration.relation.unique",
+        "hydration.target.single-role"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "relation-endpoint",
+        "relation",
+        "roles"
+      ],
+      "allowedReasons": [
+        "equal-endpoint",
+        "unknown-endpoint",
+        "cross-group",
+        "duplicate-relation",
+        "server-capability-missing",
+        "client-capability-missing",
+        "dual-role"
+      ],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-hydration-locale-policy-incompatible",
+      "allowedCheckIds": [
+        "hydration.relation.same-requested-locales",
+        "hydration.relation.same-effective-default"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "relation"
+      ],
+      "allowedReasons": [
+        "requested-locales",
+        "effective-default"
+      ],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-hydration-capability-incompatible",
+      "allowedCheckIds": [
+        "hydration.relation.static-compatibility"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "relation"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-resource-policy-not-admitted",
+      "allowedCheckIds": [
+        "resource-policy.resource-limits.bootstrap-candidate"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "resource-limits"
+      ],
+      "allowedReasons": [
+        "body-integrity-invalid",
+        "body-schema-invalid",
+        "project-profile-resolution-missing",
+        "project-profile-resolution-invalid"
+      ],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-resource-policy-capability-incompatible",
+      "allowedCheckIds": [
+        "resource-policy.resource-limits.compatible"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "resource-limits"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-bootstrap-limit-exceeded",
+      "allowedCheckIds": [
+        "entry.input.within-file-bytes",
+        "entry.input.within-parser-tokens"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "complete-input"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-resource-limit-exceeded",
+      "allowedCheckIds": [
+        "entry.input.within-nodes",
+        "entry.input.within-depth",
+        "entry.input.within-collection-entries",
+        "entry.input.within-total-string-bytes",
+        "entry.input.within-single-string-bytes",
+        "structural.analysis.within-capability",
+        "selection.profiles.within-capability",
+        "selection.profile-id.within-capability",
+        "selection.selector.within-capability",
+        "resource-policy.artifacts.within-capability",
+        "resource-policy.policy-artifacts.within-capability",
+        "resource-policy.target-profile-artifacts.within-capability",
+        "resource-policy.references.within-capability",
+        "resource-policy.artifact.within-capability",
+        "resource-policy.artifact-bytes.within-capability",
+        "resource-policy.policy-reference.within-capability",
+        "resource-policy.target-profile-reference.within-capability",
+        "resource-policy.reference-bytes.within-capability",
+        "resource-policy.root-nodes.within-bound",
+        "resource-policy.root-depth.within-bound",
+        "resource-policy.root-collection-entries.within-bound",
+        "resource-policy.root-string-bytes.within-bound",
+        "resource-policy.root-longest-string.within-bound",
+        "resource-policy.profiles.within-bound",
+        "resource-policy.profile-id.within-bound",
+        "resource-policy.selector.within-bound",
+        "resource-policy.structural-analysis.within-bound",
+        "resource-policy.artifacts.within-bound",
+        "resource-policy.policy-artifacts.within-bound",
+        "resource-policy.target-profile-artifacts.within-bound",
+        "resource-policy.references.within-bound",
+        "resource-policy.artifact.within-bound",
+        "resource-policy.artifact-bytes.within-bound",
+        "resource-policy.policy-reference.within-bound",
+        "resource-policy.target-profile-reference.within-bound",
+        "resource-policy.reference-bytes.within-bound",
+        "locale.occurrences.within-bound",
+        "locale.requested.canonical",
+        "locale.requested-set.within-bound",
+        "locale.default-source.canonical",
+        "locale.default-requested.canonical",
+        "locale.alias-key.canonical",
+        "locale.alias-destination.canonical",
+        "locale.fallback-key.canonical",
+        "locale.target-profiles.within-bound",
+        "locale.target-id.within-bound",
+        "locale.target-requested.canonical",
+        "locale.target-default-requested.canonical",
+        "negotiation.aliases.within-bound",
+        "fallback.sources.within-bound",
+        "fallback.sequence.within-bound",
+        "fallback.candidate.canonical",
+        "coverage.rules.within-bound",
+        "coverage.locale-selectors.within-bound",
+        "coverage.surface-selectors.within-bound",
+        "coverage.locale.canonical",
+        "coverage.cells.within-bound",
+        "coverage.comparisons.within-bound",
+        "group.groups.within-bound",
+        "group.memberships.within-bound",
+        "group.group-id.within-bound",
+        "group.members.within-bound",
+        "group.member.within-bound",
+        "hydration.relations.within-bound",
+        "hydration.endpoint.within-bound"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "complete-input",
+        "capability-structural-analysis",
+        "capability-profiles",
+        "capability-profile-id",
+        "profile-selector",
+        "capability-artifacts",
+        "capability-policy-artifacts",
+        "capability-target-profile-artifacts",
+        "capability-references",
+        "capability-artifact",
+        "capability-artifact-bytes",
+        "capability-policy-reference",
+        "capability-target-profile-reference",
+        "capability-reference-bytes",
+        "root-nodes",
+        "root-depth",
+        "root-collection-entries",
+        "root-string-bytes",
+        "root-longest-string",
+        "profiles",
+        "profile-id",
+        "selector",
+        "structural-analysis",
+        "artifacts",
+        "policy-artifacts",
+        "target-profile-artifacts",
+        "references",
+        "artifact",
+        "artifact-bytes",
+        "policy-reference",
+        "target-profile-reference",
+        "reference-bytes",
+        "locale-occurrences",
+        "requested-locale",
+        "requested-locales",
+        "default-source-locale",
+        "default-requested-locale",
+        "negotiation-alias-key",
+        "negotiation-alias-value",
+        "message-fallback-key",
+        "target-profiles",
+        "target-id",
+        "target-requested-locale",
+        "target-default-requested-locale",
+        "negotiation-aliases",
+        "fallback-sources",
+        "fallback-sequence",
+        "fallback-candidate",
+        "coverage-rules",
+        "coverage-locale-selectors",
+        "coverage-surface-selectors",
+        "coverage-locale",
+        "coverage-cells",
+        "coverage-comparisons",
+        "groups",
+        "memberships",
+        "group",
+        "group-members",
+        "group-member",
+        "relations",
+        "relation-endpoint"
+      ],
+      "allowedReasons": [],
+      "suggestionKind": "none"
+    },
+    {
+      "code": "project-profile-reporting-limit-exceeded",
+      "allowedCheckIds": [
+        "reporting.diagnostic-domain.complete"
+      ],
+      "severity": "error",
+      "blocking": true,
+      "allowedSubjectKinds": [
+        "diagnostic-domain"
+      ],
+      "allowedReasons": [
+        "entry",
+        "shared"
+      ],
+      "suggestionKind": "none"
+    }
+  ]
+}

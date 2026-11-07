@@ -18,12 +18,15 @@
 //! then reads the registries and checks that they form the required closed
 //! graph.
 //!
-//! The Safe Origin Kind Registry and the Check Registry are written here
-//! ([`safe_origin`], [`check`]), and row 41 reads each of them and checks its
-//! own graph. The Finding Registry, its schema, the container, and the
-//! references between registries come with their own stages.
+//! The Safe Origin Kind, Check, and Finding Registries are written here
+//! ([`safe_origin`], [`check`], [`finding`]). Row 41 reads each of them,
+//! checks its own graph, and reads the Finding Registry against the Check
+//! Registry, so that a code's checks are exactly the rows that list it. The
+//! rows' occurrence Evidence and its references to the Safe Origin Kind
+//! Registry, and the container's own artifact, come with their own stages.
 
 pub(crate) mod check;
+pub(crate) mod finding;
 pub(crate) mod safe_origin;
 
 use std::collections::BTreeMap;
@@ -39,6 +42,7 @@ use super::root::ConstructionRoot;
 use super::validator::schema::Schema;
 
 use self::check::CheckRegistry;
+use self::finding::FindingRegistry;
 use self::safe_origin::SafeOriginKindRegistry;
 
 /// The package's identity.
@@ -135,9 +139,8 @@ pub(crate) struct AdmittedPackage {
     pub(crate) safe_origin_kinds: SafeOriginKindRegistry,
     /// The Check Registry.
     pub(crate) checks: CheckRegistry,
-    /// The Finding Registry, valid against its admitted schema; it is read
-    /// when its own stage comes.
-    pub(crate) finding_registry: Value,
+    /// The Finding Registry, related to the Check Registry.
+    pub(crate) findings: FindingRegistry,
 }
 
 /// Check the Registry Package construction is given: rows 31 to 41 of the
@@ -177,11 +180,13 @@ pub(crate) fn admit(
             .ok_or(CROSS_REFERENCES_ROW)?;
     let checks =
         CheckRegistry::read(registry(RegistryRole::CheckRegistry)).ok_or(CROSS_REFERENCES_ROW)?;
+    let findings = FindingRegistry::read(registry(RegistryRole::FindingRegistry), &checks)
+        .ok_or(CROSS_REFERENCES_ROW)?;
     Ok(AdmittedPackage {
         declared: checked.declared,
         safe_origin_kinds,
         checks,
-        finding_registry: registry(RegistryRole::FindingRegistry).clone(),
+        findings,
     })
 }
 
@@ -265,15 +270,9 @@ mod tests {
         include_bytes!("../../conformance/registries/safe-origin-kind-v0.json");
     const CHECK_SCHEMA: &[u8] = include_bytes!("../../conformance/registries/check-v0.schema.json");
     const CHECKS: &[u8] = include_bytes!("../../conformance/registries/check-v0.json");
-
-    /// A registry schema that admits any container of rows, for the Finding
-    /// Registry, whose own schema comes with its own stage.
-    const ROWS_SCHEMA: &[u8] = br#"{
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "type": "object",
-        "required": ["rows"],
-        "properties": { "rows": { "type": "array" } }
-    }"#;
+    const FINDING_SCHEMA: &[u8] =
+        include_bytes!("../../conformance/registries/finding-v0.schema.json");
+    const FINDINGS: &[u8] = include_bytes!("../../conformance/registries/finding-v0.json");
     const NO_ROWS: &[u8] = br#"{"rows": []}"#;
     const OPEN_SCHEMA: &[u8] = br#"{"$schema": "http://json-schema.org/draft-07/schema#"}"#;
 
@@ -281,17 +280,15 @@ mod tests {
         ConstructionRoot::built_in().unwrap()
     }
 
-    /// Each member's bytes: the committed Safe Origin Kind and Check
-    /// Registries and their schemas, and an empty registry of rows for the
-    /// Finding Registry.
+    /// Each member's bytes: the committed registries and their schemas.
     fn members() -> Vec<(RegistryRole, Vec<u8>)> {
         vec![
             (R::SafeOriginKindRegistrySchema, SAFE_ORIGIN_SCHEMA.to_vec()),
             (R::CheckRegistrySchema, CHECK_SCHEMA.to_vec()),
-            (R::FindingRegistrySchema, ROWS_SCHEMA.to_vec()),
+            (R::FindingRegistrySchema, FINDING_SCHEMA.to_vec()),
             (R::SafeOriginKindRegistry, SAFE_ORIGINS.to_vec()),
             (R::CheckRegistry, CHECKS.to_vec()),
-            (R::FindingRegistry, NO_ROWS.to_vec()),
+            (R::FindingRegistry, FINDINGS.to_vec()),
         ]
     }
 
@@ -412,7 +409,7 @@ mod tests {
             SafeOriginKindRegistry::revision_zero()
         );
         assert_eq!(admitted.checks, CheckRegistry::revision_zero());
-        assert_eq!(admitted.finding_registry, json!({ "rows": [] }));
+        assert_eq!(admitted.findings, FindingRegistry::revision_zero());
     }
 
     #[test]
@@ -624,6 +621,41 @@ mod tests {
                 Some(41),
                 "{case}"
             );
+        }
+    }
+
+    #[test]
+    fn the_finding_registry_must_relate_to_the_check_registry() {
+        let findings: Value = serde_json::from_slice(FINDINGS).unwrap();
+        let checks: Value = serde_json::from_slice(CHECKS).unwrap();
+        // A code whose checks leave one of the rows that list it out.
+        let mut short = findings;
+        for row in short["rows"].as_array_mut().unwrap() {
+            if row["code"] == "project-profile-hydration-relation-invalid" {
+                row["allowedCheckIds"].as_array_mut().unwrap().pop();
+            }
+        }
+        let short = serde_json::to_vec_pretty(&short).unwrap();
+        // A check that no longer lists a code the Finding Registry gives it,
+        // a Check Registry closed by itself.
+        let mut dropped = checks;
+        for row in dropped["rows"].as_array_mut().unwrap() {
+            if row["checkId"] == "hydration.target.single-role" {
+                row["possibleFindingCodes"] = json!([]);
+                row["possibleEvidenceRecordKinds"] = json!(["shared-evaluation-status"]);
+                row["findingPayloadStrategy"]["details"] = json!([]);
+            }
+        }
+        let dropped = serde_json::to_vec_pretty(&dropped).unwrap();
+        for (case, members) in [
+            ("a check left out", members_with(R::FindingRegistry, &short)),
+            (
+                "a check that lists nothing",
+                members_with(R::CheckRegistry, &dropped),
+            ),
+        ] {
+            // The schemas admit both; the cross-references do not.
+            assert_eq!(checked(&package(&members)), Some(41), "{case}");
         }
     }
 }

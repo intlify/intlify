@@ -37,8 +37,9 @@
 //! A row's Finding codes are those its units may report, a notice included,
 //! in 015's table order: what the resolver's checks report, and for the kinds
 //! declared only, what 015 gives their checks. Every evaluation a test runs
-//! asserts that each code it records is one its unit's row lists. Whether a
-//! code names a Finding Registry row comes with that registry.
+//! asserts that each code it records is one its unit's row lists. Each code
+//! names one Finding Registry row, whose checks are exactly the rows that
+//! list the code ([`super::finding`]).
 //!
 //! A row's record kinds follow 015's rules for who owns which ordinary
 //! Evidence record, since the records themselves come with Resolution

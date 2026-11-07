@@ -27,6 +27,7 @@ use super::capability::{self, CapabilitySpecification};
 use super::component::file_digest;
 use super::profile::{self, ProjectProfileSpecification};
 use super::registry::check::{self, CheckRegistry};
+use super::registry::finding::{self, FindingRegistry};
 use super::registry::safe_origin::{self, SafeOriginKindRegistry};
 use super::root::{canonical_digest, RootRole, PATH};
 use super::rules::CrossAuthorityRules;
@@ -46,6 +47,8 @@ pub struct RegistryPins {
     pub safe_origin_kind_registry: String,
     pub check_registry_schema: String,
     pub check_registry: String,
+    pub finding_registry_schema: String,
+    pub finding_registry: String,
 }
 
 /// The two digests the implementation compiles in.
@@ -163,7 +166,8 @@ pub fn authorities() -> Result<Vec<Artifact>, serde_json::Error> {
 }
 
 /// Write the Registry Package's members: the Safe Origin Kind Registry's
-/// schema and the registry, then the Check Registry's.
+/// schema and the registry, then the Check Registry's, then the Finding
+/// Registry's.
 ///
 /// # Errors
 ///
@@ -188,6 +192,14 @@ pub fn registries() -> Result<Vec<Artifact>, serde_json::Error> {
             path: check::PATH,
             bytes: write(&serde_json::to_value(CheckRegistry::revision_zero())?)?,
         },
+        Artifact {
+            path: finding::SCHEMA_PATH,
+            bytes: write(&finding::schema()?)?,
+        },
+        Artifact {
+            path: finding::PATH,
+            bytes: write(&serde_json::to_value(FindingRegistry::revision_zero())?)?,
+        },
     ])
 }
 
@@ -197,13 +209,16 @@ pub fn registries() -> Result<Vec<Artifact>, serde_json::Error> {
 ///
 /// Returns the serialization failure of a member, which the values rule out.
 pub fn registry_pins() -> Result<RegistryPins, serde_json::Error> {
-    let [schema, registry, check_schema, check_registry] = <[Artifact; 4]>::try_from(registries()?)
-        .unwrap_or_else(|_| unreachable!("four members are written"));
+    let [schema, registry, check_schema, check_registry, finding_schema, finding_registry] =
+        <[Artifact; 6]>::try_from(registries()?)
+            .unwrap_or_else(|_| unreachable!("six members are written"));
     Ok(RegistryPins {
         safe_origin_kind_registry_schema: file_digest(&schema.bytes).as_str().to_owned(),
         safe_origin_kind_registry: file_digest(&registry.bytes).as_str().to_owned(),
         check_registry_schema: file_digest(&check_schema.bytes).as_str().to_owned(),
         check_registry: file_digest(&check_registry.bytes).as_str().to_owned(),
+        finding_registry_schema: file_digest(&finding_schema.bytes).as_str().to_owned(),
+        finding_registry: file_digest(&finding_registry.bytes).as_str().to_owned(),
     })
 }
 
@@ -293,7 +308,7 @@ mod tests {
     ];
 
     /// The committed Registry Package members, at their paths.
-    const COMMITTED_REGISTRIES: [(&str, &[u8]); 4] = [
+    const COMMITTED_REGISTRIES: [(&str, &[u8]); 6] = [
         (
             safe_origin::SCHEMA_PATH,
             include_bytes!("../../conformance/registries/safe-origin-kind-v0.schema.json"),
@@ -310,12 +325,20 @@ mod tests {
             check::PATH,
             include_bytes!("../../conformance/registries/check-v0.json"),
         ),
+        (
+            finding::SCHEMA_PATH,
+            include_bytes!("../../conformance/registries/finding-v0.schema.json"),
+        ),
+        (
+            finding::PATH,
+            include_bytes!("../../conformance/registries/finding-v0.json"),
+        ),
     ];
 
     #[test]
     fn the_committed_registries_are_the_ones_this_crate_writes() {
         let registries = registries().unwrap();
-        assert_eq!(registries.len(), 4);
+        assert_eq!(registries.len(), 6);
         for (artifact, (path, bytes)) in registries.iter().zip(COMMITTED_REGISTRIES) {
             assert_eq!(artifact.path, path);
             assert_eq!(
@@ -334,8 +357,10 @@ mod tests {
                 safe_origin_kind_registry: safe_origin::DIGEST.to_owned(),
                 check_registry_schema: check::SCHEMA_DIGEST.to_owned(),
                 check_registry: check::DIGEST.to_owned(),
+                finding_registry_schema: finding::SCHEMA_DIGEST.to_owned(),
+                finding_registry: finding::DIGEST.to_owned(),
             },
-            "the pinned digests in construction/registry/safe_origin.rs or check.rs are stale"
+            "the pinned digests in construction/registry/safe_origin.rs, check.rs, or finding.rs are stale"
         );
     }
 
