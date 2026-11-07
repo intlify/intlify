@@ -201,8 +201,8 @@ catalogs:
       specifier: ^3.5.39
       version: 3.5.39
     wasm-pack:
-      specifier: 0.15.0
-      version: 0.15.0
+      specifier: 0.15.1
+      version: 0.15.1
 
 overrides:
   vite: npm:@voidzero-dev/vite-plus-core@0.3.3
@@ -313,7 +313,7 @@ importers:
         version: 0.2.8(@types/node@24.13.2)(@voidzero-dev/vite-plus-core@0.3.3(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(typescript@6.0.3)(yaml@2.9.0))(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(typescript@6.0.3)(yaml@2.9.0)
       wasm-pack:
         specifier: 'catalog:'
-        version: 0.15.0
+        version: 0.15.1
 
   packages/ox-mf2-napi:
     devDependencies:
@@ -358,7 +358,7 @@ importers:
         version: 0.2.8(@types/node@24.13.2)(@voidzero-dev/vite-plus-core@0.3.3(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(typescript@6.0.3)(yaml@2.9.0))(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4)(typescript@6.0.3)(yaml@2.9.0)
       wasm-pack:
         specifier: 'catalog:'
-        version: 0.15.0
+        version: 0.15.1
 
   proto/locale-compiler-poc:
     devDependencies:
@@ -4557,8 +4557,8 @@ packages:
       typescript:
         optional: true
 
-  wasm-pack@0.15.0:
-    resolution: {integrity: sha512-DdqtGWc3+iFx+7lL7QU5LBWs7qMnwQSWxF0htSfE15sNa3roVwHjAkTm2JXgueU2GGfSwNqbq2EzyC2b/biKDA==}
+  wasm-pack@0.15.1:
+    resolution: {integrity: sha512-PF9zzc5tBVwN0E4Vff9o4hXWbg2VMt8YBhA0CiJ+T98cn2i1ElXSs9Hww6ZCWOVn+Kke3WMSPNXDdlMn7DXvnA==}
     engines: {node: '>=16'}
     hasBin: true
 
@@ -8153,7 +8153,7 @@ snapshots:
     optionalDependencies:
       typescript: 6.0.3
 
-  wasm-pack@0.15.0:
+  wasm-pack@0.15.1:
     dependencies:
       tar: 7.5.16
 
