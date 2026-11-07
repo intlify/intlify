@@ -737,9 +737,24 @@ pub(crate) struct Evaluation {
     statuses: BTreeMap<Unit, Status>,
     issues: BTreeMap<IssueKey, Option<Details>>,
     notices: BTreeSet<IssueKey>,
+    /// The unit a test makes block.
+    #[cfg(test)]
+    blocked: Option<Unit>,
 }
 
 impl Evaluation {
+    /// An evaluation in which `unit`, once its prerequisite is admitted,
+    /// blocks whatever it checks, so a test sees what waits on it: a unit
+    /// that needs its result is not evaluated, and a unit whose subject only
+    /// its result names is not recorded.
+    #[cfg(test)]
+    pub(crate) fn blocking(unit: Unit) -> Self {
+        Self {
+            blocked: Some(unit),
+            ..Self::default()
+        }
+    }
+
     /// Runs `unit` when its prerequisite is admitted and records its status.
     /// A unit whose subject is of another phase's kind, that runs a check its
     /// kind does not run, or that waits on a result not before it, is a
@@ -768,6 +783,19 @@ impl Evaluation {
         if self.statuses.contains_key(&unit) {
             return Err(EvaluationInvariant::UnitRecordedTwice(unit));
         }
+        #[cfg(test)]
+        let evaluate = |value| {
+            if self.blocked.as_ref() == Some(&unit) {
+                // Any code serves: the test reads only which unit blocked.
+                Err(Blocking {
+                    code: Code::JsonInvalid,
+                    reason: None,
+                    details: None,
+                })
+            } else {
+                evaluate(value)
+            }
+        };
         let (status, result) = match prerequisite {
             Err(causes) => (Status::NotEvaluated(causes.clone()), Err(causes)),
             Ok(value) => match evaluate(value) {
@@ -1185,6 +1213,56 @@ mod tests {
             ]
         );
         assert_eq!(joined.clone().union(placement), joined);
+    }
+
+    #[test]
+    fn a_test_can_make_a_unit_block_to_see_what_waits_on_it() {
+        let blocked = slot(Slot::LocaleCanonicalization);
+        let mut evaluation = Evaluation::blocking(blocked.clone());
+        let mut ran = false;
+        let causes = evaluation
+            .check(blocked.clone(), Ok(()), |()| {
+                ran = true;
+                Ok::<(), Blocking>(())
+            })
+            .unwrap()
+            .unwrap_err();
+        assert!(!ran);
+        let found: Vec<_> = evaluation.issues().cloned().collect();
+        assert_eq!(causes.keys().collect::<Vec<_>>(), [&found[0]]);
+        assert_eq!(found[0].unit(), &blocked);
+        assert_eq!(evaluation.status(&blocked), Some(&Status::Evaluated));
+        // What waits on it is not evaluated, and every other unit runs.
+        let waiting = evaluation
+            .check(data(), Err::<(), _>(causes.clone()), |()| {
+                Ok::<(), Blocking>(())
+            })
+            .unwrap();
+        assert_eq!(waiting, Err(causes.clone()));
+        assert_eq!(
+            evaluation.status(&data()),
+            Some(&Status::NotEvaluated(causes))
+        );
+        let doubled = evaluation
+            .check(slot(Slot::Coverage), Ok(2), |value| {
+                Ok::<_, Blocking>(value * 2)
+            })
+            .unwrap();
+        assert_eq!(doubled, Ok(4));
+        // Without its prerequisite, the unit is not evaluated and finds nothing.
+        let mut evaluation = Evaluation::blocking(data());
+        let causes = missing(&mut evaluation, blocked);
+        let waiting = evaluation
+            .check(data(), Err::<(), _>(causes.clone()), |()| {
+                Ok::<(), Blocking>(())
+            })
+            .unwrap();
+        assert_eq!(waiting, Err(causes.clone()));
+        assert_eq!(
+            evaluation.status(&data()),
+            Some(&Status::NotEvaluated(causes))
+        );
+        assert_eq!(evaluation.issues().count(), 1);
     }
 
     #[test]

@@ -1,16 +1,16 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! The Check Registry and its schema, as far as each row's identity and
-//! subject kind go.
+//! The Check Registry and its schema, as far as each row's identity, subject
+//! kind, and prerequisites go.
 //!
 //! Design 015's Check Registry has one row for each `(phase, subject kind,
 //! check)` the resolver evaluates (D15:2167). Revision `"0"` writes the rows
 //! from the resolver's own kinds and checks: every check of every kind in
 //! [`SubjectKind::ALL`], the kinds declared only included, in phase, kind-rank,
 //! and check-rank order. A row names its check ID, phase, rule ID, subject
-//! kind, key strategy, content projection, owning scope, parent subject, and
-//! its two ranks. The prerequisites, the codes and Evidence record kinds a row
+//! kind, key strategy, content projection, owning scope, parent subject, its
+//! two ranks, and its prerequisites. The codes and Evidence record kinds a row
 //! may produce, the dependencies it owns, and its payload strategy come with
 //! their own stages.
 //!
@@ -23,19 +23,32 @@
 //! because classifying invalid content as non-secret would expose arbitrary
 //! values (Decision 015-157); every other kind uses `none`.
 //!
+//! A row's prerequisites are the checks its units wait on (D15:2143, 2160): a
+//! unit waits on a check whose result it needs, and is not evaluated without
+//! it, or whose result alone names its subjects, and is then not recorded. A
+//! row lists, in row order, the checks it waits on that none of the others it
+//! lists already waits on. A check under the admitted Resource Limit Policy
+//! waits on every Policy recheck (D15:1675). The kinds declared only list no
+//! prerequisite until their units exist, and no row lists a check of
+//! structural admission or profile selection yet: the resolver starts from
+//! their complete results.
+//!
 //! Construction reads the registry it admitted with the registry
 //! cross-references (row 41), and refuses one this type cannot read or whose
 //! rows do not relate as 015 requires: a check ID names one row, under its own
 //! rule ID; the rows of one kind in one phase agree on its key shape, parent,
 //! and rank (D15:2178); kinds rank uniquely within a phase and checks within a
 //! kind (D15:2193, 2195); only a kind keyed by an identity or content names a
-//! projection (D15:2182); a singleton is unscoped; and a parent is a kind with
+//! projection (D15:2182); a singleton is unscoped; a parent is a kind with
 //! rows in the same or an earlier phase (D15:2169), from which following
-//! parents ends at an unscoped kind. Ranks are compared as the shortest
-//! decimal strings the schema spells them as. Whether the rows are this
-//! resolver's own kinds and checks is not part of the graph: a closed registry
-//! that is not the one compiled in fails the implemented-authority row (43) by
-//! its file digest.
+//! parents ends at an unscoped kind; and a prerequisite names a row once,
+//! never one of a later phase or of a kind its phase ranks later, and
+//! following prerequisites never comes back to a row (D15:2269). A row of the
+//! same kind may be an earlier subject's check (D15:2143), so its rank is not
+//! compared. Ranks are compared as the shortest decimal strings the schema
+//! spells them as. Whether the rows are this resolver's own kinds and checks
+//! is not part of the graph: a closed registry that is not the one compiled in
+//! fails the implemented-authority row (43) by its file digest.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -67,11 +80,11 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:be46e5286158dc65ccd5dc79bc2d089df29fc47f52be91d91520cf5890ad15d9";
+    "sha256:7ce975e71b253567fc885d4ea27763e72e1e96db4feb31f40ed9565e1b41b66f";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
-    "sha256:a41d95f8857d83e6d59a3ab1d53e3379c63e45a187cd9e0d4d0729cef88e7aa7";
+    "sha256:14442a9d04ee531fa1cd0da3744026e85473931942fec07390e33f074dd9d682";
 
 /// A check ID: three kebab-case segments joined by dots.
 pub(crate) const CHECK_ID_PATTERN: &str =
@@ -133,6 +146,9 @@ pub(crate) struct CheckRow {
     pub(crate) subject_kind_rank: String,
     #[schemars(pattern(RANK_PATTERN))]
     pub(crate) check_rank: String,
+    /// The checks the row waits on, except those another listed check waits on.
+    #[schemars(extend("uniqueItems" = true), inner(pattern(CHECK_ID_PATTERN)))]
+    pub(crate) prerequisite_check_ids: Vec<String>,
 }
 
 /// The registry's body.
@@ -151,8 +167,10 @@ impl CheckRegistry {
         for kind in SubjectKind::ALL {
             let shape = shape(kind);
             let ids = check_ids(kind);
+            let prerequisites = prerequisite_ids(kind);
             debug_assert_eq!(ids.len(), kind.checks().len(), "{kind:?}");
-            for (rank, id) in ids.iter().enumerate() {
+            debug_assert_eq!(prerequisites.len(), ids.len(), "{kind:?}");
+            for (rank, (id, prerequisites)) in ids.iter().zip(prerequisites).enumerate() {
                 rows.push(CheckRow {
                     check_id: (*id).to_owned(),
                     phase_id: kind.phase(),
@@ -167,6 +185,10 @@ impl CheckRegistry {
                     }),
                     subject_kind_rank: kind.rank().to_string(),
                     check_rank: rank.to_string(),
+                    prerequisite_check_ids: prerequisites
+                        .iter()
+                        .map(|&prerequisite| prerequisite.to_owned())
+                        .collect(),
                 });
             }
         }
@@ -184,7 +206,8 @@ impl CheckRegistry {
     /// Whether the rows relate as 015 requires: each check ID is one row's,
     /// under its own rule ID; every row's key shape is sound and agrees with
     /// the other rows of its kind; kinds rank uniquely within a phase and
-    /// checks within a kind; and every chain of parents ends.
+    /// checks within a kind; every chain of parents ends; and so does every
+    /// chain of prerequisites.
     fn is_closed(&self) -> bool {
         let mut domains = BTreeMap::new();
         for row in &self.rows {
@@ -216,6 +239,7 @@ impl CheckRegistry {
             && check_ranks.len() == self.rows.len()
             && kind_ranks.len() == domains.len()
             && parents_end(&domains)
+            && prerequisites_end(&self.rows)
     }
 }
 
@@ -271,6 +295,67 @@ fn parents_end(domains: &BTreeMap<(Phase, SubjectKind), Domain<'_>>) -> bool {
         }
         false
     })
+}
+
+/// Whether every prerequisite names a row once, never one whose units follow
+/// all of its dependent's in canonical unit order, and whether following
+/// prerequisites from any row ends, so that no row waits on itself
+/// (D15:2269).
+fn prerequisites_end(rows: &[CheckRow]) -> bool {
+    let named: BTreeMap<&str, &CheckRow> = rows
+        .iter()
+        .map(|row| (row.check_id.as_str(), row))
+        .collect();
+    // How many of each row's prerequisites have not ended yet, and which rows
+    // wait on each row.
+    let mut pending = BTreeMap::new();
+    let mut dependents: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for row in rows {
+        let mut listed = BTreeSet::new();
+        for id in &row.prerequisite_check_ids {
+            match named.get(id.as_str()) {
+                Some(prerequisite) if listed.insert(id.as_str()) && !follows(prerequisite, row) => {
+                    dependents
+                        .entry(id.as_str())
+                        .or_default()
+                        .push(row.check_id.as_str());
+                }
+                _ => return false,
+            }
+        }
+        pending.insert(row.check_id.as_str(), listed.len());
+    }
+    let mut ended: Vec<&str> = pending
+        .iter()
+        .filter(|&(_, &left)| left == 0)
+        .map(|(&id, _)| id)
+        .collect();
+    let mut count = 0;
+    while let Some(id) = ended.pop() {
+        count += 1;
+        for &dependent in dependents.get(id).into_iter().flatten() {
+            if let Some(left) = pending.get_mut(dependent) {
+                *left -= 1;
+                if *left == 0 {
+                    ended.push(dependent);
+                }
+            }
+        }
+    }
+    count == pending.len()
+}
+
+/// Whether `prerequisite`'s units follow all of `dependent`'s in canonical
+/// unit order: it is of a later phase, or of a kind its phase ranks later
+/// (D15:2143). A row of the same kind may be an earlier subject's check.
+fn follows(prerequisite: &CheckRow, dependent: &CheckRow) -> bool {
+    place(prerequisite) > place(dependent)
+}
+
+/// A row's phase and kind rank, the rank compared as a number.
+fn place(row: &CheckRow) -> (Phase, usize, &str) {
+    let rank = row.subject_kind_rank.as_str();
+    (row.phase_id, rank.len(), rank)
 }
 
 /// The registry's schema.
@@ -699,12 +784,413 @@ const fn check_ids(kind: SubjectKind) -> &'static [&'static str] {
     }
 }
 
+/// No prerequisite.
+const NONE: &[&str] = &[];
+
+/// The prerequisites of a check of a kind declared only: none listed until
+/// its units exist.
+const NOT_YET: &[&str] = &[];
+
+/// What a check under the admitted Resource Limit Policy waits on: every
+/// Policy recheck, in row order (D15:1675).
+const CONFIRMED_POLICY: &[&str] = &[
+    "resource-policy.root-nodes.within-bound",
+    "resource-policy.root-depth.within-bound",
+    "resource-policy.root-collection-entries.within-bound",
+    "resource-policy.root-string-bytes.within-bound",
+    "resource-policy.root-longest-string.within-bound",
+    "resource-policy.profiles.within-bound",
+    "resource-policy.profile-id.within-bound",
+    "resource-policy.selector.within-bound",
+    "resource-policy.structural-analysis.within-bound",
+    "resource-policy.artifacts.within-bound",
+    "resource-policy.policy-artifacts.within-bound",
+    "resource-policy.target-profile-artifacts.within-bound",
+    "resource-policy.references.within-bound",
+    "resource-policy.artifact.within-bound",
+    "resource-policy.artifact-bytes.within-bound",
+    "resource-policy.policy-reference.within-bound",
+    "resource-policy.target-profile-reference.within-bound",
+    "resource-policy.reference-bytes.within-bound",
+];
+
+/// Each kind's prerequisites, one list for each of its checks in the order
+/// of [`SubjectKind::checks`]: the checks its units wait on that none of the
+/// others listed already waits on, in row order. The resolver's tests make
+/// each unit of complete invocations block, and these are the waits the
+/// units show. The kinds declared only wait on nothing until their units
+/// exist.
+#[expect(clippy::too_many_lines, reason = "one list for each of 015's checks")]
+const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str]] {
+    use SubjectKind as K;
+    match kind {
+        K::ProjectProfileSlot
+        | K::CapabilityArtifacts
+        | K::CapabilityPolicyArtifacts
+        | K::CapabilityTargetProfileArtifacts
+        | K::CapabilityReferences
+        | K::CapabilityArtifact
+        | K::CapabilityArtifactBytes
+        | K::CapabilityPolicyReference
+        | K::CapabilityTargetProfileReference
+        | K::CapabilityReferenceBytes => &[NONE],
+        K::ProfileSpecificationDependency => &[&["specification.project-profile.supported"]],
+        K::ResourceLimits => &[
+            &[
+                "resource-policy.artifacts.within-capability",
+                "resource-policy.policy-artifacts.within-capability",
+                "resource-policy.target-profile-artifacts.within-capability",
+                "resource-policy.artifact.within-capability",
+                "resource-policy.artifact-bytes.within-capability",
+                "resource-policy.policy-reference.within-capability",
+            ],
+            &["resource-policy.resource-limits.bootstrap-candidate"],
+        ],
+        K::RootNodes
+        | K::RootDepth
+        | K::RootCollectionEntries
+        | K::RootStringBytes
+        | K::RootLongestString
+        | K::Profiles
+        | K::ProfileId
+        | K::Selector
+        | K::StructuralAnalysis
+        | K::Artifacts
+        | K::PolicyArtifacts
+        | K::TargetProfileArtifacts
+        | K::References
+        | K::Artifact
+        | K::ArtifactBytes
+        | K::PolicyReference
+        | K::TargetProfileReference
+        | K::ReferenceBytes => &[&["resource-policy.resource-limits.compatible"]],
+        K::LocaleCanonicalizationSlot
+        | K::LocaleNegotiationSlot
+        | K::MessageLocaleFallbackSlot
+        | K::CoverageSlot
+        | K::IntentSurfaceClassVocabularySlot
+        | K::DeliveryGraphSlot
+        | K::DeliveryPlacementSlot
+        | K::DeclarationField
+        | K::LocaleOccurrences
+        | K::TargetProfiles
+        | K::CollectionGroup
+        | K::Groups
+        | K::Memberships
+        | K::Relations => &[CONFIRMED_POLICY],
+        K::Vocabulary => &[
+            CONFIRMED_POLICY,
+            &[
+                "specification.intent-surface-class-vocabulary.supported",
+                "specification.vocabulary.intact",
+            ],
+        ],
+        K::CanonicalizationData => &[&["specification.locale-canonicalization.supported"]],
+        K::LocaleCanonicalizationDependency => &[&["specification.locale-data.matching"]],
+        K::ProjectIdentityDependency => &[&["identity.declaration-field.opaque"]],
+        K::RequestedLocale => &[
+            &[
+                "specification.locale-data.matching",
+                "locale.occurrences.within-bound",
+            ],
+            &["locale.requested.canonical"],
+        ],
+        K::RequestedLocales => &[&["locale.requested.canonical"]],
+        K::DefaultSourceLocale
+        | K::NegotiationAliasKey
+        | K::NegotiationAliasValue
+        | K::MessageFallbackKey => &[&[
+            "specification.locale-data.matching",
+            "locale.occurrences.within-bound",
+        ]],
+        K::DefaultRequestedLocale => &[
+            &[
+                "specification.locale-data.matching",
+                "locale.occurrences.within-bound",
+            ],
+            &[
+                "locale.requested.canonical",
+                "locale.default-requested.canonical",
+            ],
+        ],
+        K::TargetId => &[&["locale.target-profiles.within-bound"]],
+        K::TargetRequestedLocale => &[
+            &[
+                "specification.locale-data.matching",
+                "locale.occurrences.within-bound",
+                "locale.target-id.within-bound",
+            ],
+            &["locale.target-requested.canonical"],
+        ],
+        K::TargetDefaultRequestedLocale => &[&[
+            "specification.locale-data.matching",
+            "locale.occurrences.within-bound",
+            "locale.target-id.within-bound",
+        ]],
+        K::ProjectLocalesDependency => &[&[
+            "locale.requested.unique",
+            "locale.requested-set.within-bound",
+            "locale.default-source.canonical",
+            "locale.default-requested.member",
+        ]],
+        K::NegotiationAliases => &[&["specification.locale-negotiation.supported"]],
+        K::NegotiationKey => &[&[
+            "locale.alias-key.canonical",
+            "negotiation.aliases.within-bound",
+        ]],
+        K::NegotiationDestination => &[&[
+            "locale.requested.canonical",
+            "locale.alias-destination.canonical",
+            "negotiation.aliases.within-bound",
+        ]],
+        K::FallbackSources => &[&["specification.message-locale-fallback.supported"]],
+        K::FallbackSource => &[
+            &[
+                "locale.fallback-key.canonical",
+                "fallback.sources.within-bound",
+            ],
+            &[
+                "locale.requested.canonical",
+                "locale.fallback-key.canonical",
+                "fallback.sources.within-bound",
+            ],
+        ],
+        K::FallbackSequence => &[&["fallback.source.unique"]],
+        K::FallbackCandidate => &[
+            &["fallback.sequence.within-bound"],
+            &["fallback.candidate.canonical"],
+        ],
+        K::FallbackLiteral => &[&["fallback.candidate.canonical"]],
+        K::FallbackIntentSource => &[&["fallback.sequence.within-bound"]],
+        K::CoverageRules | K::CoverageLocaleSelectors | K::CoverageSurfaceSelectors => {
+            &[&["specification.coverage.supported"]]
+        }
+        K::CoverageLocale => &[
+            &[
+                "specification.locale-data.matching",
+                "locale.occurrences.within-bound",
+                "coverage.rules.within-bound",
+                "coverage.locale-selectors.within-bound",
+            ],
+            &["coverage.locale.canonical"],
+            &["locale.requested.canonical", "coverage.locale.canonical"],
+        ],
+        K::CoverageSurfaceClass => &[
+            &[
+                "specification.vocabulary.asserted",
+                "coverage.rules.within-bound",
+                "coverage.surface-selectors.within-bound",
+            ],
+            &["coverage.surface-class.vocabulary-member"],
+        ],
+        K::CoverageRule => &[&[
+            "coverage.locale.unique",
+            "coverage.locale.member",
+            "coverage.surface-class.unique",
+        ]],
+        K::CoverageDomain => &[&["coverage.rule.normalized-domain"]],
+        K::CoverageCells | K::CoverageComparisons => &[&[
+            "specification.coverage.supported",
+            "specification.vocabulary.asserted",
+            "locale.requested.canonical",
+        ]],
+        K::CoverageCell => &[&[
+            "coverage.domain.unique",
+            "coverage.cells.within-bound",
+            "coverage.comparisons.within-bound",
+        ]],
+        K::CoverageTable => &[&["coverage.cell.effective-mode"]],
+        K::LocaleNegotiationDependency => &[&[
+            "negotiation.alias-key.unique",
+            "negotiation.destination.member",
+        ]],
+        K::MessageFallbackDependency => &[&[
+            "fallback.source.member",
+            "fallback.candidate.distinct-from-source",
+            "fallback.literal.unique",
+            "fallback.intent-source.unique",
+        ]],
+        K::CoverageDependency => &[&["coverage.table.complete"]],
+        K::CollectionMember => &[CONFIRMED_POLICY, CONFIRMED_POLICY],
+        K::ResolvedPolicyReference => &[&[
+            "artifact.member.admissible",
+            "artifact.member.single-occurrence",
+            "artifact.conflict-group.consistent-content",
+        ]],
+        K::ResolvedTargetProfileReference => &[&[
+            "locale.target-id.within-bound",
+            "artifact.member.admissible",
+            "artifact.member.single-occurrence",
+            "artifact.conflict-group.consistent-content",
+        ]],
+        K::RequiredPoliciesDependency | K::OptionalPoliciesDependency => {
+            &[&["artifact.policy-reference.resolved"]]
+        }
+        K::DeliveryPlacement => &[&[
+            "specification.delivery-graph.supported",
+            "specification.delivery-placement.supported",
+        ]],
+        K::DeliveryDependency => &[&["delivery.placement.effective-mode"]],
+        K::Target => &[
+            &[
+                "locale.requested.canonical",
+                "locale.target-requested.canonical",
+            ],
+            &[
+                "locale.default-requested.canonical",
+                "locale.target-requested.canonical",
+                "locale.target-default-requested.canonical",
+            ],
+            &[
+                "locale.target-requested.canonical",
+                "artifact.target-profile-reference.resolved",
+            ],
+        ],
+        K::TargetsDependency => &[&[
+            "locale.target-requested.unique",
+            "target.requested-locales.project-subset",
+            "target.effective-default.supported",
+            "target.requested-locales.directed",
+        ]],
+        K::Group => &[&["group.groups.within-bound"]],
+        K::GroupMembers => &[&["group.group-id.within-bound"]],
+        K::GroupMember => &[
+            &[
+                "group.memberships.within-bound",
+                "group.members.within-bound",
+            ],
+            &[
+                "locale.target-profiles.within-bound",
+                "group.member.within-bound",
+            ],
+            &["group.member.within-bound"],
+        ],
+        K::Assignment => &[&[
+            "locale.target-id.within-bound",
+            "group.memberships.within-bound",
+            "group.members.within-bound",
+        ]],
+        K::RelationEndpoint => &[
+            &[
+                "group.group-id.within-bound",
+                "hydration.relations.within-bound",
+            ],
+            &[
+                "locale.target-profiles.within-bound",
+                "hydration.endpoint.within-bound",
+            ],
+            &[
+                "group.members.within-bound",
+                "hydration.endpoint.within-bound",
+            ],
+            &[
+                "artifact.target-profile-reference.resolved",
+                "hydration.endpoint.known",
+            ],
+        ],
+        K::Relation => &[
+            &["hydration.endpoint.within-bound"],
+            &["hydration.endpoint.within-bound"],
+            &[
+                "target.requested-locales.project-subset",
+                "hydration.endpoint.known",
+            ],
+            &[
+                "target.effective-default.supported",
+                "hydration.endpoint.known",
+            ],
+            &[
+                "artifact.target-profile-reference.resolved",
+                "hydration.endpoint.known",
+            ],
+        ],
+        K::Roles => &[&["hydration.endpoint.within-bound"]],
+        K::DeploymentGroupsDependency => &[&[
+            "group.member.known",
+            "group.member.unique",
+            "group.target.single-group",
+            "hydration.endpoint.same-group",
+            "hydration.endpoint.role",
+            "hydration.relation.distinct-endpoints",
+            "hydration.relation.unique",
+            "hydration.relation.same-requested-locales",
+            "hydration.relation.same-effective-default",
+            "hydration.relation.static-compatibility",
+            "hydration.target.single-role",
+        ]],
+        // Declared only: their units come with their phases' Findings.
+        K::EntryDependencies
+        | K::MaterializedDependencies
+        | K::CapabilityStructuralAnalysis
+        | K::ProfileKey
+        | K::TargetProfileKey
+        | K::DeploymentGroupKey
+        | K::CapabilityProfiles
+        | K::CapabilityProfileId
+        | K::DiagnosticDomain => &[NOT_YET],
+        K::CompleteInput => &[NOT_YET; 10],
+        K::ConfigurationSchemaSelection
+        | K::RootField
+        | K::ProfileField
+        | K::TargetField
+        | K::GroupField
+        | K::ProfileSelector => &[NOT_YET; 4],
+    }
+}
+
+/// Helpers for the tests that compare the resolver with the registry.
+#[cfg(test)]
+pub(crate) mod testing {
+    use std::collections::{BTreeMap, BTreeSet};
+
+    use crate::resolver::evaluation::Check;
+    use crate::resolver::subject::SubjectKind;
+
+    use super::{check_ids, CheckRegistry};
+
+    /// The check ID of `check` of `kind`.
+    pub(crate) fn check_id(kind: SubjectKind, check: Check) -> &'static str {
+        let rank = kind
+            .checks()
+            .iter()
+            .position(|&own| own == check)
+            .expect("the kind runs the check");
+        check_ids(kind)[rank]
+    }
+
+    /// Every row each row of `registry` waits on, through its prerequisites
+    /// and theirs.
+    pub(crate) fn requirements(registry: &CheckRegistry) -> BTreeMap<&str, BTreeSet<&str>> {
+        let prerequisites: BTreeMap<&str, &[String]> = registry
+            .rows
+            .iter()
+            .map(|row| (row.check_id.as_str(), row.prerequisite_check_ids.as_slice()))
+            .collect();
+        prerequisites
+            .keys()
+            .map(|&id| {
+                let mut found = BTreeSet::new();
+                let mut pending = vec![id];
+                while let Some(next) = pending.pop() {
+                    for prerequisite in prerequisites[next] {
+                        if found.insert(prerequisite.as_str()) {
+                            pending.push(prerequisite.as_str());
+                        }
+                    }
+                }
+                (id, found)
+            })
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
 
     use serde_json::json;
 
+    use super::testing::requirements;
     use super::*;
     use crate::construction::admission::{ConstructionAdmission, DRAFT_7};
     use crate::construction::validator::schema::Schema;
@@ -933,7 +1419,11 @@ mod tests {
                     "subjectKind": "relation"
                 },
                 "subjectKindRank": "1",
-                "checkRank": "1"
+                "checkRank": "1",
+                "prerequisiteCheckIds": [
+                    "locale.target-profiles.within-bound",
+                    "hydration.endpoint.within-bound"
+                ]
             })
         );
         // An unscoped row has no parent member at all.
@@ -987,6 +1477,135 @@ mod tests {
             let own = shape(kind);
             assert_eq!(own.parent, Some(parent), "{kind:?}");
             assert_eq!(own.strategy, strategy, "{kind:?}");
+        }
+    }
+
+    /// The prerequisites of `check` of `kind`.
+    fn prerequisites(kind: SubjectKind, check: Check) -> Vec<String> {
+        row(kind, check).prerequisite_check_ids
+    }
+
+    #[test]
+    fn a_row_lists_the_checks_its_units_wait_on() {
+        use SubjectKind as K;
+        // A member is known once its bytes hold and the Target ID map's bound
+        // does; it waits on the other bounds through those two.
+        assert_eq!(
+            prerequisites(K::GroupMember, Check::KnownMember),
+            [
+                "locale.target-profiles.within-bound",
+                "group.member.within-bound"
+            ]
+        );
+        assert_eq!(
+            prerequisites(K::DefaultRequestedLocale, Check::RequestedMember),
+            [
+                "locale.requested.canonical",
+                "locale.default-requested.canonical"
+            ]
+        );
+        // Only a rule that normalized to a domain names it.
+        assert_eq!(
+            prerequisites(K::CoverageDomain, Check::UniqueDomain),
+            ["coverage.rule.normalized-domain"]
+        );
+        // Phase 0, and the bounds before a policy is admitted, wait on nothing.
+        for (kind, check) in [
+            (K::ProjectProfileSlot, Check::SupportedAssertion),
+            (K::CapabilityArtifacts, Check::WithinCapability),
+        ] {
+            assert!(prerequisites(kind, check).is_empty(), "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn a_check_under_the_admitted_policy_waits_on_every_recheck() {
+        let rows = registry().rows;
+        let rechecks: Vec<&str> = rows
+            .iter()
+            .filter(|row| {
+                row.phase_id == Phase::ResourcePolicyAdmission
+                    && row.check_id.ends_with(".within-bound")
+            })
+            .map(|row| row.check_id.as_str())
+            .collect();
+        assert_eq!(rechecks, CONFIRMED_POLICY);
+        for row in &rows {
+            let listed = row
+                .prerequisite_check_ids
+                .iter()
+                .filter(|id| rechecks.contains(&id.as_str()))
+                .count();
+            assert!(listed == 0 || listed == rechecks.len(), "{}", row.check_id);
+        }
+        assert_eq!(
+            prerequisites(
+                SubjectKind::LocaleNegotiationSlot,
+                Check::SupportedAssertion
+            ),
+            CONFIRMED_POLICY
+        );
+    }
+
+    #[test]
+    fn prerequisites_are_earlier_rows_in_row_order_and_none_waits_on_another() {
+        let registry = registry();
+        let place: BTreeMap<&str, usize> = registry
+            .rows
+            .iter()
+            .enumerate()
+            .map(|(index, row)| (row.check_id.as_str(), index))
+            .collect();
+        let requirements = requirements(&registry);
+        for (index, row) in registry.rows.iter().enumerate() {
+            let listed: Vec<usize> = row
+                .prerequisite_check_ids
+                .iter()
+                .map(|id| place[id.as_str()])
+                .collect();
+            // A row of the same kind is listed only with a lower check rank.
+            assert!(
+                listed.iter().all(|&earlier| earlier < index),
+                "{}",
+                row.check_id
+            );
+            assert!(
+                listed.windows(2).all(|pair| pair[0] < pair[1]),
+                "{}",
+                row.check_id
+            );
+            for first in &row.prerequisite_check_ids {
+                for second in &row.prerequisite_check_ids {
+                    assert!(
+                        !requirements[first.as_str()].contains(second.as_str()),
+                        "{} lists {first}, which waits on {second}",
+                        row.check_id
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_kinds_declared_only_list_and_are_listed_as_no_prerequisite_yet() {
+        let rows = registry().rows;
+        let declared: BTreeSet<&str> = rows
+            .iter()
+            .filter(|row| row.subject_kind.declared_only())
+            .map(|row| row.check_id.as_str())
+            .collect();
+        assert_eq!(declared.len(), 43);
+        for row in &rows {
+            if row.subject_kind.declared_only() {
+                assert!(row.prerequisite_check_ids.is_empty(), "{}", row.check_id);
+            }
+            for id in &row.prerequisite_check_ids {
+                assert!(
+                    !declared.contains(id.as_str()),
+                    "{} lists {id}",
+                    row.check_id
+                );
+            }
         }
     }
 
@@ -1136,7 +1755,7 @@ mod tests {
             assert_eq!(CheckRegistry::read(&value), None, "{case}");
         }
         // The ranks need only differ, not count up from zero.
-        let spread = changed(of_kind("relation-endpoint"), |row| {
+        let spread = changed(of_kind("deployment-groups-dependency"), |row| {
             row["subjectKindRank"] = json!("7");
         });
         assert!(CheckRegistry::read(&spread).is_some());
@@ -1216,6 +1835,78 @@ mod tests {
             });
             assert_eq!(CheckRegistry::read(&value), None, "{parent}");
         }
+    }
+
+    /// The registry with `check`'s prerequisites replaced by `ids`.
+    fn waiting(check: &'static str, ids: &[&str]) -> Value {
+        changed(of_check(check), |row| {
+            row["prerequisiteCheckIds"] = json!(ids);
+        })
+    }
+
+    #[test]
+    fn a_prerequisite_names_a_row_once() {
+        for (case, ids) in [
+            (
+                "a check ID no row has",
+                ["hydration.endpoint.unknown"].as_slice(),
+            ),
+            (
+                "a check ID twice",
+                &[
+                    "hydration.endpoint.within-bound",
+                    "hydration.endpoint.within-bound",
+                ],
+            ),
+        ] {
+            let value = waiting("hydration.endpoint.known", ids);
+            assert_eq!(CheckRegistry::read(&value), None, "{case}");
+        }
+    }
+
+    #[test]
+    fn no_prerequisite_follows_its_dependent() {
+        for (case, prerequisite) in [
+            ("of a later phase", "hydration.relations.within-bound"),
+            (
+                "of a kind its phase ranks later",
+                "group.memberships.within-bound",
+            ),
+        ] {
+            let value = waiting("group.groups.within-bound", &[prerequisite]);
+            assert_eq!(CheckRegistry::read(&value), None, "{case}");
+        }
+        // A row of its own kind may be an earlier subject's check, whatever
+        // its rank. (The committed rows already name kinds ranked 9 and 10
+        // from one ranked 12, so ranks compare as numbers.)
+        let value = waiting(
+            "hydration.relation.distinct-endpoints",
+            &[
+                "hydration.endpoint.within-bound",
+                "hydration.relation.unique",
+            ],
+        );
+        assert!(CheckRegistry::read(&value).is_some());
+    }
+
+    #[test]
+    fn no_row_waits_on_itself_through_its_prerequisites() {
+        let unique = "hydration.relation.unique";
+        let distinct = "hydration.relation.distinct-endpoints";
+        let itself = waiting(unique, &[unique]);
+        assert_eq!(CheckRegistry::read(&itself), None);
+        let each_other = changed(
+            |row| row["checkId"] == unique || row["checkId"] == distinct,
+            |row| {
+                let other = if row["checkId"] == unique {
+                    distinct
+                } else {
+                    unique
+                };
+                row["prerequisiteCheckIds"] = json!(["hydration.endpoint.within-bound", other]);
+            },
+        );
+        assert_eq!(CheckRegistry::read(&each_other), None);
     }
 
     #[test]
@@ -1311,13 +2002,36 @@ mod tests {
                 "a rank as a number",
                 changed(&|value| value["rows"][0]["subjectKindRank"] = json!(0)),
             ),
+            (
+                "a row without its prerequisites",
+                changed(&|value| {
+                    value["rows"][0]
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("prerequisiteCheckIds");
+                }),
+            ),
+            (
+                "a prerequisite named twice",
+                changed(&|value| {
+                    value["rows"][0]["prerequisiteCheckIds"] = json!(["a.b.c", "a.b.c"]);
+                }),
+            ),
+            (
+                "a prerequisite that is no check ID",
+                changed(&|value| value["rows"][0]["prerequisiteCheckIds"] = json!(["a.b"])),
+            ),
         ] {
             assert!(!read.validate(&value).valid, "{case}");
             assert!(!oracle.is_valid(&value), "{case}");
         }
         // Whether the rows agree with each other is not the schema's to say.
-        let swapped = changed(&|value| value["rows"][0]["checkRank"] = json!("7"));
-        assert!(read.validate(&swapped).valid);
-        assert!(oracle.is_valid(&swapped));
+        for value in [
+            changed(&|value| value["rows"][0]["checkRank"] = json!("7")),
+            changed(&|value| value["rows"][0]["prerequisiteCheckIds"] = json!(["no.such.check"])),
+        ] {
+            assert!(read.validate(&value).valid);
+            assert!(oracle.is_valid(&value));
+        }
     }
 }
