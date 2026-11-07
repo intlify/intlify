@@ -4,13 +4,12 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use crate::benchmark::operation::Schema;
 use crate::input_limits::Bound;
 use crate::materialize::materialize_file;
 use crate::structural::selection::{InvalidSelectorType, Selection, SelectorInput};
 use crate::structural::StructuralLimits;
 
-use super::prepare::{prepare, PreparationFailure};
+use super::prepare::{configuration_schema, prepare, PreparationFailure};
 use super::*;
 
 fn limits() -> StructuralLimits {
@@ -94,7 +93,7 @@ fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
 
 #[test]
 fn declared_unbounded_case_kinds_agree_with_independently_checked_fixture_semantics() {
-    let schema = Schema::for_model().unwrap();
+    let schema = configuration_schema();
     let published: serde_json::Value = serde_json::from_str(include_str!(
         "../../../schema/project-profile-config-v0.schema.json"
     ))

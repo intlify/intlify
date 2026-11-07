@@ -40,7 +40,7 @@ pub(super) struct SchemaIssue {
     pub(super) subject: NodeId,
     pub(super) span: ByteSpan,
     pub(super) role: LocationRole,
-    /// Only a known required field copied from the generated schema, never an
+    /// Only a known required field copied from the compiled schema, never an
     /// arbitrary configuration key, selector, or rejected scalar.
     pub(super) missing_field: Option<String>,
     pub(super) alternatives: Vec<SchemaIssue>,
