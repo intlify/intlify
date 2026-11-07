@@ -1,21 +1,22 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Design 015's construction flow: the five components, the cross-authority
-//! rules, and the implemented authority, in the order of the
-//! construction-failure precedence.
+//! Design 015's construction flow: the construction-root bounds, the five
+//! components, the cross-authority rules, and the implemented authority, in
+//! the order of the construction-failure precedence.
 //!
-//! Construction checks the Profile Specification Schema, the Profile
-//! Specification against it, the Configuration Schema Authority Set, the
-//! Resolver Capability Specification, and the Registry Package, each with its
-//! own rows, then applies the four cross-authority rules in the order the
-//! construction-admission body lists them ([`rules`](super::rules)), and ends
-//! with one check after every other: every admitted authority must be the one
-//! the resolver is compiled from (D15:991). It reports the first row that
-//! fails and nothing else. The construction-root bounds, which come before
-//! every other row, come with their own stage.
+//! Construction first applies the construction-root bounds to the whole
+//! input ([`bounds`](super::bounds)). It then checks the Profile
+//! Specification Schema, the Profile Specification against it, the
+//! Configuration Schema Authority Set, the Resolver Capability Specification,
+//! and the Registry Package, each with its own rows, then applies the four
+//! cross-authority rules in the order the construction-admission body lists
+//! them ([`rules`](super::rules)), and ends with one check after every other:
+//! every admitted authority must be the one the resolver is compiled from
+//! (D15:991). It reports the first row that fails and nothing else.
 
 use super::authority_set::{self, AdmittedSet, SubmittedSet};
+use super::bounds;
 use super::capability::{self, AdmittedCapabilitySpecification};
 use super::component::{Refusal, Submitted};
 use super::failure::{Check, Component};
@@ -55,12 +56,13 @@ pub(crate) struct AdmittedAuthorities {
     pub(crate) registry_package: AdmittedPackage,
 }
 
-/// Construct from the input: rows 2 to 43 of the construction-failure
+/// Construct from the input: the 43 rows of the construction-failure
 /// precedence, in order, refusing with the first that fails.
 pub(crate) fn construct(
     root: &ConstructionRoot,
     input: &ConstructionInput,
 ) -> Result<AdmittedAuthorities, Refusal> {
+    bounds::check(root, input)?;
     let profile_specification_schema =
         profile::admit_schema(root, input.profile_specification_schema.as_ref())?;
     let profile_specification = profile::admit(
@@ -230,7 +232,7 @@ mod tests {
         CONFIGURATION_SCHEMA, PACKAGE, PROFILE_SPECIFICATION, REGISTRY_MEMBERS,
     };
     use super::*;
-    use crate::construction::admission::DRAFT_7;
+    use crate::construction::admission::{ConstructionBoundId, DRAFT_7};
     use crate::construction::capability::CapabilitySpecification;
     use crate::construction::component::testing::{row, submitted};
     use crate::construction::component::{self, Artifact};
@@ -486,6 +488,105 @@ mod tests {
             admitted.registry_package.members[index].digest = other().as_str().to_owned();
             assert!(!implemented(&admitted), "member {index}");
         }
+    }
+
+    /// The committed input, given `bytes` for a `schemaVersion` the set does
+    /// not map: the construction-root bounds count them, and no later row
+    /// reads them.
+    fn with_unmapped(bytes: Vec<u8>) -> ConstructionInput {
+        let mut input = committed();
+        input
+            .configuration_schema_authority_set
+            .as_mut()
+            .unwrap()
+            .members
+            .insert("1".to_owned(), Artifact::read(bytes));
+        input
+    }
+
+    fn bound(input: &ConstructionInput) -> Option<(usize, Option<ConstructionBoundId>)> {
+        construct(root(), input)
+            .err()
+            .map(|refusal| (refusal.number(), refusal.bound()))
+    }
+
+    /// The construction-root bounds come before every other row, presence
+    /// included, and a refusal there names its bound.
+    #[test]
+    fn the_bounds_come_before_every_other_row() {
+        let mut input = with_unmapped(vec![b' '; 4 * 1024 * 1024 + 1]);
+        input.profile_specification_schema = None;
+        assert_eq!(
+            bound(&input),
+            Some((1, Some(ConstructionBoundId::InputMaxSingleArtifactBytes)))
+        );
+        input.configuration_schema_authority_set = None;
+        assert_eq!(bound(&input), Some((2, None)));
+    }
+
+    /// An exact total is admitted and one more is refused, end to end.
+    #[test]
+    fn an_exact_total_constructs_and_one_more_is_refused() {
+        let nested = |levels: usize| format!("{}{}", "[".repeat(levels), "]".repeat(levels));
+        assert_eq!(bound(&with_unmapped(nested(64).into_bytes())), None);
+        assert_eq!(
+            bound(&with_unmapped(nested(65).into_bytes())),
+            Some((1, Some(ConstructionBoundId::InputMaxDepth)))
+        );
+        // References up to the bound, in the subschemas of one schema.
+        let committed_references = bounds::totals(root(), &committed())
+            .get(ConstructionBoundId::SchemaMaxReferences)
+            .unwrap();
+        let references = |count: u64| {
+            let item = r##"{"$ref": "#"}"##;
+            let items = vec![item; usize::try_from(count).unwrap()].join(",");
+            format!(r#"{{"items": [{items}]}}"#).into_bytes()
+        };
+        let exact = 65_536 - committed_references;
+        assert_eq!(bound(&with_unmapped(references(exact))), None);
+        assert_eq!(
+            bound(&with_unmapped(references(exact + 1))),
+            Some((1, Some(ConstructionBoundId::SchemaMaxReferences)))
+        );
+        // Mappings up to the bound: the exact count passes row 1 and is
+        // refused later, here for want of the mapped schemas' bytes.
+        let mappings = |count: usize| {
+            let mut set = value(AUTHORITY_SET);
+            let member = set["members"]["0"].clone();
+            for version in 1..count {
+                set["members"][version.to_string()] = member.clone();
+            }
+            authority_set(&compact(&set))
+        };
+        let mut exact = committed();
+        exact.configuration_schema_authority_set = Some(mappings(64));
+        assert!(bound(&exact).is_some_and(|(row, bound)| row > 1 && bound.is_none()));
+        let mut over = committed();
+        over.configuration_schema_authority_set = Some(mappings(65));
+        assert_eq!(
+            bound(&over),
+            Some((1, Some(ConstructionBoundId::SchemaMaxConfigurationSchemas)))
+        );
+    }
+
+    /// Of several exceeded bounds, the first in the canonical order is named,
+    /// whichever artifact exceeds it.
+    #[test]
+    fn of_several_exceeded_bounds_the_first_is_named() {
+        let long = format!(r#"["{}"]"#, "a".repeat(65_537));
+        let mut input = with_unmapped(long.into_bytes());
+        assert_eq!(
+            bound(&input),
+            Some((1, Some(ConstructionBoundId::InputMaxSingleStringBytes)))
+        );
+        input.registry_package.as_mut().unwrap().members.insert(
+            RegistryRole::CheckRegistry,
+            Artifact::read(format!("{}{}", "[".repeat(65), "]".repeat(65)).into_bytes()),
+        );
+        assert_eq!(
+            bound(&input),
+            Some((1, Some(ConstructionBoundId::InputMaxDepth)))
+        );
     }
 
     #[test]

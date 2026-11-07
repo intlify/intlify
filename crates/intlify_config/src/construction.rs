@@ -24,13 +24,15 @@
 //! construction-failure precedence, each check refusing with its row: the
 //! checks every component starts with ([`component`]), against the members of
 //! the built-in root ([`root`]), and then each authority's own checks, in the
-//! authority's module. The construction flow ([`flow`]) takes the five
-//! components in that order, then applies the cross-authority rules
+//! authority's module. The construction flow ([`flow`]) first applies the
+//! construction-root bounds to the whole input ([`bounds`]), then takes the
+//! five components in that order, then applies the cross-authority rules
 //! ([`rules`]), and ends by checking that every admitted authority is the one
 //! the resolver is compiled from.
 
 pub(crate) mod admission;
 pub(crate) mod authority_set;
+pub(crate) mod bounds;
 pub(crate) mod capability;
 pub(crate) mod component;
 pub(crate) mod envelope;

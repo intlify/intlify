@@ -318,25 +318,15 @@ impl Scanner<'_> {
     }
 }
 
+/// Helpers for tests that count decoded values as the scan counts bytes.
 #[cfg(test)]
-mod tests {
+pub(crate) mod testing {
     use serde_json::Value;
 
-    use intlify_shared_json::json::decode_unique_json;
-
-    use super::*;
-    use crate::construction::flow::testing::{
-        AUTHORITY_SET, CAPABILITY, CONFIGURATION_SCHEMA, PACKAGE, PROFILE_SPECIFICATION,
-        PROFILE_SPECIFICATION_SCHEMA, REGISTRY_MEMBERS,
-    };
-
-    /// Whether the shared decoder reads the bytes as strict UTF-8 JSON.
-    fn decodes(bytes: &[u8]) -> bool {
-        std::str::from_utf8(bytes).is_ok_and(|text| decode_unique_json(text).is_ok())
-    }
+    use super::{count, JsonCounts};
 
     /// The counts of a decoded value, walked as the units define them.
-    fn counted(value: &Value) -> JsonCounts {
+    pub(crate) fn counted(value: &Value) -> JsonCounts {
         let mut counts = JsonCounts::default();
         let mut stack = vec![(value, 1)];
         let string = |counts: &mut JsonCounts, text: &str| {
@@ -364,6 +354,23 @@ mod tests {
             }
         }
         counts
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use intlify_shared_json::json::decode_unique_json;
+
+    use super::testing::counted;
+    use super::*;
+    use crate::construction::flow::testing::{
+        AUTHORITY_SET, CAPABILITY, CONFIGURATION_SCHEMA, PACKAGE, PROFILE_SPECIFICATION,
+        PROFILE_SPECIFICATION_SCHEMA, REGISTRY_MEMBERS,
+    };
+
+    /// Whether the shared decoder reads the bytes as strict UTF-8 JSON.
+    fn decodes(bytes: &[u8]) -> bool {
+        std::str::from_utf8(bytes).is_ok_and(|text| decode_unique_json(text).is_ok())
     }
 
     fn nested(levels: usize) -> String {

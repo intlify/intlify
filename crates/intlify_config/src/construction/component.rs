@@ -31,7 +31,7 @@ use intlify_shared_json::encoding::digest_bytes;
 use intlify_shared_json::json::decode_unique_json;
 use intlify_shared_json::token::IntegrityDigest;
 
-use super::admission::{ComponentAdmission, DRAFT_7};
+use super::admission::{ComponentAdmission, ConstructionBoundId, DRAFT_7};
 use super::failure::{Check, Component, ConstructionFailure, PRECEDENCE};
 use super::root::ConstructionRoot;
 use super::scan::{self, JsonCounts};
@@ -109,9 +109,14 @@ pub(crate) struct Declared {
     pub(crate) semantic_digest: Option<String>,
 }
 
-/// The precedence row a check refused at.
+/// The precedence row a check refused at, and, at the construction-root
+/// bounds' row, the first bound the input exceeds: a refusal's only detail
+/// (D15:3091).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct Refusal(usize);
+pub(crate) struct Refusal {
+    row: usize,
+    bound: Option<ConstructionBoundId>,
+}
 
 impl Refusal {
     /// The row of one component's check.
@@ -125,21 +130,39 @@ impl Refusal {
         while index < PRECEDENCE.len() {
             let row = PRECEDENCE[index];
             if row.component as u8 == component as u8 && row.check as u8 == check as u8 {
-                return Self(index);
+                return Self {
+                    row: index,
+                    bound: None,
+                };
             }
             index += 1;
         }
         panic!("no precedence row has this component and check");
     }
 
+    /// The construction-root bounds' row, naming the first bound, in the
+    /// canonical order, that the input exceeds.
+    pub(crate) const fn exceeding(bound: ConstructionBoundId) -> Self {
+        Self {
+            bound: Some(bound),
+            ..Self::at(Component::All, Check::ConstructionBounds)
+        }
+    }
+
     /// The row's number in design 015's table, counted from one.
     pub(crate) const fn number(self) -> usize {
-        self.0 + 1
+        self.row + 1
     }
 
     /// The reason the row refuses with.
     pub(crate) const fn reason(self) -> ConstructionFailure {
-        PRECEDENCE[self.0].reason
+        PRECEDENCE[self.row].reason
+    }
+
+    /// The bound a refusal at the construction-root bounds' row names; no
+    /// other row has one.
+    pub(crate) const fn bound(self) -> Option<ConstructionBoundId> {
+        self.bound
     }
 }
 
