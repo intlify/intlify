@@ -203,6 +203,7 @@ struct Envelopes {
 /// by the validator.
 #[derive(Debug)]
 pub(crate) struct ConstructionRoot {
+    canonical_digest: [u8; 32],
     admission: ConstructionAdmission,
     envelopes: Envelopes,
     meta_schema: Schema,
@@ -231,10 +232,17 @@ impl ConstructionRoot {
             RootPackageFailure::Unreadable(R::JsonSchemaMetaSchemaPackage),
         )?;
         Ok(Self {
+            canonical_digest: package.canonical_digest(),
             admission,
             envelopes,
             meta_schema,
         })
+    }
+
+    /// The canonical digest of the package the root was read from, which
+    /// the Resolver Construction Identity commits to.
+    pub(crate) const fn canonical_digest(&self) -> [u8; 32] {
+        self.canonical_digest
     }
 
     /// The admission body.
@@ -293,7 +301,7 @@ fn meta_schema(bytes: &[u8]) -> Option<Schema> {
 }
 
 /// Read a `sha256:` presentation back into its 32 bytes.
-fn digest_bytes_of(text: &str) -> Option<[u8; 32]> {
+pub(crate) fn digest_bytes_of(text: &str) -> Option<[u8; 32]> {
     let hex = text.strip_prefix("sha256:")?;
     if hex.len() != 64 {
         return None;
@@ -314,6 +322,12 @@ fn digest_bytes_of(text: &str) -> Option<[u8; 32]> {
 
 /// The canonical digest of a package with these members, in this order.
 pub(crate) fn canonical_digest(members: &[(RootRole, [u8; 32])]) -> [u8; 32] {
+    digest_bytes(&canonical_preimage(members))
+}
+
+/// The bytes the canonical digest hashes: the domain separator, then the
+/// package's record of its identity, its revision, and its members.
+pub(crate) fn canonical_preimage(members: &[(RootRole, [u8; 32])]) -> Vec<u8> {
     let items = members
         .iter()
         .map(|(role, digest)| {
@@ -330,7 +344,7 @@ pub(crate) fn canonical_digest(members: &[(RootRole, [u8; 32])]) -> [u8; 32] {
         .finish();
     let mut preimage = CANONICAL_DOMAIN.to_vec();
     preimage.extend_from_slice(&record);
-    digest_bytes(&preimage)
+    preimage
 }
 
 /// The member digests a Root Package artifact lists, in role order.

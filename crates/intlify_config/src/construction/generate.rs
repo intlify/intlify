@@ -15,24 +15,37 @@
 //! crate publishes it. The Profile Specification's semantic digest goes into
 //! the Configuration Schema Authority Set, and so does the mapped schema's
 //! file digest. The Registry Package's members follow the same form.
+//!
+//! The construction vectors come last: they construct the written
+//! authorities and members under the built-in root and the digests this crate
+//! pins, and record the Root Package's canonical preimage and the identity
+//! construction derives, so they wait for the pins after a value changes.
+
+use std::collections::BTreeMap;
 
 use serde_json::{json, Map, Value};
 
 use intlify_shared_json::encoding::digest_bytes;
 use intlify_shared_json::token::IntegrityDigest;
 
-use super::admission::ConstructionAdmission;
-use super::authority_set::{self, ConfigurationSchemaAuthoritySet};
+use super::admission::{ComponentAdmission, ConstructionAdmission};
+use super::authority_set::{self, ConfigurationSchemaAuthoritySet, SubmittedSet};
 use super::capability::{self, CapabilitySpecification};
-use super::component::file_digest;
+use super::component::{self, file_digest, Submitted};
+use super::flow::{self, ConstructionInput};
+use super::identity;
 use super::profile::{self, ProjectProfileSpecification};
-use super::registry as package;
 use super::registry::check::{self, CheckRegistry};
 use super::registry::finding::{self, FindingRegistry};
 use super::registry::safe_origin::{self, SafeOriginKindRegistry};
-use super::root::{canonical_digest, RootRole, PATH};
+use super::registry::{self as package, RegistryRole, SubmittedPackage};
+use super::root::{canonical_digest, canonical_preimage, ConstructionRoot, RootRole, PATH};
 use super::rules::CrossAuthorityRules;
 use super::{envelope, meta_schema};
+use crate::model::CONFIGURATION_SCHEMA_VERSION;
+
+/// The construction vectors' path below the conformance suite's root.
+pub(crate) const VECTORS_PATH: &str = "construction/construction-vectors-v0.json";
 
 /// One artifact and its path below the conformance suite's root.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -285,6 +298,127 @@ pub fn pinned() -> Result<Pinned, serde_json::Error> {
     })
 }
 
+/// Hexadecimal digits of bytes.
+fn hex(bytes: &[u8]) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    bytes
+        .iter()
+        .flat_map(|&byte| {
+            [
+                DIGITS[usize::from(byte >> 4)],
+                DIGITS[usize::from(byte & 0x0f)],
+            ]
+        })
+        .map(char::from)
+        .collect()
+}
+
+/// The construction input of every authority and member this crate writes,
+/// each declared as construction admits it.
+fn written_input() -> Result<ConstructionInput, serde_json::Error> {
+    let admission = ConstructionAdmission::revision_zero();
+    let components = &admission.components;
+    let declared = |admitted: &ComponentAdmission, bytes: Vec<u8>| Submitted {
+        tuple: json!({
+            "identity": admitted.identity,
+            "revision": admitted.revisions.first(),
+            "digest": file_digest(&bytes).as_str()
+        }),
+        artifact: component::Artifact::read(bytes),
+    };
+    let [schema, body, set, member, capability] = <[Artifact; 5]>::try_from(authorities()?)
+        .unwrap_or_else(|_| unreachable!("five authorities are written"));
+    let [origin_schema, origins, check_schema, checks, finding_schema, findings, container] =
+        <[Artifact; 7]>::try_from(registries()?)
+            .unwrap_or_else(|_| unreachable!("six members and the container are written"));
+    let semantic_digest = profile::semantic_digest(&serde_json::from_slice(&body.bytes)?)
+        .expect("the Profile Specification is number-free");
+    let mut profile_specification = declared(&components.profile_specification, body.bytes);
+    profile_specification.tuple["semanticDigest"] = json!(semantic_digest.as_str());
+    let members = [
+        origin_schema,
+        check_schema,
+        finding_schema,
+        origins,
+        checks,
+        findings,
+    ];
+    Ok(ConstructionInput {
+        profile_specification_schema: Some(declared(
+            &components.profile_specification_schema,
+            schema.bytes,
+        )),
+        profile_specification: Some(profile_specification),
+        configuration_schema_authority_set: Some(SubmittedSet {
+            component: declared(&components.configuration_schema_authority_set, set.bytes),
+            members: BTreeMap::from([(
+                CONFIGURATION_SCHEMA_VERSION.to_owned(),
+                component::Artifact::read(member.bytes),
+            )]),
+        }),
+        resolver_capability_specification: Some(declared(
+            &components.resolver_capability_specification,
+            capability.bytes,
+        )),
+        registry_package: Some(SubmittedPackage {
+            component: declared(&components.registry_package, container.bytes),
+            members: RegistryRole::ALL
+                .into_iter()
+                .zip(members)
+                .map(|(role, member)| (role, component::Artifact::read(member.bytes)))
+                .collect(),
+        }),
+    })
+}
+
+/// Write the construction vectors (D15:987): the Root Package's canonical
+/// preimage and digest, and the Resolver Construction Identity of every
+/// authority and member this crate writes, constructed under the built-in
+/// root: its preimage, its digest, and its text.
+///
+/// # Errors
+///
+/// Returns why the vectors cannot be written: a member's serialization
+/// failure, which the values rule out, or the written authorities not
+/// constructing, as when the pinned digests are not yet theirs.
+pub fn vectors() -> Result<Artifact, String> {
+    let serialization = |error: serde_json::Error| error.to_string();
+    let mut members = Vec::new();
+    for role in RootRole::ALL {
+        let bytes = member(role)
+            .and_then(|value| write(&value))
+            .map_err(serialization)?;
+        members.push((role, digest_bytes(&bytes)));
+    }
+    let root_preimage = canonical_preimage(&members);
+    let input = written_input().map_err(serialization)?;
+    let root = ConstructionRoot::built_in()
+        .map_err(|failure| format!("the built-in Root Package is unusable: {failure:?}"))?;
+    let admitted = flow::construct(root, &input).map_err(|refusal| {
+        format!(
+            "the written authorities do not construct: row {} refuses them with {:?}",
+            refusal.number(),
+            refusal.reason()
+        )
+    })?;
+    let identity = identity::derive(root, &admitted);
+    let body = json!({
+        "rootPackage": {
+            "preimage": hex(&root_preimage),
+            "canonicalDigest": IntegrityDigest::from_hash(digest_bytes(&root_preimage)).as_str()
+        },
+        "constructionIdentity": {
+            "preimage": hex(&identity::preimage(root, &admitted)),
+            "digest": IntegrityDigest::from_hash(*identity.bytes()).as_str(),
+            "text": identity.text()
+        }
+    });
+    Ok(Artifact {
+        path: VECTORS_PATH,
+        bytes: write(&body).map_err(serialization)?,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -474,6 +608,21 @@ mod tests {
         assert!(!oracle.is_valid(&unknown));
     }
 
+    /// The committed construction vectors are the ones this crate writes,
+    /// and their Root Package digest is the pinned canonical digest.
+    #[test]
+    fn the_committed_vectors_are_the_ones_this_crate_writes() {
+        let vectors = vectors().unwrap();
+        assert_eq!(vectors.path, VECTORS_PATH);
+        assert_eq!(
+            vectors.bytes,
+            include_bytes!("../../conformance/construction/construction-vectors-v0.json"),
+            "rerun the generator with --write"
+        );
+        let value: Value = serde_json::from_slice(&vectors.bytes).unwrap();
+        assert_eq!(value["rootPackage"]["canonicalDigest"], CANONICAL_DIGEST);
+    }
+
     #[test]
     fn every_artifact_ends_with_one_newline_and_has_no_carriage_return() {
         for artifact in artifacts()
@@ -481,6 +630,7 @@ mod tests {
             .into_iter()
             .chain(authorities().unwrap())
             .chain(registries().unwrap())
+            .chain(vectors())
         {
             assert!(artifact.bytes.ends_with(b"}\n"), "{}", artifact.path);
             assert!(!artifact.bytes.ends_with(b"\n\n"), "{}", artifact.path);
