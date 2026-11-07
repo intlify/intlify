@@ -1,14 +1,17 @@
 /**
- * Check the committed Resolver Construction Root Package against this implementation.
+ * Check the committed Resolver Construction Root Package and construction
+ * vectors against this implementation.
  *
  * The Rust crate writes the five Root Package members and the Root Package
  * artifact, and compiles in two digests: the artifact's file digest and the
- * package's canonical digest. This script shares no code with it: it hashes
- * every artifact itself, frames the canonical digest from design 015's record
- * shape, lists the roles, bounds, units, envelope schema references, and
- * failure precedence from its own copy of the design's tables, and reads the
- * two pinned digests out of the crate's source. It does not read the design
- * document.
+ * package's canonical digest. It also writes the construction vectors: the
+ * Root Package's canonical preimage, and the Resolver Construction Identity of
+ * the committed authorities and registries. This script shares no code with
+ * it: it hashes every artifact itself, frames the canonical digest and the
+ * identity from design 015's record shapes, lists the roles, bounds, units,
+ * envelope schema references, and failure precedence from its own copy of the
+ * design's tables, and reads the two pinned digests out of the crate's
+ * source. It does not read the design document.
  */
 
 import { createHash } from 'node:crypto'
@@ -17,13 +20,19 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
 
+import { digest as semanticDigest } from './framing.mjs'
+
 const here = dirname(fileURLToPath(import.meta.url))
 const crate = resolve(here, '../../../crates/intlify_config')
 const construction = resolve(crate, 'conformance/construction')
+const authorities = resolve(crate, 'conformance/authorities')
+const registries = resolve(crate, 'conformance/registries')
 
 const IDENTITY = 'intlify-resolver-construction-root-package'
 const REVISION = '0'
 const DOMAIN = 'intlify.resolver-construction-root-package.v0'
+const IDENTITY_DOMAIN = 'intlify.resolver-construction-identity.v0'
+const SEMANTIC_DOMAIN = 'project-profile-specification-semantic-digest'
 const DRAFT_7 = 'http://json-schema.org/draft-07/schema#'
 const META_SCHEMA_DIGEST = 'sha256:9e786e2198debe6717675ce48e199199f2dba8e3a3e1ffe35cfc0959efd691cb'
 
@@ -279,11 +288,13 @@ function pinned(source, name) {
 
 const rootBytes = readFileSync(resolve(construction, 'root-package-v0.json'))
 const memberBytes = ROLES.map(([, file]) => readFileSync(resolve(construction, file)))
+const vectorBytes = readFileSync(resolve(construction, 'construction-vectors-v0.json'))
 const source = readFileSync(resolve(crate, 'src/construction/root.rs'), 'utf8')
 
 for (const [name, bytes] of [
   ['root-package-v0.json', rootBytes],
-  ...ROLES.map(([, file], index) => [file, memberBytes[index]])
+  ...ROLES.map(([, file], index) => [file, memberBytes[index]]),
+  ['construction-vectors-v0.json', vectorBytes]
 ]) {
   if (
     bytes.includes(0x0d) ||
@@ -455,6 +466,99 @@ if (
   fail('meta-schema package: not exactly Draft 7 with its published meta-schema')
 }
 
+// The construction vectors: the Root Package's canonical preimage, and the
+// Resolver Construction Identity of the committed authorities and registries,
+// each component declared with the identity and first revision the admission
+// body admits for it. The identity's record has eight fields: the Root
+// Package, the Profile Specification Schema, the Profile Specification by its
+// semantic digest, the set with its association, every mapping in ascending
+// unsigned UTF-8 schemaVersion order, the Capability Specification, the
+// Registry Package, and its six members in role order. Strings are their
+// UTF-8 bytes and digests their 32 bytes.
+const vectors = JSON.parse(vectorBytes.toString('utf8'))
+const rootPreimage = Buffer.concat([Buffer.from(DOMAIN, 'utf8'), record])
+if (
+  vectors.rootPackage?.preimage !== rootPreimage.toString('hex') ||
+  vectors.rootPackage?.canonicalDigest !== canonical
+) {
+  fail('construction vectors: the Root Package preimage or digest is not the one framed here')
+}
+const text = value => Buffer.from(String(value ?? ''), 'utf8')
+const raw = presentation => Buffer.from(String(presentation ?? '').replace(/^sha256:/, ''), 'hex')
+const hash = bytes => createHash('sha256').update(bytes).digest()
+const nested = fields => Buffer.concat(fields.map((field, index) => frame(index + 1, field)))
+const admitted = name => {
+  const component = admission.components?.[name] ?? {}
+  return [text(component.identity), text(component.revisions?.[0])]
+}
+const tuple = (name, bytes) => nested([...admitted(name), hash(bytes)])
+const schemaArtifact = readFileSync(
+  resolve(authorities, 'project-profile-specification-v0.schema.json')
+)
+const profileArtifact = readFileSync(resolve(authorities, 'project-profile-specification-v0.json'))
+const setArtifact = readFileSync(resolve(authorities, 'configuration-schema-authority-set-v0.json'))
+const capabilityArtifact = readFileSync(resolve(authorities, 'resolver-capability-v0.json'))
+const packageArtifact = readFileSync(resolve(registries, 'package-v0.json'))
+const set = JSON.parse(setArtifact.toString('utf8'))
+const container = JSON.parse(packageArtifact.toString('utf8'))
+const association = set.profileSpecification ?? {}
+const versions = Object.keys(set.members ?? {}).sort((left, right) =>
+  Buffer.compare(text(left), text(right))
+)
+const mappings = versions.map(version => {
+  const member = set.members[version]
+  return nested([
+    text(version),
+    text(member.identity),
+    text(member.revision),
+    text(member.dialect),
+    raw(member.digest)
+  ])
+})
+const registryMembers = REGISTRY_ROLES.map(role => {
+  const member = container.members?.[role] ?? {}
+  return nested([text(role), text(member.identity), text(member.revision), raw(member.digest)])
+})
+const identityRecord = Buffer.concat([
+  frame(1, nested([text(IDENTITY), text(REVISION), raw(canonical)])),
+  frame(2, tuple('profileSpecificationSchema', schemaArtifact)),
+  frame(
+    3,
+    nested([
+      ...admitted('profileSpecification'),
+      raw(semanticDigest(SEMANTIC_DOMAIN, JSON.parse(profileArtifact.toString('utf8'))))
+    ])
+  ),
+  frame(
+    4,
+    nested([
+      ...admitted('configurationSchemaAuthoritySet'),
+      hash(setArtifact),
+      nested([
+        text(association.identity),
+        text(association.revision),
+        raw(association.semanticDigest)
+      ])
+    ])
+  ),
+  frame(5, collection(mappings)),
+  frame(6, tuple('resolverCapabilitySpecification', capabilityArtifact)),
+  frame(7, tuple('registryPackage', packageArtifact)),
+  frame(8, collection(registryMembers))
+])
+const identityPreimage = Buffer.concat([Buffer.from(IDENTITY_DOMAIN, 'utf8'), identityRecord])
+const identity = hash(identityPreimage)
+const identityText = `rci0_${identity.toString('base64url')}`
+const expected = vectors.constructionIdentity ?? {}
+if (expected.preimage !== identityPreimage.toString('hex')) {
+  fail('construction vectors: the identity preimage is not the one framed here')
+}
+if (expected.digest !== `sha256:${identity.toString('hex')}` || expected.text !== identityText) {
+  fail(
+    `construction vectors: the identity is not ${identityText}, the digest of the preimage framed here`
+  )
+}
+
 if (failures.length > 0) {
   for (const message of failures) {
     console.error(message)
@@ -463,5 +567,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `construction root agrees: ${ROLES.length} members, ${bounds.length} bounds, ${rows.length} precedence rows, ${RULES.length} cross-authority rules, canonical digest ${canonical}`
+  `construction root agrees: ${ROLES.length} members, ${bounds.length} bounds, ${rows.length} precedence rows, ${RULES.length} cross-authority rules, canonical digest ${canonical}; the committed authorities construct as ${identityText}`
 )

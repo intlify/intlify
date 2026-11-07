@@ -6,7 +6,8 @@
 //!
 //! The five members, the Root Package artifact, the five authorities, and the
 //! Registry Package's six members and container are written from this
-//! crate's values. A file digest covers every byte, so
+//! crate's values, and the construction vectors from constructing those
+//! authorities under the digests the crate pins. A file digest covers every byte, so
 //! `--check` compares the exact bytes, not decoded values, and the artifacts
 //! are kept out of the repository formatter. `--write` also prints the digests
 //! the crate pins: the Root Package's two belong in
@@ -44,7 +45,7 @@ fn main() -> ExitCode {
             support::registry_pins()?,
         ))
     })();
-    let (artifacts, pinned, authority_pins, registry_pins) = match support {
+    let (mut artifacts, pinned, authority_pins, registry_pins) = match support {
         Ok(support) => support,
         Err(error) => {
             eprintln!("the artifacts could not be written: {error}");
@@ -53,6 +54,17 @@ fn main() -> ExitCode {
     };
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(ROOT);
     let mut stale = false;
+    // The vectors construct from the written artifacts under the digests
+    // compiled in, so after a value changes they wait for the new pins.
+    match intlify_config::construction_support::vectors() {
+        Ok(vectors) => artifacts.push(vectors),
+        Err(reason) => {
+            eprintln!(
+                "the construction vectors could not be written: {reason}; pin the printed digests and rerun with --write"
+            );
+            stale = true;
+        }
+    }
     for artifact in &artifacts {
         let path = root.join(artifact.path);
         if write {
