@@ -5,8 +5,8 @@
 //! construction authorities.
 //!
 //! The five members, the Root Package artifact, the five authorities, and the
-//! Registry Package's members written so far are written from this crate's
-//! values. A file digest covers every byte, so
+//! Registry Package's six members and container are written from this
+//! crate's values. A file digest covers every byte, so
 //! `--check` compares the exact bytes, not decoded values, and the artifacts
 //! are kept out of the repository formatter. `--write` also prints the digests
 //! the crate pins: the Root Package's two belong in
