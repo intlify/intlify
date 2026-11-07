@@ -38,6 +38,19 @@ pub(super) enum Scope {
 }
 
 impl Scope {
+    /// Whether a spelling's own key names its subject here, which several
+    /// spellings can share: those of one canonical locale, or, once content
+    /// keys are projected, of one projection. A single-valued field's path
+    /// names its one spelling.
+    const fn keyed_by_spelling(&self) -> bool {
+        !matches!(
+            self,
+            Self::DefaultSourceLocale
+                | Self::DefaultRequestedLocale
+                | Self::TargetDefaultRequestedLocale(_)
+        )
+    }
+
     /// The subject of a spelling with `key` here. A single-valued field's
     /// subject is its path, whatever the spelling names.
     fn subject(self, key: LocaleKey) -> LocaleSubject {
@@ -105,8 +118,17 @@ impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
         let mut groups: BTreeMap<LocaleSubject, (Attempt, bool)> = BTreeMap::new();
         let mut subjects = Vec::with_capacity(spellings.len());
         for (location, scope, raw) in spellings {
+            // Past the byte bound, a subject several spellings can share
+            // reports only the first-over witness (Decision 015-157).
+            let shared = scope.keyed_by_spelling();
             let attempt = match both(self.canonicalizer.clone(), after.clone()) {
-                Ok((canonicalizer, ())) => Ok(canonicalize(canonicalizer, raw)?),
+                Ok((canonicalizer, ())) => Ok(canonicalize(canonicalizer, raw)?.map_err(|issue| {
+                    if shared {
+                        issue.first_over()
+                    } else {
+                        issue
+                    }
+                })),
                 Err(causes) => Err(causes),
             };
             let (key, corrected) = match &attempt {
@@ -486,22 +508,28 @@ mod tests {
 
     #[test]
     fn identifier_bytes_bound_the_raw_and_then_the_canonical_spelling() {
-        let exceeded = |limit, actual| {
+        let exceeded = |limit: u64, actual| {
             Some(LimitExceeded {
                 bound: MAX_LOCALE_IDENTIFIER_BYTES,
                 limit: Bound::new(limit).unwrap(),
-                actual: Actual::Exact(actual),
+                actual,
             })
         };
-        let over = |raw: &str, limit, actual| {
+        // A requested locale's key can stand for several spellings, so past
+        // the bound it reports only the first-over witness.
+        let over = |raw: &str, limit: u64| {
             (
                 requested_unit(content(raw)),
                 "project-profile-resource-limit-exceeded",
-                exceeded(limit, actual),
+                exceeded(limit, Actual::AtLeast(limit + 1)),
             )
         };
         // The raw spelling is checked before the provider sees it.
-        for (limit, found) in [(5, vec![]), (4, vec![over("EN-us", 4, 5)])] {
+        for (limit, found) in [
+            (5, vec![]),
+            (4, vec![over("EN-us", 4)]),
+            (2, vec![over("EN-us", 2)]),
+        ] {
             let canonicalizer = canonicalizer(limit);
             let mut evaluation = Evaluation::default();
             spell(&mut evaluation, Ok(&canonicalizer), &["EN-us"])
@@ -510,7 +538,7 @@ mod tests {
             assert_eq!(issues(&evaluation), found, "{limit}");
         }
         // 17 bytes become 22, and the canonical spelling is checked too.
-        for (limit, found) in [(22, vec![]), (21, vec![over("und-u-ca-islamicc", 21, 22)])] {
+        for (limit, found) in [(22, vec![]), (21, vec![over("und-u-ca-islamicc", 21)])] {
             let canonicalizer = canonicalizer(limit);
             let mut evaluation = Evaluation::default();
             spell(&mut evaluation, Ok(&canonicalizer), &["und-u-ca-islamicc"])
@@ -518,6 +546,27 @@ mod tests {
                 .unwrap();
             assert_eq!(issues(&evaluation), found, "{limit}");
         }
+        // A single-valued field's path names its one spelling, whose exact
+        // length it reports.
+        let canonicalizer = canonicalizer(2);
+        let mut evaluation = Evaluation::default();
+        {
+            let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer));
+            pass.spell_one(
+                Location::DefaultSourceLocale,
+                Scope::DefaultSourceLocale,
+                "EN-us",
+            )
+            .unwrap();
+        }
+        assert_eq!(
+            issues(&evaluation),
+            [(
+                canonical_unit(LocaleSubject::DefaultSourceLocale),
+                "project-profile-resource-limit-exceeded",
+                exceeded(2, Actual::Exact(5)),
+            )]
+        );
     }
 
     #[test]

@@ -881,7 +881,7 @@ mod tests {
             available: Bound::new(6).unwrap(),
         });
         let noticed = {
-            let mut evaluation = resolved(R::Storefront).evaluation;
+            let mut evaluation = resolved(R::Storefront).evaluation.fabricating();
             evaluation
                 .notice(client_endpoint(Check::KnownEndpoint), invalid)
                 .unwrap();

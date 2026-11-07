@@ -603,6 +603,71 @@ fn blocked_recipes_keep_exact_subjects_codes_and_independent_checks() {
     }
 }
 
+/// Past the spelling bound, a subject several spellings can share reports
+/// only the first-over witness, and a single-valued field the exact length
+/// of its one spelling.
+#[test]
+fn the_identifier_bound_reports_a_shared_subjects_witness_and_a_fields_length() {
+    for (kind, recipe, exact, expected) in [
+        (
+            LimitKind::ResolutionRawIdentifierBytes,
+            R::Minimal,
+            2,
+            vec![
+                ("requested en", Actual::AtLeast(2)),
+                ("default", Actual::Exact(2)),
+                ("browser requested en", Actual::AtLeast(2)),
+            ],
+        ),
+        // 17 bytes become 22: the requested spelling stands for its content.
+        (
+            LimitKind::ResolutionCanonicalIdentifierBytes,
+            R::ExpandingAlias,
+            22,
+            vec![
+                ("requested und-u-ca-islamicc", Actual::AtLeast(22)),
+                ("default", Actual::Exact(22)),
+            ],
+        ),
+    ] {
+        for edge in [LimitEdge::Exact, LimitEdge::FirstOver] {
+            let declaration = declarations()
+                .into_iter()
+                .find(|case| {
+                    case.fixture == Recipe::LocalePolicyResolution(recipe)
+                        && case.limit == Some((kind, edge))
+                })
+                .unwrap();
+            let resolved = resolved(&declaration);
+            let found: Vec<(String, Actual)> = resolved
+                .evaluation
+                .issues()
+                .map(|issue| {
+                    let Subject::Locale(subject) = &issue.unit().subject else {
+                        panic!("only Phase 7's spellings block");
+                    };
+                    let exceeded = resolved.evaluation.limit(issue).unwrap();
+                    assert_eq!(
+                        (exceeded.bound.name, exceeded.limit.get()),
+                        ("maxLocaleIdentifierBytes", exact - 1),
+                        "{kind:?}"
+                    );
+                    (describe(subject), exceeded.actual)
+                })
+                .collect();
+            let expected: Vec<(String, Actual)> = if edge == LimitEdge::Exact {
+                Vec::new()
+            } else {
+                expected
+                    .iter()
+                    .map(|&(subject, actual): &(&str, Actual)| (subject.to_owned(), actual))
+                    .collect()
+            };
+            assert_eq!(found, expected, "{kind:?} {edge:?}");
+        }
+    }
+}
+
 #[test]
 fn the_occurrence_bound_counts_every_role_at_its_exact_value_and_first_over() {
     for edge in [LimitEdge::Exact, LimitEdge::FirstOver] {
@@ -1101,7 +1166,9 @@ fn reordered_rules_and_selector_items_change_no_observation() {
 }
 
 /// Each of Phase 8's eight bounds counts every role at its exact value, and
-/// one under it blocks with that bound's own name, limit, and count.
+/// one under it blocks with that bound's own name, limit, and count, or for
+/// a sequence, whose key can stand for several sources, the first-over
+/// witness.
 #[test]
 fn phase_8_bounds_count_every_role_at_their_exact_values_and_first_over() {
     for (kind, name, exact) in [
@@ -1159,9 +1226,14 @@ fn phase_8_bounds_count_every_role_at_their_exact_values_and_first_over() {
             assert_eq!(issues.len(), 1, "{kind:?}");
             assert_eq!(issues[0].code(), Code::ResourceLimitExceeded, "{kind:?}");
             let exceeded = resolved.evaluation.limit(issues[0]).unwrap();
+            let actual = if kind == LimitKind::ResolutionFallbackCandidatesPerSource {
+                Actual::AtLeast(exact)
+            } else {
+                Actual::Exact(exact)
+            };
             assert_eq!(
                 (exceeded.bound.name, exceeded.limit.get(), exceeded.actual),
-                (name, exact - 1, Actual::Exact(exact)),
+                (name, exact - 1, actual),
                 "{kind:?}"
             );
         }

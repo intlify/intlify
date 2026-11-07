@@ -168,6 +168,89 @@ const CODES = [
   'project-profile-reporting-limit-exceeded'
 ]
 
+/** Design 015's closed vocabulary of a Finding's details members, in its order. */
+const DETAILS_MEMBERS = [
+  'reason',
+  'field',
+  'component',
+  'slot',
+  'subject',
+  'resourceGroup',
+  'bound',
+  'limit',
+  'actual',
+  'required',
+  'available',
+  'actualRelation'
+]
+
+/** What a row's Finding payloads may derive from: its key alone, or the one value it names. */
+const DERIVATIONS = ['key-only', 'exact']
+
+/**
+ * The details members design 015's code tables give each code that carries
+ * any, in the vocabulary's order: a stable reason wherever a code's row names
+ * reasons, the schema field, the missing slot, the delivery component, and a
+ * bound's subject kind, group, ID, value, and total, or what the policy
+ * requires and the capability makes available. Every other code's details are
+ * empty.
+ *
+ * @type {Record<string, string[]>}
+ */
+const CODE_DETAILS = {
+  'project-profile-input-not-json-compatible': ['reason'],
+  'project-profile-required-field-missing': ['field'],
+  'project-profile-field-type-invalid': ['field'],
+  'project-profile-field-value-invalid': ['field'],
+  'project-profile-unknown-field': ['field'],
+  'project-profile-specification-input-incomplete': ['reason', 'slot'],
+  'project-profile-specification-not-admitted': ['reason'],
+  'project-profile-locale-specification-not-admitted': ['reason'],
+  'project-profile-negotiation-specification-not-admitted': ['reason'],
+  'project-profile-message-fallback-specification-not-admitted': ['reason'],
+  'project-profile-coverage-specification-not-admitted': ['reason'],
+  'project-profile-delivery-specification-not-admitted': ['reason', 'component'],
+  'project-profile-intent-surface-class-vocabulary-not-admitted': ['reason'],
+  'project-profile-target-default-locale-not-supported': ['reason'],
+  'project-profile-negotiation-alias-duplicate': ['reason'],
+  'project-profile-message-fallback-sequence-invalid': ['reason'],
+  'project-profile-coverage-rule-invalid': ['reason'],
+  'project-profile-artifact-reference-not-admitted': ['reason'],
+  'project-profile-artifact-collection-not-admitted': ['reason'],
+  'project-profile-hydration-relation-invalid': ['reason'],
+  'project-profile-hydration-locale-policy-incompatible': ['reason'],
+  'project-profile-resource-policy-not-admitted': ['reason'],
+  'project-profile-resource-policy-capability-incompatible': [
+    'resourceGroup',
+    'bound',
+    'required',
+    'available'
+  ],
+  'project-profile-bootstrap-limit-exceeded': ['bound', 'limit', 'actual', 'actualRelation'],
+  'project-profile-resource-limit-exceeded': [
+    'subject',
+    'resourceGroup',
+    'bound',
+    'limit',
+    'actual',
+    'actualRelation'
+  ],
+  'project-profile-reporting-limit-exceeded': ['reason', 'bound']
+}
+
+/**
+ * The singleton checks that see each occurrence on its own, as 015's bound
+ * table says of the longest string, and as the duplicate members and the
+ * values outside the JSON domain each are: their payloads derive from the key
+ * alone.
+ */
+const INDEPENDENT_SINGLETON_CHECKS = [
+  'entry.input.unique-members',
+  'entry.input.json-compatible',
+  'entry.input.within-single-string-bytes',
+  'resource-policy.root-longest-string.within-bound'
+]
+
 /**
  * Design 015's five example check IDs, each with the phase and subject kind of
  * the check it names.
@@ -659,6 +742,54 @@ for (const [recordKind, ids] of Object.entries(DEPENDENCY_IDS)) {
     }
   }
 }
+// A row's payload strategy derives in one of the two ways and names each code
+// the row may report, in their order, with exactly the details members 015's
+// code tables give it. A singleton's payloads derive from its key alone
+// exactly where its check sees each occurrence on its own; structural
+// admission's other keys, whose paths hold `*` and whose failed map keys are
+// keyed by their content, always do; and so does a key under a parent whose
+// key does.
+const keyOnlyKinds = new Set()
+let keyOnlyRows = 0
+for (const row of checkRows) {
+  const where = `check registry: ${row.checkId}`
+  const strategy = row.findingPayloadStrategy
+  if (!DERIVATIONS.includes(strategy?.derivation)) {
+    fail(`${where}: the payloads derive in no way of the registry's`)
+    continue
+  }
+  const codes = (strategy.details ?? []).map(details => details.code)
+  if (!isDeepStrictEqual(codes, row.possibleFindingCodes ?? [])) {
+    fail(`${where}: the payload strategy does not name the row's codes in their order`)
+  }
+  for (const details of strategy.details ?? []) {
+    if (!isDeepStrictEqual(details.members, CODE_DETAILS[details.code] ?? [])) {
+      fail(`${where}: ${details.code} does not carry the details 015 gives it`)
+    }
+  }
+  const keyOnly = strategy.derivation === 'key-only'
+  if (keyOnly) {
+    keyOnlyKinds.add(row.subjectKind)
+    keyOnlyRows += 1
+  }
+  const singleton = row.subjectKeyStrategy === 'singleton'
+  if (singleton && keyOnly !== INDEPENDENT_SINGLETON_CHECKS.includes(row.checkId)) {
+    fail(
+      `${where}: a singleton derives from its key alone only where it sees each occurrence on its own`
+    )
+  }
+  if (row.phaseId === 'structural-admission' && !singleton && !keyOnly) {
+    fail(`${where}: a structural admission key can stand for several values`)
+  }
+}
+for (const row of checkRows) {
+  const parent = row.parentSubject?.subjectKind
+  if (keyOnlyKinds.has(parent) && row.findingPayloadStrategy?.derivation !== 'key-only') {
+    fail(
+      `check registry: ${row.checkId}: its parent's key can stand for several values, and so can its own`
+    )
+  }
+}
 // Every phase but profile projection has rows.
 const expectedPhases = PHASES.filter(phase => phase !== 'profile-projection')
 if (!isDeepStrictEqual([...phasesWithRows], expectedPhases)) {
@@ -680,7 +811,8 @@ if (fileDigest(checkRegistryBytes) !== pinned(checkSource, 'DIGEST')) {
 }
 
 // The Check Registry's schema: Draft 7, closing the container, every row, its
-// parent, and the vocabularies of phases, kinds, strategies, and projections.
+// parent, its payload strategy, and the vocabularies of phases, kinds,
+// strategies, projections, codes, record kinds, and details members.
 const checkSchema = JSON.parse(checkSchemaBytes.toString('utf8'))
 if (checkSchema.$schema !== DRAFT_7) {
   fail(`check registry schema: $schema ${checkSchema.$schema}`)
@@ -706,7 +838,8 @@ const required = [
   'prerequisiteCheckIds',
   'possibleFindingCodes',
   'possibleEvidenceRecordKinds',
-  'ownedDependencies'
+  'ownedDependencies',
+  'findingPayloadStrategy'
 ]
 const members = [...required.slice(0, 7), 'parentSubject', ...required.slice(7)]
 if (
@@ -785,6 +918,24 @@ if (
 ) {
   fail("check registry schema: the dependencies are not 015's three kinds of record, each closed")
 }
+const strategySchema = follow(checkSchema, property('findingPayloadStrategy')?.allOf?.[0])
+const detailsSchema = strategySchema?.properties?.details
+const codeDetails = follow(checkSchema, detailsSchema?.items)
+const membersSchema = codeDetails?.properties?.members
+if (
+  !closes(strategySchema, ['derivation', 'details']) ||
+  !isDeepStrictEqual(vocabulary(strategySchema?.properties?.derivation), DERIVATIONS) ||
+  detailsSchema?.type !== 'array' ||
+  !closes(codeDetails, ['code', 'members']) ||
+  !isDeepStrictEqual(vocabulary(codeDetails?.properties?.code), CODES) ||
+  membersSchema?.type !== 'array' ||
+  membersSchema.uniqueItems !== true ||
+  !isDeepStrictEqual(vocabulary(membersSchema.items), DETAILS_MEMBERS)
+) {
+  fail(
+    "check registry schema: a payload strategy is not closed over 015's codes and details members"
+  )
+}
 const parentSchema = follow(checkSchema, property('parentSubject')?.allOf?.[0])
 if (!closes(parentSchema, ['phaseId', 'subjectKind'])) {
   fail('check registry schema: a parent is not closed')
@@ -803,5 +954,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `registries agree: ${expected.rows.length} safe origin kinds, ${EVIDENCE_KINDS.length} evidence kinds, ${checkRows.length} checks of ${kinds.size} subject kinds with ${prerequisiteCount} prerequisites, reporting ${reportedCodes.size} codes and owning ${owners.size} dependency records`
+  `registries agree: ${expected.rows.length} safe origin kinds, ${EVIDENCE_KINDS.length} evidence kinds, ${checkRows.length} checks of ${kinds.size} subject kinds with ${prerequisiteCount} prerequisites, reporting ${reportedCodes.size} codes, owning ${owners.size} dependency records, and deriving ${keyOnlyRows} rows' payloads from their keys alone`
 )

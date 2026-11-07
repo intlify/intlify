@@ -662,6 +662,25 @@ impl Blocking {
             details: Some(Details::Shortfall(shortfall)),
         }
     }
+
+    /// The same result as a unit whose key can stand for several values
+    /// reports it: past its bound only the first-over witness `limit + 1`,
+    /// whichever value the unit measured, since every value the key stands
+    /// for reports the same (Decision 015-157).
+    pub(crate) const fn first_over(self) -> Self {
+        match self.details {
+            Some(Details::Limit(exceeded)) => Self {
+                details: Some(Details::Limit(LimitExceeded {
+                    // `Bound` excludes `u64::MAX`, so the witness is
+                    // representable.
+                    actual: Actual::AtLeast(exceeded.limit.get() + 1),
+                    ..exceeded
+                })),
+                ..self
+            },
+            _ => self,
+        }
+    }
 }
 
 /// The details 015 reports with an issue that has them.
@@ -853,20 +872,70 @@ impl Evaluation {
         }
     }
 
-    /// Asserts that `unit`'s Check Registry row lists `code`, unless a test
-    /// made the result up or made the unit block.
+    /// This evaluation, which a test goes on to fill with results no check
+    /// of the resolver reports, such as a notice added to a real resolution.
     #[cfg(test)]
-    fn registered(&self, unit: &Unit, code: Code) {
+    pub(crate) fn fabricating(self) -> Self {
+        Self {
+            fabricated: true,
+            ..self
+        }
+    }
+
+    /// Asserts that `unit`'s Check Registry row lists `code`, and that the
+    /// result carries what the row's payload strategy gives the code: a
+    /// reason exactly when its details have one, a bound's or a shortfall's
+    /// details exactly when they have its members, and past a bound an exact
+    /// total only under a key that names one value, and otherwise the
+    /// smallest witness `limit + 1`. Unless a test made the result up or made
+    /// the unit block.
+    #[cfg(test)]
+    fn registered(
+        &self,
+        unit: &Unit,
+        code: Code,
+        reason: Option<Reason>,
+        details: Option<Details>,
+    ) {
+        use crate::construction::registry::check::{testing, Derivation, DetailsMember};
         if self.fabricated || self.blocked.as_ref() == Some(unit) {
             return;
         }
-        let listed = crate::construction::registry::check::testing::possible_codes(
-            unit.subject.kind(),
-            unit.check,
-        );
+        let kind = unit.subject.kind();
+        let listed = testing::possible_codes(kind, unit.check);
         assert!(
             listed.contains(&code),
             "{unit:?} reports {}, which its Check Registry row does not list",
+            code.as_str()
+        );
+        let members = testing::details_members(code);
+        assert_eq!(
+            reason.is_some(),
+            members.contains(&DetailsMember::Reason),
+            "{unit:?} reports {} with {reason:?}, against its payload strategy",
+            code.as_str()
+        );
+        let carried = match details {
+            Some(Details::Limit(exceeded)) => {
+                let limit = exceeded.limit.get();
+                let measured = match exceeded.actual {
+                    // An exact total only under a key that names one value.
+                    Actual::Exact(total) => {
+                        total > limit && testing::derivation(kind, unit.check) == Derivation::Exact
+                    }
+                    Actual::AtLeast(witness) => witness == limit + 1,
+                };
+                measured && members.contains(&DetailsMember::Actual)
+            }
+            Some(Details::Shortfall(_)) => members.contains(&DetailsMember::Available),
+            None => {
+                !members.contains(&DetailsMember::Actual)
+                    && !members.contains(&DetailsMember::Available)
+            }
+        };
+        assert!(
+            carried,
+            "{unit:?} reports {} with {details:?}, against its payload strategy",
             code.as_str()
         );
     }
@@ -922,7 +991,7 @@ impl Evaluation {
                     details,
                 }) => {
                     #[cfg(test)]
-                    self.registered(&unit, code);
+                    self.registered(&unit, code, reason, details);
                     let key = IssueKey {
                         unit: unit.clone(),
                         code,
@@ -944,7 +1013,7 @@ impl Evaluation {
             return Err(EvaluationInvariant::NoticeWithoutEvaluation(unit));
         }
         #[cfg(test)]
-        self.registered(&unit, code);
+        self.registered(&unit, code, None, None);
         self.notices.insert(IssueKey {
             unit,
             code,
@@ -1336,6 +1405,172 @@ mod tests {
             .unwrap()
             .unwrap();
         evaluation.notice(data(), Code::LocaleNonCanonical).unwrap();
+        // A real evaluation a test goes on to fill.
+        let mut evaluation = Evaluation::default();
+        evaluation
+            .check(data(), Ok(()), |()| Ok::<(), Blocking>(()))
+            .unwrap()
+            .unwrap();
+        let mut evaluation = evaluation.fabricating();
+        evaluation.notice(data(), Code::LocaleNonCanonical).unwrap();
+        assert_eq!(evaluation.notices().count(), 1);
+    }
+
+    /// The data's check reports a code without details.
+    const UNAVAILABLE: Code = Code::LocaleDataNotAdmitted;
+
+    #[test]
+    #[should_panic(expected = "against its payload strategy")]
+    fn a_test_evaluation_records_no_reason_where_the_codes_details_have_none() {
+        let mut evaluation = Evaluation::default();
+        let _ = evaluation.check(data(), Ok(()), |()| {
+            Err::<(), _>(Blocking {
+                code: UNAVAILABLE,
+                reason: Some(Reason::Incompatible),
+                details: None,
+            })
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "against its payload strategy")]
+    fn a_test_evaluation_records_a_reason_where_the_codes_details_have_one() {
+        let mut evaluation = Evaluation::default();
+        let _ = evaluation.check(slot(Slot::Coverage), Ok(()), |()| {
+            Err::<(), _>(Blocking {
+                reason: None,
+                ..MISSING
+            })
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "against its payload strategy")]
+    fn a_test_evaluation_records_a_bounds_details_only_where_the_code_has_them() {
+        let mut evaluation = Evaluation::default();
+        let _ = evaluation.check(data(), Ok(()), |()| {
+            Err::<(), _>(Blocking {
+                code: UNAVAILABLE,
+                reason: None,
+                details: Some(Details::Limit(exceeded(Actual::Exact(4)))),
+            })
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "against its payload strategy")]
+    fn a_test_evaluation_records_a_bounds_details_wherever_the_code_has_them() {
+        let mut evaluation = Evaluation::default();
+        let _ = evaluation.check(occurrences(), Ok(()), |()| {
+            Err::<(), _>(Blocking {
+                details: None,
+                ..Blocking::limit(exceeded(Actual::Exact(4)))
+            })
+        });
+    }
+
+    /// The occurrence bound's unit, whose key names one total.
+    fn occurrences() -> Unit {
+        Unit {
+            phase: Phase::LocaleResolution,
+            subject: Subject::Locale(LocaleSubject::Occurrences),
+            check: Check::WithinBound,
+        }
+    }
+
+    /// A requested locale's unit, whose key can stand for several spellings.
+    fn spelled() -> Unit {
+        use crate::resolver::locales::{Content, LocaleKey};
+        Unit {
+            phase: Phase::LocaleResolution,
+            subject: Subject::Locale(LocaleSubject::RequestedLocale(LocaleKey::Content(
+                Content::new("x-long"),
+            ))),
+            check: Check::CanonicalLocale,
+        }
+    }
+
+    fn exceeded(actual: Actual) -> LimitExceeded {
+        LimitExceeded {
+            bound: BoundId {
+                group: crate::resolver::limits::Group::LocaleResolution,
+                name: "maxLocaleOccurrences",
+            },
+            limit: Bound::new(3).unwrap(),
+            actual,
+        }
+    }
+
+    #[test]
+    fn past_a_bound_a_unit_records_its_exact_total_or_the_smallest_witness() {
+        let mut evaluation = Evaluation::default();
+        for (unit, actual) in [
+            (occurrences(), Actual::Exact(4)),
+            (spelled(), Actual::AtLeast(4)),
+        ] {
+            let found = evaluation
+                .check(unit, Ok(()), |()| {
+                    Err::<(), _>(Blocking::limit(exceeded(actual)))
+                })
+                .unwrap();
+            assert!(found.is_err());
+        }
+        let mut evaluation = Evaluation::default();
+        let found = evaluation
+            .check(occurrences(), Ok(()), |()| {
+                Err::<(), _>(Blocking::limit(exceeded(Actual::AtLeast(4))))
+            })
+            .unwrap();
+        assert!(found.is_err());
+    }
+
+    #[test]
+    #[should_panic(expected = "against its payload strategy")]
+    fn past_a_bound_a_key_that_can_stand_for_several_values_records_only_the_witness() {
+        let mut evaluation = Evaluation::default();
+        let _ = evaluation.check(spelled(), Ok(()), |()| {
+            Err::<(), _>(Blocking::limit(exceeded(Actual::Exact(4))))
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "against its payload strategy")]
+    fn past_a_bound_the_witness_is_the_smallest() {
+        let mut evaluation = Evaluation::default();
+        let _ = evaluation.check(occurrences(), Ok(()), |()| {
+            Err::<(), _>(Blocking::limit(exceeded(Actual::AtLeast(5))))
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "against its payload strategy")]
+    fn an_exact_total_is_past_its_bound() {
+        let mut evaluation = Evaluation::default();
+        let _ = evaluation.check(occurrences(), Ok(()), |()| {
+            Err::<(), _>(Blocking::limit(exceeded(Actual::Exact(3))))
+        });
+    }
+
+    #[test]
+    fn the_first_over_witness_replaces_a_bounds_total_and_nothing_else() {
+        assert_eq!(
+            Blocking::limit(exceeded(Actual::Exact(9))).first_over(),
+            Blocking::limit(exceeded(Actual::AtLeast(4)))
+        );
+        assert_eq!(
+            Blocking::limit(exceeded(Actual::AtLeast(4))).first_over(),
+            Blocking::limit(exceeded(Actual::AtLeast(4)))
+        );
+        for unchanged in [
+            MISSING,
+            Blocking::shortfall(Shortfall {
+                bound: exceeded(Actual::Exact(4)).bound,
+                required: Bound::new(4).unwrap(),
+                available: Bound::new(3).unwrap(),
+            }),
+        ] {
+            assert_eq!(unchanged.first_over(), unchanged);
+        }
     }
 
     #[test]

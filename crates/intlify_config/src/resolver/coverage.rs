@@ -490,8 +490,13 @@ fn selected_locales<P: Provider>(
     // and how many items spell it.
     let mut subjects: BTreeMap<LocaleKey, (Attempt, bool, usize)> = BTreeMap::new();
     for raw in items {
+        // An item's key can stand for several spellings, under a rule keyed
+        // by its content: past the byte bound it reports only the first-over
+        // witness (Decision 015-157).
         let attempt = match selectors.spelling {
-            Ok(canonicalizer) => Ok(canonicalize(canonicalizer, raw)?),
+            Ok(canonicalizer) => {
+                Ok(canonicalize(canonicalizer, raw)?.map_err(Blocking::first_over))
+            }
             Err(ref causes) => Err(causes.clone()),
         };
         let (key, corrected) = match &attempt {
@@ -893,6 +898,16 @@ mod tests {
             bound,
             limit: Bound::new(limit).unwrap(),
             actual: Actual::Exact(actual),
+        }
+    }
+
+    /// Past `limit`, the first-over witness, which a key that can stand for
+    /// several values reports.
+    fn first_over(bound: BoundId, limit: u64) -> LimitExceeded {
+        LimitExceeded {
+            bound,
+            limit: Bound::new(limit).unwrap(),
+            actual: Actual::AtLeast(limit + 1),
         }
     }
 
@@ -1896,7 +1911,9 @@ mod tests {
             )]
         );
         assert_eq!(notices(&at.evaluation), [corrected(Check::CanonicalLocale)]);
-        // Each item is measured in bytes before the provider sees it.
+        // Each item is measured in bytes before the provider sees it, and
+        // under a rule keyed by its content reports only the first-over
+        // witness.
         let short = resolve_fields(
             &fields,
             &Setup {
@@ -1907,13 +1924,12 @@ mod tests {
         let long = locale_unit(&owner, content("EN-us"), Check::CanonicalLocale);
         assert_eq!(
             exceeded(&short.evaluation, &long),
-            exactly(
+            first_over(
                 BoundId {
                     group: Group::LocaleResolution,
                     name: "maxLocaleIdentifierBytes",
                 },
-                4,
-                5
+                4
             )
         );
         assert_eq!(

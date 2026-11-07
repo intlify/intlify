@@ -93,6 +93,14 @@
             "$ref": "#/definitions/OwnedDependency"
           },
           "uniqueItems": true
+        },
+        "findingPayloadStrategy": {
+          "description": "How the row's Finding payloads derive, and each code's details.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/PayloadStrategy"
+            }
+          ]
         }
       },
       "additionalProperties": false,
@@ -109,7 +117,8 @@
         "prerequisiteCheckIds",
         "possibleFindingCodes",
         "possibleEvidenceRecordKinds",
-        "ownedDependencies"
+        "ownedDependencies",
+        "findingPayloadStrategy"
       ]
     },
     "Phase": {
@@ -457,6 +466,75 @@
         "call-site-source",
         "profile-selector",
         "origins"
+      ]
+    },
+    "PayloadStrategy": {
+      "description": "How a row's Finding payloads derive, and the `details` members of each\ncode it may report.",
+      "type": "object",
+      "properties": {
+        "derivation": {
+          "$ref": "#/definitions/Derivation"
+        },
+        "details": {
+          "description": "One for each of the row's possible Finding codes, in their order.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CodeDetails"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "derivation",
+        "details"
+      ]
+    },
+    "Derivation": {
+      "description": "What a row's Finding payloads derive from. Under `key-only`, the row's key\ncan stand for distinct raw values, so a payload derives only from the\ncheck, code, reason, Logical subject key, and bound authority, and past a\nbound reports the first-over witness `limit + 1` with `at-least`, even for\none value. Under `exact`, the row's key names one value, so an exactly\ncomputed total is `exact`, and only a total that cannot be safely\nestablished reports that smallest witness.",
+      "type": "string",
+      "enum": [
+        "key-only",
+        "exact"
+      ]
+    },
+    "CodeDetails": {
+      "description": "The `details` members of one code a row may report.",
+      "type": "object",
+      "properties": {
+        "code": {
+          "$ref": "#/definitions/FindingCode"
+        },
+        "members": {
+          "description": "In 015's order, each once.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DetailsMember"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "members"
+      ]
+    },
+    "DetailsMember": {
+      "description": "015's closed vocabulary of a Finding's `details` members, in its order.",
+      "type": "string",
+      "enum": [
+        "reason",
+        "field",
+        "component",
+        "slot",
+        "subject",
+        "resourceGroup",
+        "bound",
+        "limit",
+        "actual",
+        "required",
+        "available",
+        "actualRelation"
       ]
     }
   }

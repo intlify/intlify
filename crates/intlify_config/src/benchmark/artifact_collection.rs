@@ -472,7 +472,7 @@ mod tests {
             Check::AdmissibleMember,
         );
         let blocked = |blocking: Blocking| {
-            let mut evaluation = Evaluation::default();
+            let mut evaluation = Evaluation::fabricated();
             let _ = evaluation
                 .check(first.clone(), Ok(()), |()| Err::<(), _>(blocking))
                 .unwrap();
@@ -524,7 +524,7 @@ mod tests {
             details: None,
         });
         let noticed = {
-            let mut evaluation = prepared(&values).resolve().evaluation;
+            let mut evaluation = prepared(&values).resolve().evaluation.fabricating();
             evaluation
                 .notice(first.clone(), Code::ArtifactCollectionNotAdmitted)
                 .unwrap();
