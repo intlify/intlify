@@ -36,7 +36,7 @@ pub(crate) mod admission;
 pub(crate) mod authority_set;
 pub(crate) mod bounds;
 pub(crate) mod capability;
-#[cfg(any(test, feature = "benchmark"))]
+#[cfg(any(test, feature = "benchmark", feature = "dev-example"))]
 pub(crate) mod committed;
 pub(crate) mod component;
 pub(crate) mod envelope;

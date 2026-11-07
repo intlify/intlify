@@ -26,7 +26,7 @@ use crate::resolver::locales::{
 
 use super::eval::IssueKind;
 use super::selection::{Selection, SelectionFailure, SelectorInput};
-use super::{AuthoringSchema, StructuralLimits};
+use super::StructuralLimits;
 
 /// Example-owned capacity, not an admitted Resource Limit Policy or a product default.
 pub const MAX_FILE_BYTES: u64 = 1_000_000;
@@ -284,8 +284,8 @@ pub fn resolve(source: &[u8], selector: Option<&str>) -> Result<Value, String> {
         max_profile_id_bytes: bound(64),
         max_structural_analysis_units: bound(1_000_000),
     };
-    let schema = AuthoringSchema::<PolicyReference, TargetProfileReference>::for_model()
-        .map_err(|e| format!("Example schema invariant: {e:?}"))?;
+    // The configuration schema admitted by the resolver the committed input builds.
+    let schema = crate::construction::resolver::committed().configuration_schema();
     let analysis = schema
         .analyze(Arc::clone(&doc), limits)
         .map_err(|e| format!("Example analysis invariant: {e:?}"))?;

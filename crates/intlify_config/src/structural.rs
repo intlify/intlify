@@ -1,22 +1,22 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Private schema-guided admission for the minimum profile path. Formal 017
-//! references and isolated synthetic fixtures use the same admission mechanism;
-//! neither a generated schema nor a fixture is full construction authority.
+//! Private schema-guided admission for the minimum profile path. A resolver
+//! analyzes a configuration with the configuration schema its construction
+//! admitted, for the formal 017 references; tests also analyze with schemas
+//! generated from a model's types, isolated synthetic fixtures included, by
+//! the same admission mechanism.
 
 use std::collections::BTreeSet;
+use std::fmt;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 
 use crate::input_limits::{Bound, ValueCounts};
 use crate::materialize::{ByteSpan, MaterializedDocument, NodeId, NodeKind};
-use crate::model::{
-    valid_identity, IntlifyConfig, ProfileDeclaration, CONFIGURATION_SCHEMA_VERSION,
-};
+use crate::model::{valid_identity, IntlifyConfig, ProfileDeclaration};
 use eval::{EvaluationFailure, FragmentState, SchemaEvaluation};
 use program::{ProgramError, SchemaId, SchemaProgram};
 
@@ -58,6 +58,7 @@ pub(crate) struct AdmissionIssue {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AdmissionInvariant {
+    #[cfg(test)]
     SchemaGeneration,
     SchemaCompilation,
     ModelLayout,
@@ -66,13 +67,18 @@ pub(crate) enum AdmissionInvariant {
 }
 
 struct BoundSchema {
+    /// The `schemaVersion` the schema is mapped to.
+    version: String,
     body: serde_json::Value,
     program: SchemaProgram,
     declaration_schema: SchemaId,
 }
 
-/// A type-bound generated schema for the internal minimum path, including the
-/// formal reference types. Not a complete formal Schema Authority Set or RCI.
+/// A configuration schema compiled for the internal minimum path, bound to
+/// the model types it describes. A resolver compiles the configuration schema
+/// its construction admitted, for the formal reference types; tests also
+/// compile the schema generated from a model's types, isolated fixtures
+/// included.
 pub(crate) struct AuthoringSchema<Policy, Target> {
     binding: Arc<BoundSchema>,
     model: PhantomData<fn() -> (Policy, Target)>,
@@ -87,10 +93,37 @@ impl<Policy, Target> Clone for AuthoringSchema<Policy, Target> {
     }
 }
 
-impl<Policy: JsonSchema, Target: JsonSchema> AuthoringSchema<Policy, Target> {
+impl<Policy, Target> fmt::Debug for AuthoringSchema<Policy, Target> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("AuthoringSchema")
+            .finish_non_exhaustive()
+    }
+}
+
+#[cfg(test)]
+impl<Policy: schemars::JsonSchema, Target: schemars::JsonSchema> AuthoringSchema<Policy, Target> {
+    /// Compile the schema generated from the model's types, for the
+    /// `schemaVersion` the model reads.
     pub(crate) fn for_model() -> Result<Self, AdmissionInvariant> {
         let body = crate::schema::draft7_schema::<IntlifyConfig<Policy, Target>>()
             .map_err(|_| AdmissionInvariant::SchemaGeneration)?;
+        Self::compile(crate::model::CONFIGURATION_SCHEMA_VERSION.to_owned(), body)
+    }
+}
+
+impl<Policy, Target> AuthoringSchema<Policy, Target> {
+    /// Compile `body`, the schema mapped to `version`, for the model it
+    /// describes, `IntlifyConfig<Policy, Target>`. Nothing here checks that
+    /// it describes that model: the caller compiles a schema it knows does.
+    ///
+    /// Admission selects the schema only for a configuration whose root
+    /// `schemaVersion` is `version`, and refuses any other version as
+    /// unsupported.
+    pub(crate) fn compile(
+        version: String,
+        body: serde_json::Value,
+    ) -> Result<Self, AdmissionInvariant> {
         let program = SchemaProgram::compile(&body)
             .map_err(|_: ProgramError| AdmissionInvariant::SchemaCompilation)?;
         let profiles_schema = program
@@ -101,6 +134,7 @@ impl<Policy: JsonSchema, Target: JsonSchema> AuthoringSchema<Policy, Target> {
             .ok_or(AdmissionInvariant::ModelLayout)?;
         Ok(Self {
             binding: Arc::new(BoundSchema {
+                version,
                 body,
                 program,
                 declaration_schema,
@@ -108,9 +142,7 @@ impl<Policy: JsonSchema, Target: JsonSchema> AuthoringSchema<Policy, Target> {
             model: PhantomData,
         })
     }
-}
 
-impl<Policy, Target> AuthoringSchema<Policy, Target> {
     pub(crate) fn schema_body(&self) -> &serde_json::Value {
         &self.binding.body
     }
@@ -231,7 +263,7 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
         };
         let value = self.doc.node(version.value());
         match value.kind() {
-            NodeKind::String(version) if version == CONFIGURATION_SCHEMA_VERSION => {
+            NodeKind::String(version) if *version == self.binding.version => {
                 self.selected_version = true;
             }
             NodeKind::String(_) => self.issues.push(AdmissionIssue {

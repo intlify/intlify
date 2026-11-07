@@ -3,7 +3,8 @@
 
 //! Complete private structural-result observation, outside the measured interval.
 //! Physical node IDs become canonical value-preorder ranks; schema IDs become
-//! generated schema locations. Neither allocator addresses nor elapsed time enter it.
+//! locations in the compiled schema. Neither allocator addresses nor elapsed time
+//! enter it.
 
 use std::collections::BTreeMap;
 

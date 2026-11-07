@@ -147,8 +147,9 @@ impl Frame {
         self.uint(counts.single_string_bytes);
     }
 
-    /// Generated schema and admitted fixed-depth authoring values only. Arbitrary
-    /// deep materialized input uses the iterative document traversal below.
+    /// The configuration schema and admitted fixed-depth authoring values only.
+    /// Arbitrary deep materialized input uses the iterative document traversal
+    /// below.
     pub(crate) fn json(&mut self, value: &Value) {
         match value {
             Value::Null => self.uint(0),

@@ -105,6 +105,24 @@ fn version_failure_suppresses_schema_body_work_without_fallback() {
 }
 
 #[test]
+fn admission_selects_only_the_version_the_schema_is_mapped_to() {
+    let body = FixtureSchema::for_model().unwrap().schema_body().clone();
+    let schema = FixtureSchema::compile("future-private-version".to_owned(), body).unwrap();
+    let analyze = |version: &str| {
+        let mut value = minimal_config();
+        value["schemaVersion"] = json!(version);
+        schema.analyze(document(&value), limits()).unwrap()
+    };
+    assert!(analyze("future-private-version").version_selected());
+    let analysis = analyze("0");
+    assert!(!analysis.version_selected());
+    assert_eq!(
+        analysis.issues()[0].reason,
+        StructuralFailure::SchemaVersionUnsupported
+    );
+}
+
+#[test]
 fn schema_metadata_never_selects_or_fetches_an_authority() {
     let mut value = minimal_config();
     value["$schema"] = json!("https://invalid.example/private-other-schema.json");

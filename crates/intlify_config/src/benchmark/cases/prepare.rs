@@ -50,6 +50,12 @@ pub(in crate::benchmark) enum PreparationFailure {
     Observation,
 }
 
+/// The configuration schema the cases are prepared with: the one admitted by
+/// the resolver the committed input builds.
+pub(super) fn configuration_schema() -> &'static Schema {
+    crate::construction::resolver::committed().configuration_schema()
+}
+
 /// The numbers are explicit owner fixture capacity, not resolver defaults or a
 /// substitute for an admitted Implementation Capability / Resource Limit Policy.
 pub(super) fn fixture_capacity() -> (InputLimits, StructuralLimits) {
@@ -121,8 +127,7 @@ pub(in crate::benchmark) fn prepare(
             LimitKind::TotalStringBytes => counts.value.total_string_bytes,
             LimitKind::SingleStringBytes => counts.value.single_string_bytes,
             LimitKind::Profiles | LimitKind::ProfileIdBytes | LimitKind::StructuralUnits => {
-                let analysis = Schema::for_model()
-                    .map_err(|_| PreparationFailure::CoreInvariant)?
+                let analysis = configuration_schema()
                     .analyze(Arc::new(baseline), structural_limits)
                     .map_err(|_| PreparationFailure::CoreInvariant)?;
                 if !analysis.is_complete() {
@@ -217,7 +222,7 @@ pub(in crate::benchmark) fn prepare(
             materialize_file(source, input_limits)
                 .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?,
         );
-        let schema = Schema::for_model().map_err(|_| PreparationFailure::CoreInvariant)?;
+        let schema = configuration_schema().clone();
         match declaration.operation {
             Operation::StructuralAnalysis => Prepared::Structural {
                 schema,
@@ -510,8 +515,7 @@ fn prepare_resolution(declaration: &Declaration) -> Result<Candidate, Preparatio
     let (input_limits, structural_limits) = fixture_capacity();
     let doc = materialize_file(declaration.fixture.source(), input_limits)
         .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?;
-    let analysis = Schema::for_model()
-        .map_err(|_| PreparationFailure::CoreInvariant)?
+    let analysis = configuration_schema()
         .analyze(Arc::new(doc), structural_limits)
         .map_err(|_| PreparationFailure::CoreInvariant)?;
     let config = analysis
@@ -1054,8 +1058,7 @@ fn select_config(config: &Value, selector: Selector) -> Result<SelectedConfig, P
     let source = serde_json::to_vec(config).map_err(|_| PreparationFailure::CoreInvariant)?;
     let doc = materialize_file(Arc::from(source), input_limits)
         .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?;
-    let analysis = Schema::for_model()
-        .map_err(|_| PreparationFailure::CoreInvariant)?
+    let analysis = configuration_schema()
         .analyze(Arc::new(doc), structural_limits)
         .map_err(|_| PreparationFailure::CoreInvariant)?;
     let config = analysis

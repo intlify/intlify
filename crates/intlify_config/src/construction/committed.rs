@@ -5,8 +5,10 @@
 //! and registry member below `conformance/`, each declared beside its bytes as
 //! construction admits it.
 //!
-//! Tests construct from it, and so does the benchmark, which binds the
-//! canonicalization data the resolver this input builds admits.
+//! Tests construct from it, and so do the benchmark, which binds the
+//! canonicalization data the resolver this input builds admits and prepares
+//! its cases with that resolver's configuration schema, and the developer
+//! example, which analyzes with that schema too.
 
 use std::collections::BTreeMap;
 
