@@ -69,6 +69,14 @@
             "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*\\.[a-z][a-z0-9]*(-[a-z0-9]+)*\\.[a-z][a-z0-9]*(-[a-z0-9]+)*$"
           },
           "uniqueItems": true
+        },
+        "possibleFindingCodes": {
+          "description": "The Finding codes the row's units may report, in 015's table order.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FindingCode"
+          },
+          "uniqueItems": true
         }
       },
       "additionalProperties": false,
@@ -82,7 +90,8 @@
         "owningScope",
         "subjectKindRank",
         "checkRank",
-        "prerequisiteCheckIds"
+        "prerequisiteCheckIds",
+        "possibleFindingCodes"
       ]
     },
     "Phase": {
@@ -261,6 +270,59 @@
       "required": [
         "phaseId",
         "subjectKind"
+      ]
+    },
+    "FindingCode": {
+      "type": "string",
+      "enum": [
+        "project-profile-json-invalid",
+        "project-profile-json-member-duplicate",
+        "project-profile-input-not-json-compatible",
+        "project-profile-schema-version-unsupported",
+        "project-profile-required-field-missing",
+        "project-profile-field-type-invalid",
+        "project-profile-field-value-invalid",
+        "project-profile-unknown-field",
+        "project-profile-selector-required",
+        "project-profile-selector-invalid",
+        "project-profile-selector-unknown",
+        "project-profile-specification-input-incomplete",
+        "project-profile-specification-not-admitted",
+        "project-profile-locale-specification-not-admitted",
+        "project-profile-locale-data-not-admitted",
+        "project-profile-negotiation-specification-not-admitted",
+        "project-profile-message-fallback-specification-not-admitted",
+        "project-profile-coverage-specification-not-admitted",
+        "project-profile-delivery-specification-not-admitted",
+        "project-profile-intent-surface-class-vocabulary-not-admitted",
+        "project-profile-locale-invalid",
+        "project-profile-locale-non-canonical",
+        "project-profile-locale-duplicate",
+        "project-profile-default-requested-locale-not-in-project",
+        "project-profile-target-locales-not-subset",
+        "project-profile-target-default-locale-not-supported",
+        "project-profile-target-locale-direction-missing",
+        "project-profile-negotiation-alias-duplicate",
+        "project-profile-negotiation-alias-destination-not-requested",
+        "project-profile-message-fallback-source-not-requested",
+        "project-profile-message-fallback-sequence-invalid",
+        "project-profile-coverage-rule-invalid",
+        "project-profile-coverage-rule-duplicate",
+        "project-profile-coverage-rule-conflict",
+        "project-profile-artifact-reference-not-admitted",
+        "project-profile-artifact-collection-not-admitted",
+        "project-profile-group-member-unknown",
+        "project-profile-group-member-duplicate",
+        "project-profile-target-unassigned",
+        "project-profile-target-assigned-to-multiple-groups",
+        "project-profile-hydration-relation-invalid",
+        "project-profile-hydration-locale-policy-incompatible",
+        "project-profile-hydration-capability-incompatible",
+        "project-profile-resource-policy-not-admitted",
+        "project-profile-resource-policy-capability-incompatible",
+        "project-profile-bootstrap-limit-exceeded",
+        "project-profile-resource-limit-exceeded",
+        "project-profile-reporting-limit-exceeded"
       ]
     }
   }

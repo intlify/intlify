@@ -10,7 +10,11 @@
       "owningScope": "project-profile-slot",
       "subjectKindRank": "0",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-specification-input-incomplete",
+        "project-profile-specification-not-admitted"
+      ]
     },
     {
       "checkId": "dependency.entry.established-slots",
@@ -22,7 +26,8 @@
       "owningScope": "entry-dependencies",
       "subjectKindRank": "0",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": []
     },
     {
       "checkId": "entry.input.within-file-bytes",
@@ -34,7 +39,10 @@
       "owningScope": "complete-input",
       "subjectKindRank": "1",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ]
     },
     {
       "checkId": "entry.input.within-parser-tokens",
@@ -46,7 +54,10 @@
       "owningScope": "complete-input",
       "subjectKindRank": "1",
       "checkRank": "1",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ]
     },
     {
       "checkId": "entry.input.well-formed-json",
@@ -58,7 +69,10 @@
       "owningScope": "complete-input",
       "subjectKindRank": "1",
       "checkRank": "2",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-json-invalid"
+      ]
     },
     {
       "checkId": "entry.input.unique-members",
@@ -70,7 +84,10 @@
       "owningScope": "complete-input",
       "subjectKindRank": "1",
       "checkRank": "3",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-json-member-duplicate"
+      ]
     },
     {
       "checkId": "entry.input.json-compatible",
@@ -82,7 +99,10 @@
       "owningScope": "complete-input",
       "subjectKindRank": "1",
       "checkRank": "4",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-input-not-json-compatible"
+      ]
     },
     {
       "checkId": "entry.input.within-nodes",
@@ -94,7 +114,10 @@
       "owningScope": "complete-input",
       "subjectKindRank": "1",
       "checkRank": "5",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
+      ]
     },
     {
       "checkId": "entry.input.within-depth",
@@ -106,7 +129,10 @@
       "owningScope": "complete-input",
       "subjectKindRank": "1",
       "checkRank": "6",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
+      ]
     },
     {
       "checkId": "entry.input.within-collection-entries",
@@ -118,7 +144,10 @@
       "owningScope": "complete-input",
       "subjectKindRank": "1",
       "checkRank": "7",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
+      ]
     },
     {
       "checkId": "entry.input.within-total-string-bytes",
@@ -130,7 +159,10 @@
       "owningScope": "complete-input",
       "subjectKindRank": "1",
       "checkRank": "8",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
+      ]
     },
     {
       "checkId": "entry.input.within-single-string-bytes",
@@ -142,7 +174,10 @@
       "owningScope": "complete-input",
       "subjectKindRank": "1",
       "checkRank": "9",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
+      ]
     },
     {
       "checkId": "dependency.materialized.established-slots",
@@ -154,7 +189,8 @@
       "owningScope": "materialized-dependencies",
       "subjectKindRank": "0",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": []
     },
     {
       "checkId": "structural.schema-selection.object-root",
@@ -166,7 +202,10 @@
       "owningScope": "configuration-schema-selection",
       "subjectKindRank": "1",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-field-type-invalid"
+      ]
     },
     {
       "checkId": "structural.schema-selection.present-schema-version",
@@ -178,7 +217,10 @@
       "owningScope": "configuration-schema-selection",
       "subjectKindRank": "1",
       "checkRank": "1",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-required-field-missing"
+      ]
     },
     {
       "checkId": "structural.schema-selection.string-schema-version",
@@ -190,7 +232,10 @@
       "owningScope": "configuration-schema-selection",
       "subjectKindRank": "1",
       "checkRank": "2",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-field-type-invalid"
+      ]
     },
     {
       "checkId": "structural.schema-selection.supported-schema-version",
@@ -202,7 +247,10 @@
       "owningScope": "configuration-schema-selection",
       "subjectKindRank": "1",
       "checkRank": "3",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-schema-version-unsupported"
+      ]
     },
     {
       "checkId": "structural.analysis.within-capability",
@@ -214,7 +262,10 @@
       "owningScope": "capability-structural-analysis",
       "subjectKindRank": "2",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
+      ]
     },
     {
       "checkId": "structural.root.required-field",
@@ -226,7 +277,10 @@
       "owningScope": "root",
       "subjectKindRank": "3",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-required-field-missing"
+      ]
     },
     {
       "checkId": "structural.root.field-type",
@@ -238,7 +292,10 @@
       "owningScope": "root",
       "subjectKindRank": "3",
       "checkRank": "1",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-field-type-invalid"
+      ]
     },
     {
       "checkId": "structural.root.field-value",
@@ -250,7 +307,10 @@
       "owningScope": "root",
       "subjectKindRank": "3",
       "checkRank": "2",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-field-value-invalid"
+      ]
     },
     {
       "checkId": "structural.root.known-field",
@@ -262,7 +322,10 @@
       "owningScope": "root",
       "subjectKindRank": "3",
       "checkRank": "3",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-unknown-field"
+      ]
     },
     {
       "checkId": "structural.profile-key.field-value",
@@ -274,7 +337,10 @@
       "owningScope": "profiles",
       "subjectKindRank": "4",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-field-value-invalid"
+      ]
     },
     {
       "checkId": "structural.profile.required-field",
@@ -290,7 +356,10 @@
       },
       "subjectKindRank": "5",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-required-field-missing"
+      ]
     },
     {
       "checkId": "structural.profile.field-type",
@@ -306,7 +375,10 @@
       },
       "subjectKindRank": "5",
       "checkRank": "1",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-field-type-invalid"
+      ]
     },
     {
       "checkId": "structural.profile.field-value",
@@ -322,7 +394,10 @@
       },
       "subjectKindRank": "5",
       "checkRank": "2",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-field-value-invalid"
+      ]
     },
     {
       "checkId": "structural.profile.known-field",
@@ -338,7 +413,10 @@
       },
       "subjectKindRank": "5",
       "checkRank": "3",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-unknown-field"
+      ]
     },
     {
       "checkId": "structural.target-key.field-value",
@@ -354,7 +432,10 @@
       },
       "subjectKindRank": "6",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-field-value-invalid"
+      ]
     },
     {
       "checkId": "structural.target.required-field",
@@ -370,7 +451,10 @@
       },
       "subjectKindRank": "7",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-required-field-missing"
+      ]
     },
     {
       "checkId": "structural.target.field-type",
@@ -386,7 +470,10 @@
       },
       "subjectKindRank": "7",
       "checkRank": "1",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-field-type-invalid"
+      ]
     },
     {
       "checkId": "structural.target.field-value",
@@ -402,7 +489,10 @@
       },
       "subjectKindRank": "7",
       "checkRank": "2",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-field-value-invalid"
+      ]
     },
     {
       "checkId": "structural.target.known-field",
@@ -418,7 +508,10 @@
       },
       "subjectKindRank": "7",
       "checkRank": "3",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-unknown-field"
+      ]
     },
     {
       "checkId": "structural.group-key.field-value",
@@ -434,7 +527,10 @@
       },
       "subjectKindRank": "8",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-field-value-invalid"
+      ]
     },
     {
       "checkId": "structural.group.required-field",
@@ -450,7 +546,10 @@
       },
       "subjectKindRank": "9",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-required-field-missing"
+      ]
     },
     {
       "checkId": "structural.group.field-type",
@@ -466,7 +565,10 @@
       },
       "subjectKindRank": "9",
       "checkRank": "1",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-field-type-invalid"
+      ]
     },
     {
       "checkId": "structural.group.field-value",
@@ -482,7 +584,10 @@
       },
       "subjectKindRank": "9",
       "checkRank": "2",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-field-value-invalid"
+      ]
     },
     {
       "checkId": "structural.group.known-field",
@@ -498,7 +603,10 @@
       },
       "subjectKindRank": "9",
       "checkRank": "3",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-unknown-field"
+      ]
     },
     {
       "checkId": "dependency.profile-specification.established",
@@ -512,7 +620,8 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "specification.project-profile.supported"
-      ]
+      ],
+      "possibleFindingCodes": []
     },
     {
       "checkId": "selection.profiles.within-capability",
@@ -524,7 +633,10 @@
       "owningScope": "capability-profiles",
       "subjectKindRank": "0",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
+      ]
     },
     {
       "checkId": "selection.profile-id.within-capability",
@@ -536,7 +648,10 @@
       "owningScope": "profiles",
       "subjectKindRank": "1",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
+      ]
     },
     {
       "checkId": "selection.selector.within-capability",
@@ -548,7 +663,10 @@
       "owningScope": "profile-selector",
       "subjectKindRank": "2",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
+      ]
     },
     {
       "checkId": "selection.selector.required",
@@ -560,7 +678,10 @@
       "owningScope": "profile-selector",
       "subjectKindRank": "2",
       "checkRank": "1",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-selector-required"
+      ]
     },
     {
       "checkId": "selection.selector.valid",
@@ -572,7 +693,10 @@
       "owningScope": "profile-selector",
       "subjectKindRank": "2",
       "checkRank": "2",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-selector-invalid"
+      ]
     },
     {
       "checkId": "selection.selector.declared",
@@ -584,7 +708,10 @@
       "owningScope": "profile-selector",
       "subjectKindRank": "2",
       "checkRank": "3",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-selector-unknown"
+      ]
     },
     {
       "checkId": "resource-policy.artifacts.within-capability",
@@ -596,7 +723,10 @@
       "owningScope": "capability-artifacts",
       "subjectKindRank": "0",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
+      ]
     },
     {
       "checkId": "resource-policy.policy-artifacts.within-capability",
@@ -608,7 +738,10 @@
       "owningScope": "capability-policy-artifacts",
       "subjectKindRank": "1",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
+      ]
     },
     {
       "checkId": "resource-policy.target-profile-artifacts.within-capability",
@@ -620,7 +753,10 @@
       "owningScope": "capability-target-profile-artifacts",
       "subjectKindRank": "2",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
+      ]
     },
     {
       "checkId": "resource-policy.references.within-capability",
@@ -632,7 +768,10 @@
       "owningScope": "capability-references",
       "subjectKindRank": "3",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
+      ]
     },
     {
       "checkId": "resource-policy.artifact.within-capability",
@@ -644,7 +783,10 @@
       "owningScope": "artifact-collection",
       "subjectKindRank": "4",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
+      ]
     },
     {
       "checkId": "resource-policy.artifact-bytes.within-capability",
@@ -656,7 +798,10 @@
       "owningScope": "capability-artifact-bytes",
       "subjectKindRank": "5",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
+      ]
     },
     {
       "checkId": "resource-policy.policy-reference.within-capability",
@@ -668,7 +813,10 @@
       "owningScope": "declaration",
       "subjectKindRank": "6",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
+      ]
     },
     {
       "checkId": "resource-policy.target-profile-reference.within-capability",
@@ -680,7 +828,10 @@
       "owningScope": "target-profile-references",
       "subjectKindRank": "7",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
+      ]
     },
     {
       "checkId": "resource-policy.reference-bytes.within-capability",
@@ -692,7 +843,10 @@
       "owningScope": "capability-reference-bytes",
       "subjectKindRank": "8",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
+      ]
     },
     {
       "checkId": "resource-policy.resource-limits.bootstrap-candidate",
@@ -711,6 +865,11 @@
         "resource-policy.artifact.within-capability",
         "resource-policy.artifact-bytes.within-capability",
         "resource-policy.policy-reference.within-capability"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-artifact-reference-not-admitted",
+        "project-profile-artifact-collection-not-admitted",
+        "project-profile-resource-policy-not-admitted"
       ]
     },
     {
@@ -725,6 +884,9 @@
       "checkRank": "1",
       "prerequisiteCheckIds": [
         "resource-policy.resource-limits.bootstrap-candidate"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-policy-capability-incompatible"
       ]
     },
     {
@@ -739,6 +901,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "resource-policy.resource-limits.compatible"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -753,6 +918,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "resource-policy.resource-limits.compatible"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -767,6 +935,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "resource-policy.resource-limits.compatible"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -781,6 +952,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "resource-policy.resource-limits.compatible"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -795,6 +969,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "resource-policy.resource-limits.compatible"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -809,6 +986,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "resource-policy.resource-limits.compatible"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -823,6 +1003,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "resource-policy.resource-limits.compatible"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -837,6 +1020,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "resource-policy.resource-limits.compatible"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -851,6 +1037,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "resource-policy.resource-limits.compatible"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -865,6 +1054,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "resource-policy.resource-limits.compatible"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -879,6 +1071,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "resource-policy.resource-limits.compatible"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -893,6 +1088,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "resource-policy.resource-limits.compatible"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -907,6 +1105,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "resource-policy.resource-limits.compatible"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -921,6 +1122,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "resource-policy.resource-limits.compatible"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -935,6 +1139,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "resource-policy.resource-limits.compatible"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -949,6 +1156,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "resource-policy.resource-limits.compatible"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -963,6 +1173,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "resource-policy.resource-limits.compatible"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -977,6 +1190,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "resource-policy.resource-limits.compatible"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1008,6 +1224,10 @@
         "resource-policy.policy-reference.within-bound",
         "resource-policy.target-profile-reference.within-bound",
         "resource-policy.reference-bytes.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-specification-input-incomplete",
+        "project-profile-locale-specification-not-admitted"
       ]
     },
     {
@@ -1039,6 +1259,10 @@
         "resource-policy.policy-reference.within-bound",
         "resource-policy.target-profile-reference.within-bound",
         "resource-policy.reference-bytes.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-specification-input-incomplete",
+        "project-profile-negotiation-specification-not-admitted"
       ]
     },
     {
@@ -1070,6 +1294,10 @@
         "resource-policy.policy-reference.within-bound",
         "resource-policy.target-profile-reference.within-bound",
         "resource-policy.reference-bytes.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-specification-input-incomplete",
+        "project-profile-message-fallback-specification-not-admitted"
       ]
     },
     {
@@ -1101,6 +1329,10 @@
         "resource-policy.policy-reference.within-bound",
         "resource-policy.target-profile-reference.within-bound",
         "resource-policy.reference-bytes.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-specification-input-incomplete",
+        "project-profile-coverage-specification-not-admitted"
       ]
     },
     {
@@ -1132,6 +1364,9 @@
         "resource-policy.policy-reference.within-bound",
         "resource-policy.target-profile-reference.within-bound",
         "resource-policy.reference-bytes.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-specification-input-incomplete"
       ]
     },
     {
@@ -1163,6 +1398,10 @@
         "resource-policy.policy-reference.within-bound",
         "resource-policy.target-profile-reference.within-bound",
         "resource-policy.reference-bytes.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-specification-input-incomplete",
+        "project-profile-delivery-specification-not-admitted"
       ]
     },
     {
@@ -1194,6 +1433,10 @@
         "resource-policy.policy-reference.within-bound",
         "resource-policy.target-profile-reference.within-bound",
         "resource-policy.reference-bytes.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-specification-input-incomplete",
+        "project-profile-delivery-specification-not-admitted"
       ]
     },
     {
@@ -1225,6 +1468,9 @@
         "resource-policy.policy-reference.within-bound",
         "resource-policy.target-profile-reference.within-bound",
         "resource-policy.reference-bytes.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-intent-surface-class-vocabulary-not-admitted"
       ]
     },
     {
@@ -1240,6 +1486,9 @@
       "prerequisiteCheckIds": [
         "specification.intent-surface-class-vocabulary.supported",
         "specification.vocabulary.intact"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-intent-surface-class-vocabulary-not-admitted"
       ]
     },
     {
@@ -1254,6 +1503,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "specification.locale-canonicalization.supported"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-locale-data-not-admitted"
       ]
     },
     {
@@ -1268,7 +1520,8 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "specification.locale-data.matching"
-      ]
+      ],
+      "possibleFindingCodes": []
     },
     {
       "checkId": "identity.declaration-field.opaque",
@@ -1299,7 +1552,8 @@
         "resource-policy.policy-reference.within-bound",
         "resource-policy.target-profile-reference.within-bound",
         "resource-policy.reference-bytes.within-bound"
-      ]
+      ],
+      "possibleFindingCodes": []
     },
     {
       "checkId": "dependency.project-identity.established",
@@ -1313,7 +1567,8 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "identity.declaration-field.opaque"
-      ]
+      ],
+      "possibleFindingCodes": []
     },
     {
       "checkId": "locale.occurrences.within-bound",
@@ -1344,6 +1599,9 @@
         "resource-policy.policy-reference.within-bound",
         "resource-policy.target-profile-reference.within-bound",
         "resource-policy.reference-bytes.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1359,6 +1617,11 @@
       "prerequisiteCheckIds": [
         "specification.locale-data.matching",
         "locale.occurrences.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-locale-invalid",
+        "project-profile-locale-non-canonical",
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1373,6 +1636,9 @@
       "checkRank": "1",
       "prerequisiteCheckIds": [
         "locale.requested.canonical"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-locale-duplicate"
       ]
     },
     {
@@ -1387,6 +1653,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "locale.requested.canonical"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1402,6 +1671,11 @@
       "prerequisiteCheckIds": [
         "specification.locale-data.matching",
         "locale.occurrences.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-locale-invalid",
+        "project-profile-locale-non-canonical",
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1417,6 +1691,11 @@
       "prerequisiteCheckIds": [
         "specification.locale-data.matching",
         "locale.occurrences.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-locale-invalid",
+        "project-profile-locale-non-canonical",
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1432,6 +1711,9 @@
       "prerequisiteCheckIds": [
         "locale.requested.canonical",
         "locale.default-requested.canonical"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-default-requested-locale-not-in-project"
       ]
     },
     {
@@ -1447,6 +1729,11 @@
       "prerequisiteCheckIds": [
         "specification.locale-data.matching",
         "locale.occurrences.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-locale-invalid",
+        "project-profile-locale-non-canonical",
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1466,6 +1753,11 @@
       "prerequisiteCheckIds": [
         "specification.locale-data.matching",
         "locale.occurrences.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-locale-invalid",
+        "project-profile-locale-non-canonical",
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1481,6 +1773,11 @@
       "prerequisiteCheckIds": [
         "specification.locale-data.matching",
         "locale.occurrences.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-locale-invalid",
+        "project-profile-locale-non-canonical",
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1512,6 +1809,9 @@
         "resource-policy.policy-reference.within-bound",
         "resource-policy.target-profile-reference.within-bound",
         "resource-policy.reference-bytes.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1526,6 +1826,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "locale.target-profiles.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1546,6 +1849,11 @@
         "specification.locale-data.matching",
         "locale.occurrences.within-bound",
         "locale.target-id.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-locale-invalid",
+        "project-profile-locale-non-canonical",
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1564,6 +1872,9 @@
       "checkRank": "1",
       "prerequisiteCheckIds": [
         "locale.target-requested.canonical"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-locale-duplicate"
       ]
     },
     {
@@ -1584,6 +1895,11 @@
         "specification.locale-data.matching",
         "locale.occurrences.within-bound",
         "locale.target-id.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-locale-invalid",
+        "project-profile-locale-non-canonical",
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1601,7 +1917,8 @@
         "locale.requested-set.within-bound",
         "locale.default-source.canonical",
         "locale.default-requested.member"
-      ]
+      ],
+      "possibleFindingCodes": []
     },
     {
       "checkId": "negotiation.aliases.within-bound",
@@ -1615,6 +1932,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "specification.locale-negotiation.supported"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1630,6 +1950,9 @@
       "prerequisiteCheckIds": [
         "locale.alias-key.canonical",
         "negotiation.aliases.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-negotiation-alias-duplicate"
       ]
     },
     {
@@ -1650,6 +1973,9 @@
         "locale.requested.canonical",
         "locale.alias-destination.canonical",
         "negotiation.aliases.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-negotiation-alias-destination-not-requested"
       ]
     },
     {
@@ -1664,6 +1990,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "specification.message-locale-fallback.supported"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1679,6 +2008,9 @@
       "prerequisiteCheckIds": [
         "locale.fallback-key.canonical",
         "fallback.sources.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-locale-duplicate"
       ]
     },
     {
@@ -1695,6 +2027,9 @@
         "locale.requested.canonical",
         "locale.fallback-key.canonical",
         "fallback.sources.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-message-fallback-source-not-requested"
       ]
     },
     {
@@ -1713,6 +2048,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "fallback.source.unique"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1731,6 +2069,11 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "fallback.sequence.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-locale-invalid",
+        "project-profile-locale-non-canonical",
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1749,6 +2092,9 @@
       "checkRank": "1",
       "prerequisiteCheckIds": [
         "fallback.candidate.canonical"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-message-fallback-sequence-invalid"
       ]
     },
     {
@@ -1767,6 +2113,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "fallback.candidate.canonical"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-message-fallback-sequence-invalid"
       ]
     },
     {
@@ -1785,6 +2134,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "fallback.sequence.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-message-fallback-sequence-invalid"
       ]
     },
     {
@@ -1799,6 +2151,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "specification.coverage.supported"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1813,6 +2168,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "specification.coverage.supported"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1827,6 +2185,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "specification.coverage.supported"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1848,6 +2209,11 @@
         "locale.occurrences.within-bound",
         "coverage.rules.within-bound",
         "coverage.locale-selectors.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-locale-invalid",
+        "project-profile-locale-non-canonical",
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1866,6 +2232,9 @@
       "checkRank": "1",
       "prerequisiteCheckIds": [
         "coverage.locale.canonical"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-locale-duplicate"
       ]
     },
     {
@@ -1885,6 +2254,9 @@
       "prerequisiteCheckIds": [
         "locale.requested.canonical",
         "coverage.locale.canonical"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-coverage-rule-invalid"
       ]
     },
     {
@@ -1905,6 +2277,9 @@
         "specification.vocabulary.asserted",
         "coverage.rules.within-bound",
         "coverage.surface-selectors.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-coverage-rule-invalid"
       ]
     },
     {
@@ -1923,6 +2298,9 @@
       "checkRank": "1",
       "prerequisiteCheckIds": [
         "coverage.surface-class.vocabulary-member"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-coverage-rule-invalid"
       ]
     },
     {
@@ -1939,7 +2317,8 @@
         "coverage.locale.unique",
         "coverage.locale.member",
         "coverage.surface-class.unique"
-      ]
+      ],
+      "possibleFindingCodes": []
     },
     {
       "checkId": "coverage.domain.unique",
@@ -1953,6 +2332,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "coverage.rule.normalized-domain"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-coverage-rule-duplicate"
       ]
     },
     {
@@ -1969,6 +2351,9 @@
         "specification.coverage.supported",
         "specification.vocabulary.asserted",
         "locale.requested.canonical"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -1985,6 +2370,9 @@
         "specification.coverage.supported",
         "specification.vocabulary.asserted",
         "locale.requested.canonical"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -2001,6 +2389,9 @@
         "coverage.domain.unique",
         "coverage.cells.within-bound",
         "coverage.comparisons.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-coverage-rule-conflict"
       ]
     },
     {
@@ -2015,7 +2406,8 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "coverage.cell.effective-mode"
-      ]
+      ],
+      "possibleFindingCodes": []
     },
     {
       "checkId": "dependency.locale-negotiation.established",
@@ -2030,7 +2422,8 @@
       "prerequisiteCheckIds": [
         "negotiation.alias-key.unique",
         "negotiation.destination.member"
-      ]
+      ],
+      "possibleFindingCodes": []
     },
     {
       "checkId": "dependency.message-fallback.established",
@@ -2047,7 +2440,8 @@
         "fallback.candidate.distinct-from-source",
         "fallback.literal.unique",
         "fallback.intent-source.unique"
-      ]
+      ],
+      "possibleFindingCodes": []
     },
     {
       "checkId": "dependency.coverage.established",
@@ -2061,7 +2455,8 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "coverage.table.complete"
-      ]
+      ],
+      "possibleFindingCodes": []
     },
     {
       "checkId": "artifact.member.admissible",
@@ -2092,6 +2487,9 @@
         "resource-policy.policy-reference.within-bound",
         "resource-policy.target-profile-reference.within-bound",
         "resource-policy.reference-bytes.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-artifact-collection-not-admitted"
       ]
     },
     {
@@ -2123,6 +2521,9 @@
         "resource-policy.policy-reference.within-bound",
         "resource-policy.target-profile-reference.within-bound",
         "resource-policy.reference-bytes.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-artifact-collection-not-admitted"
       ]
     },
     {
@@ -2154,6 +2555,9 @@
         "resource-policy.policy-reference.within-bound",
         "resource-policy.target-profile-reference.within-bound",
         "resource-policy.reference-bytes.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-artifact-collection-not-admitted"
       ]
     },
     {
@@ -2170,6 +2574,9 @@
         "artifact.member.admissible",
         "artifact.member.single-occurrence",
         "artifact.conflict-group.consistent-content"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-artifact-reference-not-admitted"
       ]
     },
     {
@@ -2187,6 +2594,9 @@
         "artifact.member.admissible",
         "artifact.member.single-occurrence",
         "artifact.conflict-group.consistent-content"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-artifact-reference-not-admitted"
       ]
     },
     {
@@ -2201,7 +2611,8 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "artifact.policy-reference.resolved"
-      ]
+      ],
+      "possibleFindingCodes": []
     },
     {
       "checkId": "dependency.optional-policies.established",
@@ -2215,7 +2626,8 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "artifact.policy-reference.resolved"
-      ]
+      ],
+      "possibleFindingCodes": []
     },
     {
       "checkId": "delivery.placement.effective-mode",
@@ -2230,7 +2642,8 @@
       "prerequisiteCheckIds": [
         "specification.delivery-graph.supported",
         "specification.delivery-placement.supported"
-      ]
+      ],
+      "possibleFindingCodes": []
     },
     {
       "checkId": "dependency.delivery.established",
@@ -2244,7 +2657,8 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "delivery.placement.effective-mode"
-      ]
+      ],
+      "possibleFindingCodes": []
     },
     {
       "checkId": "target.requested-locales.project-subset",
@@ -2259,6 +2673,9 @@
       "prerequisiteCheckIds": [
         "locale.requested.canonical",
         "locale.target-requested.canonical"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-target-locales-not-subset"
       ]
     },
     {
@@ -2275,6 +2692,9 @@
         "locale.default-requested.canonical",
         "locale.target-requested.canonical",
         "locale.target-default-requested.canonical"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-target-default-locale-not-supported"
       ]
     },
     {
@@ -2290,6 +2710,9 @@
       "prerequisiteCheckIds": [
         "locale.target-requested.canonical",
         "artifact.target-profile-reference.resolved"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-target-locale-direction-missing"
       ]
     },
     {
@@ -2307,7 +2730,8 @@
         "target.requested-locales.project-subset",
         "target.effective-default.supported",
         "target.requested-locales.directed"
-      ]
+      ],
+      "possibleFindingCodes": []
     },
     {
       "checkId": "group.groups.within-bound",
@@ -2338,6 +2762,9 @@
         "resource-policy.policy-reference.within-bound",
         "resource-policy.target-profile-reference.within-bound",
         "resource-policy.reference-bytes.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -2369,6 +2796,9 @@
         "resource-policy.policy-reference.within-bound",
         "resource-policy.target-profile-reference.within-bound",
         "resource-policy.reference-bytes.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -2383,6 +2813,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "group.groups.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -2401,6 +2834,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "group.group-id.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -2420,6 +2856,9 @@
       "prerequisiteCheckIds": [
         "group.memberships.within-bound",
         "group.members.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -2439,6 +2878,9 @@
       "prerequisiteCheckIds": [
         "locale.target-profiles.within-bound",
         "group.member.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-group-member-unknown"
       ]
     },
     {
@@ -2457,6 +2899,9 @@
       "checkRank": "2",
       "prerequisiteCheckIds": [
         "group.member.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-group-member-duplicate"
       ]
     },
     {
@@ -2473,6 +2918,10 @@
         "locale.target-id.within-bound",
         "group.memberships.within-bound",
         "group.members.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-target-unassigned",
+        "project-profile-target-assigned-to-multiple-groups"
       ]
     },
     {
@@ -2504,6 +2953,9 @@
         "resource-policy.policy-reference.within-bound",
         "resource-policy.target-profile-reference.within-bound",
         "resource-policy.reference-bytes.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -2523,6 +2975,9 @@
       "prerequisiteCheckIds": [
         "group.group-id.within-bound",
         "hydration.relations.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-limit-exceeded"
       ]
     },
     {
@@ -2542,6 +2997,9 @@
       "prerequisiteCheckIds": [
         "locale.target-profiles.within-bound",
         "hydration.endpoint.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-hydration-relation-invalid"
       ]
     },
     {
@@ -2561,6 +3019,9 @@
       "prerequisiteCheckIds": [
         "group.members.within-bound",
         "hydration.endpoint.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-hydration-relation-invalid"
       ]
     },
     {
@@ -2580,6 +3041,9 @@
       "prerequisiteCheckIds": [
         "artifact.target-profile-reference.resolved",
         "hydration.endpoint.known"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-hydration-relation-invalid"
       ]
     },
     {
@@ -2598,6 +3062,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "hydration.endpoint.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-hydration-relation-invalid"
       ]
     },
     {
@@ -2616,6 +3083,9 @@
       "checkRank": "1",
       "prerequisiteCheckIds": [
         "hydration.endpoint.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-hydration-relation-invalid"
       ]
     },
     {
@@ -2635,6 +3105,9 @@
       "prerequisiteCheckIds": [
         "target.requested-locales.project-subset",
         "hydration.endpoint.known"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-hydration-locale-policy-incompatible"
       ]
     },
     {
@@ -2654,6 +3127,9 @@
       "prerequisiteCheckIds": [
         "target.effective-default.supported",
         "hydration.endpoint.known"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-hydration-locale-policy-incompatible"
       ]
     },
     {
@@ -2673,6 +3149,9 @@
       "prerequisiteCheckIds": [
         "artifact.target-profile-reference.resolved",
         "hydration.endpoint.known"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-hydration-capability-incompatible"
       ]
     },
     {
@@ -2691,6 +3170,9 @@
       "checkRank": "0",
       "prerequisiteCheckIds": [
         "hydration.endpoint.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-hydration-relation-invalid"
       ]
     },
     {
@@ -2715,7 +3197,8 @@
         "hydration.relation.same-effective-default",
         "hydration.relation.static-compatibility",
         "hydration.target.single-role"
-      ]
+      ],
+      "possibleFindingCodes": []
     },
     {
       "checkId": "reporting.diagnostic-domain.complete",
@@ -2727,7 +3210,10 @@
       "owningScope": "diagnostic-domain",
       "subjectKindRank": "0",
       "checkRank": "0",
-      "prerequisiteCheckIds": []
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-reporting-limit-exceeded"
+      ]
     }
   ]
 }

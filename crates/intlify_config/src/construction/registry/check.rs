@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! The Check Registry and its schema, as far as each row's identity, subject
-//! kind, and prerequisites go.
+//! kind, prerequisites, and Finding codes go.
 //!
 //! Design 015's Check Registry has one row for each `(phase, subject kind,
 //! check)` the resolver evaluates (D15:2167). Revision `"0"` writes the rows
@@ -10,9 +10,9 @@
 //! [`SubjectKind::ALL`], the kinds declared only included, in phase, kind-rank,
 //! and check-rank order. A row names its check ID, phase, rule ID, subject
 //! kind, key strategy, content projection, owning scope, parent subject, its
-//! two ranks, and its prerequisites. The codes and Evidence record kinds a row
-//! may produce, the dependencies it owns, and its payload strategy come with
-//! their own stages.
+//! two ranks, its prerequisites, and the Finding codes it may report. The
+//! Evidence record kinds a row may produce, the dependencies it owns, and its
+//! payload strategy come with their own stages.
 //!
 //! 015 leaves the IDs of kinds, scopes, and checks to the registry (D15:2167,
 //! 2169). A kind's ID is its name in kebab case. A singleton's owning scope is
@@ -32,6 +32,12 @@
 //! prerequisite until their units exist, and no row lists a check of
 //! structural admission or profile selection yet: the resolver starts from
 //! their complete results.
+//!
+//! A row's Finding codes are those its units may report, a notice included,
+//! in 015's table order: what the resolver's checks report, and for the kinds
+//! declared only, what 015 gives their checks. Every evaluation a test runs
+//! asserts that each code it records is one its unit's row lists. Whether a
+//! code names a Finding Registry row comes with that registry.
 //!
 //! Construction reads the registry it admitted with the registry
 //! cross-references (row 41), and refuses one this type cannot read or whose
@@ -58,7 +64,7 @@ use serde_json::Value;
 
 use intlify_shared_json::decode;
 
-use crate::resolver::evaluation::Phase;
+use crate::resolver::evaluation::{Code, Phase};
 use crate::resolver::subject::SubjectKind;
 
 use super::RANK_PATTERN;
@@ -80,11 +86,11 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:7ce975e71b253567fc885d4ea27763e72e1e96db4feb31f40ed9565e1b41b66f";
+    "sha256:c431e07178156ac5e32a3f5294550be92b486a8dbffaf7964517d338d5dc165e";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
-    "sha256:14442a9d04ee531fa1cd0da3744026e85473931942fec07390e33f074dd9d682";
+    "sha256:d00f55a9afb0d0654bfdcbc7aab09d55c35b0023fe384b53c36391f997d58d52";
 
 /// A check ID: three kebab-case segments joined by dots.
 pub(crate) const CHECK_ID_PATTERN: &str =
@@ -149,6 +155,9 @@ pub(crate) struct CheckRow {
     /// The checks the row waits on, except those another listed check waits on.
     #[schemars(extend("uniqueItems" = true), inner(pattern(CHECK_ID_PATTERN)))]
     pub(crate) prerequisite_check_ids: Vec<String>,
+    /// The Finding codes the row's units may report, in 015's table order.
+    #[schemars(extend("uniqueItems" = true))]
+    pub(crate) possible_finding_codes: Vec<Code>,
 }
 
 /// The registry's body.
@@ -168,9 +177,13 @@ impl CheckRegistry {
             let shape = shape(kind);
             let ids = check_ids(kind);
             let prerequisites = prerequisite_ids(kind);
+            let codes = finding_codes(kind);
             debug_assert_eq!(ids.len(), kind.checks().len(), "{kind:?}");
             debug_assert_eq!(prerequisites.len(), ids.len(), "{kind:?}");
-            for (rank, (id, prerequisites)) in ids.iter().zip(prerequisites).enumerate() {
+            debug_assert_eq!(codes.len(), ids.len(), "{kind:?}");
+            for (rank, ((id, prerequisites), codes)) in
+                ids.iter().zip(prerequisites).zip(codes).enumerate()
+            {
                 rows.push(CheckRow {
                     check_id: (*id).to_owned(),
                     phase_id: kind.phase(),
@@ -189,6 +202,7 @@ impl CheckRegistry {
                         .iter()
                         .map(|&prerequisite| prerequisite.to_owned())
                         .collect(),
+                    possible_finding_codes: codes.to_vec(),
                 });
             }
         }
@@ -1138,6 +1152,212 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
     }
 }
 
+/// No Finding: the check only establishes what later checks wait on.
+const NO_FINDING: &[Code] = &[];
+
+/// What a bound's check reports past it.
+const BOUND: &[Code] = &[Code::ResourceLimitExceeded];
+
+/// What canonicalizing one locale spelling reports: an invalid locale, a
+/// spelling that is not canonical, which blocks nothing, or one past
+/// `maxLocaleIdentifierBytes`.
+const SPELLING: &[Code] = &[
+    Code::LocaleInvalid,
+    Code::LocaleNonCanonical,
+    Code::ResourceLimitExceeded,
+];
+
+/// Each kind's Finding codes, one list for each of its checks in the order of
+/// [`SubjectKind::checks`], in 015's table order: what the resolver's checks
+/// report, and for the kinds declared only, what 015 gives their checks.
+#[expect(clippy::too_many_lines, reason = "one list for each of 015's checks")]
+const fn finding_codes(kind: SubjectKind) -> &'static [&'static [Code]] {
+    use Code as C;
+    use SubjectKind as K;
+    match kind {
+        K::ProjectProfileSlot => &[&[C::SpecificationInputIncomplete, C::SpecificationNotAdmitted]],
+        K::EntryDependencies
+        | K::MaterializedDependencies
+        | K::ProfileSpecificationDependency
+        | K::LocaleCanonicalizationDependency
+        | K::DeclarationField
+        | K::ProjectIdentityDependency
+        | K::ProjectLocalesDependency
+        | K::CoverageRule
+        | K::CoverageTable
+        | K::LocaleNegotiationDependency
+        | K::MessageFallbackDependency
+        | K::CoverageDependency
+        | K::RequiredPoliciesDependency
+        | K::OptionalPoliciesDependency
+        | K::DeliveryPlacement
+        | K::DeliveryDependency
+        | K::TargetsDependency
+        | K::DeploymentGroupsDependency => &[NO_FINDING],
+        K::CompleteInput => &[
+            &[C::BootstrapLimitExceeded],
+            &[C::BootstrapLimitExceeded],
+            &[C::JsonInvalid],
+            &[C::JsonMemberDuplicate],
+            &[C::InputNotJsonCompatible],
+            BOUND,
+            BOUND,
+            BOUND,
+            BOUND,
+            BOUND,
+        ],
+        K::ConfigurationSchemaSelection => &[
+            &[C::FieldTypeInvalid],
+            &[C::RequiredFieldMissing],
+            &[C::FieldTypeInvalid],
+            &[C::SchemaVersionUnsupported],
+        ],
+        K::CapabilityStructuralAnalysis
+        | K::CapabilityProfiles
+        | K::CapabilityProfileId
+        | K::CapabilityArtifacts
+        | K::CapabilityPolicyArtifacts
+        | K::CapabilityTargetProfileArtifacts
+        | K::CapabilityReferences
+        | K::CapabilityArtifact
+        | K::CapabilityArtifactBytes
+        | K::CapabilityPolicyReference
+        | K::CapabilityTargetProfileReference
+        | K::CapabilityReferenceBytes
+        | K::RootNodes
+        | K::RootDepth
+        | K::RootCollectionEntries
+        | K::RootStringBytes
+        | K::RootLongestString
+        | K::Profiles
+        | K::ProfileId
+        | K::Selector
+        | K::StructuralAnalysis
+        | K::Artifacts
+        | K::PolicyArtifacts
+        | K::TargetProfileArtifacts
+        | K::References
+        | K::Artifact
+        | K::ArtifactBytes
+        | K::PolicyReference
+        | K::TargetProfileReference
+        | K::ReferenceBytes
+        | K::LocaleOccurrences
+        | K::RequestedLocales
+        | K::TargetProfiles
+        | K::TargetId
+        | K::NegotiationAliases
+        | K::FallbackSources
+        | K::FallbackSequence
+        | K::CoverageRules
+        | K::CoverageLocaleSelectors
+        | K::CoverageSurfaceSelectors
+        | K::CoverageCells
+        | K::CoverageComparisons
+        | K::Groups
+        | K::Memberships
+        | K::Group
+        | K::GroupMembers
+        | K::Relations => &[BOUND],
+        K::RootField | K::ProfileField | K::TargetField | K::GroupField => &[
+            &[C::RequiredFieldMissing],
+            &[C::FieldTypeInvalid],
+            &[C::FieldValueInvalid],
+            &[C::UnknownField],
+        ],
+        K::ProfileKey | K::TargetProfileKey | K::DeploymentGroupKey => &[&[C::FieldValueInvalid]],
+        K::ProfileSelector => &[
+            BOUND,
+            &[C::SelectorRequired],
+            &[C::SelectorInvalid],
+            &[C::SelectorUnknown],
+        ],
+        K::ResourceLimits => &[
+            &[
+                C::ArtifactReferenceNotAdmitted,
+                C::ArtifactCollectionNotAdmitted,
+                C::ResourcePolicyNotAdmitted,
+            ],
+            &[C::ResourcePolicyCapabilityIncompatible],
+        ],
+        K::LocaleCanonicalizationSlot => &[&[
+            C::SpecificationInputIncomplete,
+            C::LocaleSpecificationNotAdmitted,
+        ]],
+        K::LocaleNegotiationSlot => &[&[
+            C::SpecificationInputIncomplete,
+            C::NegotiationSpecificationNotAdmitted,
+        ]],
+        K::MessageLocaleFallbackSlot => &[&[
+            C::SpecificationInputIncomplete,
+            C::MessageFallbackSpecificationNotAdmitted,
+        ]],
+        K::CoverageSlot => &[&[
+            C::SpecificationInputIncomplete,
+            C::CoverageSpecificationNotAdmitted,
+        ]],
+        K::IntentSurfaceClassVocabularySlot => &[&[C::SpecificationInputIncomplete]],
+        K::DeliveryGraphSlot | K::DeliveryPlacementSlot => &[&[
+            C::SpecificationInputIncomplete,
+            C::DeliverySpecificationNotAdmitted,
+        ]],
+        K::Vocabulary => &[
+            &[C::IntentSurfaceClassVocabularyNotAdmitted],
+            &[C::IntentSurfaceClassVocabularyNotAdmitted],
+        ],
+        K::CanonicalizationData => &[&[C::LocaleDataNotAdmitted]],
+        K::RequestedLocale | K::TargetRequestedLocale => &[SPELLING, &[C::LocaleDuplicate]],
+        K::DefaultSourceLocale
+        | K::NegotiationAliasKey
+        | K::NegotiationAliasValue
+        | K::MessageFallbackKey
+        | K::TargetDefaultRequestedLocale => &[SPELLING],
+        K::DefaultRequestedLocale => &[SPELLING, &[C::DefaultRequestedLocaleNotInProject]],
+        K::NegotiationKey => &[&[C::NegotiationAliasDuplicate]],
+        K::NegotiationDestination => &[&[C::NegotiationAliasDestinationNotRequested]],
+        K::FallbackSource => &[
+            &[C::LocaleDuplicate],
+            &[C::MessageFallbackSourceNotRequested],
+        ],
+        K::FallbackCandidate => &[SPELLING, &[C::MessageFallbackSequenceInvalid]],
+        K::FallbackLiteral | K::FallbackIntentSource => &[&[C::MessageFallbackSequenceInvalid]],
+        K::CoverageLocale => &[SPELLING, &[C::LocaleDuplicate], &[C::CoverageRuleInvalid]],
+        K::CoverageSurfaceClass => &[&[C::CoverageRuleInvalid], &[C::CoverageRuleInvalid]],
+        K::CoverageDomain => &[&[C::CoverageRuleDuplicate]],
+        K::CoverageCell => &[&[C::CoverageRuleConflict]],
+        K::CollectionMember => &[
+            &[C::ArtifactCollectionNotAdmitted],
+            &[C::ArtifactCollectionNotAdmitted],
+        ],
+        K::CollectionGroup => &[&[C::ArtifactCollectionNotAdmitted]],
+        K::ResolvedPolicyReference | K::ResolvedTargetProfileReference => {
+            &[&[C::ArtifactReferenceNotAdmitted]]
+        }
+        K::Target => &[
+            &[C::TargetLocalesNotSubset],
+            &[C::TargetDefaultLocaleNotSupported],
+            &[C::TargetLocaleDirectionMissing],
+        ],
+        K::GroupMember => &[BOUND, &[C::GroupMemberUnknown], &[C::GroupMemberDuplicate]],
+        K::Assignment => &[&[C::TargetUnassigned, C::TargetAssignedToMultipleGroups]],
+        K::RelationEndpoint => &[
+            BOUND,
+            &[C::HydrationRelationInvalid],
+            &[C::HydrationRelationInvalid],
+            &[C::HydrationRelationInvalid],
+        ],
+        K::Relation => &[
+            &[C::HydrationRelationInvalid],
+            &[C::HydrationRelationInvalid],
+            &[C::HydrationLocalePolicyIncompatible],
+            &[C::HydrationLocalePolicyIncompatible],
+            &[C::HydrationCapabilityIncompatible],
+        ],
+        K::Roles => &[&[C::HydrationRelationInvalid]],
+        K::DiagnosticDomain => &[&[C::ReportingLimitExceeded]],
+    }
+}
+
 /// Helpers for the tests that compare the resolver with the registry.
 #[cfg(test)]
 pub(crate) mod testing {
@@ -1146,16 +1366,26 @@ pub(crate) mod testing {
     use crate::resolver::evaluation::Check;
     use crate::resolver::subject::SubjectKind;
 
-    use super::{check_ids, CheckRegistry};
+    use crate::resolver::evaluation::Code;
+
+    use super::{check_ids, finding_codes, CheckRegistry};
+
+    /// The Finding codes `check` of `kind` may report.
+    pub(crate) fn possible_codes(kind: SubjectKind, check: Check) -> &'static [Code] {
+        finding_codes(kind)[rank(kind, check)]
+    }
+
+    /// The place of `check` among the checks of `kind`.
+    fn rank(kind: SubjectKind, check: Check) -> usize {
+        kind.checks()
+            .iter()
+            .position(|&own| own == check)
+            .expect("the kind runs the check")
+    }
 
     /// The check ID of `check` of `kind`.
     pub(crate) fn check_id(kind: SubjectKind, check: Check) -> &'static str {
-        let rank = kind
-            .checks()
-            .iter()
-            .position(|&own| own == check)
-            .expect("the kind runs the check");
-        check_ids(kind)[rank]
+        check_ids(kind)[rank(kind, check)]
     }
 
     /// Every row each row of `registry` waits on, through its prerequisites
@@ -1423,7 +1653,8 @@ mod tests {
                 "prerequisiteCheckIds": [
                     "locale.target-profiles.within-bound",
                     "hydration.endpoint.within-bound"
-                ]
+                ],
+                "possibleFindingCodes": ["project-profile-hydration-relation-invalid"]
             })
         );
         // An unscoped row has no parent member at all.
@@ -1607,6 +1838,122 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// The Finding codes `check` of `kind` may report.
+    fn codes(kind: SubjectKind, check: Check) -> Vec<Code> {
+        row(kind, check).possible_finding_codes
+    }
+
+    #[test]
+    fn a_row_lists_the_codes_its_check_may_report() {
+        use Code as C;
+        use SubjectKind as K;
+        // Canonicalizing a spelling may find it invalid, not canonical, which
+        // blocks nothing, or past its byte bound, wherever it is spelled.
+        for kind in SubjectKind::ALL {
+            if let Some(rank) = kind
+                .checks()
+                .iter()
+                .position(|&own| own == Check::CanonicalLocale)
+            {
+                assert_eq!(
+                    finding_codes(kind)[rank],
+                    [
+                        C::LocaleInvalid,
+                        C::LocaleNonCanonical,
+                        C::ResourceLimitExceeded
+                    ],
+                    "{kind:?}"
+                );
+            }
+        }
+        assert_eq!(
+            codes(K::Assignment, Check::SingleGroup),
+            [C::TargetUnassigned, C::TargetAssignedToMultipleGroups]
+        );
+        assert_eq!(
+            codes(K::ResourceLimits, Check::BootstrapCandidate),
+            [
+                C::ArtifactReferenceNotAdmitted,
+                C::ArtifactCollectionNotAdmitted,
+                C::ResourcePolicyNotAdmitted
+            ]
+        );
+        // The kinds declared only report what 015 gives their checks: the raw
+        // file's bounds are resolver-side bootstrap bounds (D15:2350), the
+        // root's are the policy's (D15:1870), and so is an over-long selector
+        // (D15:2290).
+        for (kind, check, code) in [
+            (
+                K::CompleteInput,
+                Check::WithinFileBytes,
+                C::BootstrapLimitExceeded,
+            ),
+            (K::CompleteInput, Check::WellFormedJson, C::JsonInvalid),
+            (
+                K::CompleteInput,
+                Check::WithinNodes,
+                C::ResourceLimitExceeded,
+            ),
+            (
+                K::ConfigurationSchemaSelection,
+                Check::ObjectRoot,
+                C::FieldTypeInvalid,
+            ),
+            (
+                K::ConfigurationSchemaSelection,
+                Check::SupportedSchemaVersion,
+                C::SchemaVersionUnsupported,
+            ),
+            (K::GroupField, Check::KnownField, C::UnknownField),
+            (
+                K::ProfileSelector,
+                Check::WithinCapability,
+                C::ResourceLimitExceeded,
+            ),
+            (
+                K::ProfileSelector,
+                Check::DeclaredSelector,
+                C::SelectorUnknown,
+            ),
+            (
+                K::DiagnosticDomain,
+                Check::CompleteReporting,
+                C::ReportingLimitExceeded,
+            ),
+        ] {
+            assert_eq!(codes(kind, check), [code], "{kind:?} {check:?}");
+        }
+        // A check that only establishes what later checks wait on reports
+        // nothing.
+        for (kind, check) in [
+            (K::EntryDependencies, Check::EstablishedSlots),
+            (K::CoverageDependency, Check::EstablishedGroup),
+            (K::CoverageRule, Check::NormalizedDomain),
+            (K::CoverageTable, Check::CompleteTable),
+            (K::DeliveryPlacement, Check::EffectiveMode),
+            (K::DeclarationField, Check::OpaqueIdentity),
+        ] {
+            assert!(codes(kind, check).is_empty(), "{kind:?} {check:?}");
+        }
+    }
+
+    #[test]
+    fn every_015_code_is_some_rows_and_each_row_lists_its_codes_once_in_table_order() {
+        let rows = registry().rows;
+        let place = |code: &Code| Code::ALL.iter().position(|own| own == code).unwrap();
+        let mut reported = BTreeSet::new();
+        for row in &rows {
+            let places: Vec<usize> = row.possible_finding_codes.iter().map(place).collect();
+            assert!(
+                places.windows(2).all(|pair| pair[0] < pair[1]),
+                "{}",
+                row.check_id
+            );
+            reported.extend(places);
+        }
+        assert_eq!(reported, (0..Code::ALL.len()).collect());
     }
 
     #[test]
@@ -2020,6 +2367,30 @@ mod tests {
             (
                 "a prerequisite that is no check ID",
                 changed(&|value| value["rows"][0]["prerequisiteCheckIds"] = json!(["a.b"])),
+            ),
+            (
+                "a row without its codes",
+                changed(&|value| {
+                    value["rows"][0]
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("possibleFindingCodes");
+                }),
+            ),
+            (
+                "a code twice",
+                changed(&|value| {
+                    value["rows"][0]["possibleFindingCodes"] = json!([
+                        "project-profile-json-invalid",
+                        "project-profile-json-invalid"
+                    ]);
+                }),
+            ),
+            (
+                "a code 015 does not register",
+                changed(&|value| {
+                    value["rows"][0]["possibleFindingCodes"] = json!(["project-profile-unknown"]);
+                }),
             ),
         ] {
             assert!(!read.validate(&value).valid, "{case}");

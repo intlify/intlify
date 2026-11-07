@@ -10,11 +10,12 @@
 //! resource issue keeps the details 015 reports with it, and an evaluated unit
 //! may also find a non-blocking result, which suppresses nothing.
 
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use schemars::{JsonSchema, Schema, SchemaGenerator};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::input_limits::Bound;
 
@@ -362,6 +363,59 @@ pub(crate) enum Code {
 }
 
 impl Code {
+    /// Every code, in 015's table order.
+    pub(crate) const ALL: [Self; 48] = [
+        Self::JsonInvalid,
+        Self::JsonMemberDuplicate,
+        Self::InputNotJsonCompatible,
+        Self::SchemaVersionUnsupported,
+        Self::RequiredFieldMissing,
+        Self::FieldTypeInvalid,
+        Self::FieldValueInvalid,
+        Self::UnknownField,
+        Self::SelectorRequired,
+        Self::SelectorInvalid,
+        Self::SelectorUnknown,
+        Self::SpecificationInputIncomplete,
+        Self::SpecificationNotAdmitted,
+        Self::LocaleSpecificationNotAdmitted,
+        Self::LocaleDataNotAdmitted,
+        Self::NegotiationSpecificationNotAdmitted,
+        Self::MessageFallbackSpecificationNotAdmitted,
+        Self::CoverageSpecificationNotAdmitted,
+        Self::DeliverySpecificationNotAdmitted,
+        Self::IntentSurfaceClassVocabularyNotAdmitted,
+        Self::LocaleInvalid,
+        Self::LocaleNonCanonical,
+        Self::LocaleDuplicate,
+        Self::DefaultRequestedLocaleNotInProject,
+        Self::TargetLocalesNotSubset,
+        Self::TargetDefaultLocaleNotSupported,
+        Self::TargetLocaleDirectionMissing,
+        Self::NegotiationAliasDuplicate,
+        Self::NegotiationAliasDestinationNotRequested,
+        Self::MessageFallbackSourceNotRequested,
+        Self::MessageFallbackSequenceInvalid,
+        Self::CoverageRuleInvalid,
+        Self::CoverageRuleDuplicate,
+        Self::CoverageRuleConflict,
+        Self::ArtifactReferenceNotAdmitted,
+        Self::ArtifactCollectionNotAdmitted,
+        Self::GroupMemberUnknown,
+        Self::GroupMemberDuplicate,
+        Self::TargetUnassigned,
+        Self::TargetAssignedToMultipleGroups,
+        Self::HydrationRelationInvalid,
+        Self::HydrationLocalePolicyIncompatible,
+        Self::HydrationCapabilityIncompatible,
+        Self::ResourcePolicyNotAdmitted,
+        Self::ResourcePolicyCapabilityIncompatible,
+        Self::BootstrapLimitExceeded,
+        Self::ResourceLimitExceeded,
+        Self::ReportingLimitExceeded,
+    ];
+
+    /// 015's spelling of the code.
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::JsonInvalid => "project-profile-json-invalid",
@@ -445,6 +499,35 @@ impl Code {
             Self::ResourceLimitExceeded => "project-profile-resource-limit-exceeded",
             Self::ReportingLimitExceeded => "project-profile-reporting-limit-exceeded",
         }
+    }
+}
+
+/// A code reads and writes as 015 spells it.
+impl Serialize for Code {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for Code {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let spelled = Cow::<str>::deserialize(deserializer)?;
+        Self::ALL
+            .into_iter()
+            .find(|code| code.as_str() == spelled)
+            .ok_or_else(|| de::Error::custom(format!("no Finding code {spelled}")))
+    }
+}
+
+/// A code's schema is the closed list of 015's spellings, in table order.
+impl JsonSchema for Code {
+    fn schema_name() -> Cow<'static, str> {
+        "FindingCode".into()
+    }
+
+    fn json_schema(_: &mut SchemaGenerator) -> Schema {
+        let codes: Vec<&str> = Self::ALL.iter().map(|code| code.as_str()).collect();
+        schemars::json_schema!({ "type": "string", "enum": codes })
     }
 }
 
@@ -740,6 +823,9 @@ pub(crate) struct Evaluation {
     /// The unit a test makes block.
     #[cfg(test)]
     blocked: Option<Unit>,
+    /// Whether a test fills the evaluation with results no check reports.
+    #[cfg(test)]
+    fabricated: bool,
 }
 
 impl Evaluation {
@@ -753,6 +839,36 @@ impl Evaluation {
             blocked: Some(unit),
             ..Self::default()
         }
+    }
+
+    /// An evaluation a test fills with results no check of the resolver
+    /// reports, such as a code standing for an earlier phase's. Every other
+    /// evaluation a test runs reports only the codes each unit's Check
+    /// Registry row lists.
+    #[cfg(test)]
+    pub(crate) fn fabricated() -> Self {
+        Self {
+            fabricated: true,
+            ..Self::default()
+        }
+    }
+
+    /// Asserts that `unit`'s Check Registry row lists `code`, unless a test
+    /// made the result up or made the unit block.
+    #[cfg(test)]
+    fn registered(&self, unit: &Unit, code: Code) {
+        if self.fabricated || self.blocked.as_ref() == Some(unit) {
+            return;
+        }
+        let listed = crate::construction::registry::check::testing::possible_codes(
+            unit.subject.kind(),
+            unit.check,
+        );
+        assert!(
+            listed.contains(&code),
+            "{unit:?} reports {}, which its Check Registry row does not list",
+            code.as_str()
+        );
     }
 
     /// Runs `unit` when its prerequisite is admitted and records its status.
@@ -805,6 +921,8 @@ impl Evaluation {
                     reason,
                     details,
                 }) => {
+                    #[cfg(test)]
+                    self.registered(&unit, code);
                     let key = IssueKey {
                         unit: unit.clone(),
                         code,
@@ -825,6 +943,8 @@ impl Evaluation {
         if self.statuses.get(&unit) != Some(&Status::Evaluated) {
             return Err(EvaluationInvariant::NoticeWithoutEvaluation(unit));
         }
+        #[cfg(test)]
+        self.registered(&unit, code);
         self.notices.insert(IssueKey {
             unit,
             code,
@@ -938,57 +1058,7 @@ mod tests {
     #[test]
     fn codes_and_reasons_are_spelled_as_015_registers_them() {
         assert_eq!(
-            [
-                Code::JsonInvalid,
-                Code::JsonMemberDuplicate,
-                Code::InputNotJsonCompatible,
-                Code::SchemaVersionUnsupported,
-                Code::RequiredFieldMissing,
-                Code::FieldTypeInvalid,
-                Code::FieldValueInvalid,
-                Code::UnknownField,
-                Code::SelectorRequired,
-                Code::SelectorInvalid,
-                Code::SelectorUnknown,
-                Code::SpecificationInputIncomplete,
-                Code::SpecificationNotAdmitted,
-                Code::LocaleSpecificationNotAdmitted,
-                Code::LocaleDataNotAdmitted,
-                Code::NegotiationSpecificationNotAdmitted,
-                Code::MessageFallbackSpecificationNotAdmitted,
-                Code::CoverageSpecificationNotAdmitted,
-                Code::DeliverySpecificationNotAdmitted,
-                Code::IntentSurfaceClassVocabularyNotAdmitted,
-                Code::LocaleInvalid,
-                Code::LocaleNonCanonical,
-                Code::LocaleDuplicate,
-                Code::DefaultRequestedLocaleNotInProject,
-                Code::TargetLocalesNotSubset,
-                Code::TargetDefaultLocaleNotSupported,
-                Code::TargetLocaleDirectionMissing,
-                Code::NegotiationAliasDuplicate,
-                Code::NegotiationAliasDestinationNotRequested,
-                Code::MessageFallbackSourceNotRequested,
-                Code::MessageFallbackSequenceInvalid,
-                Code::CoverageRuleInvalid,
-                Code::CoverageRuleDuplicate,
-                Code::CoverageRuleConflict,
-                Code::ArtifactReferenceNotAdmitted,
-                Code::ArtifactCollectionNotAdmitted,
-                Code::GroupMemberUnknown,
-                Code::GroupMemberDuplicate,
-                Code::TargetUnassigned,
-                Code::TargetAssignedToMultipleGroups,
-                Code::HydrationRelationInvalid,
-                Code::HydrationLocalePolicyIncompatible,
-                Code::HydrationCapabilityIncompatible,
-                Code::ResourcePolicyNotAdmitted,
-                Code::ResourcePolicyCapabilityIncompatible,
-                Code::BootstrapLimitExceeded,
-                Code::ResourceLimitExceeded,
-                Code::ReportingLimitExceeded,
-            ]
-            .map(Code::as_str),
+            Code::ALL.map(Code::as_str),
             [
                 "project-profile-json-invalid",
                 "project-profile-json-member-duplicate",
@@ -1140,6 +1210,21 @@ mod tests {
     }
 
     #[test]
+    fn a_code_reads_and_writes_as_015_spells_it() {
+        for code in Code::ALL {
+            let value = serde_json::to_value(code).unwrap();
+            assert_eq!(value, code.as_str());
+            assert_eq!(serde_json::from_value::<Code>(value).unwrap(), code);
+        }
+        assert!(serde_json::from_value::<Code>(serde_json::json!("json-invalid")).is_err());
+        let schema = serde_json::to_value(schemars::schema_for!(Code)).unwrap();
+        assert_eq!(
+            schema["enum"],
+            serde_json::json!(Code::ALL.map(Code::as_str).to_vec())
+        );
+    }
+
+    #[test]
     fn an_admitted_prerequisite_is_evaluated_and_a_blocking_result_becomes_the_cause() {
         let mut evaluation = Evaluation::default();
         let doubled = evaluation
@@ -1213,6 +1298,44 @@ mod tests {
             ]
         );
         assert_eq!(joined.clone().union(placement), joined);
+    }
+
+    /// A result `data()`'s check never reports.
+    const MADE_UP: Blocking = Blocking {
+        code: Code::LocaleInvalid,
+        reason: None,
+        details: None,
+    };
+
+    #[test]
+    #[should_panic(expected = "which its Check Registry row does not list")]
+    fn a_test_evaluation_records_only_codes_the_units_row_lists() {
+        let mut evaluation = Evaluation::default();
+        let _ = evaluation.check(data(), Ok(()), |()| Err::<(), _>(MADE_UP));
+    }
+
+    #[test]
+    #[should_panic(expected = "which its Check Registry row does not list")]
+    fn a_test_evaluation_records_only_notices_the_units_row_lists() {
+        let mut evaluation = Evaluation::default();
+        let _ = evaluation.check(data(), Ok(()), |()| Ok::<(), Blocking>(()));
+        let _ = evaluation.notice(data(), Code::LocaleNonCanonical);
+    }
+
+    #[test]
+    fn a_made_up_result_or_a_blocked_unit_is_not_compared_with_the_registry() {
+        for mut evaluation in [Evaluation::fabricated(), Evaluation::blocking(data())] {
+            let found = evaluation
+                .check(data(), Ok(()), |()| Err::<(), _>(MADE_UP))
+                .unwrap();
+            assert!(found.is_err());
+        }
+        let mut evaluation = Evaluation::fabricated();
+        evaluation
+            .check(data(), Ok(()), |()| Ok::<(), Blocking>(()))
+            .unwrap()
+            .unwrap();
+        evaluation.notice(data(), Code::LocaleNonCanonical).unwrap();
     }
 
     #[test]
@@ -1311,12 +1434,12 @@ mod tests {
     fn a_unit_waits_only_on_results_before_it() {
         // The data comes after the slots in its phase, and the declaration's
         // fields in the next phase.
-        let mut earlier = Evaluation::default();
+        let mut earlier = Evaluation::fabricated();
         let slot_causes = missing(&mut earlier, slot(Slot::Coverage));
         let data_causes = missing(&mut earlier, data());
         let field_causes = missing(&mut earlier, field(DeclarationField::ProjectId));
         let mut ran = false;
-        let mut evaluation = Evaluation::default();
+        let mut evaluation = Evaluation::fabricated();
         for (unit, causes) in [
             // Not on a result of a later subject kind in the same phase,
             (slot(Slot::Coverage), data_causes.clone()),
@@ -1329,7 +1452,7 @@ mod tests {
                 data(),
                 slot_causes
                     .clone()
-                    .union(missing(&mut Evaluation::default(), data())),
+                    .union(missing(&mut Evaluation::fabricated(), data())),
             ),
         ] {
             assert_eq!(
@@ -1403,7 +1526,7 @@ mod tests {
             field(DeclarationField::ProjectId),
             field(DeclarationField::SelectionScope),
         ];
-        let mut evaluation = Evaluation::default();
+        let mut evaluation = Evaluation::fabricated();
         for unit in canonical.iter().rev() {
             missing(&mut evaluation, unit.clone());
         }
@@ -1545,7 +1668,7 @@ mod tests {
             limit: Bound::new(3).unwrap(),
             actual: Actual::Exact(4),
         };
-        let mut evaluation = Evaluation::default();
+        let mut evaluation = Evaluation::fabricated();
         let causes = evaluation
             .check(data(), Ok(()), |()| Err::<(), _>(Blocking::limit(exceeded)))
             .unwrap()
@@ -1585,7 +1708,7 @@ mod tests {
 
     #[test]
     fn a_notice_belongs_to_an_evaluated_unit_and_is_never_a_cause() {
-        let mut evaluation = Evaluation::default();
+        let mut evaluation = Evaluation::fabricated();
         evaluation
             .check(slot(Slot::Coverage), Ok(()), Ok::<(), Blocking>)
             .unwrap()
