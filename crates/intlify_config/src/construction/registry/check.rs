@@ -22,10 +22,28 @@
 //! `015.`. A kind keyed by an identity or content uses `redacted-structure`,
 //! because classifying invalid content as non-secret would expose arbitrary
 //! values (Decision 015-157); every other kind uses `none`.
+//!
+//! Construction reads the registry it admitted with the registry
+//! cross-references (row 41), and refuses one this type cannot read or whose
+//! rows do not relate as 015 requires: a check ID names one row, under its own
+//! rule ID; the rows of one kind in one phase agree on its key shape, parent,
+//! and rank (D15:2178); kinds rank uniquely within a phase and checks within a
+//! kind (D15:2193, 2195); only a kind keyed by an identity or content names a
+//! projection (D15:2182); a singleton is unscoped; and a parent is a kind with
+//! rows in the same or an earlier phase (D15:2169), from which following
+//! parents ends at an unscoped kind. Ranks are compared as the shortest
+//! decimal strings the schema spells them as. Whether the rows are this
+//! resolver's own kinds and checks is not part of the graph: a closed registry
+//! that is not the one compiled in fails the implemented-authority row (43) by
+//! its file digest.
+
+use std::collections::{BTreeMap, BTreeSet};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+use intlify_shared_json::decode;
 
 use crate::resolver::evaluation::Phase;
 use crate::resolver::subject::SubjectKind;
@@ -154,6 +172,105 @@ impl CheckRegistry {
         }
         Self { rows }
     }
+
+    /// Read a registry its admitted schema accepted, as the closed graph needs
+    /// it: a registry this type cannot read, or one whose rows do not relate
+    /// as 015 requires, is not part of one.
+    pub(crate) fn read(value: &Value) -> Option<Self> {
+        let registry = decode::typed::<Self>(value.clone()).ok()?;
+        registry.is_closed().then_some(registry)
+    }
+
+    /// Whether the rows relate as 015 requires: each check ID is one row's,
+    /// under its own rule ID; every row's key shape is sound and agrees with
+    /// the other rows of its kind; kinds rank uniquely within a phase and
+    /// checks within a kind; and every chain of parents ends.
+    fn is_closed(&self) -> bool {
+        let mut domains = BTreeMap::new();
+        for row in &self.rows {
+            let domain = Domain::of(row);
+            if row.rule_id.strip_prefix("015.") != Some(row.check_id.as_str())
+                || !domain.is_sound(row.phase_id)
+            {
+                return false;
+            }
+            if *domains
+                .entry((row.phase_id, row.subject_kind))
+                .or_insert(domain)
+                != domain
+            {
+                return false;
+            }
+        }
+        let check_ids: BTreeSet<&str> = self.rows.iter().map(|row| row.check_id.as_str()).collect();
+        let check_ranks: BTreeSet<(Phase, SubjectKind, &str)> = self
+            .rows
+            .iter()
+            .map(|row| (row.phase_id, row.subject_kind, row.check_rank.as_str()))
+            .collect();
+        let kind_ranks: BTreeSet<(Phase, &str)> = domains
+            .iter()
+            .map(|(&(phase, _), domain)| (phase, domain.rank))
+            .collect();
+        check_ids.len() == self.rows.len()
+            && check_ranks.len() == self.rows.len()
+            && kind_ranks.len() == domains.len()
+            && parents_end(&domains)
+    }
+}
+
+/// What the rows of one kind in one phase agree on (D15:2178): the kind's key
+/// shape, its parent, and its rank among the phase's kinds (D15:2193).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Domain<'a> {
+    strategy: KeyStrategy,
+    projection: ContentProjection,
+    scope: &'a str,
+    parent: Option<&'a ParentSubject>,
+    rank: &'a str,
+}
+
+impl<'a> Domain<'a> {
+    fn of(row: &'a CheckRow) -> Self {
+        Self {
+            strategy: row.subject_key_strategy,
+            projection: row.subject_content_projection,
+            scope: &row.owning_scope,
+            parent: row.parent_subject.as_ref(),
+            rank: &row.subject_kind_rank,
+        }
+    }
+
+    /// Whether 015 allows this key shape in `phase`: a kind keyed by an
+    /// identity or content names one closed projection and every other kind
+    /// none (D15:2182), a singleton's phase-global subject is unscoped
+    /// (D15:2173), and a parent comes from the same or an earlier phase
+    /// (D15:2169).
+    fn is_sound(self, phase: Phase) -> bool {
+        let keyed = self.strategy == KeyStrategy::CanonicalIdentityOrContent;
+        keyed == (self.projection != ContentProjection::None)
+            && self.parent.is_none_or(|parent| {
+                self.strategy != KeyStrategy::Singleton && parent.phase_id <= phase
+            })
+    }
+}
+
+/// Whether every kind's parent is a kind with rows (D15:2169) and following
+/// parents from any kind ends at an unscoped one, so that no kind scopes
+/// itself.
+fn parents_end(domains: &BTreeMap<(Phase, SubjectKind), Domain<'_>>) -> bool {
+    domains.keys().all(|&start| {
+        let mut kind = start;
+        // A chain that visits more domains than there are repeats one.
+        for _ in 0..domains.len() {
+            match domains.get(&kind).map(|domain| domain.parent) {
+                None => return false,
+                Some(None) => return true,
+                Some(Some(parent)) => kind = (parent.phase_id, parent.subject_kind),
+            }
+        }
+        false
+    })
 }
 
 /// The registry's schema.
@@ -880,6 +997,225 @@ mod tests {
             serde_json::from_value::<CheckRegistry>(value).unwrap(),
             registry()
         );
+    }
+
+    /// The registry as JSON, with `change` made to every row `pick` picks.
+    fn changed(pick: impl Fn(&Value) -> bool, change: impl Fn(&mut Value)) -> Value {
+        let mut value = serde_json::to_value(registry()).unwrap();
+        for row in value["rows"].as_array_mut().unwrap() {
+            if pick(row) {
+                change(row);
+            }
+        }
+        value
+    }
+
+    /// Picks the rows of one kind.
+    fn of_kind(id: &'static str) -> impl Fn(&Value) -> bool {
+        move |row| row["subjectKind"] == id
+    }
+
+    /// Picks the row of one check.
+    fn of_check(id: &'static str) -> impl Fn(&Value) -> bool {
+        move |row| row["checkId"] == id
+    }
+
+    #[test]
+    fn construction_reads_the_registry_as_a_closed_graph() {
+        let value = serde_json::to_value(registry()).unwrap();
+        assert_eq!(CheckRegistry::read(&value), Some(registry()));
+        // A registry this type cannot read is not part of one.
+        let known = of_check("hydration.endpoint.known");
+        for (case, value) in [
+            (
+                "an unknown kind",
+                changed(&known, |row| row["subjectKind"] = json!("endpoint")),
+            ),
+            (
+                "an unknown phase",
+                changed(of_kind("relation"), |row| {
+                    row["phaseId"] = json!("hydration");
+                }),
+            ),
+            (
+                "another member",
+                changed(&known, |row| row["note"] = json!("note")),
+            ),
+            (
+                "a rank as a number",
+                changed(of_kind("roles"), |row| row["subjectKindRank"] = json!(3)),
+            ),
+        ] {
+            assert_eq!(CheckRegistry::read(&value), None, "{case}");
+        }
+    }
+
+    #[test]
+    fn a_check_id_names_one_row_under_its_own_rule_id() {
+        let known = of_check("hydration.endpoint.known");
+        for (case, value) in [
+            (
+                "a repeated check ID",
+                changed(&known, |row| {
+                    row["checkId"] = json!("hydration.endpoint.within-bound");
+                    row["ruleId"] = json!("015.hydration.endpoint.within-bound");
+                }),
+            ),
+            (
+                "another check's rule ID",
+                changed(&known, |row| {
+                    row["ruleId"] = json!("015.hydration.endpoint.within-bound");
+                }),
+            ),
+            (
+                "a rule ID outside 015",
+                changed(&known, |row| {
+                    row["ruleId"] = json!("hydration.endpoint.known");
+                }),
+            ),
+        ] {
+            assert_eq!(CheckRegistry::read(&value), None, "{case}");
+        }
+    }
+
+    /// One row of a kind differs from the kind's other rows in one field,
+    /// each sound by itself.
+    #[test]
+    fn the_rows_of_a_kind_agree_on_its_shape_parent_and_rank() {
+        let known = of_check("hydration.endpoint.known");
+        for (case, value) in [
+            (
+                "strategy",
+                changed(&known, |row| {
+                    row["subjectKeyStrategy"] = json!("canonical-identity-or-content");
+                    row["subjectContentProjection"] = json!("redacted-structure");
+                }),
+            ),
+            (
+                "projection",
+                changed(of_check("hydration.relation.unique"), |row| {
+                    row["subjectContentProjection"] = json!("non-secret-content");
+                }),
+            ),
+            (
+                "scope",
+                changed(&known, |row| row["owningScope"] = json!("relations")),
+            ),
+            (
+                "parent",
+                changed(&known, |row| {
+                    row["parentSubject"] =
+                        json!({ "phaseId": "group-resolution", "subjectKind": "group" });
+                }),
+            ),
+            (
+                "rank",
+                changed(&known, |row| row["subjectKindRank"] = json!("7")),
+            ),
+        ] {
+            assert_eq!(CheckRegistry::read(&value), None, "{case}");
+        }
+    }
+
+    #[test]
+    fn kinds_rank_uniquely_within_a_phase_and_checks_within_a_kind() {
+        for (case, value) in [
+            (
+                "an endpoint ranked as the relation",
+                changed(of_kind("relation-endpoint"), |row| {
+                    row["subjectKindRank"] = json!("2");
+                }),
+            ),
+            (
+                "a check ranked as another",
+                changed(of_check("hydration.endpoint.known"), |row| {
+                    row["checkRank"] = json!("0");
+                }),
+            ),
+        ] {
+            assert_eq!(CheckRegistry::read(&value), None, "{case}");
+        }
+        // The ranks need only differ, not count up from zero.
+        let spread = changed(of_kind("relation-endpoint"), |row| {
+            row["subjectKindRank"] = json!("7");
+        });
+        assert!(CheckRegistry::read(&spread).is_some());
+    }
+
+    #[test]
+    fn only_identity_and_content_keys_name_a_projection() {
+        for (case, value) in [
+            (
+                "an identity key without one",
+                changed(of_kind("group-member"), |row| {
+                    row["subjectContentProjection"] = json!("none");
+                }),
+            ),
+            (
+                "a field with one",
+                changed(of_kind("relation-endpoint"), |row| {
+                    row["subjectContentProjection"] = json!("redacted-structure");
+                }),
+            ),
+            (
+                "a singleton with one",
+                changed(of_kind("coverage-table"), |row| {
+                    row["subjectContentProjection"] = json!("redacted-structure");
+                }),
+            ),
+        ] {
+            assert_eq!(CheckRegistry::read(&value), None, "{case}");
+        }
+        // Which closed projection an identity key names is the registry's
+        // choice, which its file digest fixes.
+        let disclosed = changed(of_kind("group-member"), |row| {
+            row["subjectContentProjection"] = json!("non-secret-content");
+        });
+        assert!(CheckRegistry::read(&disclosed).is_some());
+    }
+
+    #[test]
+    fn a_parent_is_a_kind_with_rows_in_the_same_or_an_earlier_phase() {
+        for (case, value) in [
+            (
+                "a parent without rows in its phase",
+                changed(of_kind("relation"), |row| {
+                    row["parentSubject"] =
+                        json!({ "phaseId": "hydration-validation", "subjectKind": "group" });
+                }),
+            ),
+            (
+                "a parent of a later phase",
+                changed(of_kind("coverage-rule"), |row| {
+                    row["parentSubject"] = json!({
+                        "phaseId": "hydration-validation",
+                        "subjectKind": "relation-endpoint"
+                    });
+                }),
+            ),
+            (
+                "a scoped singleton",
+                changed(of_kind("coverage-table"), |row| {
+                    row["parentSubject"] = json!({
+                        "phaseId": "locale-policy-resolution",
+                        "subjectKind": "coverage-rule"
+                    });
+                }),
+            ),
+        ] {
+            assert_eq!(CheckRegistry::read(&value), None, "{case}");
+        }
+    }
+
+    #[test]
+    fn no_kind_scopes_itself_through_its_parents() {
+        for parent in ["relation", "relation-endpoint"] {
+            let value = changed(of_kind("relation"), |row| {
+                row["parentSubject"] =
+                    json!({ "phaseId": "hydration-validation", "subjectKind": parent });
+            });
+            assert_eq!(CheckRegistry::read(&value), None, "{parent}");
+        }
     }
 
     #[test]

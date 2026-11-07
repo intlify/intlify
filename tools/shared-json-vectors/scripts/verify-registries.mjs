@@ -380,6 +380,19 @@ for (const [name, { row }] of kinds) {
     fail(`check registry: ${name}'s parent is not keyed by an identity or content`)
   }
 }
+// Following parents from any kind ends at an unscoped kind, so no kind
+// scopes itself.
+for (const [name] of kinds) {
+  const seen = new Set()
+  let current = name
+  while (current !== undefined && !seen.has(current)) {
+    seen.add(current)
+    current = kinds.get(current)?.row.parentSubject?.subjectKind
+  }
+  if (current !== undefined) {
+    fail(`check registry: ${name}'s parents lead back to ${current}`)
+  }
+}
 // Every phase but profile projection has rows.
 const expectedPhases = PHASES.filter(phase => phase !== 'profile-projection')
 if (!isDeepStrictEqual([...phasesWithRows], expectedPhases)) {
