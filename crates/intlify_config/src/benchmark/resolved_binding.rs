@@ -602,7 +602,9 @@ mod tests {
         }));
         let (unexplained, unexplained_causes) = blocked(trust(), mismatch(None, None));
         let noticed = {
-            let mut evaluation = resolved(ResolvedBindingRecipe::RequiredOnly).evaluation;
+            let mut evaluation = resolved(ResolvedBindingRecipe::RequiredOnly)
+                .evaluation
+                .fabricating();
             evaluation
                 .notice(reference_unit(trust()), Code::ArtifactReferenceNotAdmitted)
                 .unwrap();

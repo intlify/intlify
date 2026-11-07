@@ -185,6 +185,8 @@ pub(crate) fn resolve_fallback<Id: Clone, P: Provider>(
             },
         )?;
         // A key holding alone has one sequence, the one its bound measures.
+        // The key can stand for several sources, so past the bound the
+        // sequence reports only the first-over witness (Decision 015-157).
         let sequence = evaluation.check(
             unit(FallbackSubject::Sequence(key.clone()), Check::WithinBound),
             both(alone.clone(), policy.clone()),
@@ -197,6 +199,7 @@ pub(crate) fn resolve_fallback<Id: Clone, P: Provider>(
                         .max_fallback_candidates_per_source,
                     sharing[0].candidates.len(),
                 )
+                .map_err(Blocking::first_over)
                 .map(|()| source)
             },
         )?;
@@ -348,7 +351,10 @@ fn literal_at<P: Provider>(
             let &[raw] = raws else {
                 unreachable!("a key holding alone has one sequence");
             };
-            Ok(canonicalize(canonicalizer, raw)?)
+            // A candidate sits under a source key that can stand for several
+            // sources: past the byte bound it reports only the first-over
+            // witness, even under a key holding alone (Decision 015-157).
+            Ok(canonicalize(canonicalizer, raw)?.map_err(Blocking::first_over))
         }
         Err(causes) => Err(causes.clone()),
     };
@@ -1033,15 +1039,20 @@ mod tests {
                 None
             )]
         );
-        let found = resolved.evaluation.issues().last().unwrap();
-        assert_eq!(
-            resolved.evaluation.limit(found),
-            Some(LimitExceeded {
-                bound: MAX_FALLBACK_CANDIDATES_PER_SOURCE,
-                limit: Bound::new(2).unwrap(),
-                actual: Actual::Exact(3),
-            })
-        );
+        // The key can stand for several sources, so the sequence reports
+        // only the first-over witness, however far past the bound it is.
+        for (limit, resolved) in [(2, resolved), (1, resolve_under(&declaration, 100, 1))] {
+            let found = resolved.evaluation.issues().last().unwrap();
+            assert_eq!(
+                resolved.evaluation.limit(found),
+                Some(LimitExceeded {
+                    bound: MAX_FALLBACK_CANDIDATES_PER_SOURCE,
+                    limit: Bound::new(limit).unwrap(),
+                    actual: Actual::AtLeast(limit + 1),
+                })
+            );
+        }
+        let resolved = resolve_under(&declaration, 100, 2);
         // Nothing past the bound is canonicalized, so `en` stands for its
         // spelling.
         for candidate in [
@@ -1128,7 +1139,9 @@ mod tests {
             }
             assert_eq!(resolved.policy, Err(causes.clone()));
         }
-        // Each literal is measured in bytes before the provider reads it.
+        // Each literal is measured in bytes before the provider reads it,
+        // and under a key that can stand for several sources reports only
+        // the first-over witness.
         let short = resolve_with(
             &fields,
             Ok(&confirmed),
@@ -1156,7 +1169,7 @@ mod tests {
                     name: "maxLocaleIdentifierBytes",
                 },
                 limit: Bound::new(4).unwrap(),
-                actual: Actual::Exact(5),
+                actual: Actual::AtLeast(5),
             })
         );
         assert_eq!(

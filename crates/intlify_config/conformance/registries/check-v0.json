@@ -21,7 +21,25 @@
         "finding-occurrence",
         "evidence-index"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-specification-input-incomplete",
+            "members": [
+              "reason",
+              "slot"
+            ]
+          },
+          {
+            "code": "project-profile-specification-not-admitted",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "dependency.entry.established-slots",
@@ -56,7 +74,11 @@
           "recordKind": "entry-dependency",
           "id": "origins"
         }
-      ]
+      ],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": []
+      }
     },
     {
       "checkId": "entry.input.within-file-bytes",
@@ -79,7 +101,21 @@
         "evidence-index",
         "shared-unavailability-cause"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "entry.input.within-parser-tokens",
@@ -102,7 +138,21 @@
         "evidence-index",
         "shared-unavailability-cause"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "entry.input.well-formed-json",
@@ -125,7 +175,16 @@
         "evidence-index",
         "shared-unavailability-cause"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-json-invalid",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "entry.input.unique-members",
@@ -148,7 +207,16 @@
         "evidence-index",
         "shared-unavailability-cause"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-json-member-duplicate",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "entry.input.json-compatible",
@@ -171,7 +239,18 @@
         "evidence-index",
         "shared-unavailability-cause"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-input-not-json-compatible",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "entry.input.within-nodes",
@@ -194,7 +273,23 @@
         "evidence-index",
         "shared-unavailability-cause"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "entry.input.within-depth",
@@ -217,7 +312,23 @@
         "evidence-index",
         "shared-unavailability-cause"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "entry.input.within-collection-entries",
@@ -240,7 +351,23 @@
         "evidence-index",
         "shared-unavailability-cause"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "entry.input.within-total-string-bytes",
@@ -263,7 +390,23 @@
         "evidence-index",
         "shared-unavailability-cause"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "entry.input.within-single-string-bytes",
@@ -286,7 +429,23 @@
         "evidence-index",
         "shared-unavailability-cause"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "dependency.materialized.established-slots",
@@ -337,7 +496,11 @@
           "recordKind": "materialized-dependency",
           "id": "profile-selector"
         }
-      ]
+      ],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": []
+      }
     },
     {
       "checkId": "structural.schema-selection.object-root",
@@ -359,7 +522,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-field-type-invalid",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.schema-selection.present-schema-version",
@@ -381,7 +555,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-required-field-missing",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.schema-selection.string-schema-version",
@@ -403,7 +588,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-field-type-invalid",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.schema-selection.supported-schema-version",
@@ -425,7 +621,16 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-schema-version-unsupported",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.analysis.within-capability",
@@ -447,7 +652,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.root.required-field",
@@ -469,7 +690,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-required-field-missing",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.root.field-type",
@@ -491,7 +723,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-field-type-invalid",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.root.field-value",
@@ -513,7 +756,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-field-value-invalid",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.root.known-field",
@@ -535,7 +789,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-unknown-field",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.profile-key.field-value",
@@ -557,7 +822,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-field-value-invalid",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.profile.required-field",
@@ -583,7 +859,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-required-field-missing",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.profile.field-type",
@@ -609,7 +896,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-field-type-invalid",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.profile.field-value",
@@ -635,7 +933,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-field-value-invalid",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.profile.known-field",
@@ -661,7 +970,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-unknown-field",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.target-key.field-value",
@@ -687,7 +1007,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-field-value-invalid",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.target.required-field",
@@ -713,7 +1044,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-required-field-missing",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.target.field-type",
@@ -739,7 +1081,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-field-type-invalid",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.target.field-value",
@@ -765,7 +1118,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-field-value-invalid",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.target.known-field",
@@ -791,7 +1155,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-unknown-field",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.group-key.field-value",
@@ -817,7 +1192,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-field-value-invalid",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.group.required-field",
@@ -843,7 +1229,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-required-field-missing",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.group.field-type",
@@ -869,7 +1266,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-field-type-invalid",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.group.field-value",
@@ -895,7 +1303,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-field-value-invalid",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "structural.group.known-field",
@@ -921,7 +1340,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-unknown-field",
+            "members": [
+              "field"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "dependency.profile-specification.established",
@@ -946,7 +1376,11 @@
           "recordKind": "semantic-dependency",
           "id": "profileSpecification"
         }
-      ]
+      ],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": []
+      }
     },
     {
       "checkId": "selection.profiles.within-capability",
@@ -968,7 +1402,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "selection.profile-id.within-capability",
@@ -990,7 +1440,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "selection.selector.within-capability",
@@ -1012,7 +1478,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "selection.selector.required",
@@ -1034,7 +1516,16 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-selector-required",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "selection.selector.valid",
@@ -1056,7 +1547,16 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-selector-invalid",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "selection.selector.declared",
@@ -1078,7 +1578,16 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-selector-unknown",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.artifacts.within-capability",
@@ -1100,7 +1609,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.policy-artifacts.within-capability",
@@ -1122,7 +1647,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.target-profile-artifacts.within-capability",
@@ -1144,7 +1685,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.references.within-capability",
@@ -1166,7 +1723,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.artifact.within-capability",
@@ -1188,7 +1761,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.artifact-bytes.within-capability",
@@ -1210,7 +1799,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.policy-reference.within-capability",
@@ -1232,7 +1837,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.target-profile-reference.within-capability",
@@ -1254,7 +1875,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.reference-bytes.within-capability",
@@ -1276,7 +1913,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.resource-limits.bootstrap-candidate",
@@ -1307,7 +1960,30 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-artifact-reference-not-admitted",
+            "members": [
+              "reason"
+            ]
+          },
+          {
+            "code": "project-profile-artifact-collection-not-admitted",
+            "members": [
+              "reason"
+            ]
+          },
+          {
+            "code": "project-profile-resource-policy-not-admitted",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.resource-limits.compatible",
@@ -1331,7 +2007,21 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-policy-capability-incompatible",
+            "members": [
+              "resourceGroup",
+              "bound",
+              "required",
+              "available"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.root-nodes.within-bound",
@@ -1355,7 +2045,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.root-depth.within-bound",
@@ -1379,7 +2085,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.root-collection-entries.within-bound",
@@ -1403,7 +2125,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.root-string-bytes.within-bound",
@@ -1427,7 +2165,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.root-longest-string.within-bound",
@@ -1451,7 +2205,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.profiles.within-bound",
@@ -1475,7 +2245,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.profile-id.within-bound",
@@ -1499,7 +2285,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.selector.within-bound",
@@ -1523,7 +2325,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.structural-analysis.within-bound",
@@ -1547,7 +2365,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.artifacts.within-bound",
@@ -1571,7 +2405,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.policy-artifacts.within-bound",
@@ -1595,7 +2445,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.target-profile-artifacts.within-bound",
@@ -1619,7 +2485,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.references.within-bound",
@@ -1643,7 +2525,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.artifact.within-bound",
@@ -1667,7 +2565,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.artifact-bytes.within-bound",
@@ -1691,7 +2605,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.policy-reference.within-bound",
@@ -1715,7 +2645,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.target-profile-reference.within-bound",
@@ -1739,7 +2685,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "resource-policy.reference-bytes.within-bound",
@@ -1763,7 +2725,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "specification.locale-canonicalization.supported",
@@ -1805,7 +2783,25 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-specification-input-incomplete",
+            "members": [
+              "reason",
+              "slot"
+            ]
+          },
+          {
+            "code": "project-profile-locale-specification-not-admitted",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "specification.locale-negotiation.supported",
@@ -1847,7 +2843,25 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-specification-input-incomplete",
+            "members": [
+              "reason",
+              "slot"
+            ]
+          },
+          {
+            "code": "project-profile-negotiation-specification-not-admitted",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "specification.message-locale-fallback.supported",
@@ -1889,7 +2903,25 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-specification-input-incomplete",
+            "members": [
+              "reason",
+              "slot"
+            ]
+          },
+          {
+            "code": "project-profile-message-fallback-specification-not-admitted",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "specification.coverage.supported",
@@ -1931,7 +2963,25 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-specification-input-incomplete",
+            "members": [
+              "reason",
+              "slot"
+            ]
+          },
+          {
+            "code": "project-profile-coverage-specification-not-admitted",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "specification.intent-surface-class-vocabulary.supported",
@@ -1972,7 +3022,19 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-specification-input-incomplete",
+            "members": [
+              "reason",
+              "slot"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "specification.delivery-graph.supported",
@@ -2014,7 +3076,26 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-specification-input-incomplete",
+            "members": [
+              "reason",
+              "slot"
+            ]
+          },
+          {
+            "code": "project-profile-delivery-specification-not-admitted",
+            "members": [
+              "reason",
+              "component"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "specification.delivery-placement.supported",
@@ -2056,7 +3137,26 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-specification-input-incomplete",
+            "members": [
+              "reason",
+              "slot"
+            ]
+          },
+          {
+            "code": "project-profile-delivery-specification-not-admitted",
+            "members": [
+              "reason",
+              "component"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "specification.vocabulary.intact",
@@ -2097,7 +3197,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-intent-surface-class-vocabulary-not-admitted",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "specification.vocabulary.asserted",
@@ -2122,7 +3233,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-intent-surface-class-vocabulary-not-admitted",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "specification.locale-data.matching",
@@ -2146,7 +3268,16 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-locale-data-not-admitted",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "dependency.locale-canonicalization.established",
@@ -2171,7 +3302,11 @@
           "recordKind": "semantic-dependency",
           "id": "localeCanonicalization"
         }
-      ]
+      ],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": []
+      }
     },
     {
       "checkId": "identity.declaration-field.opaque",
@@ -2207,7 +3342,11 @@
       "possibleEvidenceRecordKinds": [
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": []
+      }
     },
     {
       "checkId": "dependency.project-identity.established",
@@ -2232,7 +3371,11 @@
           "recordKind": "semantic-dependency",
           "id": "projectIdentity"
         }
-      ]
+      ],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": []
+      }
     },
     {
       "checkId": "locale.occurrences.within-bound",
@@ -2273,7 +3416,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "locale.requested.canonical",
@@ -2300,7 +3459,31 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-locale-invalid",
+            "members": []
+          },
+          {
+            "code": "project-profile-locale-non-canonical",
+            "members": []
+          },
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "locale.requested.unique",
@@ -2324,7 +3507,16 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-locale-duplicate",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "locale.requested-set.within-bound",
@@ -2348,7 +3540,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "locale.default-source.canonical",
@@ -2375,7 +3583,31 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-locale-invalid",
+            "members": []
+          },
+          {
+            "code": "project-profile-locale-non-canonical",
+            "members": []
+          },
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "locale.default-requested.canonical",
@@ -2402,7 +3634,31 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-locale-invalid",
+            "members": []
+          },
+          {
+            "code": "project-profile-locale-non-canonical",
+            "members": []
+          },
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "locale.default-requested.member",
@@ -2427,7 +3683,16 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-default-requested-locale-not-in-project",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "locale.alias-key.canonical",
@@ -2454,7 +3719,31 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-locale-invalid",
+            "members": []
+          },
+          {
+            "code": "project-profile-locale-non-canonical",
+            "members": []
+          },
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "locale.alias-destination.canonical",
@@ -2485,7 +3774,31 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-locale-invalid",
+            "members": []
+          },
+          {
+            "code": "project-profile-locale-non-canonical",
+            "members": []
+          },
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "locale.fallback-key.canonical",
@@ -2512,7 +3825,31 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-locale-invalid",
+            "members": []
+          },
+          {
+            "code": "project-profile-locale-non-canonical",
+            "members": []
+          },
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "locale.target-profiles.within-bound",
@@ -2553,7 +3890,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "locale.target-id.within-bound",
@@ -2577,7 +3930,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "locale.target-requested.canonical",
@@ -2609,7 +3978,31 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-locale-invalid",
+            "members": []
+          },
+          {
+            "code": "project-profile-locale-non-canonical",
+            "members": []
+          },
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "locale.target-requested.unique",
@@ -2637,7 +4030,16 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-locale-duplicate",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "locale.target-default-requested.canonical",
@@ -2669,7 +4071,31 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-locale-invalid",
+            "members": []
+          },
+          {
+            "code": "project-profile-locale-non-canonical",
+            "members": []
+          },
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "dependency.project-locales.established",
@@ -2697,7 +4123,11 @@
           "recordKind": "semantic-dependency",
           "id": "projectLocales"
         }
-      ]
+      ],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": []
+      }
     },
     {
       "checkId": "negotiation.aliases.within-bound",
@@ -2721,7 +4151,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "negotiation.alias-key.unique",
@@ -2746,7 +4192,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-negotiation-alias-duplicate",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "negotiation.destination.member",
@@ -2776,7 +4233,16 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-negotiation-alias-destination-not-requested",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "fallback.sources.within-bound",
@@ -2800,7 +4266,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "fallback.source.unique",
@@ -2825,7 +4307,16 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-locale-duplicate",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "fallback.source.member",
@@ -2851,7 +4342,16 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-message-fallback-source-not-requested",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "fallback.sequence.within-bound",
@@ -2879,7 +4379,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "fallback.candidate.canonical",
@@ -2909,7 +4425,31 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-locale-invalid",
+            "members": []
+          },
+          {
+            "code": "project-profile-locale-non-canonical",
+            "members": []
+          },
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "fallback.candidate.distinct-from-source",
@@ -2937,7 +4477,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-message-fallback-sequence-invalid",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "fallback.literal.unique",
@@ -2965,7 +4516,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-message-fallback-sequence-invalid",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "fallback.intent-source.unique",
@@ -2993,7 +4555,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-message-fallback-sequence-invalid",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "coverage.rules.within-bound",
@@ -3017,7 +4590,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "coverage.locale-selectors.within-bound",
@@ -3041,7 +4630,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "coverage.surface-selectors.within-bound",
@@ -3065,7 +4670,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "coverage.locale.canonical",
@@ -3098,7 +4719,31 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-locale-invalid",
+            "members": []
+          },
+          {
+            "code": "project-profile-locale-non-canonical",
+            "members": []
+          },
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "coverage.locale.unique",
@@ -3126,7 +4771,16 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-locale-duplicate",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "coverage.locale.member",
@@ -3155,7 +4809,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-coverage-rule-invalid",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "coverage.surface-class.vocabulary-member",
@@ -3185,7 +4850,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-coverage-rule-invalid",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "coverage.surface-class.unique",
@@ -3213,7 +4889,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-coverage-rule-invalid",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "coverage.rule.normalized-domain",
@@ -3234,7 +4921,11 @@
       "possibleEvidenceRecordKinds": [
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": []
+      }
     },
     {
       "checkId": "coverage.domain.unique",
@@ -3258,7 +4949,16 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-coverage-rule-duplicate",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "coverage.cells.within-bound",
@@ -3284,7 +4984,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "coverage.comparisons.within-bound",
@@ -3310,7 +5026,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "coverage.cell.effective-mode",
@@ -3336,7 +5068,16 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-coverage-rule-conflict",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "coverage.table.complete",
@@ -3357,7 +5098,11 @@
         "shared-evaluation-status",
         "coverage-decision-basis"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": []
+      }
     },
     {
       "checkId": "dependency.locale-negotiation.established",
@@ -3383,7 +5128,11 @@
           "recordKind": "semantic-dependency",
           "id": "localeNegotiation"
         }
-      ]
+      ],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": []
+      }
     },
     {
       "checkId": "dependency.message-fallback.established",
@@ -3411,7 +5160,11 @@
           "recordKind": "semantic-dependency",
           "id": "messageFallback"
         }
-      ]
+      ],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": []
+      }
     },
     {
       "checkId": "dependency.coverage.established",
@@ -3436,7 +5189,11 @@
           "recordKind": "semantic-dependency",
           "id": "coverage"
         }
-      ]
+      ],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": []
+      }
     },
     {
       "checkId": "artifact.member.admissible",
@@ -3477,7 +5234,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-artifact-collection-not-admitted",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "artifact.member.single-occurrence",
@@ -3518,7 +5286,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-artifact-collection-not-admitted",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "artifact.conflict-group.consistent-content",
@@ -3559,7 +5338,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-artifact-collection-not-admitted",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "artifact.policy-reference.resolved",
@@ -3585,7 +5375,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-artifact-reference-not-admitted",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "artifact.target-profile-reference.resolved",
@@ -3612,7 +5413,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-artifact-reference-not-admitted",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "dependency.required-policies.established",
@@ -3637,7 +5449,11 @@
           "recordKind": "semantic-dependency",
           "id": "requiredPolicies"
         }
-      ]
+      ],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": []
+      }
     },
     {
       "checkId": "dependency.optional-policies.established",
@@ -3662,7 +5478,11 @@
           "recordKind": "semantic-dependency",
           "id": "optionalPolicies"
         }
-      ]
+      ],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": []
+      }
     },
     {
       "checkId": "delivery.placement.effective-mode",
@@ -3682,7 +5502,11 @@
       "possibleEvidenceRecordKinds": [
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": []
+      }
     },
     {
       "checkId": "dependency.delivery.established",
@@ -3707,7 +5531,11 @@
           "recordKind": "semantic-dependency",
           "id": "delivery"
         }
-      ]
+      ],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": []
+      }
     },
     {
       "checkId": "target.requested-locales.project-subset",
@@ -3732,7 +5560,16 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-target-locales-not-subset",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "target.effective-default.supported",
@@ -3758,7 +5595,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-target-default-locale-not-supported",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "target.requested-locales.directed",
@@ -3783,7 +5631,16 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-target-locale-direction-missing",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "dependency.targets.established",
@@ -3811,7 +5668,11 @@
           "recordKind": "semantic-dependency",
           "id": "targets"
         }
-      ]
+      ],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": []
+      }
     },
     {
       "checkId": "group.groups.within-bound",
@@ -3852,7 +5713,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "group.memberships.within-bound",
@@ -3893,7 +5770,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "group.group-id.within-bound",
@@ -3917,7 +5810,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "group.members.within-bound",
@@ -3945,7 +5854,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "group.member.within-bound",
@@ -3974,7 +5899,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "group.member.known",
@@ -4003,7 +5944,16 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-group-member-unknown",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "group.member.unique",
@@ -4031,7 +5981,16 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-group-member-duplicate",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "group.target.single-group",
@@ -4058,7 +6017,20 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-target-unassigned",
+            "members": []
+          },
+          {
+            "code": "project-profile-target-assigned-to-multiple-groups",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "hydration.relations.within-bound",
@@ -4099,7 +6071,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "hydration.endpoint.within-bound",
@@ -4128,7 +6116,23 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-resource-limit-exceeded",
+            "members": [
+              "subject",
+              "resourceGroup",
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "hydration.endpoint.known",
@@ -4157,7 +6161,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-hydration-relation-invalid",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "hydration.endpoint.same-group",
@@ -4186,7 +6201,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-hydration-relation-invalid",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "hydration.endpoint.role",
@@ -4215,7 +6241,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-hydration-relation-invalid",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "hydration.relation.distinct-endpoints",
@@ -4243,7 +6280,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-hydration-relation-invalid",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "hydration.relation.unique",
@@ -4271,7 +6319,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-hydration-relation-invalid",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "hydration.relation.same-requested-locales",
@@ -4300,7 +6359,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-hydration-locale-policy-incompatible",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "hydration.relation.same-effective-default",
@@ -4329,7 +6399,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-hydration-locale-policy-incompatible",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "hydration.relation.static-compatibility",
@@ -4358,7 +6439,16 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-hydration-capability-incompatible",
+            "members": []
+          }
+        ]
+      }
     },
     {
       "checkId": "hydration.target.single-role",
@@ -4386,7 +6476,18 @@
         "shared-finding",
         "shared-evaluation-status"
       ],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-hydration-relation-invalid",
+            "members": [
+              "reason"
+            ]
+          }
+        ]
+      }
     },
     {
       "checkId": "dependency.deployment-groups.established",
@@ -4421,7 +6522,11 @@
           "recordKind": "semantic-dependency",
           "id": "deploymentGroups"
         }
-      ]
+      ],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": []
+      }
     },
     {
       "checkId": "reporting.diagnostic-domain.complete",
@@ -4438,7 +6543,19 @@
         "project-profile-reporting-limit-exceeded"
       ],
       "possibleEvidenceRecordKinds": [],
-      "ownedDependencies": []
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-reporting-limit-exceeded",
+            "members": [
+              "reason",
+              "bound"
+            ]
+          }
+        ]
+      }
     }
   ]
 }

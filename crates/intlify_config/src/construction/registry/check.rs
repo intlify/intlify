@@ -1,8 +1,9 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! The Check Registry and its schema, as far as each row's identity, subject
-//! kind, prerequisites, Finding codes, Evidence records, and dependencies go.
+//! The Check Registry and its schema: each row's identity, subject kind,
+//! prerequisites, Finding codes, Evidence records, dependencies, and payload
+//! strategy.
 //!
 //! Design 015's Check Registry has one row for each `(phase, subject kind,
 //! check)` the resolver evaluates (D15:2167). Revision `"0"` writes the rows
@@ -11,8 +12,8 @@
 //! and check-rank order. A row names its check ID, phase, rule ID, subject
 //! kind, key strategy, content projection, owning scope, parent subject, its
 //! two ranks, its prerequisites, the Finding codes it may report, the ordinary
-//! Evidence record kinds its units may own, and the dependency records they
-//! own. Its payload strategy comes with its own stage.
+//! Evidence record kinds its units may own, the dependency records they own,
+//! and its Finding payload strategy.
 //!
 //! 015 leaves the IDs of kinds, scopes, and checks to the registry (D15:2167,
 //! 2169). A kind's ID is its name in kebab case. A singleton's owning scope is
@@ -47,6 +48,18 @@
 //! of entry and structural admission and each semantic group's owner own the
 //! dependency records (D15:2510).
 //!
+//! A row's payload strategy says how every Finding payload it may produce
+//! derives (D15:2167). Where its key can stand for distinct raw values, the
+//! payload derives only from its check, code, reason, Logical subject key,
+//! and bound authority, so past a bound it reports the first-over witness
+//! `limit + 1` even for one value (Decision 015-157). Elsewhere its key names
+//! one value, whose exact total it reports (D15:2000). The strategy also
+//! names, for each code the row may report, the members of the code's
+//! `details` from 015's closed vocabulary (D15:2225). Severity, blocking
+//! state, and suggestion kind are each code's own and come with the Finding
+//! Registry. Every evaluation a test runs asserts that each result carries
+//! what its row's strategy gives its code.
+//!
 //! Construction reads the registry it admitted with the registry
 //! cross-references (row 41), and refuses one this type cannot read or whose
 //! rows do not relate as 015 requires: a check ID names one row, under its own
@@ -57,8 +70,10 @@
 //! rows in the same or an earlier phase (D15:2169), from which following
 //! parents ends at an unscoped kind; a prerequisite names a row once, never
 //! one of a later phase or of a kind its phase ranks later, and following
-//! prerequisites never comes back to a row; and every dependency record is
-//! owned by exactly one row, which lists its record kind (D15:2269). A row of
+//! prerequisites never comes back to a row; every dependency record is owned
+//! by exactly one row, which lists its record kind (D15:2269); and a row's
+//! payload strategy covers exactly the codes it may report, in their order
+//! (D15:2167). A row of
 //! the same kind may be an earlier subject's check (D15:2143), so its rank is
 //! not compared. Ranks are compared as the shortest decimal strings the
 //! schema spells them as. Whether the rows are this resolver's own kinds and
@@ -74,7 +89,7 @@ use serde_json::Value;
 use intlify_shared_json::decode;
 
 use crate::resolver::dependency::{EntrySlot, MaterializedSlot, SemanticGroup};
-use crate::resolver::evaluation::{Code, Phase, Subject};
+use crate::resolver::evaluation::{Check, Code, Phase, Subject};
 use crate::resolver::subject::SubjectKind;
 
 use super::RANK_PATTERN;
@@ -96,11 +111,11 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:7d9214e104b268947ec0d997f99b80074db9df844c24d121aa317f7e70a95c13";
+    "sha256:02c4dccaadbabd3a2c71f76fe40e0e64fd5ae2aebc7652264160bdf033b858b2";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
-    "sha256:c105ce7fa39c9f7dbe0107b540b047df6a5201a177a59979b4b57b01e5addd93";
+    "sha256:72ab90f3e21e9d07af1e8cbdb2d1b2783a792c44c39a51c061882c6b52990237";
 
 /// A check ID: three kebab-case segments joined by dots.
 pub(crate) const CHECK_ID_PATTERN: &str =
@@ -186,6 +201,60 @@ impl OwnedDependency {
     }
 }
 
+/// What a row's Finding payloads derive from. Under `key-only`, the row's key
+/// can stand for distinct raw values, so a payload derives only from the
+/// check, code, reason, Logical subject key, and bound authority, and past a
+/// bound reports the first-over witness `limit + 1` with `at-least`, even for
+/// one value. Under `exact`, the row's key names one value, so an exactly
+/// computed total is `exact`, and only a total that cannot be safely
+/// established reports that smallest witness.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum Derivation {
+    KeyOnly,
+    Exact,
+}
+
+/// 015's closed vocabulary of a Finding's `details` members, in its order.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum DetailsMember {
+    Reason,
+    Field,
+    Component,
+    Slot,
+    Subject,
+    ResourceGroup,
+    Bound,
+    Limit,
+    Actual,
+    Required,
+    Available,
+    ActualRelation,
+}
+
+/// The `details` members of one code a row may report.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CodeDetails {
+    pub(crate) code: Code,
+    /// In 015's order, each once.
+    #[schemars(extend("uniqueItems" = true))]
+    pub(crate) members: Vec<DetailsMember>,
+}
+
+/// How a row's Finding payloads derive, and the `details` members of each
+/// code it may report.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PayloadStrategy {
+    pub(crate) derivation: Derivation,
+    /// One for each of the row's possible Finding codes, in their order.
+    pub(crate) details: Vec<CodeDetails>,
+}
+
 /// One row: one check of one subject kind in one phase.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -220,6 +289,8 @@ pub(crate) struct CheckRow {
     /// The dependency records the row's units own.
     #[schemars(extend("uniqueItems" = true))]
     pub(crate) owned_dependencies: Vec<OwnedDependency>,
+    /// How the row's Finding payloads derive, and each code's details.
+    pub(crate) finding_payload_strategy: PayloadStrategy,
 }
 
 /// The registry's body.
@@ -247,6 +318,7 @@ impl CheckRegistry {
             for (rank, ((id, prerequisites), codes)) in
                 ids.iter().zip(prerequisites).zip(codes).enumerate()
             {
+                let check = kind.checks()[rank];
                 rows.push(CheckRow {
                     check_id: (*id).to_owned(),
                     phase_id: kind.phase(),
@@ -268,6 +340,7 @@ impl CheckRegistry {
                     possible_finding_codes: codes.to_vec(),
                     possible_evidence_record_kinds: record_kinds(kind, codes, &owned),
                     owned_dependencies: owned.clone(),
+                    finding_payload_strategy: payload_strategy(kind, check, codes),
                 });
             }
         }
@@ -284,15 +357,17 @@ impl CheckRegistry {
 
     /// Whether the rows relate as 015 requires: each check ID is one row's,
     /// under its own rule ID; every row's key shape is sound and agrees with
-    /// the other rows of its kind; kinds rank uniquely within a phase and
-    /// checks within a kind; every chain of parents ends; so does every chain
-    /// of prerequisites; and every dependency record has one owner.
+    /// the other rows of its kind; every row's payload strategy covers its
+    /// codes; kinds rank uniquely within a phase and checks within a kind;
+    /// every chain of parents ends; so does every chain of prerequisites; and
+    /// every dependency record has one owner.
     fn is_closed(&self) -> bool {
         let mut domains = BTreeMap::new();
         for row in &self.rows {
             let domain = Domain::of(row);
             if row.rule_id.strip_prefix("015.") != Some(row.check_id.as_str())
                 || !domain.is_sound(row.phase_id)
+                || !payloads_cover_codes(row)
             {
                 return false;
             }
@@ -423,6 +498,17 @@ fn prerequisites_end(rows: &[CheckRow]) -> bool {
         }
     }
     count == pending.len()
+}
+
+/// Whether a row's payload strategy covers exactly the codes the row may
+/// report, in their order: the strategy closes every code the row may emit
+/// and no other (D15:2167).
+fn payloads_cover_codes(row: &CheckRow) -> bool {
+    row.finding_payload_strategy
+        .details
+        .iter()
+        .map(|details| details.code)
+        .eq(row.possible_finding_codes.iter().copied())
 }
 
 /// Whether every dependency record is owned by exactly one row, which lists
@@ -1506,6 +1592,240 @@ fn record_kinds(kind: SubjectKind, codes: &[Code], owned: &[OwnedDependency]) ->
     kinds.into_iter().collect()
 }
 
+/// A row's payload strategy: what its payloads derive from, and the details
+/// members of each code it may report.
+fn payload_strategy(kind: SubjectKind, check: Check, codes: &[Code]) -> PayloadStrategy {
+    PayloadStrategy {
+        derivation: derivation(kind, check),
+        details: codes
+            .iter()
+            .map(|&code| CodeDetails {
+                code,
+                members: details_members(code).to_vec(),
+            })
+            .collect(),
+    }
+}
+
+/// What each check's payloads derive from (Decision 015-157): only its key
+/// where the key can stand for distinct raw values, and otherwise the one
+/// value the key names (D15:2000).
+///
+/// A key stands for distinct raw values when spellings share its canonical
+/// locale or its content projection groups them: a locale's own key, an
+/// artifact's exact tuple or admission key, which bodies share, a coverage
+/// rule's content and what normalizing it gives, and an identity map's key
+/// in structural admission, where a key that fails admission is keyed by its
+/// content. So does a structural field path, which holds `*` for elements
+/// and entries and names the object of its undeclared members; a singleton
+/// whose check sees each occurrence on its own (D15:1878, 1889); and a key
+/// under a parent whose key stands for distinct raw parents. A Target ID,
+/// Group ID, or Profile ID after structural admission is its own key and
+/// names one raw ID (D15:1880, 1925, 1927), a single-valued field's path
+/// names one value, and a singleton's total is one value.
+#[expect(clippy::too_many_lines, reason = "one arm for each of 015's kinds")]
+const fn derivation(kind: SubjectKind, check: Check) -> Derivation {
+    use Derivation::{Exact, KeyOnly};
+    use SubjectKind as K;
+    match kind {
+        // Every duplicate member and every value outside the JSON domain is
+        // an occurrence of its own, and so is every string the single-string
+        // bound checks; the input's totals are one value each.
+        K::CompleteInput => match check {
+            Check::UniqueMembers | Check::JsonCompatible | Check::WithinSingleStringBytes => {
+                KeyOnly
+            }
+            _ => Exact,
+        },
+        K::RootField
+        | K::ProfileKey
+        | K::ProfileField
+        | K::TargetProfileKey
+        | K::TargetField
+        | K::DeploymentGroupKey
+        | K::GroupField
+        | K::CapabilityArtifact
+        | K::RootLongestString
+        | K::Artifact
+        | K::RequestedLocale
+        | K::NegotiationAliasKey
+        | K::NegotiationAliasValue
+        | K::MessageFallbackKey
+        | K::TargetRequestedLocale
+        | K::NegotiationKey
+        | K::NegotiationDestination
+        | K::FallbackSource
+        | K::FallbackSequence
+        | K::FallbackCandidate
+        | K::FallbackLiteral
+        | K::FallbackIntentSource
+        | K::CoverageLocale
+        | K::CoverageSurfaceClass
+        | K::CoverageRule
+        | K::CoverageDomain
+        | K::CoverageCell
+        | K::CollectionMember
+        | K::CollectionGroup => KeyOnly,
+        K::ProjectProfileSlot
+        | K::EntryDependencies
+        | K::MaterializedDependencies
+        | K::ConfigurationSchemaSelection
+        | K::CapabilityStructuralAnalysis
+        | K::ProfileSpecificationDependency
+        | K::CapabilityProfiles
+        | K::CapabilityProfileId
+        | K::ProfileSelector
+        | K::CapabilityArtifacts
+        | K::CapabilityPolicyArtifacts
+        | K::CapabilityTargetProfileArtifacts
+        | K::CapabilityReferences
+        | K::CapabilityArtifactBytes
+        | K::CapabilityPolicyReference
+        | K::CapabilityTargetProfileReference
+        | K::CapabilityReferenceBytes
+        | K::ResourceLimits
+        | K::RootNodes
+        | K::RootDepth
+        | K::RootCollectionEntries
+        | K::RootStringBytes
+        | K::Profiles
+        | K::ProfileId
+        | K::Selector
+        | K::StructuralAnalysis
+        | K::Artifacts
+        | K::PolicyArtifacts
+        | K::TargetProfileArtifacts
+        | K::References
+        | K::ArtifactBytes
+        | K::PolicyReference
+        | K::TargetProfileReference
+        | K::ReferenceBytes
+        | K::LocaleCanonicalizationSlot
+        | K::LocaleNegotiationSlot
+        | K::MessageLocaleFallbackSlot
+        | K::CoverageSlot
+        | K::IntentSurfaceClassVocabularySlot
+        | K::DeliveryGraphSlot
+        | K::DeliveryPlacementSlot
+        | K::Vocabulary
+        | K::CanonicalizationData
+        | K::LocaleCanonicalizationDependency
+        | K::DeclarationField
+        | K::ProjectIdentityDependency
+        | K::LocaleOccurrences
+        | K::RequestedLocales
+        | K::DefaultSourceLocale
+        | K::DefaultRequestedLocale
+        | K::TargetProfiles
+        | K::TargetId
+        | K::TargetDefaultRequestedLocale
+        | K::ProjectLocalesDependency
+        | K::NegotiationAliases
+        | K::FallbackSources
+        | K::CoverageRules
+        | K::CoverageLocaleSelectors
+        | K::CoverageSurfaceSelectors
+        | K::CoverageCells
+        | K::CoverageComparisons
+        | K::CoverageTable
+        | K::LocaleNegotiationDependency
+        | K::MessageFallbackDependency
+        | K::CoverageDependency
+        | K::ResolvedPolicyReference
+        | K::ResolvedTargetProfileReference
+        | K::RequiredPoliciesDependency
+        | K::OptionalPoliciesDependency
+        | K::DeliveryPlacement
+        | K::DeliveryDependency
+        | K::Target
+        | K::TargetsDependency
+        | K::Groups
+        | K::Memberships
+        | K::Group
+        | K::GroupMembers
+        | K::GroupMember
+        | K::Assignment
+        | K::Relations
+        | K::RelationEndpoint
+        | K::Relation
+        | K::Roles
+        | K::DeploymentGroupsDependency
+        | K::DiagnosticDomain => Exact,
+    }
+}
+
+/// The members of each code's `details`, in 015's order (D15:2225): a
+/// stable reason where 015 gives the code reasons, the schema field of the
+/// schema codes, the missing slot, and the delivery specification's
+/// component. A bound's code names its group and bound, and either its
+/// value and the total with the total's relation, or what the policy
+/// requires and the capability makes available. An exceeded policy bound
+/// also names its subject kind, a capability bound's path holds its group,
+/// and the reporting bound's reason names its domain (D15:2349, 2350, 2352,
+/// 2353).
+const fn details_members(code: Code) -> &'static [DetailsMember] {
+    use Code as C;
+    use DetailsMember as M;
+    match code {
+        C::JsonInvalid
+        | C::JsonMemberDuplicate
+        | C::SchemaVersionUnsupported
+        | C::SelectorRequired
+        | C::SelectorInvalid
+        | C::SelectorUnknown
+        | C::LocaleDataNotAdmitted
+        | C::LocaleInvalid
+        | C::LocaleNonCanonical
+        | C::LocaleDuplicate
+        | C::DefaultRequestedLocaleNotInProject
+        | C::TargetLocalesNotSubset
+        | C::TargetLocaleDirectionMissing
+        | C::NegotiationAliasDestinationNotRequested
+        | C::MessageFallbackSourceNotRequested
+        | C::CoverageRuleDuplicate
+        | C::CoverageRuleConflict
+        | C::GroupMemberUnknown
+        | C::GroupMemberDuplicate
+        | C::TargetUnassigned
+        | C::TargetAssignedToMultipleGroups
+        | C::HydrationCapabilityIncompatible => &[],
+        C::InputNotJsonCompatible
+        | C::SpecificationNotAdmitted
+        | C::LocaleSpecificationNotAdmitted
+        | C::NegotiationSpecificationNotAdmitted
+        | C::MessageFallbackSpecificationNotAdmitted
+        | C::CoverageSpecificationNotAdmitted
+        | C::IntentSurfaceClassVocabularyNotAdmitted
+        | C::TargetDefaultLocaleNotSupported
+        | C::NegotiationAliasDuplicate
+        | C::MessageFallbackSequenceInvalid
+        | C::CoverageRuleInvalid
+        | C::ArtifactReferenceNotAdmitted
+        | C::ArtifactCollectionNotAdmitted
+        | C::HydrationRelationInvalid
+        | C::HydrationLocalePolicyIncompatible
+        | C::ResourcePolicyNotAdmitted => &[M::Reason],
+        C::RequiredFieldMissing | C::FieldTypeInvalid | C::FieldValueInvalid | C::UnknownField => {
+            &[M::Field]
+        }
+        C::SpecificationInputIncomplete => &[M::Reason, M::Slot],
+        C::DeliverySpecificationNotAdmitted => &[M::Reason, M::Component],
+        C::ResourcePolicyCapabilityIncompatible => {
+            &[M::ResourceGroup, M::Bound, M::Required, M::Available]
+        }
+        C::BootstrapLimitExceeded => &[M::Bound, M::Limit, M::Actual, M::ActualRelation],
+        C::ResourceLimitExceeded => &[
+            M::Subject,
+            M::ResourceGroup,
+            M::Bound,
+            M::Limit,
+            M::Actual,
+            M::ActualRelation,
+        ],
+        C::ReportingLimitExceeded => &[M::Reason, M::Bound],
+    }
+}
+
 /// Helpers for the tests that compare the resolver with the registry.
 #[cfg(test)]
 pub(crate) mod testing {
@@ -1516,11 +1836,21 @@ pub(crate) mod testing {
 
     use crate::resolver::evaluation::Code;
 
-    use super::{check_ids, finding_codes, CheckRegistry};
+    use super::{check_ids, finding_codes, CheckRegistry, Derivation, DetailsMember};
 
     /// The Finding codes `check` of `kind` may report.
     pub(crate) fn possible_codes(kind: SubjectKind, check: Check) -> &'static [Code] {
         finding_codes(kind)[rank(kind, check)]
+    }
+
+    /// What the payloads of `check` of `kind` derive from.
+    pub(crate) const fn derivation(kind: SubjectKind, check: Check) -> Derivation {
+        super::derivation(kind, check)
+    }
+
+    /// The members of `code`'s details.
+    pub(crate) const fn details_members(code: Code) -> &'static [DetailsMember] {
+        super::details_members(code)
     }
 
     /// The place of `check` among the checks of `kind`.
@@ -1572,7 +1902,6 @@ mod tests {
     use super::*;
     use crate::construction::admission::{ConstructionAdmission, DRAFT_7};
     use crate::construction::validator::schema::Schema;
-    use crate::resolver::evaluation::Check;
 
     fn registry() -> CheckRegistry {
         CheckRegistry::revision_zero()
@@ -1809,7 +2138,14 @@ mod tests {
                     "shared-finding",
                     "shared-evaluation-status"
                 ],
-                "ownedDependencies": []
+                "ownedDependencies": [],
+                "findingPayloadStrategy": {
+                    "derivation": "exact",
+                    "details": [{
+                        "code": "project-profile-hydration-relation-invalid",
+                        "members": ["reason"]
+                    }]
+                }
             })
         );
         // An unscoped row has no parent member at all.
@@ -2247,6 +2583,330 @@ mod tests {
                 assert_eq!(kinds.contains(&kind), reports, "{} {kind:?}", row.check_id);
             }
         }
+    }
+
+    #[test]
+    fn a_rows_payload_strategy_names_each_code_it_may_report_with_its_details() {
+        for row in registry().rows {
+            let strategy = &row.finding_payload_strategy;
+            let codes: Vec<Code> = strategy
+                .details
+                .iter()
+                .map(|details| details.code)
+                .collect();
+            assert_eq!(codes, row.possible_finding_codes, "{}", row.check_id);
+            for details in &strategy.details {
+                assert_eq!(
+                    details.members,
+                    details_members(details.code),
+                    "{}",
+                    row.check_id
+                );
+            }
+        }
+    }
+
+    /// Each code's details carry the members 015's code tables give it, in
+    /// the vocabulary's order (D15:2225, 2276).
+    #[test]
+    fn each_codes_details_are_the_members_015_gives_it() {
+        use Code as C;
+        use DetailsMember as M;
+        // The codes whose rows in 015's tables name stable reasons.
+        let reasoned = [
+            C::InputNotJsonCompatible,
+            C::SpecificationInputIncomplete,
+            C::SpecificationNotAdmitted,
+            C::LocaleSpecificationNotAdmitted,
+            C::NegotiationSpecificationNotAdmitted,
+            C::MessageFallbackSpecificationNotAdmitted,
+            C::CoverageSpecificationNotAdmitted,
+            C::DeliverySpecificationNotAdmitted,
+            C::IntentSurfaceClassVocabularyNotAdmitted,
+            C::TargetDefaultLocaleNotSupported,
+            C::NegotiationAliasDuplicate,
+            C::MessageFallbackSequenceInvalid,
+            C::CoverageRuleInvalid,
+            C::ArtifactReferenceNotAdmitted,
+            C::ArtifactCollectionNotAdmitted,
+            C::HydrationRelationInvalid,
+            C::HydrationLocalePolicyIncompatible,
+            C::ResourcePolicyNotAdmitted,
+            C::ReportingLimitExceeded,
+        ];
+        for code in Code::ALL {
+            let members = details_members(code);
+            assert_eq!(
+                members.contains(&M::Reason),
+                reasoned.contains(&code),
+                "{}",
+                code.as_str()
+            );
+            assert!(
+                members.windows(2).all(|pair| pair[0] < pair[1]),
+                "{}",
+                code.as_str()
+            );
+        }
+        for (code, members) in [
+            (C::RequiredFieldMissing, &[M::Field][..]),
+            (C::UnknownField, &[M::Field]),
+            (C::SpecificationInputIncomplete, &[M::Reason, M::Slot]),
+            (
+                C::DeliverySpecificationNotAdmitted,
+                &[M::Reason, M::Component],
+            ),
+            (
+                C::ResourcePolicyCapabilityIncompatible,
+                &[M::ResourceGroup, M::Bound, M::Required, M::Available],
+            ),
+            (
+                C::BootstrapLimitExceeded,
+                &[M::Bound, M::Limit, M::Actual, M::ActualRelation],
+            ),
+            (
+                C::ResourceLimitExceeded,
+                &[
+                    M::Subject,
+                    M::ResourceGroup,
+                    M::Bound,
+                    M::Limit,
+                    M::Actual,
+                    M::ActualRelation,
+                ],
+            ),
+            (C::ReportingLimitExceeded, &[M::Reason, M::Bound]),
+            (C::LocaleNonCanonical, &[]),
+            (C::LocaleDataNotAdmitted, &[]),
+        ] {
+            assert_eq!(details_members(code), members, "{}", code.as_str());
+        }
+        // Only the field, slot, component, and bound codes name more than
+        // their reason.
+        let more: BTreeSet<&str> = Code::ALL
+            .into_iter()
+            .filter(|&code| {
+                details_members(code)
+                    .iter()
+                    .any(|&member| member != M::Reason)
+            })
+            .map(Code::as_str)
+            .collect();
+        assert_eq!(more.len(), 10);
+    }
+
+    #[test]
+    fn details_members_read_and_write_as_015_spells_them() {
+        use DetailsMember as M;
+        assert_eq!(
+            serde_json::to_value([
+                M::Reason,
+                M::Field,
+                M::Component,
+                M::Slot,
+                M::Subject,
+                M::ResourceGroup,
+                M::Bound,
+                M::Limit,
+                M::Actual,
+                M::Required,
+                M::Available,
+                M::ActualRelation,
+            ])
+            .unwrap(),
+            json!([
+                "reason",
+                "field",
+                "component",
+                "slot",
+                "subject",
+                "resourceGroup",
+                "bound",
+                "limit",
+                "actual",
+                "required",
+                "available",
+                "actualRelation"
+            ])
+        );
+        assert_eq!(
+            serde_json::to_value([Derivation::KeyOnly, Derivation::Exact]).unwrap(),
+            json!(["key-only", "exact"])
+        );
+    }
+
+    /// What `check` of `kind`'s payloads derive from.
+    fn derived(kind: SubjectKind, check: Check) -> Derivation {
+        row(kind, check).finding_payload_strategy.derivation
+    }
+
+    /// A row derives its payloads from its key alone where the key can stand
+    /// for distinct raw values (Decision 015-157), and otherwise from the one
+    /// value its key names (D15:2000).
+    #[test]
+    fn a_row_derives_its_payloads_from_its_key_alone_where_it_can_stand_for_several_values() {
+        use Derivation::{Exact, KeyOnly};
+        use SubjectKind as K;
+        let rows = registry().rows;
+        let derivation_of = |kind: SubjectKind| {
+            rows.iter()
+                .find(|row| row.subject_kind == kind)
+                .map(|row| row.finding_payload_strategy.derivation)
+                .unwrap()
+        };
+        // A key under a parent whose key stands for distinct raw parents does
+        // too.
+        for kind in SubjectKind::ALL {
+            if let Some(parent) = shape(kind).parent {
+                if derivation_of(parent) == KeyOnly {
+                    assert_eq!(derivation_of(kind), KeyOnly, "{kind:?}");
+                }
+            }
+        }
+        // Structural admission's fields and identity map keys, whose paths
+        // hold `*` and whose failed keys are keyed by their content.
+        for kind in [K::RootField, K::ProfileKey, K::TargetField, K::GroupField] {
+            assert_eq!(derivation_of(kind), KeyOnly, "{kind:?}");
+        }
+        // A locale's own key, which spellings share; an artifact's tuple,
+        // which bodies share; and a coverage rule's content.
+        for kind in [
+            K::RequestedLocale,
+            K::TargetRequestedLocale,
+            K::NegotiationAliasValue,
+            K::FallbackSequence,
+            K::FallbackCandidate,
+            K::CoverageLocale,
+            K::CapabilityArtifact,
+            K::Artifact,
+            K::CollectionMember,
+            K::CoverageCell,
+        ] {
+            assert_eq!(derivation_of(kind), KeyOnly, "{kind:?}");
+        }
+        // A singleton is one value, except where its check sees each
+        // occurrence on its own (D15:1878, 1889).
+        let independent = [
+            (K::CompleteInput, Check::UniqueMembers),
+            (K::CompleteInput, Check::JsonCompatible),
+            (K::CompleteInput, Check::WithinSingleStringBytes),
+            (K::RootLongestString, Check::WithinBound),
+        ];
+        for row in &rows {
+            if row.subject_key_strategy == KeyStrategy::Singleton {
+                let check = row
+                    .subject_kind
+                    .checks()
+                    .iter()
+                    .copied()
+                    .find(|&check| testing::check_id(row.subject_kind, check) == row.check_id)
+                    .unwrap();
+                let one = !independent.contains(&(row.subject_kind, check));
+                assert_eq!(
+                    row.finding_payload_strategy.derivation == Exact,
+                    one,
+                    "{}",
+                    row.check_id
+                );
+            }
+        }
+        // The identity-keyed kinds whose key is a raw ID, which names one
+        // value (D15:1880, 1925, 1927); every other identity-keyed kind's key
+        // can stand for several values.
+        let exact_identities: Vec<SubjectKind> = SubjectKind::ALL
+            .into_iter()
+            .filter(|&kind| {
+                shape(kind).strategy == KeyStrategy::CanonicalIdentityOrContent
+                    && derivation_of(kind) == Exact
+            })
+            .collect();
+        assert_eq!(
+            exact_identities,
+            [
+                K::CapabilityProfileId,
+                K::CapabilityTargetProfileReference,
+                K::ProfileId,
+                K::TargetProfileReference,
+                K::TargetId,
+                K::ResolvedTargetProfileReference,
+                K::Target,
+                K::Group,
+                K::GroupMember,
+                K::Assignment,
+                K::Relation,
+                K::Roles,
+            ]
+        );
+        // A single-valued field's path names its one value.
+        for kind in [
+            K::DefaultSourceLocale,
+            K::DefaultRequestedLocale,
+            K::TargetDefaultRequestedLocale,
+            K::GroupMembers,
+            K::RelationEndpoint,
+        ] {
+            assert_eq!(derivation_of(kind), Exact, "{kind:?}");
+        }
+        assert_eq!(derived(K::RootLongestString, Check::WithinBound), KeyOnly);
+        assert_eq!(derived(K::RootStringBytes, Check::WithinBound), Exact);
+    }
+
+    #[test]
+    fn construction_refuses_a_payload_strategy_that_does_not_cover_its_rows_codes() {
+        let spelling = of_check("locale.requested.canonical");
+        let details = |code: &str| json!({ "code": code, "members": [] });
+        for (case, value) in [
+            (
+                "a code left out",
+                changed(&spelling, |row| {
+                    row["findingPayloadStrategy"]["details"]
+                        .as_array_mut()
+                        .unwrap()
+                        .pop();
+                }),
+            ),
+            (
+                "a code the row does not report",
+                changed(&spelling, |row| {
+                    row["findingPayloadStrategy"]["details"]
+                        .as_array_mut()
+                        .unwrap()
+                        .push(details("project-profile-locale-duplicate"));
+                }),
+            ),
+            (
+                "a code twice",
+                changed(&spelling, |row| {
+                    row["findingPayloadStrategy"]["details"]
+                        .as_array_mut()
+                        .unwrap()
+                        .insert(0, details("project-profile-locale-invalid"));
+                }),
+            ),
+            (
+                "the codes out of order",
+                changed(&spelling, |row| {
+                    row["findingPayloadStrategy"]["details"]
+                        .as_array_mut()
+                        .unwrap()
+                        .reverse();
+                }),
+            ),
+            (
+                "details for a row that reports nothing",
+                changed(of_check("coverage.table.complete"), |row| {
+                    row["findingPayloadStrategy"]["details"] =
+                        json!([details("project-profile-coverage-rule-conflict")]);
+                }),
+            ),
+        ] {
+            assert_eq!(CheckRegistry::read(&value), None, "{case}");
+        }
+        // Which members a code's details carry is the registry's to say.
+        let fewer = changed(&spelling, |row| {
+            row["findingPayloadStrategy"]["details"][2]["members"] = json!(["bound"]);
+        });
+        assert!(CheckRegistry::read(&fewer).is_some());
     }
 
     #[test]
@@ -2769,14 +3429,72 @@ mod tests {
                     }]);
                 }),
             ),
+            (
+                "a row without its payload strategy",
+                changed(&|value| {
+                    value["rows"][0]
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("findingPayloadStrategy");
+                }),
+            ),
+            (
+                "an unknown derivation",
+                changed(&|value| {
+                    value["rows"][0]["findingPayloadStrategy"]["derivation"] = json!("first-over");
+                }),
+            ),
+            (
+                "a payload strategy's other member",
+                changed(&|value| {
+                    value["rows"][0]["findingPayloadStrategy"]["note"] = json!("note");
+                }),
+            ),
+            (
+                "details without their code",
+                changed(&|value| {
+                    value["rows"][0]["findingPayloadStrategy"]["details"] =
+                        json!([{ "members": [] }]);
+                }),
+            ),
+            (
+                "details of a code 015 does not register",
+                changed(&|value| {
+                    value["rows"][0]["findingPayloadStrategy"]["details"] =
+                        json!([{ "code": "project-profile-unknown", "members": [] }]);
+                }),
+            ),
+            (
+                "a member outside 015's vocabulary",
+                changed(&|value| {
+                    value["rows"][0]["findingPayloadStrategy"]["details"][0]["members"] =
+                        json!(["value"]);
+                }),
+            ),
+            (
+                "a member twice",
+                changed(&|value| {
+                    value["rows"][0]["findingPayloadStrategy"]["details"][0]["members"] =
+                        json!(["reason", "reason"]);
+                }),
+            ),
+            (
+                "details' other member",
+                changed(&|value| {
+                    value["rows"][0]["findingPayloadStrategy"]["details"][0]["note"] =
+                        json!("note");
+                }),
+            ),
         ] {
             assert!(!read.validate(&value).valid, "{case}");
             assert!(!oracle.is_valid(&value), "{case}");
         }
-        // Whether the rows agree with each other is not the schema's to say.
+        // Whether the rows agree with each other, or a strategy with its
+        // row's codes, is not the schema's to say.
         for value in [
             changed(&|value| value["rows"][0]["checkRank"] = json!("7")),
             changed(&|value| value["rows"][0]["prerequisiteCheckIds"] = json!(["no.such.check"])),
+            changed(&|value| value["rows"][0]["findingPayloadStrategy"]["details"] = json!([])),
         ] {
             assert!(read.validate(&value).valid);
             assert!(oracle.is_valid(&value));

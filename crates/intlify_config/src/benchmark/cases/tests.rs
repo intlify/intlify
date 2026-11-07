@@ -259,17 +259,18 @@ fn every_finite_case_prepares_its_exact_result_and_work_including_all_limit_edge
                         ..
                     })) => assert_eq!(*actual, limit.get() + 1),
                     Output::LocalePolicyResolution(resolved) => {
-                        // Only the bound itself, one past its value.
+                        // Only the bound itself, one past its value: the
+                        // total, or the first-over witness of a key that can
+                        // stand for several values, which each unit's Check
+                        // Registry row tells apart.
                         let evaluation = &resolved.evaluation;
                         assert!(evaluation.issues().next().is_some());
                         for issue in evaluation.issues() {
                             let exceeded = evaluation.limit(issue).unwrap();
-                            assert_eq!(
-                                exceeded.actual,
-                                crate::resolver::evaluation::Actual::Exact(
-                                    exceeded.limit.get() + 1
-                                )
-                            );
+                            let (crate::resolver::evaluation::Actual::Exact(actual)
+                            | crate::resolver::evaluation::Actual::AtLeast(actual)) =
+                                exceeded.actual;
+                            assert_eq!(actual, exceeded.limit.get() + 1);
                         }
                     }
                     // The target map's bound is Phase 7's, which runs before
