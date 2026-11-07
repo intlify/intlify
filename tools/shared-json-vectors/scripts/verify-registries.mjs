@@ -184,6 +184,96 @@ const DETAILS_MEMBERS = [
   'actualRelation'
 ]
 
+/**
+ * The stable reasons design 015's code tables give each code that has any, in
+ * the order the tables list them.
+ *
+ * @type {Record<string, string[]>}
+ */
+const CODE_REASONS = {
+  'project-profile-input-not-json-compatible': [
+    'unsupported-type',
+    'non-finite-number',
+    'non-portable-number',
+    'invalid-unicode',
+    'non-string-key',
+    'dynamic-container',
+    'dynamic-property',
+    'sparse-array',
+    'cycle'
+  ],
+  'project-profile-specification-input-incomplete': ['missing-required-slot'],
+  'project-profile-specification-not-admitted': ['unsupported', 'incompatible'],
+  'project-profile-locale-specification-not-admitted': ['unsupported', 'incompatible'],
+  'project-profile-negotiation-specification-not-admitted': ['unsupported', 'incompatible'],
+  'project-profile-message-fallback-specification-not-admitted': ['unsupported', 'incompatible'],
+  'project-profile-coverage-specification-not-admitted': ['unsupported', 'incompatible'],
+  'project-profile-delivery-specification-not-admitted': ['unsupported', 'incompatible'],
+  'project-profile-intent-surface-class-vocabulary-not-admitted': [
+    'body-integrity-invalid',
+    'member-invalid',
+    'member-duplicate',
+    'non-canonical-order',
+    'identity-mismatch',
+    'revision-mismatch',
+    'digest-mismatch'
+  ],
+  'project-profile-target-default-locale-not-supported': [
+    'explicit-override',
+    'inherited-project-default'
+  ],
+  'project-profile-negotiation-alias-duplicate': ['same-destination', 'conflicting-destination'],
+  'project-profile-message-fallback-sequence-invalid': [
+    'literal-self-reference',
+    'literal-duplicate',
+    'intent-source-duplicate'
+  ],
+  'project-profile-coverage-rule-invalid': [
+    'locale-not-requested',
+    'surface-class-unknown',
+    'surface-class-duplicate'
+  ],
+  'project-profile-artifact-reference-not-admitted': [
+    'not-found',
+    'kind-mismatch',
+    'identity-mismatch',
+    'revision-mismatch',
+    'specification-revision-mismatch',
+    'specification-revision-unsupported',
+    'role-kind-mismatch',
+    'digest-mismatch'
+  ],
+  'project-profile-artifact-collection-not-admitted': [
+    'envelope-invalid',
+    'kind-unsupported',
+    'duplicate-envelope',
+    'conflicting-content'
+  ],
+  'project-profile-hydration-relation-invalid': [
+    'equal-endpoint',
+    'unknown-endpoint',
+    'cross-group',
+    'duplicate-relation',
+    'server-capability-missing',
+    'client-capability-missing',
+    'dual-role'
+  ],
+  'project-profile-hydration-locale-policy-incompatible': [
+    'requested-locales',
+    'effective-default'
+  ],
+  'project-profile-resource-policy-not-admitted': [
+    'body-integrity-invalid',
+    'body-schema-invalid',
+    'project-profile-resolution-missing',
+    'project-profile-resolution-invalid'
+  ],
+  'project-profile-reporting-limit-exceeded': ['entry', 'shared']
+}
+
+/** Design 015's stable reasons, in the order of its tables, each where it first appears. */
+const REASONS = [...new Set(CODES.flatMap(code => CODE_REASONS[code] ?? []))]
+
 /** What a row's Finding payloads may derive from: its key alone, or the one value it names. */
 const DERIVATIONS = ['key-only', 'exact']
 
@@ -750,6 +840,7 @@ for (const [recordKind, ids] of Object.entries(DEPENDENCY_IDS)) {
 // keyed by their content, always do; and so does a key under a parent whose
 // key does.
 const keyOnlyKinds = new Set()
+const reachedReasons = new Map()
 let keyOnlyRows = 0
 for (const row of checkRows) {
   const where = `check registry: ${row.checkId}`
@@ -766,6 +857,19 @@ for (const row of checkRows) {
     if (!isDeepStrictEqual(details.members, CODE_DETAILS[details.code] ?? [])) {
       fail(`${where}: ${details.code} does not carry the details 015 gives it`)
     }
+    const allowed = CODE_REASONS[details.code] ?? []
+    const places = (details.reasons ?? []).map(reason => allowed.indexOf(reason))
+    if (
+      places.some((place, at) => place < 0 || (at > 0 && place <= places[at - 1])) ||
+      (places.length === 0) !== !(details.members ?? []).includes('reason')
+    ) {
+      fail(`${where}: ${details.code} is not reported with 015's reasons for it, in their order`)
+    }
+    const reached = reachedReasons.get(details.code) ?? new Set()
+    for (const reason of details.reasons ?? []) {
+      reached.add(reason)
+    }
+    reachedReasons.set(details.code, reached)
   }
   const keyOnly = strategy.derivation === 'key-only'
   if (keyOnly) {
@@ -780,6 +884,14 @@ for (const row of checkRows) {
   }
   if (row.phaseId === 'structural-admission' && !singleton && !keyOnly) {
     fail(`${where}: a structural admission key can stand for several values`)
+  }
+}
+// Every reason 015 gives a code is one some row reports the code with.
+for (const code of CODES) {
+  const reached = reachedReasons.get(code) ?? new Set()
+  const allowed = CODE_REASONS[code] ?? []
+  if (reached.size !== allowed.length || allowed.some(reason => !reached.has(reason))) {
+    fail(`check registry: ${code} is not reported with every reason 015 gives it`)
   }
 }
 for (const row of checkRows) {
@@ -922,18 +1034,22 @@ const strategySchema = follow(checkSchema, property('findingPayloadStrategy')?.a
 const detailsSchema = strategySchema?.properties?.details
 const codeDetails = follow(checkSchema, detailsSchema?.items)
 const membersSchema = codeDetails?.properties?.members
+const reasonsSchema = codeDetails?.properties?.reasons
 if (
   !closes(strategySchema, ['derivation', 'details']) ||
   !isDeepStrictEqual(vocabulary(strategySchema?.properties?.derivation), DERIVATIONS) ||
   detailsSchema?.type !== 'array' ||
-  !closes(codeDetails, ['code', 'members']) ||
+  !closes(codeDetails, ['code', 'members', 'reasons']) ||
   !isDeepStrictEqual(vocabulary(codeDetails?.properties?.code), CODES) ||
   membersSchema?.type !== 'array' ||
   membersSchema.uniqueItems !== true ||
-  !isDeepStrictEqual(vocabulary(membersSchema.items), DETAILS_MEMBERS)
+  !isDeepStrictEqual(vocabulary(membersSchema.items), DETAILS_MEMBERS) ||
+  reasonsSchema?.type !== 'array' ||
+  reasonsSchema.uniqueItems !== true ||
+  !isDeepStrictEqual(vocabulary(reasonsSchema.items), REASONS)
 ) {
   fail(
-    "check registry schema: a payload strategy is not closed over 015's codes and details members"
+    "check registry schema: a payload strategy is not closed over 015's codes, details members, and reasons"
   )
 }
 const parentSchema = follow(checkSchema, property('parentSubject')?.allOf?.[0])
@@ -954,5 +1070,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `registries agree: ${expected.rows.length} safe origin kinds, ${EVIDENCE_KINDS.length} evidence kinds, ${checkRows.length} checks of ${kinds.size} subject kinds with ${prerequisiteCount} prerequisites, reporting ${reportedCodes.size} codes, owning ${owners.size} dependency records, and deriving ${keyOnlyRows} rows' payloads from their keys alone`
+  `registries agree: ${expected.rows.length} safe origin kinds, ${EVIDENCE_KINDS.length} evidence kinds, ${checkRows.length} checks of ${kinds.size} subject kinds with ${prerequisiteCount} prerequisites, reporting ${reportedCodes.size} codes with ${new Set([...reachedReasons.values()].flatMap(reached => [...reached])).size} reasons, owning ${owners.size} dependency records, and deriving ${keyOnlyRows} rows' payloads from their keys alone`
 )

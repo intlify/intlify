@@ -498,7 +498,7 @@
       ]
     },
     "CodeDetails": {
-      "description": "The `details` members of one code a row may report.",
+      "description": "The `details` members of one code a row may report, and the stable\nreasons the row may report it with.",
       "type": "object",
       "properties": {
         "code": {
@@ -511,12 +511,21 @@
             "$ref": "#/definitions/DetailsMember"
           },
           "uniqueItems": true
+        },
+        "reasons": {
+          "description": "In the order 015 lists the code's reasons, each once; none for a code\nwithout stable reasons.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FindingReason"
+          },
+          "uniqueItems": true
         }
       },
       "additionalProperties": false,
       "required": [
         "code",
-        "members"
+        "members",
+        "reasons"
       ]
     },
     "DetailsMember": {
@@ -535,6 +544,63 @@
         "required",
         "available",
         "actualRelation"
+      ]
+    },
+    "FindingReason": {
+      "type": "string",
+      "enum": [
+        "unsupported-type",
+        "non-finite-number",
+        "non-portable-number",
+        "invalid-unicode",
+        "non-string-key",
+        "dynamic-container",
+        "dynamic-property",
+        "sparse-array",
+        "cycle",
+        "missing-required-slot",
+        "unsupported",
+        "incompatible",
+        "body-integrity-invalid",
+        "member-invalid",
+        "member-duplicate",
+        "non-canonical-order",
+        "identity-mismatch",
+        "revision-mismatch",
+        "digest-mismatch",
+        "explicit-override",
+        "inherited-project-default",
+        "same-destination",
+        "conflicting-destination",
+        "literal-self-reference",
+        "literal-duplicate",
+        "intent-source-duplicate",
+        "locale-not-requested",
+        "surface-class-unknown",
+        "surface-class-duplicate",
+        "not-found",
+        "kind-mismatch",
+        "specification-revision-mismatch",
+        "specification-revision-unsupported",
+        "role-kind-mismatch",
+        "envelope-invalid",
+        "kind-unsupported",
+        "duplicate-envelope",
+        "conflicting-content",
+        "equal-endpoint",
+        "unknown-endpoint",
+        "cross-group",
+        "duplicate-relation",
+        "server-capability-missing",
+        "client-capability-missing",
+        "dual-role",
+        "requested-locales",
+        "effective-default",
+        "body-schema-invalid",
+        "project-profile-resolution-missing",
+        "project-profile-resolution-invalid",
+        "entry",
+        "shared"
       ]
     }
   }
