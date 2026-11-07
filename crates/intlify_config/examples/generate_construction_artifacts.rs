@@ -15,7 +15,8 @@
 //! `src/construction/capability.rs`, and the registries' in
 //! `src/construction/registry/safe_origin.rs`,
 //! `src/construction/registry/check.rs`, and
-//! `src/construction/registry/finding.rs`.
+//! `src/construction/registry/finding.rs`, and the container's in
+//! `src/construction/registry.rs`.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -119,6 +120,10 @@ fn main() -> ExitCode {
         println!(
             "pinned Finding Registry digest: {}",
             registry_pins.finding_registry
+        );
+        println!(
+            "pinned Registry Package digest: {}",
+            registry_pins.registry_package
         );
     }
     if stale {

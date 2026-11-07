@@ -1,0 +1,34 @@
+{
+  "members": {
+    "safe-origin-kind-registry-schema": {
+      "identity": "intlify-project-profile-safe-origin-kind-registry-schema",
+      "revision": "0",
+      "digest": "sha256:3fec118838b775196e7c08834fab1779ef6cc596f17f6ab210d7605f1cceec89"
+    },
+    "check-registry-schema": {
+      "identity": "intlify-project-profile-check-registry-schema",
+      "revision": "0",
+      "digest": "sha256:5f6261c1b6b7db6da5c7040c45b971c6ae38f4a2ede3906f6d8c1644d3cc0b90"
+    },
+    "finding-registry-schema": {
+      "identity": "intlify-project-profile-finding-registry-schema",
+      "revision": "0",
+      "digest": "sha256:7a54e536bf4938d207afbf96bad7669f25622ab59b4873829709bfe36e8f6e5e"
+    },
+    "safe-origin-kind-registry": {
+      "identity": "intlify-project-profile-safe-origin-kind-registry",
+      "revision": "0",
+      "digest": "sha256:5e38b2ad8d2bb7eeeb2e17e885817486d8e14aaaef5e7d6c4b262b185c10fba7"
+    },
+    "check-registry": {
+      "identity": "intlify-project-profile-check-registry",
+      "revision": "0",
+      "digest": "sha256:e21bc6383192951745c88f936c5cf7a709c626dc227c217578c76d44965de51d"
+    },
+    "finding-registry": {
+      "identity": "intlify-project-profile-finding-registry",
+      "revision": "0",
+      "digest": "sha256:56a77fe79d9ded10b0466c134466b0b24384bae99b51f24c70b365400dd7dd43"
+    }
+  }
+}

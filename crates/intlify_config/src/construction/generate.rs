@@ -26,6 +26,7 @@ use super::authority_set::{self, ConfigurationSchemaAuthoritySet};
 use super::capability::{self, CapabilitySpecification};
 use super::component::file_digest;
 use super::profile::{self, ProjectProfileSpecification};
+use super::registry as package;
 use super::registry::check::{self, CheckRegistry};
 use super::registry::finding::{self, FindingRegistry};
 use super::registry::safe_origin::{self, SafeOriginKindRegistry};
@@ -49,6 +50,7 @@ pub struct RegistryPins {
     pub check_registry: String,
     pub finding_registry_schema: String,
     pub finding_registry: String,
+    pub registry_package: String,
 }
 
 /// The two digests the implementation compiles in.
@@ -165,15 +167,15 @@ pub fn authorities() -> Result<Vec<Artifact>, serde_json::Error> {
     ])
 }
 
-/// Write the Registry Package's members: the Safe Origin Kind Registry's
+/// Write the Registry Package's members, the Safe Origin Kind Registry's
 /// schema and the registry, then the Check Registry's, then the Finding
-/// Registry's.
+/// Registry's, and then the container that lists them.
 ///
 /// # Errors
 ///
 /// Returns the serialization failure of a member, which the values rule out.
 pub fn registries() -> Result<Vec<Artifact>, serde_json::Error> {
-    Ok(vec![
+    let mut artifacts = vec![
         Artifact {
             path: safe_origin::SCHEMA_PATH,
             bytes: write(&safe_origin::schema()?)?,
@@ -200,7 +202,16 @@ pub fn registries() -> Result<Vec<Artifact>, serde_json::Error> {
             path: finding::PATH,
             bytes: write(&serde_json::to_value(FindingRegistry::revision_zero())?)?,
         },
-    ])
+    ];
+    // The members in role order: the three schemas, then the registries.
+    let bytes = |index: usize| artifacts[index].bytes.as_slice();
+    let container =
+        package::container([bytes(0), bytes(2), bytes(4), bytes(1), bytes(3), bytes(5)]);
+    artifacts.push(Artifact {
+        path: package::PATH,
+        bytes: write(&container)?,
+    });
+    Ok(artifacts)
 }
 
 /// The Registry Package members' digests the implementation compiles in.
@@ -209,9 +220,9 @@ pub fn registries() -> Result<Vec<Artifact>, serde_json::Error> {
 ///
 /// Returns the serialization failure of a member, which the values rule out.
 pub fn registry_pins() -> Result<RegistryPins, serde_json::Error> {
-    let [schema, registry, check_schema, check_registry, finding_schema, finding_registry] =
-        <[Artifact; 6]>::try_from(registries()?)
-            .unwrap_or_else(|_| unreachable!("six members are written"));
+    let [schema, registry, check_schema, check_registry, finding_schema, finding_registry, container] =
+        <[Artifact; 7]>::try_from(registries()?)
+            .unwrap_or_else(|_| unreachable!("six members and the container are written"));
     Ok(RegistryPins {
         safe_origin_kind_registry_schema: file_digest(&schema.bytes).as_str().to_owned(),
         safe_origin_kind_registry: file_digest(&registry.bytes).as_str().to_owned(),
@@ -219,6 +230,7 @@ pub fn registry_pins() -> Result<RegistryPins, serde_json::Error> {
         check_registry: file_digest(&check_registry.bytes).as_str().to_owned(),
         finding_registry_schema: file_digest(&finding_schema.bytes).as_str().to_owned(),
         finding_registry: file_digest(&finding_registry.bytes).as_str().to_owned(),
+        registry_package: file_digest(&container.bytes).as_str().to_owned(),
     })
 }
 
@@ -307,8 +319,8 @@ mod tests {
         ),
     ];
 
-    /// The committed Registry Package members, at their paths.
-    const COMMITTED_REGISTRIES: [(&str, &[u8]); 6] = [
+    /// The committed Registry Package members and container, at their paths.
+    const COMMITTED_REGISTRIES: [(&str, &[u8]); 7] = [
         (
             safe_origin::SCHEMA_PATH,
             include_bytes!("../../conformance/registries/safe-origin-kind-v0.schema.json"),
@@ -333,12 +345,16 @@ mod tests {
             finding::PATH,
             include_bytes!("../../conformance/registries/finding-v0.json"),
         ),
+        (
+            package::PATH,
+            include_bytes!("../../conformance/registries/package-v0.json"),
+        ),
     ];
 
     #[test]
     fn the_committed_registries_are_the_ones_this_crate_writes() {
         let registries = registries().unwrap();
-        assert_eq!(registries.len(), 6);
+        assert_eq!(registries.len(), 7);
         for (artifact, (path, bytes)) in registries.iter().zip(COMMITTED_REGISTRIES) {
             assert_eq!(artifact.path, path);
             assert_eq!(
@@ -359,8 +375,9 @@ mod tests {
                 check_registry: check::DIGEST.to_owned(),
                 finding_registry_schema: finding::SCHEMA_DIGEST.to_owned(),
                 finding_registry: finding::DIGEST.to_owned(),
+                registry_package: package::DIGEST.to_owned(),
             },
-            "the pinned digests in construction/registry/safe_origin.rs, check.rs, or finding.rs are stale"
+            "the pinned digests in construction/registry.rs or its safe_origin.rs, check.rs, or finding.rs are stale"
         );
     }
 

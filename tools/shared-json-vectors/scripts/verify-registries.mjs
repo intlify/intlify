@@ -1,17 +1,17 @@
 /**
- * Check the committed Registry Package members against this implementation.
+ * Check the committed Registry Package against this implementation.
  *
- * The Rust crate writes the Safe Origin Kind, Check, and Finding Registries
- * and their schemas, and compiles in their file digests. This script shares no
- * code with it. It builds the Safe Origin Kind Registry from its own copy of
- * design 015's table. It checks that the Check Registry's rows agree with each
- * other the way 015's registry rules require and carry 015's five example
- * check IDs, without rebuilding the rows, and that the Finding Registry's rows
- * agree with them and with its own copy of 015's code tables. It checks that
- * each schema closes
- * its container, every row, and its vocabularies, hashes every artifact, and
- * reads the pinned digests out of the crate's source. It does not read the
- * design document.
+ * The Rust crate writes the Safe Origin Kind, Check, and Finding Registries,
+ * their schemas, and the package's container, and compiles in their file
+ * digests. This script shares no code with it. It builds the Safe Origin Kind
+ * Registry from its own copy of design 015's table. It checks that the Check
+ * Registry's rows agree with each other the way 015's registry rules require
+ * and carry 015's five example check IDs, without rebuilding the rows, and
+ * that the Finding Registry's rows agree with them and with its own copy of
+ * 015's code tables. It checks that each schema closes its container, every
+ * row, and its vocabularies, builds the package's container from the
+ * members' file digests, hashes every artifact, and reads the pinned digests
+ * out of the crate's source. It does not read the design document.
  */
 
 import { createHash } from 'node:crypto'
@@ -387,6 +387,16 @@ const SAFE_ORIGIN_KINDS = [
   ['implementation-capability', ['implementation-capability']]
 ]
 
+/** Design 015's six Registry Package roles, in role order. */
+const ROLES = [
+  'safe-origin-kind-registry-schema',
+  'check-registry-schema',
+  'finding-registry-schema',
+  'safe-origin-kind-registry',
+  'check-registry',
+  'finding-registry'
+]
+
 const failures = []
 const fail = message => failures.push(message)
 
@@ -450,15 +460,20 @@ const checkSchemaBytes = read('check-v0.schema.json')
 const checkRegistryBytes = read('check-v0.json')
 const findingSchemaBytes = read('finding-v0.schema.json')
 const findingRegistryBytes = read('finding-v0.json')
+const packageBytes = read('package-v0.json')
 const source = readFileSync(resolve(crate, 'src/construction/registry/safe_origin.rs'), 'utf8')
 const checkSource = readFileSync(resolve(crate, 'src/construction/registry/check.rs'), 'utf8')
 const findingSource = readFileSync(resolve(crate, 'src/construction/registry/finding.rs'), 'utf8')
+const packageSource = readFileSync(resolve(crate, 'src/construction/registry.rs'), 'utf8')
 
 for (const [name, bytes] of [
   ['safe-origin-kind-v0.schema.json', schemaBytes],
   ['safe-origin-kind-v0.json', registryBytes],
   ['check-v0.schema.json', checkSchemaBytes],
-  ['check-v0.json', checkRegistryBytes]
+  ['check-v0.json', checkRegistryBytes],
+  ['finding-v0.schema.json', findingSchemaBytes],
+  ['finding-v0.json', findingRegistryBytes],
+  ['package-v0.json', packageBytes]
 ]) {
   if (
     bytes.includes(0x0d) ||
@@ -1182,6 +1197,39 @@ if (fileDigest(findingSchemaBytes) !== pinned(findingSource, 'SCHEMA_DIGEST')) {
   )
 }
 
+// The package's container: under each of the six roles, in role order, the
+// identity revision "0" gives the role's member, that revision, and the file
+// digest of the member's committed bytes.
+const memberBytes = [
+  schemaBytes,
+  checkSchemaBytes,
+  findingSchemaBytes,
+  registryBytes,
+  checkRegistryBytes,
+  findingRegistryBytes
+]
+const expectedContainer = {
+  members: Object.fromEntries(
+    ROLES.map((role, index) => [
+      role,
+      {
+        identity: `intlify-project-profile-${role}`,
+        revision: '0',
+        digest: fileDigest(memberBytes[index])
+      }
+    ])
+  )
+}
+const packageContainer = JSON.parse(packageBytes.toString('utf8'))
+if (JSON.stringify(packageContainer) !== JSON.stringify(expectedContainer)) {
+  fail("registry package: the container is not each role's member tuple, in role order")
+}
+if (fileDigest(packageBytes) !== pinned(packageSource, 'DIGEST')) {
+  fail(
+    `registry package: the file digest ${fileDigest(packageBytes)} is not the pinned ${pinned(packageSource, 'DIGEST')}`
+  )
+}
+
 if (failures.length > 0) {
   for (const message of failures) {
     console.error(message)
@@ -1190,5 +1238,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `registries agree: ${expected.rows.length} safe origin kinds, ${EVIDENCE_KINDS.length} evidence kinds, ${checkRows.length} checks of ${kinds.size} subject kinds with ${prerequisiteCount} prerequisites, reporting ${reportedCodes.size} codes with ${new Set([...reachedReasons.values()].flatMap(reached => [...reached])).size} reasons, owning ${owners.size} dependency records, and deriving ${keyOnlyRows} rows' payloads from their keys alone; ${findingRows.length} Finding Registry rows agree with them`
+  `registries agree: ${expected.rows.length} safe origin kinds, ${EVIDENCE_KINDS.length} evidence kinds, ${checkRows.length} checks of ${kinds.size} subject kinds with ${prerequisiteCount} prerequisites, reporting ${reportedCodes.size} codes with ${new Set([...reachedReasons.values()].flatMap(reached => [...reached])).size} reasons, owning ${owners.size} dependency records, and deriving ${keyOnlyRows} rows' payloads from their keys alone; ${findingRows.length} Finding Registry rows agree with them; the package lists its ${ROLES.length} members`
 )
