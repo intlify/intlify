@@ -393,6 +393,37 @@ for (const [name] of kinds) {
     fail(`check registry: ${name}'s parents lead back to ${current}`)
   }
 }
+// A row's prerequisites name earlier rows, so none is a cycle, each once and
+// in row order, and none is one another listed prerequisite already waits on.
+const rowIndex = new Map(checkRows.map((row, index) => [row.checkId, index]))
+const requirements = new Map()
+let prerequisiteCount = 0
+for (const [index, row] of checkRows.entries()) {
+  const where = `check registry: ${row.checkId}`
+  const listed = row.prerequisiteCheckIds ?? []
+  prerequisiteCount += listed.length
+  const places = listed.map(id => rowIndex.get(id))
+  if (places.some(place => place === undefined || place >= index)) {
+    fail(`${where}: a prerequisite is no earlier row`)
+    requirements.set(row.checkId, new Set())
+    continue
+  }
+  if (places.some((place, at) => at > 0 && place <= places[at - 1])) {
+    fail(`${where}: the prerequisites are not in row order, each once`)
+  }
+  const reached = new Set()
+  for (const id of listed) {
+    for (const required of requirements.get(id)) {
+      reached.add(required)
+    }
+  }
+  for (const id of listed) {
+    if (reached.has(id)) {
+      fail(`${where}: lists ${id}, which another prerequisite waits on`)
+    }
+  }
+  requirements.set(row.checkId, new Set([...reached, ...listed]))
+}
 // Every phase but profile projection has rows.
 const expectedPhases = PHASES.filter(phase => phase !== 'profile-projection')
 if (!isDeepStrictEqual([...phasesWithRows], expectedPhases)) {
@@ -436,7 +467,8 @@ const required = [
   'subjectContentProjection',
   'owningScope',
   'subjectKindRank',
-  'checkRank'
+  'checkRank',
+  'prerequisiteCheckIds'
 ]
 const members = [...required.slice(0, 7), 'parentSubject', ...required.slice(7)]
 if (
@@ -458,6 +490,15 @@ for (const [name, pattern] of [
   if (property(name)?.type !== 'string' || property(name)?.pattern !== pattern) {
     fail(`check registry schema: ${name} is not a string of ${pattern}`)
   }
+}
+const prerequisites = property('prerequisiteCheckIds')
+if (
+  prerequisites?.type !== 'array' ||
+  prerequisites.uniqueItems !== true ||
+  prerequisites.items?.type !== 'string' ||
+  prerequisites.items?.pattern !== CHECK_ID_PATTERN
+) {
+  fail('check registry schema: the prerequisites are not check IDs, each once')
 }
 const vocabulary = node => {
   const definition = follow(checkSchema, node)
@@ -494,5 +535,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `registries agree: ${expected.rows.length} safe origin kinds, ${EVIDENCE_KINDS.length} evidence kinds, ${checkRows.length} checks of ${kinds.size} subject kinds`
+  `registries agree: ${expected.rows.length} safe origin kinds, ${EVIDENCE_KINDS.length} evidence kinds, ${checkRows.length} checks of ${kinds.size} subject kinds with ${prerequisiteCount} prerequisites`
 )

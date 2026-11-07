@@ -60,6 +60,15 @@
         "checkRank": {
           "type": "string",
           "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "prerequisiteCheckIds": {
+          "description": "The checks the row waits on, except those another listed check waits on.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*\\.[a-z][a-z0-9]*(-[a-z0-9]+)*\\.[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+          },
+          "uniqueItems": true
         }
       },
       "additionalProperties": false,
@@ -72,7 +81,8 @@
         "subjectContentProjection",
         "owningScope",
         "subjectKindRank",
-        "checkRank"
+        "checkRank",
+        "prerequisiteCheckIds"
       ]
     },
     "Phase": {

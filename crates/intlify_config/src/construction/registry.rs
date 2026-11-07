@@ -584,18 +584,29 @@ mod tests {
     #[test]
     fn the_check_registry_must_form_a_closed_graph() {
         let committed: Value = serde_json::from_slice(CHECKS).unwrap();
-        // A repeated check ID, and a relation that scopes itself.
+        // A repeated check ID, a relation that scopes itself, and a check
+        // that waits on itself.
         let mut repeated = committed.clone();
         repeated["rows"][1]["checkId"] = committed["rows"][0]["checkId"].clone();
         repeated["rows"][1]["ruleId"] = committed["rows"][0]["ruleId"].clone();
-        let mut circular = committed;
+        let mut circular = committed.clone();
+        let mut waiting = committed;
         for row in circular["rows"].as_array_mut().unwrap() {
             if row["subjectKind"] == "relation" {
                 row["parentSubject"] =
                     json!({ "phaseId": "hydration-validation", "subjectKind": "relation" });
             }
         }
-        for (case, registry) in [("repeated", repeated), ("circular", circular)] {
+        for row in waiting["rows"].as_array_mut().unwrap() {
+            if row["checkId"] == "hydration.relation.unique" {
+                row["prerequisiteCheckIds"] = json!(["hydration.relation.unique"]);
+            }
+        }
+        for (case, registry) in [
+            ("repeated", repeated),
+            ("circular", circular),
+            ("waiting on itself", waiting),
+        ] {
             let bytes = serde_json::to_vec_pretty(&registry).unwrap();
             // The schema admits it; the graph does not.
             assert_eq!(

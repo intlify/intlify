@@ -422,6 +422,8 @@ pub(super) mod tests {
     use crate::artifacts::content::sample;
     use crate::artifacts::envelope::{envelope_of, ArtifactKind, ExactTuple, FormalMember};
     use crate::artifacts::vectors::vocabulary::{self as vectors, formal};
+    use crate::construction::registry::check::testing::{check_id, requirements};
+    use crate::construction::registry::check::CheckRegistry;
     use crate::input_limits::{Bound, InputLimits, RawInputLimits};
     use crate::locale::fixtures::{fixture_pins, FixtureProvider};
     use crate::locale::{CanonicalLocale, ProviderFailure, Supported, VersionedIdentity};
@@ -816,8 +818,18 @@ pub(super) mod tests {
             &self,
             inspect: impl FnOnce(Evaluation, Result<SemanticState<'_, Id>, ResolverInvariant>) -> R,
         ) -> R {
+            self.attempt_in(Evaluation::default(), inspect)
+        }
+
+        /// The entry over the prepared inputs, recording into `evaluation`.
+        /// Every unit it leaves not evaluated waits on each of its causes
+        /// through its Check Registry row's prerequisites.
+        fn attempt_in<R>(
+            &self,
+            mut evaluation: Evaluation,
+            inspect: impl FnOnce(Evaluation, Result<SemanticState<'_, Id>, ResolverInvariant>) -> R,
+        ) -> R {
             self.prepared(|configuration, invocation| {
-                let mut evaluation = Evaluation::default();
                 let mut set = None;
                 let state = resolve_profile(
                     &mut evaluation,
@@ -826,6 +838,19 @@ pub(super) mod tests {
                     FixtureProvider::new(),
                     &mut set,
                 );
+                let registry = CheckRegistry::revision_zero();
+                let requirements = requirements(&registry);
+                for (unit, status) in evaluation.statuses() {
+                    if let Status::NotEvaluated(causes) = status {
+                        for cause in causes.keys() {
+                            assert!(
+                                requirements[row_of(unit)].contains(row_of(cause.unit())),
+                                "{unit:?} waits on {:?}",
+                                cause.unit()
+                            );
+                        }
+                    }
+                }
                 inspect(evaluation, state)
             })
         }
@@ -836,6 +861,11 @@ pub(super) mod tests {
         ) -> R {
             self.attempt(|evaluation, state| inspect(evaluation, state.unwrap()))
         }
+    }
+
+    /// The check ID of the Check Registry row a unit belongs to.
+    fn row_of(unit: &Unit) -> &'static str {
+        check_id(unit.subject.kind(), unit.check)
     }
 
     /// Every blocking result, as its unit, code, and reason.
@@ -1098,6 +1128,64 @@ pub(super) mod tests {
                 .collect();
             assert_eq!(ran, listed);
         });
+    }
+
+    /// Every unit's status.
+    fn statuses(evaluation: &Evaluation) -> BTreeMap<Unit, Status> {
+        evaluation
+            .statuses()
+            .map(|(unit, status)| (unit.clone(), status.clone()))
+            .collect()
+    }
+
+    /// Each unit of two complete invocations blocks in turn. A unit then not
+    /// evaluated with the blocked unit's result among its causes, or not
+    /// recorded because only that result names its subject, waits on it: its
+    /// row reaches the blocked unit's row through the Check Registry's
+    /// prerequisites, and each prerequisite a row lists is such a wait.
+    #[test]
+    fn the_check_registry_lists_what_each_check_waits_on() {
+        let mut waits = BTreeSet::new();
+        for inputs in [Inputs::complete(), Inputs::two_groups()] {
+            let complete = inputs.resolve(|evaluation, _| statuses(&evaluation));
+            assert!(complete.values().all(|status| *status == Status::Evaluated));
+            for blocked in complete.keys() {
+                let after = inputs.attempt_in(
+                    Evaluation::blocking(blocked.clone()),
+                    |evaluation, state| {
+                        assert!(state.is_ok(), "{blocked:?}");
+                        statuses(&evaluation)
+                    },
+                );
+                for (unit, status) in &after {
+                    if let Status::NotEvaluated(causes) = status {
+                        if causes.keys().any(|cause| cause.unit() == blocked) {
+                            waits.insert((row_of(unit), row_of(blocked)));
+                        }
+                    }
+                }
+                for unit in complete.keys().filter(|unit| !after.contains_key(unit)) {
+                    waits.insert((row_of(unit), row_of(blocked)));
+                }
+            }
+        }
+        let registry = CheckRegistry::revision_zero();
+        let requirements = requirements(&registry);
+        for &(dependent, prerequisite) in &waits {
+            assert!(
+                requirements[dependent].contains(prerequisite),
+                "{dependent} waits on {prerequisite}"
+            );
+        }
+        for row in &registry.rows {
+            for prerequisite in &row.prerequisite_check_ids {
+                assert!(
+                    waits.contains(&(row.check_id.as_str(), prerequisite.as_str())),
+                    "{} lists {prerequisite}",
+                    row.check_id
+                );
+            }
+        }
     }
 
     #[test]
