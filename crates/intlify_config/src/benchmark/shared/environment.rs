@@ -54,6 +54,12 @@ pub(super) fn project(
     let duration_rule =
         VersionedIdentity::new("intlify-config-duration-only-no-memory-observer", "0")
             .expect("registered rule");
+    // A memory run is handed its observer and reads no clock (#139).
+    let memory = native_context.memory_observer.is_some();
+    let memory_rule = || {
+        VersionedIdentity::new("intlify-config-memory-run-reads-no-clock", "0")
+            .expect("registered rule")
+    };
     macro_rules! unavailable {
         ($field:ident, $cause:ident) => {
             Observation::Unavailable {
@@ -132,24 +138,52 @@ pub(super) fn project(
             )),
             Datum::BuildConfiguration(unavailable!(BuildConfiguration, EffectiveBuildNotAttested)),
             Datum::Instrumentation(RequiredObservation::Observed {
-                value: Instrumentation {
-                    descriptor: VersionedIdentity::new(
-                        "intlify-config-owner-run-instrumentation",
-                        "0",
-                    )?,
-                    timing: Token::literal("compiled-and-enabled-posix-monotonic-invocation"),
-                    allocation: Token::literal("not-installed-by-this-harness"),
-                    trace: Token::literal("not-installed-by-this-harness"),
-                    profiling: Token::literal("not-installed-by-this-harness"),
-                    external: Token::literal("not-attested"),
+                value: if memory {
+                    Instrumentation {
+                        descriptor: VersionedIdentity::new(
+                            "intlify-config-owner-memory-run-instrumentation",
+                            "0",
+                        )?,
+                        timing: Token::literal("not-installed-by-this-harness"),
+                        allocation: Token::literal(
+                            "observer-counting-global-allocator-installed-by-the-binary",
+                        ),
+                        trace: Token::literal("not-installed-by-this-harness"),
+                        profiling: Token::literal("not-installed-by-this-harness"),
+                        external: Token::literal("not-attested"),
+                    }
+                } else {
+                    Instrumentation {
+                        descriptor: VersionedIdentity::new(
+                            "intlify-config-owner-run-instrumentation",
+                            "0",
+                        )?,
+                        timing: Token::literal("compiled-and-enabled-posix-monotonic-invocation"),
+                        allocation: Token::literal("not-installed-by-this-harness"),
+                        trace: Token::literal("not-installed-by-this-harness"),
+                        profiling: Token::literal("not-installed-by-this-harness"),
+                        external: Token::literal("not-attested"),
+                    }
                 },
             }),
+            // The observer counts what is requested through the allocator it
+            // wraps; that allocator itself is not identified.
             Datum::Allocator(conditional_unavailable!(Allocator, NotCollected)),
-            Datum::MemoryObserver(ConditionalObservation::NotApplicable {
-                applicability_rule: duration_rule,
+            Datum::MemoryObserver(match &native_context.memory_observer {
+                Some(observer) => ConditionalObservation::Observed {
+                    value: VersionedIdentity::new(&observer.identity, &observer.revision)?,
+                },
+                None => ConditionalObservation::NotApplicable {
+                    applicability_rule: duration_rule,
+                },
             }),
-            Datum::ClockOrSampler(ConditionalObservation::Observed {
-                value: native_context.clock.clone(),
+            Datum::ClockOrSampler(match &native_context.clock {
+                Some(clock) => ConditionalObservation::Observed {
+                    value: clock.clone(),
+                },
+                None => ConditionalObservation::NotApplicable {
+                    applicability_rule: memory_rule(),
+                },
             }),
             Datum::Concurrency(Observation::Observed {
                 value: Concurrency {

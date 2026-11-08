@@ -240,10 +240,71 @@ fn paths(value: &Value, pointer: String, leaves: &mut Vec<String>, objects: &mut
     }
 }
 
+#[test]
+fn the_memory_profile_measures_each_construction_case_at_its_peak() {
+    let registry = Registry::load().unwrap();
+    let profile = AdmittedProfile::memory_smoke(&registry);
+    let document = profile.document();
+    // The construction cases, in registry order; the identity cases' interval
+    // is not the construction's (D15:2766).
+    let construction = registry
+        .declarations()
+        .filter(|declaration| declaration.operation == Operation::ConstructionAuthorityAdmission)
+        .cloned()
+        .collect::<Vec<_>>();
+    assert_eq!(document.cases(), construction);
+    assert_eq!(document.cases().len(), 40);
+    let value = serde_json::to_value(document).unwrap();
+    assert_eq!(value["identity"], "intlify-config-minimum-memory-smoke");
+    assert_eq!(value["revision"], "0");
+    assert_eq!(
+        value["scope"],
+        "internal-resolver-construction-peak-live-memory"
+    );
+    assert_eq!(value["sampling"]["aggregation"], "peak_over_batch");
+    assert_eq!(value["sampling"]["warmupRepetitions"], "1");
+    assert_eq!(value["sampling"]["measuredSamples"], "1");
+    assert_eq!(
+        value["scheduling"]["allocator"],
+        "observer-counting-global-allocator-no-harness-reset"
+    );
+    assert_eq!(
+        value["clockResolutionRelationship"],
+        "not-applicable-no-clock-read-in-memory-intervals"
+    );
+    assert_eq!(
+        value["operationStates"],
+        json!([{
+            "operation": "construction-authority-admission",
+            "execution": prepared_core(Operation::ConstructionAuthorityAdmission, None),
+        }])
+    );
+    let decoded: MeasurementProfile = serde_json::from_value(value).unwrap();
+    assert!(decoded.validate_memory_smoke(&registry).is_empty());
+    // Neither run's profile passes for the other's.
+    let apart = vec![
+        ProfileIssue::Identity,
+        ProfileIssue::Scope,
+        ProfileIssue::Inventory,
+        ProfileIssue::Sampling,
+        ProfileIssue::Scheduling,
+        ProfileIssue::OperationStates,
+        ProfileIssue::ClockResolution,
+    ];
+    assert_eq!(decoded.validate_smoke(&registry), apart);
+    assert_eq!(
+        AdmittedProfile::smoke(&registry)
+            .document()
+            .validate_memory_smoke(&registry),
+        apart
+    );
+}
+
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 mod native {
     use super::*;
     use crate::benchmark::clock::MonotonicClock;
+    use crate::benchmark::instrument::{InstrumentDescription, RunInstrument};
     use crate::benchmark::observation::Frame;
     use crate::benchmark::profile::{
         ProfileCollectionFailure, ProfileCollectionIssue, ProfiledOperation,
@@ -267,7 +328,7 @@ mod native {
     fn all_cases_use_the_admitted_profile_for_native_capture_and_revalidation() {
         let registry = Registry::load().unwrap();
         let profile = AdmittedProfile::smoke(&registry);
-        let clock = MonotonicClock::acquire().unwrap();
+        let clock = RunInstrument::Clock(MonotonicClock::acquire().unwrap());
         let mut retained = Vec::new();
         for (index, declaration) in profile.document().cases().iter().enumerate() {
             let ordinal = Quantity::new(u64::try_from(index).unwrap());
@@ -311,7 +372,7 @@ mod native {
     fn profile_and_case_locators_cannot_be_rebound_by_decoded_rows() {
         let registry = Registry::load().unwrap();
         let profile = AdmittedProfile::smoke(&registry);
-        let clock = MonotonicClock::acquire().unwrap();
+        let clock = RunInstrument::Clock(MonotonicClock::acquire().unwrap());
         let declaration = &profile.document().cases()[0];
         let fixture = registry.prepare(declaration).unwrap();
         let first = Quantity::new(0);
@@ -373,7 +434,7 @@ mod native {
     fn sample_counts_and_acquired_clock_are_not_inferred_from_the_record() {
         let registry = Registry::load().unwrap();
         let profile = AdmittedProfile::smoke(&registry);
-        let clock = MonotonicClock::acquire().unwrap();
+        let clock = RunInstrument::Clock(MonotonicClock::acquire().unwrap());
         let declaration = &profile.document().cases()[0];
         let fixture = registry.prepare(declaration).unwrap();
         let ordinal = Quantity::new(0);
@@ -402,11 +463,19 @@ mod native {
             .validate(&profile, ordinal, &fixture, clock.description(), binding)
             .is_empty());
         let record: ProfiledOperation = serde_json::from_value(original).unwrap();
-        let mut changed_clock = clock.description();
+        let InstrumentDescription::Clock(mut changed_clock) = clock.description() else {
+            panic!("a duration run is timed");
+        };
         changed_clock.resolution_nanoseconds =
             Quantity::new(changed_clock.resolution_nanoseconds.get() + 1);
         assert!(!record
-            .validate(&profile, ordinal, &fixture, changed_clock, binding)
+            .validate(
+                &profile,
+                ordinal,
+                &fixture,
+                InstrumentDescription::Clock(changed_clock),
+                binding
+            )
             .is_empty());
     }
 }

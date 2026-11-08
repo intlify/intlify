@@ -5,6 +5,7 @@ use std::collections::BTreeSet;
 
 use serde_json::{json, Value};
 
+use crate::benchmark::instrument::tests::DESCRIPTION;
 use crate::benchmark::operation::tests::operations;
 
 use super::super::quantity::Quantity;
@@ -53,14 +54,14 @@ fn all_active_pairs_keep_distinct_owner_boundaries_and_exact_method_meaning() {
         );
         assert!(boundary.direct_parents.is_empty());
         assert!(boundary.direct_children.is_empty());
-        assert_eq!(decoded.method.metric, "wall_duration");
-        assert_eq!(decoded.method.canonical_unit, "nanosecond");
-        assert_eq!(decoded.method.sample_aggregation_kind, "batch_total");
-        assert_eq!(
-            decoded.method.numeric_decision_eligibility,
-            "qualified-runner"
-        );
-        assert!(!decoded.method.estimated_overhead_subtraction);
+        let Method::Duration(method) = &decoded.method else {
+            panic!("a duration case is timed");
+        };
+        assert_eq!(method.metric, "wall_duration");
+        assert_eq!(method.canonical_unit, "nanosecond");
+        assert_eq!(method.sample_aggregation_kind, "batch_total");
+        assert_eq!(method.numeric_decision_eligibility, "qualified-runner");
+        assert!(!method.estimated_overhead_subtraction);
     }
     assert_eq!(pairs.len(), 13);
     assert_eq!(identities.len(), 13);
@@ -208,6 +209,15 @@ fn missing_or_unknown_fields_cannot_supply_implicit_method_defaults() {
                     .as_object_mut()
                     .unwrap()
                     .remove(key);
+                // A memory case reads no clock, so descriptors without one
+                // decode, but they are not this duration case's.
+                if path.is_empty() && key == "clockObservation" {
+                    let decoded: Descriptors = serde_json::from_value(missing).unwrap();
+                    assert!(decoded
+                        .validate(operation, clock(1))
+                        .contains(&DescriptorIssue::ClockBindingMismatch));
+                    continue;
+                }
                 assert!(
                     serde_json::from_value::<Descriptors>(missing).is_err(),
                     "{path}/{key}"
@@ -243,7 +253,10 @@ fn resolution_is_bound_to_the_actual_acquisition_not_storage_precision() {
 fn observational_profile_cannot_relax_the_duration_methods_eligibility() {
     let operation = &prepared(Operation::StructuralAnalysis);
     let mut changed = Descriptors::for_acquisition(operation, clock(1));
-    changed.method.numeric_decision_eligibility = "observational-only".into();
+    let Method::Duration(method) = &mut changed.method else {
+        panic!("a duration case is timed");
+    };
+    method.numeric_decision_eligibility = "observational-only".into();
     assert_eq!(
         changed.validate(operation, clock(1)),
         vec![DescriptorIssue::MethodMismatch]
@@ -791,8 +804,15 @@ fn simultaneous_descriptor_issues_have_stable_registry_order() {
     let operation = &prepared(Operation::FileMaterialization);
     let mut broken = Descriptors::for_acquisition(operation, clock(2));
     broken.boundary.metric = "peak_live_bytes".into();
-    broken.method.estimated_overhead_subtraction = true;
-    broken.clock_observation.resolution_nanoseconds = Quantity::new(0);
+    let Method::Duration(method) = &mut broken.method else {
+        panic!("a duration case is timed");
+    };
+    method.estimated_overhead_subtraction = true;
+    broken
+        .clock_observation
+        .as_mut()
+        .unwrap()
+        .resolution_nanoseconds = Quantity::new(0);
     broken.execution.initial_preparation_state = "absent".into();
     assert_eq!(
         broken.validate(operation, clock(2)),
@@ -815,4 +835,126 @@ fn actual_provider_description_is_supported_without_a_numeric_threshold() {
             .validate(operation, clock.description())
             .is_empty());
     }
+}
+
+#[test]
+fn a_memory_case_is_described_by_its_observer_and_reads_no_clock() {
+    let operation = &prepared(Operation::ConstructionAuthorityAdmission);
+    let observer = InstrumentDescription::Observer(DESCRIPTION);
+    let descriptors = Descriptors::for_observer(operation, DESCRIPTION).unwrap();
+    assert!(descriptors.validate_with(operation, observer).is_empty());
+    let value = serde_json::to_value(&descriptors).unwrap();
+    assert!(value.get("clockObservation").is_none());
+    let decoded: Descriptors = serde_json::from_value(value).unwrap();
+    assert_eq!(decoded, descriptors);
+    let boundary = &decoded.boundary;
+    assert_eq!(boundary.identity, "resolver-construction-peak-memory/0");
+    assert_eq!(
+        (boundary.phase.as_str(), boundary.cost.as_str()),
+        (
+            "profile_resolve_peak_memory",
+            "construction_peak_live_memory"
+        )
+    );
+    assert_eq!(boundary.metric, "peak_live_bytes");
+    assert_eq!(
+        boundary.operation,
+        Operation::ConstructionAuthorityAdmission
+    );
+    // The interval is enclosed by the markers its duration is.
+    let duration = Boundary::for_operation(Operation::ConstructionAuthorityAdmission);
+    assert_eq!(boundary.included_markers, duration.included_markers);
+    assert!(boundary
+        .excluded_markers
+        .iter()
+        .any(|marker| marker == "observer-and-collector-setup"));
+    assert!(!boundary
+        .excluded_markers
+        .iter()
+        .any(|marker| marker == "clock-and-collector-setup"));
+    let Method::Memory(method) = &decoded.method else {
+        panic!("a memory case is observed");
+    };
+    assert_eq!(method.metric, "peak_live_bytes");
+    assert_eq!(method.canonical_unit, "octet");
+    assert_eq!(method.sample_aggregation_kind, "peak_over_batch");
+    assert_eq!(method.numeric_decision_eligibility, "qualified-runner");
+    assert_eq!(
+        (method.provider.as_str(), method.provider_revision.as_str()),
+        ("test-provider", "9.9.9")
+    );
+    assert_eq!(
+        (method.observer.as_str(), method.observer_revision.as_str()),
+        ("intlify-config-test-observer", "0")
+    );
+    assert_eq!(method.counting, "scripted-reports");
+    assert_eq!(method.limitations, ["reports-are-written-by-the-test"]);
+    assert_eq!(
+        method.optimization_barrier.input_placement,
+        "before-start-mark"
+    );
+    // Another observer is another method, and a clock binding is foreign.
+    let other = ObserverDescription {
+        revision: "1",
+        ..DESCRIPTION
+    };
+    assert_eq!(
+        descriptors.validate_with(operation, InstrumentDescription::Observer(other)),
+        vec![DescriptorIssue::MethodMismatch]
+    );
+    let mut clocked = descriptors.clone();
+    clocked.clock_observation = Some(clock(1).observation());
+    assert_eq!(
+        clocked.validate_with(operation, observer),
+        vec![DescriptorIssue::ClockBindingMismatch]
+    );
+    // A memory record is not a duration record, nor the other way round.
+    let mismatched = vec![
+        DescriptorIssue::BoundaryMismatch,
+        DescriptorIssue::MethodMismatch,
+        DescriptorIssue::ClockBindingMismatch,
+    ];
+    assert_eq!(descriptors.validate(operation, clock(1)), mismatched);
+    assert_eq!(
+        Descriptors::for_acquisition(operation, clock(1)).validate_with(operation, observer),
+        mismatched
+    );
+}
+
+#[test]
+fn only_an_operation_with_a_memory_boundary_has_memory_descriptors() {
+    for operation in &operations() {
+        let memory = Descriptors::for_observer(operation, DESCRIPTION);
+        assert_eq!(
+            memory.is_some(),
+            operation.operation() == Operation::ConstructionAuthorityAdmission,
+            "{:?}",
+            operation.operation()
+        );
+        assert_eq!(
+            Descriptors::for_instrument(operation, InstrumentDescription::Observer(DESCRIPTION)),
+            memory
+        );
+        assert_eq!(
+            Descriptors::for_instrument(operation, InstrumentDescription::Clock(clock(1))),
+            Some(Descriptors::for_acquisition(operation, clock(1)))
+        );
+    }
+}
+
+#[test]
+fn each_method_decodes_as_its_own_shape_and_a_mixed_one_as_neither() {
+    let duration = serde_json::to_value(Method::monotonic_invocation()).unwrap();
+    let memory = serde_json::to_value(Method::observed_peak(DESCRIPTION)).unwrap();
+    assert!(matches!(
+        serde_json::from_value(duration.clone()).unwrap(),
+        Method::Duration(_)
+    ));
+    assert!(matches!(
+        serde_json::from_value(memory.clone()).unwrap(),
+        Method::Memory(_)
+    ));
+    let mut mixed = memory;
+    mixed["clock"] = duration["clock"].clone();
+    assert!(serde_json::from_value::<Method>(mixed).is_err());
 }

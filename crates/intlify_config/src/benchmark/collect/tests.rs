@@ -3,9 +3,13 @@
 
 #![cfg(any(target_os = "linux", target_os = "macos"))]
 
+use intlify_measurement::acquisition::memory::ObserverDescription;
 use serde_json::{json, Value};
 
 use crate::benchmark::clock::tests::ScriptedClock;
+use crate::benchmark::clock::MonotonicClock;
+use crate::benchmark::descriptor::Method;
+use crate::benchmark::instrument::tests::{report, ScriptedObserver, DESCRIPTION};
 use crate::benchmark::observation::{Digest, Frame};
 use crate::benchmark::operation::tests::operations;
 use crate::benchmark::operation::Operation;
@@ -142,7 +146,7 @@ fn fixture_observation(prepared: &Prepared) -> (Observation, LogicalWork) {
 
 #[test]
 fn all_active_real_pairs_produce_revalidated_serializable_owner_fragments() {
-    let clock = MonotonicClock::acquire().unwrap();
+    let clock = RunInstrument::Clock(MonotonicClock::acquire().unwrap());
     for prepared in operations() {
         let operation = prepared.operation();
         let (expected, work) = fixture_observation(&prepared);
@@ -180,7 +184,7 @@ fn all_active_real_pairs_produce_revalidated_serializable_owner_fragments() {
 
 #[test]
 fn wrong_expected_semantics_returns_failure_not_a_serializable_success_prefix() {
-    let clock = MonotonicClock::acquire().unwrap();
+    let clock = RunInstrument::Clock(MonotonicClock::acquire().unwrap());
     let prepared = operations().into_iter().next().unwrap();
     let (mut expected, work) = fixture_observation(&prepared);
     expected.shared = id("deliberately-incorrect-fixture-observation");
@@ -210,7 +214,7 @@ fn unsupported_locale_input_cannot_be_recorded_as_a_successful_expected_failure(
     use crate::benchmark::operation::OutputFailure;
     use std::sync::Arc;
 
-    let clock = MonotonicClock::acquire().unwrap();
+    let clock = RunInstrument::Clock(MonotonicClock::acquire().unwrap());
     let mut prepared = operations()
         .into_iter()
         .find(|prepared| prepared.operation() == Operation::LocaleCanonicalization)
@@ -250,7 +254,7 @@ fn unsupported_locale_input_cannot_be_recorded_as_a_successful_expected_failure(
 #[test]
 fn unsupported_resolution_input_cannot_supply_samples_even_as_an_expected_failure() {
     use crate::benchmark::operation::{tests::resolution_operation, OutputFailure};
-    let clock = MonotonicClock::acquire().unwrap();
+    let clock = RunInstrument::Clock(MonotonicClock::acquire().unwrap());
     let (expected, work) = fixture_observation(&resolution_operation(&minimal_config()));
     let mut value = minimal_config();
     value["profiles"]["app"]["requestedLocales"] = json!(["pt-BR"]);
@@ -283,7 +287,7 @@ fn unsupported_resolution_input_cannot_supply_samples_even_as_an_expected_failur
 
 #[test]
 fn decoded_fragments_cannot_rebind_themselves_to_a_different_case_or_run() {
-    let clock = MonotonicClock::acquire().unwrap();
+    let clock = RunInstrument::Clock(MonotonicClock::acquire().unwrap());
     let prepared = operations().into_iter().next().unwrap();
     let operation = prepared.operation();
     let (expected, work) = fixture_observation(&prepared);
@@ -327,7 +331,7 @@ fn decoded_fragments_cannot_rebind_themselves_to_a_different_case_or_run() {
 
 #[test]
 fn missing_unknown_or_tampered_record_parts_never_become_admitted_defaults() {
-    let clock = MonotonicClock::acquire().unwrap();
+    let clock = RunInstrument::Clock(MonotonicClock::acquire().unwrap());
     let prepared = operations().into_iter().next().unwrap();
     let operation = prepared.operation();
     let (expected, work) = fixture_observation(&prepared);
@@ -387,7 +391,7 @@ fn missing_unknown_or_tampered_record_parts_never_become_admitted_defaults() {
 #[test]
 fn all_pinned_cases_collect_and_revalidate_through_the_admitted_fixture_path() {
     let registry = crate::benchmark::cases::registry::Registry::load().unwrap();
-    let clock = MonotonicClock::acquire().unwrap();
+    let clock = RunInstrument::Clock(MonotonicClock::acquire().unwrap());
     for declaration in crate::benchmark::cases::declarations() {
         let fixture = registry.prepare(&declaration).unwrap();
         // Test-only binding; the fixture context is not a common Case ID codec.
@@ -439,7 +443,7 @@ fn equal_outputs_and_work_cannot_rebind_a_record_to_different_input_bounds() {
     assert_eq!(base.expected(), exact.expected());
     assert!(base.expected_work().matches_expected(exact.expected_work()));
     assert_ne!(base.input_context(), exact.input_context());
-    let clock = MonotonicClock::acquire().unwrap();
+    let clock = RunInstrument::Clock(MonotonicClock::acquire().unwrap());
     let binding = binding(Operation::FileMaterialization);
     let collected = collect_operation(&clock, &base, sampling(), binding).unwrap();
     // Even retaining the same run/case labels cannot conceal a changed context.
@@ -477,7 +481,7 @@ fn equal_locale_results_cannot_conceal_a_changed_provider_input_byte_bound() {
     assert_eq!(base.expected(), exact.expected());
     assert!(base.expected_work().matches_expected(exact.expected_work()));
     assert_ne!(base.input_context(), exact.input_context());
-    let clock = MonotonicClock::acquire().unwrap();
+    let clock = RunInstrument::Clock(MonotonicClock::acquire().unwrap());
     let binding = binding(Operation::LocaleCanonicalization);
     let collected = collect_operation(&clock, &base, sampling(), binding).unwrap();
     assert_eq!(
@@ -487,4 +491,100 @@ fn equal_locale_results_cannot_conceal_a_changed_provider_input_byte_bound() {
             CollectionIssue::Descriptor(DescriptorIssue::LocaleInputBindingMismatch),
         ]
     );
+}
+
+fn construction() -> Prepared {
+    operations()
+        .into_iter()
+        .find(|prepared| prepared.operation() == Operation::ConstructionAuthorityAdmission)
+        .unwrap()
+}
+
+#[test]
+fn a_memory_capture_keeps_each_samples_largest_peak_under_the_observers_descriptors() {
+    let prepared = construction();
+    let (expected, work) = fixture_observation(&prepared);
+    let binding = binding(Operation::ConstructionAuthorityAdmission);
+    // The warmup's peak is no sample's; each sample keeps its larger repetition.
+    let instrument = RunInstrument::Observer {
+        observer: Box::new(ScriptedObserver::new([
+            report(1, 0),
+            report(4096, 64),
+            report(1024, 64),
+            report(512, 0),
+            report(8192, 0),
+        ])),
+        description: DESCRIPTION,
+    };
+    let collected = collect_prepared(
+        &instrument,
+        &prepared,
+        expected,
+        &work,
+        id("collector-unit-test-context"),
+        sampling(),
+        binding,
+    )
+    .unwrap();
+    assert_eq!(
+        collected
+            .capture
+            .samples
+            .iter()
+            .map(|sample| sample.aggregate_quantity)
+            .collect::<Vec<_>>(),
+        [4096, 8192].map(Quantity::new)
+    );
+    assert!(collected.descriptors.clock_observation.is_none());
+    assert!(matches!(collected.descriptors.method, Method::Memory(_)));
+    let decoded: CollectedOperation =
+        serde_json::from_slice(&serde_json::to_vec(&collected).unwrap()).unwrap();
+    assert_eq!(decoded, collected);
+    assert!(decoded
+        .validate_against(
+            &prepared,
+            instrument.description(),
+            expected,
+            &work,
+            sampling(),
+            binding
+        )
+        .is_empty());
+    // Neither another observer nor the clock acquired it.
+    let other = InstrumentDescription::Observer(ObserverDescription {
+        revision: "1",
+        ..DESCRIPTION
+    });
+    let clock = RunInstrument::Clock(MonotonicClock::acquire().unwrap());
+    for acquisition in [other, clock.description()] {
+        assert!(!decoded
+            .validate_against(&prepared, acquisition, expected, &work, sampling(), binding)
+            .is_empty());
+    }
+}
+
+#[test]
+fn an_operation_without_a_memory_boundary_is_refused_before_any_interval() {
+    let prepared = operations().into_iter().next().unwrap();
+    assert_eq!(prepared.operation(), Operation::FileMaterialization);
+    let (expected, work) = fixture_observation(&prepared);
+    // The observer has no report to give, so observing anything would panic.
+    let instrument = RunInstrument::Observer {
+        observer: Box::new(ScriptedObserver::new([])),
+        description: DESCRIPTION,
+    };
+    let error = collect_prepared(
+        &instrument,
+        &prepared,
+        expected,
+        &work,
+        id("collector-unit-test-context"),
+        sampling(),
+        binding(prepared.operation()),
+    )
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        CollectionFailure::Descriptor(issues) if issues == [DescriptorIssue::BoundaryMismatch]
+    ));
 }

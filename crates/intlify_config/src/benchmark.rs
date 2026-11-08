@@ -30,6 +30,8 @@ mod environment;
 #[cfg(feature = "benchmark")]
 mod hydration_relation;
 #[cfg(feature = "benchmark")]
+mod instrument;
+#[cfg(feature = "benchmark")]
 mod inventory;
 #[cfg(feature = "benchmark")]
 mod locale;

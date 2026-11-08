@@ -1,7 +1,8 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! One-shot owner-run assembly around the thirteen ordinary component operations.
+//! One-shot owner-run assembly around the thirteen ordinary component operations,
+//! timed by a duration run or observed by a memory run.
 //!
 //! All fixtures, expectations, context, and ordering are fixed before capture.
 //! Failed cases remain in the result; their prefixes never become measured rows.
@@ -11,6 +12,10 @@
 //! immutable instance identity. Common Evidence/Run Evaluation, the complete
 //! Environment Observation, and report admission remain separate requirements.
 
+use intlify_measurement::acquisition::memory::{
+    MemoryFailure, MemoryObserver, ObserverDescription,
+};
+use intlify_measurement::measurement::Metric;
 use serde::{Deserialize, Serialize};
 
 use super::cases::registry::{
@@ -22,7 +27,7 @@ use super::context::{
 };
 use super::measure::MeasurementFailure;
 use super::observation::{Digest, Frame};
-use super::profile::ProfileCollectionFailure;
+use super::profile::{self, ProfileCollectionFailure};
 use super::quantity::Quantity;
 use super::sample::{CaptureBinding, CaptureFailureCause};
 use super::shared::identity::{OwnerRecordIdentity, RecordIdentity, OWNER_RESULT_DOMAIN};
@@ -231,15 +236,38 @@ fn fresh_run(context: Digest) -> Result<Digest, RunFailure> {
 }
 
 impl PreparedRun {
+    /// A duration run, timed with the acquired clock.
     pub(super) fn acquire() -> Result<Self, RunFailure> {
         let registry = Registry::load().map_err(RunFailure::Registry)?;
         let context = CaptureContext::acquire(&registry).map_err(RunFailure::Context)?;
+        Self::issue(&registry, context)
+    }
+
+    /// A memory run, observed with the observer it is handed (#139).
+    pub(super) fn acquire_memory(
+        observer: Box<dyn MemoryObserver>,
+        description: ObserverDescription,
+    ) -> Result<Self, RunFailure> {
+        let registry = Registry::load().map_err(RunFailure::Registry)?;
+        let context = CaptureContext::acquire_memory(&registry, observer, description)
+            .map_err(RunFailure::Context)?;
+        Self::issue(&registry, context)
+    }
+
+    fn issue(registry: &Registry, context: CaptureContext) -> Result<Self, RunFailure> {
         let context_binding = checksum("owner-run-context", &context.observation())?;
         let run = fresh_run(context_binding)?;
-        let common_plan = plan::issue(&registry, &context).map_err(RunFailure::SharedPlan)?;
+        let common_plan = plan::issue(registry, &context).map_err(RunFailure::SharedPlan)?;
         let result_identity = OwnerRecordIdentity::fresh(OWNER_RESULT_DOMAIN)
             .map_err(|_| RunFailure::EntropyUnavailable)?;
-        let count = registry.expectations().len();
+        // The profile's cases are the declarations the run's metric measures,
+        // in registry order, and so are these rows.
+        let metric = context.instrument().metric();
+        let expectations = registry
+            .expectations()
+            .iter()
+            .filter(|expectation| profile::measures(metric, expectation.declaration()));
+        let count = expectations.clone().count();
         u64::try_from(count).map_err(|_| RunFailure::Addressability)?;
         let mut cases = Vec::new();
         let mut fixtures = Vec::new();
@@ -249,15 +277,16 @@ impl PreparedRun {
         fixtures
             .try_reserve_exact(count)
             .map_err(|_| RunFailure::Allocation)?;
-        for (declaration, expectation) in context
-            .profile()
-            .cases()
-            .iter()
-            .zip(registry.expectations())
-        {
+        // A memory case is another case than the duration case it shares its
+        // row with, so its binding is framed apart.
+        let domain = match metric {
+            Metric::WallDuration => "owner-planned-case",
+            Metric::PeakLiveBytes => "owner-planned-memory-case",
+        };
+        for (declaration, expectation) in context.profile().cases().iter().zip(expectations) {
             // Stable case binding has no run nonce, ordinal, clock, or build.
             // Exact expectations include the input, operation, and owner scope.
-            let case = checksum("owner-planned-case", &(registry.binding(), expectation))?;
+            let case = checksum(domain, &(registry.binding(), expectation))?;
             cases.push(PlannedCase {
                 case,
                 requirement: Requirement::RequiredUnconditional,
@@ -485,6 +514,9 @@ fn outcome(attempts: &[CaseAttempt]) -> OwnerOutcome {
             AttemptResult::CollectionFailed(ProfileCollectionFailure::Collection(
                 CollectionFailure::Capture(failure),
             )) => match &failure.cause {
+                // A peak whose net fell below zero reached past its case's
+                // boundary, and an observer that never ran the interval is
+                // defective: neither is a failed invocation (#138).
                 CaptureFailureCause::SemanticObservationMismatch(_)
                 | CaptureFailureCause::LogicalWorkMismatch(_)
                 | CaptureFailureCause::Output(_)
@@ -492,6 +524,9 @@ fn outcome(attempts: &[CaseAttempt]) -> OwnerOutcome {
                 | CaptureFailureCause::Measurement(MeasurementFailure::PrerequisiteUnavailable)
                 | CaptureFailureCause::LogicalWorkObservation(
                     WorkFailure::OperationMismatch | WorkFailure::InvalidOrdinaryResult,
+                )
+                | CaptureFailureCause::Memory(
+                    MemoryFailure::NegativeNet | MemoryFailure::NotInvoked,
                 ) => OwnerOutcome::Invalid,
                 CaptureFailureCause::CollectorAllocation
                 | CaptureFailureCause::Measurement(_)
@@ -499,7 +534,10 @@ fn outcome(attempts: &[CaseAttempt]) -> OwnerOutcome {
                 | CaptureFailureCause::MeasurementOverflow
                 | CaptureFailureCause::LogicalWorkObservation(
                     WorkFailure::UnrepresentableCounter,
-                ) => OwnerOutcome::Incomplete,
+                )
+                | CaptureFailureCause::Memory(MemoryFailure::InvocationPanicked) => {
+                    OwnerOutcome::Incomplete
+                }
             },
             AttemptResult::PreparationFailed(_) | AttemptResult::CollectionFailed(_) => {
                 OwnerOutcome::Invalid

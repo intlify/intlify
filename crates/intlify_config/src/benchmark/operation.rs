@@ -23,9 +23,10 @@ use crate::structural::{
 
 use super::cases::Engine;
 use super::clock::Clock;
+use super::instrument::{Instrument, Interval, Timed};
 use super::locale_icu4x::PreparedEngine;
 use super::locale_resolution::Canonicalizers;
-use super::measure::{measure, Measured, MeasurementFailure};
+use super::measure::{Measured, MeasurementFailure};
 use super::observation::{self, Frame, Observation};
 use super::{
     artifact_collection, construction, hydration_relation, locale, locale_icu4x, locale_resolution,
@@ -123,6 +124,28 @@ impl Operation {
             Self::ConstructionIdentity => "resolver-construction-identity/0",
         }
     }
+    /// The pair and boundary of the peak live memory measured over this
+    /// operation's interval (D15:2764). Only a fresh resolver construction has
+    /// one yet; a complete invocation's comes with that boundary.
+    pub(super) const fn peak_memory(self) -> Option<PeakMemory> {
+        match self {
+            Self::ConstructionAuthorityAdmission => Some(PeakMemory {
+                phase: "profile_resolve_peak_memory",
+                cost: "construction_peak_live_memory",
+                boundary: "resolver-construction-peak-memory/0",
+            }),
+            _ => None,
+        }
+    }
+}
+
+/// Design 015's memory pair over one operation's interval, and the boundary
+/// the pair is measured at.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct PeakMemory {
+    pub(super) phase: &'static str,
+    pub(super) cost: &'static str,
+    pub(super) boundary: &'static str,
 }
 
 pub(super) enum Prepared {
@@ -220,16 +243,31 @@ impl Prepared {
         }
     }
 
+    /// Time one invocation, as a duration sample's repetition does.
     pub(super) fn once(&self, clock: &impl Clock) -> Result<Measured<Output>, MeasurementFailure> {
+        let interval = self.interval(&Timed(clock))?;
+        Ok(Measured {
+            duration: interval.quantity,
+            output: interval.output,
+        })
+    }
+
+    /// Measure one invocation with either instrument. Both measure the same
+    /// production boundary: the clock times it, and the observer counts the
+    /// live bytes it requests.
+    pub(super) fn interval<I: Instrument>(
+        &self,
+        instrument: &I,
+    ) -> Result<Interval<Output>, I::Failure> {
         // Prepare owned immutable handles and dispatch before the first marker.
         match self {
             Self::Entry { source, limits } => {
-                let measured =
-                    measure(clock, (Arc::clone(source), *limits), |(source, limits)| {
+                let measured = instrument
+                    .interval((Arc::clone(source), *limits), |(source, limits)| {
                         materialize_file(source, limits)
                     })?;
-                Ok(Measured {
-                    duration: measured.duration,
+                Ok(Interval {
+                    quantity: measured.quantity,
                     output: Output::Entry(measured.output),
                 })
             }
@@ -238,59 +276,56 @@ impl Prepared {
                 doc,
                 limits,
             } => {
-                let measured = measure(
-                    clock,
+                let measured = instrument.interval(
                     (schema, Arc::clone(doc), *limits),
                     |(schema, doc, limits)| schema.analyze(doc, limits),
                 )?;
-                Ok(Measured {
-                    duration: measured.duration,
+                Ok(Interval {
+                    quantity: measured.quantity,
                     output: Output::Structural(measured.output),
                 })
             }
             Self::Authoring(analysis) => {
-                let measured = measure(clock, analysis, Analysis::construct)?;
-                Ok(Measured {
-                    duration: measured.duration,
+                let measured = instrument.interval(analysis, Analysis::construct)?;
+                Ok(Interval {
+                    quantity: measured.quantity,
                     output: Output::Authoring(measured.output),
                 })
             }
             Self::Select { analysis, selector } => {
-                let measured = measure(clock, (analysis, selector), |(analysis, selector)| {
-                    analysis.select(selector)
-                })?;
-                Ok(Measured {
-                    duration: measured.duration,
+                let measured = instrument
+                    .interval((analysis, selector), |(analysis, selector)| {
+                        analysis.select(selector)
+                    })?;
+                Ok(Interval {
+                    quantity: measured.quantity,
                     output: Output::Select(measured.output),
                 })
             }
             Self::Locale { core, input } => {
-                let measured = measure(clock, (core.as_ref(), input.as_ref()), |(core, input)| {
-                    core.canonicalize(input)
-                })?;
-                Ok(Measured {
-                    duration: measured.duration,
+                let measured = instrument
+                    .interval((core.as_ref(), input.as_ref()), |(core, input)| {
+                        core.canonicalize(input)
+                    })?;
+                Ok(Interval {
+                    quantity: measured.quantity,
                     output: Output::Locale(measured.output),
                 })
             }
             Self::LocalePolicyResolution(prepared) => {
-                let fields = prepared
-                    .fields()
-                    .ok_or(MeasurementFailure::PrerequisiteUnavailable)?;
+                let fields = prepared.fields().ok_or_else(I::unavailable)?;
                 let measured = match &prepared.canonicalizer {
-                    Canonicalizers::Finite(core) => measure(
-                        clock,
+                    Canonicalizers::Finite(core) => instrument.interval(
                         (&prepared.policy, &prepared.inputs, core.as_ref(), &fields),
                         |(policy, inputs, canonicalizer, fields)| {
                             locale_resolution::resolve(policy, inputs, canonicalizer, fields)
                         },
                     )?,
                     // A fresh engine is admitted and bound before the start
-                    // read and released after the end read.
+                    // mark and released after the end mark.
                     Canonicalizers::Icu4x(engine) => engine
                         .with_engine(|core| {
-                            measure(
-                                clock,
+                            instrument.interval(
                                 (&prepared.policy, &prepared.inputs, core, &fields),
                                 |(policy, inputs, canonicalizer, fields)| {
                                     locale_resolution::resolve(
@@ -302,39 +337,35 @@ impl Prepared {
                                 },
                             )
                         })
-                        .map_err(|_| MeasurementFailure::PrerequisiteUnavailable)??,
+                        .map_err(|_| I::unavailable())??,
                 };
-                Ok(Measured {
-                    duration: measured.duration,
+                Ok(Interval {
+                    quantity: measured.quantity,
                     output: Output::LocalePolicyResolution(measured.output),
                 })
             }
             Self::ResourcePolicy(prepared) => {
-                let inputs = prepared
-                    .inputs()
-                    .ok_or(MeasurementFailure::PrerequisiteUnavailable)?;
-                let measured = measure(
-                    clock,
+                let inputs = prepared.inputs().ok_or_else(I::unavailable)?;
+                let measured = instrument.interval(
                     (&prepared.capability, &prepared.collection, &inputs),
                     |(capability, collection, inputs)| {
                         resource_policy::resolve(capability, collection, inputs)
                     },
                 )?;
-                Ok(Measured {
-                    duration: measured.duration,
+                Ok(Interval {
+                    quantity: measured.quantity,
                     output: Output::ResourcePolicy(measured.output),
                 })
             }
             Self::ArtifactCollection(prepared) => {
-                let measured = measure(
-                    clock,
+                let measured = instrument.interval(
                     (&prepared.policy, &prepared.collection),
                     |(policy, collection)| artifact_collection::admit(policy, collection),
                 )?;
                 // The Set borrows the prepared collection, so it is copied out
-                // after the end read.
-                Ok(Measured {
-                    duration: measured.duration,
+                // after the end mark.
+                Ok(Interval {
+                    quantity: measured.quantity,
                     output: Output::ArtifactCollection(artifact_collection::Resolved::retain(
                         measured.output,
                     )),
@@ -342,14 +373,12 @@ impl Prepared {
             }
             Self::ResolvedBinding(prepared) => {
                 // The collection is admitted into the Set before the start
-                // read; the resolution and the bindings borrow it, so they
-                // are copied out after the end read.
-                let inputs = prepared
-                    .inputs()
-                    .ok_or(MeasurementFailure::PrerequisiteUnavailable)?;
-                let measured = measure(clock, &inputs, resolved_binding::construct)?;
-                Ok(Measured {
-                    duration: measured.duration,
+                // mark; the resolution and the bindings borrow it, so they
+                // are copied out after the end mark.
+                let inputs = prepared.inputs().ok_or_else(I::unavailable)?;
+                let measured = instrument.interval(&inputs, resolved_binding::construct)?;
+                Ok(Interval {
+                    quantity: measured.quantity,
                     output: Output::ResolvedBinding(resolved_binding::Resolved::retain(
                         measured.output,
                     )),
@@ -357,48 +386,37 @@ impl Prepared {
             }
             Self::TargetAndGroup(prepared) => {
                 // Phase 7, the collection admission, and Phase 9 run before
-                // the start read; the targets borrow the Set, so they are
-                // copied out after the end read.
-                let set = prepared
-                    .set()
-                    .ok_or(MeasurementFailure::PrerequisiteUnavailable)?;
-                let inputs = prepared
-                    .inputs(&set)
-                    .ok_or(MeasurementFailure::PrerequisiteUnavailable)?;
-                let measured = measure(clock, &inputs, target_group::construct)?;
-                Ok(Measured {
-                    duration: measured.duration,
+                // the start mark; the targets borrow the Set, so they are
+                // copied out after the end mark.
+                let set = prepared.set().ok_or_else(I::unavailable)?;
+                let inputs = prepared.inputs(&set).ok_or_else(I::unavailable)?;
+                let measured = instrument.interval(&inputs, target_group::construct)?;
+                Ok(Interval {
+                    quantity: measured.quantity,
                     output: Output::TargetAndGroup(target_group::Resolved::retain(measured.output)),
                 })
             }
             Self::Hydration(prepared) => {
-                // Every earlier phase runs before the start read; Phase 13's
+                // Every earlier phase runs before the start mark; Phase 13's
                 // result owns its values.
-                let set = prepared
-                    .set()
-                    .ok_or(MeasurementFailure::PrerequisiteUnavailable)?;
-                let inputs = prepared
-                    .inputs(&set)
-                    .ok_or(MeasurementFailure::PrerequisiteUnavailable)?;
-                let measured = measure(clock, &inputs, hydration_relation::construct)?;
-                Ok(Measured {
-                    duration: measured.duration,
+                let set = prepared.set().ok_or_else(I::unavailable)?;
+                let inputs = prepared.inputs(&set).ok_or_else(I::unavailable)?;
+                let measured = instrument.interval(&inputs, hydration_relation::construct)?;
+                Ok(Interval {
+                    quantity: measured.quantity,
                     output: Output::Hydration(hydration_relation::Resolved::retain(
                         measured.output,
                     )),
                 })
             }
             Self::Construction(prepared) => {
-                // The input is copied before the start read. The resolver,
+                // The input is copied before the start mark. The resolver,
                 // or the refused input construction hands back, is released
-                // after the end read.
-                let measured = measure(
-                    clock,
-                    (prepared.root, prepared.input.clone()),
-                    construction::build,
-                )?;
-                Ok(Measured {
-                    duration: measured.duration,
+                // after the end mark.
+                let measured = instrument
+                    .interval((prepared.root, prepared.input.clone()), construction::build)?;
+                Ok(Interval {
+                    quantity: measured.quantity,
                     output: Output::Construction(Box::new(construction::Resolved {
                         root: prepared.root,
                         constructed: measured.output,
@@ -406,30 +424,29 @@ impl Prepared {
                 })
             }
             Self::ConstructionIdentity(prepared) => {
-                // The resolver is constructed before the first start read and
+                // The resolver is constructed before the first start mark and
                 // reused; the identity's bytes are copied out.
-                let measured = measure(
-                    clock,
-                    (prepared.root, &prepared.resolver),
-                    |(root, resolver)| resolver.identity(root),
-                )?;
-                Ok(Measured {
-                    duration: measured.duration,
+                let measured = instrument
+                    .interval((prepared.root, &prepared.resolver), |(root, resolver)| {
+                        resolver.identity(root)
+                    })?;
+                Ok(Interval {
+                    quantity: measured.quantity,
                     output: Output::ConstructionIdentity(measured.output),
                 })
             }
             Self::Icu4xLocale { engine, input } => {
-                // A fresh engine is admitted and bound before the start read
-                // and released after the end read.
+                // A fresh engine is admitted and bound before the start mark
+                // and released after the end mark.
                 let measured = engine
                     .with_engine(|core| {
-                        measure(clock, (core, input.as_ref()), |(core, input)| {
+                        instrument.interval((core, input.as_ref()), |(core, input)| {
                             core.canonicalize(input)
                         })
                     })
-                    .map_err(|_| MeasurementFailure::PrerequisiteUnavailable)??;
-                Ok(Measured {
-                    duration: measured.duration,
+                    .map_err(|_| I::unavailable())??;
+                Ok(Interval {
+                    quantity: measured.quantity,
                     output: Output::Locale(measured.output),
                 })
             }

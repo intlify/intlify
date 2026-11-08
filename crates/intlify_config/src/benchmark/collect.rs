@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Connect actual owner calls, acquired clock metadata, and bounded capture.
+//! Connect actual owner calls, the acquired instrument, and bounded capture.
 //! The retained fragment is intentionally not a complete Owner Result or common
 //! Evidence Set: common case identities, build/environment, Run Plan, projection,
 //! and report validation are additional mandatory harness responsibilities.
@@ -9,8 +9,8 @@
 use serde::{Deserialize, Serialize};
 
 use super::cases::registry::AdmittedFixture;
-use super::clock::{ClockDescription, MonotonicClock};
 use super::descriptor::{DescriptorIssue, Descriptors};
+use super::instrument::{InstrumentDescription, Peaked, RunInstrument, Timed};
 use super::observation::{Digest, Observation};
 use super::operation::Prepared;
 use super::sample::{
@@ -56,16 +56,17 @@ pub(super) enum CollectionFailure {
     Integrity(Vec<CollectionIssue>),
 }
 
-/// Only the real supported provider enters production capture. Scripted clocks
-/// remain test inputs to the lower-level sampler, never a runtime method option.
+/// Only the run's acquired instrument enters production capture: the real
+/// clock, or the observer the run was handed. Scripted clocks remain test
+/// inputs to the lower-level sampler, never a runtime method option.
 pub(super) fn collect_operation(
-    clock: &MonotonicClock,
+    instrument: &RunInstrument,
     fixture: &AdmittedFixture,
     sampling: Sampling,
     binding: CaptureBinding,
 ) -> Result<CollectedOperation, CollectionFailure> {
     collect_prepared(
-        clock,
+        instrument,
         fixture.prepared(),
         fixture.expected(),
         fixture.expected_work(),
@@ -79,7 +80,7 @@ pub(super) fn collect_operation(
 // directly only by this module's negative tests. Normal collection needs the
 // immutable fixture token constructed by the checked-in expectation gate.
 fn collect_prepared(
-    clock: &MonotonicClock,
+    instrument: &RunInstrument,
     prepared: &Prepared,
     expected: Observation,
     expected_work: &LogicalWork,
@@ -87,13 +88,34 @@ fn collect_prepared(
     sampling: Sampling,
     binding: CaptureBinding,
 ) -> Result<CollectedOperation, CollectionFailure> {
-    let descriptors = Descriptors::for_acquisition(prepared, clock.description());
-    let issues = descriptors.validate(prepared, clock.description());
+    let description = instrument.description();
+    // An operation without a memory boundary has no descriptors to observe
+    // its peak under, so it is refused before any interval.
+    let descriptors = Descriptors::for_instrument(prepared, description)
+        .ok_or_else(|| CollectionFailure::Descriptor(vec![DescriptorIssue::BoundaryMismatch]))?;
+    let issues = descriptors.validate_with(prepared, description);
     if !issues.is_empty() {
         return Err(CollectionFailure::Descriptor(issues));
     }
-    let capture = collect_with_work(clock, prepared, expected, expected_work, sampling, binding)
-        .map_err(CollectionFailure::Capture)?;
+    let capture = match instrument {
+        RunInstrument::Clock(clock) => collect_with_work(
+            &Timed(clock),
+            prepared,
+            expected,
+            expected_work,
+            sampling,
+            binding,
+        ),
+        RunInstrument::Observer { observer, .. } => collect_with_work(
+            &Peaked(observer.as_ref()),
+            prepared,
+            expected,
+            expected_work,
+            sampling,
+            binding,
+        ),
+    }
+    .map_err(CollectionFailure::Capture)?;
     let collected = CollectedOperation {
         fixture_input_context,
         descriptors,
@@ -102,7 +124,7 @@ fn collect_prepared(
     };
     let issues = collected.validate_against(
         prepared,
-        clock.description(),
+        description,
         expected,
         expected_work,
         sampling,
@@ -118,7 +140,7 @@ impl CollectedOperation {
     pub(super) fn validate(
         &self,
         fixture: &AdmittedFixture,
-        acquisition: ClockDescription,
+        acquisition: InstrumentDescription,
         sampling: Sampling,
         binding: CaptureBinding,
     ) -> Vec<CollectionIssue> {
@@ -139,18 +161,18 @@ impl CollectedOperation {
 
     /// Rebind decoded data to separately supplied fixture/run/method inputs.
     /// A record cannot choose its own expected checksum, sample count, operation,
-    /// run/case identities, or the clock resolution used to validate itself.
+    /// run/case identities, or the instrument used to validate itself.
     fn validate_against(
         &self,
         prepared: &Prepared,
-        acquisition: ClockDescription,
+        acquisition: InstrumentDescription,
         expected: Observation,
         expected_work: &LogicalWork,
         sampling: Sampling,
         binding: CaptureBinding,
     ) -> Vec<CollectionIssue> {
         self.descriptors
-            .validate(prepared, acquisition)
+            .validate_with(prepared, acquisition)
             .into_iter()
             .map(CollectionIssue::Descriptor)
             .chain(

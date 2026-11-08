@@ -23,10 +23,13 @@ pub(in crate::benchmark) use intlify_measurement::plan::{
     case_identity, PlanFailure, RunPlanRecord,
 };
 
-use crate::benchmark::cases::registry::Registry;
+use crate::benchmark::cases::registry::{FixtureExpectation, Registry};
 use crate::benchmark::cases::{EntryKind, LimitEdge, LimitKind, Recipe, ResolverState, Selector};
 use crate::benchmark::context::CaptureContext;
 use crate::benchmark::descriptor::{prepared_core, Boundary, Execution, Method};
+use crate::benchmark::instrument::InstrumentDescription;
+use crate::benchmark::memory_domain;
+use crate::benchmark::operation::PeakMemory;
 
 use super::identity::{
     CaseIdentity, NativeChecksum, OwnerLabel, OwnerRecordIdentity, Token, VersionedIdentity,
@@ -67,7 +70,7 @@ fn subject() -> Subject {
 // A dimension that applies to only some cases is absent from the others, not
 // null: an explicit null is refused, and the cases it does not apply to keep
 // exactly the bytes, and so the identities, they had before it existed.
-fn present<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
+pub(in crate::benchmark) fn present<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
     decoder: D,
 ) -> Result<Option<T>, D::Error> {
     T::deserialize(decoder).map(Some)
@@ -166,48 +169,98 @@ impl CaseProjection {
         case_identity(self)
     }
 
-    fn all(registry: &Registry, profile_revision: &str) -> Result<Vec<Self>, PlanFailure> {
+    /// The projections of the cases a run measuring with the instrument
+    /// plans: a duration run every row, and a memory run each row whose
+    /// operation has a memory boundary.
+    fn all(
+        registry: &Registry,
+        profile_revision: &str,
+        instrument: InstrumentDescription,
+    ) -> Result<Vec<Self>, PlanFailure> {
         registry
             .expectations()
             .iter()
-            .map(|expected| {
-                let declaration = expected.declaration();
-                let operation = declaration.operation;
-                Ok(Self {
-                    owner_identity: Token::literal("intlify-config"),
-                    owner_result_schema_revision: Token::literal("0"),
-                    owner_benchmark_profile_revision: Token::new(profile_revision)?,
-                    owner_phase: operation.phase().into(),
-                    owner_cost: operation.cost().into(),
-                    category: Category::Toolchain,
-                    operation_class: OperationClass::Component,
-                    performance_surface: Surface::Value,
-                    memory_observation_domain: None,
-                    interval_boundary: Boundary::for_operation(operation),
-                    fixture: VersionedIdentity::new(
-                        "intlify-config-minimum-fixtures",
-                        &declaration.fixture_revision,
-                    )?,
-                    variant: Variant {
-                        recipe: declaration.fixture,
-                        limit: declaration.limit,
-                        selector: declaration.selector,
-                        entry_kind: None,
-                        resolver: None,
-                    },
-                    scale: Scale::Value,
-                    verification_subject: subject(),
-                    execution_model: ExecutionModel::Value,
-                    execution_state: prepared_core(operation, declaration.fixture.icu4x_engine()),
-                    concurrency: Concurrency::Value,
-                    workload: expected.work().clone(),
-                    metric: Metric::WallDuration,
-                    measurement_method: Method::monotonic_invocation(),
-                    sample_aggregation: Aggregation::BatchTotal,
-                    measurement_profile_revision: Token::new(profile_revision)?,
-                })
+            .filter_map(|expected| match instrument {
+                InstrumentDescription::Clock(_) => Some(Self::duration(expected, profile_revision)),
+                InstrumentDescription::Observer(observer) => {
+                    let operation = expected.declaration().operation;
+                    let memory = operation.peak_memory()?;
+                    let boundary = Boundary::for_memory(operation)?;
+                    Some(Self::memory(
+                        expected,
+                        profile_revision,
+                        memory,
+                        boundary,
+                        Method::observed_peak(observer),
+                    ))
+                }
             })
             .collect()
+    }
+
+    fn duration(
+        expected: &FixtureExpectation,
+        profile_revision: &str,
+    ) -> Result<Self, PlanFailure> {
+        let declaration = expected.declaration();
+        let operation = declaration.operation;
+        Ok(Self {
+            owner_identity: Token::literal("intlify-config"),
+            owner_result_schema_revision: Token::literal("0"),
+            owner_benchmark_profile_revision: Token::new(profile_revision)?,
+            owner_phase: operation.phase().into(),
+            owner_cost: operation.cost().into(),
+            category: Category::Toolchain,
+            operation_class: OperationClass::Component,
+            performance_surface: Surface::Value,
+            memory_observation_domain: None,
+            interval_boundary: Boundary::for_operation(operation),
+            fixture: VersionedIdentity::new(
+                "intlify-config-minimum-fixtures",
+                &declaration.fixture_revision,
+            )?,
+            variant: Variant {
+                recipe: declaration.fixture,
+                limit: declaration.limit,
+                selector: declaration.selector,
+                entry_kind: None,
+                resolver: None,
+            },
+            scale: Scale::Value,
+            verification_subject: subject(),
+            execution_model: ExecutionModel::Value,
+            execution_state: prepared_core(operation, declaration.fixture.icu4x_engine()),
+            concurrency: Concurrency::Value,
+            workload: expected.work().clone(),
+            metric: Metric::WallDuration,
+            measurement_method: Method::monotonic_invocation(),
+            sample_aggregation: Aggregation::BatchTotal,
+            measurement_profile_revision: Token::new(profile_revision)?,
+        })
+    }
+
+    /// The peak live memory of a case's interval: the same fixture, variant,
+    /// workload, and execution state as its duration, under the memory pair,
+    /// the construction domain (D15:2796), and the observer's method.
+    fn memory(
+        expected: &FixtureExpectation,
+        profile_revision: &str,
+        memory: PeakMemory,
+        boundary: Boundary,
+        method: Method,
+    ) -> Result<Self, PlanFailure> {
+        Ok(Self {
+            owner_phase: memory.phase.into(),
+            owner_cost: memory.cost.into(),
+            category: Category::Memory,
+            operation_class: OperationClass::PeakLive,
+            memory_observation_domain: Some(memory_domain::construction()),
+            interval_boundary: boundary,
+            metric: Metric::PeakLiveBytes,
+            measurement_method: method,
+            sample_aggregation: Aggregation::PeakOverBatch,
+            ..Self::duration(expected, profile_revision)?
+        })
     }
 }
 
@@ -221,7 +274,7 @@ pub(in crate::benchmark) fn issue(
 ) -> Result<IssuedRunPlan, PlanFailure> {
     let (profile_identity, profile_revision) = context.profile().identity_revision();
     plan::IssuedRunPlan::issue(Issuance {
-        projections: CaseProjection::all(registry, profile_revision)?,
+        projections: CaseProjection::all(registry, profile_revision, context.instrument())?,
         measurement_profile: VersionedIdentity::new(profile_identity, profile_revision)?,
         verification_subject: subject(),
         build_identity: BuildIdentity {

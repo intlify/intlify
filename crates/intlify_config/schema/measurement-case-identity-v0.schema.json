@@ -303,6 +303,97 @@
       "required": ["process", "thread", "workers", "childProcesses"],
       "type": "object"
     },
+    "DurationMethod": {
+      "additionalProperties": false,
+      "properties": {
+        "canonicalUnit": {
+          "type": "string"
+        },
+        "clock": {
+          "type": "string"
+        },
+        "clockResolutionSource": {
+          "type": "string"
+        },
+        "concurrencyCoverage": {
+          "type": "string"
+        },
+        "durationConversion": {
+          "type": "string"
+        },
+        "estimatedOverheadSubtraction": {
+          "type": "boolean"
+        },
+        "eventTaxonomy": {
+          "type": "string"
+        },
+        "excludedDomain": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "includedInstrumentation": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "metric": {
+          "type": "string"
+        },
+        "numericDecisionEligibility": {
+          "type": "string"
+        },
+        "observationDomain": {
+          "type": "string"
+        },
+        "optimizationBarrier": {
+          "$ref": "#/definitions/OptimizationBarrier"
+        },
+        "overflowBehavior": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "providerRevision": {
+          "type": "string"
+        },
+        "repetitionAggregation": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "sampleAggregationKind": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "identity",
+        "revision",
+        "metric",
+        "canonicalUnit",
+        "provider",
+        "providerRevision",
+        "clock",
+        "observationDomain",
+        "excludedDomain",
+        "eventTaxonomy",
+        "durationConversion",
+        "sampleAggregationKind",
+        "repetitionAggregation",
+        "concurrencyCoverage",
+        "overflowBehavior",
+        "numericDecisionEligibility",
+        "clockResolutionSource",
+        "includedInstrumentation",
+        "estimatedOverheadSubtraction",
+        "optimizationBarrier"
+      ],
+      "type": "object"
+    },
     "Engine": {
       "description": "026's engine state of a canonicalization case: one admitted engine reused\nby every invocation, or a fresh engine admitted before each.",
       "enum": ["reused", "fresh"],
@@ -557,6 +648,113 @@
       "required": ["profileIdentity", "profileRevision", "operation", "facts"],
       "type": "object"
     },
+    "MemoryMethod": {
+      "additionalProperties": false,
+      "description": "The method of a peak observed through an allocator observer. What counts,\nwho counts it, and what the counts do not see are the observer's own\ndescription; the rest is how this owner reads one interval.",
+      "properties": {
+        "canonicalUnit": {
+          "type": "string"
+        },
+        "concurrencyCoverage": {
+          "type": "string"
+        },
+        "counting": {
+          "type": "string"
+        },
+        "estimatedOverheadSubtraction": {
+          "type": "boolean"
+        },
+        "eventTaxonomy": {
+          "type": "string"
+        },
+        "excludedDomain": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "includedInstrumentation": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "limitations": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "metric": {
+          "type": "string"
+        },
+        "netRelation": {
+          "type": "string"
+        },
+        "numericDecisionEligibility": {
+          "type": "string"
+        },
+        "observationDomain": {
+          "type": "string"
+        },
+        "observer": {
+          "type": "string"
+        },
+        "observerRevision": {
+          "type": "string"
+        },
+        "optimizationBarrier": {
+          "$ref": "#/definitions/OptimizationBarrier"
+        },
+        "overflowBehavior": {
+          "type": "string"
+        },
+        "peakRelation": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "providerRevision": {
+          "type": "string"
+        },
+        "repetitionAggregation": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "sampleAggregationKind": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "identity",
+        "revision",
+        "metric",
+        "canonicalUnit",
+        "provider",
+        "providerRevision",
+        "observer",
+        "observerRevision",
+        "counting",
+        "observationDomain",
+        "excludedDomain",
+        "eventTaxonomy",
+        "peakRelation",
+        "netRelation",
+        "sampleAggregationKind",
+        "repetitionAggregation",
+        "concurrencyCoverage",
+        "overflowBehavior",
+        "numericDecisionEligibility",
+        "limitations",
+        "includedInstrumentation",
+        "estimatedOverheadSubtraction",
+        "optimizationBarrier"
+      ],
+      "type": "object"
+    },
     "MemoryObservationDomain": {
       "additionalProperties": false,
       "description": "The versioned descriptor of what one memory measurement observed.",
@@ -584,95 +782,15 @@
       "type": "object"
     },
     "Method": {
-      "additionalProperties": false,
-      "properties": {
-        "canonicalUnit": {
-          "type": "string"
+      "anyOf": [
+        {
+          "$ref": "#/definitions/DurationMethod"
         },
-        "clock": {
-          "type": "string"
-        },
-        "clockResolutionSource": {
-          "type": "string"
-        },
-        "concurrencyCoverage": {
-          "type": "string"
-        },
-        "durationConversion": {
-          "type": "string"
-        },
-        "estimatedOverheadSubtraction": {
-          "type": "boolean"
-        },
-        "eventTaxonomy": {
-          "type": "string"
-        },
-        "excludedDomain": {
-          "type": "string"
-        },
-        "identity": {
-          "type": "string"
-        },
-        "includedInstrumentation": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "metric": {
-          "type": "string"
-        },
-        "numericDecisionEligibility": {
-          "type": "string"
-        },
-        "observationDomain": {
-          "type": "string"
-        },
-        "optimizationBarrier": {
-          "$ref": "#/definitions/OptimizationBarrier"
-        },
-        "overflowBehavior": {
-          "type": "string"
-        },
-        "provider": {
-          "type": "string"
-        },
-        "providerRevision": {
-          "type": "string"
-        },
-        "repetitionAggregation": {
-          "type": "string"
-        },
-        "revision": {
-          "type": "string"
-        },
-        "sampleAggregationKind": {
-          "type": "string"
+        {
+          "$ref": "#/definitions/MemoryMethod"
         }
-      },
-      "required": [
-        "identity",
-        "revision",
-        "metric",
-        "canonicalUnit",
-        "provider",
-        "providerRevision",
-        "clock",
-        "observationDomain",
-        "excludedDomain",
-        "eventTaxonomy",
-        "durationConversion",
-        "sampleAggregationKind",
-        "repetitionAggregation",
-        "concurrencyCoverage",
-        "overflowBehavior",
-        "numericDecisionEligibility",
-        "clockResolutionSource",
-        "includedInstrumentation",
-        "estimatedOverheadSubtraction",
-        "optimizationBarrier"
       ],
-      "type": "object"
+      "description": "A case's Measurement Method Descriptor: how its duration is timed, or how\nits peak is observed. Each spells its own fields, so neither reads as the\nother, and a duration case keeps exactly the bytes it had before memory."
     },
     "Metric": {
       "description": "The measured metric.",
