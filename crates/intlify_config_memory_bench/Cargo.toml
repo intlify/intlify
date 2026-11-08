@@ -1,0 +1,26 @@
+[package]
+name = "intlify_config_memory_bench"
+version = "0.14.0-alpha.12"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# The binary that observes peak live memory. Its observer crate installs its
+# own global allocator in every binary that links it, so it lives in a crate
+# of its own: `cargo test -p intlify_config --all-features` never builds this
+# crate, and no product binary or duration run links the allocator.
+[dependencies]
+intlify_config = { path = "../intlify_config", features = ["benchmark"] }
+intlify_measurement = { path = "../intlify_measurement", features = ["allocation-counter"] }
+serde_json = "1.0.106"
+tempfile = "3"
+
+[[bench]]
+name = "profile_resolver_memory"
+harness = false
+test = false

@@ -772,6 +772,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "intlify_config_memory_bench"
+version = "0.14.0-alpha.12"
+dependencies = [
+ "intlify_config",
+ "intlify_measurement",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "intlify_contract"
 version = "0.14.0-alpha.11"
 dependencies = [
