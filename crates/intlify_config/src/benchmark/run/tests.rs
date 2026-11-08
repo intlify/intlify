@@ -4,7 +4,9 @@
 use super::*;
 use crate::benchmark::clock::ClockFailure;
 use crate::benchmark::collect::CollectionFailure;
+use crate::benchmark::instrument::tests::{report, ScriptedObserver, DESCRIPTION};
 use crate::benchmark::measure::MeasurementFailure;
+use crate::benchmark::operation::Operation;
 use crate::benchmark::sample::{CaptureFailure, CaptureStage};
 use serde_json::{json, Value};
 
@@ -22,8 +24,28 @@ fn failed_clock_capture() -> ProfileCollectionFailure {
         complete_sample_prefix: Vec::new(),
         attempted_repetitions_in_sample: Quantity::new(1),
         completed_repetitions_in_sample: Quantity::new(0),
-        accumulated_nanoseconds: Quantity::new(0),
+        aggregate_quantity: Quantity::new(0),
     })))
+}
+
+fn failed_memory_capture(failure: MemoryFailure) -> ProfileCollectionFailure {
+    ProfileCollectionFailure::Collection(CollectionFailure::Capture(Box::new(CaptureFailure {
+        cause: CaptureFailureCause::Memory(failure),
+        stage: CaptureStage::Measured,
+        warmup_completed: Quantity::new(1),
+        complete_sample_prefix: Vec::new(),
+        attempted_repetitions_in_sample: Quantity::new(1),
+        completed_repetitions_in_sample: Quantity::new(0),
+        aggregate_quantity: Quantity::new(0),
+    })))
+}
+
+fn memory_run() -> PreparedRun {
+    PreparedRun::acquire_memory(
+        Box::new(ScriptedObserver::new([report(4096, 0)])),
+        DESCRIPTION,
+    )
+    .unwrap()
 }
 
 #[test]
@@ -139,7 +161,7 @@ fn self_rehashed_metadata_samples_and_status_do_not_replace_acquired_observation
         ("/result/context/environment/clock/resolutionNanoseconds", json!("0")),
         ("/result/context/profile/sampling/measuredSamples", json!("2")),
         ("/result/context/build/package/revision", json!("changed")),
-        ("/result/attempts/0/result/detail/operation/operation/capture/samples/0/aggregateNanoseconds", json!("18446744073709551615")),
+        ("/result/attempts/0/result/detail/operation/operation/capture/samples/0/aggregateQuantity", json!("18446744073709551615")),
         ("/result/outcome", json!("incomplete")),
     ] {
         let mut changed = raw.clone();
@@ -414,6 +436,7 @@ fn semantic_mismatch_retains_both_observations_and_is_never_an_operational_succe
 #[test]
 fn a_failed_multi_sample_prefix_roundtrips_but_is_not_a_successful_capture() {
     use crate::benchmark::clock::{Clock, Tick};
+    use crate::benchmark::instrument::Timed;
     use crate::benchmark::quantity::Repetitions;
     use crate::benchmark::sample::{self, Capture, CaptureCapacity, Sampling};
     use std::cell::Cell;
@@ -452,7 +475,7 @@ fn a_failed_multi_sample_prefix_roundtrips_but_is_not_a_successful_capture() {
         case: Frame::new("diagnostic-prefix-test-case").finish(),
     };
     let failure = sample::collect_with_work(
-        &FailSecondSample(Cell::new(0)),
+        &Timed(&FailSecondSample(Cell::new(0))),
         fixture.prepared(),
         fixture.expected(),
         fixture.expected_work(),
@@ -480,4 +503,68 @@ fn a_failed_multi_sample_prefix_roundtrips_but_is_not_a_successful_capture() {
         !sample::validate_capture(&fabricated_success, sampling, binding, fixture.expected())
             .is_empty()
     );
+}
+
+#[test]
+fn a_memory_run_plans_the_construction_cases_apart_and_keeps_failed_from_invalid() {
+    use crate::benchmark::shared::pipeline;
+    const FAILURES: [MemoryFailure; 3] = [
+        MemoryFailure::InvocationPanicked,
+        MemoryFailure::NotInvoked,
+        MemoryFailure::NegativeNet,
+    ];
+    let memory = memory_run();
+    assert_eq!(memory.fixtures.len(), 40);
+    assert!(memory.fixtures.iter().all(Result::is_ok));
+    let registry = Registry::load().unwrap();
+    let rows = registry
+        .expectations()
+        .iter()
+        .filter(|row| row.declaration().operation == Operation::ConstructionAuthorityAdmission)
+        .collect::<Vec<_>>();
+    assert_eq!((memory.plan.cases.len(), rows.len()), (40, 40));
+    for (planned, row) in memory.plan.cases.iter().zip(rows) {
+        // The duration case's row, bound as another case.
+        assert_eq!(planned.expectation, *row);
+        let duration = checksum("owner-planned-case", &(registry.binding(), row)).unwrap();
+        assert_ne!(planned.case, duration);
+    }
+    let failure = |ordinal: Quantity| FAILURES[usize::try_from(ordinal.get() % 3).unwrap()];
+    // Every case reports a failure, so no construction runs; the cases take
+    // the three in turn.
+    let recorded = memory
+        .collect_with(|_, ordinal, _, _| Err(failed_memory_capture(failure(ordinal))))
+        .unwrap();
+    // An invalid case outranks a failed one.
+    assert_eq!(recorded.record.result.outcome, OwnerOutcome::Invalid);
+    assert!(recorded.validate(&recorded.record).is_empty());
+    for attempt in &recorded.record.result.attempts {
+        assert_eq!(
+            attempt_outcome(attempt),
+            if failure(attempt.ordinal) == MemoryFailure::InvocationPanicked {
+                OwnerOutcome::Incomplete
+            } else {
+                OwnerOutcome::Invalid
+            }
+        );
+    }
+    let artifacts = pipeline::produce(&recorded).unwrap();
+    assert!(artifacts.evidence.is_none());
+    let evaluation: Value = serde_json::from_slice(&artifacts.evaluation).unwrap();
+    let cases = evaluation["body"]["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 40);
+    for (ordinal, case) in (0..).map(Quantity::new).zip(cases) {
+        let result = &case["result"];
+        let reason = &result["reasons"][0];
+        if failure(ordinal) == MemoryFailure::InvocationPanicked {
+            assert_eq!(result["kind"], "unavailable");
+            assert_eq!(result["unavailableKind"], "failed");
+            assert_eq!(reason["code"]["code"], "failed-invocation");
+            assert_eq!(reason["detail"]["subtype"], "invocation-panicked");
+        } else {
+            assert_eq!(result["kind"], "invalid");
+            assert_eq!(reason["code"]["code"], "inconsistent-record");
+            assert_eq!(reason["detail"]["kind"], "invalid-owner-case");
+        }
+    }
 }

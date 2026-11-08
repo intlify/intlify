@@ -404,3 +404,84 @@ fn a_dimension_that_applies_is_present_and_one_that_does_not_is_never_null() {
     // The memory case is another case than the duration case it came from.
     assert_ne!(memory.identity().unwrap(), duration.identity().unwrap());
 }
+
+#[test]
+fn a_memory_run_projects_each_construction_case_as_its_peak() {
+    use crate::benchmark::instrument::tests::{ScriptedObserver, DESCRIPTION};
+    use crate::benchmark::memory_domain;
+    use crate::benchmark::operation::Operation;
+    let registry = Registry::load().unwrap();
+    let context =
+        CaptureContext::acquire_memory(&registry, Box::new(ScriptedObserver::new([])), DESCRIPTION)
+            .unwrap();
+    let memory = super::issue(&registry, &context).unwrap();
+    let duration = issue();
+    let twins = duration
+        .projections()
+        .iter()
+        .filter(|projection| {
+            projection.phase_cost()
+                == (
+                    "profile_resolver_construct",
+                    "construction_authority_admission",
+                )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!((memory.projections().len(), twins.len()), (40, 40));
+    let schema: Value = serde_json::from_str(include_str!(
+        "../../../../schema/measurement-case-identity-v0.schema.json"
+    ))
+    .unwrap();
+    let validator = jsonschema::draft7::new(&schema).unwrap();
+    for (memory, duration) in memory.projections().iter().zip(twins) {
+        let common = CommonProjection::common(memory);
+        assert_eq!(common.eligibility(), Ok(()));
+        assert_eq!(
+            memory.phase_cost(),
+            (
+                "profile_resolve_peak_memory",
+                "construction_peak_live_memory"
+            )
+        );
+        assert_eq!(common.category, Category::Memory);
+        assert_eq!(common.operation_class, OperationClass::PeakLive);
+        assert_eq!(common.metric, Metric::PeakLiveBytes);
+        assert_eq!(common.aggregation, Aggregation::PeakOverBatch);
+        assert_eq!(common.memory_domain, Some(&memory_domain::construction()));
+        assert!(memory_domain::agrees(
+            common.memory_domain.unwrap(),
+            &memory.execution_state
+        ));
+        assert_eq!(
+            memory.measurement_method,
+            Method::observed_peak(DESCRIPTION)
+        );
+        assert_eq!(
+            Some(&memory.interval_boundary),
+            Boundary::for_memory(Operation::ConstructionAuthorityAdmission).as_ref()
+        );
+        // The fixture, variant, workload, and execution state are the
+        // duration case's, and the memory case is another case.
+        assert_eq!(
+            (
+                &memory.fixture,
+                &memory.variant,
+                &memory.workload,
+                &memory.execution_state
+            ),
+            (
+                &duration.fixture,
+                &duration.variant,
+                &duration.workload,
+                &duration.execution_state
+            )
+        );
+        assert_ne!(memory.identity().unwrap(), duration.identity().unwrap());
+        let input = case_identity_input(memory).unwrap();
+        assert!(
+            validator.is_valid(&input),
+            "{:?}",
+            validator.iter_errors(&input).collect::<Vec<_>>()
+        );
+    }
+}

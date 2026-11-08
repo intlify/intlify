@@ -6,13 +6,14 @@
 //! common Evidence Set, or proof of runner qualification. The enclosing harness
 //! must bind it to those records and verify the complete attempted inventory.
 
+use intlify_measurement::measurement::Metric;
 use serde::{Deserialize, Serialize};
 
 use super::cases::registry::{AdmittedFixture, Registry, RegistryBinding};
 use super::cases::{Declaration, Engine};
-use super::clock::{ClockDescription, MonotonicClock};
 use super::collect::{collect_operation, CollectedOperation, CollectionFailure, CollectionIssue};
 use super::descriptor::Execution;
+use super::instrument::{InstrumentDescription, RunInstrument};
 use super::operation::Operation;
 use super::quantity::{Quantity, Repetitions};
 use super::sample::{CaptureBinding, CaptureCapacity, FailureIntegrityIssue, Sampling};
@@ -101,20 +102,52 @@ pub(super) struct AdmittedProfile {
     sampling: Sampling,
 }
 
+/// Whether a run measuring the metric measures the declared case: a duration
+/// run every case, and a memory run each one whose operation has a memory
+/// boundary.
+pub(super) fn measures(metric: Metric, declaration: &Declaration) -> bool {
+    match metric {
+        Metric::WallDuration => true,
+        Metric::PeakLiveBytes => declaration.operation.peak_memory().is_some(),
+    }
+}
+
 impl MeasurementProfile {
     fn smoke(registry: &Registry) -> Self {
+        Self::for_metric(registry, Metric::WallDuration)
+    }
+
+    fn memory_smoke(registry: &Registry) -> Self {
+        Self::for_metric(registry, Metric::PeakLiveBytes)
+    }
+
+    fn for_metric(registry: &Registry, metric: Metric) -> Self {
         let one = Repetitions::new(1).expect("fixed positive smoke count");
+        let memory = metric == Metric::PeakLiveBytes;
         Self {
-            identity: "intlify-config-minimum-smoke".into(),
+            identity: if memory {
+                "intlify-config-minimum-memory-smoke"
+            } else {
+                "intlify-config-minimum-smoke"
+            }
+            .into(),
             revision: "0".into(),
             adopted_specification: Revision {
                 identity: "intlify-design-026".into(),
                 revision: "0".into(),
             },
-            scope: "internal-configuration-locale-policy-resolution-canonicalization-with-icu4x-resource-policy-bootstrap-artifact-collection-admission-and-resolved-binding-construction"
-                .into(),
+            scope: if memory {
+                "internal-resolver-construction-peak-live-memory"
+            } else {
+                "internal-configuration-locale-policy-resolution-canonicalization-with-icu4x-resource-policy-bootstrap-artifact-collection-admission-and-resolved-binding-construction"
+            }
+            .into(),
             fixture_registry: registry.binding().clone(),
-            cases: registry.declarations().cloned().collect(),
+            cases: registry
+                .declarations()
+                .filter(|declaration| measures(metric, declaration))
+                .cloned()
+                .collect(),
             case_requirement: "all-required-unconditional".into(),
             sampling: SamplingPolicy {
                 warmup_strategy: "fixed-invocations-before-measured-samples-per-case".into(),
@@ -122,12 +155,19 @@ impl MeasurementProfile {
                 measured_samples: one,
                 repetitions_per_sample: one,
                 calibration: "none".into(),
-                aggregation: "batch_total".into(),
+                aggregation: if memory { "peak_over_batch" } else { "batch_total" }.into(),
             },
             scheduling: SchedulingPolicy {
                 process: "single-calling-process-resident-compiled-core".into(),
                 fixture: "prepare-and-admit-before-case-reuse-immutable-input".into(),
-                allocator: "ordinary-build-allocator-no-harness-reset".into(),
+                // A memory run's binary installs the observer's counting
+                // allocator; neither run resets the allocator between cases.
+                allocator: if memory {
+                    "observer-counting-global-allocator-no-harness-reset"
+                } else {
+                    "ordinary-build-allocator-no-harness-reset"
+                }
+                .into(),
                 concurrency: "sequential-cases-synchronous-calling-thread-no-workers".into(),
                 // A finite invocation count is not a wall-clock timeout. A
                 // CI timeout terminates this process; it does not publish a
@@ -153,6 +193,8 @@ impl MeasurementProfile {
                         [Engine::Reused, Engine::Fresh].map(|engine| (operation, Some(engine)))
                     }),
                 )
+                // A memory run states only the operations it measures.
+                .filter(|(operation, _)| !memory || operation.peak_memory().is_some())
                 .map(|(operation, icu4x)| OperationState {
                     operation,
                     execution: crate::benchmark::descriptor::prepared_core(operation, icu4x),
@@ -165,9 +207,14 @@ impl MeasurementProfile {
                 }),
             ordering: "fixture-registry-order-no-interleaving".into(),
             // Zero elapsed time can be an honest observation. Smoke checks
-            // reported positive granularity but imposes no duration ratio.
-            clock_resolution_relationship: "retain-reported-positive-resolution-no-minimum-ratio"
-                .into(),
+            // reported positive granularity but imposes no duration ratio. A
+            // memory interval reads no clock.
+            clock_resolution_relationship: if memory {
+                "not-applicable-no-clock-read-in-memory-intervals"
+            } else {
+                "retain-reported-positive-resolution-no-minimum-ratio"
+            }
+            .into(),
             raw_samples: "retain-all-in-order-no-outlier-deletion".into(),
             numeric_decisions: "prohibited-advisory-and-gating".into(),
             diagnostic_profiling: "disabled".into(),
@@ -187,7 +234,14 @@ impl MeasurementProfile {
     }
 
     pub(super) fn validate_smoke(&self, registry: &Registry) -> Vec<ProfileIssue> {
-        let expected = Self::smoke(registry);
+        self.validate_against(&Self::smoke(registry))
+    }
+
+    pub(super) fn validate_memory_smoke(&self, registry: &Registry) -> Vec<ProfileIssue> {
+        self.validate_against(&Self::memory_smoke(registry))
+    }
+
+    fn validate_against(&self, expected: &Self) -> Vec<ProfileIssue> {
         [
             (
                 ProfileIssue::Identity,
@@ -245,6 +299,10 @@ impl AdmittedProfile {
         Self::from_checked(MeasurementProfile::smoke(registry))
     }
 
+    pub(super) fn memory_smoke(registry: &Registry) -> Self {
+        Self::from_checked(MeasurementProfile::memory_smoke(registry))
+    }
+
     pub(super) fn admit_smoke(
         document: MeasurementProfile,
         registry: &Registry,
@@ -296,7 +354,7 @@ impl AdmittedProfile {
 
     pub(super) fn collect(
         &self,
-        clock: &MonotonicClock,
+        instrument: &RunInstrument,
         ordinal: Quantity,
         fixture: &AdmittedFixture,
         binding: CaptureBinding,
@@ -304,7 +362,7 @@ impl AdmittedProfile {
         if !self.contains(ordinal, fixture) {
             return Err(ProfileCollectionFailure::CaseSelection);
         }
-        let operation = collect_operation(clock, fixture, self.sampling, binding)
+        let operation = collect_operation(instrument, fixture, self.sampling, binding)
             .map_err(ProfileCollectionFailure::Collection)?;
         Ok(ProfiledOperation {
             measurement_profile: self.reference(),
@@ -392,7 +450,7 @@ impl ProfiledOperation {
         profile: &AdmittedProfile,
         ordinal: Quantity,
         fixture: &AdmittedFixture,
-        clock: ClockDescription,
+        instrument: InstrumentDescription,
         binding: CaptureBinding,
     ) -> Vec<ProfileCollectionIssue> {
         let mut issues = Vec::new();
@@ -404,7 +462,7 @@ impl ProfiledOperation {
         }
         issues.extend(
             self.operation
-                .validate(fixture, clock, profile.sampling, binding)
+                .validate(fixture, instrument, profile.sampling, binding)
                 .into_iter()
                 .map(ProfileCollectionIssue::Operation),
         );

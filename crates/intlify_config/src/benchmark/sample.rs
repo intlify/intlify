@@ -9,7 +9,14 @@
 use serde::{Deserialize, Serialize};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
+use intlify_measurement::acquisition::memory::MemoryFailure;
+use intlify_measurement::measurement::Aggregation;
+
+#[cfg(test)]
 use super::clock::Clock;
+#[cfg(test)]
+use super::instrument::Timed;
+use super::instrument::{aggregate, Instrument, PeakFailure};
 use super::measure::MeasurementFailure;
 use super::observation::{Digest, Frame, Observation};
 use super::operation::{OutputFailure, Prepared};
@@ -86,9 +93,11 @@ impl CaptureBinding {
     }
 }
 
+/// Neither a duration nor a peak needs a determinism proof: both methods are
+/// `qualified-runner` (D26:1459).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub(super) enum DurationProof {
+pub(super) enum DeterminismProof {
     NotRequired,
 }
 
@@ -104,10 +113,12 @@ pub(super) struct CapturedSample {
     pub(super) local_identity: Digest,
     pub(super) ordinal: Quantity,
     pub(super) repetition_count: Repetitions,
-    pub(super) aggregate_nanoseconds: Quantity,
+    /// The sample's repetitions aggregated in the metric's unit: their
+    /// nanoseconds' checked sum, or the largest of their peaks in octets.
+    pub(super) aggregate_quantity: Quantity,
     pub(super) semantic_observation: Observation,
     pub(super) execution_identity: Digest,
-    pub(super) determinism_proof: DurationProof,
+    pub(super) determinism_proof: DeterminismProof,
     pub(super) acquisition: Acquisition,
 }
 
@@ -143,6 +154,22 @@ pub(super) enum CaptureFailureCause {
     LogicalWorkObservation(WorkFailure),
     LogicalWorkMismatch(Box<WorkMismatch>),
     MeasurementOverflow,
+    Memory(MemoryFailure),
+}
+
+impl From<MeasurementFailure> for CaptureFailureCause {
+    fn from(failure: MeasurementFailure) -> Self {
+        Self::Measurement(failure)
+    }
+}
+
+impl From<PeakFailure> for CaptureFailureCause {
+    fn from(failure: PeakFailure) -> Self {
+        match failure {
+            PeakFailure::PrerequisiteUnavailable => Self::PrerequisiteUnavailable,
+            PeakFailure::Memory(failure) => Self::Memory(failure),
+        }
+    }
 }
 
 /// Preserve both complete observations. The allocation exists only on failure,
@@ -172,7 +199,8 @@ pub(super) struct CaptureFailure {
     pub(super) complete_sample_prefix: Vec<CapturedSample>,
     pub(super) attempted_repetitions_in_sample: Quantity,
     pub(super) completed_repetitions_in_sample: Quantity,
-    pub(super) accumulated_nanoseconds: Quantity,
+    /// The completed repetitions of the failed sample, aggregated so far.
+    pub(super) aggregate_quantity: Quantity,
 }
 
 /// Lower-level sampler tests may isolate semantic observations from work facts.
@@ -190,24 +218,31 @@ pub(super) fn collect(
         sampling,
         binding,
         expected,
-        || observe_invocation(clock, operation, expected, None),
+        Aggregation::BatchTotal,
+        || observe_invocation(&Timed(clock), operation, expected, None),
     )
 }
 
-pub(super) fn collect_with_work(
-    clock: &impl Clock,
+/// Capture one operation's samples with the run's instrument: each sample
+/// aggregates its repetitions as the instrument's metric does.
+pub(super) fn collect_with_work<I: Instrument>(
+    instrument: &I,
     operation: &Prepared,
     expected: Observation,
     expected_work: &LogicalWork,
     sampling: Sampling,
     binding: CaptureBinding,
-) -> Result<Capture, Box<CaptureFailure>> {
+) -> Result<Capture, Box<CaptureFailure>>
+where
+    CaptureFailureCause: From<I::Failure>,
+{
     collect_inner(
         operation.prerequisites_admitted(),
         sampling,
         binding,
         expected,
-        || observe_invocation(clock, operation, expected, Some(expected_work)),
+        I::AGGREGATION,
+        || observe_invocation(instrument, operation, expected, Some(expected_work)),
     )
 }
 
@@ -216,6 +251,7 @@ fn collect_inner(
     sampling: Sampling,
     binding: CaptureBinding,
     expected: Observation,
+    aggregation: Aggregation,
     mut invoke: impl FnMut() -> Result<Quantity, CaptureFailureCause>,
 ) -> Result<Capture, Box<CaptureFailure>> {
     let mut progress = CaptureFailure {
@@ -225,7 +261,7 @@ fn collect_inner(
         complete_sample_prefix: Vec::new(),
         attempted_repetitions_in_sample: Quantity::new(0),
         completed_repetitions_in_sample: Quantity::new(0),
-        accumulated_nanoseconds: Quantity::new(0),
+        aggregate_quantity: Quantity::new(0),
     };
     if !prerequisites {
         return Err(Box::new(progress));
@@ -253,33 +289,33 @@ fn collect_inner(
         // Identity construction and resetting collector state precede intervals.
         let local_identity = binding.local_identity("sample", ordinal);
         let execution_identity = binding.local_identity("sample-execution", ordinal);
-        progress.accumulated_nanoseconds = Quantity::new(0);
+        progress.aggregate_quantity = Quantity::new(0);
         progress.completed_repetitions_in_sample = Quantity::new(0);
         progress.attempted_repetitions_in_sample = Quantity::new(0);
         for repetition in 0..sampling.repetitions.get() {
             progress.attempted_repetitions_in_sample = Quantity::new(repetition + 1);
-            let duration = match invoke() {
-                Ok(duration) => duration,
+            let quantity = match invoke() {
+                Ok(quantity) => quantity,
                 Err(cause) => {
                     progress.cause = cause;
                     return Err(Box::new(progress));
                 }
             };
-            let Ok(total) = progress.accumulated_nanoseconds.checked_add(duration) else {
+            let Some(total) = aggregate(aggregation, progress.aggregate_quantity, quantity) else {
                 progress.cause = CaptureFailureCause::MeasurementOverflow;
                 return Err(Box::new(progress));
             };
-            progress.accumulated_nanoseconds = total;
+            progress.aggregate_quantity = total;
             progress.completed_repetitions_in_sample = Quantity::new(repetition + 1);
         }
         progress.complete_sample_prefix.push(CapturedSample {
             local_identity,
             ordinal: Quantity::new(ordinal),
             repetition_count: sampling.repetitions,
-            aggregate_nanoseconds: progress.accumulated_nanoseconds,
+            aggregate_quantity: progress.aggregate_quantity,
             semantic_observation: expected,
             execution_identity,
-            determinism_proof: DurationProof::NotRequired,
+            determinism_proof: DeterminismProof::NotRequired,
             acquisition: Acquisition::Unpaired,
         });
     }
@@ -289,15 +325,18 @@ fn collect_inner(
     })
 }
 
-fn observe_invocation(
-    clock: &impl Clock,
+fn observe_invocation<I: Instrument>(
+    instrument: &I,
     operation: &Prepared,
     expected: Observation,
     expected_work: Option<&LogicalWork>,
-) -> Result<Quantity, CaptureFailureCause> {
+) -> Result<Quantity, CaptureFailureCause>
+where
+    CaptureFailureCause: From<I::Failure>,
+{
     let measured = operation
-        .once(clock)
-        .map_err(CaptureFailureCause::Measurement)?;
+        .interval(instrument)
+        .map_err(CaptureFailureCause::from)?;
     let actual = catch_unwind(AssertUnwindSafe(|| measured.output.observe()))
         .map_err(|_| CaptureFailureCause::ObservationPanicked)?
         .map_err(CaptureFailureCause::Output)?;
@@ -322,8 +361,8 @@ fn observe_invocation(
         }
     }
     // Observation and destruction occur after the end marker; no estimated
-    // checksum/teardown cost is subtracted from the recorded component duration.
-    Ok(measured.duration)
+    // checksum/teardown cost is subtracted from the recorded quantity.
+    Ok(measured.quantity)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -368,7 +407,7 @@ pub(super) fn validate_failure(
     let mut issues = Vec::new();
     let zero_progress = failure.attempted_repetitions_in_sample.get() == 0
         && failure.completed_repetitions_in_sample.get() == 0
-        && failure.accumulated_nanoseconds.get() == 0;
+        && failure.aggregate_quantity.get() == 0;
     let preparation_cause = matches!(
         failure.cause,
         CaptureFailureCause::PrerequisiteUnavailable | CaptureFailureCause::CollectorAllocation
@@ -397,7 +436,7 @@ pub(super) fn validate_failure(
         if attempted == 0
             || attempted > sampling.repetitions.get()
             || completed.checked_add(1) != Some(attempted)
-            || (completed == 0 && failure.accumulated_nanoseconds.get() != 0)
+            || (completed == 0 && failure.aggregate_quantity.get() != 0)
         {
             issues.push(FailureIntegrityIssue::RepetitionProgress);
         }

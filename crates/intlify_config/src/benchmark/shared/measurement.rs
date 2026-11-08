@@ -115,7 +115,7 @@ fn sample_facts(sample: &CapturedSample) -> SampleFacts<Observation> {
     SampleFacts {
         ordinal: sample.ordinal,
         repetition_count: sample.repetition_count,
-        aggregate_quantity: sample.aggregate_nanoseconds,
+        aggregate_quantity: sample.aggregate_quantity,
         semantic_observation: sample.semantic_observation,
         semantic_identity: NativeChecksum::from_bytes(
             sample.semantic_observation.identity().bytes(),

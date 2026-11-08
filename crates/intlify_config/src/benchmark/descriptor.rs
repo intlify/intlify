@@ -5,13 +5,16 @@
 //! These are not 017 artifacts, common Verification Record Envelopes, or a claim
 //! that all 015 boundaries or all 026 measurement methods are implemented.
 
+use intlify_measurement::acquisition::memory::ObserverDescription;
 use serde::{Deserialize, Serialize};
 
 use super::cases::Engine;
 use super::clock::ClockDescription;
+use super::instrument::InstrumentDescription;
 use super::locale::InputFacts;
 use super::locale_icu4x::AdmittedInputFacts;
 use super::operation::{Operation, Prepared};
+use super::shared::plan::present;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -64,6 +67,31 @@ impl Boundary {
             direct_children: Vec::new(),
         }
     }
+
+    /// The boundary of the peak live memory observed over an operation's
+    /// interval: the same markers as its duration's, under its memory pair.
+    /// An operation design 015 measures no memory over has none.
+    pub(super) fn for_memory(operation: Operation) -> Option<Self> {
+        let memory = operation.peak_memory()?;
+        Some(Self {
+            identity: memory.boundary.into(),
+            phase: memory.phase.into(),
+            cost: memory.cost.into(),
+            metric: "peak_live_bytes".into(),
+            excluded_markers: strings(&[
+                "fixture-and-input-acquisition",
+                "immutable-input-preparation",
+                "observer-and-collector-setup",
+                "operation-dispatch-and-handle-cloning",
+                "input-and-invocation-black-box",
+                "peak-selection-and-aggregation",
+                "semantic-observation-and-validation",
+                "reporting",
+                "output-destruction-and-teardown",
+            ]),
+            ..Self::for_operation(operation)
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -82,9 +110,19 @@ struct OptimizationBarrier {
     semantic_validation: String,
 }
 
+/// A case's Measurement Method Descriptor: how its duration is timed, or how
+/// its peak is observed. Each spells its own fields, so neither reads as the
+/// other, and a duration case keeps exactly the bytes it had before memory.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(untagged)]
+pub(super) enum Method {
+    Duration(DurationMethod),
+    Memory(MemoryMethod),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct Method {
+pub(super) struct DurationMethod {
     identity: String,
     revision: String,
     metric: String,
@@ -107,8 +145,85 @@ pub(super) struct Method {
     optimization_barrier: OptimizationBarrier,
 }
 
+/// The method of a peak observed through an allocator observer. What counts,
+/// who counts it, and what the counts do not see are the observer's own
+/// description; the rest is how this owner reads one interval.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct MemoryMethod {
+    identity: String,
+    revision: String,
+    metric: String,
+    canonical_unit: String,
+    provider: String,
+    provider_revision: String,
+    observer: String,
+    observer_revision: String,
+    counting: String,
+    observation_domain: String,
+    excluded_domain: String,
+    event_taxonomy: String,
+    peak_relation: String,
+    net_relation: String,
+    sample_aggregation_kind: String,
+    repetition_aggregation: String,
+    concurrency_coverage: String,
+    overflow_behavior: String,
+    numeric_decision_eligibility: String,
+    limitations: Vec<String>,
+    included_instrumentation: Vec<String>,
+    estimated_overhead_subtraction: bool,
+    optimization_barrier: OptimizationBarrier,
+}
+
 impl Method {
     pub(super) fn monotonic_invocation() -> Self {
+        Self::Duration(DurationMethod::monotonic_invocation())
+    }
+
+    /// The method of a peak the given observer counts.
+    pub(super) fn observed_peak(observer: ObserverDescription) -> Self {
+        Self::Memory(MemoryMethod {
+            identity: "intlify-config-observed-peak-invocation".into(),
+            revision: "0".into(),
+            metric: "peak_live_bytes".into(),
+            canonical_unit: "octet".into(),
+            provider: observer.provider.into(),
+            provider_revision: observer.provider_revision.into(),
+            observer: observer.identity.into(),
+            observer_revision: observer.revision.into(),
+            counting: observer.counting.into(),
+            observation_domain: "owner-boundary-complete-core-invocation".into(),
+            excluded_domain: "ordered-owner-boundary-excluded-markers".into(),
+            event_taxonomy: "one-observer-mark-pair-per-invocation".into(),
+            peak_relation: "largest-net-growth-over-the-start-mark".into(),
+            net_relation: "net-below-zero-at-the-end-mark-refused-not-clamped".into(),
+            sample_aggregation_kind: "peak_over_batch".into(),
+            repetition_aggregation: "largest-of-separate-single-invocation-peaks".into(),
+            concurrency_coverage: "calling-thread-synchronous-core-no-worker-summation".into(),
+            // Taking the largest peak needs no arithmetic, so it cannot
+            // overflow; the provider's unchecked counters are a limitation.
+            overflow_behavior: "largest-peak-needs-no-arithmetic-provider-counters-unchecked"
+                .into(),
+            // 026 fixes this class for memory too (D26:1459).
+            numeric_decision_eligibility: "qualified-runner".into(),
+            limitations: strings(observer.limitations),
+            included_instrumentation: strings(&[
+                "preserved-indirect-call",
+                "complete-output-black-box",
+                "observer-mark-edges",
+            ]),
+            estimated_overhead_subtraction: false,
+            optimization_barrier: OptimizationBarrier::between(
+                "intlify-config-observed-core-call-black-box",
+                "mark",
+            ),
+        })
+    }
+}
+
+impl DurationMethod {
+    fn monotonic_invocation() -> Self {
         Self {
             identity: "intlify-config-posix-monotonic-invocation".into(),
             revision: "0".into(),
@@ -135,21 +250,32 @@ impl Method {
                 "clock-read-edge-overhead",
             ]),
             estimated_overhead_subtraction: false,
-            optimization_barrier: OptimizationBarrier {
-                identity: "intlify-config-core-call-black-box".into(),
-                revision: "0".into(),
-                applicability: "required".into(),
-                input_opacity: "std-hint-black-box-runtime-materialized-input".into(),
-                invocation_preservation: "std-hint-black-box-function-pointer-per-repetition"
-                    .into(),
-                output_consumption: "std-hint-black-box-complete-ordinary-output".into(),
-                output_lifetime: "owned-result-retained-through-end-read-and-observation".into(),
-                input_placement: "before-start-read".into(),
-                invocation_placement: "after-start-read".into(),
-                output_placement: "before-end-read".into(),
-                semantic_validation:
-                    "after-end-read-compare-full-output-with-independent-fixture-observation".into(),
-            },
+            optimization_barrier: OptimizationBarrier::between(
+                "intlify-config-core-call-black-box",
+                "read",
+            ),
+        }
+    }
+}
+
+impl OptimizationBarrier {
+    /// The barrier around one invocation between two marks of the given kind:
+    /// a clock's reads, or an observer's marks.
+    fn between(identity: &str, mark: &str) -> Self {
+        Self {
+            identity: identity.into(),
+            revision: "0".into(),
+            applicability: "required".into(),
+            input_opacity: "std-hint-black-box-runtime-materialized-input".into(),
+            invocation_preservation: "std-hint-black-box-function-pointer-per-repetition".into(),
+            output_consumption: "std-hint-black-box-complete-ordinary-output".into(),
+            output_lifetime: format!("owned-result-retained-through-end-{mark}-and-observation"),
+            input_placement: format!("before-start-{mark}"),
+            invocation_placement: format!("after-start-{mark}"),
+            output_placement: format!("before-end-{mark}"),
+            semantic_validation: format!(
+                "after-end-{mark}-compare-full-output-with-independent-fixture-observation"
+            ),
         }
     }
 }
@@ -223,7 +349,15 @@ pub(super) fn prepared_core(operation: Operation, icu4x: Option<Engine>) -> Exec
 pub(super) struct Descriptors {
     pub(super) boundary: Boundary,
     pub(super) method: Method,
-    pub(super) clock_observation: ClockObservation,
+    /// The clock a duration case was timed with. A memory case reads none,
+    /// so it has none, rather than a null.
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(with = "ClockObservation")]
+    pub(super) clock_observation: Option<ClockObservation>,
     pub(super) execution: Execution,
     #[serde(deserialize_with = "Option::deserialize")]
     pub(super) locale_input: Option<InputFacts>,
@@ -268,10 +402,48 @@ impl Descriptors {
     /// Decoded record fields must never manufacture their own expected binding.
     pub(super) fn for_acquisition(prepared: &Prepared, clock: ClockDescription) -> Self {
         let operation = prepared.operation();
+        Self::assemble(
+            prepared,
+            Boundary::for_operation(operation),
+            Method::monotonic_invocation(),
+            Some(clock.observation()),
+        )
+    }
+
+    /// A memory case's descriptors, from its preparation and the description
+    /// its observer gives. An operation without a memory boundary has none.
+    pub(super) fn for_observer(prepared: &Prepared, observer: ObserverDescription) -> Option<Self> {
+        let boundary = Boundary::for_memory(prepared.operation())?;
+        Some(Self::assemble(
+            prepared,
+            boundary,
+            Method::observed_peak(observer),
+            None,
+        ))
+    }
+
+    /// The descriptors the run's instrument gives one case.
+    pub(super) fn for_instrument(
+        prepared: &Prepared,
+        instrument: InstrumentDescription,
+    ) -> Option<Self> {
+        match instrument {
+            InstrumentDescription::Clock(clock) => Some(Self::for_acquisition(prepared, clock)),
+            InstrumentDescription::Observer(observer) => Self::for_observer(prepared, observer),
+        }
+    }
+
+    fn assemble(
+        prepared: &Prepared,
+        boundary: Boundary,
+        method: Method,
+        clock_observation: Option<ClockObservation>,
+    ) -> Self {
+        let operation = prepared.operation();
         Self {
-            boundary: Boundary::for_operation(operation),
-            method: Method::monotonic_invocation(),
-            clock_observation: clock.observation(),
+            boundary,
+            method,
+            clock_observation,
             execution: prepared_core(operation, prepared.icu4x_engine()),
             locale_input: finite(prepared),
             locale_policy_resolution_input: match prepared {
@@ -290,33 +462,28 @@ impl Descriptors {
         }
     }
 
+    /// Check a duration case's descriptors against the acquired clock.
     pub(super) fn validate(
         &self,
         prepared: &Prepared,
         acquisition: ClockDescription,
     ) -> Vec<DescriptorIssue> {
-        let mut issues = Vec::new();
+        self.validate_with(prepared, InstrumentDescription::Clock(acquisition))
+    }
+
+    /// Check one case's descriptors against the run's acquired instrument.
+    pub(super) fn validate_with(
+        &self,
+        prepared: &Prepared,
+        acquisition: InstrumentDescription,
+    ) -> Vec<DescriptorIssue> {
         let operation = prepared.operation();
-        if self.boundary != Boundary::for_operation(operation) {
-            issues.push(DescriptorIssue::BoundaryMismatch);
-        }
-        let method = Method::monotonic_invocation();
-        if self.method != method {
-            issues.push(DescriptorIssue::MethodMismatch);
-        }
-        if self.clock_observation != acquisition.observation() {
-            issues.push(DescriptorIssue::ClockBindingMismatch);
-        }
-        let clock = &self.clock_observation;
-        if clock.provider != method.provider
-            || clock.provider_revision != method.provider_revision
-            || clock.clock != method.clock
-            || clock.resolution_nanoseconds.get() == 0
-            || clock.resolution_source != method.clock_resolution_source
-            || clock.conversion != "exact-integer-nanoseconds"
-        {
-            issues.push(DescriptorIssue::InvalidClockObservation);
-        }
+        let mut issues = match acquisition {
+            InstrumentDescription::Clock(clock) => self.validate_clock(operation, clock),
+            InstrumentDescription::Observer(observer) => {
+                self.validate_observer(operation, observer)
+            }
+        };
         if self.execution != prepared_core(operation, prepared.icu4x_engine()) {
             issues.push(DescriptorIssue::ExecutionMismatch);
         }
@@ -350,6 +517,57 @@ impl Descriptors {
         }
         if self.construction_input != construction(prepared) {
             issues.push(DescriptorIssue::ConstructionInputBindingMismatch);
+        }
+        issues
+    }
+
+    fn validate_clock(
+        &self,
+        operation: Operation,
+        acquisition: ClockDescription,
+    ) -> Vec<DescriptorIssue> {
+        let mut issues = Vec::new();
+        if self.boundary != Boundary::for_operation(operation) {
+            issues.push(DescriptorIssue::BoundaryMismatch);
+        }
+        let method = DurationMethod::monotonic_invocation();
+        if self.method != Method::Duration(method.clone()) {
+            issues.push(DescriptorIssue::MethodMismatch);
+        }
+        let Some(clock) = &self.clock_observation else {
+            issues.push(DescriptorIssue::ClockBindingMismatch);
+            return issues;
+        };
+        if *clock != acquisition.observation() {
+            issues.push(DescriptorIssue::ClockBindingMismatch);
+        }
+        if clock.provider != method.provider
+            || clock.provider_revision != method.provider_revision
+            || clock.clock != method.clock
+            || clock.resolution_nanoseconds.get() == 0
+            || clock.resolution_source != method.clock_resolution_source
+            || clock.conversion != "exact-integer-nanoseconds"
+        {
+            issues.push(DescriptorIssue::InvalidClockObservation);
+        }
+        issues
+    }
+
+    fn validate_observer(
+        &self,
+        operation: Operation,
+        observer: ObserverDescription,
+    ) -> Vec<DescriptorIssue> {
+        let mut issues = Vec::new();
+        if Boundary::for_memory(operation).as_ref() != Some(&self.boundary) {
+            issues.push(DescriptorIssue::BoundaryMismatch);
+        }
+        if self.method != Method::observed_peak(observer) {
+            issues.push(DescriptorIssue::MethodMismatch);
+        }
+        // A memory interval reads no clock, so a clock binding is foreign.
+        if self.clock_observation.is_some() {
+            issues.push(DescriptorIssue::ClockBindingMismatch);
         }
         issues
     }

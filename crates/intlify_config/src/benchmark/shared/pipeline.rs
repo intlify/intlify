@@ -8,6 +8,7 @@
 //! one this run issued, how each planned case turned out, and what the
 //! measured cases project to.
 
+use intlify_measurement::acquisition::memory::MemoryFailure;
 use intlify_measurement::owner::{
     CaseOutcome, ObservedDescriptors, OwnerFailure, OwnerRun, Rejection,
 };
@@ -49,13 +50,16 @@ impl ObservedDescriptors for Descriptors {
     }
 }
 
-fn failed_invocation(cause: &CaptureFailureCause) -> Invocation {
-    match cause {
+/// The common subtype of a failed invocation, or `None` for a cause that
+/// makes the case invalid rather than failed.
+fn failed_invocation(cause: &CaptureFailureCause) -> Option<Invocation> {
+    Some(match cause {
         CaptureFailureCause::Measurement(MeasurementFailure::Clock(
             ClockFailure::DurationConversionOverflow,
         )) => Invocation::DurationConversionOverflow,
         CaptureFailureCause::Measurement(MeasurementFailure::Clock(_)) => Invocation::ClockFailure,
-        CaptureFailureCause::Measurement(MeasurementFailure::InvocationPanicked) => {
+        CaptureFailureCause::Measurement(MeasurementFailure::InvocationPanicked)
+        | CaptureFailureCause::Memory(MemoryFailure::InvocationPanicked) => {
             Invocation::InvocationPanicked
         }
         CaptureFailureCause::MeasurementOverflow => Invocation::MeasurementOverflow,
@@ -72,7 +76,12 @@ fn failed_invocation(cause: &CaptureFailureCause) -> Invocation {
         CaptureFailureCause::LogicalWorkObservation(_)
         | CaptureFailureCause::LogicalWorkMismatch(_)
         | CaptureFailureCause::SemanticObservationMismatch(_) => Invocation::WorkObservationFailure,
-    }
+        // A net below zero reached past the case's boundary, and an observer
+        // that never ran the interval is defective (#138).
+        CaptureFailureCause::Memory(MemoryFailure::NegativeNet | MemoryFailure::NotInvoked) => {
+            return None
+        }
+    })
 }
 
 impl OwnerRun for RecordedRun {
@@ -148,7 +157,8 @@ impl OwnerRun for RecordedRun {
                 AttemptResult::CollectionFailed(ProfileCollectionFailure::Collection(
                     CollectionFailure::Capture(failure),
                 )) if attempt_outcome(attempt) == OwnerOutcome::Incomplete => {
-                    CaseOutcome::Failed(failed_invocation(&failure.cause))
+                    failed_invocation(&failure.cause)
+                        .map_or(CaseOutcome::Invalid, CaseOutcome::Failed)
                 }
                 AttemptResult::CollectionFailed(ProfileCollectionFailure::Collection(
                     CollectionFailure::Capture(failure),

@@ -65,13 +65,13 @@ fn warmup_is_excluded_and_raw_sample_order_and_repetitions_are_retained() {
     assert_eq!(clock.remaining(), 0);
     assert_eq!(capture.warmup_completed, Quantity::new(2));
     assert_eq!(capture.samples.len(), 2);
-    assert_eq!(capture.samples[0].aggregate_nanoseconds, Quantity::new(8));
-    assert_eq!(capture.samples[1].aggregate_nanoseconds, Quantity::new(18));
+    assert_eq!(capture.samples[0].aggregate_quantity, Quantity::new(8));
+    assert_eq!(capture.samples[1].aggregate_quantity, Quantity::new(18));
     for (ordinal, sample) in capture.samples.iter().enumerate() {
         assert_eq!(sample.ordinal.get(), u64::try_from(ordinal).unwrap());
         assert_eq!(sample.repetition_count.get(), 2);
         assert_eq!(sample.semantic_observation, expected);
-        assert_eq!(sample.determinism_proof, DurationProof::NotRequired);
+        assert_eq!(sample.determinism_proof, DeterminismProof::NotRequired);
         assert_eq!(sample.acquisition, Acquisition::Unpaired);
         let wire = serde_json::to_string(sample).unwrap();
         assert_eq!(
@@ -103,7 +103,7 @@ fn zero_warmup_and_one_sample_are_valid_observations_not_a_numeric_gate() {
     )
     .unwrap();
     assert_eq!(capture.warmup_completed.get(), 0);
-    assert_eq!(capture.samples[0].aggregate_nanoseconds.get(), 0);
+    assert_eq!(capture.samples[0].aggregate_quantity.get(), 0);
     assert!(validate_capture(&capture, policy, binding(), expected).is_empty());
 }
 
@@ -139,14 +139,21 @@ fn a_later_failed_repetition_keeps_only_a_diagnostic_prefix_not_successful_evide
             entry: None,
         },
     }));
-    let error = collect_inner(true, sampling(0, 2, 2), binding(), expected, || {
-        calls += 1;
-        if calls == 4 {
-            Err(cause.clone())
-        } else {
-            Ok(Quantity::new(5))
-        }
-    })
+    let error = collect_inner(
+        true,
+        sampling(0, 2, 2),
+        binding(),
+        expected,
+        Aggregation::BatchTotal,
+        || {
+            calls += 1;
+            if calls == 4 {
+                Err(cause.clone())
+            } else {
+                Ok(Quantity::new(5))
+            }
+        },
+    )
     .unwrap_err();
     assert_eq!(calls, 4);
     assert_eq!(error.cause, cause);
@@ -154,7 +161,7 @@ fn a_later_failed_repetition_keeps_only_a_diagnostic_prefix_not_successful_evide
     assert_eq!(error.complete_sample_prefix.len(), 1);
     assert_eq!(error.attempted_repetitions_in_sample.get(), 2);
     assert_eq!(error.completed_repetitions_in_sample.get(), 1);
-    assert_eq!(error.accumulated_nanoseconds.get(), 5);
+    assert_eq!(error.aggregate_quantity.get(), 5);
 }
 
 #[test]
@@ -175,16 +182,21 @@ fn clock_failure_is_not_an_empty_or_zero_successful_sample() {
 fn aggregate_overflow_rejects_the_complete_sample_without_saturation() {
     let (_, expected) = fixture();
     let mut values = [Quantity::new(u64::MAX), Quantity::new(1)].into_iter();
-    let error = collect_inner(true, sampling(0, 1, 2), binding(), expected, || {
-        Ok(values.next().unwrap())
-    })
+    let error = collect_inner(
+        true,
+        sampling(0, 1, 2),
+        binding(),
+        expected,
+        Aggregation::BatchTotal,
+        || Ok(values.next().unwrap()),
+    )
     .unwrap_err();
     assert_eq!(error.cause, CaptureFailureCause::MeasurementOverflow);
     assert!(error.complete_sample_prefix.is_empty());
     assert_eq!(error.attempted_repetitions_in_sample.get(), 2);
     assert_eq!(error.completed_repetitions_in_sample.get(), 1);
     // This is explicitly the diagnostic sum of the completed valid prefix.
-    assert_eq!(error.accumulated_nanoseconds.get(), u64::MAX);
+    assert_eq!(error.aggregate_quantity.get(), u64::MAX);
 }
 
 #[test]
@@ -234,9 +246,14 @@ fn sample_capacity_and_total_arithmetic_are_admitted_before_execution_or_allocat
 #[test]
 fn unavailable_preparation_runs_no_warmup_or_measurement() {
     let (_, expected) = fixture();
-    let error = collect_inner(false, sampling(1, 1, 1), binding(), expected, || {
-        panic!("must not invoke")
-    })
+    let error = collect_inner(
+        false,
+        sampling(1, 1, 1),
+        binding(),
+        expected,
+        Aggregation::BatchTotal,
+        || panic!("must not invoke"),
+    )
     .unwrap_err();
     assert_eq!(error.cause, CaptureFailureCause::PrerequisiteUnavailable);
     assert_eq!(error.stage, CaptureStage::Preparation);
@@ -308,4 +325,50 @@ fn cross_run_cross_case_and_reordered_samples_cannot_pass_revalidation() {
     }
     capture.samples.swap(0, 1);
     assert!(!validate_capture(&capture, policy, binding(), expected).is_empty());
+}
+
+#[test]
+fn a_peak_sample_keeps_its_largest_repetition_and_a_duration_sample_their_sum() {
+    let (_, expected) = fixture();
+    for (aggregation, aggregate) in [
+        (Aggregation::PeakOverBatch, 9),
+        (Aggregation::BatchTotal, 21),
+    ] {
+        let mut values = [5, 9, 7].map(Quantity::new).into_iter();
+        let capture = collect_inner(
+            true,
+            sampling(0, 1, 3),
+            binding(),
+            expected,
+            aggregation,
+            || Ok(values.next().unwrap()),
+        )
+        .unwrap();
+        assert_eq!(
+            capture.samples[0].aggregate_quantity,
+            Quantity::new(aggregate)
+        );
+    }
+}
+
+#[test]
+fn a_memory_failure_is_its_own_cause() {
+    assert_eq!(
+        CaptureFailureCause::from(PeakFailure::PrerequisiteUnavailable),
+        CaptureFailureCause::PrerequisiteUnavailable
+    );
+    for failure in [
+        MemoryFailure::InvocationPanicked,
+        MemoryFailure::NotInvoked,
+        MemoryFailure::NegativeNet,
+    ] {
+        assert_eq!(
+            CaptureFailureCause::from(PeakFailure::Memory(failure)),
+            CaptureFailureCause::Memory(failure)
+        );
+    }
+    assert_eq!(
+        serde_json::to_value(CaptureFailureCause::Memory(MemoryFailure::NegativeNet)).unwrap(),
+        serde_json::json!({"kind": "memory", "detail": "negative-net"})
+    );
 }

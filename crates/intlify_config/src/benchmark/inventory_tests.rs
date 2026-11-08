@@ -539,6 +539,7 @@ fn all_native_fixture_collections_are_accounted_for_and_cannot_hide_a_missing_at
     use super::cases::{declarations, registry::Registry};
     use super::clock::MonotonicClock;
     use super::collect::collect_operation;
+    use super::instrument::RunInstrument;
     use super::observation::Frame;
     use super::quantity::{Quantity, Repetitions};
     use super::sample::{CaptureBinding, CaptureCapacity, Sampling};
@@ -555,7 +556,7 @@ fn all_native_fixture_collections_are_accounted_for_and_cannot_hide_a_missing_at
         build: id("build"),
     };
     let registry = Registry::load().unwrap();
-    let clock = MonotonicClock::acquire().unwrap();
+    let clock = RunInstrument::Clock(MonotonicClock::acquire().unwrap());
     let sampling = Sampling::admit(
         Quantity::new(1),
         Repetitions::new(1).unwrap(),

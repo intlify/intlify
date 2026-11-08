@@ -866,6 +866,7 @@ fn decoded_missing_reordered_duplicate_or_changed_facts_do_not_match_the_fixture
 
 #[test]
 fn sample_capture_rechecks_work_even_when_the_semantic_checksum_matches() {
+    use crate::benchmark::instrument::Timed;
     use crate::benchmark::observation::Frame;
     use crate::benchmark::quantity::Repetitions;
     use crate::benchmark::sample::{
@@ -895,7 +896,7 @@ fn sample_capture_rechecks_work_even_when_the_semantic_checksum_matches() {
         case: Frame::new("test-work-case").finish(),
     };
     let error = collect_with_work(
-        &ScriptedClock::nanos([2, 9]),
+        &Timed(&ScriptedClock::nanos([2, 9])),
         &prepared,
         expected,
         &work,

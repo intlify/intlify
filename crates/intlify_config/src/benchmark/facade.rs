@@ -5,7 +5,9 @@
 //! project settings, arbitrary measured callbacks, or partial Profile state.
 //! Revalidation retains the original independent capture authority privately.
 
-use super::run::{PreparedRun, RecordedRun};
+use intlify_measurement::acquisition::memory::{MemoryObserver, ObserverDescription};
+
+use super::run::{PreparedRun, RecordedRun, RunFailure};
 use super::shared::{measurement::Outcome, pipeline};
 
 /// Diagnostic outcome, never a numeric performance decision.
@@ -62,7 +64,26 @@ pub struct CompletedObservation {
 /// POSIX clock acquisition is supported on Linux/macOS; unsupported acquisition
 /// fails explicitly rather than selecting an undeclared alternative method.
 pub fn observe_smoke() -> Result<CompletedObservation, ObservationError> {
-    let run = PreparedRun::acquire()
+    complete(PreparedRun::acquire())
+}
+
+/// Observe the fixed 40-case peak live memory of fresh resolver construction
+/// (design 015's `construction_peak_live_memory`) with the observer handed in,
+/// described as it describes itself. The observer is a seam: a memory
+/// measurement's own binary installs the allocator it counts through, so this
+/// library names none. The run's identity takes Linux/macOS entropy; elsewhere
+/// the capture fails explicitly, as the duration run's does.
+pub fn observe_memory_smoke(
+    observer: Box<dyn MemoryObserver>,
+    description: ObserverDescription,
+) -> Result<CompletedObservation, ObservationError> {
+    complete(PreparedRun::acquire_memory(observer, description))
+}
+
+fn complete(
+    acquired: Result<PreparedRun, RunFailure>,
+) -> Result<CompletedObservation, ObservationError> {
+    let run = acquired
         .and_then(PreparedRun::collect)
         .map_err(|_| ObservationError::CaptureFailed)?;
     let artifacts =
@@ -169,6 +190,36 @@ mod tests {
         assert_eq!(
             observation.verify_saved(&duplicate),
             Err(ObservationError::InvalidFileInventory)
+        );
+    }
+
+    #[test]
+    fn the_memory_facade_observes_each_construction_case_and_revalidates_its_bytes() {
+        use crate::benchmark::instrument::tests::{report, ScriptedObserver, DESCRIPTION};
+        let observation = observe_memory_smoke(
+            Box::new(ScriptedObserver::new([report(4096, 64)])),
+            DESCRIPTION,
+        )
+        .unwrap();
+        let records = observation.records();
+        assert_eq!(
+            records.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
+            [
+                "run-plan.json",
+                "owner-result.json",
+                "measurement-evidence.json",
+                "run-evaluation.json",
+                "report.json"
+            ]
+        );
+        assert_eq!(
+            observation.verify_saved(&records).unwrap(),
+            ObservationSummary {
+                outcome: ObservationOutcome::Complete,
+                planned_cases: 40,
+                measured_cases: 40,
+                non_measured_cases: 0
+            }
         );
     }
 }

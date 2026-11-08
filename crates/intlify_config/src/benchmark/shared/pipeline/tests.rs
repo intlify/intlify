@@ -74,7 +74,7 @@ fn actual_owner_run_projects_all_thirteen_pairs_and_raw_samples_through_report_a
         let projected = &case["samples"][0];
         let raw = &native["result"]["attempts"][index]["result"]["detail"]["operation"]
             ["operation"]["capture"]["samples"][0];
-        assert_eq!(projected["aggregateQuantity"], raw["aggregateNanoseconds"]);
+        assert_eq!(projected["aggregateQuantity"], raw["aggregateQuantity"]);
         assert_eq!(projected["repetitionCount"], raw["repetitionCount"]);
         assert_eq!(
             projected["executionIdentity"]["value"],
@@ -539,4 +539,109 @@ fn a_projection_outside_the_common_vocabulary_is_never_projected() {
     value["sampleAggregation"] = json!("peak_over_batch");
     let outside: CaseProjection = serde_json::from_value(value).unwrap();
     assert!(project(&outside).is_none());
+}
+
+#[test]
+fn a_memory_run_projects_each_construction_peak_through_report_admission() {
+    use crate::benchmark::instrument::tests::{report, ScriptedObserver, DESCRIPTION};
+    let run = PreparedRun::acquire_memory(
+        Box::new(ScriptedObserver::new([report(4096, 64)])),
+        DESCRIPTION,
+    )
+    .unwrap()
+    .collect()
+    .unwrap();
+    let artifacts = produce(&run).unwrap();
+    let checked = validate(&run, &artifacts).unwrap();
+    assert_eq!(checked.outcome, Outcome::Complete);
+    assert_eq!(
+        (
+            checked.planned_cases,
+            checked.measured_cases,
+            checked.non_measured_cases
+        ),
+        (40, 40, 0)
+    );
+    let evidence = value(artifacts.evidence.as_ref().unwrap());
+    let report = value(&artifacts.report);
+    let cases = evidence["body"]["cases"].as_array().unwrap();
+    let rows = report["body"]["sections"][0]["rows"].as_array().unwrap();
+    assert_eq!((cases.len(), rows.len()), (40, 40));
+    for (case, row) in cases.iter().zip(rows) {
+        // The peak is the observed one, never divided by the repetitions.
+        assert_eq!(case["samples"][0]["aggregateQuantity"], "4096");
+        assert_eq!(row["samples"][0]["aggregateQuantity"], "4096");
+        assert_eq!(row["ownerPhase"], "profile_resolve_peak_memory");
+        assert_eq!(row["ownerCost"], "construction_peak_live_memory");
+        assert_eq!(row["category"], "memory");
+        assert_eq!(row["operationClass"], "peak_live");
+        assert_eq!(row["performanceSurface"], "core");
+        assert_eq!(row["metric"], "peak_live_bytes");
+        assert_eq!(row["unit"], "octet");
+    }
+    let fields = evidence["body"]["environment"]["fields"]
+        .as_array()
+        .unwrap();
+    let state = |name: &str| {
+        &fields
+            .iter()
+            .find(|entry| entry["observation"]["field"] == name)
+            .unwrap()["observation"]["state"]
+    };
+    assert_eq!(
+        state("memory_observer"),
+        &json!({
+            "kind": "observed",
+            "value": {"identity": "intlify-config-test-observer", "revision": "0"},
+        })
+    );
+    assert_eq!(state("clock_or_sampler")["kind"], "not-applicable");
+    assert_eq!(
+        state("clock_or_sampler")["applicabilityRule"],
+        json!({"identity": "intlify-config-memory-run-reads-no-clock", "revision": "0"})
+    );
+    // The harness times nothing in a memory run; its binary installs the
+    // observer's counting allocator.
+    let instrumentation = &state("instrumentation")["value"];
+    assert_eq!(
+        instrumentation["descriptor"],
+        json!({"identity": "intlify-config-owner-memory-run-instrumentation", "revision": "0"})
+    );
+    assert_eq!(instrumentation["timing"], "not-installed-by-this-harness");
+    assert_eq!(
+        instrumentation["allocation"],
+        "observer-counting-global-allocator-installed-by-the-binary"
+    );
+    // The committed evidence schema admits a memory run's evidence too.
+    let schema: Value = serde_json::from_str(include_str!(
+        "../../../../schema/measurement-evidence-set-v0.schema.json"
+    ))
+    .unwrap();
+    let oracle = jsonschema::draft7::new(&schema).unwrap();
+    assert!(
+        oracle.is_valid(&evidence),
+        "{:?}",
+        oracle.iter_errors(&evidence).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn only_a_panicking_memory_interval_is_a_failed_invocation() {
+    assert_eq!(
+        failed_invocation(&CaptureFailureCause::Memory(
+            MemoryFailure::InvocationPanicked
+        )),
+        Some(Invocation::InvocationPanicked)
+    );
+    // The other two make the case invalid rather than failed (#138).
+    for failure in [MemoryFailure::NotInvoked, MemoryFailure::NegativeNet] {
+        assert_eq!(
+            failed_invocation(&CaptureFailureCause::Memory(failure)),
+            None
+        );
+    }
+    assert_eq!(
+        failed_invocation(&CaptureFailureCause::MeasurementOverflow),
+        Some(Invocation::MeasurementOverflow)
+    );
 }

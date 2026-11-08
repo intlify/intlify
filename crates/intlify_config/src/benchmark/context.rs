@@ -2,10 +2,12 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Attach acquired build/environment inputs to profile-bound capture. The
-//! context owns the measured clock; submitted rows cannot select another one.
+//! context owns the run's instrument, the measured clock or the observer it
+//! was handed; submitted rows cannot select another one.
 //! This remains a partial owner context, not the complete 026 environment-field
 //! inventory, a common Build Identity, Run Plan, or projection/report admission.
 
+use intlify_measurement::acquisition::memory::{MemoryObserver, ObserverDescription};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
 
@@ -13,6 +15,7 @@ use super::build::{BuildIssue, BuildObservation, ObservedBuild};
 use super::cases::registry::{AdmittedFixture, Registry};
 use super::clock::{ClockFailure, MonotonicClock};
 use super::environment::{EnvironmentInputs, EnvironmentIssue, ObservedEnvironment};
+use super::instrument::{InstrumentDescription, RunInstrument};
 use super::observation::Digest;
 use super::profile::{
     AdmittedProfile, MeasurementProfile, ProfileCollectionFailure, ProfileCollectionIssue,
@@ -25,7 +28,7 @@ pub(super) struct CaptureContext {
     profile: AdmittedProfile,
     build: ObservedBuild,
     environment: ObservedEnvironment,
-    clock: MonotonicClock,
+    instrument: RunInstrument,
 }
 
 /// The complete context is retained once, not copied into every operation row.
@@ -56,21 +59,56 @@ pub(super) enum ContextIssue {
 }
 
 impl CaptureContext {
+    /// A duration run's context, timed with the acquired clock.
     pub(super) fn acquire(registry: &Registry) -> Result<Self, ContextAcquisitionIssue> {
         let build = ObservedBuild::acquire().map_err(ContextAcquisitionIssue::Build)?;
         let clock = MonotonicClock::acquire().map_err(ContextAcquisitionIssue::Clock)?;
-        let environment =
-            ObservedEnvironment::acquire(&clock).map_err(ContextAcquisitionIssue::Environment)?;
+        Self::with(
+            AdmittedProfile::smoke(registry),
+            build,
+            RunInstrument::Clock(clock),
+        )
+    }
+
+    /// A memory run's context, observed with the observer it is handed and
+    /// described as that observer describes itself.
+    pub(super) fn acquire_memory(
+        registry: &Registry,
+        observer: Box<dyn MemoryObserver>,
+        description: ObserverDescription,
+    ) -> Result<Self, ContextAcquisitionIssue> {
+        let build = ObservedBuild::acquire().map_err(ContextAcquisitionIssue::Build)?;
+        Self::with(
+            AdmittedProfile::memory_smoke(registry),
+            build,
+            RunInstrument::Observer {
+                observer,
+                description,
+            },
+        )
+    }
+
+    fn with(
+        profile: AdmittedProfile,
+        build: ObservedBuild,
+        instrument: RunInstrument,
+    ) -> Result<Self, ContextAcquisitionIssue> {
+        let environment = ObservedEnvironment::acquire(instrument.description())
+            .map_err(ContextAcquisitionIssue::Environment)?;
         Ok(Self {
-            profile: AdmittedProfile::smoke(registry),
+            profile,
             build,
             environment,
-            clock,
+            instrument,
         })
     }
 
     pub(super) fn profile(&self) -> &MeasurementProfile {
         self.profile.document()
+    }
+
+    pub(super) fn instrument(&self) -> InstrumentDescription {
+        self.instrument.description()
     }
 
     pub(super) fn build_checksum(&self) -> Digest {
@@ -113,7 +151,7 @@ impl CaptureContext {
     ) -> Result<ContextualOperation, ProfileCollectionFailure> {
         let operation = self
             .profile
-            .collect(&self.clock, ordinal, fixture, binding)?;
+            .collect(&self.instrument, ordinal, fixture, binding)?;
         Ok(ContextualOperation {
             build_observation: self.build.checksum(),
             environment_observation: self.environment.checksum(),
@@ -175,7 +213,7 @@ impl ContextualOperation {
                     &context.profile,
                     ordinal,
                     fixture,
-                    context.clock.description(),
+                    context.instrument.description(),
                     binding,
                 )
                 .into_iter()

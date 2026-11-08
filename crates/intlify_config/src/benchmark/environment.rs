@@ -14,11 +14,13 @@ use intlify_measurement::acquisition::host::HostView;
 pub(super) use intlify_measurement::acquisition::host::{
     KernelView, LibraryTarget, ParallelismHint,
 };
+use intlify_measurement::acquisition::memory::ObserverDescription;
 pub(super) use intlify_measurement::acquisition::Acquired;
 
-use super::clock::MonotonicClock;
 use super::descriptor::ClockObservation;
+use super::instrument::InstrumentDescription;
 use super::observation::{Digest, Frame};
+use super::shared::plan::present;
 
 /// This path has no qualification/preflight admission, so it cannot construct
 /// either controlled or qualified contexts from CI flags or caller strings.
@@ -39,7 +41,50 @@ pub(super) struct EnvironmentInputs {
     pub(super) kernel_view: Acquired<KernelView>,
     pub(super) available_parallelism_hint: Acquired<ParallelismHint>,
     pub(super) runner: RunnerContext,
-    pub(super) clock: ClockObservation,
+    /// The clock a duration run times with. A memory run reads none.
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(super) clock: Option<ClockObservation>,
+    /// The observer a memory run counts with, as it describes itself. A
+    /// duration run has none.
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(super) memory_observer: Option<ObserverFacts>,
+}
+
+/// What an observer said about itself when the run acquired it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct ObserverFacts {
+    pub(super) provider: String,
+    pub(super) provider_revision: String,
+    pub(super) identity: String,
+    pub(super) revision: String,
+    pub(super) counting: String,
+    pub(super) limitations: Vec<String>,
+}
+
+impl ObserverFacts {
+    fn observe(description: ObserverDescription) -> Self {
+        Self {
+            provider: description.provider.into(),
+            provider_revision: description.provider_revision.into(),
+            identity: description.identity.into(),
+            revision: description.revision.into(),
+            counting: description.counting.into(),
+            limitations: description
+                .limitations
+                .iter()
+                .map(|limitation| (*limitation).into())
+                .collect(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,17 +107,24 @@ fn checksum(document: &EnvironmentInputs) -> Result<Digest, EnvironmentIssue> {
 }
 
 impl ObservedEnvironment {
-    pub(super) fn acquire(clock: &MonotonicClock) -> Result<Self, EnvironmentIssue> {
+    pub(super) fn acquire(instrument: InstrumentDescription) -> Result<Self, EnvironmentIssue> {
         // The host views are the shared acquisition's, so every owner reads
         // the same machine the same way. This owner's codec frames them.
         let host = HostView::acquire();
+        let (clock, memory_observer) = match instrument {
+            InstrumentDescription::Clock(clock) => (Some(clock.observation()), None),
+            InstrumentDescription::Observer(observer) => {
+                (None, Some(ObserverFacts::observe(observer)))
+            }
+        };
         let document = EnvironmentInputs {
             codec: "intlify-config-environment-inputs/0".into(),
             library_target: host.library_target,
             kernel_view: host.kernel_view,
             available_parallelism_hint: host.available_parallelism_hint,
             runner: RunnerContext::LocalUncontrolled,
-            clock: clock.description().observation(),
+            clock,
+            memory_observer,
         };
         let checksum = checksum(&document)?;
         Ok(Self { document, checksum })
