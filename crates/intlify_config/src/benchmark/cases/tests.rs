@@ -23,7 +23,7 @@ fn limits() -> StructuralLimits {
 #[test]
 fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
     let cases = declarations();
-    assert_eq!(cases.len(), 318);
+    assert_eq!(cases.len(), 343);
     assert_eq!(cases, declarations());
     let mut identities = BTreeSet::new();
     for case in &cases {
@@ -328,12 +328,19 @@ fn every_finite_case_prepares_its_exact_result_and_work_including_all_limit_edge
                             ));
                         }
                     }
+                    Output::Construction(resolved) => {
+                        // Refused at the bounds' row, naming the bound one past
+                        // its value.
+                        let (refusal, _) = resolved.constructed.as_ref().unwrap_err();
+                        assert_eq!(refusal.number(), 1);
+                        assert_eq!(refusal.bound(), super::construction_inputs::bound(kind));
+                    }
                     _ => panic!("first-over must fail its owning stage"),
                 }
             }
         }
     }
-    assert_eq!(edges, 72);
+    assert_eq!(edges, 97);
 }
 
 #[test]
@@ -407,5 +414,5 @@ fn every_declared_case_is_admitted_against_fixed_input_result_and_work_expectati
                 .matches_expected(fixture.expected_work())
         );
     }
-    assert_eq!(contexts.len(), 318);
+    assert_eq!(contexts.len(), 343);
 }

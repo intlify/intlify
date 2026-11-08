@@ -391,16 +391,15 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
 }
 
 /// Every byte of the input construction is given, and each component's
-/// tuple: the recipe's input, and nothing else.
+/// tuple: the case's input, and nothing else.
 fn construction_input(
     frame: &mut Frame,
     candidate: &Candidate,
     input: &ConstructionInput,
 ) -> Result<(), ContextFailure> {
-    let Recipe::Construction(recipe) = candidate.declaration.fixture else {
-        return Err(ContextFailure::ConstructionInputMismatch);
-    };
-    if candidate.declaration.selector != super::Selector::Absent || *input != recipe.input() {
+    let expected = super::construction_inputs::case_input(&candidate.declaration)
+        .ok_or(ContextFailure::ConstructionInputMismatch)?;
+    if candidate.declaration.selector != super::Selector::Absent || *input != expected.0 {
         return Err(ContextFailure::ConstructionInputMismatch);
     }
     let mut component = |submitted: Option<&Submitted>| -> Result<(), ContextFailure> {

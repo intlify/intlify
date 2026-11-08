@@ -100,7 +100,7 @@ fn waiting(resolved: &Resolved) -> Vec<(Unit, Vec<Subject>)> {
 #[test]
 fn hydration_cases_keep_the_281_rows_and_append_after_them() {
     let cases = declarations();
-    assert_eq!(cases.len(), 318);
+    assert_eq!(cases.len(), 343);
     assert!(cases[..281]
         .iter()
         .all(|case| case.operation != Operation::HydrationRelationValidation));
