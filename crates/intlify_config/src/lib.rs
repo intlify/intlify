@@ -105,8 +105,8 @@ mod references;
 #[allow(dead_code)]
 mod artifacts;
 
-// 015's resolver construction under its built-in Root Package; nothing builds a
-// resolver from it yet.
+// 015's resolver construction under its built-in Root Package; only tests, the
+// benchmark, and the developer example build a resolver from it yet.
 #[allow(dead_code)]
 mod construction;
 

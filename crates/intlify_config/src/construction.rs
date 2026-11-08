@@ -30,7 +30,8 @@
 //! ([`rules`]), and ends by checking that every admitted authority is the one
 //! the resolver is compiled from. A successful construction keeps its input
 //! in an immutable resolver ([`resolver`]), whose Resolver Construction
-//! Identity is derived after it ([`identity`]).
+//! Identity is derived after it ([`identity`]). Two constructions compare by
+//! their identities and what those commit ([`staleness`]).
 
 pub(crate) mod admission;
 pub(crate) mod authority_set;
@@ -50,6 +51,7 @@ pub(crate) mod resolver;
 pub(crate) mod root;
 pub(crate) mod rules;
 pub(crate) mod scan;
+pub(crate) mod staleness;
 pub(crate) mod validator;
 
 #[cfg(any(test, feature = "vectors"))]

@@ -33,6 +33,7 @@ use super::flow::{self, AdmittedAuthorities, ConstructionInput};
 use super::identity::{self, ConstructionIdentity};
 use super::profile::{Pin, ProjectProfileSpecification, SlotValue};
 use super::root::ConstructionRoot;
+use super::staleness::ConstructionContext;
 use crate::locale::{DatasetPin, SemanticPins, Supported, VersionedIdentity};
 use crate::model::CONFIGURATION_SCHEMA_VERSION;
 use crate::references::{PolicyReference, TargetProfileReference};
@@ -117,6 +118,14 @@ impl ConstructedResolver {
     /// The resolver's Resolver Construction Identity.
     pub(crate) fn identity(&self, root: &ConstructionRoot) -> ConstructionIdentity {
         identity::derive(root, &self.admitted)
+    }
+
+    /// The construction as staleness compares it.
+    pub(crate) const fn context(&self) -> ConstructionContext<'_> {
+        ConstructionContext {
+            input: &self.input,
+            admitted: &self.admitted,
+        }
     }
 
     /// The configuration schema the resolver analyzes a configuration with.
