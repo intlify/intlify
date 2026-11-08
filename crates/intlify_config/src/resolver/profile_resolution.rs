@@ -21,7 +21,7 @@
 use crate::artifacts::collection::FormalCollection;
 use crate::artifacts::vocabulary::FormalVocabulary;
 use crate::input_limits::ValueCounts;
-use crate::locale::{CanonicalizationFailure, Provider};
+use crate::locale::{CanonicalizationFailure, Provider, SemanticPins};
 use crate::model::{IntlifyConfig, ProfileDeclaration, ProfileId};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::selection::{ProvisionalSelection, SelectionInvariant, SelectorInput};
@@ -131,7 +131,7 @@ pub(crate) struct Invocation<'a, Id> {
 
 /// What each phase admitted, or the causes of its absence. The canonicalizer
 /// Phase 5 binds runs Phases 7 and 8 but is no semantic value, so it is not
-/// kept.
+/// kept; the pins it was bound under are.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct SemanticState<'s, Id> {
     /// Phase 4: the confirmed policy, which also confirms the provisional
@@ -139,7 +139,11 @@ pub(crate) struct SemanticState<'s, Id> {
     pub(crate) policy: PolicyOutcome,
     /// Phases 0 and 5: the complete Profile Resolution Specification Set.
     pub(crate) specifications: Admitted<SpecificationSet<Id>>,
-    /// Phase 5: the surface classes of the admitted vocabulary.
+    /// Phase 5: the canonicalization specification and the dataset the
+    /// canonicalization data was bound under, which a checked profile
+    /// retains (D15:1311).
+    pub(crate) canonicalization: Admitted<SemanticPins<Id>>,
+    /// Phase 5: the admitted vocabulary.
     pub(crate) vocabulary: Admitted<SurfaceVocabulary>,
     /// Phase 6.
     pub(crate) identity: Admitted<ProjectIdentity>,
@@ -251,6 +255,9 @@ where
         SemanticGroup::LocaleCanonicalization,
         held(canonicalizer),
     )?;
+    let canonicalization = canonicalizer
+        .map(|canonicalizer| canonicalizer.binding().pins.clone())
+        .map_err(Causes::clone);
     let identity = resolve_project_identity(
         evaluation,
         confirmed,
@@ -386,6 +393,7 @@ where
     )?;
     Ok(SemanticState {
         specifications: SpecificationSet::new(&project_profile, &admitted),
+        canonicalization,
         vocabulary: admitted.vocabulary,
         policy,
         identity,
@@ -421,7 +429,7 @@ pub(super) mod tests {
     use crate::artifacts::collection::{read_collection, CollectionLimits};
     use crate::artifacts::content::sample;
     use crate::artifacts::envelope::{envelope_of, ArtifactKind, ExactTuple, FormalMember};
-    use crate::artifacts::vectors::vocabulary::{self as vectors, formal};
+    use crate::artifacts::vectors::vocabulary::{self as vectors, formal_of};
     use crate::construction::registry::check::testing::{check_id, requirements};
     use crate::construction::registry::check::CheckRegistry;
     use crate::input_limits::{Bound, InputLimits, RawInputLimits};
@@ -441,8 +449,9 @@ pub(super) mod tests {
     use crate::resolver::limits::{fixture_limits, ResolutionLimits, SECTION};
     use crate::resolver::locales::fixtures::canonical;
     use crate::resolver::locales::{self, LocaleKey, LocaleSubject, Location};
+    use crate::resolver::profile_view::{project, ProfileView};
     use crate::resolver::resource_policy::{self, PolicySlot, PolicySubject, ReferenceField};
-    use crate::resolver::specification::{Slot, VocabularyAssertion};
+    use crate::resolver::specification::{ActiveProfileSpecification, Slot, VocabularyAssertion};
     use crate::resolver::subject::SubjectKind;
     use crate::resolver::targets::{self, TargetSubject};
     use crate::structural::selection::{Selection, StringLengthFact};
@@ -544,7 +553,7 @@ pub(super) mod tests {
     }
 
     /// The selected policy's bounds, with room for every input here.
-    fn policy_limits() -> ResolutionLimits {
+    pub(crate) fn policy_limits() -> ResolutionLimits {
         fixture_limits(50_000)
     }
 
@@ -647,8 +656,12 @@ pub(super) mod tests {
     /// One invocation's inputs, which a test edits before resolving them.
     pub(crate) struct Inputs {
         config: Value,
+        /// The Profile ID the selector names.
+        selected: &'static str,
         members: Vec<Value>,
         specifications: SpecificationInput<Id>,
+        /// The members of the vocabulary submitted against its slot.
+        surfaces: &'static [&'static str],
         capability: ResolutionLimits,
         /// What trusted setup pinned in 018's Verification Input: the policy
         /// the declaration selects, whatever a test then changes.
@@ -677,8 +690,10 @@ pub(super) mod tests {
             let policy = resource_limit_policy(&policy_limits());
             let mut inputs = Self {
                 config,
+                selected: "web",
                 members: vec![policy.clone()],
                 specifications: specifications(),
+                surfaces: &vectors::MEMBERS,
                 capability: capability_limits(),
                 pinned: tuple_of(&policy),
             };
@@ -732,8 +747,42 @@ pub(super) mod tests {
             inputs
         }
 
+        /// `complete`'s profile under a vocabulary without surface classes,
+        /// asserted exactly, and without the coverage rules, which name them.
+        pub(crate) fn without_surface_classes() -> Self {
+            let mut inputs = Self::complete();
+            inputs.surfaces = &[];
+            inputs.specifications.intent_surface_class_vocabulary = Some(VocabularyAssertion {
+                identity: vectors::IDENTITY,
+                revision: vectors::REVISION,
+                semantic_digest: vectors::EMPTY_SEMANTIC_DIGEST,
+            });
+            inputs.declaration()["coverage"]
+                .as_object_mut()
+                .unwrap()
+                .remove("rules");
+            inputs
+        }
+
         pub(crate) fn declaration(&mut self) -> &mut Value {
-            &mut self.config["profiles"]["web"]
+            &mut self.config["profiles"][self.selected]
+        }
+
+        /// The same inputs with the selected declaration declared again under
+        /// `id`, which the selector then names: two declarations differing
+        /// only in their Profile IDs.
+        pub(crate) fn selecting(&self, id: &'static str) -> Self {
+            let mut config = self.config.clone();
+            config["profiles"][id] = config["profiles"][self.selected].clone();
+            Self {
+                config,
+                selected: id,
+                members: self.members.clone(),
+                specifications: self.specifications.clone(),
+                surfaces: self.surfaces,
+                capability: self.capability.clone(),
+                pinned: self.pinned.clone(),
+            }
         }
 
         /// Selects `policy`, submitted first in place of the selected one,
@@ -748,7 +797,7 @@ pub(super) mod tests {
         /// another order.
         pub(crate) fn reordered(&self) -> Self {
             let mut config = self.config.clone();
-            let web = &mut config["profiles"]["web"];
+            let web = &mut config["profiles"][self.selected];
             for path in [
                 "/requestedLocales",
                 "/targetProfiles/browser/requestedLocales",
@@ -764,15 +813,17 @@ pub(super) mod tests {
             members.reverse();
             Self {
                 config,
+                selected: self.selected,
                 members,
                 specifications: self.specifications.clone(),
+                surfaces: self.surfaces,
                 capability: self.capability.clone(),
                 pinned: self.pinned.clone(),
             }
         }
 
-        /// Phases 1 to 3 over the configuration, selecting `web`, and the
-        /// invocation's other inputs, for `run`.
+        /// Phases 1 to 3 over the configuration, selecting the declaration,
+        /// and the invocation's other inputs, for `run`.
         fn prepared<R>(
             &self,
             run: impl FnOnce(&CompleteConfiguration<'_>, &Invocation<'_, Id>) -> R,
@@ -780,24 +831,24 @@ pub(super) mod tests {
             let analysis = analyze(&self.config, &self.capability);
             let config = analysis.construct().unwrap().unwrap();
             let selector = SelectorInput::string(
-                "web",
+                self.selected,
                 self.capability
                     .configuration_input
                     .structural
                     .max_profile_id_bytes,
             );
             let Ok(Selection::Selected(selection)) = analysis.select(&selector) else {
-                panic!("web is not selected");
+                panic!("{} is not selected", self.selected);
             };
             let configuration =
                 CompleteConfiguration::new(&analysis, &config, &selector, &selection).unwrap();
             let supported = SupportedSpecifications::revision_zero(
-                ACTIVE,
+                ActiveProfileSpecification::fixture(ACTIVE),
                 Supported::new(vec![fixture_pins()]).unwrap(),
             );
             let capability = ImplementationCapability::fixture_owned(self.capability.clone());
             let collection = collection(&self.members);
-            let vocabulary = formal();
+            let vocabulary = formal_of(self.surfaces);
             let verification = VerificationInput::exact_pins([self.pinned.clone()]).unwrap();
             run(
                 &configuration,
@@ -861,6 +912,34 @@ pub(super) mod tests {
         ) -> R {
             self.attempt(|evaluation, state| inspect(evaluation, state.unwrap()))
         }
+
+        /// Phase 14 over the entry's semantic state, for `inspect` with what
+        /// the invocation recorded.
+        pub(crate) fn viewed<R>(
+            &self,
+            inspect: impl FnOnce(Evaluation, Admitted<ProfileView>) -> R,
+        ) -> R {
+            self.prepared(|configuration, invocation| {
+                let mut evaluation = Evaluation::default();
+                let mut set = None;
+                let state = resolve_profile(
+                    &mut evaluation,
+                    configuration,
+                    invocation,
+                    FixtureProvider::new(),
+                    &mut set,
+                )
+                .unwrap();
+                let view = project(&state, invocation.supported);
+                inspect(evaluation, view)
+            })
+        }
+
+        /// Phase 14 over the entry's semantic state: the profile view, or
+        /// the causes of the semantic results it needs and does not have.
+        pub(crate) fn view(&self) -> Admitted<ProfileView> {
+            self.viewed(|_, view| view)
+        }
     }
 
     /// The check ID of the Check Registry row a unit belongs to.
@@ -908,6 +987,7 @@ pub(super) mod tests {
         [
             ("policy", state.policy.confirmed.is_err()),
             ("specifications", state.specifications.is_err()),
+            ("canonicalization", state.canonicalization.is_err()),
             ("vocabulary", state.vocabulary.is_err()),
             ("identity", state.identity.is_err()),
             ("locales", state.locales.project.is_err()),
@@ -945,9 +1025,10 @@ pub(super) mod tests {
     }
 
     /// Every name `absent` returns when no policy was confirmed.
-    const EVERY: [&str; 14] = [
+    const EVERY: [&str; 15] = [
         "policy",
         "specifications",
+        "canonicalization",
         "vocabulary",
         "identity",
         "locales",
@@ -1738,8 +1819,10 @@ pub(super) mod tests {
         Inputs::complete().prepared(|configuration, invocation| {
             let mut pins = fixture_pins();
             pins.dataset.semantic_digest = "test-only-other-content-pin";
-            let supported =
-                SupportedSpecifications::revision_zero(ACTIVE, Supported::new(vec![pins]).unwrap());
+            let supported = SupportedSpecifications::revision_zero(
+                ActiveProfileSpecification::fixture(ACTIVE),
+                Supported::new(vec![pins]).unwrap(),
+            );
             let invocation = Invocation {
                 supported: &supported,
                 ..*invocation
@@ -1858,6 +1941,74 @@ pub(super) mod tests {
                     assert_eq!(first_evaluation, second_evaluation);
                     assert_eq!(unlocated(first), unlocated(second));
                 });
+            });
+        }
+    }
+
+    /// Phase 14 needs every semantic result: there is a view exactly when
+    /// every semantic group is established, and otherwise the view waits on
+    /// what the groups' owners wait on, whichever groups those are.
+    #[test]
+    fn the_view_exists_exactly_when_every_group_is_established() {
+        type Edit = (&'static str, fn(&mut Value));
+        let mut unasserted = Inputs::complete();
+        unasserted.specifications.project_profile = None;
+        let mut unconfirmed = Inputs::complete();
+        let mut limits = policy_limits();
+        let capability = capability_limits().locale_resolution.max_requested_locales;
+        limits.locale_resolution.max_requested_locales = bound(capability.get() + 1);
+        unconfirmed.select_policy(resource_limit_policy(&limits));
+        let mut untrusted = Inputs::complete();
+        untrusted.members.remove(TRUST);
+        let mut roleless = Inputs::complete();
+        roleless.replace_target_profile("server", target_profile("storefront-server", &[]));
+        let mut cases = vec![
+            ("complete", Inputs::complete()),
+            ("no project-profile assertion", unasserted),
+            ("a policy needing more than the capability", unconfirmed),
+            ("a trust policy not submitted", untrusted),
+            ("a server without its role", roleless),
+        ];
+        let edits: [Edit; 5] = [
+            ("a target in no group", |declaration| {
+                declaration["deploymentGroups"]["web"]["members"] = json!(["browser"]);
+            }),
+            ("a surface class outside the vocabulary", |declaration| {
+                declaration["coverage"]["rules"][1]["intentSurfaceClasses"] = json!(["unknown"]);
+            }),
+            ("a target locale outside the project", |declaration| {
+                declaration["targetProfiles"]["browser"]["requestedLocales"] = json!(["de"]);
+            }),
+            ("a fallback to its own key", |declaration| {
+                declaration["messageFallback"]["ja"] = json!(["ja"]);
+            }),
+            ("a glossary set not submitted", |declaration| {
+                declaration["policies"]["glossarySet"]["revision"] = json!("2");
+            }),
+        ];
+        for (name, edit) in edits {
+            let mut inputs = Inputs::complete();
+            edit(inputs.declaration());
+            cases.push((name, inputs));
+        }
+        for (name, inputs) in cases {
+            inputs.viewed(|evaluation, view| {
+                let groups = unestablished(&evaluation);
+                let waiting: BTreeSet<IssueKey> = groups
+                    .iter()
+                    .flat_map(|&group| match evaluation.status(&dependency::unit(group)) {
+                        Some(Status::NotEvaluated(causes)) => keys(causes),
+                        _ => unreachable!("{group:?} is unestablished"),
+                    })
+                    .collect();
+                assert_eq!(view.is_ok(), name == "complete", "{name}");
+                match view {
+                    Ok(_) => assert_eq!(groups, [], "{name}"),
+                    Err(causes) => {
+                        assert_ne!(groups, [], "{name}");
+                        assert_eq!(keys(&causes), waiting, "{name}");
+                    }
+                }
             });
         }
     }

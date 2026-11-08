@@ -72,7 +72,7 @@ pub(crate) struct IntentSurfaceClassVocabularyArtifact {
 impl IntentSurfaceClassVocabularyArtifact {
     /// The artifact of these members, as given, with its integrity digest
     /// computed over the rest.
-    #[cfg(any(test, feature = "vectors"))]
+    #[cfg(any(test, feature = "vectors", feature = "benchmark"))]
     pub(crate) fn sealed(
         identity: &'static str,
         revision: &'static str,

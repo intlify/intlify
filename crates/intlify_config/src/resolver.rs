@@ -28,6 +28,7 @@ pub(crate) mod locales;
 pub(crate) mod negotiation;
 pub(crate) mod origin;
 pub(crate) mod profile_resolution;
+pub(crate) mod profile_view;
 pub(crate) mod resource_policy;
 pub(crate) mod specification;
 pub(crate) mod subject;

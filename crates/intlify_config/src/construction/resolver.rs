@@ -37,7 +37,7 @@ use super::staleness::ConstructionContext;
 use crate::locale::{DatasetPin, SemanticPins, Supported, VersionedIdentity};
 use crate::model::CONFIGURATION_SCHEMA_VERSION;
 use crate::references::{PolicyReference, TargetProfileReference};
-use crate::resolver::specification::SupportedSpecifications;
+use crate::resolver::specification::{ActiveProfileSpecification, SupportedSpecifications};
 use crate::structural::AuthoringSchema;
 
 /// A configuration schema compiled for the formal reference types.
@@ -161,7 +161,15 @@ impl ConstructedResolver {
     pub(crate) fn supported(&self) -> SupportedSpecifications<String> {
         let slots = &self.profile.specification_slots;
         SupportedSpecifications::new(
-            pinned(&slots.project_profile),
+            ActiveProfileSpecification {
+                specification: pinned(&slots.project_profile),
+                semantic_digest: self
+                    .admitted
+                    .profile_specification
+                    .semantic_digest
+                    .as_str()
+                    .to_owned(),
+            },
             self.locale_canonicalization(),
             pinned(&slots.locale_negotiation),
             pinned(&slots.message_locale_fallback),
@@ -286,7 +294,13 @@ mod tests {
         };
         assert_eq!(
             resolver.supported(),
-            SupportedSpecifications::revision_zero(project_profile, Supported::revision_zero())
+            SupportedSpecifications::revision_zero(
+                ActiveProfileSpecification {
+                    specification: project_profile,
+                    semantic_digest: profile::SEMANTIC_DIGEST.to_owned(),
+                },
+                Supported::revision_zero()
+            )
         );
     }
 

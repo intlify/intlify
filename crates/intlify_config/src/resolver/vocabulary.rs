@@ -10,7 +10,8 @@
 
 use intlify_shared_json::token::Token;
 
-use crate::artifacts::vocabulary::{BodyFailure, FormalVocabulary};
+use crate::artifacts::vocabulary::{BodyFailure, FormalVocabulary, IntactVocabulary};
+use crate::artifacts::SemanticDigest;
 
 use super::evaluation::{
     both, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Phase, Reason,
@@ -32,38 +33,82 @@ pub(crate) const ASSERTED: Unit = Unit {
     check: Check::AssertedArtifact,
 };
 
-/// An admitted vocabulary's members: `IdentityToken`s, unique and in
-/// ascending unsigned UTF-8 byte order. The set may be empty.
+/// An admitted vocabulary: the identity, revision, and semantic digest its
+/// slot asserts, and its members, `IdentityToken`s unique and in ascending
+/// unsigned UTF-8 byte order. The set may be empty.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct SurfaceVocabulary(Vec<Token>);
+pub(crate) struct SurfaceVocabulary {
+    identity: Token,
+    revision: Token,
+    semantic_digest: SemanticDigest,
+    members: Vec<Token>,
+}
 
 impl SurfaceVocabulary {
+    /// An intact artifact, once found to be the one its slot asserts.
+    fn admitted(intact: IntactVocabulary) -> Self {
+        Self {
+            identity: intact.identity().clone(),
+            revision: intact.revision().clone(),
+            semantic_digest: intact.semantic_digest().clone(),
+            members: intact.into_members(),
+        }
+    }
+
+    pub(crate) const fn identity(&self) -> &Token {
+        &self.identity
+    }
+
+    pub(crate) const fn revision(&self) -> &Token {
+        &self.revision
+    }
+
+    pub(crate) const fn semantic_digest(&self) -> &SemanticDigest {
+        &self.semantic_digest
+    }
+
     pub(crate) fn members(&self) -> &[Token] {
-        &self.0
+        &self.members
     }
 
     /// The member `spelling` names, when it names one exactly.
     pub(crate) fn member(&self, spelling: &str) -> Option<&Token> {
-        self.0
+        self.members
             .binary_search_by(|member| member.as_str().cmp(spelling))
             .ok()
-            .map(|index| &self.0[index])
+            .map(|index| &self.members[index])
     }
 
-    /// The vocabulary of `members`, given in any order and each once, standing
-    /// in for one Phase 5 admitted.
+    /// The fixture vocabulary with `members`, given in any order and each
+    /// once, standing in for one Phase 5 admitted: sealed under the identity
+    /// and revision the vocabulary vectors give it, read, and found intact.
     #[cfg(any(test, feature = "benchmark"))]
     pub(crate) fn fixture_owned(members: &[&str]) -> Self {
-        let mut members: Vec<Token> = members
-            .iter()
-            .map(|member| Token::new(member).expect("a fixture member is an IdentityToken"))
-            .collect();
+        use crate::artifacts::vocabulary::{
+            read, IntentSurfaceClassVocabularyArtifact, VocabularyLimits,
+        };
+        let mut members = members.to_vec();
         members.sort_unstable();
         assert!(
             members.windows(2).all(|pair| pair[0] < pair[1]),
             "a fixture names each member once"
         );
-        Self(members)
+        let artifact =
+            IntentSurfaceClassVocabularyArtifact::sealed("intlify-test-vocabulary", "0", &members)
+                .expect("a fixture vocabulary has an integrity digest");
+        let room = VocabularyLimits {
+            artifact_bytes: u64::MAX,
+            depth: u64::MAX,
+            members: u64::MAX,
+            member_bytes: u64::MAX,
+            total_member_bytes: u64::MAX,
+        };
+        let bytes = serde_json::to_vec(&artifact).expect("a sealed vocabulary serializes");
+        let intact = read(Some(&bytes), &room)
+            .expect("a fixture vocabulary is within its room")
+            .admit()
+            .expect("a fixture member is an IdentityToken");
+        Self::admitted(intact)
     }
 }
 
@@ -116,7 +161,7 @@ pub(crate) fn admit_vocabulary<Id: AsRef<str>>(
             if assertion.semantic_digest.as_ref() != intact.semantic_digest().as_str() {
                 return Err(not_admitted(Reason::DigestMismatch));
             }
-            Ok(SurfaceVocabulary(intact.into_members()))
+            Ok(SurfaceVocabulary::admitted(intact))
         },
     )
 }

@@ -209,17 +209,37 @@ pub(crate) type Cells = BTreeMap<(CanonicalLocale, Token), Basis>;
 /// of the first.
 type Domains = BTreeMap<Domain, (usize, CoverageMode)>;
 
-/// The checked coverage: the admitted specification and the complete decision
-/// table.
+/// The checked coverage, 015's coverage semantic group: the admitted
+/// specification, the vocabulary its table was checked against, the
+/// effective project default mode, and the complete decision table over the
+/// requested locales.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CoveragePolicy<Id> {
     specification: VersionedIdentity<Id>,
+    vocabulary: SurfaceVocabulary,
+    requested: LocaleSet,
+    default_mode: CoverageMode,
     cells: Cells,
 }
 
 impl<Id> CoveragePolicy<Id> {
     pub(crate) const fn specification(&self) -> &VersionedIdentity<Id> {
         &self.specification
+    }
+
+    /// The admitted vocabulary whose surface classes the table spans.
+    pub(crate) const fn vocabulary(&self) -> &SurfaceVocabulary {
+        &self.vocabulary
+    }
+
+    /// The requested locales the table spans.
+    pub(crate) const fn requested(&self) -> &LocaleSet {
+        &self.requested
+    }
+
+    /// The declared default mode, or `direct-required` when none is declared.
+    pub(crate) const fn default_mode(&self) -> CoverageMode {
+        self.default_mode
     }
 
     /// The decision table: each cell with its effective mode, in cell order.
@@ -358,11 +378,12 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
             .and_then(|coverage| coverage.default_mode.as_option().copied())
             .unwrap_or(CoverageMode::DirectRequired)
     });
-    let decidable = both(default, both(checked.clone(), compared)).map(|(default, _)| default);
+    let decidable =
+        both(default.clone(), both(checked.clone(), compared)).map(|(default, _)| default);
     // A cell is named only once the bound proves the table may be built, and
     // every cell waits on the comparison bound. With no cell to wait on them,
     // the rules' own checks still decide whether the policy exists.
-    let cells = match both(span, sized) {
+    let cells = match both(span.clone(), sized) {
         Ok(((requested, vocabulary), ())) => {
             decide(evaluation, &decidable, requested, vocabulary, &domains)?
         }
@@ -375,14 +396,22 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
         cells,
         Ok,
     )?;
-    Ok(
-        both(both(specification.clone(), checked), table).map(|((specification, ()), cells)| {
-            CoveragePolicy {
-                specification,
-                cells,
-            }
-        }),
+    // The default mode exists whenever the declared coverage does, which the
+    // rule counts wait on too, and the span whenever the table does, so
+    // neither adds a cause of its own.
+    Ok(both(
+        both(both(specification.clone(), checked), table),
+        both(default, span),
     )
+    .map(
+        |(((specification, ()), cells), (default_mode, (requested, vocabulary)))| CoveragePolicy {
+            specification,
+            vocabulary: vocabulary.clone(),
+            requested: requested.clone(),
+            default_mode,
+            cells,
+        },
+    ))
 }
 
 /// A count's unit: every submitted item counts, within its bound.
