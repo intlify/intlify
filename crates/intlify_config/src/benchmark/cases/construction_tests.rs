@@ -31,7 +31,7 @@ fn observed(operation: Operation, recipe: ConstructionRecipe) -> Observation {
 #[test]
 fn construction_cases_keep_the_304_rows_and_append_after_them() {
     let cases = declarations();
-    assert_eq!(cases.len(), 343);
+    assert_eq!(cases.len(), 347);
     assert!(cases[..304].iter().all(|case| !matches!(
         case.operation,
         Operation::ConstructionAuthorityAdmission | Operation::ConstructionIdentity
@@ -167,44 +167,50 @@ fn the_inputs_that_construct_are_one_construction() {
 }
 
 /// The edges of the construction-root bounds follow the 318 rows, each the
-/// committed recipe with its bound and edge, in the bounds' canonical order.
+/// committed recipe with its bound and edge, in the bounds' canonical order;
+/// the two validation-work bounds' edges follow those 343 rows.
 #[test]
 fn bound_edges_keep_the_318_rows_and_append_after_them() {
-    use super::construction_inputs::{bound, edge_refused_at, EDGES};
+    use super::construction_inputs::{bound, edge_refused_at, EDGES, VALIDATION_WORK_EDGES};
 
     let cases = declarations();
-    let edges = EDGES
-        .into_iter()
-        .flat_map(|(kind, first_over)| {
-            [(kind, LimitEdge::Exact)]
-                .into_iter()
-                .chain(first_over.then_some((kind, LimitEdge::FirstOver)))
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(edges.len(), 25);
-    assert_eq!(cases.len(), 318 + edges.len());
-    let mut order = Vec::new();
-    for (declaration, &(kind, edge)) in cases[318..].iter().zip(&edges) {
-        assert_eq!(
-            declaration.operation,
-            Operation::ConstructionAuthorityAdmission
-        );
-        assert_eq!(declaration.fixture, Recipe::Construction(R::Committed));
-        assert_eq!(declaration.limit, Some((kind, edge)));
-        assert_eq!(
-            declaration.expected_kind == ExpectedKind::ConstructionConstructed,
-            edge_refused_at(kind, edge).is_none()
-        );
-        order.push(bound(kind).unwrap());
+    let mut start = 318;
+    for (bounds, kinds, count) in [(&EDGES[..], 13, 25), (&VALIDATION_WORK_EDGES[..], 2, 4)] {
+        let edges = bounds
+            .iter()
+            .flat_map(|&(kind, first_over)| {
+                [(kind, LimitEdge::Exact)]
+                    .into_iter()
+                    .chain(first_over.then_some((kind, LimitEdge::FirstOver)))
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(edges.len(), count);
+        let mut order = Vec::new();
+        for (declaration, &(kind, edge)) in cases[start..].iter().zip(&edges) {
+            assert_eq!(
+                declaration.operation,
+                Operation::ConstructionAuthorityAdmission
+            );
+            assert_eq!(declaration.fixture, Recipe::Construction(R::Committed));
+            assert_eq!(declaration.limit, Some((kind, edge)));
+            assert_eq!(
+                declaration.expected_kind == ExpectedKind::ConstructionConstructed,
+                edge_refused_at(kind, edge).is_none()
+            );
+            order.push(bound(kind).unwrap());
+        }
+        // The bounds' canonical order, each once.
+        order.dedup();
+        let canonical = crate::construction::admission::ConstructionBoundId::ALL
+            .into_iter()
+            .filter(|bound| order.contains(bound))
+            .collect::<Vec<_>>();
+        assert_eq!(order, canonical);
+        assert_eq!(order.len(), kinds);
+        start += count;
     }
-    // The bounds' canonical order, each once.
-    order.dedup();
-    let canonical = crate::construction::admission::ConstructionBoundId::ALL
-        .into_iter()
-        .filter(|bound| order.contains(bound))
-        .collect::<Vec<_>>();
-    assert_eq!(order, canonical);
-    assert_eq!(order.len(), 13);
+    assert_eq!(start, 343 + 4);
+    assert_eq!(cases.len(), start);
 }
 
 /// Each edge's input is at its bound or one past it, a first-over input is

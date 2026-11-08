@@ -2925,7 +2925,9 @@
         "construction-schema-references",
         "construction-registry-rows",
         "construction-registry-single-member-artifact-bytes",
-        "construction-cross-authority-checks"
+        "construction-cross-authority-checks",
+        "construction-schema-validation-work-units",
+        "construction-registry-validation-work-units"
       ],
       "type": "string"
     },

@@ -183,7 +183,9 @@ pub(in crate::benchmark) fn prepare(
             | LimitKind::ConstructionSchemaReferences
             | LimitKind::ConstructionRegistryRows
             | LimitKind::ConstructionRegistrySingleMemberArtifactBytes
-            | LimitKind::ConstructionCrossAuthorityChecks => {
+            | LimitKind::ConstructionCrossAuthorityChecks
+            | LimitKind::ConstructionSchemaValidationWorkUnits
+            | LimitKind::ConstructionRegistryValidationWorkUnits => {
                 return Err(PreparationFailure::UndeclaredCase);
             }
         };
@@ -241,7 +243,9 @@ pub(in crate::benchmark) fn prepare(
             | LimitKind::ConstructionSchemaReferences
             | LimitKind::ConstructionRegistryRows
             | LimitKind::ConstructionRegistrySingleMemberArtifactBytes
-            | LimitKind::ConstructionCrossAuthorityChecks => unreachable!(),
+            | LimitKind::ConstructionCrossAuthorityChecks
+            | LimitKind::ConstructionSchemaValidationWorkUnits
+            | LimitKind::ConstructionRegistryValidationWorkUnits => unreachable!(),
         }
     }
     let prepared = if declaration.operation == Operation::FileMaterialization {

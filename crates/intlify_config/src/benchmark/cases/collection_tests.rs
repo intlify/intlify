@@ -58,7 +58,7 @@ fn group(value: &Value) -> Unit {
 #[test]
 fn collection_cases_keep_the_186_rows_and_append_after_them() {
     let cases = declarations();
-    assert_eq!(cases.len(), 343);
+    assert_eq!(cases.len(), 347);
     assert!(cases[..186]
         .iter()
         .all(|case| case.operation != Operation::ArtifactCollectionAdmission));

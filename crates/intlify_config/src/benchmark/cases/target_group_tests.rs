@@ -60,7 +60,7 @@ fn of_target(id: &str, check: Check) -> Unit {
 #[test]
 fn target_group_cases_keep_the_252_rows_and_append_after_them() {
     let cases = declarations();
-    assert_eq!(cases.len(), 343);
+    assert_eq!(cases.len(), 347);
     assert!(cases[..252]
         .iter()
         .all(|case| case.operation != Operation::TargetAndGroupResolution));
