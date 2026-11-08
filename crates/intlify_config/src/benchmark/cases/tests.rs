@@ -23,7 +23,7 @@ fn limits() -> StructuralLimits {
 #[test]
 fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
     let cases = declarations();
-    assert_eq!(cases.len(), 304);
+    assert_eq!(cases.len(), 318);
     assert_eq!(cases, declarations());
     let mut identities = BTreeSet::new();
     for case in &cases {
@@ -111,6 +111,8 @@ fn declared_unbounded_case_kinds_agree_with_independently_checked_fixture_semant
                     | Operation::ResolvedBindingConstruction
                     | Operation::TargetAndGroupResolution
                     | Operation::HydrationRelationValidation
+                    | Operation::ConstructionAuthorityAdmission
+                    | Operation::ConstructionIdentity
             )
     }) {
         let source = case.fixture.source();
@@ -177,7 +179,9 @@ fn declared_unbounded_case_kinds_agree_with_independently_checked_fixture_semant
             | Operation::ArtifactCollectionAdmission
             | Operation::ResolvedBindingConstruction
             | Operation::TargetAndGroupResolution
-            | Operation::HydrationRelationValidation => unreachable!(),
+            | Operation::HydrationRelationValidation
+            | Operation::ConstructionAuthorityAdmission
+            | Operation::ConstructionIdentity => unreachable!(),
         }
     }
 }
@@ -403,5 +407,5 @@ fn every_declared_case_is_admitted_against_fixed_input_result_and_work_expectati
                 .matches_expected(fixture.expected_work())
         );
     }
-    assert_eq!(contexts.len(), 304);
+    assert_eq!(contexts.len(), 318);
 }

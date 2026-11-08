@@ -9,6 +9,8 @@ use crate::benchmark::locale_icu4x::PreparedEngine;
 use crate::benchmark::locale_resolution::Canonicalizers;
 use crate::benchmark::observation::{document, Digest, Frame};
 use crate::benchmark::operation::Prepared;
+use crate::construction::component::Submitted;
+use crate::construction::flow::ConstructionInput;
 use crate::input_limits::InputLimits;
 use crate::structural::StructuralLimits;
 
@@ -28,6 +30,7 @@ pub(in crate::benchmark) enum ContextFailure {
     BindingInputMismatch,
     TargetInputMismatch,
     HydrationInputMismatch,
+    ConstructionInputMismatch,
 }
 
 pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
@@ -43,7 +46,9 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
         (
             Prepared::Locale { .. }
             | Prepared::Icu4xLocale { .. }
-            | Prepared::ArtifactCollection(_),
+            | Prepared::ArtifactCollection(_)
+            | Prepared::Construction(_)
+            | Prepared::ConstructionIdentity(_),
             None,
         ) => {
             frame.text("no-file-preparation");
@@ -51,7 +56,9 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
         (
             Prepared::Locale { .. }
             | Prepared::Icu4xLocale { .. }
-            | Prepared::ArtifactCollection(_),
+            | Prepared::ArtifactCollection(_)
+            | Prepared::Construction(_)
+            | Prepared::ConstructionIdentity(_),
             Some(_),
         )
         | (_, None) => return Err(ContextFailure::PreparationLimitsMismatch),
@@ -373,8 +380,63 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
                 .map_err(|_| ContextFailure::Encoding)?,
             );
         }
+        Prepared::Construction(prepared) => {
+            construction_input(&mut frame, candidate, &prepared.input)?;
+        }
+        Prepared::ConstructionIdentity(prepared) => {
+            construction_input(&mut frame, candidate, prepared.resolver.input())?;
+        }
     }
     Ok(frame.finish())
+}
+
+/// Every byte of the input construction is given, and each component's
+/// tuple: the recipe's input, and nothing else.
+fn construction_input(
+    frame: &mut Frame,
+    candidate: &Candidate,
+    input: &ConstructionInput,
+) -> Result<(), ContextFailure> {
+    let Recipe::Construction(recipe) = candidate.declaration.fixture else {
+        return Err(ContextFailure::ConstructionInputMismatch);
+    };
+    if candidate.declaration.selector != super::Selector::Absent || *input != recipe.input() {
+        return Err(ContextFailure::ConstructionInputMismatch);
+    }
+    let mut component = |submitted: Option<&Submitted>| -> Result<(), ContextFailure> {
+        frame.flag(submitted.is_some());
+        if let Some(submitted) = submitted {
+            frame.json(&submitted.tuple);
+            frame.bytes(submitted.artifact.bytes());
+        }
+        Ok(())
+    };
+    component(input.profile_specification_schema.as_ref())?;
+    component(input.profile_specification.as_ref())?;
+    let set = input.configuration_schema_authority_set.as_ref();
+    component(set.map(|set| &set.component))?;
+    component(input.resolver_capability_specification.as_ref())?;
+    let package = input.registry_package.as_ref();
+    component(package.map(|package| &package.component))?;
+    // The schemas the set is given, mapped or not, by `schemaVersion`; the
+    // package's members by role.
+    let schemas = set.map(|set| &set.members);
+    frame.uint(schemas.map_or(0, |schemas| {
+        u64::try_from(schemas.len()).unwrap_or(u64::MAX)
+    }));
+    for (version, schema) in schemas.into_iter().flatten() {
+        frame.text(version);
+        frame.bytes(schema.bytes());
+    }
+    let members = package.map(|package| &package.members);
+    frame.uint(members.map_or(0, |members| {
+        u64::try_from(members.len()).unwrap_or(u64::MAX)
+    }));
+    for (role, member) in members.into_iter().flatten() {
+        frame.text(role.name());
+        frame.bytes(member.bytes());
+    }
+    Ok(())
 }
 
 fn input_limits(frame: &mut Frame, limits: InputLimits) {

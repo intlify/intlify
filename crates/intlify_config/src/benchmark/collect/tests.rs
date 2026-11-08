@@ -122,6 +122,16 @@ fn fixture_observation(prepared: &Prepared) -> (Observation, LogicalWork) {
             );
             assert!(retained.negotiation.is_ok());
         }
+        Output::Construction(resolved) => {
+            assert!(resolved.constructed.is_ok());
+        }
+        Output::ConstructionIdentity(identity) => {
+            let root = crate::construction::root::ConstructionRoot::built_in().unwrap();
+            assert_eq!(
+                *identity,
+                crate::construction::resolver::committed().identity(root)
+            );
+        }
         _ => panic!("fixture preparation did not produce its known result"),
     }
     (

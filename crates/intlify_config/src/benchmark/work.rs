@@ -4,9 +4,9 @@
 //! Versioned workload facts for input/structural/selection, single-locale
 //! canonicalization, 015 Phases 7 and 8 locale and locale-policy resolution,
 //! 015 Phase 4 resource policy admission, and 015 Phase 9 collection admission
-//! and exact resolution, and 015 Phases 11 to 13 target, group, and
-//! hydration resolution. These are not physical metrics or formal Resource
-//! Policy observations.
+//! and exact resolution, 015 Phases 11 to 13 target, group, and hydration
+//! resolution, and 015's resolver construction and its identity. These are
+//! not physical metrics or formal Resource Policy observations.
 
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +20,7 @@ use super::quantity::Quantity;
 
 mod binding;
 mod collection;
+mod construction;
 mod hydration;
 mod policy;
 mod resolution;
@@ -109,6 +110,25 @@ pub(super) enum WorkKind {
     HydrationBlockingIssues,
     HydrationCheckedRelations,
     HydrationCheckedGroups,
+    ConstructionTotalArtifactBytes,
+    ConstructionMaximumArtifactBytes,
+    ConstructionMaximumDepth,
+    ConstructionNodes,
+    ConstructionCollectionEntries,
+    ConstructionTotalStringBytes,
+    ConstructionMaximumStringBytes,
+    ConstructionConfigurationSchemas,
+    ConstructionMaximumSchemaArtifactBytes,
+    ConstructionTotalSchemaArtifactBytes,
+    ConstructionSchemaNodes,
+    ConstructionSchemaReferences,
+    ConstructionSchemaValidationWorkUnits,
+    ConstructionRegistryRows,
+    ConstructionMaximumRegistryMemberBytes,
+    ConstructionTotalRegistryArtifactBytes,
+    ConstructionRegistryValidationWorkUnits,
+    ConstructionCrossAuthorityChecks,
+    ConstructionIdentityPreimageBytes,
 }
 
 impl WorkKind {
@@ -217,6 +237,30 @@ impl WorkKind {
         Self::HydrationCheckedGroups,
     ];
 
+    /// The construction-root bounds' totals, in the bounds' canonical order.
+    const CONSTRUCTION: [Self; 18] = [
+        Self::ConstructionTotalArtifactBytes,
+        Self::ConstructionMaximumArtifactBytes,
+        Self::ConstructionMaximumDepth,
+        Self::ConstructionNodes,
+        Self::ConstructionCollectionEntries,
+        Self::ConstructionTotalStringBytes,
+        Self::ConstructionMaximumStringBytes,
+        Self::ConstructionConfigurationSchemas,
+        Self::ConstructionMaximumSchemaArtifactBytes,
+        Self::ConstructionTotalSchemaArtifactBytes,
+        Self::ConstructionSchemaNodes,
+        Self::ConstructionSchemaReferences,
+        Self::ConstructionSchemaValidationWorkUnits,
+        Self::ConstructionRegistryRows,
+        Self::ConstructionMaximumRegistryMemberBytes,
+        Self::ConstructionTotalRegistryArtifactBytes,
+        Self::ConstructionRegistryValidationWorkUnits,
+        Self::ConstructionCrossAuthorityChecks,
+    ];
+
+    const CONSTRUCTION_IDENTITY: [Self; 1] = [Self::ConstructionIdentityPreimageBytes];
+
     pub(super) fn for_operation(operation: Operation) -> &'static [Self] {
         match operation {
             Operation::LocaleCanonicalization => &Self::LOCALE,
@@ -226,13 +270,29 @@ impl WorkKind {
             Operation::ResolvedBindingConstruction => &Self::RESOLVED_BINDING,
             Operation::TargetAndGroupResolution => &Self::TARGET_AND_GROUP,
             Operation::HydrationRelationValidation => &Self::HYDRATION,
+            Operation::ConstructionAuthorityAdmission => &Self::CONSTRUCTION,
+            Operation::ConstructionIdentity => &Self::CONSTRUCTION_IDENTITY,
             _ => &Self::INPUT,
         }
     }
 
     const fn unit(self) -> WorkUnit {
         match self {
-            Self::RawFileBytes => WorkUnit::Octet,
+            Self::RawFileBytes
+            | Self::ConstructionTotalArtifactBytes
+            | Self::ConstructionMaximumArtifactBytes
+            | Self::ConstructionMaximumSchemaArtifactBytes
+            | Self::ConstructionTotalSchemaArtifactBytes
+            | Self::ConstructionMaximumRegistryMemberBytes
+            | Self::ConstructionTotalRegistryArtifactBytes
+            | Self::ConstructionIdentityPreimageBytes => WorkUnit::Octet,
+            Self::ConstructionConfigurationSchemas => WorkUnit::ConfigurationSchema,
+            Self::ConstructionSchemaNodes => WorkUnit::SchemaNode,
+            Self::ConstructionSchemaReferences => WorkUnit::SchemaReference,
+            Self::ConstructionSchemaValidationWorkUnits
+            | Self::ConstructionRegistryValidationWorkUnits => WorkUnit::ValidationPair,
+            Self::ConstructionRegistryRows => WorkUnit::RegistryRow,
+            Self::ConstructionCrossAuthorityChecks => WorkUnit::CrossAuthorityCheck,
             Self::TotalDecodedStringBytes
             | Self::MaximumDecodedStringBytes
             | Self::MaximumDeclaredProfileIdBytes
@@ -242,11 +302,15 @@ impl WorkKind {
             | Self::CanonicalLocaleIdentifierBytes
             | Self::TargetAndGroupMaximumTargetIdBytes
             | Self::TargetAndGroupMaximumGroupIdBytes
-            | Self::HydrationMaximumEndpointIdBytes => WorkUnit::Utf8Octet,
+            | Self::HydrationMaximumEndpointIdBytes
+            | Self::ConstructionTotalStringBytes
+            | Self::ConstructionMaximumStringBytes => WorkUnit::Utf8Octet,
             Self::ParserTokensVisited => WorkUnit::ParserToken,
-            Self::LogicalValueNodes => WorkUnit::LogicalValue,
-            Self::MaximumValueDepth => WorkUnit::ValueLevel,
-            Self::CollectionEntries => WorkUnit::CollectionEntry,
+            Self::LogicalValueNodes | Self::ConstructionNodes => WorkUnit::LogicalValue,
+            Self::MaximumValueDepth | Self::ConstructionMaximumDepth => WorkUnit::ValueLevel,
+            Self::CollectionEntries | Self::ConstructionCollectionEntries => {
+                WorkUnit::CollectionEntry
+            }
             Self::ProfileDeclarations => WorkUnit::ProfileDeclaration,
             Self::StructuralAnalysisUnits => WorkUnit::ApplicableKeywordSubject,
             Self::RetainedAdmissionIssues
@@ -355,6 +419,12 @@ enum WorkUnit {
     MembershipOccurrence,
     RelationOccurrence,
     HydrationRelation,
+    ConfigurationSchema,
+    SchemaNode,
+    SchemaReference,
+    ValidationPair,
+    RegistryRow,
+    CrossAuthorityCheck,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -441,6 +511,12 @@ impl LogicalWork {
                 Operation::HydrationRelationValidation => {
                     "intlify-config-hydration-relation-validation-work"
                 }
+                Operation::ConstructionAuthorityAdmission => {
+                    "intlify-config-resolver-construction-work"
+                }
+                Operation::ConstructionIdentity => {
+                    "intlify-config-resolver-construction-identity-work"
+                }
                 _ => "intlify-config-minimum-input-work",
             }
             .into(),
@@ -518,6 +594,12 @@ impl LogicalWork {
             }
             (Prepared::Hydration(prepared), Output::Hydration(resolved)) => {
                 work.hydration(prepared, resolved)?;
+            }
+            (Prepared::Construction(prepared), Output::Construction(_)) => {
+                work.construction(prepared);
+            }
+            (Prepared::ConstructionIdentity(prepared), Output::ConstructionIdentity(_)) => {
+                work.construction_identity(prepared)?;
             }
             _ => return Err(WorkFailure::OperationMismatch),
         }

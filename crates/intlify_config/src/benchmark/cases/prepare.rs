@@ -112,6 +112,12 @@ pub(in crate::benchmark) fn prepare(
     if declaration.operation == Operation::HydrationRelationValidation {
         return prepare_hydration(declaration);
     }
+    if matches!(
+        declaration.operation,
+        Operation::ConstructionAuthorityAdmission | Operation::ConstructionIdentity
+    ) {
+        return prepare_construction(declaration);
+    }
     let source = declaration.fixture.source();
     let (mut input_limits, mut structural_limits) = fixture_capacity();
     if let Some((kind, edge)) = declaration.limit {
@@ -253,7 +259,9 @@ pub(in crate::benchmark) fn prepare(
             | Operation::ArtifactCollectionAdmission
             | Operation::ResolvedBindingConstruction
             | Operation::TargetAndGroupResolution
-            | Operation::HydrationRelationValidation => unreachable!(),
+            | Operation::HydrationRelationValidation
+            | Operation::ConstructionAuthorityAdmission
+            | Operation::ConstructionIdentity => unreachable!(),
         }
     };
     // Only dispatch is repeated here; both reference preparation and timed calls
@@ -277,8 +285,12 @@ pub(in crate::benchmark) fn prepare(
         | Prepared::ArtifactCollection(_)
         | Prepared::ResolvedBinding(_)
         | Prepared::TargetAndGroup(_)
-        | Prepared::Hydration(_) => {
-            unreachable!("Phases 7, 4, 9, 11, 12, and 13 have their own preparation")
+        | Prepared::Hydration(_)
+        | Prepared::Construction(_)
+        | Prepared::ConstructionIdentity(_) => {
+            unreachable!(
+                "Phases 7, 4, 9, 11, 12, and 13 and construction have their own preparation"
+            )
         }
     };
     let kind = match &output {
@@ -1049,6 +1061,78 @@ struct SelectedConfig {
     config: Config,
     selector: SelectorInput,
     selected: ProfileId,
+}
+
+/// 015's resolver construction from a recipe's input under the built-in
+/// root, assembled and read before the interval. A construction case
+/// observes the construction, refused or not; an identity case observes the
+/// identity of the resolver constructed before it.
+fn prepare_construction(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
+    use crate::benchmark::construction::{PreparedConstruction, PreparedIdentity};
+    use crate::construction::root::ConstructionRoot;
+
+    let Recipe::Construction(recipe) = declaration.fixture else {
+        return Err(PreparationFailure::UndeclaredCase);
+    };
+    let root = ConstructionRoot::built_in().map_err(|_| PreparationFailure::CoreInvariant)?;
+    let construction = PreparedConstruction {
+        root,
+        input: recipe.input(),
+    };
+    let resolved = construction.construct();
+    // The row a refusal names is the recipe's own declaration, not learned
+    // from this construction.
+    let refused_at = resolved
+        .constructed
+        .as_ref()
+        .err()
+        .map(|(refusal, _)| refusal.number());
+    if refused_at != recipe.refused_at() {
+        return Err(PreparationFailure::UnexpectedOutputKind);
+    }
+    let (prepared, output, kind) = match declaration.operation {
+        Operation::ConstructionAuthorityAdmission => {
+            let kind = if resolved.constructed.is_ok() {
+                ExpectedKind::ConstructionConstructed
+            } else {
+                ExpectedKind::ConstructionRefused
+            };
+            (
+                Prepared::Construction(Box::new(construction)),
+                Output::Construction(Box::new(resolved)),
+                kind,
+            )
+        }
+        Operation::ConstructionIdentity => {
+            let resolver = resolved
+                .constructed
+                .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?;
+            let prepared = PreparedIdentity { root, resolver };
+            let identity = prepared.derive();
+            (
+                Prepared::ConstructionIdentity(Box::new(prepared)),
+                Output::ConstructionIdentity(identity),
+                ExpectedKind::ConstructionIdentityDerived,
+            )
+        }
+        _ => return Err(PreparationFailure::UndeclaredCase),
+    };
+    if declaration.expected_kind != kind {
+        return Err(PreparationFailure::UnexpectedOutputKind);
+    }
+    let observation = output
+        .observe()
+        .map_err(|_| PreparationFailure::Observation)?;
+    let logical_work =
+        LogicalWork::observe(&prepared, &output).map_err(|_| PreparationFailure::Observation)?;
+    Ok(Candidate {
+        declaration: declaration.clone(),
+        input_limits: None,
+        prepared,
+        output,
+        observation,
+        logical_work,
+    })
 }
 
 /// `config` through Phases 1 to 3 under the fixture capacity: materialized,

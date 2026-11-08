@@ -20,6 +20,8 @@ mod clock;
 #[cfg(feature = "benchmark")]
 mod collect;
 #[cfg(feature = "benchmark")]
+mod construction;
+#[cfg(feature = "benchmark")]
 mod context;
 #[cfg(feature = "benchmark")]
 mod descriptor;

@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
+use crate::construction::identity::ConstructionIdentity;
 use crate::input_limits::InputLimits;
 use crate::materialize::{materialize_file, MaterializationError, MaterializedDocument};
 use crate::model::IntlifyConfig;
@@ -27,7 +28,7 @@ use super::locale_resolution::Canonicalizers;
 use super::measure::{measure, Measured, MeasurementFailure};
 use super::observation::{self, Frame, Observation};
 use super::{
-    artifact_collection, hydration_relation, locale, locale_icu4x, locale_resolution,
+    artifact_collection, construction, hydration_relation, locale, locale_icu4x, locale_resolution,
     resolved_binding, resource_policy, target_group,
 };
 
@@ -51,10 +52,12 @@ pub(super) enum Operation {
     ResolvedBindingConstruction,
     TargetAndGroupResolution,
     HydrationRelationValidation,
+    ConstructionAuthorityAdmission,
+    ConstructionIdentity,
 }
 
 impl Operation {
-    pub(super) const ALL: [Self; 11] = [
+    pub(super) const ALL: [Self; 13] = [
         Self::FileMaterialization,
         Self::StructuralAnalysis,
         Self::AuthoringConstruction,
@@ -66,6 +69,8 @@ impl Operation {
         Self::ResolvedBindingConstruction,
         Self::TargetAndGroupResolution,
         Self::HydrationRelationValidation,
+        Self::ConstructionAuthorityAdmission,
+        Self::ConstructionIdentity,
     ];
     pub(super) const fn phase(self) -> &'static str {
         match self {
@@ -78,6 +83,9 @@ impl Operation {
             | Self::ResolvedBindingConstruction => "profile_artifact_admit",
             Self::TargetAndGroupResolution | Self::HydrationRelationValidation => {
                 "profile_target_group_resolve"
+            }
+            Self::ConstructionAuthorityAdmission | Self::ConstructionIdentity => {
+                "profile_resolver_construct"
             }
         }
     }
@@ -94,6 +102,8 @@ impl Operation {
             Self::ResolvedBindingConstruction => "resolved_binding_construction",
             Self::TargetAndGroupResolution => "target_and_group_resolution",
             Self::HydrationRelationValidation => "hydration_relation_validation",
+            Self::ConstructionAuthorityAdmission => "construction_authority_admission",
+            Self::ConstructionIdentity => "construction_identity",
         }
     }
     pub(super) const fn boundary(self) -> &'static str {
@@ -109,6 +119,8 @@ impl Operation {
             Self::ResolvedBindingConstruction => "resolved-binding-construction/0",
             Self::TargetAndGroupResolution => "target-and-group-resolution/0",
             Self::HydrationRelationValidation => "hydration-relation-validation/0",
+            Self::ConstructionAuthorityAdmission => "resolver-construction/0",
+            Self::ConstructionIdentity => "resolver-construction-identity/0",
         }
     }
 }
@@ -138,6 +150,8 @@ pub(super) enum Prepared {
     ResolvedBinding(Box<resolved_binding::PreparedBindings>),
     TargetAndGroup(Box<target_group::PreparedTargets>),
     Hydration(Box<hydration_relation::PreparedHydration>),
+    Construction(Box<construction::PreparedConstruction>),
+    ConstructionIdentity(Box<construction::PreparedIdentity>),
     Icu4xLocale {
         engine: locale_icu4x::PreparedEngine,
         input: Arc<str>,
@@ -156,6 +170,8 @@ pub(super) enum Output {
     ResolvedBinding(resolved_binding::Resolved),
     TargetAndGroup(target_group::Resolved),
     Hydration(hydration_relation::Resolved),
+    Construction(Box<construction::Resolved>),
+    ConstructionIdentity(ConstructionIdentity),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -189,6 +205,8 @@ impl Prepared {
             Self::ResolvedBinding(_) => Operation::ResolvedBindingConstruction,
             Self::TargetAndGroup(_) => Operation::TargetAndGroupResolution,
             Self::Hydration(_) => Operation::HydrationRelationValidation,
+            Self::Construction(_) => Operation::ConstructionAuthorityAdmission,
+            Self::ConstructionIdentity(_) => Operation::ConstructionIdentity,
         }
     }
 
@@ -370,6 +388,36 @@ impl Prepared {
                     )),
                 })
             }
+            Self::Construction(prepared) => {
+                // The input is copied before the start read. The resolver,
+                // or the refused input construction hands back, is released
+                // after the end read.
+                let measured = measure(
+                    clock,
+                    (prepared.root, prepared.input.clone()),
+                    construction::build,
+                )?;
+                Ok(Measured {
+                    duration: measured.duration,
+                    output: Output::Construction(Box::new(construction::Resolved {
+                        root: prepared.root,
+                        constructed: measured.output,
+                    })),
+                })
+            }
+            Self::ConstructionIdentity(prepared) => {
+                // The resolver is constructed before the first start read and
+                // reused; the identity's bytes are copied out.
+                let measured = measure(
+                    clock,
+                    (prepared.root, &prepared.resolver),
+                    |(root, resolver)| resolver.identity(root),
+                )?;
+                Ok(Measured {
+                    duration: measured.duration,
+                    output: Output::ConstructionIdentity(measured.output),
+                })
+            }
             Self::Icu4xLocale { engine, input } => {
                 // A fresh engine is admitted and bound before the start read
                 // and released after the end read.
@@ -434,6 +482,8 @@ impl Output {
             Self::ResolvedBinding(resolved) => resolved_binding::observe(resolved),
             Self::TargetAndGroup(resolved) => target_group::observe(resolved),
             Self::Hydration(resolved) => hydration_relation::observe(resolved),
+            Self::Construction(resolved) => construction::observe(resolved),
+            Self::ConstructionIdentity(identity) => Ok(construction::observe_identity(identity)),
         }
     }
 }

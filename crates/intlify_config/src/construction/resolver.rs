@@ -56,11 +56,21 @@ pub(crate) struct ConstructedResolver {
 
 /// Construct a resolver from the input, which it keeps: the 43 rows of the
 /// construction-failure precedence, refusing with the first that fails.
+///
+/// A refused input is handed back with the refusal, so the caller that
+/// acquired it also releases it, outside construction.
+#[expect(
+    clippy::result_large_err,
+    reason = "the refused input goes back as it was moved in, so refusing allocates nothing"
+)]
 pub(crate) fn build(
     root: &ConstructionRoot,
     input: ConstructionInput,
-) -> Result<ConstructedResolver, Refusal> {
-    let admitted = flow::construct(root, &input)?;
+) -> Result<ConstructedResolver, (Refusal, ConstructionInput)> {
+    let admitted = match flow::construct(root, &input) {
+        Ok(admitted) => admitted,
+        Err(refusal) => return Err((refusal, input)),
+    };
     // The implemented authority admits only the Profile Specification this
     // crate writes, so its body reads as the type it is written from.
     let profile =
@@ -243,16 +253,22 @@ mod tests {
         assert_eq!(committed().identity(root()), resolver.identity(root()));
     }
 
+    /// A refused input builds no resolver and comes back as it was given.
     #[test]
     fn a_refused_input_builds_no_resolver() {
         let mut input = committed::input();
         input.profile_specification_schema = None;
-        assert_eq!(row(build(root(), input)), Some(2));
+        let (refusal, returned) = build(root(), input.clone()).unwrap_err();
+        assert_eq!(refusal.number(), 2);
+        assert_eq!(returned, input);
         // Nothing reads the configuration schema before construction admits
         // the set that maps it.
         let mut input = committed::input();
         input.configuration_schema_authority_set = None;
-        assert_eq!(row(build(root(), input)), Some(15));
+        assert_eq!(
+            row(build(root(), input).map_err(|(refusal, _)| refusal)),
+            Some(15)
+        );
     }
 
     /// The values the resolver tests write by hand are the ones a resolver

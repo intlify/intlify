@@ -37,7 +37,7 @@ fn analysis(value: &Value) -> Analysis {
         .unwrap()
 }
 
-pub(crate) fn operations() -> [Prepared; 11] {
+pub(crate) fn operations() -> [Prepared; 13] {
     let source: Arc<[u8]> = Arc::from(serde_json::to_vec(&minimal_config()).unwrap());
     let doc = Arc::new(
         materialize_file(Arc::clone(&source), crate::materialize_tests::limits()).unwrap(),
@@ -74,7 +74,26 @@ pub(crate) fn operations() -> [Prepared; 11] {
         binding_operation(),
         target_group_operation(),
         hydration_operation(),
+        construction_operation(Operation::ConstructionAuthorityAdmission),
+        construction_operation(Operation::ConstructionIdentity),
     ]
+}
+
+/// Construction, or the identity, from the committed input, as its case
+/// prepares it.
+pub(crate) fn construction_operation(operation: Operation) -> Prepared {
+    use crate::benchmark::cases::{declarations, ConstructionRecipe, Recipe};
+
+    let declaration = declarations()
+        .into_iter()
+        .find(|case| {
+            case.operation == operation
+                && case.fixture == Recipe::Construction(ConstructionRecipe::Committed)
+        })
+        .unwrap();
+    crate::benchmark::cases::prepare::prepare(&declaration)
+        .unwrap()
+        .prepared
 }
 
 /// Phase 4 over the fixture's policy alone, as its case prepares it.
@@ -248,6 +267,20 @@ fn every_active_pair_calls_its_real_core_operation_between_exact_markers() {
                     Ok(vec![("ssr".to_owned(), "browser".to_owned())])
                 );
                 assert!(retained.negotiation.is_ok());
+            }
+            Output::Construction(resolved) => {
+                let resolver = resolved.constructed.as_ref().unwrap();
+                assert_eq!(
+                    resolver.identity(resolved.root),
+                    crate::construction::resolver::committed().identity(resolved.root)
+                );
+            }
+            Output::ConstructionIdentity(identity) => {
+                let root = crate::construction::root::ConstructionRoot::built_in().unwrap();
+                assert_eq!(
+                    *identity,
+                    crate::construction::resolver::committed().identity(root)
+                );
             }
             _ => panic!("unexpected owner operation result"),
         }

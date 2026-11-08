@@ -224,6 +224,65 @@
       "enum": ["sequential-cases-calling-thread-no-workers"],
       "type": "string"
     },
+    "ConstructionRecipe": {
+      "oneOf": [
+        {
+          "const": "committed",
+          "description": "The committed input.",
+          "type": "string"
+        },
+        {
+          "const": "profile-specification-layout",
+          "description": "The Profile Specification written with other bytes: one construction\n(D15:2583).",
+          "type": "string"
+        },
+        {
+          "const": "unmapped-schema",
+          "description": "One more schema, which the set does not map and no row reads.",
+          "type": "string"
+        },
+        {
+          "const": "missing-profile-specification-schema",
+          "description": "No Profile Specification Schema: row 2.",
+          "type": "string"
+        },
+        {
+          "const": "missing-profile-specification",
+          "description": "No Profile Specification: row 8.",
+          "type": "string"
+        },
+        {
+          "const": "missing-authority-set",
+          "description": "No Configuration Schema Authority Set: row 15.",
+          "type": "string"
+        },
+        {
+          "const": "missing-capability",
+          "description": "No Resolver Capability Specification: row 25.",
+          "type": "string"
+        },
+        {
+          "const": "missing-registry-package",
+          "description": "No Registry Package: row 31.",
+          "type": "string"
+        },
+        {
+          "const": "undeclared-registry-member",
+          "description": "A registry member whose digest its container does not declare: row 39.",
+          "type": "string"
+        },
+        {
+          "const": "foreign-association",
+          "description": "A set associated with another Profile Specification: row 42.",
+          "type": "string"
+        },
+        {
+          "const": "unimplemented-capability",
+          "description": "A Capability Specification with other bytes than the one implemented:\nrow 43.",
+          "type": "string"
+        }
+      ]
+    },
     "Coverage": {
       "additionalProperties": false,
       "description": "Which process and threads an observation covers, and whether it counts\nworkers and child processes.",
@@ -617,7 +676,9 @@
         "artifact-collection-admission",
         "resolved-binding-construction",
         "target-and-group-resolution",
-        "hydration-relation-validation"
+        "hydration-relation-validation",
+        "construction-authority-admission",
+        "construction-identity"
       ],
       "type": "string"
     },
@@ -855,6 +916,16 @@
             }
           },
           "required": ["hydration"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "construction": {
+              "$ref": "#/definitions/ConstructionRecipe"
+            }
+          },
+          "required": ["construction"],
           "type": "object"
         }
       ]
@@ -1178,7 +1249,26 @@
         "hydration-not-evaluated-units",
         "hydration-blocking-issues",
         "hydration-checked-relations",
-        "hydration-checked-groups"
+        "hydration-checked-groups",
+        "construction-total-artifact-bytes",
+        "construction-maximum-artifact-bytes",
+        "construction-maximum-depth",
+        "construction-nodes",
+        "construction-collection-entries",
+        "construction-total-string-bytes",
+        "construction-maximum-string-bytes",
+        "construction-configuration-schemas",
+        "construction-maximum-schema-artifact-bytes",
+        "construction-total-schema-artifact-bytes",
+        "construction-schema-nodes",
+        "construction-schema-references",
+        "construction-schema-validation-work-units",
+        "construction-registry-rows",
+        "construction-maximum-registry-member-bytes",
+        "construction-total-registry-artifact-bytes",
+        "construction-registry-validation-work-units",
+        "construction-cross-authority-checks",
+        "construction-identity-preimage-bytes"
       ],
       "type": "string"
     },
@@ -1216,7 +1306,13 @@
         "deployment-group",
         "membership-occurrence",
         "relation-occurrence",
-        "hydration-relation"
+        "hydration-relation",
+        "configuration-schema",
+        "schema-node",
+        "schema-reference",
+        "validation-pair",
+        "registry-row",
+        "cross-authority-check"
       ],
       "type": "string"
     },

@@ -62,8 +62,31 @@ fn all_active_pairs_keep_distinct_owner_boundaries_and_exact_method_meaning() {
         );
         assert!(!decoded.method.estimated_overhead_subtraction);
     }
-    assert_eq!(pairs.len(), 11);
-    assert_eq!(identities.len(), 11);
+    assert_eq!(pairs.len(), 13);
+    assert_eq!(identities.len(), 13);
+}
+
+/// A construction case builds a fresh resolver in every interval; the
+/// identity reuses the resolver its preparation built.
+#[test]
+fn construction_builds_a_fresh_resolver_and_the_identity_reuses_one() {
+    let state = |operation| prepared_core(operation, None).engine_state;
+    assert_eq!(state(Operation::ConstructionAuthorityAdmission), "fresh");
+    assert_eq!(state(Operation::ConstructionIdentity), "reused");
+    assert_eq!(state(Operation::HydrationRelationValidation), "reused");
+    // Both bind the construction input they were prepared from; no other
+    // case does.
+    for operation in Operation::ALL {
+        let descriptors = Descriptors::for_acquisition(&prepared(operation), clock(100));
+        assert_eq!(
+            descriptors.construction_input.is_some(),
+            matches!(
+                operation,
+                Operation::ConstructionAuthorityAdmission | Operation::ConstructionIdentity
+            ),
+            "{operation:?}"
+        );
+    }
 }
 
 #[test]
