@@ -170,7 +170,20 @@ pub(in crate::benchmark) fn prepare(
             | LimitKind::MembersPerGroup
             | LimitKind::MembershipOccurrences
             | LimitKind::HydrationRelations
-            | LimitKind::HydrationEndpointBytes => {
+            | LimitKind::HydrationEndpointBytes
+            | LimitKind::ConstructionTotalArtifactBytes
+            | LimitKind::ConstructionSingleArtifactBytes
+            | LimitKind::ConstructionDepth
+            | LimitKind::ConstructionNodes
+            | LimitKind::ConstructionSingleStringBytes
+            | LimitKind::ConstructionConfigurationSchemas
+            | LimitKind::ConstructionSchemaSingleArtifactBytes
+            | LimitKind::ConstructionSchemaTotalArtifactBytes
+            | LimitKind::ConstructionSchemaNodes
+            | LimitKind::ConstructionSchemaReferences
+            | LimitKind::ConstructionRegistryRows
+            | LimitKind::ConstructionRegistrySingleMemberArtifactBytes
+            | LimitKind::ConstructionCrossAuthorityChecks => {
                 return Err(PreparationFailure::UndeclaredCase);
             }
         };
@@ -215,7 +228,20 @@ pub(in crate::benchmark) fn prepare(
             | LimitKind::MembersPerGroup
             | LimitKind::MembershipOccurrences
             | LimitKind::HydrationRelations
-            | LimitKind::HydrationEndpointBytes => unreachable!(),
+            | LimitKind::HydrationEndpointBytes
+            | LimitKind::ConstructionTotalArtifactBytes
+            | LimitKind::ConstructionSingleArtifactBytes
+            | LimitKind::ConstructionDepth
+            | LimitKind::ConstructionNodes
+            | LimitKind::ConstructionSingleStringBytes
+            | LimitKind::ConstructionConfigurationSchemas
+            | LimitKind::ConstructionSchemaSingleArtifactBytes
+            | LimitKind::ConstructionSchemaTotalArtifactBytes
+            | LimitKind::ConstructionSchemaNodes
+            | LimitKind::ConstructionSchemaReferences
+            | LimitKind::ConstructionRegistryRows
+            | LimitKind::ConstructionRegistrySingleMemberArtifactBytes
+            | LimitKind::ConstructionCrossAuthorityChecks => unreachable!(),
         }
     }
     let prepared = if declaration.operation == Operation::FileMaterialization {
@@ -1071,23 +1097,24 @@ fn prepare_construction(declaration: &Declaration) -> Result<Candidate, Preparat
     use crate::benchmark::construction::{PreparedConstruction, PreparedIdentity};
     use crate::construction::root::ConstructionRoot;
 
-    let Recipe::Construction(recipe) = declaration.fixture else {
-        return Err(PreparationFailure::UndeclaredCase);
-    };
+    let (input, refused_at) = super::construction_inputs::case_input(declaration)
+        .ok_or(PreparationFailure::UnrepresentableCounterEdge)?;
     let root = ConstructionRoot::built_in().map_err(|_| PreparationFailure::CoreInvariant)?;
-    let construction = PreparedConstruction {
-        root,
-        input: recipe.input(),
-    };
+    let construction = PreparedConstruction { root, input };
     let resolved = construction.construct();
-    // The row a refusal names is the recipe's own declaration, not learned
-    // from this construction.
-    let refused_at = resolved
+    // The row a refusal names, and at the bounds' row the bound, are the
+    // case's own declaration, not learned from this construction.
+    let refusal = resolved
         .constructed
         .as_ref()
         .err()
-        .map(|(refusal, _)| refusal.number());
-    if refused_at != recipe.refused_at() {
+        .map(|(refusal, _)| *refusal);
+    let bound = declaration
+        .limit
+        .and_then(|(kind, _)| super::construction_inputs::bound(kind));
+    if refusal.map(crate::construction::component::Refusal::number) != refused_at
+        || refusal.is_some_and(|refusal| refusal.number() == 1 && refusal.bound() != bound)
+    {
         return Err(PreparationFailure::UnexpectedOutputKind);
     }
     let (prepared, output, kind) = match declaration.operation {

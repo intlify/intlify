@@ -39,7 +39,7 @@ fn actual_owner_run_projects_all_thirteen_pairs_and_raw_samples_through_report_a
             checked.measured_cases,
             checked.non_measured_cases
         ),
-        (318, 318, 0)
+        (343, 343, 0)
     );
     let evidence = value(artifacts.evidence.as_ref().unwrap());
     let evaluation = value(&artifacts.evaluation);
@@ -141,7 +141,7 @@ fn missing_unsupported_malformed_and_duplicate_native_inputs_keep_the_complete_n
         assert_eq!(admitted.outcome, outcome);
         assert_eq!(
             (admitted.measured_cases, admitted.non_measured_cases),
-            (0, 318)
+            (0, 343)
         );
         assert!(artifacts.evidence.is_none());
         let evaluation = value(&artifacts.evaluation);
@@ -155,7 +155,7 @@ fn missing_unsupported_malformed_and_duplicate_native_inputs_keep_the_complete_n
                 .as_array()
                 .unwrap()
                 .len(),
-            318
+            343
         );
         let report = value(&artifacts.report);
         assert_eq!(report["body"]["sections"][0]["rows"], json!([]));
@@ -164,7 +164,7 @@ fn missing_unsupported_malformed_and_duplicate_native_inputs_keep_the_complete_n
                 .as_array()
                 .unwrap()
                 .len(),
-            318
+            343
         );
     }
 }

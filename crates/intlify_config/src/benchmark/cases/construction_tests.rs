@@ -31,7 +31,7 @@ fn observed(operation: Operation, recipe: ConstructionRecipe) -> Observation {
 #[test]
 fn construction_cases_keep_the_304_rows_and_append_after_them() {
     let cases = declarations();
-    assert_eq!(cases.len(), 318);
+    assert_eq!(cases.len(), 343);
     assert!(cases[..304].iter().all(|case| !matches!(
         case.operation,
         Operation::ConstructionAuthorityAdmission | Operation::ConstructionIdentity
@@ -52,7 +52,7 @@ fn construction_cases_keep_the_304_rows_and_append_after_them() {
             .collect::<Vec<_>>()
     );
     assert_eq!(
-        cases[315..]
+        cases[315..318]
             .iter()
             .map(|case| (case.operation, case.fixture))
             .collect::<Vec<_>>(),
@@ -68,7 +68,7 @@ fn construction_cases_keep_the_304_rows_and_append_after_them() {
         ))
         .collect::<Vec<_>>()
     );
-    for declaration in &cases[304..] {
+    for declaration in &cases[304..318] {
         assert_eq!(declaration.selector, Selector::Absent);
         assert!(declaration.limit.is_none());
         let Recipe::Construction(recipe) = declaration.fixture else {
@@ -164,4 +164,160 @@ fn the_inputs_that_construct_are_one_construction() {
     refusals.sort_unstable();
     refusals.dedup();
     assert_eq!(refusals.len(), count);
+}
+
+/// The edges of the construction-root bounds follow the 318 rows, each the
+/// committed recipe with its bound and edge, in the bounds' canonical order.
+#[test]
+fn bound_edges_keep_the_318_rows_and_append_after_them() {
+    use super::construction_inputs::{bound, edge_refused_at, EDGES};
+
+    let cases = declarations();
+    let edges = EDGES
+        .into_iter()
+        .flat_map(|(kind, first_over)| {
+            [(kind, LimitEdge::Exact)]
+                .into_iter()
+                .chain(first_over.then_some((kind, LimitEdge::FirstOver)))
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(edges.len(), 25);
+    assert_eq!(cases.len(), 318 + edges.len());
+    let mut order = Vec::new();
+    for (declaration, &(kind, edge)) in cases[318..].iter().zip(&edges) {
+        assert_eq!(
+            declaration.operation,
+            Operation::ConstructionAuthorityAdmission
+        );
+        assert_eq!(declaration.fixture, Recipe::Construction(R::Committed));
+        assert_eq!(declaration.limit, Some((kind, edge)));
+        assert_eq!(
+            declaration.expected_kind == ExpectedKind::ConstructionConstructed,
+            edge_refused_at(kind, edge).is_none()
+        );
+        order.push(bound(kind).unwrap());
+    }
+    // The bounds' canonical order, each once.
+    order.dedup();
+    let canonical = crate::construction::admission::ConstructionBoundId::ALL
+        .into_iter()
+        .filter(|bound| order.contains(bound))
+        .collect::<Vec<_>>();
+    assert_eq!(order, canonical);
+    assert_eq!(order.len(), 13);
+}
+
+/// Each edge's input is at its bound or one past it, a first-over input is
+/// refused at the bounds' row naming that bound, and an exact one passes
+/// that row.
+#[test]
+fn each_edge_is_at_its_bound_or_one_past_it() {
+    use super::construction_inputs::bound;
+
+    for declaration in &declarations()[318..] {
+        let (kind, edge) = declaration.limit.unwrap();
+        let bound = bound(kind).unwrap();
+        let candidate = prepare(declaration).unwrap();
+        let (Prepared::Construction(prepared), Output::Construction(resolved)) =
+            (&candidate.prepared, &candidate.output)
+        else {
+            panic!("wrong owner boundary")
+        };
+        let over = u64::from(edge == LimitEdge::FirstOver);
+        assert_eq!(
+            prepared.totals().get(bound),
+            Some(bound.value().get() + over),
+            "{declaration:?}"
+        );
+        let refusal = resolved
+            .constructed
+            .as_ref()
+            .err()
+            .map(|(refusal, _)| *refusal);
+        match edge {
+            LimitEdge::FirstOver => {
+                let refusal = refusal.unwrap();
+                assert_eq!((refusal.number(), refusal.bound()), (1, Some(bound)));
+            }
+            LimitEdge::Exact => {
+                assert_ne!(
+                    refusal.map(crate::construction::component::Refusal::number),
+                    Some(1),
+                    "{declaration:?}"
+                );
+            }
+        }
+    }
+}
+
+/// The edges #134 leaves out: an earlier bound in the canonical order is
+/// exceeded first, so the bound is never the one reported.
+#[test]
+fn the_edges_left_out_are_exceeded_after_an_earlier_bound() {
+    use crate::construction::admission::ConstructionBoundId as B;
+    use crate::construction::bounds;
+    use crate::construction::component::Artifact;
+
+    let first = |input: &crate::construction::flow::ConstructionInput| {
+        resolver::build(root(), input.clone())
+            .err()
+            .and_then(|(refusal, _)| refusal.bound())
+    };
+    let unmapped = |schemas: Vec<Vec<u8>>| {
+        let mut input = committed::input();
+        let set = input.configuration_schema_authority_set.as_mut().unwrap();
+        for (index, schema) in schemas.into_iter().enumerate() {
+            set.members
+                .insert((index + 1).to_string(), Artifact::read(schema));
+        }
+        input
+    };
+    // Every entry is a node and every artifact's root one more, so the
+    // entries reach their bound only past the nodes'.
+    let input = committed::input();
+    let totals = bounds::totals(root(), &input);
+    assert_eq!(
+        totals.get(B::InputMaxNodes).unwrap() - totals.get(B::InputMaxCollectionEntries).unwrap(),
+        12
+    );
+    let zeros = |count: usize| serde_json::to_vec(&vec![0; count]).unwrap();
+    let entries = B::InputMaxCollectionEntries.value().get();
+    let missing =
+        usize::try_from(entries - totals.get(B::InputMaxCollectionEntries).unwrap()).unwrap();
+    let input = unmapped(vec![zeros(missing / 2), zeros(missing - missing / 2)]);
+    assert_eq!(
+        bounds::totals(root(), &input).get(B::InputMaxCollectionEntries),
+        Some(entries)
+    );
+    assert_eq!(first(&input), Some(B::InputMaxNodes));
+    // A decoded string is never longer than its bytes, so the strings reach
+    // their bound only past the artifacts' total bytes.
+    let strings = B::InputMaxTotalStringBytes.value().get();
+    assert_eq!(strings, B::InputMaxTotalArtifactBytes.value().get());
+    assert!(totals.get(B::InputMaxTotalStringBytes) < totals.get(B::InputMaxTotalArtifactBytes));
+    let half = usize::try_from(strings / 8).unwrap();
+    let input = unmapped(
+        (0..8)
+            .map(|_| serde_json::to_vec(&"a".repeat(half)).unwrap())
+            .collect(),
+    );
+    assert!(bounds::totals(root(), &input).get(B::InputMaxTotalStringBytes) >= Some(strings));
+    assert_eq!(first(&input), Some(B::InputMaxTotalArtifactBytes));
+    // Three registries, each within the input's single-artifact bound, which
+    // comes first: their total stays under its bound, and one over the
+    // single member's bound is one over the input's too.
+    let single = B::InputMaxSingleArtifactBytes.value().get();
+    assert_eq!(
+        single,
+        B::RegistryMaxSingleMemberArtifactBytes.value().get()
+    );
+    assert!(3 * single < B::RegistryMaxTotalArtifactBytes.value().get());
+    let mut members = committed::REGISTRY_MEMBERS.map(<[u8]>::to_vec);
+    members[4].resize(usize::try_from(single + 1).unwrap(), b' ');
+    let mut input = committed::input();
+    input.registry_package = Some(committed::package(
+        committed::PACKAGE,
+        members.each_ref().map(Vec::as_slice),
+    ));
+    assert_eq!(first(&input), Some(B::InputMaxSingleArtifactBytes));
 }

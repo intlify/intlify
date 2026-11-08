@@ -73,6 +73,19 @@ pub(super) enum LimitKind {
     MembershipOccurrences,
     HydrationRelations,
     HydrationEndpointBytes,
+    ConstructionTotalArtifactBytes,
+    ConstructionSingleArtifactBytes,
+    ConstructionDepth,
+    ConstructionNodes,
+    ConstructionSingleStringBytes,
+    ConstructionConfigurationSchemas,
+    ConstructionSchemaSingleArtifactBytes,
+    ConstructionSchemaTotalArtifactBytes,
+    ConstructionSchemaNodes,
+    ConstructionSchemaReferences,
+    ConstructionRegistryRows,
+    ConstructionRegistrySingleMemberArtifactBytes,
+    ConstructionCrossAuthorityChecks,
 }
 
 impl LimitKind {
@@ -832,6 +845,30 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 Selector::Absent,
                 ExpectedKind::ConstructionIdentityDerived,
             ));
+        }
+    }
+    // Append the construction-root bounds without changing any of the 318
+    // rows: each bound the committed input can be grown to, and one past it
+    // where that is reachable (plan 025, #134).
+    for (limit, first_over) in construction_inputs::EDGES {
+        let edges: &[LimitEdge] = if first_over {
+            &[LimitEdge::Exact, LimitEdge::FirstOver]
+        } else {
+            &[LimitEdge::Exact]
+        };
+        for &edge in edges {
+            let mut case = declaration(
+                Operation::ConstructionAuthorityAdmission,
+                Recipe::Construction(ConstructionRecipe::Committed),
+                Selector::Absent,
+                if construction_inputs::edge_refused_at(limit, edge).is_none() {
+                    ExpectedKind::ConstructionConstructed
+                } else {
+                    ExpectedKind::ConstructionRefused
+                },
+            );
+            case.limit = Some((limit, edge));
+            cases.push(case);
         }
     }
     cases

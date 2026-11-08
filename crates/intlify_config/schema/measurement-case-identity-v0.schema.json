@@ -440,7 +440,20 @@
         "members-per-group",
         "membership-occurrences",
         "hydration-relations",
-        "hydration-endpoint-bytes"
+        "hydration-endpoint-bytes",
+        "construction-total-artifact-bytes",
+        "construction-single-artifact-bytes",
+        "construction-depth",
+        "construction-nodes",
+        "construction-single-string-bytes",
+        "construction-configuration-schemas",
+        "construction-schema-single-artifact-bytes",
+        "construction-schema-total-artifact-bytes",
+        "construction-schema-nodes",
+        "construction-schema-references",
+        "construction-registry-rows",
+        "construction-registry-single-member-artifact-bytes",
+        "construction-cross-authority-checks"
       ],
       "type": "string"
     },
