@@ -86,6 +86,8 @@ pub(super) enum LimitKind {
     ConstructionRegistryRows,
     ConstructionRegistrySingleMemberArtifactBytes,
     ConstructionCrossAuthorityChecks,
+    ConstructionSchemaValidationWorkUnits,
+    ConstructionRegistryValidationWorkUnits,
 }
 
 impl LimitKind {
@@ -849,8 +851,12 @@ pub(super) fn declarations() -> Vec<Declaration> {
     }
     // Append the construction-root bounds without changing any of the 318
     // rows: each bound the committed input can be grown to, and one past it
-    // where that is reachable (plan 025, #134).
-    for (limit, first_over) in construction_inputs::EDGES {
+    // where that is reachable (plan 025, #134); then, without changing any
+    // of those 343 rows, the two validation-work bounds.
+    for (limit, first_over) in construction_inputs::EDGES
+        .into_iter()
+        .chain(construction_inputs::VALIDATION_WORK_EDGES)
+    {
         let edges: &[LimitEdge] = if first_over {
             &[LimitEdge::Exact, LimitEdge::FirstOver]
         } else {
