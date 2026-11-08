@@ -189,12 +189,19 @@ pub(super) fn prepared_core(operation: Operation, icu4x: Option<Engine>) -> Exec
         };
     }
     let locale = operation == Operation::LocaleCanonicalization;
+    // A construction case builds a fresh resolver in every interval; every
+    // other case, the identity's included, reuses what preparation built.
+    let engine = if operation == Operation::ConstructionAuthorityAdmission {
+        "fresh"
+    } else {
+        "reused"
+    };
     Execution {
         // The harness invokes prepared calls in its existing process. Its
         // compiled core and immutable preparation are retained, not rebuilt
         // between samples. None of these fields claims a warm lookup cache.
         process_state: "reused-process".into(),
-        engine_state: "reused".into(),
+        engine_state: engine.into(),
         initial_preparation_state: "resident".into(),
         cache_state: "disabled".into(),
         runtime_compilation_state: "ahead-of-time".into(),
@@ -234,6 +241,8 @@ pub(super) struct Descriptors {
     pub(super) target_and_group_input: Option<super::target_group::InputFacts>,
     #[serde(deserialize_with = "Option::deserialize")]
     pub(super) hydration_relation_input: Option<super::hydration_relation::InputFacts>,
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub(super) construction_input: Option<super::construction::InputFacts>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -251,6 +260,7 @@ pub(super) enum DescriptorIssue {
     ResolvedBindingInputBindingMismatch,
     TargetAndGroupInputBindingMismatch,
     HydrationRelationInputBindingMismatch,
+    ConstructionInputBindingMismatch,
 }
 
 impl Descriptors {
@@ -276,6 +286,7 @@ impl Descriptors {
             resolved_binding_input: binding(prepared),
             target_and_group_input: targets(prepared),
             hydration_relation_input: hydration(prepared),
+            construction_input: construction(prepared),
         }
     }
 
@@ -336,6 +347,9 @@ impl Descriptors {
         }
         if self.hydration_relation_input != hydration(prepared) {
             issues.push(DescriptorIssue::HydrationRelationInputBindingMismatch);
+        }
+        if self.construction_input != construction(prepared) {
+            issues.push(DescriptorIssue::ConstructionInputBindingMismatch);
         }
         issues
     }
@@ -410,6 +424,20 @@ fn hydration(prepared: &Prepared) -> Option<super::hydration_relation::InputFact
     match prepared {
         Prepared::Hydration(prepared) => {
             Some(super::hydration_relation::InputFacts::observe(prepared))
+        }
+        _ => None,
+    }
+}
+
+/// The input facts of a construction case, or of an identity case and the
+/// resolver it reuses.
+fn construction(prepared: &Prepared) -> Option<super::construction::InputFacts> {
+    match prepared {
+        Prepared::Construction(prepared) => {
+            Some(super::construction::InputFacts::construction(prepared))
+        }
+        Prepared::ConstructionIdentity(prepared) => {
+            Some(super::construction::InputFacts::identity(prepared))
         }
         _ => None,
     }

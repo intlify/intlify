@@ -151,6 +151,16 @@ fn every_active_operation_retains_the_complete_ordered_vocabulary_and_its_stages
                 };
                 assert_eq!(item.stage, expected, "{:?}", item.kind);
             }
+        } else if prepared.operation() == Operation::ConstructionAuthorityAdmission {
+            // The bounds' totals, of the prepared input, in their order.
+            assert_eq!(work.facts.len(), 18);
+            assert!(work
+                .facts
+                .iter()
+                .all(|item| item.stage == WorkStage::PreparedInput));
+        } else if prepared.operation() == Operation::ConstructionIdentity {
+            assert_eq!(work.facts.len(), 1);
+            assert_eq!(work.facts[0].stage, WorkStage::OperationResult);
         } else {
             assert_eq!(work.facts.len(), 14);
             assert_eq!(fact(&work, WorkKind::LogicalValueNodes).stage, input_stage);
@@ -168,6 +178,35 @@ fn every_active_operation_retains_the_complete_ordered_vocabulary_and_its_stages
             );
         }
     }
+}
+
+/// Construction's work is the input's totals in the construction-root
+/// bounds' units; the identity's is the bytes of its preimage, 1846 for the
+/// committed input.
+#[test]
+fn construction_work_is_the_bounds_totals_and_the_identity_preimage() {
+    use crate::benchmark::operation::tests::construction_operation;
+    use crate::construction::admission::ConstructionBoundId;
+
+    let prepared = construction_operation(Operation::ConstructionAuthorityAdmission);
+    let Prepared::Construction(construction) = &prepared else {
+        unreachable!()
+    };
+    let totals = construction.totals();
+    let work = observe(&prepared);
+    for (fact, bound) in work.facts.iter().zip(ConstructionBoundId::ALL) {
+        assert_eq!(
+            fact.observation,
+            WorkValue::exact(totals.get(bound).unwrap()),
+            "{bound:?}"
+        );
+    }
+    assert_eq!(
+        fact(&work, WorkKind::ConstructionConfigurationSchemas).observation,
+        WorkValue::exact(1)
+    );
+    let work = observe(&construction_operation(Operation::ConstructionIdentity));
+    assert_eq!(work.facts[0].observation, WorkValue::exact(1846));
 }
 
 #[test]

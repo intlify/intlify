@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Finite owner case declarations for the eleven active boundaries.
+//! Finite owner case declarations for the thirteen active boundaries.
 //! This is not a common Run Plan, case-identity codec, or a complete 015 suite.
 //! Preparation yields an unadmitted candidate; the separate fixture registry
 //! binds its exact input/result/work before method-bound collection can use it.
@@ -24,6 +24,8 @@ mod target_group_inputs;
 pub(super) use target_group_inputs::TargetAndGroupRecipe;
 mod hydration_inputs;
 pub(super) use hydration_inputs::HydrationRecipe;
+mod construction_inputs;
+pub(super) use construction_inputs::ConstructionRecipe;
 mod context;
 pub(super) mod prepare;
 pub(super) mod registry;
@@ -130,6 +132,9 @@ pub(super) enum ExpectedKind {
     TargetAndGroupResolutionBlocked,
     HydrationRelationValidationComplete,
     HydrationRelationValidationBlocked,
+    ConstructionConstructed,
+    ConstructionRefused,
+    ConstructionIdentityDerived,
 }
 
 #[derive(
@@ -371,7 +376,9 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 | Operation::ArtifactCollectionAdmission
                 | Operation::ResolvedBindingConstruction
                 | Operation::TargetAndGroupResolution
-                | Operation::HydrationRelationValidation => unreachable!(),
+                | Operation::HydrationRelationValidation
+                | Operation::ConstructionAuthorityAdmission
+                | Operation::ConstructionIdentity => unreachable!(),
             };
             let selector = if operation == Operation::ProfileSelection {
                 Selector::App
@@ -802,6 +809,31 @@ pub(super) fn declarations() -> Vec<Declaration> {
             cases.push(case);
         }
     }
+    // Append 015's resolver construction without changing any of the 304
+    // rows: every construction recipe, those refused being the expected
+    // result, then the identity of each input that constructs.
+    for recipe in ConstructionRecipe::ALL {
+        cases.push(declaration(
+            Operation::ConstructionAuthorityAdmission,
+            Recipe::Construction(recipe),
+            Selector::Absent,
+            if recipe.constructs() {
+                ExpectedKind::ConstructionConstructed
+            } else {
+                ExpectedKind::ConstructionRefused
+            },
+        ));
+    }
+    for recipe in ConstructionRecipe::ALL {
+        if recipe.constructs() {
+            cases.push(declaration(
+                Operation::ConstructionIdentity,
+                Recipe::Construction(recipe),
+                Selector::Absent,
+                ExpectedKind::ConstructionIdentityDerived,
+            ));
+        }
+    }
     cases
 }
 
@@ -865,3 +897,6 @@ mod target_group_tests;
 
 #[cfg(test)]
 mod hydration_tests;
+
+#[cfg(test)]
+mod construction_tests;

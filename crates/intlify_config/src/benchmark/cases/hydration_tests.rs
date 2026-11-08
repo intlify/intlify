@@ -100,11 +100,11 @@ fn waiting(resolved: &Resolved) -> Vec<(Unit, Vec<Subject>)> {
 #[test]
 fn hydration_cases_keep_the_281_rows_and_append_after_them() {
     let cases = declarations();
-    assert_eq!(cases.len(), 304);
+    assert_eq!(cases.len(), 318);
     assert!(cases[..281]
         .iter()
         .all(|case| case.operation != Operation::HydrationRelationValidation));
-    assert!(cases[281..].iter().all(|case| {
+    assert!(cases[281..304].iter().all(|case| {
         case.operation == Operation::HydrationRelationValidation && case.selector == Selector::App
     }));
     // Every recipe once, in its order, and then the four edges.
@@ -118,8 +118,8 @@ fn hydration_cases_keep_the_281_rows_and_append_after_them() {
             .map(|recipe| (Recipe::Hydration(recipe), None))
             .collect::<Vec<_>>()
     );
-    assert!(cases[300..].iter().all(|case| case.limit.is_some()));
-    for declaration in &cases[281..] {
+    assert!(cases[300..304].iter().all(|case| case.limit.is_some()));
+    for declaration in &cases[281..304] {
         // The case's source is the configuration, and the members, whose
         // Target Profiles declare the roles, are what preparation read.
         let Recipe::Hydration(recipe) = declaration.fixture else {

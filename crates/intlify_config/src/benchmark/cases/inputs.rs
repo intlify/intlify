@@ -57,6 +57,7 @@ pub(in crate::benchmark) enum Recipe {
     ResolvedBinding(super::ResolvedBindingRecipe),
     TargetAndGroup(super::TargetAndGroupRecipe),
     Hydration(super::HydrationRecipe),
+    Construction(super::ConstructionRecipe),
 }
 
 impl Recipe {
@@ -129,6 +130,13 @@ impl Recipe {
             return Arc::from(
                 serde_json::to_vec(&recipe.fixture().config)
                     .expect("finite owner hydration fixture"),
+            );
+        }
+        if let Self::Construction(recipe) = self {
+            // What each component declares; the input context binds every
+            // byte, which the committed artifacts make too many to keep here.
+            return Arc::from(
+                serde_json::to_vec(&recipe.source()).expect("finite owner construction fixture"),
             );
         }
         let raw: Option<&[u8]> = match self {
