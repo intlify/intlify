@@ -20,6 +20,7 @@
 
 use crate::artifacts::collection::FormalCollection;
 use crate::artifacts::vocabulary::FormalVocabulary;
+use crate::boundary::capability::ImplementationCapability;
 use crate::input_limits::ValueCounts;
 use crate::locale::{CanonicalizationFailure, Provider, SemanticPins};
 use crate::model::{IntlifyConfig, ProfileDeclaration, ProfileId};
@@ -38,7 +39,6 @@ use super::fallback::{resolve_fallback, MessageFallbackPolicy};
 use super::groups::{resolve_groups, ResolvedGroups};
 use super::hydration::{validate_hydration, ResolvedHydration};
 use super::identity::{resolve_project_identity, ProjectIdentity};
-use super::limits::ImplementationCapability;
 use super::locales::{resolve_locales, LocaleFields, LocaleInvariant, ResolvedLocales};
 use super::negotiation::{resolve_negotiation, NegotiationProfile};
 use super::resource_policy::{

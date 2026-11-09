@@ -433,7 +433,7 @@ fn locale_resolution_descriptor_binds_its_bounds_roles_and_actual_reuse() {
 
 #[test]
 fn resource_policy_descriptor_binds_the_capability_and_the_collection() {
-    use crate::resolver::limits::ImplementationCapability;
+    use crate::boundary::capability::ImplementationCapability;
 
     let mut operation = prepared(Operation::ResourcePolicyBootstrap);
     let descriptors = Descriptors::for_acquisition(&operation, clock(1));
