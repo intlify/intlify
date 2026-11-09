@@ -530,6 +530,8 @@ fn delivery<Id: AsRef<str>>(state: &SemanticState<'_, Id>) -> Admitted<Delivery>
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use serde_json::json;
 
     use super::*;
@@ -538,6 +540,9 @@ mod tests {
     use crate::resolver::dependency::SemanticGroup;
     use crate::resolver::profile_resolution::tests::{policy_limits, Inputs};
     use crate::resolver::specification::FIXTURE_PROFILE_DIGEST;
+
+    /// The committed profile view vectors, relative to the crate.
+    const VECTOR_FILE: &str = "fixtures/profile-view/vectors.json";
 
     /// An edit of the selected declaration.
     type Edit = fn(&mut Value);
@@ -658,6 +663,242 @@ mod tests {
         })
     }
 
+    /// `Inputs::complete` without its second coverage rule, on which no
+    /// cell's mode depends.
+    fn redundant_rule() -> Inputs {
+        edited(|declaration| {
+            declaration["coverage"]["rules"]
+                .as_array_mut()
+                .unwrap()
+                .remove(1);
+        })
+    }
+
+    /// Other declarations of `Inputs::complete`'s profile, each differing in
+    /// what the projection leaves out: the Profile ID and the selector, the
+    /// order of sets, objects, and the collection, an omitted placement or
+    /// default mode in place of the default, and a redundant rule.
+    fn same_profile() -> [(&'static str, Inputs); 5] {
+        let complete = Inputs::complete();
+        [
+            ("another-profile-id", complete.selecting("shop")),
+            ("another-order", complete.reordered()),
+            (
+                "omitted-placement",
+                edited(|declaration| {
+                    declaration.as_object_mut().unwrap().remove("delivery");
+                }),
+            ),
+            (
+                "omitted-default-mode",
+                edited(|declaration| {
+                    declaration["coverage"]
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("defaultMode");
+                }),
+            ),
+            ("redundant-rule", redundant_rule()),
+        ]
+    }
+
+    /// Each change of a semantic field, named as its vector case is.
+    fn changes() -> [Change; 13] {
+        [
+            (
+                "project-id",
+                |declaration| declaration["projectId"] = json!("outlet"),
+                vec![("/projectIdentity/projectId", json!("outlet"))],
+            ),
+            (
+                "selection-scope",
+                |declaration| declaration["selectionScope"] = json!("storefront.staging"),
+                vec![(
+                    "/projectIdentity/selectionScope",
+                    json!("storefront.staging"),
+                )],
+            ),
+            (
+                "requested-locales",
+                |declaration| declaration["requestedLocales"] = json!(["fr", "ja", "en"]),
+                vec![
+                    (
+                        "/projectLocales/requestedLocales",
+                        json!(["en", "fr", "ja"]),
+                    ),
+                    ("/coverage/decisions/fr/nav", json!("direct-required")),
+                ],
+            ),
+            (
+                "default-requested-locale",
+                |declaration| {
+                    declaration["defaultRequestedLocale"] = json!("ja");
+                    declaration["targetProfiles"]["browser"]["defaultRequestedLocale"] =
+                        json!("ja");
+                },
+                vec![
+                    ("/projectLocales/defaultRequestedLocale", json!("ja")),
+                    ("/targets/server/defaultRequestedLocale", Value::Null),
+                    (
+                        "/targets/server/effectiveDefaultRequestedLocale",
+                        json!("ja"),
+                    ),
+                ],
+            ),
+            (
+                "default-source-locale",
+                |declaration| declaration["defaultSourceLocale"] = json!("ja"),
+                vec![("/projectLocales/defaultSourceLocale", json!("ja"))],
+            ),
+            (
+                "no-default-source-locale",
+                |declaration| {
+                    declaration
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("defaultSourceLocale");
+                },
+                vec![("/projectLocales/defaultSourceLocale", Value::Null)],
+            ),
+            (
+                "aliases",
+                |declaration| declaration["localeNegotiation"]["aliases"]["de"] = json!("ja"),
+                vec![("/localeNegotiation/aliases", json!({"de": "ja"}))],
+            ),
+            (
+                "message-fallback",
+                |declaration| {
+                    declaration["messageFallback"]["ja"] =
+                        json!([{"kind": "intent-source-locale"}, "en"]);
+                },
+                vec![(
+                    "/messageFallback/mappings/ja",
+                    json!([{"kind": "intent-source-locale"}, "en"]),
+                )],
+            ),
+            (
+                "default-mode",
+                |declaration| declaration["coverage"]["defaultMode"] = json!("fallback-allowed"),
+                vec![
+                    ("/coverage/defaultMode", json!("fallback-allowed")),
+                    ("/coverage/decisions/en/nav", json!("fallback-allowed")),
+                ],
+            ),
+            (
+                "rules",
+                |declaration| {
+                    declaration["coverage"]["rules"]
+                        .as_array_mut()
+                        .unwrap()
+                        .remove(0);
+                },
+                vec![(
+                    "/coverage/decisions/ja",
+                    json!({
+                        "checkout": "fallback-allowed",
+                        "internal-tool": "direct-required",
+                        "nav": "direct-required"
+                    }),
+                )],
+            ),
+            (
+                "provider-routing",
+                |declaration| declaration["policies"]["providerRouting"] = Value::Null,
+                vec![("/optionalPolicies/providerRouting", Value::Null)],
+            ),
+            (
+                "target-default",
+                |declaration| {
+                    declaration["targetProfiles"]["browser"]
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("defaultRequestedLocale");
+                },
+                vec![
+                    ("/targets/browser/defaultRequestedLocale", Value::Null),
+                    (
+                        "/targets/browser/effectiveDefaultRequestedLocale",
+                        json!("en"),
+                    ),
+                ],
+            ),
+            (
+                "hydration-relations",
+                |declaration| {
+                    declaration["deploymentGroups"]["web"]["hydrationRelations"] = json!([]);
+                },
+                vec![("/deploymentGroups/web/hydrationRelations", json!([]))],
+            ),
+        ]
+    }
+
+    /// Every vector case, by its name: the complete profile, a second group,
+    /// a vocabulary without surface classes, each semantic change, and each
+    /// other declaration of the complete profile.
+    fn cases() -> Vec<(&'static str, Inputs)> {
+        let mut cases = vec![
+            ("complete", Inputs::complete()),
+            ("two-groups", Inputs::two_groups()),
+            ("no-surface-classes", Inputs::without_surface_classes()),
+        ];
+        cases.extend(changes().map(|(id, edit, _)| (id, edited(edit))));
+        cases.extend(same_profile());
+        cases
+    }
+
+    /// The vectors: each distinct view once, under the name of the first case
+    /// that projects it, with its profile semantic digest, and the view each
+    /// case projects.
+    fn document() -> Value {
+        let mut views: Vec<(&'static str, ProfileView)> = Vec::new();
+        let mut named = Vec::new();
+        for (id, inputs) in cases() {
+            let view = inputs
+                .view()
+                .unwrap_or_else(|causes| panic!("{id}: {causes:?}"));
+            let name = if let Some(index) = views.iter().position(|(_, other)| *other == view) {
+                views[index].0
+            } else {
+                views.push((id, view));
+                id
+            };
+            named.push(json!({"id": id, "view": name}));
+        }
+        let views: Vec<Value> = views
+            .iter()
+            .map(|(id, view)| {
+                json!({
+                    "id": id,
+                    "view": view,
+                    "semanticDigest": view.semantic_digest().unwrap().as_str(),
+                })
+            })
+            .collect();
+        json!({
+            "note": "Profile views of checked test profiles, projected by intlify_config, with \
+                     their profile semantic digests. An independent implementation checks every \
+                     view against 015's closed number-free shape: one member for each of the \
+                     committed Profile Specification's semanticGroups, in its order; exact \
+                     references of the kind 017 expects in each slot; the bounds its \
+                     resourceBounds lists, as decimal strings; sets in ascending UTF-8 byte \
+                     order; a decision row for every requested locale; each target's effective \
+                     default; and the targets partitioned among the groups, each hydration \
+                     relation inside its group. It recomputes each digest as 017's H under \
+                     localization-project-profile-semantic-digest and checks that distinct views \
+                     have distinct digests. Each case names the view its test inputs project, so \
+                     the cases that share a view are declarations of one profile. None of these \
+                     profiles is one a project declares.",
+            "domain": DOMAIN,
+            "views": views,
+            "cases": named,
+        })
+    }
+
+    fn committed() -> Value {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(VECTOR_FILE);
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+    }
+
     /// Every semantic group, in the inventory's order, as the declaration
     /// states it: canonical locales, references as written, and the
     /// confirmed policy's bounds as decimal strings.
@@ -714,173 +955,31 @@ mod tests {
         );
     }
 
-    /// What the projection leaves out: the Profile ID and the selector, the
-    /// order of sets, objects, and the collection, an omitted placement or
-    /// default mode in place of the default, and a rule no cell's mode
-    /// depends on, which changes only the Coverage Decision Basis.
+    /// What the projection leaves out: each declaration `same_profile` lists
+    /// has the complete profile's view and digest, and the redundant rule
+    /// changes only the Coverage Decision Basis.
     #[test]
     fn declarations_of_one_profile_have_one_view_and_digest() {
         let complete = Inputs::complete();
         let view = checked(&complete);
         let digest = view.semantic_digest().unwrap();
-        let redundant = edited(|declaration| {
-            declaration["coverage"]["rules"]
-                .as_array_mut()
-                .unwrap()
-                .remove(1);
-        });
         let basis =
             |inputs: &Inputs| inputs.resolve(|_, state| state.coverage.unwrap().basis().clone());
-        assert_ne!(basis(&redundant), basis(&complete));
-        for (name, inputs) in [
-            ("another Profile ID", complete.selecting("shop")),
-            ("another order", complete.reordered()),
-            (
-                "an omitted placement",
-                edited(|declaration| {
-                    declaration.as_object_mut().unwrap().remove("delivery");
-                }),
-            ),
-            (
-                "an omitted default mode",
-                edited(|declaration| {
-                    declaration["coverage"]
-                        .as_object_mut()
-                        .unwrap()
-                        .remove("defaultMode");
-                }),
-            ),
-            ("a redundant rule", redundant),
-        ] {
+        assert_ne!(basis(&redundant_rule()), basis(&complete));
+        for (name, inputs) in same_profile() {
             let other = checked(&inputs);
             assert_eq!(other, view, "{name}");
             assert_eq!(other.semantic_digest().unwrap(), digest, "{name}");
         }
     }
 
-    /// Each change of a semantic field: a profile of its own, whose view holds
-    /// the change.
+    /// Each change of a semantic field that `changes` lists: a profile of its
+    /// own, whose view holds the change.
     #[test]
     fn each_semantic_change_changes_the_view_and_its_digest() {
         let view = checked(&Inputs::complete());
         let digest = view.semantic_digest().unwrap();
-        let changes: [Change; 12] = [
-            (
-                "projectId",
-                |declaration| declaration["projectId"] = json!("outlet"),
-                vec![("/projectIdentity/projectId", json!("outlet"))],
-            ),
-            (
-                "selectionScope",
-                |declaration| declaration["selectionScope"] = json!("storefront.staging"),
-                vec![(
-                    "/projectIdentity/selectionScope",
-                    json!("storefront.staging"),
-                )],
-            ),
-            (
-                "requestedLocales",
-                |declaration| declaration["requestedLocales"] = json!(["fr", "ja", "en"]),
-                vec![
-                    (
-                        "/projectLocales/requestedLocales",
-                        json!(["en", "fr", "ja"]),
-                    ),
-                    ("/coverage/decisions/fr/nav", json!("direct-required")),
-                ],
-            ),
-            (
-                "defaultRequestedLocale",
-                |declaration| {
-                    declaration["defaultRequestedLocale"] = json!("ja");
-                    declaration["targetProfiles"]["browser"]["defaultRequestedLocale"] =
-                        json!("ja");
-                },
-                vec![
-                    ("/projectLocales/defaultRequestedLocale", json!("ja")),
-                    ("/targets/server/defaultRequestedLocale", Value::Null),
-                    (
-                        "/targets/server/effectiveDefaultRequestedLocale",
-                        json!("ja"),
-                    ),
-                ],
-            ),
-            (
-                "defaultSourceLocale",
-                |declaration| declaration["defaultSourceLocale"] = json!("ja"),
-                vec![("/projectLocales/defaultSourceLocale", json!("ja"))],
-            ),
-            (
-                "aliases",
-                |declaration| declaration["localeNegotiation"]["aliases"]["de"] = json!("ja"),
-                vec![("/localeNegotiation/aliases", json!({"de": "ja"}))],
-            ),
-            (
-                "messageFallback",
-                |declaration| {
-                    declaration["messageFallback"]["ja"] =
-                        json!([{"kind": "intent-source-locale"}, "en"]);
-                },
-                vec![(
-                    "/messageFallback/mappings/ja",
-                    json!([{"kind": "intent-source-locale"}, "en"]),
-                )],
-            ),
-            (
-                "defaultMode",
-                |declaration| declaration["coverage"]["defaultMode"] = json!("fallback-allowed"),
-                vec![
-                    ("/coverage/defaultMode", json!("fallback-allowed")),
-                    ("/coverage/decisions/en/nav", json!("fallback-allowed")),
-                ],
-            ),
-            (
-                "rules",
-                |declaration| {
-                    declaration["coverage"]["rules"]
-                        .as_array_mut()
-                        .unwrap()
-                        .remove(0);
-                },
-                vec![(
-                    "/coverage/decisions/ja",
-                    json!({
-                        "checkout": "fallback-allowed",
-                        "internal-tool": "direct-required",
-                        "nav": "direct-required"
-                    }),
-                )],
-            ),
-            (
-                "providerRouting",
-                |declaration| declaration["policies"]["providerRouting"] = Value::Null,
-                vec![("/optionalPolicies/providerRouting", Value::Null)],
-            ),
-            (
-                "a target's default",
-                |declaration| {
-                    declaration["targetProfiles"]["browser"]
-                        .as_object_mut()
-                        .unwrap()
-                        .remove("defaultRequestedLocale");
-                },
-                vec![
-                    ("/targets/browser/defaultRequestedLocale", Value::Null),
-                    (
-                        "/targets/browser/effectiveDefaultRequestedLocale",
-                        json!("en"),
-                    ),
-                ],
-            ),
-            (
-                "hydrationRelations",
-                |declaration| {
-                    declaration["deploymentGroups"]["web"]["hydrationRelations"] = json!([]);
-                },
-                vec![("/deploymentGroups/web/hydrationRelations", json!([]))],
-            ),
-        ];
-        for (name, edit, changed) in changes {
+        for (name, edit, changed) in changes() {
             let other = edited(edit)
                 .view()
                 .unwrap_or_else(|causes| panic!("{name}: {causes:?}"));
@@ -906,5 +1005,19 @@ mod tests {
             view["coverage"]["vocabulary"]["semanticDigest"],
             vectors::EMPTY_SEMANTIC_DIGEST
         );
+    }
+
+    /// The committed vectors are the views the resolver projects for every
+    /// case, with their digests. Equal decoded values are equal canonical
+    /// bytes, so the repository formatter owns the file's layout.
+    #[test]
+    fn the_committed_vectors_are_the_resolvers() {
+        assert_eq!(committed(), document());
+    }
+
+    #[test]
+    #[ignore = "prints the vectors to review before committing them"]
+    fn print_vectors_for_review() {
+        println!("{}", serde_json::to_string_pretty(&document()).unwrap());
     }
 }

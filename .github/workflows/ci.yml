@@ -169,6 +169,10 @@ jobs:
         if: runner.os == 'Linux'
         run: vp run vectors:validator-schemas:check
 
+      - name: Validate the 015 profile view independent vectors
+        if: runner.os == 'Linux'
+        run: vp run vectors:profile-view:check
+
   cli-validation:
     runs-on: ${{ matrix.os }}
     name: CLI validation (${{ matrix.os }})

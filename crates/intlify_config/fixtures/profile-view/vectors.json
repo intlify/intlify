@@ -1,0 +1,4030 @@
+{
+  "note": "Profile views of checked test profiles, projected by intlify_config, with their profile semantic digests. An independent implementation checks every view against 015's closed number-free shape: one member for each of the committed Profile Specification's semanticGroups, in its order; exact references of the kind 017 expects in each slot; the bounds its resourceBounds lists, as decimal strings; sets in ascending UTF-8 byte order; a decision row for every requested locale; each target's effective default; and the targets partitioned among the groups, each hydration relation inside its group. It recomputes each digest as 017's H under localization-project-profile-semantic-digest and checks that distinct views have distinct digests. Each case names the view its test inputs project, so the cases that share a view are declarations of one profile. None of these profiles is one a project declares.",
+  "domain": "localization-project-profile-semantic-digest",
+  "views": [
+    {
+      "id": "complete",
+      "view": {
+        "profileSpecification": {
+          "identity": "test-only-profile-specification",
+          "revision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "projectIdentity": {
+          "projectId": "storefront",
+          "selectionScope": "storefront.production"
+        },
+        "localeCanonicalization": {
+          "specification": {
+            "identity": "test-only-locale-specification",
+            "revision": "0"
+          },
+          "dataset": {
+            "identity": "test-only-finite-locale-data",
+            "semanticDigest": "test-only-dataset-content-pin"
+          }
+        },
+        "projectLocales": {
+          "requestedLocales": ["en", "ja"],
+          "defaultRequestedLocale": "en",
+          "defaultSourceLocale": "en"
+        },
+        "localeNegotiation": {
+          "specification": {
+            "identity": "intlify-locale-negotiation",
+            "revision": "0"
+          },
+          "aliases": {
+            "de": "en"
+          }
+        },
+        "messageFallback": {
+          "specification": {
+            "identity": "intlify-message-locale-fallback",
+            "revision": "0"
+          },
+          "mappings": {
+            "ja": [
+              "en",
+              {
+                "kind": "intent-source-locale"
+              }
+            ]
+          }
+        },
+        "coverage": {
+          "specification": {
+            "identity": "intlify-localization-coverage",
+            "revision": "0"
+          },
+          "vocabulary": {
+            "identity": "intlify-test-vocabulary",
+            "revision": "0",
+            "semanticDigest": "sha256:ca5f503b95aad972565514d3b68b3e8be4a811bb2fc983be16163b88c1fffbb2"
+          },
+          "defaultMode": "direct-required",
+          "decisions": {
+            "en": {
+              "checkout": "direct-required",
+              "internal-tool": "direct-required",
+              "nav": "direct-required"
+            },
+            "ja": {
+              "checkout": "fallback-allowed",
+              "internal-tool": "fallback-allowed",
+              "nav": "fallback-allowed"
+            }
+          }
+        },
+        "requiredPolicies": {
+          "resourceLimits": {
+            "kind": "resource-limit-policy",
+            "identity": "storefront-limits",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d936878c915106944846a89340f2c89fa7472cbc1089c5b1260f47603d71efc6"
+          },
+          "trust": {
+            "kind": "trust-policy",
+            "identity": "storefront-trust",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:84cbcd61a2d9b3a5e4b346ccc884ec36524dc7b7b927d0d752fdc1d103a57d4c"
+          },
+          "sourceAdmission": {
+            "kind": "source-admission-policy",
+            "identity": "storefront-source",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
+          },
+          "approval": {
+            "kind": "approval-policy",
+            "identity": "storefront-approval",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+          },
+          "selection": {
+            "kind": "selection-policy",
+            "identity": "storefront-selection",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
+          },
+          "projectProfileResolution": {
+            "diagnostics": {
+              "entry": {
+                "maxFindingOccurrences": "50034",
+                "maxFindings": "50035",
+                "maxRelatedEvidencePerOccurrenceGroup": "50036",
+                "maxRelatedEvidenceOccurrences": "50037",
+                "maxSingleEvidenceBytes": "50038",
+                "maxTotalEvidenceBytes": "50039",
+                "maxEvaluationStatusEntries": "50040",
+                "maxSuppressionCausesPerStatus": "50041",
+                "maxSuppressionCauseOccurrences": "50042",
+                "maxRecords": "50043",
+                "maxTotalCanonicalBytes": "50044"
+              },
+              "shared": {
+                "maxFindingOccurrences": "50045",
+                "maxFindings": "50046",
+                "maxEvaluationStatusEntries": "50047",
+                "maxSuppressionCausesPerStatus": "50048",
+                "maxSuppressionCauseOccurrences": "50049",
+                "maxRecords": "50050",
+                "maxTotalCanonicalBytes": "50051"
+              }
+            },
+            "configurationInput": {
+              "maxNodes": "50000",
+              "maxDepth": "50001",
+              "maxCollectionEntries": "50002",
+              "maxTotalStringBytes": "50003",
+              "maxSingleStringBytes": "50004",
+              "maxProfiles": "50005",
+              "maxProfileIdBytes": "50006",
+              "maxStructuralAnalysisUnits": "50007"
+            },
+            "localeResolution": {
+              "maxLocaleIdentifierBytes": "50008",
+              "maxLocaleOccurrences": "50009",
+              "maxRequestedLocales": "50010",
+              "maxNegotiationAliases": "50011",
+              "maxFallbackSources": "50012",
+              "maxFallbackCandidatesPerSource": "50013",
+              "maxCoverageRules": "50014",
+              "maxCoverageLocaleSelectorOccurrences": "50015",
+              "maxCoverageSurfaceSelectorOccurrences": "50016",
+              "maxCoverageDecisionCells": "50017",
+              "maxCoverageRuleCellComparisons": "50018"
+            },
+            "artifactAdmission": {
+              "maxArtifacts": "50019",
+              "maxPolicyArtifacts": "50020",
+              "maxTargetProfileArtifacts": "50021",
+              "maxArtifactReferences": "50022",
+              "maxSingleArtifactCanonicalBytes": "50023",
+              "maxTotalArtifactCanonicalBytes": "50024",
+              "maxSingleReferenceCanonicalBytes": "50025",
+              "maxTotalReferenceCanonicalBytes": "50026"
+            },
+            "targetGrouping": {
+              "maxTargetProfiles": "50027",
+              "maxTargetIdBytes": "50028",
+              "maxDeploymentGroups": "50029",
+              "maxGroupIdBytes": "50030",
+              "maxMembersPerGroup": "50031",
+              "maxMembershipOccurrences": "50032",
+              "maxHydrationRelations": "50033"
+            }
+          }
+        },
+        "optionalPolicies": {
+          "providerRouting": {
+            "kind": "provider-routing-policy",
+            "identity": "storefront-routing",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:aff8acbb9d527ee19a96ebceeeec0961b16d279d87305b7b3481cf65efcc68ff"
+          },
+          "glossarySet": {
+            "kind": "glossary-set",
+            "identity": "storefront-glossary",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
+          }
+        },
+        "targets": {
+          "browser": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-browser",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": "en",
+            "effectiveDefaultRequestedLocale": "en"
+          },
+          "server": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-server",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": null,
+            "effectiveDefaultRequestedLocale": "en"
+          }
+        },
+        "deploymentGroups": {
+          "web": {
+            "members": ["browser", "server"],
+            "hydrationRelations": [
+              {
+                "server": "server",
+                "client": "browser"
+              }
+            ]
+          }
+        },
+        "delivery": {
+          "graph": {
+            "identity": "intlify-delivery-graph",
+            "revision": "0"
+          },
+          "placement": {
+            "identity": "intlify-delivery-placement",
+            "revision": "0"
+          },
+          "mode": "duplicate"
+        }
+      },
+      "semanticDigest": "sha256:64b15ab6b7ecf5c2410aecc775964d0a28f335dbb0d692a123cda6596243288c"
+    },
+    {
+      "id": "two-groups",
+      "view": {
+        "profileSpecification": {
+          "identity": "test-only-profile-specification",
+          "revision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "projectIdentity": {
+          "projectId": "storefront",
+          "selectionScope": "storefront.production"
+        },
+        "localeCanonicalization": {
+          "specification": {
+            "identity": "test-only-locale-specification",
+            "revision": "0"
+          },
+          "dataset": {
+            "identity": "test-only-finite-locale-data",
+            "semanticDigest": "test-only-dataset-content-pin"
+          }
+        },
+        "projectLocales": {
+          "requestedLocales": ["en", "ja"],
+          "defaultRequestedLocale": "en",
+          "defaultSourceLocale": "en"
+        },
+        "localeNegotiation": {
+          "specification": {
+            "identity": "intlify-locale-negotiation",
+            "revision": "0"
+          },
+          "aliases": {
+            "de": "en"
+          }
+        },
+        "messageFallback": {
+          "specification": {
+            "identity": "intlify-message-locale-fallback",
+            "revision": "0"
+          },
+          "mappings": {
+            "ja": [
+              "en",
+              {
+                "kind": "intent-source-locale"
+              }
+            ]
+          }
+        },
+        "coverage": {
+          "specification": {
+            "identity": "intlify-localization-coverage",
+            "revision": "0"
+          },
+          "vocabulary": {
+            "identity": "intlify-test-vocabulary",
+            "revision": "0",
+            "semanticDigest": "sha256:ca5f503b95aad972565514d3b68b3e8be4a811bb2fc983be16163b88c1fffbb2"
+          },
+          "defaultMode": "direct-required",
+          "decisions": {
+            "en": {
+              "checkout": "direct-required",
+              "internal-tool": "direct-required",
+              "nav": "direct-required"
+            },
+            "ja": {
+              "checkout": "fallback-allowed",
+              "internal-tool": "fallback-allowed",
+              "nav": "fallback-allowed"
+            }
+          }
+        },
+        "requiredPolicies": {
+          "resourceLimits": {
+            "kind": "resource-limit-policy",
+            "identity": "storefront-limits",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d936878c915106944846a89340f2c89fa7472cbc1089c5b1260f47603d71efc6"
+          },
+          "trust": {
+            "kind": "trust-policy",
+            "identity": "storefront-trust",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:84cbcd61a2d9b3a5e4b346ccc884ec36524dc7b7b927d0d752fdc1d103a57d4c"
+          },
+          "sourceAdmission": {
+            "kind": "source-admission-policy",
+            "identity": "storefront-source",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
+          },
+          "approval": {
+            "kind": "approval-policy",
+            "identity": "storefront-approval",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+          },
+          "selection": {
+            "kind": "selection-policy",
+            "identity": "storefront-selection",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
+          },
+          "projectProfileResolution": {
+            "diagnostics": {
+              "entry": {
+                "maxFindingOccurrences": "50034",
+                "maxFindings": "50035",
+                "maxRelatedEvidencePerOccurrenceGroup": "50036",
+                "maxRelatedEvidenceOccurrences": "50037",
+                "maxSingleEvidenceBytes": "50038",
+                "maxTotalEvidenceBytes": "50039",
+                "maxEvaluationStatusEntries": "50040",
+                "maxSuppressionCausesPerStatus": "50041",
+                "maxSuppressionCauseOccurrences": "50042",
+                "maxRecords": "50043",
+                "maxTotalCanonicalBytes": "50044"
+              },
+              "shared": {
+                "maxFindingOccurrences": "50045",
+                "maxFindings": "50046",
+                "maxEvaluationStatusEntries": "50047",
+                "maxSuppressionCausesPerStatus": "50048",
+                "maxSuppressionCauseOccurrences": "50049",
+                "maxRecords": "50050",
+                "maxTotalCanonicalBytes": "50051"
+              }
+            },
+            "configurationInput": {
+              "maxNodes": "50000",
+              "maxDepth": "50001",
+              "maxCollectionEntries": "50002",
+              "maxTotalStringBytes": "50003",
+              "maxSingleStringBytes": "50004",
+              "maxProfiles": "50005",
+              "maxProfileIdBytes": "50006",
+              "maxStructuralAnalysisUnits": "50007"
+            },
+            "localeResolution": {
+              "maxLocaleIdentifierBytes": "50008",
+              "maxLocaleOccurrences": "50009",
+              "maxRequestedLocales": "50010",
+              "maxNegotiationAliases": "50011",
+              "maxFallbackSources": "50012",
+              "maxFallbackCandidatesPerSource": "50013",
+              "maxCoverageRules": "50014",
+              "maxCoverageLocaleSelectorOccurrences": "50015",
+              "maxCoverageSurfaceSelectorOccurrences": "50016",
+              "maxCoverageDecisionCells": "50017",
+              "maxCoverageRuleCellComparisons": "50018"
+            },
+            "artifactAdmission": {
+              "maxArtifacts": "50019",
+              "maxPolicyArtifacts": "50020",
+              "maxTargetProfileArtifacts": "50021",
+              "maxArtifactReferences": "50022",
+              "maxSingleArtifactCanonicalBytes": "50023",
+              "maxTotalArtifactCanonicalBytes": "50024",
+              "maxSingleReferenceCanonicalBytes": "50025",
+              "maxTotalReferenceCanonicalBytes": "50026"
+            },
+            "targetGrouping": {
+              "maxTargetProfiles": "50027",
+              "maxTargetIdBytes": "50028",
+              "maxDeploymentGroups": "50029",
+              "maxGroupIdBytes": "50030",
+              "maxMembersPerGroup": "50031",
+              "maxMembershipOccurrences": "50032",
+              "maxHydrationRelations": "50033"
+            }
+          }
+        },
+        "optionalPolicies": {
+          "providerRouting": {
+            "kind": "provider-routing-policy",
+            "identity": "storefront-routing",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:aff8acbb9d527ee19a96ebceeeec0961b16d279d87305b7b3481cf65efcc68ff"
+          },
+          "glossarySet": {
+            "kind": "glossary-set",
+            "identity": "storefront-glossary",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
+          }
+        },
+        "targets": {
+          "browser": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-browser",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": "en",
+            "effectiveDefaultRequestedLocale": "en"
+          },
+          "server": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-server",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": null,
+            "effectiveDefaultRequestedLocale": "en"
+          },
+          "worker": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-worker",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:e86a606f3b0a3bcd08106fb1654a2452e093ebb7b307be86a5c5b44f52d2e431"
+            },
+            "requestedLocales": ["ja"],
+            "defaultRequestedLocale": "ja",
+            "effectiveDefaultRequestedLocale": "ja"
+          }
+        },
+        "deploymentGroups": {
+          "jobs": {
+            "members": ["worker"],
+            "hydrationRelations": []
+          },
+          "web": {
+            "members": ["browser", "server"],
+            "hydrationRelations": [
+              {
+                "server": "server",
+                "client": "browser"
+              }
+            ]
+          }
+        },
+        "delivery": {
+          "graph": {
+            "identity": "intlify-delivery-graph",
+            "revision": "0"
+          },
+          "placement": {
+            "identity": "intlify-delivery-placement",
+            "revision": "0"
+          },
+          "mode": "duplicate"
+        }
+      },
+      "semanticDigest": "sha256:a450d1cb6a5e62dd12a3ccaffd0289e93a12719c81806d2038cb3498cfcae2de"
+    },
+    {
+      "id": "no-surface-classes",
+      "view": {
+        "profileSpecification": {
+          "identity": "test-only-profile-specification",
+          "revision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "projectIdentity": {
+          "projectId": "storefront",
+          "selectionScope": "storefront.production"
+        },
+        "localeCanonicalization": {
+          "specification": {
+            "identity": "test-only-locale-specification",
+            "revision": "0"
+          },
+          "dataset": {
+            "identity": "test-only-finite-locale-data",
+            "semanticDigest": "test-only-dataset-content-pin"
+          }
+        },
+        "projectLocales": {
+          "requestedLocales": ["en", "ja"],
+          "defaultRequestedLocale": "en",
+          "defaultSourceLocale": "en"
+        },
+        "localeNegotiation": {
+          "specification": {
+            "identity": "intlify-locale-negotiation",
+            "revision": "0"
+          },
+          "aliases": {
+            "de": "en"
+          }
+        },
+        "messageFallback": {
+          "specification": {
+            "identity": "intlify-message-locale-fallback",
+            "revision": "0"
+          },
+          "mappings": {
+            "ja": [
+              "en",
+              {
+                "kind": "intent-source-locale"
+              }
+            ]
+          }
+        },
+        "coverage": {
+          "specification": {
+            "identity": "intlify-localization-coverage",
+            "revision": "0"
+          },
+          "vocabulary": {
+            "identity": "intlify-test-vocabulary",
+            "revision": "0",
+            "semanticDigest": "sha256:f2993e0378a30c8ff1f2bc3aa3d44dda9575cdd995af41d079d3c2f0f0787d5e"
+          },
+          "defaultMode": "direct-required",
+          "decisions": {
+            "en": {},
+            "ja": {}
+          }
+        },
+        "requiredPolicies": {
+          "resourceLimits": {
+            "kind": "resource-limit-policy",
+            "identity": "storefront-limits",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d936878c915106944846a89340f2c89fa7472cbc1089c5b1260f47603d71efc6"
+          },
+          "trust": {
+            "kind": "trust-policy",
+            "identity": "storefront-trust",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:84cbcd61a2d9b3a5e4b346ccc884ec36524dc7b7b927d0d752fdc1d103a57d4c"
+          },
+          "sourceAdmission": {
+            "kind": "source-admission-policy",
+            "identity": "storefront-source",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
+          },
+          "approval": {
+            "kind": "approval-policy",
+            "identity": "storefront-approval",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+          },
+          "selection": {
+            "kind": "selection-policy",
+            "identity": "storefront-selection",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
+          },
+          "projectProfileResolution": {
+            "diagnostics": {
+              "entry": {
+                "maxFindingOccurrences": "50034",
+                "maxFindings": "50035",
+                "maxRelatedEvidencePerOccurrenceGroup": "50036",
+                "maxRelatedEvidenceOccurrences": "50037",
+                "maxSingleEvidenceBytes": "50038",
+                "maxTotalEvidenceBytes": "50039",
+                "maxEvaluationStatusEntries": "50040",
+                "maxSuppressionCausesPerStatus": "50041",
+                "maxSuppressionCauseOccurrences": "50042",
+                "maxRecords": "50043",
+                "maxTotalCanonicalBytes": "50044"
+              },
+              "shared": {
+                "maxFindingOccurrences": "50045",
+                "maxFindings": "50046",
+                "maxEvaluationStatusEntries": "50047",
+                "maxSuppressionCausesPerStatus": "50048",
+                "maxSuppressionCauseOccurrences": "50049",
+                "maxRecords": "50050",
+                "maxTotalCanonicalBytes": "50051"
+              }
+            },
+            "configurationInput": {
+              "maxNodes": "50000",
+              "maxDepth": "50001",
+              "maxCollectionEntries": "50002",
+              "maxTotalStringBytes": "50003",
+              "maxSingleStringBytes": "50004",
+              "maxProfiles": "50005",
+              "maxProfileIdBytes": "50006",
+              "maxStructuralAnalysisUnits": "50007"
+            },
+            "localeResolution": {
+              "maxLocaleIdentifierBytes": "50008",
+              "maxLocaleOccurrences": "50009",
+              "maxRequestedLocales": "50010",
+              "maxNegotiationAliases": "50011",
+              "maxFallbackSources": "50012",
+              "maxFallbackCandidatesPerSource": "50013",
+              "maxCoverageRules": "50014",
+              "maxCoverageLocaleSelectorOccurrences": "50015",
+              "maxCoverageSurfaceSelectorOccurrences": "50016",
+              "maxCoverageDecisionCells": "50017",
+              "maxCoverageRuleCellComparisons": "50018"
+            },
+            "artifactAdmission": {
+              "maxArtifacts": "50019",
+              "maxPolicyArtifacts": "50020",
+              "maxTargetProfileArtifacts": "50021",
+              "maxArtifactReferences": "50022",
+              "maxSingleArtifactCanonicalBytes": "50023",
+              "maxTotalArtifactCanonicalBytes": "50024",
+              "maxSingleReferenceCanonicalBytes": "50025",
+              "maxTotalReferenceCanonicalBytes": "50026"
+            },
+            "targetGrouping": {
+              "maxTargetProfiles": "50027",
+              "maxTargetIdBytes": "50028",
+              "maxDeploymentGroups": "50029",
+              "maxGroupIdBytes": "50030",
+              "maxMembersPerGroup": "50031",
+              "maxMembershipOccurrences": "50032",
+              "maxHydrationRelations": "50033"
+            }
+          }
+        },
+        "optionalPolicies": {
+          "providerRouting": {
+            "kind": "provider-routing-policy",
+            "identity": "storefront-routing",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:aff8acbb9d527ee19a96ebceeeec0961b16d279d87305b7b3481cf65efcc68ff"
+          },
+          "glossarySet": {
+            "kind": "glossary-set",
+            "identity": "storefront-glossary",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
+          }
+        },
+        "targets": {
+          "browser": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-browser",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": "en",
+            "effectiveDefaultRequestedLocale": "en"
+          },
+          "server": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-server",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": null,
+            "effectiveDefaultRequestedLocale": "en"
+          }
+        },
+        "deploymentGroups": {
+          "web": {
+            "members": ["browser", "server"],
+            "hydrationRelations": [
+              {
+                "server": "server",
+                "client": "browser"
+              }
+            ]
+          }
+        },
+        "delivery": {
+          "graph": {
+            "identity": "intlify-delivery-graph",
+            "revision": "0"
+          },
+          "placement": {
+            "identity": "intlify-delivery-placement",
+            "revision": "0"
+          },
+          "mode": "duplicate"
+        }
+      },
+      "semanticDigest": "sha256:f3dc09e6df5829a921072fba5978ee63d7e6cf742e7aedb147fa320e15b4341f"
+    },
+    {
+      "id": "project-id",
+      "view": {
+        "profileSpecification": {
+          "identity": "test-only-profile-specification",
+          "revision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "projectIdentity": {
+          "projectId": "outlet",
+          "selectionScope": "storefront.production"
+        },
+        "localeCanonicalization": {
+          "specification": {
+            "identity": "test-only-locale-specification",
+            "revision": "0"
+          },
+          "dataset": {
+            "identity": "test-only-finite-locale-data",
+            "semanticDigest": "test-only-dataset-content-pin"
+          }
+        },
+        "projectLocales": {
+          "requestedLocales": ["en", "ja"],
+          "defaultRequestedLocale": "en",
+          "defaultSourceLocale": "en"
+        },
+        "localeNegotiation": {
+          "specification": {
+            "identity": "intlify-locale-negotiation",
+            "revision": "0"
+          },
+          "aliases": {
+            "de": "en"
+          }
+        },
+        "messageFallback": {
+          "specification": {
+            "identity": "intlify-message-locale-fallback",
+            "revision": "0"
+          },
+          "mappings": {
+            "ja": [
+              "en",
+              {
+                "kind": "intent-source-locale"
+              }
+            ]
+          }
+        },
+        "coverage": {
+          "specification": {
+            "identity": "intlify-localization-coverage",
+            "revision": "0"
+          },
+          "vocabulary": {
+            "identity": "intlify-test-vocabulary",
+            "revision": "0",
+            "semanticDigest": "sha256:ca5f503b95aad972565514d3b68b3e8be4a811bb2fc983be16163b88c1fffbb2"
+          },
+          "defaultMode": "direct-required",
+          "decisions": {
+            "en": {
+              "checkout": "direct-required",
+              "internal-tool": "direct-required",
+              "nav": "direct-required"
+            },
+            "ja": {
+              "checkout": "fallback-allowed",
+              "internal-tool": "fallback-allowed",
+              "nav": "fallback-allowed"
+            }
+          }
+        },
+        "requiredPolicies": {
+          "resourceLimits": {
+            "kind": "resource-limit-policy",
+            "identity": "storefront-limits",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d936878c915106944846a89340f2c89fa7472cbc1089c5b1260f47603d71efc6"
+          },
+          "trust": {
+            "kind": "trust-policy",
+            "identity": "storefront-trust",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:84cbcd61a2d9b3a5e4b346ccc884ec36524dc7b7b927d0d752fdc1d103a57d4c"
+          },
+          "sourceAdmission": {
+            "kind": "source-admission-policy",
+            "identity": "storefront-source",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
+          },
+          "approval": {
+            "kind": "approval-policy",
+            "identity": "storefront-approval",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+          },
+          "selection": {
+            "kind": "selection-policy",
+            "identity": "storefront-selection",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
+          },
+          "projectProfileResolution": {
+            "diagnostics": {
+              "entry": {
+                "maxFindingOccurrences": "50034",
+                "maxFindings": "50035",
+                "maxRelatedEvidencePerOccurrenceGroup": "50036",
+                "maxRelatedEvidenceOccurrences": "50037",
+                "maxSingleEvidenceBytes": "50038",
+                "maxTotalEvidenceBytes": "50039",
+                "maxEvaluationStatusEntries": "50040",
+                "maxSuppressionCausesPerStatus": "50041",
+                "maxSuppressionCauseOccurrences": "50042",
+                "maxRecords": "50043",
+                "maxTotalCanonicalBytes": "50044"
+              },
+              "shared": {
+                "maxFindingOccurrences": "50045",
+                "maxFindings": "50046",
+                "maxEvaluationStatusEntries": "50047",
+                "maxSuppressionCausesPerStatus": "50048",
+                "maxSuppressionCauseOccurrences": "50049",
+                "maxRecords": "50050",
+                "maxTotalCanonicalBytes": "50051"
+              }
+            },
+            "configurationInput": {
+              "maxNodes": "50000",
+              "maxDepth": "50001",
+              "maxCollectionEntries": "50002",
+              "maxTotalStringBytes": "50003",
+              "maxSingleStringBytes": "50004",
+              "maxProfiles": "50005",
+              "maxProfileIdBytes": "50006",
+              "maxStructuralAnalysisUnits": "50007"
+            },
+            "localeResolution": {
+              "maxLocaleIdentifierBytes": "50008",
+              "maxLocaleOccurrences": "50009",
+              "maxRequestedLocales": "50010",
+              "maxNegotiationAliases": "50011",
+              "maxFallbackSources": "50012",
+              "maxFallbackCandidatesPerSource": "50013",
+              "maxCoverageRules": "50014",
+              "maxCoverageLocaleSelectorOccurrences": "50015",
+              "maxCoverageSurfaceSelectorOccurrences": "50016",
+              "maxCoverageDecisionCells": "50017",
+              "maxCoverageRuleCellComparisons": "50018"
+            },
+            "artifactAdmission": {
+              "maxArtifacts": "50019",
+              "maxPolicyArtifacts": "50020",
+              "maxTargetProfileArtifacts": "50021",
+              "maxArtifactReferences": "50022",
+              "maxSingleArtifactCanonicalBytes": "50023",
+              "maxTotalArtifactCanonicalBytes": "50024",
+              "maxSingleReferenceCanonicalBytes": "50025",
+              "maxTotalReferenceCanonicalBytes": "50026"
+            },
+            "targetGrouping": {
+              "maxTargetProfiles": "50027",
+              "maxTargetIdBytes": "50028",
+              "maxDeploymentGroups": "50029",
+              "maxGroupIdBytes": "50030",
+              "maxMembersPerGroup": "50031",
+              "maxMembershipOccurrences": "50032",
+              "maxHydrationRelations": "50033"
+            }
+          }
+        },
+        "optionalPolicies": {
+          "providerRouting": {
+            "kind": "provider-routing-policy",
+            "identity": "storefront-routing",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:aff8acbb9d527ee19a96ebceeeec0961b16d279d87305b7b3481cf65efcc68ff"
+          },
+          "glossarySet": {
+            "kind": "glossary-set",
+            "identity": "storefront-glossary",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
+          }
+        },
+        "targets": {
+          "browser": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-browser",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": "en",
+            "effectiveDefaultRequestedLocale": "en"
+          },
+          "server": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-server",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": null,
+            "effectiveDefaultRequestedLocale": "en"
+          }
+        },
+        "deploymentGroups": {
+          "web": {
+            "members": ["browser", "server"],
+            "hydrationRelations": [
+              {
+                "server": "server",
+                "client": "browser"
+              }
+            ]
+          }
+        },
+        "delivery": {
+          "graph": {
+            "identity": "intlify-delivery-graph",
+            "revision": "0"
+          },
+          "placement": {
+            "identity": "intlify-delivery-placement",
+            "revision": "0"
+          },
+          "mode": "duplicate"
+        }
+      },
+      "semanticDigest": "sha256:21abadc2eab3b448a64bf1bb00584a4635fc4e58f4942d2edf19641110f8d9a9"
+    },
+    {
+      "id": "selection-scope",
+      "view": {
+        "profileSpecification": {
+          "identity": "test-only-profile-specification",
+          "revision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "projectIdentity": {
+          "projectId": "storefront",
+          "selectionScope": "storefront.staging"
+        },
+        "localeCanonicalization": {
+          "specification": {
+            "identity": "test-only-locale-specification",
+            "revision": "0"
+          },
+          "dataset": {
+            "identity": "test-only-finite-locale-data",
+            "semanticDigest": "test-only-dataset-content-pin"
+          }
+        },
+        "projectLocales": {
+          "requestedLocales": ["en", "ja"],
+          "defaultRequestedLocale": "en",
+          "defaultSourceLocale": "en"
+        },
+        "localeNegotiation": {
+          "specification": {
+            "identity": "intlify-locale-negotiation",
+            "revision": "0"
+          },
+          "aliases": {
+            "de": "en"
+          }
+        },
+        "messageFallback": {
+          "specification": {
+            "identity": "intlify-message-locale-fallback",
+            "revision": "0"
+          },
+          "mappings": {
+            "ja": [
+              "en",
+              {
+                "kind": "intent-source-locale"
+              }
+            ]
+          }
+        },
+        "coverage": {
+          "specification": {
+            "identity": "intlify-localization-coverage",
+            "revision": "0"
+          },
+          "vocabulary": {
+            "identity": "intlify-test-vocabulary",
+            "revision": "0",
+            "semanticDigest": "sha256:ca5f503b95aad972565514d3b68b3e8be4a811bb2fc983be16163b88c1fffbb2"
+          },
+          "defaultMode": "direct-required",
+          "decisions": {
+            "en": {
+              "checkout": "direct-required",
+              "internal-tool": "direct-required",
+              "nav": "direct-required"
+            },
+            "ja": {
+              "checkout": "fallback-allowed",
+              "internal-tool": "fallback-allowed",
+              "nav": "fallback-allowed"
+            }
+          }
+        },
+        "requiredPolicies": {
+          "resourceLimits": {
+            "kind": "resource-limit-policy",
+            "identity": "storefront-limits",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d936878c915106944846a89340f2c89fa7472cbc1089c5b1260f47603d71efc6"
+          },
+          "trust": {
+            "kind": "trust-policy",
+            "identity": "storefront-trust",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:84cbcd61a2d9b3a5e4b346ccc884ec36524dc7b7b927d0d752fdc1d103a57d4c"
+          },
+          "sourceAdmission": {
+            "kind": "source-admission-policy",
+            "identity": "storefront-source",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
+          },
+          "approval": {
+            "kind": "approval-policy",
+            "identity": "storefront-approval",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+          },
+          "selection": {
+            "kind": "selection-policy",
+            "identity": "storefront-selection",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
+          },
+          "projectProfileResolution": {
+            "diagnostics": {
+              "entry": {
+                "maxFindingOccurrences": "50034",
+                "maxFindings": "50035",
+                "maxRelatedEvidencePerOccurrenceGroup": "50036",
+                "maxRelatedEvidenceOccurrences": "50037",
+                "maxSingleEvidenceBytes": "50038",
+                "maxTotalEvidenceBytes": "50039",
+                "maxEvaluationStatusEntries": "50040",
+                "maxSuppressionCausesPerStatus": "50041",
+                "maxSuppressionCauseOccurrences": "50042",
+                "maxRecords": "50043",
+                "maxTotalCanonicalBytes": "50044"
+              },
+              "shared": {
+                "maxFindingOccurrences": "50045",
+                "maxFindings": "50046",
+                "maxEvaluationStatusEntries": "50047",
+                "maxSuppressionCausesPerStatus": "50048",
+                "maxSuppressionCauseOccurrences": "50049",
+                "maxRecords": "50050",
+                "maxTotalCanonicalBytes": "50051"
+              }
+            },
+            "configurationInput": {
+              "maxNodes": "50000",
+              "maxDepth": "50001",
+              "maxCollectionEntries": "50002",
+              "maxTotalStringBytes": "50003",
+              "maxSingleStringBytes": "50004",
+              "maxProfiles": "50005",
+              "maxProfileIdBytes": "50006",
+              "maxStructuralAnalysisUnits": "50007"
+            },
+            "localeResolution": {
+              "maxLocaleIdentifierBytes": "50008",
+              "maxLocaleOccurrences": "50009",
+              "maxRequestedLocales": "50010",
+              "maxNegotiationAliases": "50011",
+              "maxFallbackSources": "50012",
+              "maxFallbackCandidatesPerSource": "50013",
+              "maxCoverageRules": "50014",
+              "maxCoverageLocaleSelectorOccurrences": "50015",
+              "maxCoverageSurfaceSelectorOccurrences": "50016",
+              "maxCoverageDecisionCells": "50017",
+              "maxCoverageRuleCellComparisons": "50018"
+            },
+            "artifactAdmission": {
+              "maxArtifacts": "50019",
+              "maxPolicyArtifacts": "50020",
+              "maxTargetProfileArtifacts": "50021",
+              "maxArtifactReferences": "50022",
+              "maxSingleArtifactCanonicalBytes": "50023",
+              "maxTotalArtifactCanonicalBytes": "50024",
+              "maxSingleReferenceCanonicalBytes": "50025",
+              "maxTotalReferenceCanonicalBytes": "50026"
+            },
+            "targetGrouping": {
+              "maxTargetProfiles": "50027",
+              "maxTargetIdBytes": "50028",
+              "maxDeploymentGroups": "50029",
+              "maxGroupIdBytes": "50030",
+              "maxMembersPerGroup": "50031",
+              "maxMembershipOccurrences": "50032",
+              "maxHydrationRelations": "50033"
+            }
+          }
+        },
+        "optionalPolicies": {
+          "providerRouting": {
+            "kind": "provider-routing-policy",
+            "identity": "storefront-routing",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:aff8acbb9d527ee19a96ebceeeec0961b16d279d87305b7b3481cf65efcc68ff"
+          },
+          "glossarySet": {
+            "kind": "glossary-set",
+            "identity": "storefront-glossary",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
+          }
+        },
+        "targets": {
+          "browser": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-browser",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": "en",
+            "effectiveDefaultRequestedLocale": "en"
+          },
+          "server": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-server",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": null,
+            "effectiveDefaultRequestedLocale": "en"
+          }
+        },
+        "deploymentGroups": {
+          "web": {
+            "members": ["browser", "server"],
+            "hydrationRelations": [
+              {
+                "server": "server",
+                "client": "browser"
+              }
+            ]
+          }
+        },
+        "delivery": {
+          "graph": {
+            "identity": "intlify-delivery-graph",
+            "revision": "0"
+          },
+          "placement": {
+            "identity": "intlify-delivery-placement",
+            "revision": "0"
+          },
+          "mode": "duplicate"
+        }
+      },
+      "semanticDigest": "sha256:cceb96d8d68af3e5eb17329970b0de04acb96666de7a140eb860cb6202a53514"
+    },
+    {
+      "id": "requested-locales",
+      "view": {
+        "profileSpecification": {
+          "identity": "test-only-profile-specification",
+          "revision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "projectIdentity": {
+          "projectId": "storefront",
+          "selectionScope": "storefront.production"
+        },
+        "localeCanonicalization": {
+          "specification": {
+            "identity": "test-only-locale-specification",
+            "revision": "0"
+          },
+          "dataset": {
+            "identity": "test-only-finite-locale-data",
+            "semanticDigest": "test-only-dataset-content-pin"
+          }
+        },
+        "projectLocales": {
+          "requestedLocales": ["en", "fr", "ja"],
+          "defaultRequestedLocale": "en",
+          "defaultSourceLocale": "en"
+        },
+        "localeNegotiation": {
+          "specification": {
+            "identity": "intlify-locale-negotiation",
+            "revision": "0"
+          },
+          "aliases": {
+            "de": "en"
+          }
+        },
+        "messageFallback": {
+          "specification": {
+            "identity": "intlify-message-locale-fallback",
+            "revision": "0"
+          },
+          "mappings": {
+            "ja": [
+              "en",
+              {
+                "kind": "intent-source-locale"
+              }
+            ]
+          }
+        },
+        "coverage": {
+          "specification": {
+            "identity": "intlify-localization-coverage",
+            "revision": "0"
+          },
+          "vocabulary": {
+            "identity": "intlify-test-vocabulary",
+            "revision": "0",
+            "semanticDigest": "sha256:ca5f503b95aad972565514d3b68b3e8be4a811bb2fc983be16163b88c1fffbb2"
+          },
+          "defaultMode": "direct-required",
+          "decisions": {
+            "en": {
+              "checkout": "direct-required",
+              "internal-tool": "direct-required",
+              "nav": "direct-required"
+            },
+            "fr": {
+              "checkout": "direct-required",
+              "internal-tool": "direct-required",
+              "nav": "direct-required"
+            },
+            "ja": {
+              "checkout": "fallback-allowed",
+              "internal-tool": "fallback-allowed",
+              "nav": "fallback-allowed"
+            }
+          }
+        },
+        "requiredPolicies": {
+          "resourceLimits": {
+            "kind": "resource-limit-policy",
+            "identity": "storefront-limits",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d936878c915106944846a89340f2c89fa7472cbc1089c5b1260f47603d71efc6"
+          },
+          "trust": {
+            "kind": "trust-policy",
+            "identity": "storefront-trust",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:84cbcd61a2d9b3a5e4b346ccc884ec36524dc7b7b927d0d752fdc1d103a57d4c"
+          },
+          "sourceAdmission": {
+            "kind": "source-admission-policy",
+            "identity": "storefront-source",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
+          },
+          "approval": {
+            "kind": "approval-policy",
+            "identity": "storefront-approval",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+          },
+          "selection": {
+            "kind": "selection-policy",
+            "identity": "storefront-selection",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
+          },
+          "projectProfileResolution": {
+            "diagnostics": {
+              "entry": {
+                "maxFindingOccurrences": "50034",
+                "maxFindings": "50035",
+                "maxRelatedEvidencePerOccurrenceGroup": "50036",
+                "maxRelatedEvidenceOccurrences": "50037",
+                "maxSingleEvidenceBytes": "50038",
+                "maxTotalEvidenceBytes": "50039",
+                "maxEvaluationStatusEntries": "50040",
+                "maxSuppressionCausesPerStatus": "50041",
+                "maxSuppressionCauseOccurrences": "50042",
+                "maxRecords": "50043",
+                "maxTotalCanonicalBytes": "50044"
+              },
+              "shared": {
+                "maxFindingOccurrences": "50045",
+                "maxFindings": "50046",
+                "maxEvaluationStatusEntries": "50047",
+                "maxSuppressionCausesPerStatus": "50048",
+                "maxSuppressionCauseOccurrences": "50049",
+                "maxRecords": "50050",
+                "maxTotalCanonicalBytes": "50051"
+              }
+            },
+            "configurationInput": {
+              "maxNodes": "50000",
+              "maxDepth": "50001",
+              "maxCollectionEntries": "50002",
+              "maxTotalStringBytes": "50003",
+              "maxSingleStringBytes": "50004",
+              "maxProfiles": "50005",
+              "maxProfileIdBytes": "50006",
+              "maxStructuralAnalysisUnits": "50007"
+            },
+            "localeResolution": {
+              "maxLocaleIdentifierBytes": "50008",
+              "maxLocaleOccurrences": "50009",
+              "maxRequestedLocales": "50010",
+              "maxNegotiationAliases": "50011",
+              "maxFallbackSources": "50012",
+              "maxFallbackCandidatesPerSource": "50013",
+              "maxCoverageRules": "50014",
+              "maxCoverageLocaleSelectorOccurrences": "50015",
+              "maxCoverageSurfaceSelectorOccurrences": "50016",
+              "maxCoverageDecisionCells": "50017",
+              "maxCoverageRuleCellComparisons": "50018"
+            },
+            "artifactAdmission": {
+              "maxArtifacts": "50019",
+              "maxPolicyArtifacts": "50020",
+              "maxTargetProfileArtifacts": "50021",
+              "maxArtifactReferences": "50022",
+              "maxSingleArtifactCanonicalBytes": "50023",
+              "maxTotalArtifactCanonicalBytes": "50024",
+              "maxSingleReferenceCanonicalBytes": "50025",
+              "maxTotalReferenceCanonicalBytes": "50026"
+            },
+            "targetGrouping": {
+              "maxTargetProfiles": "50027",
+              "maxTargetIdBytes": "50028",
+              "maxDeploymentGroups": "50029",
+              "maxGroupIdBytes": "50030",
+              "maxMembersPerGroup": "50031",
+              "maxMembershipOccurrences": "50032",
+              "maxHydrationRelations": "50033"
+            }
+          }
+        },
+        "optionalPolicies": {
+          "providerRouting": {
+            "kind": "provider-routing-policy",
+            "identity": "storefront-routing",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:aff8acbb9d527ee19a96ebceeeec0961b16d279d87305b7b3481cf65efcc68ff"
+          },
+          "glossarySet": {
+            "kind": "glossary-set",
+            "identity": "storefront-glossary",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
+          }
+        },
+        "targets": {
+          "browser": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-browser",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": "en",
+            "effectiveDefaultRequestedLocale": "en"
+          },
+          "server": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-server",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": null,
+            "effectiveDefaultRequestedLocale": "en"
+          }
+        },
+        "deploymentGroups": {
+          "web": {
+            "members": ["browser", "server"],
+            "hydrationRelations": [
+              {
+                "server": "server",
+                "client": "browser"
+              }
+            ]
+          }
+        },
+        "delivery": {
+          "graph": {
+            "identity": "intlify-delivery-graph",
+            "revision": "0"
+          },
+          "placement": {
+            "identity": "intlify-delivery-placement",
+            "revision": "0"
+          },
+          "mode": "duplicate"
+        }
+      },
+      "semanticDigest": "sha256:fb70c49b996253ddd6899099611d88bd48c490d9c1dc563e2e4330ac582acb9c"
+    },
+    {
+      "id": "default-requested-locale",
+      "view": {
+        "profileSpecification": {
+          "identity": "test-only-profile-specification",
+          "revision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "projectIdentity": {
+          "projectId": "storefront",
+          "selectionScope": "storefront.production"
+        },
+        "localeCanonicalization": {
+          "specification": {
+            "identity": "test-only-locale-specification",
+            "revision": "0"
+          },
+          "dataset": {
+            "identity": "test-only-finite-locale-data",
+            "semanticDigest": "test-only-dataset-content-pin"
+          }
+        },
+        "projectLocales": {
+          "requestedLocales": ["en", "ja"],
+          "defaultRequestedLocale": "ja",
+          "defaultSourceLocale": "en"
+        },
+        "localeNegotiation": {
+          "specification": {
+            "identity": "intlify-locale-negotiation",
+            "revision": "0"
+          },
+          "aliases": {
+            "de": "en"
+          }
+        },
+        "messageFallback": {
+          "specification": {
+            "identity": "intlify-message-locale-fallback",
+            "revision": "0"
+          },
+          "mappings": {
+            "ja": [
+              "en",
+              {
+                "kind": "intent-source-locale"
+              }
+            ]
+          }
+        },
+        "coverage": {
+          "specification": {
+            "identity": "intlify-localization-coverage",
+            "revision": "0"
+          },
+          "vocabulary": {
+            "identity": "intlify-test-vocabulary",
+            "revision": "0",
+            "semanticDigest": "sha256:ca5f503b95aad972565514d3b68b3e8be4a811bb2fc983be16163b88c1fffbb2"
+          },
+          "defaultMode": "direct-required",
+          "decisions": {
+            "en": {
+              "checkout": "direct-required",
+              "internal-tool": "direct-required",
+              "nav": "direct-required"
+            },
+            "ja": {
+              "checkout": "fallback-allowed",
+              "internal-tool": "fallback-allowed",
+              "nav": "fallback-allowed"
+            }
+          }
+        },
+        "requiredPolicies": {
+          "resourceLimits": {
+            "kind": "resource-limit-policy",
+            "identity": "storefront-limits",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d936878c915106944846a89340f2c89fa7472cbc1089c5b1260f47603d71efc6"
+          },
+          "trust": {
+            "kind": "trust-policy",
+            "identity": "storefront-trust",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:84cbcd61a2d9b3a5e4b346ccc884ec36524dc7b7b927d0d752fdc1d103a57d4c"
+          },
+          "sourceAdmission": {
+            "kind": "source-admission-policy",
+            "identity": "storefront-source",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
+          },
+          "approval": {
+            "kind": "approval-policy",
+            "identity": "storefront-approval",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+          },
+          "selection": {
+            "kind": "selection-policy",
+            "identity": "storefront-selection",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
+          },
+          "projectProfileResolution": {
+            "diagnostics": {
+              "entry": {
+                "maxFindingOccurrences": "50034",
+                "maxFindings": "50035",
+                "maxRelatedEvidencePerOccurrenceGroup": "50036",
+                "maxRelatedEvidenceOccurrences": "50037",
+                "maxSingleEvidenceBytes": "50038",
+                "maxTotalEvidenceBytes": "50039",
+                "maxEvaluationStatusEntries": "50040",
+                "maxSuppressionCausesPerStatus": "50041",
+                "maxSuppressionCauseOccurrences": "50042",
+                "maxRecords": "50043",
+                "maxTotalCanonicalBytes": "50044"
+              },
+              "shared": {
+                "maxFindingOccurrences": "50045",
+                "maxFindings": "50046",
+                "maxEvaluationStatusEntries": "50047",
+                "maxSuppressionCausesPerStatus": "50048",
+                "maxSuppressionCauseOccurrences": "50049",
+                "maxRecords": "50050",
+                "maxTotalCanonicalBytes": "50051"
+              }
+            },
+            "configurationInput": {
+              "maxNodes": "50000",
+              "maxDepth": "50001",
+              "maxCollectionEntries": "50002",
+              "maxTotalStringBytes": "50003",
+              "maxSingleStringBytes": "50004",
+              "maxProfiles": "50005",
+              "maxProfileIdBytes": "50006",
+              "maxStructuralAnalysisUnits": "50007"
+            },
+            "localeResolution": {
+              "maxLocaleIdentifierBytes": "50008",
+              "maxLocaleOccurrences": "50009",
+              "maxRequestedLocales": "50010",
+              "maxNegotiationAliases": "50011",
+              "maxFallbackSources": "50012",
+              "maxFallbackCandidatesPerSource": "50013",
+              "maxCoverageRules": "50014",
+              "maxCoverageLocaleSelectorOccurrences": "50015",
+              "maxCoverageSurfaceSelectorOccurrences": "50016",
+              "maxCoverageDecisionCells": "50017",
+              "maxCoverageRuleCellComparisons": "50018"
+            },
+            "artifactAdmission": {
+              "maxArtifacts": "50019",
+              "maxPolicyArtifacts": "50020",
+              "maxTargetProfileArtifacts": "50021",
+              "maxArtifactReferences": "50022",
+              "maxSingleArtifactCanonicalBytes": "50023",
+              "maxTotalArtifactCanonicalBytes": "50024",
+              "maxSingleReferenceCanonicalBytes": "50025",
+              "maxTotalReferenceCanonicalBytes": "50026"
+            },
+            "targetGrouping": {
+              "maxTargetProfiles": "50027",
+              "maxTargetIdBytes": "50028",
+              "maxDeploymentGroups": "50029",
+              "maxGroupIdBytes": "50030",
+              "maxMembersPerGroup": "50031",
+              "maxMembershipOccurrences": "50032",
+              "maxHydrationRelations": "50033"
+            }
+          }
+        },
+        "optionalPolicies": {
+          "providerRouting": {
+            "kind": "provider-routing-policy",
+            "identity": "storefront-routing",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:aff8acbb9d527ee19a96ebceeeec0961b16d279d87305b7b3481cf65efcc68ff"
+          },
+          "glossarySet": {
+            "kind": "glossary-set",
+            "identity": "storefront-glossary",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
+          }
+        },
+        "targets": {
+          "browser": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-browser",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": "ja",
+            "effectiveDefaultRequestedLocale": "ja"
+          },
+          "server": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-server",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": null,
+            "effectiveDefaultRequestedLocale": "ja"
+          }
+        },
+        "deploymentGroups": {
+          "web": {
+            "members": ["browser", "server"],
+            "hydrationRelations": [
+              {
+                "server": "server",
+                "client": "browser"
+              }
+            ]
+          }
+        },
+        "delivery": {
+          "graph": {
+            "identity": "intlify-delivery-graph",
+            "revision": "0"
+          },
+          "placement": {
+            "identity": "intlify-delivery-placement",
+            "revision": "0"
+          },
+          "mode": "duplicate"
+        }
+      },
+      "semanticDigest": "sha256:42d19527f8aa259bc37e5d2c6ffe4f1f288d3ce2b57eda6cb74b369eb29d49e5"
+    },
+    {
+      "id": "default-source-locale",
+      "view": {
+        "profileSpecification": {
+          "identity": "test-only-profile-specification",
+          "revision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "projectIdentity": {
+          "projectId": "storefront",
+          "selectionScope": "storefront.production"
+        },
+        "localeCanonicalization": {
+          "specification": {
+            "identity": "test-only-locale-specification",
+            "revision": "0"
+          },
+          "dataset": {
+            "identity": "test-only-finite-locale-data",
+            "semanticDigest": "test-only-dataset-content-pin"
+          }
+        },
+        "projectLocales": {
+          "requestedLocales": ["en", "ja"],
+          "defaultRequestedLocale": "en",
+          "defaultSourceLocale": "ja"
+        },
+        "localeNegotiation": {
+          "specification": {
+            "identity": "intlify-locale-negotiation",
+            "revision": "0"
+          },
+          "aliases": {
+            "de": "en"
+          }
+        },
+        "messageFallback": {
+          "specification": {
+            "identity": "intlify-message-locale-fallback",
+            "revision": "0"
+          },
+          "mappings": {
+            "ja": [
+              "en",
+              {
+                "kind": "intent-source-locale"
+              }
+            ]
+          }
+        },
+        "coverage": {
+          "specification": {
+            "identity": "intlify-localization-coverage",
+            "revision": "0"
+          },
+          "vocabulary": {
+            "identity": "intlify-test-vocabulary",
+            "revision": "0",
+            "semanticDigest": "sha256:ca5f503b95aad972565514d3b68b3e8be4a811bb2fc983be16163b88c1fffbb2"
+          },
+          "defaultMode": "direct-required",
+          "decisions": {
+            "en": {
+              "checkout": "direct-required",
+              "internal-tool": "direct-required",
+              "nav": "direct-required"
+            },
+            "ja": {
+              "checkout": "fallback-allowed",
+              "internal-tool": "fallback-allowed",
+              "nav": "fallback-allowed"
+            }
+          }
+        },
+        "requiredPolicies": {
+          "resourceLimits": {
+            "kind": "resource-limit-policy",
+            "identity": "storefront-limits",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d936878c915106944846a89340f2c89fa7472cbc1089c5b1260f47603d71efc6"
+          },
+          "trust": {
+            "kind": "trust-policy",
+            "identity": "storefront-trust",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:84cbcd61a2d9b3a5e4b346ccc884ec36524dc7b7b927d0d752fdc1d103a57d4c"
+          },
+          "sourceAdmission": {
+            "kind": "source-admission-policy",
+            "identity": "storefront-source",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
+          },
+          "approval": {
+            "kind": "approval-policy",
+            "identity": "storefront-approval",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+          },
+          "selection": {
+            "kind": "selection-policy",
+            "identity": "storefront-selection",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
+          },
+          "projectProfileResolution": {
+            "diagnostics": {
+              "entry": {
+                "maxFindingOccurrences": "50034",
+                "maxFindings": "50035",
+                "maxRelatedEvidencePerOccurrenceGroup": "50036",
+                "maxRelatedEvidenceOccurrences": "50037",
+                "maxSingleEvidenceBytes": "50038",
+                "maxTotalEvidenceBytes": "50039",
+                "maxEvaluationStatusEntries": "50040",
+                "maxSuppressionCausesPerStatus": "50041",
+                "maxSuppressionCauseOccurrences": "50042",
+                "maxRecords": "50043",
+                "maxTotalCanonicalBytes": "50044"
+              },
+              "shared": {
+                "maxFindingOccurrences": "50045",
+                "maxFindings": "50046",
+                "maxEvaluationStatusEntries": "50047",
+                "maxSuppressionCausesPerStatus": "50048",
+                "maxSuppressionCauseOccurrences": "50049",
+                "maxRecords": "50050",
+                "maxTotalCanonicalBytes": "50051"
+              }
+            },
+            "configurationInput": {
+              "maxNodes": "50000",
+              "maxDepth": "50001",
+              "maxCollectionEntries": "50002",
+              "maxTotalStringBytes": "50003",
+              "maxSingleStringBytes": "50004",
+              "maxProfiles": "50005",
+              "maxProfileIdBytes": "50006",
+              "maxStructuralAnalysisUnits": "50007"
+            },
+            "localeResolution": {
+              "maxLocaleIdentifierBytes": "50008",
+              "maxLocaleOccurrences": "50009",
+              "maxRequestedLocales": "50010",
+              "maxNegotiationAliases": "50011",
+              "maxFallbackSources": "50012",
+              "maxFallbackCandidatesPerSource": "50013",
+              "maxCoverageRules": "50014",
+              "maxCoverageLocaleSelectorOccurrences": "50015",
+              "maxCoverageSurfaceSelectorOccurrences": "50016",
+              "maxCoverageDecisionCells": "50017",
+              "maxCoverageRuleCellComparisons": "50018"
+            },
+            "artifactAdmission": {
+              "maxArtifacts": "50019",
+              "maxPolicyArtifacts": "50020",
+              "maxTargetProfileArtifacts": "50021",
+              "maxArtifactReferences": "50022",
+              "maxSingleArtifactCanonicalBytes": "50023",
+              "maxTotalArtifactCanonicalBytes": "50024",
+              "maxSingleReferenceCanonicalBytes": "50025",
+              "maxTotalReferenceCanonicalBytes": "50026"
+            },
+            "targetGrouping": {
+              "maxTargetProfiles": "50027",
+              "maxTargetIdBytes": "50028",
+              "maxDeploymentGroups": "50029",
+              "maxGroupIdBytes": "50030",
+              "maxMembersPerGroup": "50031",
+              "maxMembershipOccurrences": "50032",
+              "maxHydrationRelations": "50033"
+            }
+          }
+        },
+        "optionalPolicies": {
+          "providerRouting": {
+            "kind": "provider-routing-policy",
+            "identity": "storefront-routing",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:aff8acbb9d527ee19a96ebceeeec0961b16d279d87305b7b3481cf65efcc68ff"
+          },
+          "glossarySet": {
+            "kind": "glossary-set",
+            "identity": "storefront-glossary",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
+          }
+        },
+        "targets": {
+          "browser": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-browser",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": "en",
+            "effectiveDefaultRequestedLocale": "en"
+          },
+          "server": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-server",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": null,
+            "effectiveDefaultRequestedLocale": "en"
+          }
+        },
+        "deploymentGroups": {
+          "web": {
+            "members": ["browser", "server"],
+            "hydrationRelations": [
+              {
+                "server": "server",
+                "client": "browser"
+              }
+            ]
+          }
+        },
+        "delivery": {
+          "graph": {
+            "identity": "intlify-delivery-graph",
+            "revision": "0"
+          },
+          "placement": {
+            "identity": "intlify-delivery-placement",
+            "revision": "0"
+          },
+          "mode": "duplicate"
+        }
+      },
+      "semanticDigest": "sha256:d485863497a43a342ce7ebbfdde0a97514cf876a317f4417efea96993f8c3a1d"
+    },
+    {
+      "id": "no-default-source-locale",
+      "view": {
+        "profileSpecification": {
+          "identity": "test-only-profile-specification",
+          "revision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "projectIdentity": {
+          "projectId": "storefront",
+          "selectionScope": "storefront.production"
+        },
+        "localeCanonicalization": {
+          "specification": {
+            "identity": "test-only-locale-specification",
+            "revision": "0"
+          },
+          "dataset": {
+            "identity": "test-only-finite-locale-data",
+            "semanticDigest": "test-only-dataset-content-pin"
+          }
+        },
+        "projectLocales": {
+          "requestedLocales": ["en", "ja"],
+          "defaultRequestedLocale": "en",
+          "defaultSourceLocale": null
+        },
+        "localeNegotiation": {
+          "specification": {
+            "identity": "intlify-locale-negotiation",
+            "revision": "0"
+          },
+          "aliases": {
+            "de": "en"
+          }
+        },
+        "messageFallback": {
+          "specification": {
+            "identity": "intlify-message-locale-fallback",
+            "revision": "0"
+          },
+          "mappings": {
+            "ja": [
+              "en",
+              {
+                "kind": "intent-source-locale"
+              }
+            ]
+          }
+        },
+        "coverage": {
+          "specification": {
+            "identity": "intlify-localization-coverage",
+            "revision": "0"
+          },
+          "vocabulary": {
+            "identity": "intlify-test-vocabulary",
+            "revision": "0",
+            "semanticDigest": "sha256:ca5f503b95aad972565514d3b68b3e8be4a811bb2fc983be16163b88c1fffbb2"
+          },
+          "defaultMode": "direct-required",
+          "decisions": {
+            "en": {
+              "checkout": "direct-required",
+              "internal-tool": "direct-required",
+              "nav": "direct-required"
+            },
+            "ja": {
+              "checkout": "fallback-allowed",
+              "internal-tool": "fallback-allowed",
+              "nav": "fallback-allowed"
+            }
+          }
+        },
+        "requiredPolicies": {
+          "resourceLimits": {
+            "kind": "resource-limit-policy",
+            "identity": "storefront-limits",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d936878c915106944846a89340f2c89fa7472cbc1089c5b1260f47603d71efc6"
+          },
+          "trust": {
+            "kind": "trust-policy",
+            "identity": "storefront-trust",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:84cbcd61a2d9b3a5e4b346ccc884ec36524dc7b7b927d0d752fdc1d103a57d4c"
+          },
+          "sourceAdmission": {
+            "kind": "source-admission-policy",
+            "identity": "storefront-source",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
+          },
+          "approval": {
+            "kind": "approval-policy",
+            "identity": "storefront-approval",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+          },
+          "selection": {
+            "kind": "selection-policy",
+            "identity": "storefront-selection",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
+          },
+          "projectProfileResolution": {
+            "diagnostics": {
+              "entry": {
+                "maxFindingOccurrences": "50034",
+                "maxFindings": "50035",
+                "maxRelatedEvidencePerOccurrenceGroup": "50036",
+                "maxRelatedEvidenceOccurrences": "50037",
+                "maxSingleEvidenceBytes": "50038",
+                "maxTotalEvidenceBytes": "50039",
+                "maxEvaluationStatusEntries": "50040",
+                "maxSuppressionCausesPerStatus": "50041",
+                "maxSuppressionCauseOccurrences": "50042",
+                "maxRecords": "50043",
+                "maxTotalCanonicalBytes": "50044"
+              },
+              "shared": {
+                "maxFindingOccurrences": "50045",
+                "maxFindings": "50046",
+                "maxEvaluationStatusEntries": "50047",
+                "maxSuppressionCausesPerStatus": "50048",
+                "maxSuppressionCauseOccurrences": "50049",
+                "maxRecords": "50050",
+                "maxTotalCanonicalBytes": "50051"
+              }
+            },
+            "configurationInput": {
+              "maxNodes": "50000",
+              "maxDepth": "50001",
+              "maxCollectionEntries": "50002",
+              "maxTotalStringBytes": "50003",
+              "maxSingleStringBytes": "50004",
+              "maxProfiles": "50005",
+              "maxProfileIdBytes": "50006",
+              "maxStructuralAnalysisUnits": "50007"
+            },
+            "localeResolution": {
+              "maxLocaleIdentifierBytes": "50008",
+              "maxLocaleOccurrences": "50009",
+              "maxRequestedLocales": "50010",
+              "maxNegotiationAliases": "50011",
+              "maxFallbackSources": "50012",
+              "maxFallbackCandidatesPerSource": "50013",
+              "maxCoverageRules": "50014",
+              "maxCoverageLocaleSelectorOccurrences": "50015",
+              "maxCoverageSurfaceSelectorOccurrences": "50016",
+              "maxCoverageDecisionCells": "50017",
+              "maxCoverageRuleCellComparisons": "50018"
+            },
+            "artifactAdmission": {
+              "maxArtifacts": "50019",
+              "maxPolicyArtifacts": "50020",
+              "maxTargetProfileArtifacts": "50021",
+              "maxArtifactReferences": "50022",
+              "maxSingleArtifactCanonicalBytes": "50023",
+              "maxTotalArtifactCanonicalBytes": "50024",
+              "maxSingleReferenceCanonicalBytes": "50025",
+              "maxTotalReferenceCanonicalBytes": "50026"
+            },
+            "targetGrouping": {
+              "maxTargetProfiles": "50027",
+              "maxTargetIdBytes": "50028",
+              "maxDeploymentGroups": "50029",
+              "maxGroupIdBytes": "50030",
+              "maxMembersPerGroup": "50031",
+              "maxMembershipOccurrences": "50032",
+              "maxHydrationRelations": "50033"
+            }
+          }
+        },
+        "optionalPolicies": {
+          "providerRouting": {
+            "kind": "provider-routing-policy",
+            "identity": "storefront-routing",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:aff8acbb9d527ee19a96ebceeeec0961b16d279d87305b7b3481cf65efcc68ff"
+          },
+          "glossarySet": {
+            "kind": "glossary-set",
+            "identity": "storefront-glossary",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
+          }
+        },
+        "targets": {
+          "browser": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-browser",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": "en",
+            "effectiveDefaultRequestedLocale": "en"
+          },
+          "server": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-server",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": null,
+            "effectiveDefaultRequestedLocale": "en"
+          }
+        },
+        "deploymentGroups": {
+          "web": {
+            "members": ["browser", "server"],
+            "hydrationRelations": [
+              {
+                "server": "server",
+                "client": "browser"
+              }
+            ]
+          }
+        },
+        "delivery": {
+          "graph": {
+            "identity": "intlify-delivery-graph",
+            "revision": "0"
+          },
+          "placement": {
+            "identity": "intlify-delivery-placement",
+            "revision": "0"
+          },
+          "mode": "duplicate"
+        }
+      },
+      "semanticDigest": "sha256:4938d0fe06ba26cd865d324b6f274c6b1aaaecfeae46066f52c45744f418e9c2"
+    },
+    {
+      "id": "aliases",
+      "view": {
+        "profileSpecification": {
+          "identity": "test-only-profile-specification",
+          "revision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "projectIdentity": {
+          "projectId": "storefront",
+          "selectionScope": "storefront.production"
+        },
+        "localeCanonicalization": {
+          "specification": {
+            "identity": "test-only-locale-specification",
+            "revision": "0"
+          },
+          "dataset": {
+            "identity": "test-only-finite-locale-data",
+            "semanticDigest": "test-only-dataset-content-pin"
+          }
+        },
+        "projectLocales": {
+          "requestedLocales": ["en", "ja"],
+          "defaultRequestedLocale": "en",
+          "defaultSourceLocale": "en"
+        },
+        "localeNegotiation": {
+          "specification": {
+            "identity": "intlify-locale-negotiation",
+            "revision": "0"
+          },
+          "aliases": {
+            "de": "ja"
+          }
+        },
+        "messageFallback": {
+          "specification": {
+            "identity": "intlify-message-locale-fallback",
+            "revision": "0"
+          },
+          "mappings": {
+            "ja": [
+              "en",
+              {
+                "kind": "intent-source-locale"
+              }
+            ]
+          }
+        },
+        "coverage": {
+          "specification": {
+            "identity": "intlify-localization-coverage",
+            "revision": "0"
+          },
+          "vocabulary": {
+            "identity": "intlify-test-vocabulary",
+            "revision": "0",
+            "semanticDigest": "sha256:ca5f503b95aad972565514d3b68b3e8be4a811bb2fc983be16163b88c1fffbb2"
+          },
+          "defaultMode": "direct-required",
+          "decisions": {
+            "en": {
+              "checkout": "direct-required",
+              "internal-tool": "direct-required",
+              "nav": "direct-required"
+            },
+            "ja": {
+              "checkout": "fallback-allowed",
+              "internal-tool": "fallback-allowed",
+              "nav": "fallback-allowed"
+            }
+          }
+        },
+        "requiredPolicies": {
+          "resourceLimits": {
+            "kind": "resource-limit-policy",
+            "identity": "storefront-limits",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d936878c915106944846a89340f2c89fa7472cbc1089c5b1260f47603d71efc6"
+          },
+          "trust": {
+            "kind": "trust-policy",
+            "identity": "storefront-trust",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:84cbcd61a2d9b3a5e4b346ccc884ec36524dc7b7b927d0d752fdc1d103a57d4c"
+          },
+          "sourceAdmission": {
+            "kind": "source-admission-policy",
+            "identity": "storefront-source",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
+          },
+          "approval": {
+            "kind": "approval-policy",
+            "identity": "storefront-approval",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+          },
+          "selection": {
+            "kind": "selection-policy",
+            "identity": "storefront-selection",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
+          },
+          "projectProfileResolution": {
+            "diagnostics": {
+              "entry": {
+                "maxFindingOccurrences": "50034",
+                "maxFindings": "50035",
+                "maxRelatedEvidencePerOccurrenceGroup": "50036",
+                "maxRelatedEvidenceOccurrences": "50037",
+                "maxSingleEvidenceBytes": "50038",
+                "maxTotalEvidenceBytes": "50039",
+                "maxEvaluationStatusEntries": "50040",
+                "maxSuppressionCausesPerStatus": "50041",
+                "maxSuppressionCauseOccurrences": "50042",
+                "maxRecords": "50043",
+                "maxTotalCanonicalBytes": "50044"
+              },
+              "shared": {
+                "maxFindingOccurrences": "50045",
+                "maxFindings": "50046",
+                "maxEvaluationStatusEntries": "50047",
+                "maxSuppressionCausesPerStatus": "50048",
+                "maxSuppressionCauseOccurrences": "50049",
+                "maxRecords": "50050",
+                "maxTotalCanonicalBytes": "50051"
+              }
+            },
+            "configurationInput": {
+              "maxNodes": "50000",
+              "maxDepth": "50001",
+              "maxCollectionEntries": "50002",
+              "maxTotalStringBytes": "50003",
+              "maxSingleStringBytes": "50004",
+              "maxProfiles": "50005",
+              "maxProfileIdBytes": "50006",
+              "maxStructuralAnalysisUnits": "50007"
+            },
+            "localeResolution": {
+              "maxLocaleIdentifierBytes": "50008",
+              "maxLocaleOccurrences": "50009",
+              "maxRequestedLocales": "50010",
+              "maxNegotiationAliases": "50011",
+              "maxFallbackSources": "50012",
+              "maxFallbackCandidatesPerSource": "50013",
+              "maxCoverageRules": "50014",
+              "maxCoverageLocaleSelectorOccurrences": "50015",
+              "maxCoverageSurfaceSelectorOccurrences": "50016",
+              "maxCoverageDecisionCells": "50017",
+              "maxCoverageRuleCellComparisons": "50018"
+            },
+            "artifactAdmission": {
+              "maxArtifacts": "50019",
+              "maxPolicyArtifacts": "50020",
+              "maxTargetProfileArtifacts": "50021",
+              "maxArtifactReferences": "50022",
+              "maxSingleArtifactCanonicalBytes": "50023",
+              "maxTotalArtifactCanonicalBytes": "50024",
+              "maxSingleReferenceCanonicalBytes": "50025",
+              "maxTotalReferenceCanonicalBytes": "50026"
+            },
+            "targetGrouping": {
+              "maxTargetProfiles": "50027",
+              "maxTargetIdBytes": "50028",
+              "maxDeploymentGroups": "50029",
+              "maxGroupIdBytes": "50030",
+              "maxMembersPerGroup": "50031",
+              "maxMembershipOccurrences": "50032",
+              "maxHydrationRelations": "50033"
+            }
+          }
+        },
+        "optionalPolicies": {
+          "providerRouting": {
+            "kind": "provider-routing-policy",
+            "identity": "storefront-routing",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:aff8acbb9d527ee19a96ebceeeec0961b16d279d87305b7b3481cf65efcc68ff"
+          },
+          "glossarySet": {
+            "kind": "glossary-set",
+            "identity": "storefront-glossary",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
+          }
+        },
+        "targets": {
+          "browser": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-browser",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": "en",
+            "effectiveDefaultRequestedLocale": "en"
+          },
+          "server": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-server",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": null,
+            "effectiveDefaultRequestedLocale": "en"
+          }
+        },
+        "deploymentGroups": {
+          "web": {
+            "members": ["browser", "server"],
+            "hydrationRelations": [
+              {
+                "server": "server",
+                "client": "browser"
+              }
+            ]
+          }
+        },
+        "delivery": {
+          "graph": {
+            "identity": "intlify-delivery-graph",
+            "revision": "0"
+          },
+          "placement": {
+            "identity": "intlify-delivery-placement",
+            "revision": "0"
+          },
+          "mode": "duplicate"
+        }
+      },
+      "semanticDigest": "sha256:28bd5d837ee7b864f58b8e019343388aae59c23ef4866efdcd1a8883adf5121b"
+    },
+    {
+      "id": "message-fallback",
+      "view": {
+        "profileSpecification": {
+          "identity": "test-only-profile-specification",
+          "revision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "projectIdentity": {
+          "projectId": "storefront",
+          "selectionScope": "storefront.production"
+        },
+        "localeCanonicalization": {
+          "specification": {
+            "identity": "test-only-locale-specification",
+            "revision": "0"
+          },
+          "dataset": {
+            "identity": "test-only-finite-locale-data",
+            "semanticDigest": "test-only-dataset-content-pin"
+          }
+        },
+        "projectLocales": {
+          "requestedLocales": ["en", "ja"],
+          "defaultRequestedLocale": "en",
+          "defaultSourceLocale": "en"
+        },
+        "localeNegotiation": {
+          "specification": {
+            "identity": "intlify-locale-negotiation",
+            "revision": "0"
+          },
+          "aliases": {
+            "de": "en"
+          }
+        },
+        "messageFallback": {
+          "specification": {
+            "identity": "intlify-message-locale-fallback",
+            "revision": "0"
+          },
+          "mappings": {
+            "ja": [
+              {
+                "kind": "intent-source-locale"
+              },
+              "en"
+            ]
+          }
+        },
+        "coverage": {
+          "specification": {
+            "identity": "intlify-localization-coverage",
+            "revision": "0"
+          },
+          "vocabulary": {
+            "identity": "intlify-test-vocabulary",
+            "revision": "0",
+            "semanticDigest": "sha256:ca5f503b95aad972565514d3b68b3e8be4a811bb2fc983be16163b88c1fffbb2"
+          },
+          "defaultMode": "direct-required",
+          "decisions": {
+            "en": {
+              "checkout": "direct-required",
+              "internal-tool": "direct-required",
+              "nav": "direct-required"
+            },
+            "ja": {
+              "checkout": "fallback-allowed",
+              "internal-tool": "fallback-allowed",
+              "nav": "fallback-allowed"
+            }
+          }
+        },
+        "requiredPolicies": {
+          "resourceLimits": {
+            "kind": "resource-limit-policy",
+            "identity": "storefront-limits",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d936878c915106944846a89340f2c89fa7472cbc1089c5b1260f47603d71efc6"
+          },
+          "trust": {
+            "kind": "trust-policy",
+            "identity": "storefront-trust",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:84cbcd61a2d9b3a5e4b346ccc884ec36524dc7b7b927d0d752fdc1d103a57d4c"
+          },
+          "sourceAdmission": {
+            "kind": "source-admission-policy",
+            "identity": "storefront-source",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
+          },
+          "approval": {
+            "kind": "approval-policy",
+            "identity": "storefront-approval",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+          },
+          "selection": {
+            "kind": "selection-policy",
+            "identity": "storefront-selection",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
+          },
+          "projectProfileResolution": {
+            "diagnostics": {
+              "entry": {
+                "maxFindingOccurrences": "50034",
+                "maxFindings": "50035",
+                "maxRelatedEvidencePerOccurrenceGroup": "50036",
+                "maxRelatedEvidenceOccurrences": "50037",
+                "maxSingleEvidenceBytes": "50038",
+                "maxTotalEvidenceBytes": "50039",
+                "maxEvaluationStatusEntries": "50040",
+                "maxSuppressionCausesPerStatus": "50041",
+                "maxSuppressionCauseOccurrences": "50042",
+                "maxRecords": "50043",
+                "maxTotalCanonicalBytes": "50044"
+              },
+              "shared": {
+                "maxFindingOccurrences": "50045",
+                "maxFindings": "50046",
+                "maxEvaluationStatusEntries": "50047",
+                "maxSuppressionCausesPerStatus": "50048",
+                "maxSuppressionCauseOccurrences": "50049",
+                "maxRecords": "50050",
+                "maxTotalCanonicalBytes": "50051"
+              }
+            },
+            "configurationInput": {
+              "maxNodes": "50000",
+              "maxDepth": "50001",
+              "maxCollectionEntries": "50002",
+              "maxTotalStringBytes": "50003",
+              "maxSingleStringBytes": "50004",
+              "maxProfiles": "50005",
+              "maxProfileIdBytes": "50006",
+              "maxStructuralAnalysisUnits": "50007"
+            },
+            "localeResolution": {
+              "maxLocaleIdentifierBytes": "50008",
+              "maxLocaleOccurrences": "50009",
+              "maxRequestedLocales": "50010",
+              "maxNegotiationAliases": "50011",
+              "maxFallbackSources": "50012",
+              "maxFallbackCandidatesPerSource": "50013",
+              "maxCoverageRules": "50014",
+              "maxCoverageLocaleSelectorOccurrences": "50015",
+              "maxCoverageSurfaceSelectorOccurrences": "50016",
+              "maxCoverageDecisionCells": "50017",
+              "maxCoverageRuleCellComparisons": "50018"
+            },
+            "artifactAdmission": {
+              "maxArtifacts": "50019",
+              "maxPolicyArtifacts": "50020",
+              "maxTargetProfileArtifacts": "50021",
+              "maxArtifactReferences": "50022",
+              "maxSingleArtifactCanonicalBytes": "50023",
+              "maxTotalArtifactCanonicalBytes": "50024",
+              "maxSingleReferenceCanonicalBytes": "50025",
+              "maxTotalReferenceCanonicalBytes": "50026"
+            },
+            "targetGrouping": {
+              "maxTargetProfiles": "50027",
+              "maxTargetIdBytes": "50028",
+              "maxDeploymentGroups": "50029",
+              "maxGroupIdBytes": "50030",
+              "maxMembersPerGroup": "50031",
+              "maxMembershipOccurrences": "50032",
+              "maxHydrationRelations": "50033"
+            }
+          }
+        },
+        "optionalPolicies": {
+          "providerRouting": {
+            "kind": "provider-routing-policy",
+            "identity": "storefront-routing",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:aff8acbb9d527ee19a96ebceeeec0961b16d279d87305b7b3481cf65efcc68ff"
+          },
+          "glossarySet": {
+            "kind": "glossary-set",
+            "identity": "storefront-glossary",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
+          }
+        },
+        "targets": {
+          "browser": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-browser",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": "en",
+            "effectiveDefaultRequestedLocale": "en"
+          },
+          "server": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-server",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": null,
+            "effectiveDefaultRequestedLocale": "en"
+          }
+        },
+        "deploymentGroups": {
+          "web": {
+            "members": ["browser", "server"],
+            "hydrationRelations": [
+              {
+                "server": "server",
+                "client": "browser"
+              }
+            ]
+          }
+        },
+        "delivery": {
+          "graph": {
+            "identity": "intlify-delivery-graph",
+            "revision": "0"
+          },
+          "placement": {
+            "identity": "intlify-delivery-placement",
+            "revision": "0"
+          },
+          "mode": "duplicate"
+        }
+      },
+      "semanticDigest": "sha256:24eef8f44f7269114cab56010505b6fde82325144197d68763efbf6b527854d4"
+    },
+    {
+      "id": "default-mode",
+      "view": {
+        "profileSpecification": {
+          "identity": "test-only-profile-specification",
+          "revision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "projectIdentity": {
+          "projectId": "storefront",
+          "selectionScope": "storefront.production"
+        },
+        "localeCanonicalization": {
+          "specification": {
+            "identity": "test-only-locale-specification",
+            "revision": "0"
+          },
+          "dataset": {
+            "identity": "test-only-finite-locale-data",
+            "semanticDigest": "test-only-dataset-content-pin"
+          }
+        },
+        "projectLocales": {
+          "requestedLocales": ["en", "ja"],
+          "defaultRequestedLocale": "en",
+          "defaultSourceLocale": "en"
+        },
+        "localeNegotiation": {
+          "specification": {
+            "identity": "intlify-locale-negotiation",
+            "revision": "0"
+          },
+          "aliases": {
+            "de": "en"
+          }
+        },
+        "messageFallback": {
+          "specification": {
+            "identity": "intlify-message-locale-fallback",
+            "revision": "0"
+          },
+          "mappings": {
+            "ja": [
+              "en",
+              {
+                "kind": "intent-source-locale"
+              }
+            ]
+          }
+        },
+        "coverage": {
+          "specification": {
+            "identity": "intlify-localization-coverage",
+            "revision": "0"
+          },
+          "vocabulary": {
+            "identity": "intlify-test-vocabulary",
+            "revision": "0",
+            "semanticDigest": "sha256:ca5f503b95aad972565514d3b68b3e8be4a811bb2fc983be16163b88c1fffbb2"
+          },
+          "defaultMode": "fallback-allowed",
+          "decisions": {
+            "en": {
+              "checkout": "direct-required",
+              "internal-tool": "fallback-allowed",
+              "nav": "fallback-allowed"
+            },
+            "ja": {
+              "checkout": "fallback-allowed",
+              "internal-tool": "fallback-allowed",
+              "nav": "fallback-allowed"
+            }
+          }
+        },
+        "requiredPolicies": {
+          "resourceLimits": {
+            "kind": "resource-limit-policy",
+            "identity": "storefront-limits",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d936878c915106944846a89340f2c89fa7472cbc1089c5b1260f47603d71efc6"
+          },
+          "trust": {
+            "kind": "trust-policy",
+            "identity": "storefront-trust",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:84cbcd61a2d9b3a5e4b346ccc884ec36524dc7b7b927d0d752fdc1d103a57d4c"
+          },
+          "sourceAdmission": {
+            "kind": "source-admission-policy",
+            "identity": "storefront-source",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
+          },
+          "approval": {
+            "kind": "approval-policy",
+            "identity": "storefront-approval",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+          },
+          "selection": {
+            "kind": "selection-policy",
+            "identity": "storefront-selection",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
+          },
+          "projectProfileResolution": {
+            "diagnostics": {
+              "entry": {
+                "maxFindingOccurrences": "50034",
+                "maxFindings": "50035",
+                "maxRelatedEvidencePerOccurrenceGroup": "50036",
+                "maxRelatedEvidenceOccurrences": "50037",
+                "maxSingleEvidenceBytes": "50038",
+                "maxTotalEvidenceBytes": "50039",
+                "maxEvaluationStatusEntries": "50040",
+                "maxSuppressionCausesPerStatus": "50041",
+                "maxSuppressionCauseOccurrences": "50042",
+                "maxRecords": "50043",
+                "maxTotalCanonicalBytes": "50044"
+              },
+              "shared": {
+                "maxFindingOccurrences": "50045",
+                "maxFindings": "50046",
+                "maxEvaluationStatusEntries": "50047",
+                "maxSuppressionCausesPerStatus": "50048",
+                "maxSuppressionCauseOccurrences": "50049",
+                "maxRecords": "50050",
+                "maxTotalCanonicalBytes": "50051"
+              }
+            },
+            "configurationInput": {
+              "maxNodes": "50000",
+              "maxDepth": "50001",
+              "maxCollectionEntries": "50002",
+              "maxTotalStringBytes": "50003",
+              "maxSingleStringBytes": "50004",
+              "maxProfiles": "50005",
+              "maxProfileIdBytes": "50006",
+              "maxStructuralAnalysisUnits": "50007"
+            },
+            "localeResolution": {
+              "maxLocaleIdentifierBytes": "50008",
+              "maxLocaleOccurrences": "50009",
+              "maxRequestedLocales": "50010",
+              "maxNegotiationAliases": "50011",
+              "maxFallbackSources": "50012",
+              "maxFallbackCandidatesPerSource": "50013",
+              "maxCoverageRules": "50014",
+              "maxCoverageLocaleSelectorOccurrences": "50015",
+              "maxCoverageSurfaceSelectorOccurrences": "50016",
+              "maxCoverageDecisionCells": "50017",
+              "maxCoverageRuleCellComparisons": "50018"
+            },
+            "artifactAdmission": {
+              "maxArtifacts": "50019",
+              "maxPolicyArtifacts": "50020",
+              "maxTargetProfileArtifacts": "50021",
+              "maxArtifactReferences": "50022",
+              "maxSingleArtifactCanonicalBytes": "50023",
+              "maxTotalArtifactCanonicalBytes": "50024",
+              "maxSingleReferenceCanonicalBytes": "50025",
+              "maxTotalReferenceCanonicalBytes": "50026"
+            },
+            "targetGrouping": {
+              "maxTargetProfiles": "50027",
+              "maxTargetIdBytes": "50028",
+              "maxDeploymentGroups": "50029",
+              "maxGroupIdBytes": "50030",
+              "maxMembersPerGroup": "50031",
+              "maxMembershipOccurrences": "50032",
+              "maxHydrationRelations": "50033"
+            }
+          }
+        },
+        "optionalPolicies": {
+          "providerRouting": {
+            "kind": "provider-routing-policy",
+            "identity": "storefront-routing",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:aff8acbb9d527ee19a96ebceeeec0961b16d279d87305b7b3481cf65efcc68ff"
+          },
+          "glossarySet": {
+            "kind": "glossary-set",
+            "identity": "storefront-glossary",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
+          }
+        },
+        "targets": {
+          "browser": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-browser",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": "en",
+            "effectiveDefaultRequestedLocale": "en"
+          },
+          "server": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-server",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": null,
+            "effectiveDefaultRequestedLocale": "en"
+          }
+        },
+        "deploymentGroups": {
+          "web": {
+            "members": ["browser", "server"],
+            "hydrationRelations": [
+              {
+                "server": "server",
+                "client": "browser"
+              }
+            ]
+          }
+        },
+        "delivery": {
+          "graph": {
+            "identity": "intlify-delivery-graph",
+            "revision": "0"
+          },
+          "placement": {
+            "identity": "intlify-delivery-placement",
+            "revision": "0"
+          },
+          "mode": "duplicate"
+        }
+      },
+      "semanticDigest": "sha256:2f6ec13cacc575229f41da81d1d505c19166e3993232286ec1e831c4eeb23412"
+    },
+    {
+      "id": "rules",
+      "view": {
+        "profileSpecification": {
+          "identity": "test-only-profile-specification",
+          "revision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "projectIdentity": {
+          "projectId": "storefront",
+          "selectionScope": "storefront.production"
+        },
+        "localeCanonicalization": {
+          "specification": {
+            "identity": "test-only-locale-specification",
+            "revision": "0"
+          },
+          "dataset": {
+            "identity": "test-only-finite-locale-data",
+            "semanticDigest": "test-only-dataset-content-pin"
+          }
+        },
+        "projectLocales": {
+          "requestedLocales": ["en", "ja"],
+          "defaultRequestedLocale": "en",
+          "defaultSourceLocale": "en"
+        },
+        "localeNegotiation": {
+          "specification": {
+            "identity": "intlify-locale-negotiation",
+            "revision": "0"
+          },
+          "aliases": {
+            "de": "en"
+          }
+        },
+        "messageFallback": {
+          "specification": {
+            "identity": "intlify-message-locale-fallback",
+            "revision": "0"
+          },
+          "mappings": {
+            "ja": [
+              "en",
+              {
+                "kind": "intent-source-locale"
+              }
+            ]
+          }
+        },
+        "coverage": {
+          "specification": {
+            "identity": "intlify-localization-coverage",
+            "revision": "0"
+          },
+          "vocabulary": {
+            "identity": "intlify-test-vocabulary",
+            "revision": "0",
+            "semanticDigest": "sha256:ca5f503b95aad972565514d3b68b3e8be4a811bb2fc983be16163b88c1fffbb2"
+          },
+          "defaultMode": "direct-required",
+          "decisions": {
+            "en": {
+              "checkout": "direct-required",
+              "internal-tool": "direct-required",
+              "nav": "direct-required"
+            },
+            "ja": {
+              "checkout": "fallback-allowed",
+              "internal-tool": "direct-required",
+              "nav": "direct-required"
+            }
+          }
+        },
+        "requiredPolicies": {
+          "resourceLimits": {
+            "kind": "resource-limit-policy",
+            "identity": "storefront-limits",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d936878c915106944846a89340f2c89fa7472cbc1089c5b1260f47603d71efc6"
+          },
+          "trust": {
+            "kind": "trust-policy",
+            "identity": "storefront-trust",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:84cbcd61a2d9b3a5e4b346ccc884ec36524dc7b7b927d0d752fdc1d103a57d4c"
+          },
+          "sourceAdmission": {
+            "kind": "source-admission-policy",
+            "identity": "storefront-source",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
+          },
+          "approval": {
+            "kind": "approval-policy",
+            "identity": "storefront-approval",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+          },
+          "selection": {
+            "kind": "selection-policy",
+            "identity": "storefront-selection",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
+          },
+          "projectProfileResolution": {
+            "diagnostics": {
+              "entry": {
+                "maxFindingOccurrences": "50034",
+                "maxFindings": "50035",
+                "maxRelatedEvidencePerOccurrenceGroup": "50036",
+                "maxRelatedEvidenceOccurrences": "50037",
+                "maxSingleEvidenceBytes": "50038",
+                "maxTotalEvidenceBytes": "50039",
+                "maxEvaluationStatusEntries": "50040",
+                "maxSuppressionCausesPerStatus": "50041",
+                "maxSuppressionCauseOccurrences": "50042",
+                "maxRecords": "50043",
+                "maxTotalCanonicalBytes": "50044"
+              },
+              "shared": {
+                "maxFindingOccurrences": "50045",
+                "maxFindings": "50046",
+                "maxEvaluationStatusEntries": "50047",
+                "maxSuppressionCausesPerStatus": "50048",
+                "maxSuppressionCauseOccurrences": "50049",
+                "maxRecords": "50050",
+                "maxTotalCanonicalBytes": "50051"
+              }
+            },
+            "configurationInput": {
+              "maxNodes": "50000",
+              "maxDepth": "50001",
+              "maxCollectionEntries": "50002",
+              "maxTotalStringBytes": "50003",
+              "maxSingleStringBytes": "50004",
+              "maxProfiles": "50005",
+              "maxProfileIdBytes": "50006",
+              "maxStructuralAnalysisUnits": "50007"
+            },
+            "localeResolution": {
+              "maxLocaleIdentifierBytes": "50008",
+              "maxLocaleOccurrences": "50009",
+              "maxRequestedLocales": "50010",
+              "maxNegotiationAliases": "50011",
+              "maxFallbackSources": "50012",
+              "maxFallbackCandidatesPerSource": "50013",
+              "maxCoverageRules": "50014",
+              "maxCoverageLocaleSelectorOccurrences": "50015",
+              "maxCoverageSurfaceSelectorOccurrences": "50016",
+              "maxCoverageDecisionCells": "50017",
+              "maxCoverageRuleCellComparisons": "50018"
+            },
+            "artifactAdmission": {
+              "maxArtifacts": "50019",
+              "maxPolicyArtifacts": "50020",
+              "maxTargetProfileArtifacts": "50021",
+              "maxArtifactReferences": "50022",
+              "maxSingleArtifactCanonicalBytes": "50023",
+              "maxTotalArtifactCanonicalBytes": "50024",
+              "maxSingleReferenceCanonicalBytes": "50025",
+              "maxTotalReferenceCanonicalBytes": "50026"
+            },
+            "targetGrouping": {
+              "maxTargetProfiles": "50027",
+              "maxTargetIdBytes": "50028",
+              "maxDeploymentGroups": "50029",
+              "maxGroupIdBytes": "50030",
+              "maxMembersPerGroup": "50031",
+              "maxMembershipOccurrences": "50032",
+              "maxHydrationRelations": "50033"
+            }
+          }
+        },
+        "optionalPolicies": {
+          "providerRouting": {
+            "kind": "provider-routing-policy",
+            "identity": "storefront-routing",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:aff8acbb9d527ee19a96ebceeeec0961b16d279d87305b7b3481cf65efcc68ff"
+          },
+          "glossarySet": {
+            "kind": "glossary-set",
+            "identity": "storefront-glossary",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
+          }
+        },
+        "targets": {
+          "browser": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-browser",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": "en",
+            "effectiveDefaultRequestedLocale": "en"
+          },
+          "server": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-server",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": null,
+            "effectiveDefaultRequestedLocale": "en"
+          }
+        },
+        "deploymentGroups": {
+          "web": {
+            "members": ["browser", "server"],
+            "hydrationRelations": [
+              {
+                "server": "server",
+                "client": "browser"
+              }
+            ]
+          }
+        },
+        "delivery": {
+          "graph": {
+            "identity": "intlify-delivery-graph",
+            "revision": "0"
+          },
+          "placement": {
+            "identity": "intlify-delivery-placement",
+            "revision": "0"
+          },
+          "mode": "duplicate"
+        }
+      },
+      "semanticDigest": "sha256:4f8c538e51c1e63bc0330dff86c5d0cbb3a0a6333f2dfa8f5f4aaa05ebaf4806"
+    },
+    {
+      "id": "provider-routing",
+      "view": {
+        "profileSpecification": {
+          "identity": "test-only-profile-specification",
+          "revision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "projectIdentity": {
+          "projectId": "storefront",
+          "selectionScope": "storefront.production"
+        },
+        "localeCanonicalization": {
+          "specification": {
+            "identity": "test-only-locale-specification",
+            "revision": "0"
+          },
+          "dataset": {
+            "identity": "test-only-finite-locale-data",
+            "semanticDigest": "test-only-dataset-content-pin"
+          }
+        },
+        "projectLocales": {
+          "requestedLocales": ["en", "ja"],
+          "defaultRequestedLocale": "en",
+          "defaultSourceLocale": "en"
+        },
+        "localeNegotiation": {
+          "specification": {
+            "identity": "intlify-locale-negotiation",
+            "revision": "0"
+          },
+          "aliases": {
+            "de": "en"
+          }
+        },
+        "messageFallback": {
+          "specification": {
+            "identity": "intlify-message-locale-fallback",
+            "revision": "0"
+          },
+          "mappings": {
+            "ja": [
+              "en",
+              {
+                "kind": "intent-source-locale"
+              }
+            ]
+          }
+        },
+        "coverage": {
+          "specification": {
+            "identity": "intlify-localization-coverage",
+            "revision": "0"
+          },
+          "vocabulary": {
+            "identity": "intlify-test-vocabulary",
+            "revision": "0",
+            "semanticDigest": "sha256:ca5f503b95aad972565514d3b68b3e8be4a811bb2fc983be16163b88c1fffbb2"
+          },
+          "defaultMode": "direct-required",
+          "decisions": {
+            "en": {
+              "checkout": "direct-required",
+              "internal-tool": "direct-required",
+              "nav": "direct-required"
+            },
+            "ja": {
+              "checkout": "fallback-allowed",
+              "internal-tool": "fallback-allowed",
+              "nav": "fallback-allowed"
+            }
+          }
+        },
+        "requiredPolicies": {
+          "resourceLimits": {
+            "kind": "resource-limit-policy",
+            "identity": "storefront-limits",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d936878c915106944846a89340f2c89fa7472cbc1089c5b1260f47603d71efc6"
+          },
+          "trust": {
+            "kind": "trust-policy",
+            "identity": "storefront-trust",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:84cbcd61a2d9b3a5e4b346ccc884ec36524dc7b7b927d0d752fdc1d103a57d4c"
+          },
+          "sourceAdmission": {
+            "kind": "source-admission-policy",
+            "identity": "storefront-source",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
+          },
+          "approval": {
+            "kind": "approval-policy",
+            "identity": "storefront-approval",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+          },
+          "selection": {
+            "kind": "selection-policy",
+            "identity": "storefront-selection",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
+          },
+          "projectProfileResolution": {
+            "diagnostics": {
+              "entry": {
+                "maxFindingOccurrences": "50034",
+                "maxFindings": "50035",
+                "maxRelatedEvidencePerOccurrenceGroup": "50036",
+                "maxRelatedEvidenceOccurrences": "50037",
+                "maxSingleEvidenceBytes": "50038",
+                "maxTotalEvidenceBytes": "50039",
+                "maxEvaluationStatusEntries": "50040",
+                "maxSuppressionCausesPerStatus": "50041",
+                "maxSuppressionCauseOccurrences": "50042",
+                "maxRecords": "50043",
+                "maxTotalCanonicalBytes": "50044"
+              },
+              "shared": {
+                "maxFindingOccurrences": "50045",
+                "maxFindings": "50046",
+                "maxEvaluationStatusEntries": "50047",
+                "maxSuppressionCausesPerStatus": "50048",
+                "maxSuppressionCauseOccurrences": "50049",
+                "maxRecords": "50050",
+                "maxTotalCanonicalBytes": "50051"
+              }
+            },
+            "configurationInput": {
+              "maxNodes": "50000",
+              "maxDepth": "50001",
+              "maxCollectionEntries": "50002",
+              "maxTotalStringBytes": "50003",
+              "maxSingleStringBytes": "50004",
+              "maxProfiles": "50005",
+              "maxProfileIdBytes": "50006",
+              "maxStructuralAnalysisUnits": "50007"
+            },
+            "localeResolution": {
+              "maxLocaleIdentifierBytes": "50008",
+              "maxLocaleOccurrences": "50009",
+              "maxRequestedLocales": "50010",
+              "maxNegotiationAliases": "50011",
+              "maxFallbackSources": "50012",
+              "maxFallbackCandidatesPerSource": "50013",
+              "maxCoverageRules": "50014",
+              "maxCoverageLocaleSelectorOccurrences": "50015",
+              "maxCoverageSurfaceSelectorOccurrences": "50016",
+              "maxCoverageDecisionCells": "50017",
+              "maxCoverageRuleCellComparisons": "50018"
+            },
+            "artifactAdmission": {
+              "maxArtifacts": "50019",
+              "maxPolicyArtifacts": "50020",
+              "maxTargetProfileArtifacts": "50021",
+              "maxArtifactReferences": "50022",
+              "maxSingleArtifactCanonicalBytes": "50023",
+              "maxTotalArtifactCanonicalBytes": "50024",
+              "maxSingleReferenceCanonicalBytes": "50025",
+              "maxTotalReferenceCanonicalBytes": "50026"
+            },
+            "targetGrouping": {
+              "maxTargetProfiles": "50027",
+              "maxTargetIdBytes": "50028",
+              "maxDeploymentGroups": "50029",
+              "maxGroupIdBytes": "50030",
+              "maxMembersPerGroup": "50031",
+              "maxMembershipOccurrences": "50032",
+              "maxHydrationRelations": "50033"
+            }
+          }
+        },
+        "optionalPolicies": {
+          "providerRouting": null,
+          "glossarySet": {
+            "kind": "glossary-set",
+            "identity": "storefront-glossary",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
+          }
+        },
+        "targets": {
+          "browser": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-browser",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": "en",
+            "effectiveDefaultRequestedLocale": "en"
+          },
+          "server": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-server",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": null,
+            "effectiveDefaultRequestedLocale": "en"
+          }
+        },
+        "deploymentGroups": {
+          "web": {
+            "members": ["browser", "server"],
+            "hydrationRelations": [
+              {
+                "server": "server",
+                "client": "browser"
+              }
+            ]
+          }
+        },
+        "delivery": {
+          "graph": {
+            "identity": "intlify-delivery-graph",
+            "revision": "0"
+          },
+          "placement": {
+            "identity": "intlify-delivery-placement",
+            "revision": "0"
+          },
+          "mode": "duplicate"
+        }
+      },
+      "semanticDigest": "sha256:b72abc503d87e2de1da80e0c4badcdbbc4b796fb9012b0dc9064107ca8b862ed"
+    },
+    {
+      "id": "target-default",
+      "view": {
+        "profileSpecification": {
+          "identity": "test-only-profile-specification",
+          "revision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "projectIdentity": {
+          "projectId": "storefront",
+          "selectionScope": "storefront.production"
+        },
+        "localeCanonicalization": {
+          "specification": {
+            "identity": "test-only-locale-specification",
+            "revision": "0"
+          },
+          "dataset": {
+            "identity": "test-only-finite-locale-data",
+            "semanticDigest": "test-only-dataset-content-pin"
+          }
+        },
+        "projectLocales": {
+          "requestedLocales": ["en", "ja"],
+          "defaultRequestedLocale": "en",
+          "defaultSourceLocale": "en"
+        },
+        "localeNegotiation": {
+          "specification": {
+            "identity": "intlify-locale-negotiation",
+            "revision": "0"
+          },
+          "aliases": {
+            "de": "en"
+          }
+        },
+        "messageFallback": {
+          "specification": {
+            "identity": "intlify-message-locale-fallback",
+            "revision": "0"
+          },
+          "mappings": {
+            "ja": [
+              "en",
+              {
+                "kind": "intent-source-locale"
+              }
+            ]
+          }
+        },
+        "coverage": {
+          "specification": {
+            "identity": "intlify-localization-coverage",
+            "revision": "0"
+          },
+          "vocabulary": {
+            "identity": "intlify-test-vocabulary",
+            "revision": "0",
+            "semanticDigest": "sha256:ca5f503b95aad972565514d3b68b3e8be4a811bb2fc983be16163b88c1fffbb2"
+          },
+          "defaultMode": "direct-required",
+          "decisions": {
+            "en": {
+              "checkout": "direct-required",
+              "internal-tool": "direct-required",
+              "nav": "direct-required"
+            },
+            "ja": {
+              "checkout": "fallback-allowed",
+              "internal-tool": "fallback-allowed",
+              "nav": "fallback-allowed"
+            }
+          }
+        },
+        "requiredPolicies": {
+          "resourceLimits": {
+            "kind": "resource-limit-policy",
+            "identity": "storefront-limits",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d936878c915106944846a89340f2c89fa7472cbc1089c5b1260f47603d71efc6"
+          },
+          "trust": {
+            "kind": "trust-policy",
+            "identity": "storefront-trust",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:84cbcd61a2d9b3a5e4b346ccc884ec36524dc7b7b927d0d752fdc1d103a57d4c"
+          },
+          "sourceAdmission": {
+            "kind": "source-admission-policy",
+            "identity": "storefront-source",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
+          },
+          "approval": {
+            "kind": "approval-policy",
+            "identity": "storefront-approval",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+          },
+          "selection": {
+            "kind": "selection-policy",
+            "identity": "storefront-selection",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
+          },
+          "projectProfileResolution": {
+            "diagnostics": {
+              "entry": {
+                "maxFindingOccurrences": "50034",
+                "maxFindings": "50035",
+                "maxRelatedEvidencePerOccurrenceGroup": "50036",
+                "maxRelatedEvidenceOccurrences": "50037",
+                "maxSingleEvidenceBytes": "50038",
+                "maxTotalEvidenceBytes": "50039",
+                "maxEvaluationStatusEntries": "50040",
+                "maxSuppressionCausesPerStatus": "50041",
+                "maxSuppressionCauseOccurrences": "50042",
+                "maxRecords": "50043",
+                "maxTotalCanonicalBytes": "50044"
+              },
+              "shared": {
+                "maxFindingOccurrences": "50045",
+                "maxFindings": "50046",
+                "maxEvaluationStatusEntries": "50047",
+                "maxSuppressionCausesPerStatus": "50048",
+                "maxSuppressionCauseOccurrences": "50049",
+                "maxRecords": "50050",
+                "maxTotalCanonicalBytes": "50051"
+              }
+            },
+            "configurationInput": {
+              "maxNodes": "50000",
+              "maxDepth": "50001",
+              "maxCollectionEntries": "50002",
+              "maxTotalStringBytes": "50003",
+              "maxSingleStringBytes": "50004",
+              "maxProfiles": "50005",
+              "maxProfileIdBytes": "50006",
+              "maxStructuralAnalysisUnits": "50007"
+            },
+            "localeResolution": {
+              "maxLocaleIdentifierBytes": "50008",
+              "maxLocaleOccurrences": "50009",
+              "maxRequestedLocales": "50010",
+              "maxNegotiationAliases": "50011",
+              "maxFallbackSources": "50012",
+              "maxFallbackCandidatesPerSource": "50013",
+              "maxCoverageRules": "50014",
+              "maxCoverageLocaleSelectorOccurrences": "50015",
+              "maxCoverageSurfaceSelectorOccurrences": "50016",
+              "maxCoverageDecisionCells": "50017",
+              "maxCoverageRuleCellComparisons": "50018"
+            },
+            "artifactAdmission": {
+              "maxArtifacts": "50019",
+              "maxPolicyArtifacts": "50020",
+              "maxTargetProfileArtifacts": "50021",
+              "maxArtifactReferences": "50022",
+              "maxSingleArtifactCanonicalBytes": "50023",
+              "maxTotalArtifactCanonicalBytes": "50024",
+              "maxSingleReferenceCanonicalBytes": "50025",
+              "maxTotalReferenceCanonicalBytes": "50026"
+            },
+            "targetGrouping": {
+              "maxTargetProfiles": "50027",
+              "maxTargetIdBytes": "50028",
+              "maxDeploymentGroups": "50029",
+              "maxGroupIdBytes": "50030",
+              "maxMembersPerGroup": "50031",
+              "maxMembershipOccurrences": "50032",
+              "maxHydrationRelations": "50033"
+            }
+          }
+        },
+        "optionalPolicies": {
+          "providerRouting": {
+            "kind": "provider-routing-policy",
+            "identity": "storefront-routing",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:aff8acbb9d527ee19a96ebceeeec0961b16d279d87305b7b3481cf65efcc68ff"
+          },
+          "glossarySet": {
+            "kind": "glossary-set",
+            "identity": "storefront-glossary",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
+          }
+        },
+        "targets": {
+          "browser": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-browser",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": null,
+            "effectiveDefaultRequestedLocale": "en"
+          },
+          "server": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-server",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": null,
+            "effectiveDefaultRequestedLocale": "en"
+          }
+        },
+        "deploymentGroups": {
+          "web": {
+            "members": ["browser", "server"],
+            "hydrationRelations": [
+              {
+                "server": "server",
+                "client": "browser"
+              }
+            ]
+          }
+        },
+        "delivery": {
+          "graph": {
+            "identity": "intlify-delivery-graph",
+            "revision": "0"
+          },
+          "placement": {
+            "identity": "intlify-delivery-placement",
+            "revision": "0"
+          },
+          "mode": "duplicate"
+        }
+      },
+      "semanticDigest": "sha256:0fd671e62dc8b87b4b96bd54f40fb467a006467370160c4dcb0a5afd2afaf458"
+    },
+    {
+      "id": "hydration-relations",
+      "view": {
+        "profileSpecification": {
+          "identity": "test-only-profile-specification",
+          "revision": "0",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "projectIdentity": {
+          "projectId": "storefront",
+          "selectionScope": "storefront.production"
+        },
+        "localeCanonicalization": {
+          "specification": {
+            "identity": "test-only-locale-specification",
+            "revision": "0"
+          },
+          "dataset": {
+            "identity": "test-only-finite-locale-data",
+            "semanticDigest": "test-only-dataset-content-pin"
+          }
+        },
+        "projectLocales": {
+          "requestedLocales": ["en", "ja"],
+          "defaultRequestedLocale": "en",
+          "defaultSourceLocale": "en"
+        },
+        "localeNegotiation": {
+          "specification": {
+            "identity": "intlify-locale-negotiation",
+            "revision": "0"
+          },
+          "aliases": {
+            "de": "en"
+          }
+        },
+        "messageFallback": {
+          "specification": {
+            "identity": "intlify-message-locale-fallback",
+            "revision": "0"
+          },
+          "mappings": {
+            "ja": [
+              "en",
+              {
+                "kind": "intent-source-locale"
+              }
+            ]
+          }
+        },
+        "coverage": {
+          "specification": {
+            "identity": "intlify-localization-coverage",
+            "revision": "0"
+          },
+          "vocabulary": {
+            "identity": "intlify-test-vocabulary",
+            "revision": "0",
+            "semanticDigest": "sha256:ca5f503b95aad972565514d3b68b3e8be4a811bb2fc983be16163b88c1fffbb2"
+          },
+          "defaultMode": "direct-required",
+          "decisions": {
+            "en": {
+              "checkout": "direct-required",
+              "internal-tool": "direct-required",
+              "nav": "direct-required"
+            },
+            "ja": {
+              "checkout": "fallback-allowed",
+              "internal-tool": "fallback-allowed",
+              "nav": "fallback-allowed"
+            }
+          }
+        },
+        "requiredPolicies": {
+          "resourceLimits": {
+            "kind": "resource-limit-policy",
+            "identity": "storefront-limits",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d936878c915106944846a89340f2c89fa7472cbc1089c5b1260f47603d71efc6"
+          },
+          "trust": {
+            "kind": "trust-policy",
+            "identity": "storefront-trust",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:84cbcd61a2d9b3a5e4b346ccc884ec36524dc7b7b927d0d752fdc1d103a57d4c"
+          },
+          "sourceAdmission": {
+            "kind": "source-admission-policy",
+            "identity": "storefront-source",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
+          },
+          "approval": {
+            "kind": "approval-policy",
+            "identity": "storefront-approval",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+          },
+          "selection": {
+            "kind": "selection-policy",
+            "identity": "storefront-selection",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
+          },
+          "projectProfileResolution": {
+            "diagnostics": {
+              "entry": {
+                "maxFindingOccurrences": "50034",
+                "maxFindings": "50035",
+                "maxRelatedEvidencePerOccurrenceGroup": "50036",
+                "maxRelatedEvidenceOccurrences": "50037",
+                "maxSingleEvidenceBytes": "50038",
+                "maxTotalEvidenceBytes": "50039",
+                "maxEvaluationStatusEntries": "50040",
+                "maxSuppressionCausesPerStatus": "50041",
+                "maxSuppressionCauseOccurrences": "50042",
+                "maxRecords": "50043",
+                "maxTotalCanonicalBytes": "50044"
+              },
+              "shared": {
+                "maxFindingOccurrences": "50045",
+                "maxFindings": "50046",
+                "maxEvaluationStatusEntries": "50047",
+                "maxSuppressionCausesPerStatus": "50048",
+                "maxSuppressionCauseOccurrences": "50049",
+                "maxRecords": "50050",
+                "maxTotalCanonicalBytes": "50051"
+              }
+            },
+            "configurationInput": {
+              "maxNodes": "50000",
+              "maxDepth": "50001",
+              "maxCollectionEntries": "50002",
+              "maxTotalStringBytes": "50003",
+              "maxSingleStringBytes": "50004",
+              "maxProfiles": "50005",
+              "maxProfileIdBytes": "50006",
+              "maxStructuralAnalysisUnits": "50007"
+            },
+            "localeResolution": {
+              "maxLocaleIdentifierBytes": "50008",
+              "maxLocaleOccurrences": "50009",
+              "maxRequestedLocales": "50010",
+              "maxNegotiationAliases": "50011",
+              "maxFallbackSources": "50012",
+              "maxFallbackCandidatesPerSource": "50013",
+              "maxCoverageRules": "50014",
+              "maxCoverageLocaleSelectorOccurrences": "50015",
+              "maxCoverageSurfaceSelectorOccurrences": "50016",
+              "maxCoverageDecisionCells": "50017",
+              "maxCoverageRuleCellComparisons": "50018"
+            },
+            "artifactAdmission": {
+              "maxArtifacts": "50019",
+              "maxPolicyArtifacts": "50020",
+              "maxTargetProfileArtifacts": "50021",
+              "maxArtifactReferences": "50022",
+              "maxSingleArtifactCanonicalBytes": "50023",
+              "maxTotalArtifactCanonicalBytes": "50024",
+              "maxSingleReferenceCanonicalBytes": "50025",
+              "maxTotalReferenceCanonicalBytes": "50026"
+            },
+            "targetGrouping": {
+              "maxTargetProfiles": "50027",
+              "maxTargetIdBytes": "50028",
+              "maxDeploymentGroups": "50029",
+              "maxGroupIdBytes": "50030",
+              "maxMembersPerGroup": "50031",
+              "maxMembershipOccurrences": "50032",
+              "maxHydrationRelations": "50033"
+            }
+          }
+        },
+        "optionalPolicies": {
+          "providerRouting": {
+            "kind": "provider-routing-policy",
+            "identity": "storefront-routing",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:aff8acbb9d527ee19a96ebceeeec0961b16d279d87305b7b3481cf65efcc68ff"
+          },
+          "glossarySet": {
+            "kind": "glossary-set",
+            "identity": "storefront-glossary",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
+          }
+        },
+        "targets": {
+          "browser": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-browser",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": "en",
+            "effectiveDefaultRequestedLocale": "en"
+          },
+          "server": {
+            "profile": {
+              "kind": "target-profile",
+              "identity": "storefront-server",
+              "revision": "1",
+              "specificationRevision": "0",
+              "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+            },
+            "requestedLocales": ["en", "ja"],
+            "defaultRequestedLocale": null,
+            "effectiveDefaultRequestedLocale": "en"
+          }
+        },
+        "deploymentGroups": {
+          "web": {
+            "members": ["browser", "server"],
+            "hydrationRelations": []
+          }
+        },
+        "delivery": {
+          "graph": {
+            "identity": "intlify-delivery-graph",
+            "revision": "0"
+          },
+          "placement": {
+            "identity": "intlify-delivery-placement",
+            "revision": "0"
+          },
+          "mode": "duplicate"
+        }
+      },
+      "semanticDigest": "sha256:65f529aa709ea82dbd692cc48ed2a6210cd0bd00655b185ba2dddb01a9d12d86"
+    }
+  ],
+  "cases": [
+    {
+      "id": "complete",
+      "view": "complete"
+    },
+    {
+      "id": "two-groups",
+      "view": "two-groups"
+    },
+    {
+      "id": "no-surface-classes",
+      "view": "no-surface-classes"
+    },
+    {
+      "id": "project-id",
+      "view": "project-id"
+    },
+    {
+      "id": "selection-scope",
+      "view": "selection-scope"
+    },
+    {
+      "id": "requested-locales",
+      "view": "requested-locales"
+    },
+    {
+      "id": "default-requested-locale",
+      "view": "default-requested-locale"
+    },
+    {
+      "id": "default-source-locale",
+      "view": "default-source-locale"
+    },
+    {
+      "id": "no-default-source-locale",
+      "view": "no-default-source-locale"
+    },
+    {
+      "id": "aliases",
+      "view": "aliases"
+    },
+    {
+      "id": "message-fallback",
+      "view": "message-fallback"
+    },
+    {
+      "id": "default-mode",
+      "view": "default-mode"
+    },
+    {
+      "id": "rules",
+      "view": "rules"
+    },
+    {
+      "id": "provider-routing",
+      "view": "provider-routing"
+    },
+    {
+      "id": "target-default",
+      "view": "target-default"
+    },
+    {
+      "id": "hydration-relations",
+      "view": "hydration-relations"
+    },
+    {
+      "id": "another-profile-id",
+      "view": "complete"
+    },
+    {
+      "id": "another-order",
+      "view": "complete"
+    },
+    {
+      "id": "omitted-placement",
+      "view": "complete"
+    },
+    {
+      "id": "omitted-default-mode",
+      "view": "complete"
+    },
+    {
+      "id": "redundant-rule",
+      "view": "complete"
+    }
+  ]
+}
