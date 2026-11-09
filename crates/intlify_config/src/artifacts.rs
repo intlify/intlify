@@ -15,6 +15,7 @@ use crate::references::{valid_semantic_digest, SEMANTIC_DIGEST_PATTERN};
 pub(crate) mod collection;
 pub(crate) mod content;
 pub(crate) mod envelope;
+pub(crate) mod verification;
 pub(crate) mod vocabulary;
 
 #[cfg(any(test, feature = "vectors"))]

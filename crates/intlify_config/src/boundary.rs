@@ -13,3 +13,4 @@
 //! takes its bounds from the admitted capability (D15:1106).
 
 pub(crate) mod capability;
+pub(crate) mod verification;

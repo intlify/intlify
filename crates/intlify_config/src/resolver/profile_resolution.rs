@@ -21,6 +21,7 @@
 use crate::artifacts::collection::FormalCollection;
 use crate::artifacts::vocabulary::FormalVocabulary;
 use crate::boundary::capability::ImplementationCapability;
+use crate::boundary::verification::VerificationInput;
 use crate::input_limits::ValueCounts;
 use crate::locale::{CanonicalizationFailure, Provider, SemanticPins};
 use crate::model::{IntlifyConfig, ProfileDeclaration, ProfileId};
@@ -29,7 +30,6 @@ use crate::structural::selection::{ProvisionalSelection, SelectionInvariant, Sel
 use crate::structural::StructuralAnalysis;
 
 use super::artifact_resolution::{admit_collection, ArtifactSet};
-use super::bootstrap::VerificationInput;
 use super::coverage::{resolve_coverage, CoveragePolicy};
 use super::delivery::{resolve_delivery, DeliveryPolicy};
 use super::dependency::{own, SemanticGroup, OPTIONAL_POLICIES, REQUIRED_POLICIES};
@@ -849,7 +849,7 @@ pub(super) mod tests {
             let capability = ImplementationCapability::fixture_owned(self.capability.clone());
             let collection = collection(&self.members);
             let vocabulary = formal_of(self.surfaces);
-            let verification = VerificationInput::exact_pins([self.pinned.clone()]).unwrap();
+            let verification = VerificationInput::fixture_owned([self.pinned.clone()]);
             run(
                 &configuration,
                 &Invocation {

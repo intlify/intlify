@@ -16,48 +16,18 @@
 //! lookup and one for the common body (018).
 //!
 //! 018 authenticates the candidate by membership in its exact-pin
-//! Verification Input, and closes its common body to the optional
-//! `projectProfileResolution` section.
-
-use std::collections::BTreeSet;
+//! Verification Input, which 015's pre-invocation boundary admits
+//! (`crate::boundary::verification`), and closes its common body to the
+//! optional `projectProfileResolution` section.
 
 use crate::artifacts::content;
 use crate::artifacts::envelope::{
     ArtifactKind, Envelope, ExactTuple, FormalMember, SPECIFICATION_REVISION,
 };
+use crate::boundary::verification::VerificationInput;
 
 use super::evaluation::{Blocking, Code, Reason};
 use super::limits::{ResolutionLimits, SECTION};
-
-/// 018's exact-pin Resource Limit Policy Verification Input: the exact
-/// references that trusted setup pinned, never derived from the configuration
-/// or the collection, so a policy can never pin itself. 015's pre-invocation
-/// boundary reads it from 017's shape in Implementation Phase 5; until then
-/// only tests construct one.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct VerificationInput {
-    pins: BTreeSet<ExactTuple>,
-}
-
-impl VerificationInput {
-    /// The input pinning `pins`, or `None` when 018 admits no such input:
-    /// without a pin, with a pin of another kind, or with a pin repeated.
-    pub(crate) fn exact_pins(pins: impl IntoIterator<Item = ExactTuple>) -> Option<Self> {
-        let mut admitted = BTreeSet::new();
-        for pin in pins {
-            if pin.kind != ArtifactKind::ResourceLimitPolicy || !admitted.insert(pin) {
-                return None;
-            }
-        }
-        (!admitted.is_empty()).then_some(Self { pins: admitted })
-    }
-
-    /// Whether the candidate's computed exact reference is one of the pins.
-    /// A partial match authenticates nothing.
-    pub(crate) fn authenticates(&self, candidate: &Envelope<'_>) -> bool {
-        self.pins.contains(candidate.tuple())
-    }
-}
 
 /// The admitted Resource Limit Policy: its exact reference and every bound of
 /// its `projectProfileResolution` section, which 015 records together.
@@ -258,7 +228,7 @@ mod tests {
 
     /// 018's exact-pin input as trusted setup supplies it.
     fn pinning(pins: &[&Value]) -> VerificationInput {
-        VerificationInput::exact_pins(pins.iter().map(|value| tuple_of(value))).unwrap()
+        VerificationInput::fixture_owned(pins.iter().map(|value| tuple_of(value)))
     }
 
     /// The input that pins `reference` itself, or another policy when the
@@ -269,7 +239,7 @@ mod tests {
         } else {
             tuple_of(&policy("pinned-limits", "1", 1))
         };
-        VerificationInput::exact_pins([pin]).unwrap()
+        VerificationInput::fixture_owned([pin])
     }
 
     /// The decision under an input pinning the reference, as the admitted
@@ -480,29 +450,10 @@ mod tests {
 
     #[test]
     fn the_verification_input_pins_resource_limit_policies_exactly() {
+        // The boundary refuses no pin, a pin of another kind, and a repeated
+        // pin (`crate::boundary::verification`). Several pins authenticate
+        // each, in whatever order they come.
         let chosen = policy("storefront-limits", "1", 10);
-        // No pin, a pin of another kind, or a repeated pin is no input 018
-        // admits.
-        assert_eq!(VerificationInput::exact_pins([]), None);
-        let trust = envelope_of(
-            ArtifactKind::TrustPolicy,
-            "storefront-trust",
-            "1",
-            json!({"authority": "trusted-local-host"}),
-        );
-        assert_eq!(
-            VerificationInput::exact_pins([tuple_of(&chosen), tuple_of(&trust)]),
-            None
-        );
-        assert_eq!(
-            VerificationInput::exact_pins([tuple_of(&trust), tuple_of(&chosen)]),
-            None
-        );
-        assert_eq!(
-            VerificationInput::exact_pins([tuple_of(&chosen), tuple_of(&chosen)]),
-            None
-        );
-        // Several pins authenticate each, in whatever order they come.
         let other = policy("other-limits", "1", 20);
         assert_eq!(pinning(&[&chosen, &other]), pinning(&[&other, &chosen]));
         let both = pinning(&[&other, &chosen]);
