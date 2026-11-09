@@ -56,7 +56,7 @@ pub(crate) const SCHEMA_PATH: &str = "registries/finding-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:56a77fe79d9ded10b0466c134466b0b24384bae99b51f24c70b365400dd7dd43";
+    "sha256:d5edabe903428bbd867bf363af683e29de6b50ab2c323cfeba516a9bf999fe0e";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =

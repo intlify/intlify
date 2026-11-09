@@ -52,6 +52,12 @@ fn decision() -> Unit {
     unit(PolicySubject::ResourceLimits, Check::BootstrapCandidate)
 }
 
+/// The chosen candidate's body admission, a check of its own after the
+/// bounds that measure the candidate (Decision 015-164).
+fn body() -> Unit {
+    unit(PolicySubject::ResourceLimits, Check::CandidateBody)
+}
+
 fn artifact_bound(name: &'static str) -> BoundId {
     BoundId {
         group: Group::ArtifactAdmission,
@@ -194,9 +200,16 @@ fn each_decision_stage_reports_its_own_code_and_reason() {
         (R::NotFound, ArtifactReferenceNotAdmitted, Reason::NotFound),
     ] {
         let resolved = resolved(&case(recipe));
+        // The body's failures are its admission's, the rest candidate
+        // selection's.
+        let stage = if code == ResourcePolicyNotAdmitted {
+            body()
+        } else {
+            decision()
+        };
         assert_eq!(
             issues(&resolved),
-            vec![(decision(), code, Some(reason))],
+            vec![(stage, code, Some(reason))],
             "{recipe:?}"
         );
         let outcome = outcome(&resolved);

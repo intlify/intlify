@@ -371,7 +371,12 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::AssertedArtifact
         | Check::OpaqueIdentity
         | Check::WithinCapability
+        | Check::WithinMetadataScan
         | Check::BootstrapCandidate
+        | Check::WithinEnvelopeDepth
+        | Check::WithinDecodedAllocation
+        | Check::WithinValidationWork
+        | Check::CandidateBody
         | Check::CompatiblePolicy
         | Check::AdmissibleMember
         | Check::SingleOccurrence

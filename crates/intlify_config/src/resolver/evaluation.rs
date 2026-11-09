@@ -243,9 +243,24 @@ pub(crate) enum Check {
     /// Every cell of the coverage decision table is decided, so the table and
     /// its Coverage Decision Basis exist.
     CompleteTable,
+    /// The metadata scan of the submitted collection stays within the
+    /// capability's `maxMetadataScanUnits`.
+    WithinMetadataScan,
     /// Exactly one submitted artifact is the Resource Limit Policy the
-    /// reference names, and its body is admitted.
+    /// reference names, and it is the candidate for body admission.
     BootstrapCandidate,
+    /// The chosen candidate member's nesting stays within the capability's
+    /// `maxEnvelopeDepth`.
+    WithinEnvelopeDepth,
+    /// The bytes decoded from the chosen candidate's content stay within the
+    /// capability's `maxDecodedAllocationBytes`.
+    WithinDecodedAllocation,
+    /// The rules admitting the chosen candidate's body stay within the
+    /// capability's `maxValidationWorkUnits`.
+    WithinValidationWork,
+    /// The chosen candidate's body is admitted: its integrity under the pin,
+    /// its common body, and its `projectProfileResolution` section.
+    CandidateBody,
     /// The admitted policy needs no bound past the capability's value.
     CompatiblePolicy,
     /// The member declares an admitted kind, establishes its tuple, and its
@@ -1306,6 +1321,14 @@ impl Evaluation {
     pub(crate) fn shortfall(&self, key: &IssueKey) -> Option<Shortfall> {
         match self.issues.get(key) {
             Some(Some(Details::Shortfall(shortfall))) => Some(*shortfall),
+            _ => None,
+        }
+    }
+
+    /// The details of work past a resolver-side `bootstrapOnly` bound.
+    pub(crate) fn bootstrap_limit(&self, key: &IssueKey) -> Option<BootstrapLimitExceeded> {
+        match self.issues.get(key) {
+            Some(Some(Details::BootstrapLimit(exceeded))) => Some(*exceeded),
             _ => None,
         }
     }

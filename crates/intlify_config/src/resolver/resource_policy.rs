@@ -29,7 +29,8 @@ use crate::model::{
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::selection::{SelectionInvariant, SelectorInput, StringLengthFact};
 
-use super::bootstrap::{admit_candidate, AdmittedResourcePolicy};
+use super::bootstrap::work::{self, WorkBound};
+use super::bootstrap::{admit_body, select_candidate, AdmittedResourcePolicy};
 use super::evaluation::{
     and, both, Actual, Admitted, Blocking, Causes, Check, Evaluation, EvaluationInvariant, Phase,
     Shortfall, Subject, Unit,
@@ -402,7 +403,11 @@ pub(crate) fn admit_resource_policy(
 }
 
 /// Phase 4 up to the comparison with the capability: the `artifactAdmission`
-/// bounds under the capability's values, the decision, and the comparison.
+/// bounds under the capability's values, then the bootstrap decision with each
+/// `artifactBootstrap` bound before the work it protects (Decision 015-164),
+/// each check waiting on the one before it: the metadata scan, candidate
+/// selection, the chosen candidate's envelope depth, decoded allocation, and
+/// validation work, its body admission, and the comparison.
 fn admit_and_compare(
     evaluation: &mut Evaluation,
     capability: &ImplementationCapability,
@@ -419,14 +424,47 @@ fn admit_and_compare(
         resource_limits,
         references,
     )?;
-    let decided = evaluation.check(
+    let limits = &capability.bootstrap_only().artifact_bootstrap;
+    let scanned = evaluation.check(
+        unit(PolicySubject::ResourceLimits, Check::WithinMetadataScan),
+        both(resource_limits.map_err(Causes::clone), inspected.collection),
+        |(reference, ())| {
+            let total = work::metadata_scan_units(submitted.members);
+            work::within(WorkBound::MetadataScan, limits, total).map(|()| reference)
+        },
+    )?;
+    let selected = evaluation.check(
         unit(PolicySubject::ResourceLimits, Check::BootstrapCandidate),
-        both(
-            both(resource_limits.map_err(Causes::clone), inspected.collection),
-            inspected.own_bytes,
+        both(scanned, inspected.own_bytes).map(|(reference, ())| reference),
+        |reference| select_candidate(&reference.tuple(), submitted.members),
+    )?;
+    let measured = [
+        (Check::WithinEnvelopeDepth, WorkBound::EnvelopeDepth),
+        (Check::WithinDecodedAllocation, WorkBound::DecodedAllocation),
+        (Check::WithinValidationWork, WorkBound::ValidationWork),
+    ]
+    .into_iter()
+    .try_fold(selected, |candidate, (check, bound)| {
+        evaluation.check(
+            unit(PolicySubject::ResourceLimits, check),
+            candidate,
+            |candidate| {
+                let total = match bound {
+                    WorkBound::EnvelopeDepth => work::envelope_depth(candidate.member().value()),
+                    WorkBound::DecodedAllocation => {
+                        work::decoded_allocation_bytes(candidate.content())
+                    }
+                    WorkBound::ValidationWork => work::validation_work_units(candidate.content()),
+                    WorkBound::MetadataScan => unreachable!("the scan comes before selection"),
+                };
+                work::within(bound, limits, total).map(|()| candidate)
+            },
         )
-        .map(|((reference, ()), ())| reference),
-        |reference| admit_candidate(&reference.tuple(), submitted.members, verification),
+    })?;
+    let decided = evaluation.check(
+        unit(PolicySubject::ResourceLimits, Check::CandidateBody),
+        measured,
+        |candidate| admit_body(&candidate, verification),
     )?;
     evaluation.check(
         unit(PolicySubject::ResourceLimits, Check::CompatiblePolicy),
@@ -835,7 +873,10 @@ mod tests {
     use super::*;
     use crate::artifacts::collection::{read_collection, CollectionLimits};
     use crate::artifacts::envelope::{envelope_of, ArtifactKind, ExactTuple};
-    use crate::resolver::evaluation::{Code, IssueKey, LimitExceeded, Reason, Status};
+    use crate::resolver::capability::ArtifactBootstrapLimits;
+    use crate::resolver::evaluation::{
+        Actual, BootstrapLimitExceeded, Code, IssueKey, LimitExceeded, Reason, Status,
+    };
     use crate::resolver::limits::{fixture_limits, SECTION};
     use crate::resolver::locales::fixtures::earlier;
     use crate::structural::selection::InvalidSelectorType;
@@ -1192,6 +1233,154 @@ mod tests {
         unit(PolicySubject::ResourceLimits, Check::CompatiblePolicy)
     }
 
+    /// The bootstrap's checks in their order (Decision 015-164).
+    const BOOTSTRAP: [Check; 7] = [
+        Check::WithinMetadataScan,
+        Check::BootstrapCandidate,
+        Check::WithinEnvelopeDepth,
+        Check::WithinDecodedAllocation,
+        Check::WithinValidationWork,
+        Check::CandidateBody,
+        Check::CompatiblePolicy,
+    ];
+
+    fn bootstrap_unit(check: Check) -> Unit {
+        unit(PolicySubject::ResourceLimits, check)
+    }
+
+    /// `artifactBootstrap` bounds no test reaches, with `bound` set to `limit`.
+    fn bootstrap_limits(bound: WorkBound, limit: u64) -> ArtifactBootstrapLimits {
+        let largest = self::bound(u64::MAX - 1);
+        let mut limits = ArtifactBootstrapLimits {
+            max_envelope_depth: largest,
+            max_decoded_allocation_bytes: largest,
+            max_metadata_scan_units: largest,
+            max_validation_work_units: largest,
+        };
+        let value = self::bound(limit);
+        match bound {
+            WorkBound::EnvelopeDepth => limits.max_envelope_depth = value,
+            WorkBound::DecodedAllocation => limits.max_decoded_allocation_bytes = value,
+            WorkBound::MetadataScan => limits.max_metadata_scan_units = value,
+            WorkBound::ValidationWork => limits.max_validation_work_units = value,
+        }
+        limits
+    }
+
+    /// Each bound's check, the bound, and the total the default inputs' bootstrap
+    /// counts under it.
+    fn bootstrap_totals() -> [(Check, WorkBound, u64); 4] {
+        let inputs = Inputs::new();
+        let collection = collection(&inputs.members);
+        let members = collection.members();
+        let reference = inputs.resource_limits.as_ref().unwrap().tuple();
+        let candidate = select_candidate(&reference, members).unwrap();
+        [
+            (
+                Check::WithinMetadataScan,
+                WorkBound::MetadataScan,
+                work::metadata_scan_units(members),
+            ),
+            (
+                Check::WithinEnvelopeDepth,
+                WorkBound::EnvelopeDepth,
+                work::envelope_depth(candidate.member().value()),
+            ),
+            (
+                Check::WithinDecodedAllocation,
+                WorkBound::DecodedAllocation,
+                work::decoded_allocation_bytes(candidate.content()),
+            ),
+            (
+                Check::WithinValidationWork,
+                WorkBound::ValidationWork,
+                work::validation_work_units(candidate.content()),
+            ),
+        ]
+    }
+
+    #[test]
+    fn each_bootstrap_bound_admits_its_exact_total_and_reports_one_more() {
+        // The policy, two other envelopes, a member with a kind and nothing
+        // else, and one with no kind; the policy's six levels; and its 64 rules.
+        let totals = bootstrap_totals();
+        assert_eq!(totals[0].2, 5 + 5 + 5 + 2 + 1);
+        assert_eq!(totals[1].2, 6);
+        assert_eq!(totals[3].2, 64);
+        for (check, work_bound, total) in totals {
+            let mut exact = Inputs::new();
+            exact.capability = exact
+                .capability
+                .clone()
+                .with_artifact_bootstrap(bootstrap_limits(work_bound, total));
+            let (evaluation, decided) = exact.run();
+            assert!(decided.is_ok(), "{check:?}");
+            assert_eq!(issues(&evaluation), [], "{check:?}");
+
+            let mut over = Inputs::new();
+            over.capability = over
+                .capability
+                .clone()
+                .with_artifact_bootstrap(bootstrap_limits(work_bound, total - 1));
+            let (evaluation, decided) = over.run();
+            assert!(decided.is_err(), "{check:?}");
+            let key = key_of(&evaluation, &bootstrap_unit(check));
+            assert_eq!(key.code(), Code::BootstrapLimitExceeded, "{check:?}");
+            assert_eq!(
+                evaluation.bootstrap_limit(&key),
+                Some(BootstrapLimitExceeded {
+                    bound: work_bound.id(),
+                    limit: bound(total - 1),
+                    actual: Actual::Exact(total),
+                }),
+                "{check:?}"
+            );
+            // The work it protects, and every check after it, waits on it.
+            let rank = BOOTSTRAP.iter().position(|each| *each == check).unwrap();
+            for later in &BOOTSTRAP[rank + 1..] {
+                assert_eq!(
+                    waits_on(&evaluation, &bootstrap_unit(*later)),
+                    std::slice::from_ref(&key),
+                    "{check:?} {later:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn candidate_selection_with_its_reference_checks_waits_on_the_scan() {
+        // A reference to the Trust Policy fails the role-kind check, which
+        // candidate selection makes after the scan.
+        let mut wrong = Inputs::new();
+        wrong.resource_limits = Ok(reference_to(&wrong.members[1]));
+        let (evaluation, _) = wrong.run();
+        assert_eq!(
+            issues(&evaluation),
+            [(
+                decision(),
+                Code::ArtifactReferenceNotAdmitted,
+                Some(Reason::RoleKindMismatch)
+            )]
+        );
+        let selection = key_of(&evaluation, &decision());
+        for later in &BOOTSTRAP[2..] {
+            assert_eq!(
+                waits_on(&evaluation, &bootstrap_unit(*later)),
+                std::slice::from_ref(&selection),
+                "{later:?}"
+            );
+        }
+        // Past the scan's bound, the reference's checks are not made at all.
+        wrong.capability = wrong
+            .capability
+            .clone()
+            .with_artifact_bootstrap(bootstrap_limits(WorkBound::MetadataScan, 1));
+        let (evaluation, _) = wrong.run();
+        let scan = key_of(&evaluation, &bootstrap_unit(Check::WithinMetadataScan));
+        assert_eq!(evaluation.issues().collect::<Vec<_>>(), [&scan]);
+        assert_eq!(waits_on(&evaluation, &decision()), [scan]);
+    }
+
     #[test]
     fn a_policy_within_every_capability_bound_is_admitted_and_compatible() {
         let inputs = Inputs::new();
@@ -1204,7 +1393,9 @@ mod tests {
         // three counts, the references' count, one unit per member key (three
         // tuples, then the two members that establish none), the collection's
         // bytes, one unit per visible reference, and the references' bytes;
-        // then the decision and the comparison.
+        // then the bootstrap: the metadata scan, candidate selection, the
+        // candidate's depth, allocation, and validation work, its body
+        // admission, and the comparison (Decision 015-164).
         let reference = |field| capability_unit(ArtifactSubject::Reference(field));
         let target = |id: &str| {
             reference(ReferenceField::TargetProfile(
@@ -1242,7 +1433,18 @@ mod tests {
         );
         expected.extend([target("app"), target("web")]);
         expected.push(capability_unit(ArtifactSubject::ReferenceBytes));
-        expected.extend([decision(), comparison()]);
+        expected.extend(
+            [
+                Check::WithinMetadataScan,
+                Check::BootstrapCandidate,
+                Check::WithinEnvelopeDepth,
+                Check::WithinDecodedAllocation,
+                Check::WithinValidationWork,
+                Check::CandidateBody,
+                Check::CompatiblePolicy,
+            ]
+            .map(|check| unit(PolicySubject::ResourceLimits, check)),
+        );
         let recorded: Vec<(&Unit, &Status)> = evaluation.statuses().collect();
         assert_eq!(
             recorded

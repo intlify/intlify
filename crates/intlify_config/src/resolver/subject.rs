@@ -580,7 +580,17 @@ impl SubjectKind {
             | Self::CapabilityStructuralAnalysis
             | Self::CapabilityProfiles
             | Self::CapabilityProfileId => &[Check::WithinCapability],
-            Self::ResourceLimits => &[Check::BootstrapCandidate, Check::CompatiblePolicy],
+            // Each artifactBootstrap bound comes before the work it protects
+            // (Decision 015-164).
+            Self::ResourceLimits => &[
+                Check::WithinMetadataScan,
+                Check::BootstrapCandidate,
+                Check::WithinEnvelopeDepth,
+                Check::WithinDecodedAllocation,
+                Check::WithinValidationWork,
+                Check::CandidateBody,
+                Check::CompatiblePolicy,
+            ],
             Self::RootNodes
             | Self::RootDepth
             | Self::RootCollectionEntries

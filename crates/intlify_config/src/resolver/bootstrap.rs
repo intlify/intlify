@@ -7,14 +7,14 @@
 //! or the one Finding code and reason that blocks it. It creates no Profile
 //! Resolution Artifact Set and depends on no submission order.
 //!
-//! The decision accounts for nothing and records nothing. Phase 4 runs it after
-//! the capability's `artifactAdmission` bounds and records its result, then
-//! compares the admitted policy with the capability and rechecks the earlier
-//! phases under it. [`work`] counts the `bootstrapOnly.artifactBootstrap` work
-//! bounds that decision 015-164 places around the decision: the metadata scan
+//! The decision accounts for nothing and records nothing. Phase 4 runs it as
+//! two checks, candidate selection and the chosen candidate's body admission,
+//! after the capability's `artifactAdmission` bounds, then compares the
+//! admitted policy with the capability and rechecks the earlier phases under
+//! it. [`work`] counts the `bootstrapOnly.artifactBootstrap` work bounds that
+//! Phase 4 checks around the decision (Decision 015-164): the metadata scan
 //! before candidate selection, and the chosen candidate's envelope depth,
-//! decoded allocation, and validation work before its body admission. Phase 4
-//! does not check them yet.
+//! decoded allocation, and validation work before its body admission.
 //!
 //! 018 authenticates the candidate by membership in its exact-pin
 //! Verification Input, which 015's pre-invocation boundary admits
@@ -58,17 +58,19 @@ const fn issue(code: Code, reason: Reason) -> Blocking {
     }
 }
 
-/// 015's closed decision for the selected `reference`. The reference is
-/// checked before any candidate; then only members that establish a tuple
-/// are grouped: the conflict group shares the reference's kind, identity,
-/// revision, and specification revision, and the exact-reference group also
-/// shares its semantic digest. A member without a tuple is never guessed into
-/// either group.
-pub(crate) fn admit_candidate(
+/// 015's candidate selection for the selected `reference`, steps 1 to 3 and 9
+/// to 14 of its closed decision. The reference is checked before any candidate
+/// is classified; then only members that establish a tuple are grouped: the
+/// conflict group shares the reference's kind, identity, revision, and
+/// specification revision, and the exact-reference group also shares its
+/// semantic digest. A member without a tuple is never guessed into either
+/// group. The sole exact candidate it chooses is measured by the
+/// `artifactBootstrap` bounds before its body admission, a check of its own
+/// (Decision 015-164).
+pub(crate) fn select_candidate<'m>(
     reference: &ExactTuple,
-    members: &[FormalMember],
-    verification: &VerificationInput,
-) -> Result<AdmittedResourcePolicy, Blocking> {
+    members: &'m [FormalMember],
+) -> Result<Envelope<'m>, Blocking> {
     let not_admitted = |reason| issue(Code::ArtifactReferenceNotAdmitted, reason);
     reference_checks(reference, ArtifactKind::ResourceLimitPolicy).map_err(not_admitted)?;
     let envelopes: Vec<Envelope<'_>> = members.iter().filter_map(FormalMember::envelope).collect();
@@ -106,7 +108,7 @@ pub(crate) fn admit_candidate(
             let tuples: Vec<&ExactTuple> = envelopes.iter().map(Envelope::tuple).collect();
             Err(not_admitted(mismatch(reference, &tuples)))
         }
-        [candidate] => admit_body(candidate, verification),
+        [candidate] => Ok((*candidate).clone()),
         [_, _, ..] => Err(issue(
             Code::ArtifactCollectionNotAdmitted,
             Reason::DuplicateEnvelope,
@@ -114,11 +116,12 @@ pub(crate) fn admit_candidate(
     }
 }
 
-/// The body admission of the sole exact candidate. Its specification revision
+/// The body admission of the sole exact candidate, steps 4 to 8 of the
+/// decision. Its specification revision
 /// is the reference's, which was found supported, so 017's body admission
 /// comes down to the integrity and 018's admission: the pin, then the common
 /// body.
-fn admit_body(
+pub(crate) fn admit_body(
     candidate: &Envelope<'_>,
     verification: &VerificationInput,
 ) -> Result<AdmittedResourcePolicy, Blocking> {
@@ -263,6 +266,17 @@ mod tests {
         admit_candidate(reference, &members, verification)
             .map(|policy| policy.tuple().clone())
             .map_err(|blocking| (blocking.code, blocking.reason.unwrap()))
+    }
+
+    /// The whole decision: candidate selection, then the candidate's body
+    /// admission, which Phase 4 runs as two checks.
+    fn admit_candidate(
+        reference: &ExactTuple,
+        members: &[FormalMember],
+        verification: &VerificationInput,
+    ) -> Result<AdmittedResourcePolicy, Blocking> {
+        select_candidate(reference, members)
+            .and_then(|candidate| admit_body(&candidate, verification))
     }
 
     const fn reference_issue(reason: Reason) -> (Code, Reason) {
