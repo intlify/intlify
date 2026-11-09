@@ -1,0 +1,1216 @@
+{
+  "note": "Resource Limit Policy Verification Inputs sealed by intlify_config. An independent implementation recomputes each integrity digest over its input without the top-level integrityDigest and each semantic digest over kind, schemaRevision, mode, and pins; checks that renaming or revising an input keeps its semantic digest while changing or removing a pin changes it; and reads every raw input of the boundary list under its bounds and assertion, deciding whether 015's resource-limit-policy-verification-input boundary admits it or which of its checks refuses it first, with the reason. None of these inputs is one trusted setup supplies.",
+  "integrityDomain": "resource-limit-policy-verification-input-integrity",
+  "semanticDomain": "resource-limit-policy-verification-input-semantic-digest",
+  "inputs": [
+    {
+      "id": "fixture",
+      "input": {
+        "kind": "resource-limit-policy-verification-input",
+        "schemaRevision": "0",
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "mode": "exact-pin",
+        "pins": [
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-a",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-b",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          }
+        ],
+        "integrityDigest": "sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45"
+      },
+      "integrityPreimage": {
+        "kind": "resource-limit-policy-verification-input",
+        "schemaRevision": "0",
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "mode": "exact-pin",
+        "pins": [
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-a",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-b",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          }
+        ]
+      },
+      "semanticPreimage": {
+        "kind": "resource-limit-policy-verification-input",
+        "schemaRevision": "0",
+        "mode": "exact-pin",
+        "pins": [
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-a",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-b",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          }
+        ]
+      },
+      "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+    },
+    {
+      "id": "renamed",
+      "input": {
+        "kind": "resource-limit-policy-verification-input",
+        "schemaRevision": "0",
+        "identity": "intlify-renamed-verification-input",
+        "revision": "0",
+        "mode": "exact-pin",
+        "pins": [
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-a",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-b",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          }
+        ],
+        "integrityDigest": "sha256:a9f48d86846df4cca50ef02f30e8fdff50e46d9afcbf4a4c9a8788c8f38e4d04"
+      },
+      "integrityPreimage": {
+        "kind": "resource-limit-policy-verification-input",
+        "schemaRevision": "0",
+        "identity": "intlify-renamed-verification-input",
+        "revision": "0",
+        "mode": "exact-pin",
+        "pins": [
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-a",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-b",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          }
+        ]
+      },
+      "semanticPreimage": {
+        "kind": "resource-limit-policy-verification-input",
+        "schemaRevision": "0",
+        "mode": "exact-pin",
+        "pins": [
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-a",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-b",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          }
+        ]
+      },
+      "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+    },
+    {
+      "id": "revised",
+      "input": {
+        "kind": "resource-limit-policy-verification-input",
+        "schemaRevision": "0",
+        "identity": "intlify-test-verification-input",
+        "revision": "1",
+        "mode": "exact-pin",
+        "pins": [
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-a",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-b",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          }
+        ],
+        "integrityDigest": "sha256:34693aa078979187c1f5d93c04704eb0e11350929b4a05f0c774ab954e7a046b"
+      },
+      "integrityPreimage": {
+        "kind": "resource-limit-policy-verification-input",
+        "schemaRevision": "0",
+        "identity": "intlify-test-verification-input",
+        "revision": "1",
+        "mode": "exact-pin",
+        "pins": [
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-a",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-b",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          }
+        ]
+      },
+      "semanticPreimage": {
+        "kind": "resource-limit-policy-verification-input",
+        "schemaRevision": "0",
+        "mode": "exact-pin",
+        "pins": [
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-a",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-b",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          }
+        ]
+      },
+      "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+    },
+    {
+      "id": "pin-changed",
+      "input": {
+        "kind": "resource-limit-policy-verification-input",
+        "schemaRevision": "0",
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "mode": "exact-pin",
+        "pins": [
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-a",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-b",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+          }
+        ],
+        "integrityDigest": "sha256:e824f8d92f347a07ee43ec9426aa9153ae70ed10c8203aef5e307f0cb3a566bd"
+      },
+      "integrityPreimage": {
+        "kind": "resource-limit-policy-verification-input",
+        "schemaRevision": "0",
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "mode": "exact-pin",
+        "pins": [
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-a",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-b",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+          }
+        ]
+      },
+      "semanticPreimage": {
+        "kind": "resource-limit-policy-verification-input",
+        "schemaRevision": "0",
+        "mode": "exact-pin",
+        "pins": [
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-a",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-b",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+          }
+        ]
+      },
+      "semanticDigest": "sha256:4e94621cff5dd1324c29aaf1eb3a3c823f387eb49032688180aa28558afd4d55"
+    },
+    {
+      "id": "one-pin",
+      "input": {
+        "kind": "resource-limit-policy-verification-input",
+        "schemaRevision": "0",
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "mode": "exact-pin",
+        "pins": [
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-a",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        ],
+        "integrityDigest": "sha256:6c3e33a4e242185661d4e12afa135bee0d991575d1f6cacb79700dcd3c0a81bc"
+      },
+      "integrityPreimage": {
+        "kind": "resource-limit-policy-verification-input",
+        "schemaRevision": "0",
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "mode": "exact-pin",
+        "pins": [
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-a",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        ]
+      },
+      "semanticPreimage": {
+        "kind": "resource-limit-policy-verification-input",
+        "schemaRevision": "0",
+        "mode": "exact-pin",
+        "pins": [
+          {
+            "kind": "resource-limit-policy",
+            "identity": "intlify-test-limits-a",
+            "revision": "1",
+            "specificationRevision": "0",
+            "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        ]
+      },
+      "semanticDigest": "sha256:adc9a44a1596c137b6cb4798dd691f7b919a325008436705ab8180f838eb45e7"
+    }
+  ],
+  "sameSemanticDigest": [
+    ["fixture", "renamed"],
+    ["fixture", "revised"]
+  ],
+  "differentSemanticDigest": [
+    ["fixture", "pin-changed"],
+    ["fixture", "one-pin"]
+  ],
+  "boundary": [
+    {
+      "id": "admitted",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "admitted": true
+      }
+    },
+    {
+      "id": "missing",
+      "text": null,
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "missing-input",
+        "check": "presence"
+      }
+    },
+    {
+      "id": "bytes-exact",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "656",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "admitted": true
+      }
+    },
+    {
+      "id": "bytes-first-over",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "655",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "over-bound-input",
+        "check": "bytes"
+      }
+    },
+    {
+      "id": "depth-exact",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "3",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "admitted": true
+      }
+    },
+    {
+      "id": "depth-first-over",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "2",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "over-bound-input",
+        "check": "depth"
+      }
+    },
+    {
+      "id": "pins-exact",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "2"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "admitted": true
+      }
+    },
+    {
+      "id": "pins-first-over",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "1"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "over-bound-input",
+        "check": "pin-count"
+      }
+    },
+    {
+      "id": "brackets-in-a-string",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\",\"note\":\"[[[[{{{{\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "3",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "unknown-member",
+        "check": "unknown-member"
+      }
+    },
+    {
+      "id": "syntax",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "malformed-input",
+        "check": "syntax"
+      }
+    },
+    {
+      "id": "another-kind",
+      "text": "{\"kind\":\"trust-policy\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "malformed-input",
+        "check": "shape"
+      }
+    },
+    {
+      "id": "identity-not-a-token",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"Test Pins\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "malformed-input",
+        "check": "shape"
+      }
+    },
+    {
+      "id": "pin-of-a-target-profile",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"target-profile\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "malformed-input",
+        "check": "shape"
+      }
+    },
+    {
+      "id": "repeated-member",
+      "text": "{\"mode\":\"exact-pin\",\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "duplicate-member",
+        "check": "repeated-member"
+      }
+    },
+    {
+      "id": "repeated-member-spelled-otherwise",
+      "text": "{\"mod\\u0065\":\"exact-pin\",\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "duplicate-member",
+        "check": "repeated-member"
+      }
+    },
+    {
+      "id": "repeated-member-in-a-pin",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"revision\":\"1\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "duplicate-member",
+        "check": "repeated-member"
+      }
+    },
+    {
+      "id": "unknown-member",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\",\"signature\":\"ed25519:0\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "unknown-member",
+        "check": "unknown-member"
+      }
+    },
+    {
+      "id": "unknown-member-in-a-pin",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\",\"locator\":\"https://example.com/limits\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "unknown-member",
+        "check": "unknown-member"
+      }
+    },
+    {
+      "id": "private-key",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\",\"privateKey\":\"0\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "secret-bearing-input",
+        "check": "secret-bearing-member"
+      }
+    },
+    {
+      "id": "credential-in-a-pin",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\",\"credential\":\"0\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "secret-bearing-input",
+        "check": "secret-bearing-member"
+      }
+    },
+    {
+      "id": "secret-locator",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\",\"secretLocator\":\"file:///key\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "secret-bearing-input",
+        "check": "secret-bearing-member"
+      }
+    },
+    {
+      "id": "trust-store",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\",\"trustStore\":\"system\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "ambient-authority",
+        "check": "ambient-authority-member"
+      }
+    },
+    {
+      "id": "network-source-in-a-pin",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\",\"networkSource\":\"x\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "ambient-authority",
+        "check": "ambient-authority-member"
+      }
+    },
+    {
+      "id": "host-trust",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\",\"hostTrust\":true}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "ambient-authority",
+        "check": "ambient-authority-member"
+      }
+    },
+    {
+      "id": "reserved-before-integrity",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"credential\":\"0\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "secret-bearing-input",
+        "check": "secret-bearing-member"
+      }
+    },
+    {
+      "id": "stale-integrity",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "malformed-input",
+        "check": "integrity"
+      }
+    },
+    {
+      "id": "another-mode",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"floating\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:1c47437e34e4b4d56fd471e689aba8b4195b89c7a43bd02d64fd0e6aaf3764dd\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "malformed-input",
+        "check": "mode"
+      }
+    },
+    {
+      "id": "no-pin",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[],\"integrityDigest\":\"sha256:5318be593b54c71ebfd0c32c2ee507d77289044a06627aa934436076e019f99b\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "malformed-input",
+        "check": "pins"
+      }
+    },
+    {
+      "id": "unsorted-pins",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"}],\"integrityDigest\":\"sha256:0fb53bd1927a386964bf5a4440e1756b4300ff5e0adbd2c05b9a0330b8038450\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "malformed-input",
+        "check": "pins"
+      }
+    },
+    {
+      "id": "repeated-pin",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"}],\"integrityDigest\":\"sha256:4c6e43a0df60dbb8e46dc67b18f3304d6320d16ee80bca78503ca3a2c765c230\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "malformed-input",
+        "check": "pins"
+      }
+    },
+    {
+      "id": "trust-policy-pin",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"trust-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:7b591777197942c20ada97ddaa489c26dce7fb57d713377aa939765a2d5c64f0\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "malformed-input",
+        "check": "pins"
+      }
+    },
+    {
+      "id": "identity-mismatch",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "other-pins",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "verification-identity-mismatch",
+        "check": "identity"
+      }
+    },
+    {
+      "id": "revision-mismatch",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "1",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "verification-revision-mismatch",
+        "check": "revision"
+      }
+    },
+    {
+      "id": "digest-mismatch",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:0707070707070707070707070707070707070707070707070707070707070707"
+      },
+      "outcome": {
+        "reason": "verification-digest-mismatch",
+        "check": "semantic-digest"
+      }
+    },
+    {
+      "id": "bytes-before-depth",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "655",
+        "depth": "2",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "over-bound-input",
+        "check": "bytes"
+      }
+    },
+    {
+      "id": "depth-before-syntax",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "2",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "over-bound-input",
+        "check": "depth"
+      }
+    },
+    {
+      "id": "syntax-before-pin-count",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "1"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "malformed-input",
+        "check": "syntax"
+      }
+    },
+    {
+      "id": "pin-count-before-shape",
+      "text": "{\"kind\":\"trust-policy\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "1"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "over-bound-input",
+        "check": "pin-count"
+      }
+    },
+    {
+      "id": "shape-before-a-repeated-member",
+      "text": "{\"mode\":\"exact-pin\",\"kind\":\"trust-policy\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "malformed-input",
+        "check": "shape"
+      }
+    },
+    {
+      "id": "repeated-before-unknown",
+      "text": "{\"mode\":\"exact-pin\",\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\",\"signature\":\"ed25519:0\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "duplicate-member",
+        "check": "repeated-member"
+      }
+    },
+    {
+      "id": "unknown-before-reserved",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\",\"signature\":\"ed25519:0\",\"privateKey\":\"0\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "unknown-member",
+        "check": "unknown-member"
+      }
+    },
+    {
+      "id": "secret-bearing-before-ambient-authority",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\",\"credential\":\"0\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\",\"hostTrust\":true}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "secret-bearing-input",
+        "check": "secret-bearing-member"
+      }
+    },
+    {
+      "id": "ambient-authority-before-integrity",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"trustStore\":\"system\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "ambient-authority",
+        "check": "ambient-authority-member"
+      }
+    },
+    {
+      "id": "integrity-before-mode",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"floating\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "malformed-input",
+        "check": "integrity"
+      }
+    },
+    {
+      "id": "mode-before-pins",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"floating\",\"pins\":[],\"integrityDigest\":\"sha256:c285048d57f39392515eca0a50ce163b28584f5b342e1fbc3e966b4d6bea3f46\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "malformed-input",
+        "check": "mode"
+      }
+    },
+    {
+      "id": "pins-before-the-assertion",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[],\"integrityDigest\":\"sha256:5318be593b54c71ebfd0c32c2ee507d77289044a06627aa934436076e019f99b\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "other-pins",
+        "revision": "0",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "malformed-input",
+        "check": "pins"
+      }
+    },
+    {
+      "id": "identity-before-revision",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "other-pins",
+        "revision": "1",
+        "semanticDigest": "sha256:953598b0ae519c0bb6e26c8ace348afdc9f20673c8c08df22cbd3da060fab878"
+      },
+      "outcome": {
+        "reason": "verification-identity-mismatch",
+        "check": "identity"
+      }
+    },
+    {
+      "id": "revision-before-digest",
+      "text": "{\"kind\":\"resource-limit-policy-verification-input\",\"schemaRevision\":\"0\",\"identity\":\"intlify-test-verification-input\",\"revision\":\"0\",\"mode\":\"exact-pin\",\"pins\":[{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-a\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"},{\"kind\":\"resource-limit-policy\",\"identity\":\"intlify-test-limits-b\",\"revision\":\"1\",\"specificationRevision\":\"0\",\"semanticDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}],\"integrityDigest\":\"sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45\"}",
+      "limits": {
+        "bytes": "18446744073709551614",
+        "depth": "18446744073709551614",
+        "pins": "18446744073709551614"
+      },
+      "assertion": {
+        "identity": "intlify-test-verification-input",
+        "revision": "1",
+        "semanticDigest": "sha256:0707070707070707070707070707070707070707070707070707070707070707"
+      },
+      "outcome": {
+        "reason": "verification-revision-mismatch",
+        "check": "revision"
+      }
+    }
+  ]
+}

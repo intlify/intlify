@@ -17,6 +17,7 @@
     "check:registries": "node scripts/verify-registries.mjs",
     "check:validator-schemas": "node scripts/verify-validator-schemas.mjs",
     "check:validator-values": "node scripts/verify-validator-values.mjs",
+    "check:verification": "node scripts/verify-verification.mjs",
     "check:vocabulary": "node scripts/verify-vocabulary.mjs"
   },
   "devDependencies": {
