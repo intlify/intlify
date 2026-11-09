@@ -12,9 +12,11 @@
 //! capability boundary runs first, because every boundary that reads raw input
 //! takes its bounds from the admitted capability (D15:1106). A Safe Origin
 //! Kind candidate is admitted at its own boundary beside its component's
-//! value, and reads no bound (015-166).
+//! value, and reads no bound (015-166). A selector is admitted from its
+//! binding's closed report, not from a live host value (015-167).
 
 pub(crate) mod capability;
 pub(crate) mod origin;
+pub(crate) mod selector;
 pub(crate) mod specification;
 pub(crate) mod verification;

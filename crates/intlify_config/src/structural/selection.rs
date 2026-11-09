@@ -49,8 +49,9 @@ pub(crate) struct SelectorInput {
 
 impl SelectorInput {
     /// Equality with a finite fixture input without exporting, hashing, or
-    /// rendering a potentially secret selector. Available to benchmark code only.
-    #[cfg(feature = "benchmark")]
+    /// rendering a potentially secret selector. Available to benchmark code
+    /// and tests only.
+    #[cfg(any(test, feature = "benchmark"))]
     pub(crate) fn benchmark_matches_fixture(&self, expected: &Self) -> bool {
         self.bound == expected.bound
             && match (&self.kind, &expected.kind) {
@@ -103,6 +104,15 @@ impl SelectorInput {
         Self {
             bound,
             kind: SelectorKind::InvalidType(kind),
+        }
+    }
+
+    /// A string that bounded inspection established only crossed `bound`, as
+    /// a binding reports it: without the string or its length.
+    pub(crate) const fn over_limit(bound: Bound) -> Self {
+        Self {
+            bound,
+            kind: SelectorKind::OverLimitString,
         }
     }
 }
