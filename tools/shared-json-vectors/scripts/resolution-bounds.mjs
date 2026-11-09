@@ -184,7 +184,7 @@ export const BOOTSTRAP_GROUPS = [
     [
       [
         'maxEnvelopeDepth',
-        'One nesting level of the selected candidate member, with the member root at one',
+        'One object or array nesting level of the selected candidate member, with the member root at one',
         '1'
       ],
       [
@@ -194,12 +194,12 @@ export const BOOTSTRAP_GROUPS = [
       ],
       [
         'maxMetadataScanUnits',
-        'One envelope field read from one member to establish its exact-reference tuple: `kind`, `specification.identity`, `specification.revision`, `body.identity`, or `body.revision`',
+        'One envelope field read from one member to establish its exact-reference tuple: `kind`, `specification.identity`, `specification.revision`, `body.identity`, or `body.revision`, in that order through the first that is absent or not a string',
         '1'
       ],
       [
         'maxValidationWorkUnits',
-        "One evaluation of the selected candidate's integrity, its pin lookup, its common body, or one `projectProfileResolution` rule: the section's presence, one group's closed shape, or one bound's value",
+        "One evaluation, counted whether or not it runs, of the selected candidate's integrity, its pin lookup, its common body, or one `projectProfileResolution` rule: the section's presence, the closed shape of the section, of one of its five groups, or of one of its two `diagnostics` reporting-domain groups, or one bound's value",
         '1'
       ]
     ]

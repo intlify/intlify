@@ -20,6 +20,7 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use crate::input_limits::Bound;
 
 use super::artifact_resolution::CollectionSubject;
+use super::capability::BootstrapBoundId;
 use super::coverage::CoverageSubject;
 use super::dependency::SemanticGroup;
 use super::fallback::FallbackSubject;
@@ -875,6 +876,16 @@ impl Blocking {
         }
     }
 
+    /// Work under a resolver-side `bootstrapOnly` bound past the capability's
+    /// value.
+    pub(crate) const fn bootstrap_limit(exceeded: BootstrapLimitExceeded) -> Self {
+        Self {
+            code: Code::BootstrapLimitExceeded,
+            reason: None,
+            details: Some(Details::BootstrapLimit(exceeded)),
+        }
+    }
+
     /// The same result as a unit whose key can stand for several values
     /// reports it: past its bound only the first-over witness `limit + 1`,
     /// whichever value the unit measured, since every value the key stands
@@ -900,6 +911,7 @@ impl Blocking {
 pub(crate) enum Details {
     Limit(LimitExceeded),
     Shortfall(Shortfall),
+    BootstrapLimit(BootstrapLimitExceeded),
 }
 
 /// Whether `count` submitted items stay within `limit`, or the issue 015
@@ -933,6 +945,15 @@ pub(crate) struct Shortfall {
     pub(crate) bound: BoundId,
     pub(crate) required: Bound,
     pub(crate) available: Bound,
+}
+
+/// 015's details of work past a resolver-side `bootstrapOnly` bound: the bound,
+/// whose capability bound path the Finding names, its value, and the total.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct BootstrapLimitExceeded {
+    pub(crate) bound: BootstrapBoundId,
+    pub(crate) limit: Bound,
+    pub(crate) actual: Actual,
 }
 
 /// A measured total: exact, or a witness that the total is at least this.
@@ -1159,6 +1180,14 @@ impl Evaluation {
                 measured && members.contains(&DetailsMember::Actual)
             }
             Some(Details::Shortfall(_)) => members.contains(&DetailsMember::Available),
+            Some(Details::BootstrapLimit(exceeded)) => {
+                let limit = exceeded.limit.get();
+                let measured = match exceeded.actual {
+                    Actual::Exact(total) => total > limit,
+                    Actual::AtLeast(witness) => witness == limit + 1,
+                };
+                measured && members.contains(&DetailsMember::Actual)
+            }
             None => {
                 !members.contains(&DetailsMember::Actual)
                     && !members.contains(&DetailsMember::Available)
