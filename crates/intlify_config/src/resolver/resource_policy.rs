@@ -21,6 +21,7 @@ use std::collections::BTreeMap;
 use crate::artifacts::collection::FormalCollection;
 use crate::artifacts::envelope::{ArtifactKind, Declaration, FormalMember, MemberKey};
 use crate::boundary::capability::ImplementationCapability;
+use crate::boundary::verification::VerificationInput;
 use crate::input_limits::{Bound, ValueCounts};
 use crate::model::{
     NonEmptyMap, Policies, ProfileId, RequiredNullable, TargetDeclaration, TargetId,
@@ -28,7 +29,7 @@ use crate::model::{
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::selection::{SelectionInvariant, SelectorInput, StringLengthFact};
 
-use super::bootstrap::{admit_candidate, AdmittedResourcePolicy, VerificationInput};
+use super::bootstrap::{admit_candidate, AdmittedResourcePolicy};
 use super::evaluation::{
     and, both, Actual, Admitted, Blocking, Causes, Check, Evaluation, EvaluationInvariant, Phase,
     Shortfall, Subject, Unit,
@@ -1098,7 +1099,7 @@ mod tests {
                         json!({}),
                     ))
                 });
-            VerificationInput::exact_pins([pin]).unwrap()
+            VerificationInput::fixture_owned([pin])
         }
 
         /// Phase 4 up to the comparison.
