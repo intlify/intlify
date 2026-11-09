@@ -37,6 +37,7 @@
     "corpus:locale:check": "cargo run -q -p intlify_locale_icu4x --features generate --example generate_gap_registry -- --check && vp run shared-json-vectors#check:locale-corpus",
     "schema:vocabulary:check": "cargo run -q -p intlify_config --example generate_vocabulary_schema -- --check",
     "vectors:vocabulary:check": "cargo run -q -p intlify_config --features vectors --example generate_vocabulary_vectors -- --check && vp run shared-json-vectors#check:vocabulary",
+    "vectors:verification:check": "cargo run -q -p intlify_config --features vectors --example generate_verification_vectors -- --check && vp run shared-json-vectors#check:verification",
     "vectors:envelope:check": "cargo run -q -p intlify_config --features vectors --example generate_envelope_vectors -- --check && vp run shared-json-vectors#check:envelope",
     "vectors:framing:check": "cargo run -q -p intlify_config --features vectors --example generate_framing_vectors -- --check && vp run shared-json-vectors#check:framing",
     "vectors:bounds:check": "cargo run -q -p intlify_config --features vectors --example generate_bound_vectors -- --check && vp run shared-json-vectors#check:bounds",

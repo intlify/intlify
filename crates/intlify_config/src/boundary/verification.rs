@@ -47,12 +47,12 @@ pub(crate) struct VerificationAssertion {
     pub(crate) semantic_digest: SemanticDigest,
 }
 
-/// The capability's bounds on one input.
+/// The bounds on one input: the capability's, or a vector's own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct VerificationLimits {
-    bytes: Bound,
-    depth: Bound,
-    pins: Bound,
+pub(crate) struct VerificationLimits {
+    pub(crate) bytes: Bound,
+    pub(crate) depth: Bound,
+    pub(crate) pins: Bound,
 }
 
 impl VerificationLimits {
@@ -224,7 +224,9 @@ pub(crate) fn admit(
     read_input(bytes, VerificationLimits::of(capability), assertion)
 }
 
-fn read_input(
+/// The boundary's checks under `limits`, which [`admit`] takes from the
+/// capability and the vectors state outright.
+pub(crate) fn read_input(
     bytes: Option<&[u8]>,
     limits: VerificationLimits,
     assertion: &VerificationAssertion,
