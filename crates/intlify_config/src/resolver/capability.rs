@@ -13,6 +13,7 @@
 use std::fmt;
 
 use crate::input_limits::{Bound, RawInputLimits};
+use crate::locale::LocaleDataLimits;
 
 use super::limits::{BoundId, ResolutionLimits, BOUND_COUNT};
 
@@ -420,22 +421,6 @@ pub(crate) struct ArtifactBootstrapLimits {
     pub(crate) max_envelope_depth: Bound,
     pub(crate) max_decoded_allocation_bytes: Bound,
     pub(crate) max_metadata_scan_units: Bound,
-    pub(crate) max_validation_work_units: Bound,
-}
-
-/// Reading the Locale Canonicalization Data Artifact at specification
-/// admission.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[expect(clippy::struct_field_names, reason = "mirror 015's explicit bound IDs")]
-pub(crate) struct LocaleDataLimits {
-    pub(crate) max_payloads: Bound,
-    pub(crate) max_payload_bytes: Bound,
-    pub(crate) max_marker_bytes: Bound,
-    pub(crate) max_validity_groups: Bound,
-    pub(crate) max_codes: Bound,
-    pub(crate) max_extension_keys: Bound,
-    pub(crate) max_types: Bound,
-    pub(crate) max_corrections: Bound,
     pub(crate) max_validation_work_units: Bound,
 }
 

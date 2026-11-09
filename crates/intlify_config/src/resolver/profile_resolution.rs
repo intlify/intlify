@@ -23,7 +23,7 @@ use crate::artifacts::vocabulary::FormalVocabulary;
 use crate::boundary::capability::ImplementationCapability;
 use crate::boundary::verification::VerificationInput;
 use crate::input_limits::ValueCounts;
-use crate::locale::{CanonicalizationFailure, Provider, SemanticPins};
+use crate::locale::{CanonicalizationFailure, FormalData, Provider, SemanticPins};
 use crate::model::{IntlifyConfig, ProfileDeclaration, ProfileId};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::selection::{ProvisionalSelection, SelectionInvariant, SelectorInput};
@@ -206,19 +206,21 @@ impl From<LocaleInvariant> for ResolverInvariant {
 
 /// Phase 0 and Phases 4 to 13 of one invocation over `evaluation`, in 015's
 /// order, with each semantic group's owner once the phases that establish
-/// the group have run. `data` is the canonicalization data Phase 5 binds. The
+/// the group have run. `data` is the canonicalization data past the
+/// pre-invocation boundary, which Phase 5 reads the rest of and binds. The
 /// Profile Resolution Artifact Set Phase 9 admits is kept in `set`, which the
 /// resolved references and the bindings borrow.
-pub(crate) fn resolve_profile<'s, P>(
+pub(crate) fn resolve_profile<'s, P, D>(
     evaluation: &mut Evaluation,
     configuration: &CompleteConfiguration<'_>,
     invocation: &Invocation<'s, P::Identity>,
-    data: P,
+    data: D,
     set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
 ) -> Result<SemanticState<'s, P::Identity>, ResolverInvariant>
 where
     P: Provider,
     P::Identity: AsRef<str>,
+    D: FormalData<Provider = P>,
 {
     let declaration = configuration.declaration;
     let declared = configuration.references();
@@ -248,6 +250,7 @@ where
         confirmed,
         invocation.vocabulary,
         data,
+        &invocation.capability.bootstrap_only().locale_data,
     )?;
     let canonicalizer = admitted.canonicalizer.as_ref();
     own(
@@ -434,7 +437,10 @@ pub(super) mod tests {
     use crate::construction::registry::check::CheckRegistry;
     use crate::input_limits::{Bound, InputLimits, RawInputLimits};
     use crate::locale::fixtures::{fixture_pins, FixtureProvider};
-    use crate::locale::{CanonicalLocale, ProviderFailure, Supported, VersionedIdentity};
+    use crate::locale::{
+        CanonicalLocale, DataNotAdmitted, LocaleDataLimits, ProviderFailure, Supported,
+        VersionedIdentity,
+    };
     use crate::materialize::materialize_file;
     use crate::model::CoverageMode;
     use crate::profile_fixtures::complete_config;
@@ -451,7 +457,9 @@ pub(super) mod tests {
     use crate::resolver::locales::{self, LocaleKey, LocaleSubject, Location};
     use crate::resolver::profile_view::{project, ProfileView};
     use crate::resolver::resource_policy::{self, PolicySlot, PolicySubject, ReferenceField};
-    use crate::resolver::specification::{ActiveProfileSpecification, Slot, VocabularyAssertion};
+    use crate::resolver::specification::{
+        ActiveProfileSpecification, Slot, VocabularyAssertion, DATA,
+    };
     use crate::resolver::subject::SubjectKind;
     use crate::resolver::targets::{self, TargetSubject};
     use crate::structural::selection::{Selection, StringLengthFact};
@@ -2057,6 +2065,65 @@ pub(super) mod tests {
                     ProviderFailure::UnsupportedInput
                 ))
             );
+        });
+    }
+
+    /// The capability's `localeData` bounds reach Phase 5, which reads the
+    /// rest of the data past the boundary under them. Data whose rest does
+    /// not read is not admitted, a Finding of the data's unit rather than a
+    /// refusal before invocation (D15:3160).
+    #[test]
+    fn phase_5_reads_the_data_under_the_capabilitys_locale_data_bounds() {
+        struct Behind(LocaleDataLimits);
+
+        impl FormalData for Behind {
+            type Provider = FixtureProvider;
+
+            fn admit(self, limits: &LocaleDataLimits) -> Result<FixtureProvider, DataNotAdmitted> {
+                if *limits == self.0 {
+                    Ok(FixtureProvider::new())
+                } else {
+                    Err(DataNotAdmitted)
+                }
+            }
+        }
+
+        Inputs::complete().prepared(|configuration, invocation| {
+            // Bounds unlike the fixture capability's minima, so that only the
+            // capability's own bounds can be the ones read under.
+            let seven = Bound::new(7).unwrap();
+            let bounds = LocaleDataLimits {
+                max_payloads: seven,
+                max_payload_bytes: seven,
+                max_marker_bytes: seven,
+                max_validity_groups: seven,
+                max_codes: seven,
+                max_extension_keys: seven,
+                max_types: seven,
+                max_corrections: seven,
+                max_validation_work_units: seven,
+            };
+            let capability = invocation.capability.clone().with_locale_data(bounds);
+            let invocation = Invocation {
+                capability: &capability,
+                ..*invocation
+            };
+            let resolved = |data: Behind| {
+                let mut evaluation = Evaluation::default();
+                let mut set = None;
+                let canonicalized =
+                    resolve_profile(&mut evaluation, configuration, &invocation, data, &mut set)
+                        .unwrap()
+                        .canonicalization
+                        .is_ok();
+                (issues(&evaluation), canonicalized)
+            };
+            assert_eq!(resolved(Behind(bounds)), (vec![], true));
+            let mut other = bounds;
+            other.max_codes = Bound::new(bounds.max_codes.get() + 1).unwrap();
+            let (found, canonicalized) = resolved(Behind(other));
+            assert_eq!(found, [(DATA, Code::LocaleDataNotAdmitted, None)]);
+            assert!(!canonicalized);
         });
     }
 

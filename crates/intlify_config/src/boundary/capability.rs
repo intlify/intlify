@@ -87,6 +87,14 @@ impl ImplementationCapability {
         self
     }
 
+    /// The same capability with its `localeData` bounds replaced, for the
+    /// tests of specification admission's reading of the data.
+    #[cfg(test)]
+    pub(crate) fn with_locale_data(mut self, limits: crate::locale::LocaleDataLimits) -> Self {
+        self.bootstrap_only.locale_data = limits;
+        self
+    }
+
     /// The Capability Specification the capability asserts.
     pub(crate) const fn specification(&self) -> &VersionedIdentity<String> {
         &self.specification
