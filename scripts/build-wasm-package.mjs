@@ -14,11 +14,16 @@ const wasmPackCachePath =
   process.env.WASM_PACK_CACHE ?? join(workspaceRoot, 'node_modules', '.cache', 'wasm-pack')
 const waitTimeoutMs = 10 * 60 * 1000
 const waitIntervalMs = 250
+// wasm-pack downloads wasm-bindgen and binaryen from GitHub releases when its
+// cache lacks them. A failed download is retried after a pause; any other
+// failure is not.
+const downloadFailure = 'failed to download'
+const retryDelaysMs = [15_000, 45_000]
 
 try {
   const options = parseOptions()
   await mkdir(wasmPackCachePath, { recursive: true })
-  await withWasmPackLock(() => runWasmPackBuild(options))
+  await withWasmPackLock(() => buildWithRetries(options))
 } catch (error) {
   console.error(`error: ${error instanceof Error ? error.message : String(error)}`)
   process.exitCode = 1
@@ -86,6 +91,23 @@ async function releaseLock() {
   }
 }
 
+async function buildWithRetries(options) {
+  for (let attempt = 1; ; attempt += 1) {
+    const { code, signal, downloadFailed } = await runWasmPackBuild(options)
+    if (code === 0) {
+      return
+    }
+    const delay = retryDelaysMs[attempt - 1]
+    if (!downloadFailed || delay === undefined) {
+      throw new Error(`wasm-pack build failed with ${signal ?? `exit code ${code ?? 'unknown'}`}`)
+    }
+    console.error(
+      `wasm-pack could not download a tool; retrying in ${delay / 1000}s (attempt ${attempt + 1} of ${retryDelaysMs.length + 1})`
+    )
+    await sleep(delay)
+  }
+}
+
 function runWasmPackBuild({ crate, outDir, outName }) {
   return new Promise((resolve, reject) => {
     const child = spawn(
@@ -93,18 +115,28 @@ function runWasmPackBuild({ crate, outDir, outName }) {
       ['build', crate, '--target', 'web', '--no-pack', '--out-dir', outDir, '--out-name', outName],
       {
         env: { ...process.env, WASM_PACK_CACHE: wasmPackCachePath },
-        stdio: 'inherit',
+        stdio: ['inherit', 'pipe', 'pipe'],
         shell: process.platform === 'win32'
       }
     )
 
+    let downloadFailed = false
+    const forward = (source, sink) => {
+      // The tail keeps a marker that one chunk ends and the next begins visible.
+      let tail = ''
+      source.on('data', chunk => {
+        sink.write(chunk)
+        const text = tail + chunk.toString()
+        downloadFailed ||= text.includes(downloadFailure)
+        tail = text.slice(-(downloadFailure.length - 1))
+      })
+    }
+    forward(child.stdout, process.stdout)
+    forward(child.stderr, process.stderr)
+
     child.on('error', reject)
-    child.on('exit', (code, signal) => {
-      if (code === 0) {
-        resolve()
-        return
-      }
-      reject(new Error(`wasm-pack build failed with ${signal ?? `exit code ${code ?? 'unknown'}`}`))
+    child.on('close', (code, signal) => {
+      resolve({ code, signal, downloadFailed })
     })
   })
 }
