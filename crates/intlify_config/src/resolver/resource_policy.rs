@@ -20,6 +20,7 @@ use std::collections::BTreeMap;
 
 use crate::artifacts::collection::FormalCollection;
 use crate::artifacts::envelope::{ArtifactKind, Declaration, FormalMember, MemberKey};
+use crate::boundary::capability::ImplementationCapability;
 use crate::input_limits::{Bound, ValueCounts};
 use crate::model::{
     NonEmptyMap, Policies, ProfileId, RequiredNullable, TargetDeclaration, TargetId,
@@ -34,7 +35,7 @@ use super::evaluation::{
 };
 use super::limits::{
     ArtifactAdmissionLimits, BoundId, ConfigurationInputLimits, ConfirmedPolicy, Group,
-    ImplementationCapability, ResolutionLimits,
+    ResolutionLimits,
 };
 use super::tally::{actual, first_over, measure, total, within, Tally};
 

@@ -157,6 +157,17 @@ impl ConstructedResolver {
         .expect("one entry lists its specification once")
     }
 
+    /// The Capability Specification construction admitted, by the identity
+    /// and revision its tuple declares: the specification the capability
+    /// boundary admits a capability value against.
+    pub(crate) fn capability_specification(&self) -> VersionedIdentity<String> {
+        let declared = &self.admitted.resolver_capability_specification.declared;
+        VersionedIdentity {
+            identity: declared.identity.clone(),
+            revision: declared.revision.clone(),
+        }
+    }
+
     /// What the resolver supports in each specification slot.
     pub(crate) fn supported(&self) -> SupportedSpecifications<String> {
         let slots = &self.profile.specification_slots;

@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::artifacts::collection::FormalCollection;
 use crate::artifacts::envelope::ArtifactKind;
+use crate::boundary::capability::ImplementationCapability;
 use crate::model::ProfileId;
 use crate::references::PolicyReference;
 use crate::resolver::bootstrap::VerificationInput;
@@ -20,7 +21,7 @@ use crate::resolver::evaluation::{
     Actual, Admitted, Causes, Check, Evaluation, IssueKey, LimitExceeded, Shortfall, Status,
     Subject, Unit,
 };
-use crate::resolver::limits::{ImplementationCapability, ResolutionLimits};
+use crate::resolver::limits::ResolutionLimits;
 use crate::resolver::resource_policy::{
     admit_resource_policy, ArtifactSubject, ConfigurationMeasures, DeclarationReferences,
     PolicyInvariant, PolicyOutcome, PolicySubject, ReferenceField,

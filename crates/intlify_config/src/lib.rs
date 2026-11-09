@@ -133,6 +133,11 @@ mod locale;
 #[allow(dead_code)]
 mod resolver;
 
+// 015's pre-invocation boundaries, each admitting one raw component of an
+// invocation before the resolver starts; no binding calls them yet.
+#[allow(dead_code)]
+mod boundary;
+
 #[cfg(any(test, feature = "benchmark"))]
 #[allow(dead_code)]
 mod benchmark;

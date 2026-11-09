@@ -10,12 +10,13 @@ use std::sync::Arc;
 use serde_json::Value;
 
 use crate::artifacts::collection::{read_collection, CollectionLimits, FormalCollection};
+use crate::boundary::capability::ImplementationCapability;
 use crate::input_limits::{Bound, InputLimits, RawInputLimits, ValueLimits};
 use crate::locale::fixtures::{fixture_pins, FixtureProvider};
 use crate::locale::Canonicalizer;
 use crate::materialize::materialize_file;
 use crate::model::ProfileId;
-use crate::resolver::limits::{ConfirmedPolicy, ImplementationCapability};
+use crate::resolver::limits::ConfirmedPolicy;
 use crate::structural::selection::{InvalidSelectorType, Selection, SelectorInput};
 use crate::structural::StructuralLimits;
 

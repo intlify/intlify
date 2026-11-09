@@ -7,8 +7,8 @@
 //! Resource Limit Policy bounds, with the revision-"0" minimum of every bound
 //! and the unit 015's tables count it in. Not the Capability Specification
 //! artifact, which construction admits and which is written from this
-//! inventory, and not the capability boundary, which admits a submitted value
-//! against it.
+//! inventory, and not the capability boundary (`crate::boundary::capability`),
+//! which admits a submitted value against it.
 
 use std::fmt;
 
