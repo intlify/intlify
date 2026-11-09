@@ -6,10 +6,10 @@
 //! Specification; Phase 5 checks the other seven slots against what the
 //! resolver supports, admits the vocabulary artifact against its slot, and
 //! binds the canonicalization data to the admitted specification. Not a wire
-//! decoder: 017 defines no wire form, and an adapter that reads one rejects a
-//! duplicate, unknown, malformed, or over-bound member before invocation. Not
-//! construction authority: until 015 Phase 5 constructs the supported values,
-//! tests supply them.
+//! decoder: `boundary::specification` reads 015-165's raw form into
+//! [`SpecificationInput`] and refuses a duplicate, unknown, malformed, or
+//! over-bound member before invocation. Not construction authority: until 015
+//! Phase 5 constructs the supported values, tests supply them.
 
 use crate::artifacts::vocabulary::FormalVocabulary;
 use crate::locale::{
