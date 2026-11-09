@@ -48,19 +48,43 @@ pub(crate) struct ImplementationCapability {
 impl ImplementationCapability {
     /// A capability a fixture owner states outright, as the boundary would
     /// admit it: the specification this crate writes, the given
-    /// `policyComparable` bounds, and `bootstrapOnly`'s minimum vector, which
-    /// no bootstrap-only work reads yet.
+    /// `policyComparable` bounds, and `bootstrapOnly`'s minimum vector except
+    /// `artifactBootstrap`, whose bounds are as large as a bound can be: at its
+    /// minima no Resource Limit Policy can be admitted (Decision 015-164).
     #[cfg(any(test, feature = "benchmark", feature = "dev-example"))]
     pub(crate) fn fixture_owned(policy_comparable: ResolutionLimits) -> Self {
         use crate::construction::capability::{IDENTITY, REVISION};
+        use crate::input_limits::Bound;
+        use crate::resolver::capability::ArtifactBootstrapLimits;
+        let largest = Bound::new(u64::MAX - 1).expect("the largest bound is representable");
+        let bootstrap_only = BootstrapLimits {
+            artifact_bootstrap: ArtifactBootstrapLimits {
+                max_envelope_depth: largest,
+                max_decoded_allocation_bytes: largest,
+                max_metadata_scan_units: largest,
+                max_validation_work_units: largest,
+            },
+            ..BootstrapLimits::MINIMUM
+        };
         Self {
             specification: VersionedIdentity {
                 identity: IDENTITY.to_owned(),
                 revision: REVISION.to_owned(),
             },
             policy_comparable,
-            bootstrap_only: BootstrapLimits::MINIMUM,
+            bootstrap_only,
         }
+    }
+
+    /// The same capability with its `artifactBootstrap` bounds replaced, for
+    /// the tests of the bootstrap's work.
+    #[cfg(test)]
+    pub(crate) fn with_artifact_bootstrap(
+        mut self,
+        limits: crate::resolver::capability::ArtifactBootstrapLimits,
+    ) -> Self {
+        self.bootstrap_only.artifact_bootstrap = limits;
+        self
     }
 
     /// The Capability Specification the capability asserts.

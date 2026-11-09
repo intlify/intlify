@@ -757,7 +757,7 @@
     {
       "code": "project-profile-resource-policy-not-admitted",
       "allowedCheckIds": [
-        "resource-policy.resource-limits.bootstrap-candidate"
+        "resource-policy.resource-limits.candidate-body"
       ],
       "severity": "error",
       "blocking": true,
@@ -789,12 +789,17 @@
       "code": "project-profile-bootstrap-limit-exceeded",
       "allowedCheckIds": [
         "entry.input.within-file-bytes",
-        "entry.input.within-parser-tokens"
+        "entry.input.within-parser-tokens",
+        "resource-policy.resource-limits.within-metadata-scan",
+        "resource-policy.resource-limits.within-envelope-depth",
+        "resource-policy.resource-limits.within-decoded-allocation",
+        "resource-policy.resource-limits.within-validation-work"
       ],
       "severity": "error",
       "blocking": true,
       "allowedSubjectKinds": [
-        "complete-input"
+        "complete-input",
+        "resource-limits"
       ],
       "allowedReasons": [],
       "suggestionKind": "none"

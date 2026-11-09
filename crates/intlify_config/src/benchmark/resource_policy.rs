@@ -18,8 +18,8 @@ use crate::boundary::verification::VerificationInput;
 use crate::model::ProfileId;
 use crate::references::PolicyReference;
 use crate::resolver::evaluation::{
-    Actual, Admitted, Causes, Check, Evaluation, IssueKey, LimitExceeded, Shortfall, Status,
-    Subject, Unit,
+    Actual, Admitted, BootstrapLimitExceeded, Causes, Check, Evaluation, IssueKey, LimitExceeded,
+    Shortfall, Status, Subject, Unit,
 };
 use crate::resolver::limits::ResolutionLimits;
 use crate::resolver::resource_policy::{
@@ -245,6 +245,11 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         Check::WithinBound => 1,
         Check::BootstrapCandidate => 2,
         Check::CompatiblePolicy => 3,
+        Check::WithinMetadataScan => 4,
+        Check::WithinEnvelopeDepth => 5,
+        Check::WithinDecodedAllocation => 6,
+        Check::WithinValidationWork => 7,
+        Check::CandidateBody => 8,
         Check::SupportedAssertion
         | Check::MatchingData
         | Check::IntactArtifact
@@ -327,34 +332,52 @@ fn causes(frame: &mut Frame, causes: &Causes) -> Result<(), OutputFailure> {
     Ok(())
 }
 
-/// An issue's details: none, the bound it crossed, or the bound the policy
-/// needs more of than the capability makes available.
-fn details(frame: &mut Frame, limit: Option<LimitExceeded>, shortfall: Option<Shortfall>) {
-    match (limit, shortfall) {
-        (Some(exceeded), _) => {
+/// An issue's details: none, the bound it crossed, the bound the policy needs
+/// more of than the capability makes available, or the `bootstrapOnly` bound
+/// the bootstrap's work crossed.
+fn details(
+    frame: &mut Frame,
+    limit: Option<LimitExceeded>,
+    shortfall: Option<Shortfall>,
+    bootstrap: Option<BootstrapLimitExceeded>,
+) {
+    match (limit, shortfall, bootstrap) {
+        (Some(exceeded), _, _) => {
             frame.uint(1);
             frame.text(exceeded.bound.group.path());
             frame.text(exceeded.bound.name);
             frame.uint(exceeded.limit.get());
-            match exceeded.actual {
-                Actual::Exact(value) => {
-                    frame.uint(0);
-                    frame.uint(value);
-                }
-                Actual::AtLeast(value) => {
-                    frame.uint(1);
-                    frame.uint(value);
-                }
-            }
+            actual(frame, exceeded.actual);
         }
-        (None, Some(shortfall)) => {
+        (None, Some(shortfall), _) => {
             frame.uint(2);
             frame.text(shortfall.bound.group.path());
             frame.text(shortfall.bound.name);
             frame.uint(shortfall.required.get());
             frame.uint(shortfall.available.get());
         }
-        (None, None) => frame.uint(0),
+        (None, None, Some(exceeded)) => {
+            frame.uint(3);
+            frame.text(exceeded.bound.group.path());
+            frame.text(exceeded.bound.name);
+            frame.uint(exceeded.limit.get());
+            actual(frame, exceeded.actual);
+        }
+        (None, None, None) => frame.uint(0),
+    }
+}
+
+/// A measured total: exact, or a witness that it is at least this.
+fn actual(frame: &mut Frame, actual: Actual) {
+    match actual {
+        Actual::Exact(value) => {
+            frame.uint(0);
+            frame.uint(value);
+        }
+        Actual::AtLeast(value) => {
+            frame.uint(1);
+            frame.uint(value);
+        }
     }
 }
 
@@ -426,6 +449,7 @@ pub(super) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure>
             &mut shared,
             evaluation.limit(key),
             evaluation.shortfall(key),
+            evaluation.bootstrap_limit(key),
         );
     }
     shared.uint(count(evaluation.notices().count())?);
@@ -525,7 +549,12 @@ mod tests {
         let checks = [
             Check::WithinCapability,
             Check::WithinBound,
+            Check::WithinMetadataScan,
             Check::BootstrapCandidate,
+            Check::WithinEnvelopeDepth,
+            Check::WithinDecodedAllocation,
+            Check::WithinValidationWork,
+            Check::CandidateBody,
             Check::CompatiblePolicy,
         ]
         .map(|check| {
@@ -619,6 +648,7 @@ mod tests {
     #[test]
     fn details_frame_apart_by_kind_and_value() {
         use crate::input_limits::Bound;
+        use crate::resolver::bootstrap::work::WorkBound;
         use crate::resolver::limits::{BoundId, Group};
 
         let bound = |value| Bound::new(value).unwrap();
@@ -640,16 +670,40 @@ mod tests {
                 available: bound(3),
             })
         };
+        let bootstrap = |work: WorkBound, actual| {
+            Some(BootstrapLimitExceeded {
+                bound: work.id(),
+                limit: bound(3),
+                actual,
+            })
+        };
         let framed = [
-            (None, None),
-            (limit(Actual::Exact(4)), None),
-            (limit(Actual::AtLeast(4)), None),
-            (limit(Actual::Exact(5)), None),
-            (None, shortfall("maxArtifacts", 4)),
-            (None, shortfall("maxArtifacts", 5)),
-            (None, shortfall("maxPolicyArtifacts", 4)),
+            (None, None, None),
+            (limit(Actual::Exact(4)), None, None),
+            (limit(Actual::AtLeast(4)), None, None),
+            (limit(Actual::Exact(5)), None, None),
+            (None, shortfall("maxArtifacts", 4), None),
+            (None, shortfall("maxArtifacts", 5), None),
+            (None, shortfall("maxPolicyArtifacts", 4), None),
+            (
+                None,
+                None,
+                bootstrap(WorkBound::MetadataScan, Actual::Exact(4)),
+            ),
+            (
+                None,
+                None,
+                bootstrap(WorkBound::MetadataScan, Actual::Exact(5)),
+            ),
+            (
+                None,
+                None,
+                bootstrap(WorkBound::EnvelopeDepth, Actual::Exact(4)),
+            ),
         ]
-        .map(|(limit, shortfall)| digest(|frame| details(frame, limit, shortfall)));
+        .map(|(limit, shortfall, bootstrap)| {
+            digest(|frame| details(frame, limit, shortfall, bootstrap))
+        });
         for (index, left) in framed.iter().enumerate() {
             assert!(framed[index + 1..].iter().all(|right| right != left));
         }

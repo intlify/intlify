@@ -1998,9 +1998,9 @@
       }
     },
     {
-      "checkId": "resource-policy.resource-limits.bootstrap-candidate",
+      "checkId": "resource-policy.resource-limits.within-metadata-scan",
       "phaseId": "resource-policy-admission",
-      "ruleId": "015.resource-policy.resource-limits.bootstrap-candidate",
+      "ruleId": "015.resource-policy.resource-limits.within-metadata-scan",
       "subjectKind": "resource-limits",
       "subjectKeyStrategy": "singleton",
       "subjectContentProjection": "none",
@@ -2012,13 +2012,51 @@
         "resource-policy.policy-artifacts.within-capability",
         "resource-policy.target-profile-artifacts.within-capability",
         "resource-policy.artifact.within-capability",
-        "resource-policy.artifact-bytes.within-capability",
-        "resource-policy.policy-reference.within-capability"
+        "resource-policy.artifact-bytes.within-capability"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "finding-occurrence",
+        "evidence-index",
+        "shared-finding",
+        "shared-evaluation-status"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "resource-policy.resource-limits.bootstrap-candidate",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.resource-limits.bootstrap-candidate",
+      "subjectKind": "resource-limits",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "resource-limits",
+      "subjectKindRank": "9",
+      "checkRank": "1",
+      "prerequisiteCheckIds": [
+        "resource-policy.policy-reference.within-capability",
+        "resource-policy.resource-limits.within-metadata-scan"
       ],
       "possibleFindingCodes": [
         "project-profile-artifact-reference-not-admitted",
-        "project-profile-artifact-collection-not-admitted",
-        "project-profile-resource-policy-not-admitted"
+        "project-profile-artifact-collection-not-admitted"
       ],
       "possibleEvidenceRecordKinds": [
         "finding-occurrence",
@@ -2055,7 +2093,153 @@
               "duplicate-envelope",
               "conflicting-content"
             ]
-          },
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "resource-policy.resource-limits.within-envelope-depth",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.resource-limits.within-envelope-depth",
+      "subjectKind": "resource-limits",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "resource-limits",
+      "subjectKindRank": "9",
+      "checkRank": "2",
+      "prerequisiteCheckIds": [
+        "resource-policy.resource-limits.bootstrap-candidate"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "finding-occurrence",
+        "evidence-index",
+        "shared-finding",
+        "shared-evaluation-status"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "resource-policy.resource-limits.within-decoded-allocation",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.resource-limits.within-decoded-allocation",
+      "subjectKind": "resource-limits",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "resource-limits",
+      "subjectKindRank": "9",
+      "checkRank": "3",
+      "prerequisiteCheckIds": [
+        "resource-policy.resource-limits.within-envelope-depth"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "finding-occurrence",
+        "evidence-index",
+        "shared-finding",
+        "shared-evaluation-status"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "resource-policy.resource-limits.within-validation-work",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.resource-limits.within-validation-work",
+      "subjectKind": "resource-limits",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "resource-limits",
+      "subjectKindRank": "9",
+      "checkRank": "4",
+      "prerequisiteCheckIds": [
+        "resource-policy.resource-limits.within-decoded-allocation"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "finding-occurrence",
+        "evidence-index",
+        "shared-finding",
+        "shared-evaluation-status"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "resource-policy.resource-limits.candidate-body",
+      "phaseId": "resource-policy-admission",
+      "ruleId": "015.resource-policy.resource-limits.candidate-body",
+      "subjectKind": "resource-limits",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "resource-limits",
+      "subjectKindRank": "9",
+      "checkRank": "5",
+      "prerequisiteCheckIds": [
+        "resource-policy.resource-limits.within-validation-work"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-resource-policy-not-admitted"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "finding-occurrence",
+        "evidence-index",
+        "shared-finding",
+        "shared-evaluation-status"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
           {
             "code": "project-profile-resource-policy-not-admitted",
             "members": [
@@ -2080,9 +2264,9 @@
       "subjectContentProjection": "none",
       "owningScope": "resource-limits",
       "subjectKindRank": "9",
-      "checkRank": "1",
+      "checkRank": "6",
       "prerequisiteCheckIds": [
-        "resource-policy.resource-limits.bootstrap-candidate"
+        "resource-policy.resource-limits.candidate-body"
       ],
       "possibleFindingCodes": [
         "project-profile-resource-policy-capability-incompatible"

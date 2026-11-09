@@ -199,7 +199,12 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::NormalizedDomain
         | Check::UniqueDomain
         | Check::CompleteTable
+        | Check::WithinMetadataScan
         | Check::BootstrapCandidate
+        | Check::WithinEnvelopeDepth
+        | Check::WithinDecodedAllocation
+        | Check::WithinValidationWork
+        | Check::CandidateBody
         | Check::CompatiblePolicy
         | Check::ResolvedReference
         | Check::ProjectSubset

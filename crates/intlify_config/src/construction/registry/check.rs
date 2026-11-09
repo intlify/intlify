@@ -115,7 +115,7 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:e21bc6383192951745c88f936c5cf7a709c626dc227c217578c76d44965de51d";
+    "sha256:ec9c7573aa6cc6a0c214af84b4922f1ab1e097b14ad6efcd31c09436202a10a4";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
@@ -840,7 +840,12 @@ const fn check_ids(kind: SubjectKind) -> &'static [&'static str] {
         }
         K::CapabilityReferenceBytes => &["resource-policy.reference-bytes.within-capability"],
         K::ResourceLimits => &[
+            "resource-policy.resource-limits.within-metadata-scan",
             "resource-policy.resource-limits.bootstrap-candidate",
+            "resource-policy.resource-limits.within-envelope-depth",
+            "resource-policy.resource-limits.within-decoded-allocation",
+            "resource-policy.resource-limits.within-validation-work",
+            "resource-policy.resource-limits.candidate-body",
             "resource-policy.resource-limits.compatible",
         ],
         K::RootNodes => &["resource-policy.root-nodes.within-bound"],
@@ -1028,6 +1033,9 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         | K::CapabilityTargetProfileReference
         | K::CapabilityReferenceBytes => &[NONE],
         K::ProfileSpecificationDependency => &[&["specification.project-profile.supported"]],
+        // The scan waits on the collection's bounds; selection, on the scan and
+        // the reference's own bytes; and each later check, on the one before
+        // it (Decision 015-164).
         K::ResourceLimits => &[
             &[
                 "resource-policy.artifacts.within-capability",
@@ -1035,9 +1043,16 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
                 "resource-policy.target-profile-artifacts.within-capability",
                 "resource-policy.artifact.within-capability",
                 "resource-policy.artifact-bytes.within-capability",
+            ],
+            &[
                 "resource-policy.policy-reference.within-capability",
+                "resource-policy.resource-limits.within-metadata-scan",
             ],
             &["resource-policy.resource-limits.bootstrap-candidate"],
+            &["resource-policy.resource-limits.within-envelope-depth"],
+            &["resource-policy.resource-limits.within-decoded-allocation"],
+            &["resource-policy.resource-limits.within-validation-work"],
+            &["resource-policy.resource-limits.candidate-body"],
         ],
         K::RootNodes
         | K::RootDepth
@@ -1452,11 +1467,15 @@ const fn finding_codes(kind: SubjectKind) -> &'static [&'static [Code]] {
             &[C::SelectorUnknown],
         ],
         K::ResourceLimits => &[
+            &[C::BootstrapLimitExceeded],
             &[
                 C::ArtifactReferenceNotAdmitted,
                 C::ArtifactCollectionNotAdmitted,
-                C::ResourcePolicyNotAdmitted,
             ],
+            &[C::BootstrapLimitExceeded],
+            &[C::BootstrapLimitExceeded],
+            &[C::BootstrapLimitExceeded],
+            &[C::ResourcePolicyNotAdmitted],
             &[C::ResourcePolicyCapabilityIncompatible],
         ],
         K::LocaleCanonicalizationSlot => &[&[
@@ -2030,7 +2049,7 @@ mod tests {
             .map(|row| (row.subject_kind, row.check_id.as_str()))
             .collect();
         assert_eq!(written, listed);
-        assert_eq!(rows.len(), 164);
+        assert_eq!(rows.len(), 169);
         for kind in SubjectKind::ALL {
             assert_eq!(check_ids(kind).len(), kind.checks().len(), "{kind:?}");
         }
@@ -2455,14 +2474,31 @@ mod tests {
             codes(K::Assignment, Check::SingleGroup),
             [C::TargetUnassigned, C::TargetAssignedToMultipleGroups]
         );
+        // The bootstrap decision is two checks, and each artifactBootstrap
+        // bound one of its own (Decision 015-164).
         assert_eq!(
             codes(K::ResourceLimits, Check::BootstrapCandidate),
             [
                 C::ArtifactReferenceNotAdmitted,
-                C::ArtifactCollectionNotAdmitted,
-                C::ResourcePolicyNotAdmitted
+                C::ArtifactCollectionNotAdmitted
             ]
         );
+        assert_eq!(
+            codes(K::ResourceLimits, Check::CandidateBody),
+            [C::ResourcePolicyNotAdmitted]
+        );
+        for check in [
+            Check::WithinMetadataScan,
+            Check::WithinEnvelopeDepth,
+            Check::WithinDecodedAllocation,
+            Check::WithinValidationWork,
+        ] {
+            assert_eq!(
+                codes(K::ResourceLimits, check),
+                [C::BootstrapLimitExceeded],
+                "{check:?}"
+            );
+        }
         // The kinds declared only report what 015 gives their checks: the raw
         // file's bounds are resolver-side bootstrap bounds (D15:2350), the
         // root's are the policy's (D15:1870), and so is an over-long selector
@@ -2893,6 +2929,14 @@ mod tests {
                 C::ArtifactCollectionNotAdmitted
             ),
             [R::DuplicateEnvelope, R::ConflictingContent]
+        );
+        assert_eq!(
+            listed(
+                K::ResourceLimits,
+                Check::CandidateBody,
+                C::ResourcePolicyNotAdmitted
+            ),
+            C::ResourcePolicyNotAdmitted.reasons()
         );
         assert_eq!(
             listed(
