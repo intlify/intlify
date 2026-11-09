@@ -7,7 +7,7 @@
       "digest": "sha256:cacef3fd03df208aeed0cc3c6345f3947ffa764b8c10c91b7d43e5afc1daebf8"
     },
     "authority-envelope-schema-package": {
-      "digest": "sha256:84a5e9fac0d720a9de5aa753f9a1ea142e5823b73dceeec0dc3fe63153b5b8a3"
+      "digest": "sha256:273c26066366dab9826a911d3f421f3216927a7bac402e9a39f227b4f4e8fe2a"
     },
     "json-schema-meta-schema-package": {
       "digest": "sha256:979f909428df30f41d9d3b5ce62be38173868caa752d619651d062273fdf131c"

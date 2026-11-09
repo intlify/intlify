@@ -46,7 +46,7 @@ pub(crate) const PATH: &str = "authorities/resolver-capability-v0.json";
 /// The Capability Specification's file digest, which the resolver is compiled
 /// from.
 pub(crate) const DIGEST: &str =
-    "sha256:a40fdb24c52e6a090cf42cbb917bd3d9f00f952c11504f5fc57f44954dbdd633";
+    "sha256:7ffcd14a9197e777182f4c67c971d864a3157e7b8d112cdbb000cead88a9bc6e";
 
 /// One `policyComparable` bound: its path and the unit it counts in.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

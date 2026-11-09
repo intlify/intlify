@@ -10,15 +10,18 @@
 //! The decision accounts for nothing and records nothing. Phase 4 runs it after
 //! the capability's `artifactAdmission` bounds and records its result, then
 //! compares the admitted policy with the capability and rechecks the earlier
-//! phases under it. The `bootstrapOnly.artifactBootstrap` work bounds wait for
-//! the Capability Specification that closes their units; the scan and the
-//! verification below are the work they will bound, one unit for the pin
-//! lookup and one for the common body (018).
+//! phases under it. [`work`] counts the `bootstrapOnly.artifactBootstrap` work
+//! bounds that decision 015-164 places around the decision: the metadata scan
+//! before candidate selection, and the chosen candidate's envelope depth,
+//! decoded allocation, and validation work before its body admission. Phase 4
+//! does not check them yet.
 //!
 //! 018 authenticates the candidate by membership in its exact-pin
 //! Verification Input, which 015's pre-invocation boundary admits
 //! (`crate::boundary::verification`), and closes its common body to the
 //! optional `projectProfileResolution` section.
+
+pub(crate) mod work;
 
 use crate::artifacts::content;
 use crate::artifacts::envelope::{

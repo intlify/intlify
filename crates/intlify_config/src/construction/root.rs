@@ -51,11 +51,11 @@ pub(crate) const PATH: &str = "construction/root-package-v0.json";
 
 /// The artifact's file digest, which the implementation compiles in.
 pub(crate) const DIGEST: &str =
-    "sha256:c78a379dd6d80f0448f62597385a5b12aceeeb0db4ce3f4a260ab6f5e58fc1e1";
+    "sha256:54de4030ccacbc2c4bd7449fe1ebbe0917c5b9a13c7c67e9fd54bcedda7502c1";
 
 /// The package's canonical digest, which the implementation compiles in.
 pub(crate) const CANONICAL_DIGEST: &str =
-    "sha256:9f6a0490078476833a77047cbbc638cba4ac472cb1079a32a6521a26926e7133";
+    "sha256:3915dd2807db4f7b6cc002e3ed958fa8912f8e97ed9a893e553884401b9cfa88";
 
 const BYTES: &[u8] = include_bytes!("../../conformance/construction/root-package-v0.json");
 
