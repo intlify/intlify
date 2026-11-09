@@ -827,8 +827,9 @@ impl ResolutionLimits {
         closed.then_some(limits)
     }
 
-    /// The section that sets exactly these bounds, for fixtures.
-    #[cfg(any(test, feature = "benchmark"))]
+    /// The section that sets exactly these bounds: the normalized
+    /// `projectProfileResolution` object, each bound as its decimal string,
+    /// which a profile view carries and fixtures submit.
     pub(crate) fn section(&self) -> Value {
         let mut section = serde_json::json!({"diagnostics": {}});
         for (id, bound) in self.bounds() {

@@ -23,8 +23,10 @@ pub(crate) const UNIT: Unit = Unit {
     check: Check::EffectiveMode,
 };
 
-/// The placement modes revision "0" admits.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The placement modes revision "0" admits, spelled as a profile view and
+/// the authoring model spell them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
 pub(crate) enum PlacementMode {
     Duplicate,
 }

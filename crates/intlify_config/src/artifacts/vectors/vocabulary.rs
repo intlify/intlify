@@ -147,9 +147,22 @@ pub fn document() -> Result<Value, String> {
 /// The fixture vocabulary past the boundary, for the checks over it.
 #[cfg(test)]
 pub(crate) fn formal() -> crate::artifacts::vocabulary::FormalVocabulary {
-    let artifact = sealed(IDENTITY, REVISION, &MEMBERS).unwrap();
+    formal_of(&MEMBERS)
+}
+
+/// The fixture vocabulary with `members` in place of its own, past the
+/// boundary.
+#[cfg(test)]
+pub(crate) fn formal_of(members: &[&str]) -> crate::artifacts::vocabulary::FormalVocabulary {
+    let artifact = sealed(IDENTITY, REVISION, members).unwrap();
     read(Some(&serde_json::to_vec(&artifact).unwrap()), &ROOM).unwrap()
 }
+
+/// The semantic digest of the fixture vocabulary without members, as the
+/// Node checker computes it.
+#[cfg(test)]
+pub(crate) const EMPTY_SEMANTIC_DIGEST: &str =
+    "sha256:f2993e0378a30c8ff1f2bc3aa3d44dda9575cdd995af41d079d3c2f0f0787d5e";
 
 #[cfg(test)]
 mod tests {
@@ -190,6 +203,9 @@ mod tests {
         let fixture = &cases(&vectors, "vocabularies")[0];
         assert_eq!(fixture["id"], "fixture");
         assert_eq!(fixture["semanticDigest"], SEMANTIC_DIGEST);
+        let empty = &cases(&vectors, "vocabularies")[1];
+        assert_eq!(empty["id"], "empty");
+        assert_eq!(empty["semanticDigest"], EMPTY_SEMANTIC_DIGEST);
     }
 
     #[test]

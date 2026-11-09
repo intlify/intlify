@@ -98,7 +98,8 @@ mod tests {
     use crate::resolver::evaluation::Status;
     use crate::resolver::limits::fixture_limits;
     use crate::resolver::specification::{
-        admit_project_profile, SpecificationInput, SupportedSpecifications,
+        admit_project_profile, ActiveProfileSpecification, SpecificationInput,
+        SupportedSpecifications,
     };
     use crate::structural::admission_tests::{analyze_fixture, FixtureAnalysis};
     use crate::structural::selection::{Selection, SelectorInput};
@@ -138,10 +139,10 @@ mod tests {
             delivery_placement: None,
         };
         let supported = SupportedSpecifications::revision_zero(
-            VersionedIdentity {
+            ActiveProfileSpecification::fixture(VersionedIdentity {
                 identity: "test-only-profile-specification",
                 revision: "0",
-            },
+            }),
             Supported::new(Vec::new()).unwrap(),
         );
         admit_project_profile(&mut Evaluation::default(), &supported, &input)

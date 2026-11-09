@@ -87,6 +87,15 @@ pub(crate) struct SpecificationInput<Id> {
     pub(crate) delivery_placement: Option<VersionedIdentity<Id>>,
 }
 
+/// The Active Project Profile Specification: the identity and revision a
+/// `project-profile` assertion must name, and the semantic digest of the body
+/// construction admitted, which a checked profile's view carries (D15:1187).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ActiveProfileSpecification<Id> {
+    pub(crate) specification: VersionedIdentity<Id>,
+    pub(crate) semantic_digest: Id,
+}
+
 /// What one resolver admits in each slot: the Active Project Profile
 /// Specification, the canonicalization specifications with the dataset each
 /// admits, and one value for every other specification slot. The vocabulary
@@ -94,7 +103,7 @@ pub(crate) struct SpecificationInput<Id> {
 /// Specification it admitted; tests also build fixture values.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct SupportedSpecifications<Id> {
-    project_profile: VersionedIdentity<Id>,
+    project_profile: ActiveProfileSpecification<Id>,
     locale_canonicalization: Supported<Id>,
     locale_negotiation: VersionedIdentity<Id>,
     message_locale_fallback: VersionedIdentity<Id>,
@@ -106,7 +115,7 @@ pub(crate) struct SupportedSpecifications<Id> {
 impl<Id> SupportedSpecifications<Id> {
     /// What a resolver supports, slot by slot.
     pub(crate) const fn new(
-        project_profile: VersionedIdentity<Id>,
+        project_profile: ActiveProfileSpecification<Id>,
         locale_canonicalization: Supported<Id>,
         locale_negotiation: VersionedIdentity<Id>,
         message_locale_fallback: VersionedIdentity<Id>,
@@ -123,6 +132,10 @@ impl<Id> SupportedSpecifications<Id> {
             delivery_graph,
             delivery_placement,
         }
+    }
+
+    pub(crate) const fn project_profile(&self) -> &ActiveProfileSpecification<Id> {
+        &self.project_profile
     }
 }
 
@@ -210,7 +223,7 @@ pub(crate) fn admit_project_profile<Id: Clone + Eq>(
         Code::SpecificationNotAdmitted,
         Ok(()),
         input.project_profile.as_ref(),
-        &supported.project_profile,
+        &supported.project_profile.specification,
     )
 }
 
@@ -412,7 +425,7 @@ impl<Id: From<&'static str>> SupportedSpecifications<Id> {
     /// specifications, all at revision "0". A resolver built from the
     /// committed input supports the same values.
     pub(crate) fn revision_zero(
-        project_profile: VersionedIdentity<Id>,
+        project_profile: ActiveProfileSpecification<Id>,
         locale_canonicalization: Supported<Id>,
     ) -> Self {
         let revision_zero = |identity: &'static str| VersionedIdentity {
@@ -430,6 +443,24 @@ impl<Id: From<&'static str>> SupportedSpecifications<Id> {
         }
     }
 }
+
+#[cfg(test)]
+impl<Id: From<&'static str>> ActiveProfileSpecification<Id> {
+    /// A fixture's active profile specification, which carries
+    /// [`FIXTURE_PROFILE_DIGEST`].
+    pub(crate) fn fixture(specification: VersionedIdentity<Id>) -> Self {
+        Self {
+            specification,
+            semantic_digest: FIXTURE_PROFILE_DIGEST.into(),
+        }
+    }
+}
+
+/// The semantic digest of the resolver tests' active profile specification.
+/// No committed specification has it.
+#[cfg(test)]
+pub(crate) const FIXTURE_PROFILE_DIGEST: &str =
+    "sha256:1111111111111111111111111111111111111111111111111111111111111111";
 
 #[cfg(test)]
 mod tests {
@@ -493,7 +524,10 @@ mod tests {
     ];
 
     fn supported_with(canonicalization: Vec<SemanticPins<Id>>) -> SupportedSpecifications<Id> {
-        SupportedSpecifications::revision_zero(ACTIVE, Supported::new(canonicalization).unwrap())
+        SupportedSpecifications::revision_zero(
+            ActiveProfileSpecification::fixture(ACTIVE),
+            Supported::new(canonicalization).unwrap(),
+        )
     }
 
     fn supported() -> SupportedSpecifications<Id> {
@@ -666,7 +700,10 @@ mod tests {
             identity: held.identity.to_owned(),
             revision: held.revision.to_owned(),
         };
-        let supported = SupportedSpecifications::revision_zero(ACTIVE, Supported::revision_zero());
+        let supported = SupportedSpecifications::revision_zero(
+            ActiveProfileSpecification::fixture(ACTIVE),
+            Supported::revision_zero(),
+        );
         for (slot, value, held) in [
             (
                 Slot::LocaleNegotiation,
