@@ -7,18 +7,94 @@
 //! canonicalizes through 015's revision "0" conformance layer around ICU4X.
 //! It fetches nothing, embeds no data, and never falls back to other locale
 //! behavior.
+//!
+//! [`Icu4xData::read`] is 015's `locale-canonicalization-data-artifact`
+//! pre-invocation boundary, the manifest's envelope alone; specification
+//! admission reads the rest through [`FormalData`] (D15:3160).
+//! [`Icu4xProvider::admit`] does both at once, for callers outside an
+//! invocation.
 
 use std::sync::Arc;
 
 use intlify_locale_icu4x::{
-    AdmittedData, EnvelopeFailure, LayerFailure, ReadFailure, ReadLimits, Role, VerifiedManifest,
-    ENGINE, MARKERS_FORMAT,
+    AdmittedData, ConformanceLimits, DecodedManifest, EnvelopeFailure, LayerFailure, ReadFailure,
+    ReadLimits, Role, VerifiedManifest, ENGINE, MARKERS_FORMAT,
 };
 
+use crate::input_limits::Bound;
+
 use super::{
-    Admission, AdmissionFacts, DatasetPin, EnvelopeReason, Provider, ProviderBinding,
-    ProviderFailure, SemanticPins, VersionedIdentity,
+    Admission, AdmissionFacts, DataNotAdmitted, DatasetPin, EnvelopeReason, FormalData,
+    LocaleDataLimits, Provider, ProviderBinding, ProviderFailure, SemanticPins, VersionedIdentity,
 };
+
+/// One artifact past 015's `locale-canonicalization-data-artifact` boundary:
+/// its manifest within the capability's `inputBoundary` bounds and in 017's
+/// closed shape, and the caller's way to the payloads it acquired. Only
+/// [`Icu4xData::read`] makes one.
+pub(crate) struct Icu4xData<A> {
+    manifest: DecodedManifest,
+    acquire: A,
+}
+
+impl<A> Icu4xData<A>
+where
+    A: FnMut(&str) -> Option<Vec<u8>>,
+{
+    /// The boundary: an absent manifest is `missing-input`, and then its
+    /// bytes and depth, under `bytes` and `depth`, before anything is decoded,
+    /// and its closed decoding. `acquire` is kept for specification admission,
+    /// which asks it for the payloads.
+    pub(crate) fn read(
+        manifest: Option<&[u8]>,
+        acquire: A,
+        bytes: Bound,
+        depth: Bound,
+    ) -> Result<Self, EnvelopeReason> {
+        let manifest = manifest.ok_or(EnvelopeReason::MissingInput)?;
+        let manifest =
+            DecodedManifest::decode(manifest, bytes.get(), depth.get()).map_err(envelope_reason)?;
+        Ok(Self { manifest, acquire })
+    }
+}
+
+impl<A> FormalData for Icu4xData<A>
+where
+    A: FnMut(&str) -> Option<Vec<u8>>,
+{
+    type Provider = Icu4xProvider;
+
+    /// The rest of 017's steps under the capability's `localeData` bounds: the
+    /// limits the manifest decides and its integrity, and then each payload
+    /// and the dataset.
+    fn admit(mut self, limits: &LocaleDataLimits) -> Result<Icu4xProvider, DataNotAdmitted> {
+        let limits = read_limits(limits);
+        let manifest = self.manifest.verify(&limits).map_err(|_| DataNotAdmitted)?;
+        Icu4xProvider::from_verified(manifest, &mut self.acquire, &limits)
+            .map_err(|_| DataNotAdmitted)
+    }
+}
+
+/// The reader's limits for the rest of the artifact, the capability's
+/// `localeData` bounds. The manifest's own bytes and depth were the
+/// boundary's, and the rest of the reading never asks for them.
+fn read_limits(limits: &LocaleDataLimits) -> ReadLimits {
+    ReadLimits {
+        manifest_bytes: u64::MAX,
+        manifest_depth: u64::MAX,
+        payloads: limits.max_payloads.get(),
+        payload_bytes: limits.max_payload_bytes.get(),
+        marker_bytes: limits.max_marker_bytes.get(),
+        conformance: ConformanceLimits {
+            validity_groups: limits.max_validity_groups.get(),
+            codes: limits.max_codes.get(),
+            extension_keys: limits.max_extension_keys.get(),
+            types: limits.max_types.get(),
+            corrections: limits.max_corrections.get(),
+            work: limits.max_validation_work_units.get(),
+        },
+    }
+}
 
 /// One admitted artifact and what it binds. Only [`Icu4xProvider::admit`]
 /// makes one.
@@ -38,15 +114,23 @@ impl Icu4xProvider {
         limits: &ReadLimits,
     ) -> Result<Self, Admission> {
         let manifest = VerifiedManifest::read(manifest, limits).map_err(admission)?;
+        Self::from_verified(manifest, &mut acquire, limits).map_err(admission)
+    }
+
+    /// 017 steps 4 to 6 over a verified manifest, with the payloads `acquire`
+    /// returns.
+    fn from_verified(
+        manifest: VerifiedManifest,
+        acquire: &mut impl FnMut(&str) -> Option<Vec<u8>>,
+        limits: &ReadLimits,
+    ) -> Result<Self, ReadFailure> {
         let conformance = acquire(manifest.address(Role::Conformance).as_str());
         let markers = acquire(manifest.address(Role::Markers).as_str());
-        let data = manifest
-            .admit(
-                conformance.as_deref(),
-                markers.map(Vec::into_boxed_slice),
-                limits,
-            )
-            .map_err(admission)?;
+        let data = manifest.admit(
+            conformance.as_deref(),
+            markers.map(Vec::into_boxed_slice),
+            limits,
+        )?;
         Ok(Self {
             binding: binding(&data),
             data,
@@ -107,15 +191,20 @@ fn binding(data: &AdmittedData) -> ProviderBinding<String> {
 /// it is data that was not admitted.
 fn admission(failure: ReadFailure) -> Admission {
     match failure {
-        ReadFailure::Envelope(envelope) => Admission::PreInvocation(match envelope {
-            EnvelopeFailure::OverBound(_) => EnvelopeReason::OverBoundEnvelope,
-            EnvelopeFailure::Malformed | EnvelopeFailure::Unsupported => {
-                EnvelopeReason::MalformedEnvelope
-            }
-            EnvelopeFailure::DuplicateMember => EnvelopeReason::DuplicateMember,
-            EnvelopeFailure::UnknownMember => EnvelopeReason::UnknownMember,
-        }),
+        ReadFailure::Envelope(envelope) => Admission::PreInvocation(envelope_reason(envelope)),
         ReadFailure::Data(_) => Admission::Data,
+    }
+}
+
+/// 015's closed reason for a manifest the boundary cannot read.
+const fn envelope_reason(failure: EnvelopeFailure) -> EnvelopeReason {
+    match failure {
+        EnvelopeFailure::OverBound(_) => EnvelopeReason::OverBoundEnvelope,
+        EnvelopeFailure::Malformed | EnvelopeFailure::Unsupported => {
+            EnvelopeReason::MalformedEnvelope
+        }
+        EnvelopeFailure::DuplicateMember => EnvelopeReason::DuplicateMember,
+        EnvelopeFailure::UnknownMember => EnvelopeReason::UnknownMember,
     }
 }
 
@@ -409,6 +498,126 @@ mod tests {
             ),
             Some(Admission::Data)
         );
+    }
+
+    /// The capability's `localeData` bounds that `LIMITS` sets.
+    fn locale_data() -> LocaleDataLimits {
+        let bound = |value| Bound::new(value).unwrap();
+        LocaleDataLimits {
+            max_payloads: bound(LIMITS.payloads),
+            max_payload_bytes: bound(LIMITS.payload_bytes),
+            max_marker_bytes: bound(LIMITS.marker_bytes),
+            max_validity_groups: bound(LIMITS.conformance.validity_groups),
+            max_codes: bound(LIMITS.conformance.codes),
+            max_extension_keys: bound(LIMITS.conformance.extension_keys),
+            max_types: bound(LIMITS.conformance.types),
+            max_corrections: bound(LIMITS.conformance.corrections),
+            max_validation_work_units: bound(LIMITS.conformance.work),
+        }
+    }
+
+    /// The capability's `inputBoundary` bytes and depth that `LIMITS` sets.
+    fn envelope() -> (Bound, Bound) {
+        (
+            Bound::new(LIMITS.manifest_bytes).unwrap(),
+            Bound::new(LIMITS.manifest_depth).unwrap(),
+        )
+    }
+
+    /// The boundary reads the envelope alone, and specification admission
+    /// reads the rest into the provider the one-step admission makes.
+    #[test]
+    fn the_boundary_reads_the_envelope_and_specification_admission_the_rest() {
+        let (bytes, depth) = envelope();
+        let data = Icu4xData::read(Some(MANIFEST), payload, bytes, depth).unwrap();
+        let provider = data.admit(&locale_data()).unwrap();
+        assert_eq!(provider.binding(), committed().binding());
+    }
+
+    #[test]
+    fn a_manifest_the_boundary_cannot_read_is_refused_with_its_reason() {
+        let (bytes, depth) = envelope();
+        let refused = |manifest: Option<&[u8]>, bytes, depth| {
+            Icu4xData::read(manifest, payload, bytes, depth).err()
+        };
+        assert_eq!(
+            refused(None, bytes, depth),
+            Some(EnvelopeReason::MissingInput)
+        );
+        assert_eq!(
+            refused(Some(b"["), bytes, depth),
+            Some(EnvelopeReason::MalformedEnvelope)
+        );
+        let shorter = Bound::new(u64::try_from(MANIFEST.len()).unwrap() - 1).unwrap();
+        assert_eq!(
+            refused(Some(MANIFEST), shorter, depth),
+            Some(EnvelopeReason::OverBoundEnvelope)
+        );
+        assert_eq!(
+            refused(Some(MANIFEST), bytes, Bound::new(1).unwrap()),
+            Some(EnvelopeReason::OverBoundEnvelope)
+        );
+    }
+
+    /// What fails after the envelope is the data's and never the boundary's:
+    /// a `localeData` bound, the integrity, and a payload the host has no
+    /// bytes for.
+    #[test]
+    fn what_fails_after_the_envelope_is_data_not_admitted() {
+        let (bytes, depth) = envelope();
+        let read =
+            |manifest: &[u8], acquire: fn(&str) -> Option<Vec<u8>>, limits: &LocaleDataLimits| {
+                Icu4xData::read(Some(manifest), acquire, bytes, depth)
+                    .map(|data| data.admit(limits).map(|_| ()))
+            };
+        // The artifact has two payloads.
+        let mut one = locale_data();
+        one.max_payloads = Bound::new(1).unwrap();
+        assert_eq!(read(MANIFEST, payload, &one), Ok(Err(DataNotAdmitted)));
+        let mut value: Value = serde_json::from_slice(MANIFEST).unwrap();
+        value["dataset"]["identity"] = Value::from("another-dataset");
+        let tampered = serde_json::to_vec(&value).unwrap();
+        assert_eq!(
+            read(&tampered, payload, &locale_data()),
+            Ok(Err(DataNotAdmitted))
+        );
+        assert_eq!(
+            read(
+                MANIFEST,
+                |address| (address != "markers.postcard").then(|| payload(address))?,
+                &locale_data()
+            ),
+            Ok(Err(DataNotAdmitted))
+        );
+    }
+
+    /// Every `localeData` bound reaches the reader: each alone at one, which
+    /// the committed artifact is over, leaves the data not admitted.
+    #[test]
+    fn each_locale_data_bound_reaches_the_reader() {
+        let (bytes, depth) = envelope();
+        let one = Bound::new(1).unwrap();
+        let narrowed: [fn(&mut LocaleDataLimits, Bound); 9] = [
+            |limits, bound| limits.max_payloads = bound,
+            |limits, bound| limits.max_payload_bytes = bound,
+            |limits, bound| limits.max_marker_bytes = bound,
+            |limits, bound| limits.max_validity_groups = bound,
+            |limits, bound| limits.max_codes = bound,
+            |limits, bound| limits.max_extension_keys = bound,
+            |limits, bound| limits.max_types = bound,
+            |limits, bound| limits.max_corrections = bound,
+            |limits, bound| limits.max_validation_work_units = bound,
+        ];
+        for (index, narrow) in narrowed.into_iter().enumerate() {
+            let mut limits = locale_data();
+            narrow(&mut limits, one);
+            let data = Icu4xData::read(Some(MANIFEST), payload, bytes, depth).unwrap();
+            assert_eq!(
+                data.admit(&limits).err(),
+                Some(DataNotAdmitted),
+                "bound {index}"
+            );
+        }
     }
 
     #[test]

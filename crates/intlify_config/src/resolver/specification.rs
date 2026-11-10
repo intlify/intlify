@@ -5,7 +5,8 @@
 //! checks the `project-profile` assertion against the Active Project Profile
 //! Specification; Phase 5 checks the other seven slots against what the
 //! resolver supports, admits the vocabulary artifact against its slot, and
-//! binds the canonicalization data to the admitted specification. Not a wire
+//! reads the rest of the canonicalization data past the boundary and binds it
+//! to the admitted specification. Not a wire
 //! decoder: `boundary::specification` reads 015-165's raw form into
 //! [`SpecificationInput`] and refuses a duplicate, unknown, malformed, or
 //! over-bound member before invocation. Not construction authority: until 015
@@ -13,7 +14,8 @@
 
 use crate::artifacts::vocabulary::FormalVocabulary;
 use crate::locale::{
-    Canonicalizer, Provider, SemanticPins, SpecificationNotAdmitted, Supported, VersionedIdentity,
+    Canonicalizer, FormalData, LocaleDataLimits, Provider, SemanticPins, SpecificationNotAdmitted,
+    Supported, VersionedIdentity,
 };
 
 use super::evaluation::{
@@ -246,19 +248,22 @@ pub(crate) struct AdmittedSpecifications<Id, P: Provider> {
 /// Phase 5's slots, vocabulary, and canonicalization data, which run only under
 /// the Resource Limit Policy Phase 4 confirmed. `vocabulary` and `data` are the
 /// artifacts the pre-invocation boundary already admitted as envelopes; here
-/// the vocabulary must be intact and the one its slot asserts, and the data
-/// must carry the dataset the admitted specification admits.
-pub(crate) fn admit_specifications<Id, P>(
+/// the vocabulary must be intact and the one its slot asserts, and the rest of
+/// the data is read under the capability's `localeData` bounds, `data_limits`,
+/// and must carry the dataset the admitted specification admits (D15:3160).
+pub(crate) fn admit_specifications<Id, D>(
     evaluation: &mut Evaluation,
     supported: &SupportedSpecifications<Id>,
     input: &SpecificationInput<Id>,
     policy: Result<&ConfirmedPolicy, &Causes>,
     vocabulary: &FormalVocabulary,
-    data: P,
-) -> Result<AdmittedSpecifications<Id, P>, EvaluationInvariant>
+    data: D,
+    data_limits: &LocaleDataLimits,
+) -> Result<AdmittedSpecifications<Id, D::Provider>, EvaluationInvariant>
 where
     Id: Clone + Eq + AsRef<str>,
-    P: Provider<Identity = Id>,
+    D: FormalData,
+    D::Provider: Provider<Identity = Id>,
 {
     let [canonicalization, negotiation, fallback, coverage, asserted_vocabulary, graph, placement, ..] =
         PHASE_5;
@@ -326,21 +331,24 @@ where
         DATA,
         both(pins.clone(), policy.map_err(Causes::clone)),
         |(pins, policy): (SemanticPins<Id>, &ConfirmedPolicy)| {
-            // The boundary already admitted the data, so the only failure left
-            // is data that disagrees with the admitted specification.
+            // The boundary admitted only the envelope: the rest of the data is
+            // read here, and then it must be the data the admitted
+            // specification admits. Either failure is the data's.
+            let not_admitted = || Blocking {
+                code: Code::LocaleDataNotAdmitted,
+                reason: None,
+                details: None,
+            };
+            let provider = data.admit(data_limits).map_err(|_| not_admitted())?;
             Canonicalizer::bind(
                 &pins,
-                Some(data),
+                Some(provider),
                 policy
                     .limits()
                     .locale_resolution
                     .max_locale_identifier_bytes,
             )
-            .map_err(|_| Blocking {
-                code: Code::LocaleDataNotAdmitted,
-                reason: None,
-                details: None,
-            })
+            .map_err(|_| not_admitted())
         },
     )?;
     Ok(AdmittedSpecifications {
@@ -468,9 +476,11 @@ mod tests {
 
     use super::*;
     use crate::artifacts::vectors::vocabulary::{self as vectors, formal};
+    use crate::input_limits::Bound;
     use crate::locale::fixtures::{fixture_pins, FixtureProvider};
-    use crate::locale::DatasetPin;
+    use crate::locale::{DataNotAdmitted, DatasetPin};
     use crate::model::CONFIGURATION_SCHEMA_VERSION;
+    use crate::resolver::capability::BootstrapLimits;
     use crate::resolver::evaluation::Status;
     use crate::resolver::limits::fixture_limits;
     use crate::resolver::locales::fixtures::units;
@@ -587,6 +597,17 @@ mod tests {
             input: &SpecificationInput<Id>,
             policy: Result<&ConfirmedPolicy, &Causes>,
         ) -> Self {
+            Self::run_with(supported, input, policy, FixtureProvider::new())
+        }
+
+        /// The admission with `data` as the data past the boundary, read under
+        /// [`data_limits`].
+        fn run_with(
+            supported: &SupportedSpecifications<Id>,
+            input: &SpecificationInput<Id>,
+            policy: Result<&ConfirmedPolicy, &Causes>,
+            data: impl FormalData<Provider = FixtureProvider>,
+        ) -> Self {
             let mut evaluation = Evaluation::default();
             let project_profile = admit_project_profile(&mut evaluation, supported, input).unwrap();
             let specifications = admit_specifications(
@@ -595,7 +616,8 @@ mod tests {
                 input,
                 policy,
                 &formal(),
-                FixtureProvider::new(),
+                data,
+                &data_limits(),
             )
             .unwrap();
             Self {
@@ -634,6 +656,40 @@ mod tests {
                     Status::NotEvaluated(causes) => Some((unit.clone(), causes.clone())),
                 })
                 .collect()
+        }
+    }
+
+    /// The capability's `localeData` bounds the tests read data under.
+    fn data_limits() -> LocaleDataLimits {
+        BootstrapLimits::MINIMUM.locale_data
+    }
+
+    /// Data past the boundary whose rest reads only under `expected`, as an
+    /// adapter's data reads only within its bounds.
+    struct Behind {
+        expected: LocaleDataLimits,
+    }
+
+    impl FormalData for Behind {
+        type Provider = FixtureProvider;
+
+        fn admit(self, limits: &LocaleDataLimits) -> Result<FixtureProvider, DataNotAdmitted> {
+            if *limits == self.expected {
+                Ok(FixtureProvider::new())
+            } else {
+                Err(DataNotAdmitted)
+            }
+        }
+    }
+
+    /// Data that must not be read at all.
+    struct Untouched;
+
+    impl FormalData for Untouched {
+        type Provider = FixtureProvider;
+
+        fn admit(self, _: &LocaleDataLimits) -> Result<FixtureProvider, DataNotAdmitted> {
+            panic!("the data was read before its slot was admitted")
         }
     }
 
@@ -948,6 +1004,52 @@ mod tests {
             // separate input admitted against its member.
             assert!(admission.set().is_ok());
         }
+    }
+
+    /// The boundary admitted only the envelope, so the rest is read in the
+    /// data's unit, under the capability's `localeData` bounds, and data whose
+    /// rest does not read is not admitted there (D15:3160).
+    #[test]
+    fn the_rest_of_the_data_is_read_under_the_locale_data_bounds() {
+        let read = Admission::run_with(
+            &supported(),
+            &complete(),
+            Ok(&policy()),
+            Behind {
+                expected: data_limits(),
+            },
+        );
+        assert_eq!(read.issues(), []);
+        assert!(read.specifications.canonicalizer.is_ok());
+        let mut other = data_limits();
+        other.max_payloads = Bound::new(2).unwrap();
+        let unread = Admission::run_with(
+            &supported(),
+            &complete(),
+            Ok(&policy()),
+            Behind { expected: other },
+        );
+        assert_eq!(
+            unread.issues(),
+            [(DATA, "project-profile-locale-data-not-admitted", None)]
+        );
+        // The specification was admitted; only the data was not.
+        assert_eq!(
+            unread.specifications.locale_canonicalization,
+            Ok(fixture_pins().specification)
+        );
+        assert_eq!(unread.not_evaluated(), []);
+        assert!(unread.set().is_ok());
+    }
+
+    /// Nothing reads the data before its slot is admitted.
+    #[test]
+    fn the_data_is_read_only_once_its_slot_is_admitted() {
+        let mut input = complete();
+        input.locale_canonicalization = None;
+        let admission = Admission::run_with(&supported(), &input, Ok(&policy()), Untouched);
+        let causes = only_cause(&admission);
+        assert_eq!(admission.not_evaluated(), [(DATA, causes)]);
     }
 
     #[test]

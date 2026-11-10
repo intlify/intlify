@@ -4,7 +4,8 @@
 //! Data-free, crate-private canonicalization over one explicitly bound provider.
 //! The enclosing owner supplies admitted immutable data and identities; reading
 //! 017's Locale Canonicalization Data Artifact is the adapter's job, not this
-//! module's. A binding keeps what a checked profile would retain (the
+//! module's. An adapter reads the envelope at 015's pre-invocation boundary and
+//! leaves the rest to specification admission as [`FormalData`] (D15:3160). A binding keeps what a checked profile would retain (the
 //! specification and the dataset it admits) apart from facts about the admitted
 //! artifact, which make a binding reproducible but never enter profile semantics.
 //! Behind the non-default `icu4x` feature, `icu4x` makes the ICU4X 2.2.0
@@ -157,6 +158,49 @@ pub(crate) trait Provider {
     fn binding(&self) -> &ProviderBinding<Self::Identity>;
 
     fn canonicalize(&self, input: &str) -> Result<Arc<str>, ProviderFailure>;
+}
+
+/// Reading the Locale Canonicalization Data Artifact at specification
+/// admission: the Admitted Implementation Capability's `bootstrapOnly.localeData`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[expect(clippy::struct_field_names, reason = "mirror 015's explicit bound IDs")]
+pub(crate) struct LocaleDataLimits {
+    pub(crate) max_payloads: Bound,
+    pub(crate) max_payload_bytes: Bound,
+    pub(crate) max_marker_bytes: Bound,
+    pub(crate) max_validity_groups: Bound,
+    pub(crate) max_codes: Bound,
+    pub(crate) max_extension_keys: Bound,
+    pub(crate) max_types: Bound,
+    pub(crate) max_corrections: Bound,
+    pub(crate) max_validation_work_units: Bound,
+}
+
+/// Canonicalization data past the pre-invocation boundary: its envelope
+/// admitted, the rest still to read. Specification admission reads the rest
+/// under the capability's `localeData` bounds, and a failure there, a payload
+/// limit, the integrity, a payload, or the dataset, is
+/// `project-profile-locale-data-not-admitted`, a Resolver Case and not a
+/// boundary failure (D15:3160).
+pub(crate) trait FormalData {
+    type Provider: Provider;
+
+    /// Read the rest of the artifact into the provider that serves it.
+    fn admit(self, limits: &LocaleDataLimits) -> Result<Self::Provider, DataNotAdmitted>;
+}
+
+/// The data behind an admitted envelope was not admitted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DataNotAdmitted;
+
+/// A provider built before invocation, as tests and the benchmark build one,
+/// has nothing left to read.
+impl<P: Provider> FormalData for P {
+    type Provider = P;
+
+    fn admit(self, _: &LocaleDataLimits) -> Result<P, DataNotAdmitted> {
+        Ok(self)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

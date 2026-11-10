@@ -56,6 +56,6 @@ pub use markers::{BlobFailure, Layout, Marker, MarkerBlob};
 pub use payload::{LogicalPayload, PayloadFailure};
 pub use primitives::{FileDigest, LogicalAddress, NonemptyText, SemanticDigest};
 pub use reader::{
-    AdmittedData, ArtifactLimit, DataFailure, PayloadCheck, ReadFailure, ReadLimits,
-    VerifiedManifest, CONFORMANCE_FORMAT, MARKERS_FORMAT,
+    AdmittedData, ArtifactLimit, DataFailure, DecodedManifest, PayloadCheck, ReadFailure,
+    ReadLimits, VerifiedManifest, CONFORMANCE_FORMAT, MARKERS_FORMAT,
 };

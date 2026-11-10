@@ -5,12 +5,15 @@
 //! steps. It fetches nothing: the caller reads the manifest, learns from it
 //! where each payload is, and hands over the exact bytes.
 //!
-//! [`VerifiedManifest::read`] takes the manifest through 015's pre-invocation
-//! boundary (017 steps 1 and 2), checks the limits a manifest decides
-//! (payload count and each payload's declared length), and verifies its
-//! integrity (step 3). [`VerifiedManifest::admit`] checks each payload's
-//! length and file digest (step 4), decodes each under its format (step 5),
-//! and rebuilds the dataset to compare its semantic digest (step 6).
+//! [`DecodedManifest::decode`] takes the manifest through 015's
+//! pre-invocation boundary (017 steps 1 and 2), and [`DecodedManifest::verify`]
+//! checks the limits a manifest decides (payload count and each payload's
+//! declared length) and verifies its integrity (step 3); [`VerifiedManifest::read`]
+//! does both. [`VerifiedManifest::admit`] checks each payload's length and
+//! file digest (step 4), decodes each under its format (step 5), and rebuilds
+//! the dataset to compare its semantic digest (step 6). Everything after the
+//! boundary is 015's specification admission, so a caller that admits the
+//! envelope before invocation leaves the rest to the resolver.
 //!
 //! Admitting data is not admitting a specification. Whether the
 //! specification is supported, and whether the dataset is the one it admits,
@@ -111,8 +114,16 @@ pub enum PayloadCheck {
     Digest,
 }
 
+/// A manifest past 015's pre-invocation boundary: within the caller's byte
+/// and depth limits and in the closed shape, its integrity not yet verified.
+/// Only [`DecodedManifest::decode`] makes one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecodedManifest {
+    manifest: LocaleCanonicalizationDataArtifact,
+}
+
 /// A manifest past the pre-invocation boundary, within the limits it decides,
-/// and with a verified integrity digest. Only [`VerifiedManifest::read`]
+/// and with a verified integrity digest. Only [`DecodedManifest::verify`]
 /// makes one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifiedManifest {
@@ -127,12 +138,19 @@ pub struct AdmittedData {
     markers: MarkerBlob,
 }
 
-impl VerifiedManifest {
-    /// 017 steps 1 to 3 for the manifest: its limits, its strict, closed
-    /// decoding, the limits it decides, and its integrity.
-    pub fn read(bytes: &[u8], limits: &ReadLimits) -> Result<Self, ReadFailure> {
-        let manifest = manifest::decode(bytes, limits.manifest_bytes, limits.manifest_depth)
-            .map_err(ReadFailure::Envelope)?;
+impl DecodedManifest {
+    /// 017 steps 1 and 2 for the manifest, which are 015's pre-invocation
+    /// boundary: its byte and depth limits, before anything is decoded, and
+    /// its strict, closed decoding.
+    pub fn decode(bytes: &[u8], max_bytes: u64, max_depth: u64) -> Result<Self, EnvelopeFailure> {
+        manifest::decode(bytes, max_bytes, max_depth).map(|manifest| Self { manifest })
+    }
+
+    /// The rest of 017 step 3: the limits the manifest decides and its
+    /// integrity. The manifest's own byte and depth limits were the
+    /// boundary's, so `limits` is not asked for them again.
+    pub fn verify(self, limits: &ReadLimits) -> Result<VerifiedManifest, ReadFailure> {
+        let manifest = self.manifest;
         if count(manifest.payloads().len()) > limits.payloads {
             return Err(data(DataFailure::Limit(ArtifactLimit::Payloads)));
         }
@@ -146,7 +164,17 @@ impl VerifiedManifest {
         if !framed(manifest.verify_integrity())? {
             return Err(data(DataFailure::Integrity));
         }
-        Ok(Self { manifest })
+        Ok(VerifiedManifest { manifest })
+    }
+}
+
+impl VerifiedManifest {
+    /// 017 steps 1 to 3 for the manifest: its limits, its strict, closed
+    /// decoding, the limits it decides, and its integrity.
+    pub fn read(bytes: &[u8], limits: &ReadLimits) -> Result<Self, ReadFailure> {
+        DecodedManifest::decode(bytes, limits.manifest_bytes, limits.manifest_depth)
+            .map_err(ReadFailure::Envelope)?
+            .verify(limits)
     }
 
     pub const fn manifest(&self) -> &LocaleCanonicalizationDataArtifact {
@@ -462,6 +490,64 @@ pub(crate) mod tests {
                 crate::manifest::EnvelopeLimit::Bytes
             )))
         );
+        let shallow = ReadLimits {
+            manifest_depth: 1,
+            ..GENEROUS
+        };
+        assert_eq!(
+            VerifiedManifest::read(NARROW, &shallow),
+            Err(ReadFailure::Envelope(EnvelopeFailure::OverBound(
+                crate::manifest::EnvelopeLimit::Depth
+            )))
+        );
+    }
+
+    /// The boundary decodes the envelope alone: a manifest whose integrity
+    /// does not hold passes it, and verifying refuses it afterwards, so the
+    /// failure belongs to specification admission and not to the boundary.
+    #[test]
+    fn decoding_stops_at_the_boundary_and_verifying_does_the_rest() {
+        let mut value: Value = serde_json::from_slice(NARROW).unwrap();
+        value["dataset"]["identity"] = json!("another-dataset");
+        let tampered = serde_json::to_vec(&value).unwrap();
+        let decoded = DecodedManifest::decode(&tampered, u64::MAX, u64::MAX).unwrap();
+        assert_eq!(
+            decoded.verify(&GENEROUS),
+            Err(ReadFailure::Data(DataFailure::Integrity))
+        );
+        // The envelope's own failures stay the boundary's.
+        assert_eq!(
+            DecodedManifest::decode(b"{}", u64::MAX, u64::MAX),
+            Err(EnvelopeFailure::Malformed)
+        );
+        assert_eq!(
+            DecodedManifest::decode(NARROW, u64::try_from(NARROW.len()).unwrap() - 1, u64::MAX),
+            Err(EnvelopeFailure::OverBound(
+                crate::manifest::EnvelopeLimit::Bytes
+            ))
+        );
+        assert_eq!(
+            DecodedManifest::decode(NARROW, u64::MAX, 1),
+            Err(EnvelopeFailure::OverBound(
+                crate::manifest::EnvelopeLimit::Depth
+            ))
+        );
+        // Decoding and verifying is reading.
+        let verified = DecodedManifest::decode(NARROW, u64::MAX, u64::MAX)
+            .unwrap()
+            .verify(&GENEROUS)
+            .unwrap();
+        assert_eq!(verified, VerifiedManifest::read(NARROW, &GENEROUS).unwrap());
+        // Verifying never asks for the manifest's own limits again.
+        let tight = ReadLimits {
+            manifest_bytes: 1,
+            manifest_depth: 1,
+            ..GENEROUS
+        };
+        assert!(DecodedManifest::decode(NARROW, u64::MAX, u64::MAX)
+            .unwrap()
+            .verify(&tight)
+            .is_ok());
     }
 
     #[test]
