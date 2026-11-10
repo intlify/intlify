@@ -13,9 +13,12 @@
 //! takes its bounds from the admitted capability (D15:1106). A Safe Origin
 //! Kind candidate is admitted at its own boundary beside its component's
 //! value, and reads no bound (015-166). A selector is admitted from its
-//! binding's closed report, not from a live host value (015-167).
+//! binding's closed report, not from a live host value (015-167). The Common
+//! Invocation Input Set is admitted in one step that yields the admitted set
+//! or every failure in the rank of its slots (015-168).
 
 pub(crate) mod capability;
+pub(crate) mod common;
 pub(crate) mod origin;
 pub(crate) mod selector;
 pub(crate) mod specification;
