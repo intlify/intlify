@@ -690,7 +690,6 @@ fn policy_edge(kind: LimitKind, recipe: ResourcePolicyRecipe) -> Result<u64, Pre
 /// The caller's finite limits on the collection at 015's pre-invocation
 /// boundary: explicit owner capacity, not the `artifactAdmission` bounds.
 pub(super) const COLLECTION_LIMITS: CollectionLimits = CollectionLimits {
-    members: 1_000,
     member_bytes: 1_000_000,
     total_bytes: 10_000_000,
     depth: 64,

@@ -216,12 +216,7 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
                 frame.bytes(member.canonical_body());
             }
             let read = super::prepare::COLLECTION_LIMITS;
-            for bound in [
-                read.members,
-                read.member_bytes,
-                read.total_bytes,
-                read.depth,
-            ] {
+            for bound in [read.member_bytes, read.total_bytes, read.depth] {
                 frame.uint(bound);
             }
             for (id, bound) in prepared.policy.limits().bounds() {
@@ -259,12 +254,7 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
                 frame.bytes(member.canonical_body());
             }
             let read = super::prepare::COLLECTION_LIMITS;
-            for bound in [
-                read.members,
-                read.member_bytes,
-                read.total_bytes,
-                read.depth,
-            ] {
+            for bound in [read.member_bytes, read.total_bytes, read.depth] {
                 frame.uint(bound);
             }
             for (id, bound) in prepared.policy.limits().bounds() {
@@ -311,12 +301,7 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
                 frame.bytes(member.canonical_body());
             }
             let read = super::prepare::COLLECTION_LIMITS;
-            for bound in [
-                read.members,
-                read.member_bytes,
-                read.total_bytes,
-                read.depth,
-            ] {
+            for bound in [read.member_bytes, read.total_bytes, read.depth] {
                 frame.uint(bound);
             }
             for (id, bound) in prepared.policy.limits().bounds() {
@@ -360,12 +345,7 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
                 frame.bytes(member.canonical_body());
             }
             let read = super::prepare::COLLECTION_LIMITS;
-            for bound in [
-                read.members,
-                read.member_bytes,
-                read.total_bytes,
-                read.depth,
-            ] {
+            for bound in [read.member_bytes, read.total_bytes, read.depth] {
                 frame.uint(bound);
             }
             for (id, bound) in prepared.policy.limits().bounds() {
