@@ -11,20 +11,22 @@
 //!
 //! The container's own form and any inspection of host values belong to the
 //! adapter that builds the list of members, so `malformed-container` and
-//! `unsafe-host-inspection` are reported there.
+//! `unsafe-host-inspection` are reported there. The boundary never counts the
+//! submitted occurrences: their number is the resolver's, under the Resource
+//! Limit Policy's `artifactAdmission` (D15:1849).
 
 use intlify_shared_json::decode::{self, DecodeFailure};
 
 use super::envelope::FormalMember;
 use super::{count, depth};
 
-/// The caller's finite limits on a collection, each checked before the work it
-/// bounds. There are no defaults, and they are not 015's `artifactAdmission`
-/// bounds, which the resolver checks under the Resource Limit Policy.
+/// The limits on a collection's raw bytes, each checked before the work it
+/// bounds: 015's `inputBoundary.maxCollectionMemberBytes`,
+/// `maxCollectionTotalBytes`, and `maxDepth`. They are representability
+/// limits, not the `artifactAdmission` bounds, which the resolver checks under
+/// the Resource Limit Policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct CollectionLimits {
-    /// The number of members.
-    pub(crate) members: u64,
     /// The submitted bytes of each member.
     pub(crate) member_bytes: u64,
     /// The submitted bytes of all members together.
@@ -36,7 +38,6 @@ pub(crate) struct CollectionLimits {
 /// What a boundary limit bounds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CollectionLimit {
-    Members,
     MemberBytes,
     TotalBytes,
     Depth,
@@ -80,18 +81,16 @@ impl FormalCollection {
     }
 }
 
-/// Read a collection at the pre-invocation boundary. The member count, each
-/// member's bytes, the total, and each member's depth are checked before any
-/// member is decoded; then every member is decoded and framed once, and a
-/// capacity failure anywhere comes before an unrepresentable member anywhere.
+/// Read a collection at the pre-invocation boundary. Each member's bytes, the
+/// total, and each member's depth are checked before any member is decoded;
+/// then every member is decoded and framed once, and a capacity failure
+/// anywhere comes before an unrepresentable member anywhere. However many
+/// members there are, the boundary does not count them.
 pub(crate) fn read_collection(
     members: Option<&[&[u8]]>,
     limits: &CollectionLimits,
 ) -> Result<FormalCollection, CollectionFailure> {
     let members = members.ok_or(CollectionFailure::Missing)?;
-    if count(members.len()) > limits.members {
-        return Err(CollectionFailure::OverBound(CollectionLimit::Members));
-    }
     let mut total = 0_u64;
     for bytes in members {
         let length = count(bytes.len());
@@ -132,7 +131,6 @@ mod tests {
     use crate::artifacts::envelope::{envelope_of, ArtifactKind};
 
     const ROOM: CollectionLimits = CollectionLimits {
-        members: u64::MAX,
         member_bytes: u64::MAX,
         total_bytes: u64::MAX,
         depth: u64::MAX,
@@ -163,10 +161,6 @@ mod tests {
         let reasons = [
             (CollectionFailure::Missing, "missing-input"),
             (
-                CollectionFailure::OverBound(CollectionLimit::Members),
-                "formal-envelope-over-bound",
-            ),
-            (
                 CollectionFailure::OverBound(CollectionLimit::MemberBytes),
                 "formal-envelope-over-bound",
             ),
@@ -195,20 +189,12 @@ mod tests {
         let members: [&[u8]; 2] = [br#"{"kind":"x"}"#, br#"{"body":{"content":{}}}"#];
         assert_eq!(members.map(<[u8]>::len), [12, 23]);
         let exact = CollectionLimits {
-            members: 2,
             member_bytes: 23,
             total_bytes: 35,
             depth: 3,
         };
         assert!(read(&members, &exact).is_ok());
         let over = [
-            (
-                CollectionLimits {
-                    members: 1,
-                    ..exact
-                },
-                CollectionLimit::Members,
-            ),
             (
                 CollectionLimits {
                     member_bytes: 22,
@@ -237,15 +223,24 @@ mod tests {
         }
     }
 
+    /// The boundary never counts the submitted occurrences: their number is
+    /// the resolver's, under the Resource Limit Policy (D15:1849).
+    #[test]
+    fn the_boundary_never_counts_the_members() {
+        let members = vec![b"{}".as_slice(); 1_000];
+        let tight = CollectionLimits {
+            member_bytes: 2,
+            total_bytes: 2_000,
+            depth: 1,
+        };
+        assert_eq!(read(&members, &tight).unwrap().members().len(), 1_000);
+    }
+
     #[test]
     fn limits_come_before_any_member_is_decoded() {
         // Neither member is JSON, yet each limit speaks first.
         let members: [&[u8]; 2] = [b"[[[ not json", b"{"];
         let cases = [
-            (
-                CollectionLimits { members: 1, ..ROOM },
-                CollectionLimit::Members,
-            ),
             (
                 CollectionLimits {
                     member_bytes: 11,

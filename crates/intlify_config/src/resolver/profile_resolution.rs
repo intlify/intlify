@@ -537,7 +537,6 @@ pub(super) mod tests {
 
     /// Limits no test reaches.
     const ROOM: CollectionLimits = CollectionLimits {
-        members: u64::MAX,
         member_bytes: u64::MAX,
         total_bytes: u64::MAX,
         depth: u64::MAX,
