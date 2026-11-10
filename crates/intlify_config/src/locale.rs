@@ -247,6 +247,19 @@ pub(crate) enum EnvelopeReason {
     OverBoundEnvelope,
 }
 
+impl EnvelopeReason {
+    /// The reason as 015's boundary table spells it.
+    pub(crate) const fn reason(self) -> &'static str {
+        match self {
+            Self::MissingInput => "missing-input",
+            Self::MalformedEnvelope => "malformed-envelope",
+            Self::DuplicateMember => "duplicate-member",
+            Self::UnknownMember => "unknown-member",
+            Self::OverBoundEnvelope => "over-bound-envelope",
+        }
+    }
+}
+
 /// Where 015 reports a failure to admit canonicalization data. These are private
 /// classes, not Findings: the Finding Registry belongs to 015 Phase 5. An
 /// asserted specification the resolver does not support is the

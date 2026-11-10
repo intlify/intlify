@@ -158,6 +158,27 @@ fn binding_failures_are_classified_where_015_reports_them() {
 }
 
 #[test]
+fn each_envelope_reason_is_one_of_the_boundary_rows_five() {
+    assert_eq!(
+        [
+            EnvelopeReason::MissingInput,
+            EnvelopeReason::OverBoundEnvelope,
+            EnvelopeReason::MalformedEnvelope,
+            EnvelopeReason::DuplicateMember,
+            EnvelopeReason::UnknownMember,
+        ]
+        .map(EnvelopeReason::reason),
+        [
+            "missing-input",
+            "over-bound-envelope",
+            "malformed-envelope",
+            "duplicate-member",
+            "unknown-member",
+        ]
+    );
+}
+
+#[test]
 fn another_identity_is_unsupported_and_another_revision_of_it_incompatible() {
     let supported = VersionedIdentity {
         identity: "spec",
