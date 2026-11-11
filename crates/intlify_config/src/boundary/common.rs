@@ -26,27 +26,18 @@
 
 use serde_json::Value;
 
-use crate::artifacts::collection::{
-    read_collection, CollectionFailure, CollectionLimits, FormalCollection,
-};
-use crate::artifacts::vocabulary::{self, EnvelopeFailure, FormalVocabulary, VocabularyLimits};
+use crate::artifacts::collection::{read_collection, CollectionLimits, FormalCollection};
+use crate::artifacts::vocabulary::{self, FormalVocabulary, VocabularyLimits};
 use crate::input_limits::Bound;
 use crate::locale::{EnvelopeReason, FormalData, VersionedIdentity};
 use crate::resolver::capability::InputBoundaryLimits;
 use crate::resolver::origin::SafeOriginKind;
 use crate::resolver::specification::SpecificationInput;
 
-use super::capability::{self, CapabilityRefusal, ImplementationCapability};
-use super::origin::{self, OriginRefusal};
-use super::specification::{self, SpecificationRefusal};
-use super::verification::{self, VerificationAssertion, VerificationInput, VerificationRefusal};
-
-/// One typed input slot as a binding submits it: the raw value its boundary
-/// reads, and beside it the Safe Origin Kind candidate, `None` when absent.
-pub(crate) struct Component<'a, T> {
-    pub(crate) value: T,
-    pub(crate) origin: Option<&'a str>,
-}
+use super::capability::{self, ImplementationCapability};
+use super::specification;
+use super::step::{slot, Component, InputFailure, Refusal};
+use super::verification::{self, VerificationAssertion, VerificationInput};
 
 /// The Common Invocation Input Set as submitted, its slots in rank order.
 /// Each raw value is `None` when absent. The collection is its members'
@@ -73,54 +64,6 @@ pub(crate) struct CommonInputs<D> {
     pub(crate) collection: FormalCollection,
     pub(crate) verification: VerificationInput,
     pub(crate) capability: ImplementationCapability,
-}
-
-/// One boundary's refusal, as that boundary types it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Refusal {
-    Origin(OriginRefusal),
-    Specification(SpecificationRefusal),
-    Vocabulary(EnvelopeFailure),
-    Data(EnvelopeReason),
-    Collection(CollectionFailure),
-    Verification(VerificationRefusal),
-    Capability(CapabilityRefusal),
-}
-
-impl Refusal {
-    /// The boundary kind, as 015's boundary table spells it.
-    pub(crate) const fn boundary_kind(self) -> &'static str {
-        match self {
-            Self::Origin(_) => "safe-origin-kind",
-            Self::Specification(_) => "profile-resolution-specification-input",
-            Self::Vocabulary(_) => "intent-surface-class-vocabulary-artifact",
-            Self::Data(_) => "locale-canonicalization-data-artifact",
-            Self::Collection(_) => "submitted-profile-resolution-artifact-collection",
-            Self::Verification(_) => "resource-limit-policy-verification-input",
-            Self::Capability(_) => "implementation-capability",
-        }
-    }
-
-    /// The reason, as the boundary's row spells it.
-    pub(crate) const fn reason(self) -> &'static str {
-        match self {
-            Self::Origin(refusal) => refusal.reason(),
-            Self::Specification(refusal) => refusal.reason(),
-            Self::Vocabulary(failure) => failure.reason(),
-            Self::Data(reason) => reason.reason(),
-            Self::Collection(failure) => failure.reason(),
-            Self::Verification(refusal) => refusal.reason(),
-            Self::Capability(refusal) => refusal.reason(),
-        }
-    }
-}
-
-/// One failure of the step: the slot, named by the Safe Origin Kind it fixes,
-/// and the refusal of its origin or its value.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct InputFailure {
-    pub(crate) slot: SafeOriginKind,
-    pub(crate) refusal: Refusal,
 }
 
 /// Admit `submitted` against the constructed Capability Specification
@@ -222,31 +165,6 @@ where
     }
 }
 
-/// Admit one slot's origin candidate beside its value's result, which is
-/// `None` when the value's boundary was not evaluated, and record the origin's
-/// failure before the value's. The admitted value is returned whatever the
-/// origin's result: any recorded failure refuses the whole set.
-fn slot<T>(
-    failures: &mut Vec<InputFailure>,
-    slot: SafeOriginKind,
-    candidate: Option<&str>,
-    value: Option<Result<T, Refusal>>,
-) -> Option<T> {
-    if let Err(refusal) = origin::admit(slot, candidate) {
-        failures.push(InputFailure {
-            slot,
-            refusal: Refusal::Origin(refusal),
-        });
-    }
-    match value? {
-        Ok(value) => Some(value),
-        Err(refusal) => {
-            failures.push(InputFailure { slot, refusal });
-            None
-        }
-    }
-}
-
 /// The vocabulary's limits: the capability's `inputBoundary` bounds on it
 /// (D15:1805, 1807-1810).
 const fn vocabulary_limits(bounds: &InputBoundaryLimits) -> VocabularyLimits {
@@ -276,8 +194,14 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+    use crate::artifacts::collection::CollectionFailure;
     use crate::artifacts::verification::{sealed, unsealed, VerificationInputArtifact};
+    use crate::artifacts::vocabulary::EnvelopeFailure;
     use crate::artifacts::vocabulary::IntentSurfaceClassVocabularyArtifact;
+    use crate::boundary::capability::CapabilityRefusal;
+    use crate::boundary::origin::OriginRefusal;
+    use crate::boundary::specification::SpecificationRefusal;
+    use crate::boundary::verification::VerificationRefusal;
     use crate::construction::capability::{
         IDENTITY as CAPABILITY, REVISION as CAPABILITY_REVISION,
     };
@@ -740,55 +664,5 @@ mod tests {
                 Refusal::Data(EnvelopeReason::OverBoundEnvelope)
             )])
         );
-    }
-
-    /// Each refusal names its boundary kind and one reason of that kind's row
-    /// of 015's table.
-    #[test]
-    fn each_refusal_names_its_boundary_and_reason() {
-        let named = [
-            (
-                Refusal::Origin(OriginRefusal::NonCanonical),
-                "safe-origin-kind",
-                "non-canonical-safe-origin-kind",
-            ),
-            (
-                Refusal::Specification(SpecificationRefusal::DuplicateMember),
-                "profile-resolution-specification-input",
-                "duplicate-member",
-            ),
-            (
-                Refusal::Vocabulary(EnvelopeFailure::Unsupported),
-                "intent-surface-class-vocabulary-artifact",
-                "malformed-envelope",
-            ),
-            (
-                Refusal::Data(EnvelopeReason::OverBoundEnvelope),
-                "locale-canonicalization-data-artifact",
-                "over-bound-envelope",
-            ),
-            (
-                Refusal::Collection(CollectionFailure::BeyondCapacity),
-                "submitted-profile-resolution-artifact-collection",
-                "formal-envelope-over-bound",
-            ),
-            (
-                Refusal::Verification(VerificationRefusal::SecretBearing),
-                "resource-limit-policy-verification-input",
-                "secret-bearing-input",
-            ),
-            (
-                Refusal::Capability(CapabilityRefusal::Incomplete),
-                "implementation-capability",
-                "incomplete-capability",
-            ),
-        ];
-        for (refusal, kind, reason) in named {
-            assert_eq!(
-                (refusal.boundary_kind(), refusal.reason()),
-                (kind, reason),
-                "{refusal:?}"
-            );
-        }
     }
 }

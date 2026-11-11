@@ -18,13 +18,17 @@
 //! or every failure in the rank of its slots (015-168). A file entry's source
 //! identity and revision are admitted against its bytes (015-170), and its
 //! locator candidate is admitted or treated as absence, never as a failure
-//! (015-171).
+//! (015-171). A file Entry Admission Input Set is admitted in a step of its
+//! own that works like the common one (015-172); both steps share the parts
+//! in `step`.
 
 pub(crate) mod capability;
 pub(crate) mod common;
+pub(crate) mod entry;
 pub(crate) mod locator;
 pub(crate) mod origin;
 pub(crate) mod selector;
 pub(crate) mod source;
 pub(crate) mod specification;
+pub(crate) mod step;
 pub(crate) mod verification;
