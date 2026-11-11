@@ -141,6 +141,18 @@ pub(crate) enum KeyStrategy {
     SemanticPosition,
 }
 
+impl KeyStrategy {
+    /// The strategy's ID, as a row spells it.
+    pub(crate) const fn id(self) -> &'static str {
+        match self {
+            Self::Singleton => "singleton",
+            Self::LogicalField => "logical-field",
+            Self::CanonicalIdentityOrContent => "canonical-identity-or-content",
+            Self::SemanticPosition => "semantic-position",
+        }
+    }
+}
+
 /// 015's Subject content projections: `none` for a kind keyed by no identity
 /// or content, and one closed projection otherwise.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -149,6 +161,17 @@ pub(crate) enum ContentProjection {
     None,
     NonSecretContent,
     RedactedStructure,
+}
+
+impl ContentProjection {
+    /// The projection's ID, as a row spells it.
+    pub(crate) const fn id(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::NonSecretContent => "non-secret-content",
+            Self::RedactedStructure => "redacted-structure",
+        }
+    }
 }
 
 /// The kind whose subjects scope a row's subjects.
@@ -316,7 +339,7 @@ impl CheckRegistry {
     pub(crate) fn revision_zero() -> Self {
         let mut rows = Vec::new();
         for kind in SubjectKind::ALL {
-            let shape = shape(kind);
+            let shape = key_shape(kind);
             let ids = check_ids(kind);
             let prerequisites = prerequisite_ids(kind);
             let codes = finding_codes(kind);
@@ -334,8 +357,8 @@ impl CheckRegistry {
                     rule_id: format!("015.{id}"),
                     subject_kind: kind,
                     subject_key_strategy: shape.strategy,
-                    subject_content_projection: shape.projection(),
-                    owning_scope: shape.scope.map_or_else(|| kind_id(kind), str::to_owned),
+                    subject_content_projection: shape.projection,
+                    owning_scope: shape.owning_scope.clone(),
                     parent_subject: shape.parent.map(|parent| ParentSubject {
                         phase_id: parent.phase(),
                         subject_kind: parent,
@@ -562,10 +585,33 @@ pub(crate) fn schema() -> Result<Value, serde_json::Error> {
 }
 
 /// A kind's registry ID: its name in kebab case.
-fn kind_id(kind: SubjectKind) -> String {
+pub(crate) fn kind_id(kind: SubjectKind) -> String {
     match serde_json::to_value(kind) {
         Ok(Value::String(id)) => id,
         _ => unreachable!("a kind serializes as its ID"),
+    }
+}
+
+/// The key shape every row of a kind names: its key strategy, its owning
+/// scope, the kind whose subjects scope its own, and its Subject content
+/// projection. A Redacted subject token frames all but the parent (D15:2454).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct KeyShape {
+    pub(crate) strategy: KeyStrategy,
+    pub(crate) owning_scope: String,
+    pub(crate) parent: Option<SubjectKind>,
+    pub(crate) projection: ContentProjection,
+}
+
+/// The key shape of `kind`'s subjects. A singleton's owning scope is its own
+/// kind.
+pub(crate) fn key_shape(kind: SubjectKind) -> KeyShape {
+    let shape = shape(kind);
+    KeyShape {
+        strategy: shape.strategy,
+        owning_scope: shape.scope.map_or_else(|| kind_id(kind), str::to_owned),
+        parent: shape.parent,
+        projection: shape.projection(),
     }
 }
 
@@ -2133,6 +2179,31 @@ mod tests {
     /// Every row of one kind agrees on the kind's key shape and rank
     /// (D15:2178), and only a kind keyed by an identity or content projects
     /// it.
+    #[test]
+    fn a_strategy_and_a_projection_are_spelled_as_a_row_spells_them() {
+        for strategy in [
+            KeyStrategy::Singleton,
+            KeyStrategy::LogicalField,
+            KeyStrategy::CanonicalIdentityOrContent,
+            KeyStrategy::SemanticPosition,
+        ] {
+            assert_eq!(
+                serde_json::to_value(strategy).unwrap(),
+                json!(strategy.id())
+            );
+        }
+        for projection in [
+            ContentProjection::None,
+            ContentProjection::NonSecretContent,
+            ContentProjection::RedactedStructure,
+        ] {
+            assert_eq!(
+                serde_json::to_value(projection).unwrap(),
+                json!(projection.id())
+            );
+        }
+    }
+
     #[test]
     fn the_rows_of_a_kind_share_its_shape_and_only_identities_project_content() {
         let rows = registry().rows;
