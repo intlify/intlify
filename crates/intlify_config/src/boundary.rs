@@ -15,11 +15,16 @@
 //! value, and reads no bound (015-166). A selector is admitted from its
 //! binding's closed report, not from a live host value (015-167). The Common
 //! Invocation Input Set is admitted in one step that yields the admitted set
-//! or every failure in the rank of its slots (015-168).
+//! or every failure in the rank of its slots (015-168). A file entry's source
+//! identity and revision are admitted against its bytes (015-170), and its
+//! locator candidate is admitted or treated as absence, never as a failure
+//! (015-171).
 
 pub(crate) mod capability;
 pub(crate) mod common;
+pub(crate) mod locator;
 pub(crate) mod origin;
 pub(crate) mod selector;
+pub(crate) mod source;
 pub(crate) mod specification;
 pub(crate) mod verification;
