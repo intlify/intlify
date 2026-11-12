@@ -582,7 +582,7 @@ mod tests {
     use crate::input_limits::Bound;
     use crate::model::DeploymentGroupId;
     use crate::resolver::artifact_resolution::{unit as collection_unit, CollectionSubject};
-    use crate::resolver::evaluation::{Blocking, Code, Details, Phase, Reason, Shortfall};
+    use crate::resolver::evaluation::{Blocking, Code, Details, Notice, Phase, Reason, Shortfall};
     use crate::resolver::exact_resolution::unit as reference_unit;
     use crate::resolver::hydration::unit as hydration_unit;
     use crate::resolver::limits::{BoundId, Group};
@@ -888,7 +888,10 @@ mod tests {
         let noticed = {
             let mut evaluation = resolved(R::Storefront).evaluation.fabricating();
             evaluation
-                .notice(client_endpoint(Check::KnownEndpoint), invalid)
+                .notice(
+                    client_endpoint(Check::KnownEndpoint),
+                    Notice::made_up(invalid),
+                )
                 .unwrap();
             evaluation
         };

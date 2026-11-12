@@ -371,7 +371,7 @@ mod tests {
     use crate::input_limits::Bound;
     use crate::resolver::artifact_resolution::{unit as collection_unit, CollectionSubject};
     use crate::resolver::evaluation::{
-        Actual, Blocking, Code, Details, LimitExceeded, Phase, Reason, Shortfall,
+        Actual, Blocking, Code, Details, LimitExceeded, Notice, Phase, Reason, Shortfall,
     };
     use crate::resolver::exact_resolution::unit as reference_unit;
     use crate::resolver::limits::{BoundId, Group};
@@ -606,7 +606,10 @@ mod tests {
                 .evaluation
                 .fabricating();
             evaluation
-                .notice(reference_unit(trust()), Code::ArtifactReferenceNotAdmitted)
+                .notice(
+                    reference_unit(trust()),
+                    Notice::made_up(Code::ArtifactReferenceNotAdmitted),
+                )
                 .unwrap();
             evaluation
         };

@@ -28,7 +28,7 @@ use crate::model::{Coverage, CoverageMode, CoverageRule};
 
 use super::evaluation::{
     both, within, Actual, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant,
-    LimitExceeded, Phase, Reason, Subject, Unit,
+    LimitExceeded, Notice, Phase, Reason, Subject, Unit,
 };
 use super::limits::{BoundId, ConfirmedPolicy, Group, LocaleResolutionLimits};
 use super::locales::{
@@ -556,8 +556,11 @@ fn selected_locales<P: Provider>(
         let subject = |check| unit(CoverageSubject::Locale(rule.clone(), key.clone()), check);
         let locale =
             evaluation.check(subject(Check::CanonicalLocale), attempt, |attempt| attempt)?;
-        if corrected {
-            evaluation.notice(subject(Check::CanonicalLocale), Code::LocaleNonCanonical)?;
+        if let (true, Ok(canonical)) = (corrected, &locale) {
+            evaluation.notice(
+                subject(Check::CanonicalLocale),
+                Notice::non_canonical(canonical.clone()),
+            )?;
         }
         let once = evaluation.check(subject(Check::UniqueLocale), locale.clone(), |_| {
             if spellings == 1 {

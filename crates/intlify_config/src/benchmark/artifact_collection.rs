@@ -356,7 +356,7 @@ mod tests {
     use crate::input_limits::Bound;
     use crate::resolver::artifact_resolution::unit as collection_unit;
     use crate::resolver::evaluation::{
-        Actual, Blocking, Code, Details, LimitExceeded, Phase, Reason, Shortfall,
+        Actual, Blocking, Code, Details, LimitExceeded, Notice, Phase, Reason, Shortfall,
     };
     use crate::resolver::limits::{fixture_limits, BoundId, Group};
     use crate::resolver::locales::fixtures::stand_in;
@@ -530,7 +530,10 @@ mod tests {
         let noticed = {
             let mut evaluation = prepared(&values).resolve().evaluation.fabricating();
             evaluation
-                .notice(first.clone(), Code::ArtifactCollectionNotAdmitted)
+                .notice(
+                    first.clone(),
+                    Notice::made_up(Code::ArtifactCollectionNotAdmitted),
+                )
                 .unwrap();
             evaluation
         };
