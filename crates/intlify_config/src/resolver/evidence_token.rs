@@ -29,6 +29,7 @@ use std::sync::Arc;
 use intlify_shared_json::encoding::encode;
 use serde_json::{json, Map, Value};
 
+use crate::boundary::source::ExactIdentity;
 use crate::construction::profile::EVIDENCE_TOKEN_DOMAIN;
 use crate::structural::selection::StringLengthFact;
 
@@ -145,20 +146,21 @@ pub(crate) struct Redacted {
 }
 
 impl Redacted {
-    /// A source identity of the identity domain `tag` that its owner does not
-    /// mark non-secret.
+    /// The admitted exact identity `identity` when its owner does not mark it
+    /// non-secret. Only its identity-domain tag enters the record, never its
+    /// payload.
     ///
     /// # Errors
     ///
     /// Returns the resolver bug that leaves the component without a token.
     pub(crate) fn source_identity(
         origin: SafeOriginKind,
-        tag: &str,
+        identity: &ExactIdentity,
     ) -> Result<Self, EvidenceTokenInvariant> {
         Self::new(
             TokenKind::SourceIdentity,
             origin,
-            Projected::Domain(Arc::from(tag)),
+            Projected::Domain(Arc::from(identity.tag())),
         )
     }
 
@@ -336,6 +338,8 @@ impl EvidenceTokens {
 mod tests {
     use serde_json::json;
 
+    use crate::boundary::source::{file_source_revision, read_pair, ExactIdentity, SourceLimits};
+    use crate::input_limits::Bound;
     use crate::resolver::evaluation::Subject;
     use crate::resolver::origin::SafeOriginKind as O;
     use crate::resolver::token::{Digest, Sha256, Specification, Tokens};
@@ -357,8 +361,22 @@ mod tests {
         }
     }
 
+    /// `text` admitted as an exact identity, as the file boundary admits it.
+    fn exact(text: &str) -> ExactIdentity {
+        let largest = Bound::new(u64::MAX - 1).unwrap();
+        let limits = SourceLimits {
+            identity_bytes: largest,
+            revision_bytes: largest,
+        };
+        read_pair(Some(text), Some(&file_source_revision(b"")), b"", limits)
+            .unwrap()
+            .identity()
+            .clone()
+    }
+
     fn source() -> Redacted {
-        Redacted::source_identity(O::ConfigurationFile, "intlify-file-source.v0").unwrap()
+        let identity = exact("intlify-file-source.v0:storefront/intlify.config.json");
+        Redacted::source_identity(O::ConfigurationFile, &identity).unwrap()
     }
 
     fn selector_exact() -> Redacted {
@@ -473,12 +491,18 @@ mod tests {
 
     #[test]
     fn equal_records_share_a_token_and_origins_keep_them_apart() {
-        // Two exact sources of one domain are grouped under one token.
+        // Two exact sources of one domain are grouped under one token: their
+        // payloads never enter the record.
         let first = source();
-        let second = source();
-        let programmatic =
-            Redacted::source_identity(O::ConfigurationProgrammatic, "intlify-file-source.v0")
+        let second =
+            Redacted::source_identity(O::ConfigurationFile, &exact("intlify-file-source.v0:other"))
                 .unwrap();
+        assert_eq!(first, second);
+        let programmatic = Redacted::source_identity(
+            O::ConfigurationProgrammatic,
+            &exact("intlify-file-source.v0:storefront/intlify.config.json"),
+        )
+        .unwrap();
         let tokens = EvidenceTokens::assign(PROFILE, [&first, &second, &programmatic], &Sha256);
         assert_eq!(
             tokens.token(PROFILE, &first),
@@ -550,7 +574,10 @@ mod tests {
             (
                 TokenKind::SourceIdentity,
                 O::ProfileSelectorCli,
-                Redacted::source_identity(O::ProfileSelectorCli, "intlify-file-source.v0"),
+                Redacted::source_identity(
+                    O::ProfileSelectorCli,
+                    &exact("intlify-file-source.v0:x"),
+                ),
             ),
             (
                 TokenKind::InputPathMember,
