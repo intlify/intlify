@@ -6,10 +6,12 @@
 //!
 //! A file entry has two typed input slots. The `configuration-file` slot's
 //! value is the raw configuration bytes with their exact logical source
-//! identity, Source-content revision, and optional locator candidate; the
+//! identity, whether the adapter marks that identity non-secret, the
+//! Source-content revision, and an optional locator candidate; the
 //! `profile-selector-cli` slot's value is the binding's selector report. A
 //! binding submits each beside its candidate for the Safe Origin Kind the slot
-//! fixes.
+//! fixes. The mark is carried as supplied and never decides admission; an
+//! adapter that supplies none leaves the identity unmarked (Decision 015-185).
 //!
 //! The step works like the Common Invocation Input Set's. The source pair, the
 //! locator, and the selector are read under the admitted capability's bounds,
@@ -37,6 +39,8 @@ use super::step::{slot, Component, InputFailure, Refusal};
 pub(crate) struct FileValue<'a> {
     pub(crate) bytes: Arc<[u8]>,
     pub(crate) identity: Option<&'a str>,
+    /// Whether the adapter marks the identity non-secret.
+    pub(crate) marked: bool,
     pub(crate) revision: Option<&'a str>,
     pub(crate) locator: Option<LocatorCandidate<'a>>,
 }
@@ -53,6 +57,8 @@ pub(crate) struct SubmittedFileEntry<'a> {
 pub(crate) struct FileEntryInputs {
     pub(crate) bytes: Arc<[u8]>,
     pub(crate) source: SourcePair,
+    /// Whether the adapter marked the source's identity non-secret.
+    pub(crate) marked: bool,
     pub(crate) locator: Option<Locator>,
     pub(crate) selector: SelectorInput,
 }
@@ -92,6 +98,7 @@ pub(crate) fn admit(
         (Some((source, locator)), Some(selector)) if failures.is_empty() => Ok(FileEntryInputs {
             bytes: file.value.bytes,
             source,
+            marked: file.value.marked,
             locator,
             selector,
         }),
@@ -163,6 +170,7 @@ mod tests {
                 value: FileValue {
                     bytes: Arc::from(BYTES),
                     identity: Some(IDENTITY),
+                    marked: false,
                     revision: Some(revision),
                     locator: Some(locator(LOCATOR)),
                 },
@@ -193,6 +201,7 @@ mod tests {
         };
         assert_eq!(&*admitted.bytes, BYTES);
         assert_eq!(admitted.source.identity().as_str(), IDENTITY);
+        assert!(!admitted.marked);
         assert_eq!(admitted.source.revision(), revision);
         assert_eq!(
             admitted.locator.as_ref().map(Locator::payload),
@@ -206,6 +215,32 @@ mod tests {
         assert!(admitted
             .selector
             .benchmark_matches_fixture(&SelectorInput::string("app", bound)));
+    }
+
+    /// The admitted entry keeps the mark as the adapter supplied it, and the
+    /// mark never changes whether, or why, the entry is refused.
+    #[test]
+    fn the_mark_is_carried_as_supplied() {
+        let revision = file_source_revision(BYTES);
+        let capability = roomy();
+        for marked in [false, true] {
+            let mut entry = submitted(&revision, "app");
+            entry.file.value.marked = marked;
+            let Ok(admitted) = admit(entry, Some(&capability)) else {
+                panic!("the entry is admitted: {marked}");
+            };
+            assert_eq!(admitted.marked, marked);
+            let mut entry = submitted("sha256:0", "app");
+            entry.file.value.marked = marked;
+            assert_eq!(
+                refused(entry, Some(&capability)),
+                [failure(
+                    Kind::ConfigurationFile,
+                    Refusal::Source(SourceRefusal::UnboundRevision)
+                )],
+                "{marked}"
+            );
+        }
     }
 
     /// Failures come in slot rank, an origin's before its value's, and an
