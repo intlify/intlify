@@ -8,14 +8,23 @@
 //! 2497-2499).
 //!
 //! The resolver walks an internal path, the exact member names and array
-//! indices from the root, which never leaves it. Projection receives each
-//! member already classified: a non-secret member with its exact name, and
-//! an unsafe one without it, so no unsafe name can be retained. A non-secret
-//! member stays a `safe-member` and an array index an `array-index`; an
-//! unsafe member becomes a `redacted-member`, the Redacted evidence token of
-//! the input that supplied it under its path's token kind. A token keeps only
-//! that the member is a string, so the unsafe members of one origin and path
-//! kind share one token.
+//! indices from the root, which never leaves it. Classification decides each
+//! member from facts fixed before its record is constructed (Decision
+//! 015-184): its place in the configuration schema; for a Profile, Target, or
+//! Group ID key, the identifier syntax and the capability's `policyComparable`
+//! bound for that identifier; and for an alias or message-fallback key,
+//! whether the canonicalizer bound once `specification-admission` admits the
+//! locale data returns a canonical identifier, so every locale key is unsafe
+//! before then. A schema-defined member is non-secret, and so is a key that
+//! passes its test; every other member is unsafe.
+//!
+//! Projection receives each member already classified: a non-secret member
+//! with its exact name, and an unsafe one without it, so no unsafe name can
+//! be retained. A non-secret member stays a `safe-member` and an array index
+//! an `array-index`; an unsafe member becomes a `redacted-member`, the
+//! Redacted evidence token of the input that supplied it under its path's
+//! token kind. A token keeps only that the member is a string, so the unsafe
+//! members of one origin and path kind share one token.
 //!
 //! A value locator whose members are all non-secret is the exact RFC 6901
 //! JSON Pointer, `~` written `~0` and `/` written `~1`. Any unsafe member
@@ -36,9 +45,66 @@ use std::sync::Arc;
 
 use serde_json::{json, Value};
 
+use crate::artifacts::count;
+use crate::input_limits::Bound;
+use crate::locale::{Canonicalizer, Provider};
+use crate::model::valid_identity;
+use crate::structural::{AuthoringSchema, Edge, Place};
+
 use super::evidence_token::{EvidenceTokenInvariant, EvidenceTokens, Redacted};
+use super::limits::ResolutionLimits;
 use super::origin::SafeOriginKind;
 use super::token::{RedactedToken, Specification};
+
+/// The facts Decision 015-184 classifies a configuration key from: the
+/// capability's `policyComparable` bounds, and the canonicalizer once
+/// `specification-admission` has admitted the Locale Canonicalization Data
+/// Artifact, `None` before.
+pub(crate) struct KeyFacts<'a, P: Provider> {
+    pub(crate) comparable: &'a ResolutionLimits,
+    pub(crate) locales: Option<&'a Canonicalizer<P>>,
+}
+
+impl<P: Provider> KeyFacts<'_, P> {
+    /// The steps of `edges`, an internal path from the configuration root,
+    /// each member classified at its place in `schema` (D15:776).
+    pub(crate) fn steps<'e, Policy, Target>(
+        &self,
+        schema: &AuthoringSchema<Policy, Target>,
+        edges: &[Edge<'e>],
+    ) -> Vec<Step<'e>> {
+        edges
+            .iter()
+            .zip(schema.places(edges))
+            .map(|(edge, place)| match *edge {
+                Edge::Index(index) => Step::Index(index),
+                Edge::Member(name) if self.non_secret(name, place) => Step::Safe(name),
+                Edge::Member(_) => Step::Unsafe,
+            })
+            .collect()
+    }
+
+    /// Whether the member `name` at `place` is non-secret.
+    fn non_secret(&self, name: &str, place: Option<Place>) -> bool {
+        let identifier = |bound: Bound| valid_identity(name) && count(name.len()) <= bound.get();
+        let comparable = self.comparable;
+        match place {
+            Some(Place::Defined) => true,
+            Some(Place::ProfileId) => identifier(
+                comparable
+                    .configuration_input
+                    .structural
+                    .max_profile_id_bytes,
+            ),
+            Some(Place::TargetId) => identifier(comparable.target_grouping.max_target_id_bytes),
+            Some(Place::GroupId) => identifier(comparable.target_grouping.max_group_id_bytes),
+            Some(Place::LocaleKey) => self
+                .locales
+                .is_some_and(|locales| locales.canonicalize(name).is_ok()),
+            Some(Place::Undefined) | None => false,
+        }
+    }
+}
 
 /// One edge of an internal path as projection receives it: a member
 /// classified non-secret, with its exact name; a member that is not, without
@@ -269,8 +335,18 @@ mod tests {
     use crate::resolver::origin::SafeOriginKind as O;
     use crate::resolver::token::{Digest, Sha256, Specification};
 
+    use crate::construction::committed::CONFIGURATION_SCHEMA;
+    use crate::input_limits::Bound;
+    use crate::locale::fixtures::FixtureProvider;
+    use crate::model::CONFIGURATION_SCHEMA_VERSION;
+    use crate::references::{PolicyReference, TargetProfileReference};
+    use crate::resolver::limits::{fixture_limits, ResolutionLimits};
+    use crate::resolver::locales::fixtures::canonicalizer;
+    use crate::structural::{AuthoringSchema, Edge};
+
     use super::{
-        InputPath, LogicalInputPath, PathSegment, PortableValueLocator, Step, ValueLocation,
+        InputPath, KeyFacts, LogicalInputPath, PathSegment, PortableValueLocator, Step,
+        ValueLocation,
     };
 
     const PROFILE: Specification<'static> = Specification {
@@ -568,5 +644,163 @@ mod tests {
             PathSegment::SafeMember("名前".into()).view(),
             json!({ "safe-member": "名前" })
         );
+    }
+
+    /// The configuration schema that construction admits.
+    fn schema() -> AuthoringSchema<PolicyReference, TargetProfileReference> {
+        AuthoringSchema::compile(
+            CONFIGURATION_SCHEMA_VERSION.to_owned(),
+            serde_json::from_slice(CONFIGURATION_SCHEMA).unwrap(),
+        )
+        .unwrap()
+    }
+
+    /// Distinct capability bounds, the three identifier bounds set apart.
+    fn comparable() -> ResolutionLimits {
+        let mut limits = fixture_limits(100);
+        limits.configuration_input.structural.max_profile_id_bytes = Bound::new(3).unwrap();
+        limits.target_grouping.max_target_id_bytes = Bound::new(7).unwrap();
+        limits.target_grouping.max_group_id_bytes = Bound::new(4).unwrap();
+        limits
+    }
+
+    fn before_data(comparable: &ResolutionLimits) -> KeyFacts<'_, FixtureProvider> {
+        KeyFacts {
+            comparable,
+            locales: None,
+        }
+    }
+
+    #[test]
+    fn a_schema_defined_member_and_an_index_are_kept() {
+        let comparable = comparable();
+        let facts = before_data(&comparable);
+        assert_eq!(
+            facts.steps(&schema(), &[Edge::Member("schemaVersion")]),
+            [Step::Safe("schemaVersion")]
+        );
+        assert_eq!(
+            facts.steps(
+                &schema(),
+                &[
+                    Edge::Member("profiles"),
+                    Edge::Member("app"),
+                    Edge::Member("requestedLocales"),
+                    Edge::Index(2),
+                ]
+            ),
+            [
+                Step::Safe("profiles"),
+                Step::Safe("app"),
+                Step::Safe("requestedLocales"),
+                Step::Index(2),
+            ]
+        );
+    }
+
+    /// An unknown member is unsafe, and so is every member below it, a
+    /// schema-defined name included; an index stays an index.
+    #[test]
+    fn an_unknown_member_and_everything_below_it_is_unsafe() {
+        let comparable = comparable();
+        assert_eq!(
+            before_data(&comparable).steps(
+                &schema(),
+                &[
+                    Edge::Member("token"),
+                    Edge::Index(0),
+                    Edge::Member("schemaVersion"),
+                ]
+            ),
+            [Step::Unsafe, Step::Index(0), Step::Unsafe]
+        );
+    }
+
+    /// Each ID key is kept when it matches the identifier syntax and is within
+    /// the capability's bound for its own identifier; the schema goes on below
+    /// a key over the bound, but not below one outside the syntax.
+    #[test]
+    fn an_id_key_is_kept_within_its_identifiers_bound() {
+        let comparable = comparable();
+        let facts = before_data(&comparable);
+        let schema = schema();
+        let key = |edges: &[Edge<'static>]| facts.steps(&schema, edges);
+        let profiles = |id: &'static str| vec![Edge::Member("profiles"), Edge::Member(id)];
+        assert_eq!(key(&profiles("app"))[1], Step::Safe("app"));
+        assert_eq!(key(&profiles("apps"))[1], Step::Unsafe, "over 3 bytes");
+        assert_eq!(key(&profiles("Ap"))[1], Step::Unsafe, "outside the syntax");
+        let below = |id| [profiles(id), vec![Edge::Member("targetProfiles")]].concat();
+        assert_eq!(key(&below("apps"))[2], Step::Safe("targetProfiles"));
+        assert_eq!(key(&below("Ap"))[2], Step::Unsafe);
+        let target = |id| {
+            [
+                profiles("app"),
+                vec![Edge::Member("targetProfiles"), Edge::Member(id)],
+            ]
+            .concat()
+        };
+        assert_eq!(key(&target("browser"))[3], Step::Safe("browser"));
+        assert_eq!(key(&target("browsers"))[3], Step::Unsafe, "over 7 bytes");
+        let group = |id| {
+            [
+                profiles("app"),
+                vec![Edge::Member("deploymentGroups"), Edge::Member(id)],
+            ]
+            .concat()
+        };
+        assert_eq!(key(&group("jobs"))[3], Step::Safe("jobs"));
+        assert_eq!(key(&group("batch"))[3], Step::Unsafe, "over 4 bytes");
+    }
+
+    /// A locale key is kept only once the data is admitted, and only when the
+    /// canonicalizer returns a canonical identifier for it, an alias spelling
+    /// included; a key it refuses or does not know, or one over its bound, is
+    /// unsafe.
+    #[test]
+    fn a_locale_key_is_kept_once_the_data_canonicalizes_it() {
+        let comparable = comparable();
+        let schema = schema();
+        let bound = canonicalizer(5);
+        let after = KeyFacts {
+            comparable: &comparable,
+            locales: Some(&bound),
+        };
+        let before = before_data(&comparable);
+        let fallback = |key| {
+            [
+                Edge::Member("profiles"),
+                Edge::Member("app"),
+                Edge::Member("messageFallback"),
+                Edge::Member(key),
+            ]
+        };
+        for key in ["ja", "EN-us", "en-US"] {
+            assert_eq!(
+                after.steps(&schema, &fallback(key))[3],
+                Step::Safe(key),
+                "{key}"
+            );
+            assert_eq!(
+                before.steps(&schema, &fallback(key))[3],
+                Step::Unsafe,
+                "{key}"
+            );
+        }
+        for key in ["en_US", "xx-YY", "zh-Hant-TW"] {
+            assert_eq!(
+                after.steps(&schema, &fallback(key))[3],
+                Step::Unsafe,
+                "{key}"
+            );
+        }
+        let alias = [
+            Edge::Member("profiles"),
+            Edge::Member("app"),
+            Edge::Member("localeNegotiation"),
+            Edge::Member("aliases"),
+            Edge::Member("iw-IL"),
+        ];
+        assert_eq!(after.steps(&schema, &alias)[4], Step::Safe("iw-IL"));
+        assert_eq!(before.steps(&schema, &alias)[4], Step::Unsafe);
     }
 }
