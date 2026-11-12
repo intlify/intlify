@@ -5,14 +5,17 @@
 //! which Evidence needs before it classifies the member (Decision 015-184).
 //!
 //! A member is schema-defined when the object schema at its position, or one
-//! of that schema's `anyOf` branches, names it under `properties`. A key of
-//! the `profiles`, `targetProfiles`, or `deploymentGroups` map is a Profile,
-//! Target, or Group ID key, and a key of the `localeNegotiation.aliases` or
+//! of that schema's `anyOf` branches, names it under `properties`. The keyed
+//! maps are the members at the positions 015 gives them: a key of the root's
+//! `profiles` map (D15:292), or of a profile declaration's `targetProfiles`
+//! or `deploymentGroups` map (D15:469), is a Profile, Target, or Group ID
+//! key, and a key of a declaration's `localeNegotiation.aliases` or
 //! `messageFallback` map is a locale key; whether the key itself is
-//! non-secret is the resolver's decision. Every other member is undefined,
-//! and so is every member below an undefined one or below an ID key that does
-//! not match the identifier syntax, where the schema describes nothing. An
-//! array index has no place: Evidence always keeps it.
+//! non-secret is the resolver's decision. A member of the same name at any
+//! other position holds no keyed map. Every other member is undefined, and so
+//! is every member below an undefined one or below an ID key that does not
+//! match the identifier syntax, where the schema describes nothing. An array
+//! index has no place: Evidence always keeps it.
 
 use crate::model::valid_identity;
 
@@ -31,32 +34,41 @@ pub(crate) enum Edge<'a> {
 pub(crate) enum Place {
     /// A name the schema defines at the member's position.
     Defined,
-    /// A key of `profiles`.
+    /// A key of the root's `profiles`.
     ProfileId,
     /// A key of a declaration's `targetProfiles`.
     TargetId,
     /// A key of a declaration's `deploymentGroups`.
     GroupId,
-    /// A key of `localeNegotiation.aliases` or of `messageFallback`.
+    /// A key of a declaration's `localeNegotiation.aliases` or
+    /// `messageFallback`.
     LocaleKey,
     /// Any other member.
     Undefined,
 }
 
-/// The keyed maps of Decision 015-184, by the schema-defined member that
-/// holds each.
+/// What the schema node at one position of a path is to Decision 015-184:
+/// an object that holds one of its keyed maps, or one of those maps.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Map {
+enum Role {
+    /// The configuration root, which holds `profiles`.
+    Root,
+    /// A profile declaration, which holds `targetProfiles`,
+    /// `deploymentGroups`, `messageFallback`, and `localeNegotiation`.
+    Declaration,
+    /// A declaration's `localeNegotiation`, which holds `aliases`.
+    Negotiation,
+    /// A map keyed by identifiers, whose keys have this place.
     Identifiers(Place),
+    /// A map keyed by locales.
     Locales,
 }
 
-/// The schema node at one position of a path, and the map it is when it is
-/// one of those maps.
+/// The schema node at one position of a path, and its role when it has one.
 #[derive(Debug, Clone, Copy)]
 struct Position {
     schema: SchemaId,
-    map: Option<Map>,
+    role: Option<Role>,
 }
 
 /// The place of every edge of `edges`, walked from the root of `program`:
@@ -64,7 +76,7 @@ struct Position {
 pub(super) fn places(program: &SchemaProgram, edges: &[Edge<'_>]) -> Vec<Option<Place>> {
     let mut at = Some(Position {
         schema: program.root(),
-        map: None,
+        role: Some(Role::Root),
     });
     edges
         .iter()
@@ -86,27 +98,29 @@ pub(super) fn places(program: &SchemaProgram, edges: &[Edge<'_>]) -> Vec<Option<
 
 /// The place of the member `name` at `position`, and the position below it.
 fn member(program: &SchemaProgram, position: Position, name: &str) -> (Place, Option<Position>) {
-    match position.map {
-        Some(Map::Identifiers(place)) => {
+    match position.role {
+        Some(Role::Identifiers(place)) => {
             let schema = program
                 .identity_values(position.schema)
                 .filter(|_| valid_identity(name));
-            (place, schema.map(|schema| Position { schema, map: None }))
+            // The value of a Profile ID key is a profile declaration.
+            let role = (place == Place::ProfileId).then_some(Role::Declaration);
+            (place, schema.map(|schema| Position { schema, role }))
         }
-        Some(Map::Locales) => {
+        Some(Role::Locales) => {
             let schema = match program.resolved(position.schema).additional {
                 Some(Additional::Schema(schema)) => Some(schema),
                 Some(Additional::Forbidden) | None => None,
             };
             (
                 Place::LocaleKey,
-                schema.map(|schema| Position { schema, map: None }),
+                schema.map(|schema| Position { schema, role: None }),
             )
         }
-        None => {
+        holder => {
             defined(program, position.schema, name).map_or((Place::Undefined, None), |schema| {
-                let map = held_map(program, schema, name);
-                (Place::Defined, Some(Position { schema, map }))
+                let role = holder.and_then(|holder| held(program, holder, schema, name));
+                (Place::Defined, Some(Position { schema, role }))
             })
         }
     }
@@ -130,32 +144,35 @@ fn items(program: &SchemaProgram, position: Position) -> Option<Position> {
     program
         .resolved(position.schema)
         .items
-        .map(|schema| Position { schema, map: None })
+        .map(|schema| Position { schema, role: None })
 }
 
-/// The map that the schema-defined member `name` holds, when its schema is
-/// one of the maps of Decision 015-184: an identifier map keys its members by
-/// the identifier syntax, and a locale map gives every key one schema.
-fn held_map(program: &SchemaProgram, schema: SchemaId, name: &str) -> Option<Map> {
+/// The role of the schema-defined member `name` of `holder`, whose schema is
+/// `schema`: a declaration's `localeNegotiation`, or one of the maps of
+/// Decision 015-184 when the member is at that map's position and its schema
+/// is one, where an identifier map keys its members by the identifier syntax
+/// and a locale map gives every key one schema.
+fn held(program: &SchemaProgram, holder: Role, schema: SchemaId, name: &str) -> Option<Role> {
     let node = program.resolved(schema);
-    let identifiers = |place| node.identity_values.map(|_| Map::Identifiers(place));
-    match name {
-        "profiles" => identifiers(Place::ProfileId),
-        "targetProfiles" => identifiers(Place::TargetId),
-        "deploymentGroups" => identifiers(Place::GroupId),
-        "aliases" | "messageFallback" => {
-            matches!(node.additional, Some(Additional::Schema(_))).then_some(Map::Locales)
-        }
+    let identifiers = |place| node.identity_values.map(|_| Role::Identifiers(place));
+    let locales = matches!(node.additional, Some(Additional::Schema(_))).then_some(Role::Locales);
+    match (holder, name) {
+        (Role::Root, "profiles") => identifiers(Place::ProfileId),
+        (Role::Declaration, "targetProfiles") => identifiers(Place::TargetId),
+        (Role::Declaration, "deploymentGroups") => identifiers(Place::GroupId),
+        (Role::Declaration, "messageFallback") | (Role::Negotiation, "aliases") => locales,
+        (Role::Declaration, "localeNegotiation") => Some(Role::Negotiation),
         _ => None,
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
+    use serde_json::{json, Value};
 
     use super::{places, Edge, Place};
     use crate::construction::committed::CONFIGURATION_SCHEMA;
+    use crate::model::ID_PATTERN;
     use crate::structural::program::SchemaProgram;
 
     use Edge::{Index, Member};
@@ -324,23 +341,153 @@ mod tests {
         );
     }
 
-    /// A member named like a map holder holds a map only when its schema is
-    /// one: an object with fixed members is no identifier or locale map.
-    #[test]
-    fn a_named_member_whose_schema_is_no_map_holds_none() {
-        let fixed = json!({ "type": "object", "properties": { "a": { "type": "string" } } });
-        let program = SchemaProgram::compile(&json!({
+    /// A map keyed by the identifier syntax, with `values` for every key.
+    fn identifiers(values: &Value) -> Value {
+        json!({ "type": "object", "patternProperties": { ID_PATTERN: values } })
+    }
+
+    /// A map with `values` for every key.
+    fn open(values: &Value) -> Value {
+        json!({ "type": "object", "additionalProperties": values })
+    }
+
+    /// A schema whose root object has `properties`.
+    fn compile(properties: &Value) -> SchemaProgram {
+        SchemaProgram::compile(&json!({
             "$schema": "http://json-schema.org/draft-07/schema#",
             "type": "object",
-            "properties": { "profiles": fixed, "aliases": fixed },
+            "properties": properties,
         }))
-        .unwrap();
-        for name in ["profiles", "aliases"] {
-            assert_eq!(
-                places(&program, &[Member(name), Member("a"), Member("b")]),
-                [Some(Defined), Some(Defined), Some(Undefined)],
-                "{name}"
-            );
+        .unwrap()
+    }
+
+    /// Below `holder`, each of the members `names` is defined and a key below
+    /// them is undefined: no member of `names` holds a keyed map there.
+    fn assert_no_map(program: &SchemaProgram, holder: &[Edge<'_>], names: &[&str]) {
+        let below: Vec<_> = names.iter().map(|&name| Member(name)).collect();
+        let edges = [holder, &below, &[Member("key")]].concat();
+        let mut expected = places(program, holder);
+        expected.extend(names.iter().map(|_| Some(Defined)));
+        expected.push(Some(Undefined));
+        assert_eq!(places(program, &edges), expected, "{edges:?}");
+    }
+
+    /// A member at a map's position holds the map only when its schema is
+    /// one: an object with fixed members is no identifier or locale map.
+    #[test]
+    fn a_member_whose_schema_is_no_map_holds_none() {
+        let fixed = json!({ "type": "object", "properties": { "a": { "type": "string" } } });
+        assert_no_map(&compile(&json!({ "profiles": fixed })), &[], &["profiles"]);
+        let declaration = json!({
+            "type": "object",
+            "properties": {
+                "targetProfiles": fixed,
+                "deploymentGroups": fixed,
+                "messageFallback": fixed,
+                "localeNegotiation": { "type": "object", "properties": { "aliases": fixed } },
+            },
+        });
+        let program = compile(&json!({ "profiles": identifiers(&declaration) }));
+        let app = [Member("profiles"), Member("app")];
+        assert_eq!(places(&program, &app), [Some(Defined), Some(ProfileId)]);
+        for names in [
+            &["targetProfiles"][..],
+            &["deploymentGroups"],
+            &["messageFallback"],
+            &["localeNegotiation", "aliases"],
+        ] {
+            assert_no_map(&program, &app, names);
+        }
+    }
+
+    /// The keyed maps of 015-184 sit only where 015 gives them: a member of
+    /// the same name and shape at the root, in a declaration, below a key of
+    /// each map, or in an array element holds no keyed map.
+    #[test]
+    fn only_the_designated_positions_hold_maps() {
+        let string = json!({ "type": "string" });
+        let negotiation = |aliases: &Value| json!({ "type": "object", "properties": { "aliases": open(aliases) } });
+        // Every map name of 015-184 with the schema of its map.
+        let stray = json!({
+            "type": "object",
+            "properties": {
+                "profiles": identifiers(&string),
+                "targetProfiles": identifiers(&string),
+                "deploymentGroups": identifiers(&string),
+                "messageFallback": open(&string),
+                "aliases": open(&string),
+                "localeNegotiation": negotiation(&string),
+            },
+        });
+        let mut localization = negotiation(&stray);
+        localization["properties"]["messageFallback"] = open(&string);
+        let declaration = json!({
+            "type": "object",
+            "properties": {
+                "profiles": identifiers(&string),
+                "aliases": open(&string),
+                "targetProfiles": identifiers(&stray),
+                "deploymentGroups": identifiers(&stray),
+                "messageFallback": open(&stray),
+                "localeNegotiation": localization,
+                "entries": { "type": "array", "items": stray },
+            },
+        });
+        let mut root = stray["properties"].clone();
+        root["profiles"] = identifiers(&declaration);
+        let program = compile(&root);
+
+        let app = [Member("profiles"), Member("app")];
+        let target = [&app[..], &[Member("targetProfiles"), Member("web")]].concat();
+        let group = [&app[..], &[Member("deploymentGroups"), Member("web")]].concat();
+        let fallback = [&app[..], &[Member("messageFallback"), Member("en")]].concat();
+        let alias = [
+            &app[..],
+            &[Member("localeNegotiation"), Member("aliases"), Member("fr")],
+        ]
+        .concat();
+        let entry = [&app[..], &[Member("entries"), Index(0)]].concat();
+        let keyed = |key| [Some(Defined), Some(ProfileId), Some(Defined), Some(key)];
+        assert_eq!(places(&program, &target), keyed(TargetId));
+        assert_eq!(places(&program, &group), keyed(GroupId));
+        assert_eq!(places(&program, &fallback), keyed(LocaleKey));
+        assert_eq!(
+            places(&program, &alias),
+            [
+                Some(Defined),
+                Some(ProfileId),
+                Some(Defined),
+                Some(Defined),
+                Some(LocaleKey)
+            ]
+        );
+        assert_eq!(
+            places(&program, &entry),
+            [Some(Defined), Some(ProfileId), Some(Defined), None]
+        );
+
+        let strays: [&[&str]; 6] = [
+            &["profiles"],
+            &["targetProfiles"],
+            &["deploymentGroups"],
+            &["messageFallback"],
+            &["aliases"],
+            &["localeNegotiation", "aliases"],
+        ];
+        for names in &strays[1..] {
+            assert_no_map(&program, &[], names);
+        }
+        for names in [
+            &["profiles"][..],
+            &["aliases"],
+            &["localeNegotiation", "messageFallback"],
+        ] {
+            assert_no_map(&program, &app, names);
+        }
+        for holder in [&target, &group, &fallback, &alias, &entry] {
+            for names in strays {
+                assert_no_map(&program, holder, names);
+            }
         }
     }
 }
