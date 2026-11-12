@@ -24,8 +24,8 @@ use crate::locale::{CanonicalLocale, Canonicalizer, Provider, VersionedIdentity}
 use crate::model::{FallbackCandidate, NonEmptyVec};
 
 use super::evaluation::{
-    and, both, within, Admitted, Blocking, Causes, Check, Code, Evaluation, Phase, Reason, Subject,
-    Unit,
+    and, both, within, Admitted, Blocking, Causes, Check, Code, Evaluation, Notice, Phase, Reason,
+    Subject, Unit,
 };
 use super::limits::{BoundId, ConfirmedPolicy, Group};
 use super::locales::{
@@ -374,8 +374,11 @@ fn literal_at<P: Provider>(
         attempt.map(|attempt| attempt.map(|(locale, _)| locale)),
         |attempt| attempt,
     )?;
-    if corrected {
-        evaluation.notice(own(Check::CanonicalLocale), Code::LocaleNonCanonical)?;
+    if let (true, Ok(canonical)) = (corrected, &locale) {
+        evaluation.notice(
+            own(Check::CanonicalLocale),
+            Notice::non_canonical(canonical.clone()),
+        )?;
     }
     let distinct = evaluation.check(
         own(Check::DistinctFromSource),

@@ -1921,7 +1921,7 @@ const fn derivation(kind: SubjectKind, check: Check) -> Derivation {
 /// also names its subject kind, a capability bound's path holds its group,
 /// and the reporting bound's reason names its domain (D15:2349, 2350, 2352,
 /// 2353).
-const fn details_members(code: Code) -> &'static [DetailsMember] {
+pub(crate) const fn details_members(code: Code) -> &'static [DetailsMember] {
     use Code as C;
     use DetailsMember as M;
     match code {
@@ -1994,7 +1994,7 @@ pub(crate) mod testing {
 
     use crate::resolver::evaluation::Code;
 
-    use super::{finding_codes, CheckRegistry, Derivation, DetailsMember, Reason};
+    use super::{finding_codes, CheckRegistry, Derivation, Reason};
 
     /// The Finding codes `check` of `kind` may report.
     pub(crate) fn possible_codes(kind: SubjectKind, check: Check) -> &'static [Code] {
@@ -2007,10 +2007,6 @@ pub(crate) mod testing {
     }
 
     /// The members of `code`'s details.
-    pub(crate) const fn details_members(code: Code) -> &'static [DetailsMember] {
-        super::details_members(code)
-    }
-
     /// The stable reasons `check` of `kind` may report `code` with.
     pub(crate) const fn reasons(kind: SubjectKind, check: Check, code: Code) -> &'static [Reason] {
         super::reasons(kind, check, code)

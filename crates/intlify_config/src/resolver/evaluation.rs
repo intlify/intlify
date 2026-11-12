@@ -8,7 +8,10 @@
 //! unit found, and a unit whose prerequisite is unavailable is recorded as not
 //! evaluated with the keys behind it instead of reporting a cascade issue. A
 //! resource issue keeps the details 015 reports with it, and an evaluated unit
-//! may also find a non-blocking result, which suppresses nothing.
+//! may also find a non-blocking result, which suppresses nothing and carries
+//! the suggestion its code makes. The candidates of one key carry equal
+//! details and suggestions, since a key determines its whole payload
+//! (D15:2381).
 
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -18,7 +21,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::construction::registry::finding::SuggestionKind;
 use crate::input_limits::Bound;
+use crate::locale::CanonicalLocale;
 
 use super::artifact_resolution::CollectionSubject;
 use super::capability::BootstrapBoundId;
@@ -934,6 +939,51 @@ impl Blocking {
     }
 }
 
+/// A non-blocking result an evaluated check found, which leaves the value it
+/// establishes available, with the safe suggestion its code makes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Notice {
+    pub(crate) code: Code,
+    pub(crate) suggestion: Option<Suggestion>,
+}
+
+impl Notice {
+    /// A locale spelled otherwise than its canonical form, which suggests the
+    /// exact canonical spelling in its place (D15:2410).
+    pub(crate) const fn non_canonical(locale: CanonicalLocale) -> Self {
+        Self {
+            code: Code::LocaleNonCanonical,
+            suggestion: Some(Suggestion::CanonicalLocaleReplacement(locale)),
+        }
+    }
+
+    /// A notice no check reports, without a suggestion, which a test fills
+    /// a fabricated evaluation with.
+    #[cfg(test)]
+    pub(crate) const fn made_up(code: Code) -> Self {
+        Self {
+            code,
+            suggestion: None,
+        }
+    }
+}
+
+/// A Finding's safe suggestion, of the kind its code's Finding Registry row
+/// names.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Suggestion {
+    /// The exact canonical spelling that replaces the authored one.
+    CanonicalLocaleReplacement(CanonicalLocale),
+}
+
+impl Suggestion {
+    pub(crate) const fn kind(&self) -> SuggestionKind {
+        match self {
+            Self::CanonicalLocaleReplacement(_) => SuggestionKind::CanonicalLocaleReplacement,
+        }
+    }
+}
+
 /// The details 015 reports with an issue that has them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Details {
@@ -1036,6 +1086,16 @@ impl PartialOrd for IssueKey {
     }
 }
 
+/// One result an evaluation found, blocking or not: its key, the details of a
+/// blocking result that has them, and the suggestion of a notice that makes
+/// one. The private counterpart of 015's Finding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Finding<'a> {
+    pub(crate) key: &'a IssueKey,
+    pub(crate) details: Option<&'a Details>,
+    pub(crate) suggestion: Option<&'a Suggestion>,
+}
+
 /// Why a value a check needs is unavailable: the keys of the blocking results
 /// behind it, canonical and duplicate-free. Never empty.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1091,8 +1151,8 @@ pub(crate) enum EvaluationInvariant {
     /// A resolver bug: only an evaluated unit finds a non-blocking result.
     NoticeWithoutEvaluation(Unit),
     /// A resolver bug: candidates report one Finding Key with unequal
-    /// details. A key derives its payload alone, and 015 never settles
-    /// unequal payloads by keeping one (D15:2381).
+    /// details or suggestions. A key derives its payload alone, and 015
+    /// never settles unequal payloads by keeping one (D15:2381).
     UnequalPayload(Unit),
 }
 
@@ -1109,7 +1169,7 @@ pub(crate) struct Evaluation {
     /// status.
     candidates: BTreeMap<Unit, Status>,
     issues: BTreeMap<IssueKey, Option<Details>>,
-    notices: BTreeSet<IssueKey>,
+    notices: BTreeMap<IssueKey, Option<Suggestion>>,
     /// The unit a test makes block.
     #[cfg(test)]
     blocked: Option<Unit>,
@@ -1154,15 +1214,14 @@ impl Evaluation {
     }
 
     /// Asserts that `unit`'s Check Registry row lists `code`, that the code
-    /// blocks exactly when the result does, as its Finding Registry row says,
-    /// and that the result carries what the row's payload strategy gives the
-    /// code: a
-    /// reason exactly when its details have one, and then one the row lists
-    /// for the code, a bound's or a shortfall's
-    /// details exactly when they have its members, and past a bound an exact
-    /// total only under a key that names one value, and otherwise the
-    /// smallest witness `limit + 1`. Unless a test made the result up or made
-    /// the unit block.
+    /// blocks exactly when the result does and suggests what kind it does,
+    /// as its Finding Registry row says, and that the result carries what the
+    /// row's payload strategy gives the code: a reason exactly when its
+    /// details have one, and then one the row lists for the code, a bound's
+    /// or a shortfall's details exactly when they have its members, and past
+    /// a bound an exact total only under a key that names one value, and
+    /// otherwise the smallest witness `limit + 1`. Unless a test made the
+    /// result up or made the unit block.
     #[cfg(test)]
     fn registered(
         &self,
@@ -1170,9 +1229,13 @@ impl Evaluation {
         code: Code,
         reason: Option<Reason>,
         details: Option<Details>,
+        suggestion: Option<&Suggestion>,
         blocking: bool,
     ) {
-        use crate::construction::registry::check::{testing, Derivation, DetailsMember};
+        use crate::construction::registry::check::{
+            details_members, testing, Derivation, DetailsMember,
+        };
+        use crate::construction::registry::finding;
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
@@ -1184,13 +1247,20 @@ impl Evaluation {
             code.as_str()
         );
         assert_eq!(
-            crate::construction::registry::finding::testing::blocking(code),
+            finding::blocking(code),
             blocking,
             "{unit:?} reports {} {}, against its Finding Registry row",
             code.as_str(),
             if blocking { "blocking" } else { "as a notice" }
         );
-        let members = testing::details_members(code);
+        assert_eq!(
+            suggestion.map_or(SuggestionKind::None, Suggestion::kind),
+            finding::suggestion_kind(code),
+            "{unit:?} reports {} with {suggestion:?}, against the suggestion kind of its \
+             Finding Registry row",
+            code.as_str()
+        );
+        let members = details_members(code);
         assert_eq!(
             reason.is_some(),
             members.contains(&DetailsMember::Reason),
@@ -1295,7 +1365,7 @@ impl Evaluation {
                     details,
                 }) => {
                     #[cfg(test)]
-                    self.registered(&unit, code, reason, details, true);
+                    self.registered(&unit, code, reason, details, None, true);
                     let key = IssueKey {
                         unit: unit.clone(),
                         code,
@@ -1331,21 +1401,39 @@ impl Evaluation {
         Ok(result)
     }
 
-    /// Records a non-blocking result `code` of a unit `check` evaluated,
+    /// Records the non-blocking result `notice` of a unit `check` evaluated,
     /// under the unit over its logical subject. It is never a cause: nothing
-    /// waits on it.
-    pub(crate) fn notice(&mut self, unit: Unit, code: Code) -> Result<(), EvaluationInvariant> {
+    /// waits on it. A candidate that suggests otherwise than another under
+    /// the same key is a resolver bug and is not recorded.
+    pub(crate) fn notice(&mut self, unit: Unit, notice: Notice) -> Result<(), EvaluationInvariant> {
         let logical = unit.logical();
         if self.statuses.get(&logical) != Some(&Status::Evaluated) {
             return Err(EvaluationInvariant::NoticeWithoutEvaluation(unit));
         }
         #[cfg(test)]
-        self.registered(&logical, code, None, None, false);
-        self.notices.insert(IssueKey {
+        self.registered(
+            &logical,
+            notice.code,
+            None,
+            None,
+            notice.suggestion.as_ref(),
+            false,
+        );
+        let key = IssueKey {
             unit: logical,
-            code,
+            code: notice.code,
             reason: None,
-        });
+        };
+        match self.notices.entry(key) {
+            Entry::Vacant(entry) => {
+                entry.insert(notice.suggestion);
+            }
+            Entry::Occupied(entry) => {
+                if *entry.get() != notice.suggestion {
+                    return Err(EvaluationInvariant::UnequalPayload(unit));
+                }
+            }
+        }
         Ok(())
     }
 
@@ -1393,13 +1481,35 @@ impl Evaluation {
     }
 
     pub(crate) fn notices(&self) -> impl Iterator<Item = &IssueKey> {
-        self.notices.iter()
+        self.notices.keys()
+    }
+
+    /// Every result found, blocking or not, with its details or suggestion,
+    /// in 015's Finding order.
+    pub(crate) fn findings(&self) -> Vec<Finding<'_>> {
+        let mut found: Vec<Finding<'_>> = self
+            .issues
+            .iter()
+            .map(|(key, details)| Finding {
+                key,
+                details: details.as_ref(),
+                suggestion: None,
+            })
+            .chain(self.notices.iter().map(|(key, suggestion)| Finding {
+                key,
+                details: None,
+                suggestion: suggestion.as_ref(),
+            }))
+            .collect();
+        found.sort_by_key(|finding| finding.key);
+        found
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::resolver::locales::fixtures::canonical;
 
     const MISSING: Blocking = Blocking {
         code: Code::SpecificationInputIncomplete,
@@ -1760,7 +1870,7 @@ mod tests {
     fn a_test_evaluation_records_only_notices_the_units_row_lists() {
         let mut evaluation = Evaluation::default();
         let _ = evaluation.check(data(), Ok(()), |()| Ok::<(), Blocking>(()));
-        let _ = evaluation.notice(data(), Code::LocaleNonCanonical);
+        let _ = evaluation.notice(data(), Notice::non_canonical(canonical("en")));
     }
 
     #[test]
@@ -1776,7 +1886,9 @@ mod tests {
             .check(data(), Ok(()), |()| Ok::<(), Blocking>(()))
             .unwrap()
             .unwrap();
-        evaluation.notice(data(), Code::LocaleNonCanonical).unwrap();
+        evaluation
+            .notice(data(), Notice::made_up(Code::LocaleNonCanonical))
+            .unwrap();
         // A real evaluation a test goes on to fill.
         let mut evaluation = Evaluation::default();
         evaluation
@@ -1784,7 +1896,9 @@ mod tests {
             .unwrap()
             .unwrap();
         let mut evaluation = evaluation.fabricating();
-        evaluation.notice(data(), Code::LocaleNonCanonical).unwrap();
+        evaluation
+            .notice(data(), Notice::made_up(Code::LocaleNonCanonical))
+            .unwrap();
         assert_eq!(evaluation.notices().count(), 1);
     }
 
@@ -1805,7 +1919,7 @@ mod tests {
     fn a_test_evaluation_records_a_blocking_code_only_as_a_blocking_result() {
         let mut evaluation = Evaluation::default();
         let _ = evaluation.check(data(), Ok(()), |()| Ok::<(), Blocking>(()));
-        let _ = evaluation.notice(data(), Code::LocaleDataNotAdmitted);
+        let _ = evaluation.notice(data(), Notice::made_up(Code::LocaleDataNotAdmitted));
     }
 
     #[test]
@@ -1819,6 +1933,14 @@ mod tests {
                 details: None,
             })
         });
+    }
+
+    #[test]
+    #[should_panic(expected = "against the suggestion kind")]
+    fn a_test_evaluation_records_a_suggestion_exactly_of_the_kind_its_code_makes() {
+        let mut evaluation = Evaluation::default();
+        let _ = evaluation.check(spelled(), Ok(()), |()| Ok::<(), Blocking>(()));
+        let _ = evaluation.notice(spelled(), Notice::made_up(Code::LocaleNonCanonical));
     }
 
     /// The data's check reports a code without details.
@@ -2354,7 +2476,10 @@ mod tests {
             .unwrap()
             .unwrap();
         evaluation
-            .notice(slot(Slot::Coverage), Code::LocaleNonCanonical)
+            .notice(
+                slot(Slot::Coverage),
+                Notice::made_up(Code::LocaleNonCanonical),
+            )
             .unwrap();
         assert_eq!(
             evaluation
@@ -2370,7 +2495,10 @@ mod tests {
         );
         // A unit never recorded, or one left not evaluated, found nothing.
         assert_eq!(
-            evaluation.notice(slot(Slot::LocaleNegotiation), Code::LocaleNonCanonical),
+            evaluation.notice(
+                slot(Slot::LocaleNegotiation),
+                Notice::made_up(Code::LocaleNonCanonical)
+            ),
             Err(EvaluationInvariant::NoticeWithoutEvaluation(slot(
                 Slot::LocaleNegotiation
             )))
@@ -2381,7 +2509,7 @@ mod tests {
             .unwrap()
             .unwrap_err();
         assert_eq!(
-            evaluation.notice(data(), Code::LocaleNonCanonical),
+            evaluation.notice(data(), Notice::made_up(Code::LocaleNonCanonical)),
             Err(EvaluationInvariant::NoticeWithoutEvaluation(data()))
         );
         assert_eq!(evaluation.notices().count(), 1);
@@ -2459,6 +2587,125 @@ mod tests {
         );
         assert_eq!(evaluation.issues().count(), 1);
         assert_eq!(evaluation.candidates().count(), 2);
+    }
+
+    /// D15:2381 for a suggestion: candidates that suggest one replacement
+    /// under one key are one notice, and one that suggests another is a
+    /// resolver bug.
+    #[test]
+    fn candidates_that_suggest_unequal_replacements_under_one_key_are_a_resolver_bug() {
+        let mut evaluation = Evaluation::fabricated();
+        for raw in ["zz", "zy", "en-x-brand"] {
+            evaluation
+                .check(rejected(raw), Ok(()), Ok::<(), Blocking>)
+                .unwrap()
+                .unwrap();
+        }
+        let suggest = |spelling| Notice::non_canonical(canonical(spelling));
+        evaluation.notice(rejected("zz"), suggest("en")).unwrap();
+        evaluation.notice(rejected("zy"), suggest("en")).unwrap();
+        assert_eq!(
+            evaluation.notice(rejected("en-x-brand"), suggest("ja")),
+            Err(EvaluationInvariant::UnequalPayload(rejected("en-x-brand")))
+        );
+        let replacement = Suggestion::CanonicalLocaleReplacement(canonical("en"));
+        assert_eq!(
+            evaluation
+                .findings()
+                .iter()
+                .map(|finding| (finding.key.unit().clone(), finding.suggestion))
+                .collect::<Vec<_>>(),
+            [(rejected("zz").logical(), Some(&replacement))]
+        );
+    }
+
+    /// Every order of `count` items.
+    fn orders(count: usize) -> Vec<Vec<usize>> {
+        if count == 0 {
+            return vec![Vec::new()];
+        }
+        let mut all = Vec::new();
+        for order in orders(count - 1) {
+            for at in 0..=order.len() {
+                let mut longer = order.clone();
+                longer.insert(at, count - 1);
+                all.push(longer);
+            }
+        }
+        all
+    }
+
+    /// D15:2383: candidates that share keys with equal payloads give one
+    /// evaluation, whatever order they arrive in.
+    #[test]
+    fn candidates_with_equal_payloads_under_one_key_commute() {
+        let over = Blocking::limit(exceeded(Actual::AtLeast(4)));
+        let invalid = Blocking {
+            code: Code::LocaleInvalid,
+            reason: None,
+            details: None,
+        };
+        let candidates = [
+            ("zz", Some(invalid)),
+            ("zy", Some(invalid)),
+            ("x-long", Some(over)),
+            ("x-longer", Some(over)),
+            ("q", None),
+        ];
+        let evaluations: Vec<Evaluation> = orders(candidates.len())
+            .into_iter()
+            .map(|order| {
+                let mut evaluation = Evaluation::default();
+                let causes = missing(&mut evaluation, slot(Slot::LocaleNegotiation));
+                for index in order {
+                    let (raw, found) = candidates[index];
+                    let candidate = match found {
+                        Some(found) => evaluation
+                            .check(rejected(raw), Ok(()), |()| Err::<(), _>(found))
+                            .unwrap(),
+                        // A candidate its prerequisite excludes.
+                        None => evaluation
+                            .check(
+                                rejected(raw),
+                                Err::<(), _>(causes.clone()),
+                                Ok::<(), Blocking>,
+                            )
+                            .unwrap(),
+                    };
+                    assert!(candidate.is_err());
+                }
+                evaluation
+            })
+            .collect();
+        assert_eq!(evaluations.len(), 120);
+        assert!(evaluations
+            .iter()
+            .all(|evaluation| *evaluation == evaluations[0]));
+        let evaluation = &evaluations[0];
+        assert_eq!(
+            evaluation
+                .findings()
+                .iter()
+                .map(|finding| (finding.key.code(), finding.details.copied()))
+                .collect::<Vec<_>>(),
+            [
+                // The prerequisite that excludes one candidate.
+                (Code::SpecificationInputIncomplete, None),
+                (Code::LocaleInvalid, None),
+                (
+                    Code::ResourceLimitExceeded,
+                    Some(Details::Limit(exceeded(Actual::AtLeast(4))))
+                ),
+            ]
+        );
+        assert_eq!(evaluation.status(&rejected("zz")), Some(&Status::Evaluated));
+        assert_eq!(
+            evaluation
+                .candidates()
+                .filter(|(unit, _)| unit.logical() == rejected("zz").logical())
+                .count(),
+            5
+        );
     }
 
     /// D15:2184: a unit over several values evaluates every value its
@@ -2576,7 +2823,10 @@ mod tests {
         assert_eq!(evaluation.statuses().count(), 1);
         // A notice of one candidate belongs to the unit they share.
         evaluation
-            .notice(rejected("en-x-brand"), Code::LocaleNonCanonical)
+            .notice(
+                rejected("en-x-brand"),
+                Notice::non_canonical(canonical("en")),
+            )
             .unwrap();
         assert_eq!(
             evaluation

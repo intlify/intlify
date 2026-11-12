@@ -17,6 +17,7 @@ use crate::model::{FallbackCandidate, NonEmptyMap, NonEmptyVec, TargetDeclaratio
 
 use super::super::evaluation::{
     both, Actual, Admitted, Blocking, Check, Code, Evaluation, EvaluationInvariant, LimitExceeded,
+    Notice,
 };
 use super::bound::MAX_LOCALE_IDENTIFIER_BYTES;
 use super::{
@@ -152,8 +153,9 @@ impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
             let locale = self
                 .evaluation
                 .check(unit.clone(), attempt, |attempt| attempt)?;
-            if corrected {
-                self.evaluation.notice(unit, Code::LocaleNonCanonical)?;
+            if let (true, Ok(canonical)) = (corrected, &locale) {
+                self.evaluation
+                    .notice(unit, Notice::non_canonical(canonical.clone()))?;
             }
             results.insert(subject, locale);
         }

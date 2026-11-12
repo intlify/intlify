@@ -218,13 +218,13 @@ pub(crate) fn schema() -> Result<Value, serde_json::Error> {
 
 /// Whether a code blocks: every code but the non-canonical spelling, which
 /// only suggests its canonical form (D15:2223, 2302).
-const fn blocking(code: Code) -> bool {
+pub(crate) const fn blocking(code: Code) -> bool {
     !matches!(code, Code::LocaleNonCanonical)
 }
 
 /// A code's severity: an error when it blocks, and otherwise a warning
 /// (D15:2223).
-const fn severity(code: Code) -> Severity {
+pub(crate) const fn severity(code: Code) -> Severity {
     if blocking(code) {
         Severity::Error
     } else {
@@ -234,21 +234,10 @@ const fn severity(code: Code) -> Severity {
 
 /// A code's suggestion kind: the non-canonical spelling suggests its exact
 /// canonical replacement (D15:2302), and no other code suggests anything.
-const fn suggestion_kind(code: Code) -> SuggestionKind {
+pub(crate) const fn suggestion_kind(code: Code) -> SuggestionKind {
     match code {
         Code::LocaleNonCanonical => SuggestionKind::CanonicalLocaleReplacement,
         _ => SuggestionKind::None,
-    }
-}
-
-/// Helpers for the tests that compare the resolver with the registry.
-#[cfg(test)]
-pub(crate) mod testing {
-    use crate::resolver::evaluation::Code;
-
-    /// Whether `code` blocks.
-    pub(crate) const fn blocking(code: Code) -> bool {
-        super::blocking(code)
     }
 }
 

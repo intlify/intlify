@@ -631,7 +631,7 @@ mod tests {
     use crate::input_limits::Bound;
     use crate::model::DeploymentGroupId;
     use crate::resolver::artifact_resolution::{unit as collection_unit, CollectionSubject};
-    use crate::resolver::evaluation::{Blocking, Code, Details, Phase, Reason, Shortfall};
+    use crate::resolver::evaluation::{Blocking, Code, Details, Notice, Phase, Reason, Shortfall};
     use crate::resolver::exact_resolution::unit as reference_unit;
     use crate::resolver::groups::unit as group_unit;
     use crate::resolver::limits::{BoundId, Group};
@@ -903,7 +903,7 @@ mod tests {
             evaluation
                 .notice(
                     of_browser(Check::ProjectSubset),
-                    Code::TargetLocalesNotSubset,
+                    Notice::made_up(Code::TargetLocalesNotSubset),
                 )
                 .unwrap();
             evaluation
