@@ -34,6 +34,7 @@ pub(crate) mod specification;
 pub(crate) mod subject;
 pub(crate) mod tally;
 pub(crate) mod targets;
+pub(crate) mod token;
 pub(crate) mod vocabulary;
 
 #[cfg(test)]

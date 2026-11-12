@@ -116,6 +116,13 @@ pub(crate) struct Domain {
 }
 
 impl Domain {
+    /// A domain of these sets, each already sorted, for another module's
+    /// tests.
+    #[cfg(test)]
+    pub(crate) fn of(locales: Vec<CanonicalLocale>, surfaces: Vec<Token>) -> Self {
+        Self { locales, surfaces }
+    }
+
     pub(crate) fn locales(&self) -> &[CanonicalLocale] {
         &self.locales
     }
