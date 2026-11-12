@@ -265,16 +265,16 @@ impl Digest for Sha256 {
     }
 }
 
-/// A Redacted subject token: the complete digest of its record, and an
-/// ordinal only when another record of its phase and subject kind has the
-/// same digest.
+/// A Redacted token, subject or evidence: the complete digest of its record,
+/// and an ordinal only when another record of its colliding set has the same
+/// digest.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct SubjectToken {
+pub(crate) struct RedactedToken {
     digest: [u8; 32],
     collision: Option<u64>,
 }
 
-impl SubjectToken {
+impl RedactedToken {
     /// The token's view, `{ token, collision? }`, the ordinal as a decimal
     /// string (D15:2450, 2468).
     pub(crate) fn view(&self) -> Value {
@@ -294,7 +294,7 @@ impl SubjectToken {
 /// took.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Tokens {
-    tokens: BTreeMap<Vec<u8>, SubjectToken>,
+    tokens: BTreeMap<Vec<u8>, RedactedToken>,
     comparisons: u64,
 }
 
@@ -318,23 +318,7 @@ impl Tokens {
                 .or_default()
                 .insert(record);
         }
-        let mut tokens = BTreeMap::new();
-        let mut comparisons = 0_u64;
-        for ((_, digest), records) in sets {
-            let members = u64::try_from(records.len()).expect("an in-memory count fits u64");
-            // A set of one record takes no comparison.
-            comparisons = comparisons.saturating_add(members.saturating_mul(members - 1) / 2);
-            let collides = members > 1;
-            for (ordinal, record) in (0_u64..).zip(records) {
-                tokens.insert(
-                    record,
-                    SubjectToken {
-                        digest,
-                        collision: collides.then_some(ordinal),
-                    },
-                );
-            }
-        }
+        let (tokens, comparisons) = number(sets);
         Self {
             tokens,
             comparisons,
@@ -346,7 +330,7 @@ impl Tokens {
         &self,
         specification: Specification<'_>,
         subject: &Subject,
-    ) -> Option<SubjectToken> {
+    ) -> Option<RedactedToken> {
         self.tokens.get(&record(specification, subject)).copied()
     }
 
@@ -354,6 +338,33 @@ impl Tokens {
     pub(crate) const fn comparisons(&self) -> u64 {
         self.comparisons
     }
+}
+
+/// The token of every record of `sets`, each set the records of one key that
+/// share one digest, and the comparisons the sets took. A set of unequal
+/// records is numbered from 0 in ascending byte order before any token is
+/// handed out, and each pair in it counts as one comparison (Decision
+/// 015-176). A set of one record takes no ordinal and no comparison.
+pub(crate) fn number<K: Ord>(
+    sets: BTreeMap<(K, [u8; 32]), BTreeSet<Vec<u8>>>,
+) -> (BTreeMap<Vec<u8>, RedactedToken>, u64) {
+    let mut tokens = BTreeMap::new();
+    let mut comparisons = 0_u64;
+    for ((_, digest), records) in sets {
+        let members = u64::try_from(records.len()).expect("an in-memory count fits u64");
+        comparisons = comparisons.saturating_add(members.saturating_mul(members - 1) / 2);
+        let collides = members > 1;
+        for (ordinal, record) in (0_u64..).zip(records) {
+            tokens.insert(
+                record,
+                RedactedToken {
+                    digest,
+                    collision: collides.then_some(ordinal),
+                },
+            );
+        }
+    }
+    (tokens, comparisons)
 }
 
 /// The own key of `subject` and the subject that scopes it.
