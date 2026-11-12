@@ -17,6 +17,7 @@ pub(crate) mod coverage;
 pub(crate) mod delivery;
 pub(crate) mod dependency;
 pub(crate) mod evaluation;
+pub(crate) mod evidence_token;
 pub(crate) mod exact_resolution;
 pub(crate) mod fallback;
 pub(crate) mod groups;
