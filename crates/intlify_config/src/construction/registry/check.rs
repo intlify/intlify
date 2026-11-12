@@ -615,6 +615,13 @@ pub(crate) fn key_shape(kind: SubjectKind) -> KeyShape {
     }
 }
 
+/// The ID of the row of `kind` that runs `check`, or `None` when the kind
+/// runs no such check.
+pub(crate) fn check_id(kind: SubjectKind, check: Check) -> Option<&'static str> {
+    let rank = kind.checks().iter().position(|&own| own == check)?;
+    check_ids(kind).get(rank).copied()
+}
+
 /// The shape of a kind's keys: its strategy, its owning scope (`None` for a
 /// singleton, whose scope is its own kind), and the kind whose subjects scope
 /// its own.
@@ -1987,7 +1994,7 @@ pub(crate) mod testing {
 
     use crate::resolver::evaluation::Code;
 
-    use super::{check_ids, finding_codes, CheckRegistry, Derivation, DetailsMember, Reason};
+    use super::{finding_codes, CheckRegistry, Derivation, DetailsMember, Reason};
 
     /// The Finding codes `check` of `kind` may report.
     pub(crate) fn possible_codes(kind: SubjectKind, check: Check) -> &'static [Code] {
@@ -2019,7 +2026,7 @@ pub(crate) mod testing {
 
     /// The check ID of `check` of `kind`.
     pub(crate) fn check_id(kind: SubjectKind, check: Check) -> &'static str {
-        check_ids(kind)[rank(kind, check)]
+        super::check_id(kind, check).expect("the kind runs the check")
     }
 
     /// Every row each row of `registry` waits on, through its prerequisites
@@ -2202,6 +2209,28 @@ mod tests {
                 json!(projection.id())
             );
         }
+    }
+
+    #[test]
+    fn a_check_has_the_id_of_its_row_and_none_outside_its_kind() {
+        let rows = registry().rows;
+        for kind in SubjectKind::ALL {
+            let own: Vec<Option<&str>> = rows
+                .iter()
+                .filter(|row| row.subject_kind == kind)
+                .map(|row| Some(row.check_id.as_str()))
+                .collect();
+            let ids: Vec<Option<&str>> = kind
+                .checks()
+                .iter()
+                .map(|&check| check_id(kind, check))
+                .collect();
+            assert_eq!(ids, own, "{kind:?}");
+        }
+        assert_eq!(
+            check_id(SubjectKind::Vocabulary, Check::CanonicalLocale),
+            None
+        );
     }
 
     #[test]
