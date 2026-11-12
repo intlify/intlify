@@ -18,9 +18,11 @@ use crate::input_limits::{Bound, ValueCounts};
 use crate::materialize::{ByteSpan, MaterializedDocument, NodeId, NodeKind};
 use crate::model::{valid_identity, IntlifyConfig, ProfileDeclaration};
 use eval::{EvaluationFailure, FragmentState, SchemaEvaluation};
+pub(crate) use place::{Edge, Place};
 use program::{ProgramError, SchemaId, SchemaProgram};
 
 mod eval;
+mod place;
 mod program;
 pub(crate) mod selection;
 
@@ -145,6 +147,12 @@ impl<Policy, Target> AuthoringSchema<Policy, Target> {
 
     pub(crate) fn schema_body(&self) -> &serde_json::Value {
         &self.binding.body
+    }
+
+    /// Where each edge of `edges`, an internal path from the configuration
+    /// root, sits in this schema: `None` for an index (Decision 015-184).
+    pub(crate) fn places(&self, edges: &[Edge<'_>]) -> Vec<Option<Place>> {
+        place::places(&self.binding.program, edges)
     }
 
     pub(crate) fn analyze(
