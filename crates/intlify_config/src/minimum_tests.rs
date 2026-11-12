@@ -50,11 +50,13 @@ fn corrected(resolved: &ResolvedLocales) -> Vec<Location> {
         .collect()
 }
 
-/// Each blocking result as its subject's role and locale, and its code.
+/// Each blocking result as its subject's role and locale, and its code. A
+/// spelling without an identity has the unit every such spelling shares,
+/// which no longer holds the spelling (Decision 015-174).
 fn issues(evaluation: &Evaluation) -> Vec<(String, Code)> {
     let key = |key: &LocaleKey| match key {
         LocaleKey::Canonical(locale) => locale.as_str().to_owned(),
-        LocaleKey::Content(content) => content.as_str().to_owned(),
+        LocaleKey::Content(_) => "(no identity)".to_owned(),
     };
     evaluation
         .issues()
@@ -260,7 +262,7 @@ fn named_selection_is_exact_and_failures_never_start_locale_work() {
 }
 
 #[test]
-fn semantic_failures_keep_their_exact_subject_and_leave_no_project_locales() {
+fn semantic_failures_name_their_subject_and_leave_no_project_locales() {
     for (source_default, requested, default, expected) in [
         (
             Some("en_US"),
@@ -272,7 +274,7 @@ fn semantic_failures_keep_their_exact_subject_and_leave_no_project_locales() {
             None,
             vec!["en_US"],
             "en",
-            ("requested en_US", Code::LocaleInvalid),
+            ("requested (no identity)", Code::LocaleInvalid),
         ),
         (None, vec!["en"], "en_US", ("default", Code::LocaleInvalid)),
         (

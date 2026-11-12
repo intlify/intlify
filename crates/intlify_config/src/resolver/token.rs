@@ -29,16 +29,19 @@
 //! `maxCollisionComparisons` (Decision 015-176). The digest is a parameter, so
 //! a test can make chosen records collide.
 //!
-//! Units still key by their raw subjects, so nothing records a token yet.
-//! Merging units by projected subject comes later (plan 025 PR 5b).
+//! The evaluation keys each unit by its [`logical`] subject: the raw subject
+//! with the content its projection drops replaced, so raw values with one
+//! projection join one unit as candidates. Nothing records a token yet.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use intlify_shared_json::encoding::{digest_bytes, encode};
 use intlify_shared_json::token::{hex, Token};
 use serde_json::{json, Value};
 
-use crate::artifacts::envelope::{AdmissionKey, MemberKey};
+use crate::artifacts::envelope::{AdmissionKey, ExactTuple, MemberKey};
+use crate::artifacts::SemanticDigest;
 use crate::construction::profile::SUBJECT_TOKEN_DOMAIN;
 use crate::construction::registry::check::{key_shape, kind_id};
 use crate::locale::CanonicalLocale;
@@ -50,7 +53,7 @@ use super::evaluation::Subject;
 use super::fallback::FallbackSubject;
 use super::groups::GroupSubject;
 use super::hydration::{EndpointField, HydrationSubject};
-use super::locales::{LocaleKey, LocaleSubject};
+use super::locales::{Content, LocaleKey, LocaleSubject};
 use super::negotiation::NegotiationSubject;
 use super::resource_policy::{ArtifactSubject, PolicySubject, ReferenceField};
 use super::subject::SubjectKind;
@@ -97,6 +100,129 @@ pub(crate) fn projected(subject: &Subject) -> Value {
     match parent {
         Some(parent) => json!({ "parent": projected(&parent), "subject": own }),
         None => own,
+    }
+}
+
+/// The logical subject of `subject`: the subject itself, with every value it
+/// keys by content replaced by the one value that stands for the value's JSON
+/// type, and a collection member's semantic digest dropped. Two subjects have
+/// one logical subject exactly when they have one projected logical subject,
+/// so a unit over the logical subject is 015's evaluation unit, which every
+/// raw value with that projection joins as a candidate (D15:2203).
+pub(crate) fn logical(subject: &Subject) -> Subject {
+    match subject {
+        Subject::Slot(_)
+        | Subject::Vocabulary
+        | Subject::CanonicalizationData
+        | Subject::DeclarationField(_)
+        | Subject::ArtifactReference(_)
+        | Subject::DeliveryPlacement
+        | Subject::Target(_)
+        | Subject::Group(_)
+        | Subject::Hydration(_)
+        | Subject::SemanticDependency(_)
+        | Subject::ArtifactCollection(CollectionSubject::Group(_)) => subject.clone(),
+        Subject::ResourcePolicy(policy) => Subject::ResourcePolicy(match policy {
+            PolicySubject::Capability(ArtifactSubject::Artifact(key)) => {
+                PolicySubject::Capability(ArtifactSubject::Artifact(logical_member(key)))
+            }
+            PolicySubject::Recheck(ArtifactSubject::Artifact(key)) => {
+                PolicySubject::Recheck(ArtifactSubject::Artifact(logical_member(key)))
+            }
+            other => other.clone(),
+        }),
+        Subject::Locale(locale) => Subject::Locale(logical_locale_subject(locale)),
+        Subject::Negotiation(negotiation) => Subject::Negotiation(match negotiation {
+            NegotiationSubject::Aliases => NegotiationSubject::Aliases,
+            NegotiationSubject::Key(key) => NegotiationSubject::Key(logical_locale(key)),
+            NegotiationSubject::Destination(key, destination) => {
+                NegotiationSubject::Destination(logical_locale(key), logical_locale(destination))
+            }
+        }),
+        Subject::Fallback(fallback) => Subject::Fallback(match fallback {
+            FallbackSubject::Sources => FallbackSubject::Sources,
+            FallbackSubject::Source(key) => FallbackSubject::Source(logical_locale(key)),
+            FallbackSubject::Sequence(key) => FallbackSubject::Sequence(logical_locale(key)),
+            FallbackSubject::Candidate(key, position) => {
+                FallbackSubject::Candidate(logical_locale(key), *position)
+            }
+            FallbackSubject::Literal(key, literal) => {
+                FallbackSubject::Literal(logical_locale(key), logical_locale(literal))
+            }
+            FallbackSubject::IntentSource(key) => {
+                FallbackSubject::IntentSource(logical_locale(key))
+            }
+        }),
+        Subject::Coverage(coverage) => Subject::Coverage(match coverage {
+            CoverageSubject::Locale(_, key) => {
+                CoverageSubject::Locale(RuleContent::projected(), logical_locale(key))
+            }
+            CoverageSubject::SurfaceClass(_, key) => CoverageSubject::SurfaceClass(
+                RuleContent::projected(),
+                match key {
+                    SurfaceKey::Member(_) => key.clone(),
+                    SurfaceKey::Content(_) => SurfaceKey::Content(Content::projected()),
+                },
+            ),
+            CoverageSubject::Rule(_) => CoverageSubject::Rule(RuleContent::projected()),
+            CoverageSubject::Rules
+            | CoverageSubject::LocaleSelectors
+            | CoverageSubject::SurfaceSelectors
+            | CoverageSubject::Domain(_)
+            | CoverageSubject::Cells
+            | CoverageSubject::Comparisons
+            | CoverageSubject::Cell(..)
+            | CoverageSubject::Table => coverage.clone(),
+        }),
+        Subject::ArtifactCollection(CollectionSubject::Member(key)) => {
+            Subject::ArtifactCollection(CollectionSubject::Member(logical_member(key)))
+        }
+    }
+}
+
+fn logical_locale_subject(subject: &LocaleSubject) -> LocaleSubject {
+    match subject {
+        LocaleSubject::RequestedLocale(key) => LocaleSubject::RequestedLocale(logical_locale(key)),
+        LocaleSubject::NegotiationAliasKey(key) => {
+            LocaleSubject::NegotiationAliasKey(logical_locale(key))
+        }
+        LocaleSubject::NegotiationAliasValue(key, value) => {
+            LocaleSubject::NegotiationAliasValue(logical_locale(key), logical_locale(value))
+        }
+        LocaleSubject::MessageFallbackKey(key) => {
+            LocaleSubject::MessageFallbackKey(logical_locale(key))
+        }
+        LocaleSubject::TargetRequestedLocale(target, key) => {
+            LocaleSubject::TargetRequestedLocale(target.clone(), logical_locale(key))
+        }
+        LocaleSubject::Occurrences
+        | LocaleSubject::RequestedLocales
+        | LocaleSubject::DefaultSourceLocale
+        | LocaleSubject::DefaultRequestedLocale
+        | LocaleSubject::TargetProfiles
+        | LocaleSubject::TargetId(_)
+        | LocaleSubject::TargetDefaultRequestedLocale(_) => subject.clone(),
+    }
+}
+
+/// A locale's canonical identity, or the one spelling that stands for every
+/// spelling without one.
+fn logical_locale(key: &LocaleKey) -> LocaleKey {
+    match key {
+        LocaleKey::Canonical(_) => key.clone(),
+        LocaleKey::Content(_) => LocaleKey::Content(Content::projected()),
+    }
+}
+
+/// A member's tuple without its semantic digest, or the key that stands for
+/// every member of its JSON type: the key its logical subject holds.
+pub(crate) fn logical_member(key: &MemberKey) -> MemberKey {
+    match key {
+        MemberKey::Tuple(tuple) => MemberKey::Tuple(Arc::new(ExactTuple {
+            semantic_digest: SemanticDigest::from_hash([0; 32]),
+            ..ExactTuple::clone(tuple)
+        })),
+        MemberKey::Content(content) => MemberKey::Content(content.projected()),
     }
 }
 
@@ -489,7 +615,7 @@ mod tests {
     use crate::resolver::subject::SubjectKind;
     use crate::resolver::targets::TargetSubject;
 
-    use super::{own, projected, record, Digest, Own, Sha256, Specification, Tokens};
+    use super::{logical, own, projected, record, Digest, Own, Sha256, Specification, Tokens};
 
     const PROFILE: Specification<'static> = Specification {
         identity: "intlify-project-profile",
@@ -1172,6 +1298,67 @@ mod tests {
                 projected(&subject),
                 json!({ "content": { "type": json_type } })
             );
+        }
+    }
+
+    /// Every subject of every shape, and raw values that a projection joins
+    /// with them or keeps apart.
+    fn raw_variants() -> Vec<Subject> {
+        let other: CoverageRule = serde_json::from_value(
+            json!({ "mode": "fallback-allowed", "requestedLocales": ["fr"] }),
+        )
+        .unwrap();
+        let other = RuleContent::of(&other);
+        let member = |key| Subject::ArtifactCollection(CollectionSubject::Member(key));
+        let mut subjects = every_shape();
+        subjects.extend([
+            requested(content("x!")),
+            requested(content("not a locale")),
+            requested(key("fr")),
+            member(tuple(2)),
+            member(untupled(json!("y"))),
+            member(untupled(json!(false))),
+            member(untupled(json!(true))),
+            Subject::Coverage(CoverageSubject::Rule(other.clone())),
+            Subject::Coverage(CoverageSubject::Locale(rule(), content("a"))),
+            Subject::Coverage(CoverageSubject::Locale(other.clone(), content("b"))),
+            Subject::Coverage(CoverageSubject::SurfaceClass(
+                other,
+                SurfaceKey::Content(Content::new("a")),
+            )),
+            Subject::Coverage(CoverageSubject::SurfaceClass(
+                rule(),
+                SurfaceKey::Content(Content::new("b")),
+            )),
+            Subject::Fallback(FallbackSubject::Candidate(content("zz"), 0)),
+            Subject::Fallback(FallbackSubject::Candidate(content("yy"), 0)),
+            Subject::Locale(LocaleSubject::NegotiationAliasValue(
+                content("y?"),
+                key("en"),
+            )),
+            Subject::Locale(LocaleSubject::NegotiationAliasValue(
+                content("y?"),
+                content("z?"),
+            )),
+            Subject::Negotiation(NegotiationSubject::Destination(content("q"), key("fr"))),
+        ]);
+        subjects
+    }
+
+    #[test]
+    fn logical_subjects_are_equal_exactly_when_their_token_records_are() {
+        let subjects = raw_variants();
+        for first in &subjects {
+            let own = logical(first);
+            assert_eq!(logical(&own), own, "{first:?}");
+            assert_eq!(projected(&own), projected(first), "{first:?}");
+            for second in &subjects {
+                assert_eq!(
+                    own == logical(second),
+                    record(PROFILE, first) == record(PROFILE, second),
+                    "{first:?} {second:?}"
+                );
+            }
         }
     }
 }

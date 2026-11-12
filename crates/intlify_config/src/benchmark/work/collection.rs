@@ -7,6 +7,7 @@ use crate::artifacts::envelope::{ArtifactKind, Declaration, FormalMember, Member
 use crate::benchmark::artifact_collection::{require_observable, PreparedCollection, Resolved};
 use crate::resolver::artifact_resolution::CollectionSubject;
 use crate::resolver::evaluation::Subject;
+use crate::resolver::token::logical_member;
 
 use super::{LogicalWork, UnavailableWork, WorkFailure, WorkKind, WorkStage, WorkValue};
 
@@ -48,12 +49,13 @@ impl LogicalWork {
             .map(FormalMember::canonical_body)
             .collect::<BTreeSet<_>>();
         let artifact_bytes = sum(members.iter().map(FormalMember::canonical_bytes))?;
-        // Each member key, the tuple a member establishes or else its body,
-        // has a unit checking its bodies, and each tuple another checking
-        // their occurrences.
+        // Each logical member key, the tuple a member establishes without its
+        // semantic digest or else its JSON type (Decisions 015-174 and
+        // 015-177), has a unit checking its bodies, and each tuple another
+        // checking their occurrences.
         let keys = members
             .iter()
-            .map(FormalMember::key)
+            .map(|member| logical_member(&member.key()))
             .collect::<BTreeSet<_>>();
         let tuples = keys
             .iter()

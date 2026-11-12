@@ -12,6 +12,7 @@
 
 use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet};
 
 use schemars::{JsonSchema, Schema, SchemaGenerator};
@@ -320,6 +321,18 @@ pub(crate) struct Unit {
     pub(crate) phase: Phase,
     pub(crate) subject: Subject,
     pub(crate) check: Check,
+}
+
+impl Unit {
+    /// This unit over its logical subject: the evaluation unit that every raw
+    /// value with the subject's projection joins as a candidate (D15:2203).
+    pub(crate) fn logical(&self) -> Self {
+        Self {
+            phase: self.phase,
+            subject: super::token::logical(&self.subject),
+            check: self.check,
+        }
+    }
 }
 
 /// The 015 Finding codes of the resolver's checks: every code of 015's
@@ -1077,14 +1090,24 @@ pub(crate) enum EvaluationInvariant {
     UnitRecordedTwice(Unit),
     /// A resolver bug: only an evaluated unit finds a non-blocking result.
     NoticeWithoutEvaluation(Unit),
+    /// A resolver bug: candidates report one Finding Key with unequal
+    /// details. A key derives its payload alone, and 015 never settles
+    /// unequal payloads by keeping one (D15:2381).
+    UnequalPayload(Unit),
 }
 
 /// The status of every unit recorded so far, the blocking results found with
 /// their details, and the non-blocking ones, each in 015's order whatever order
-/// the units ran in.
+/// the units ran in. Each is keyed by the unit over the logical subject, which
+/// the raw values with one projection share as candidates (D15:2203): such a
+/// unit is evaluated when its prerequisites admit any candidate, and not
+/// evaluated only when they exclude every one (D15:2184).
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct Evaluation {
     statuses: BTreeMap<Unit, Status>,
+    /// Every candidate recorded, by its raw unit, each once, with its own
+    /// status.
+    candidates: BTreeMap<Unit, Status>,
     issues: BTreeMap<IssueKey, Option<Details>>,
     notices: BTreeSet<IssueKey>,
     /// The unit a test makes block.
@@ -1150,7 +1173,7 @@ impl Evaluation {
         blocking: bool,
     ) {
         use crate::construction::registry::check::{testing, Derivation, DetailsMember};
-        if self.fabricated || self.blocked.as_ref() == Some(unit) {
+        if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
         let kind = unit.subject.kind();
@@ -1215,13 +1238,16 @@ impl Evaluation {
         );
     }
 
-    /// Runs `unit` when its prerequisite is admitted and records its status.
+    /// Runs `unit` when its prerequisite is admitted and records its status
+    /// under the unit over its logical subject, as one candidate of it.
     /// A unit whose subject is of another phase's kind, that runs a check its
-    /// kind does not run, or that waits on a result not before it, is a
-    /// resolver bug and is not recorded.
+    /// kind does not run, that waits on a result not before it, or that was
+    /// already recorded, is a resolver bug and is not recorded.
     /// `evaluate` returns the value the unit establishes or the blocking result
-    /// it found. An unavailable prerequisite becomes the unit's causes: the unit
-    /// reports nothing, and whatever depends on it inherits the same causes.
+    /// it found, which its logical unit reports. An unavailable prerequisite
+    /// becomes the candidate's causes: the candidate reports nothing, whatever
+    /// depends on it inherits the same causes, and its logical unit is not
+    /// evaluated unless another candidate is.
     pub(crate) fn check<P, T>(
         &mut self,
         unit: Unit,
@@ -1235,17 +1261,20 @@ impl Evaluation {
         if !kind.checks().contains(&unit.check) {
             return Err(EvaluationInvariant::CheckOutsideKind(unit));
         }
+        let logical = unit.logical();
         if let Err(causes) = &prerequisite {
-            if causes.keys().any(|cause| cause.unit >= unit) {
+            if causes.keys().any(|cause| cause.unit >= logical) {
                 return Err(EvaluationInvariant::CauseNotBefore(unit));
             }
         }
-        if self.statuses.contains_key(&unit) {
+        if self.candidates.contains_key(&unit) {
             return Err(EvaluationInvariant::UnitRecordedTwice(unit));
         }
+        let raw = unit;
+        let unit = logical;
         #[cfg(test)]
         let evaluate = |value| {
-            if self.blocked.as_ref() == Some(&unit) {
+            if self.blocked.as_ref().map(Unit::logical).as_ref() == Some(&unit) {
                 // Any code serves: the test reads only which unit blocked.
                 Err(Blocking {
                     code: Code::JsonInvalid,
@@ -1272,37 +1301,67 @@ impl Evaluation {
                         code,
                         reason,
                     };
-                    self.issues.insert(key.clone(), details);
+                    // A key that stands for several values derives its
+                    // details from itself alone, so every candidate that
+                    // reports it gives the same (Decision 015-157).
+                    match self.issues.entry(key.clone()) {
+                        Entry::Vacant(entry) => {
+                            entry.insert(details);
+                        }
+                        Entry::Occupied(entry) => {
+                            if *entry.get() != details {
+                                return Err(EvaluationInvariant::UnequalPayload(raw));
+                            }
+                        }
+                    }
                     (Status::Evaluated, Err(Causes(BTreeSet::from([key]))))
                 }
+            },
+        };
+        self.candidates.insert(raw, status.clone());
+        let status = match self.statuses.remove(&unit) {
+            None => status,
+            Some(Status::Evaluated) => Status::Evaluated,
+            Some(Status::NotEvaluated(earlier)) => match status {
+                Status::Evaluated => Status::Evaluated,
+                Status::NotEvaluated(causes) => Status::NotEvaluated(earlier.union(causes)),
             },
         };
         self.statuses.insert(unit, status);
         Ok(result)
     }
 
-    /// Records a non-blocking result `code` of a unit `check` evaluated. It
-    /// is never a cause: nothing waits on it.
+    /// Records a non-blocking result `code` of a unit `check` evaluated,
+    /// under the unit over its logical subject. It is never a cause: nothing
+    /// waits on it.
     pub(crate) fn notice(&mut self, unit: Unit, code: Code) -> Result<(), EvaluationInvariant> {
-        if self.statuses.get(&unit) != Some(&Status::Evaluated) {
+        let logical = unit.logical();
+        if self.statuses.get(&logical) != Some(&Status::Evaluated) {
             return Err(EvaluationInvariant::NoticeWithoutEvaluation(unit));
         }
         #[cfg(test)]
-        self.registered(&unit, code, None, None, false);
+        self.registered(&logical, code, None, None, false);
         self.notices.insert(IssueKey {
-            unit,
+            unit: logical,
             code,
             reason: None,
         });
         Ok(())
     }
 
+    /// The status of the unit over `unit`'s logical subject.
     pub(crate) fn status(&self, unit: &Unit) -> Option<&Status> {
-        self.statuses.get(unit)
+        self.statuses.get(&unit.logical())
     }
 
     pub(crate) fn statuses(&self) -> impl Iterator<Item = (&Unit, &Status)> {
         self.statuses.iter()
+    }
+
+    /// Every candidate recorded so far, by its raw unit, with its own status:
+    /// not evaluated only when its own prerequisite was unavailable.
+    pub(crate) fn candidates(&self) -> impl Iterator<Item = (&Unit, &Status)> {
+        self.candidates.iter()
     }
 
     pub(crate) fn issues(&self) -> impl Iterator<Item = &IssueKey> {
@@ -2326,5 +2385,205 @@ mod tests {
             Err(EvaluationInvariant::NoticeWithoutEvaluation(data()))
         );
         assert_eq!(evaluation.notices().count(), 1);
+    }
+
+    /// A unit over a requested spelling without an identity: one candidate of
+    /// the unit that every such spelling shares.
+    fn rejected(raw: &str) -> Unit {
+        crate::resolver::locales::unit(
+            crate::resolver::locales::LocaleSubject::RequestedLocale(
+                crate::resolver::locales::fixtures::content(raw),
+            ),
+            Check::CanonicalLocale,
+        )
+    }
+
+    #[test]
+    fn candidates_of_one_logical_unit_share_its_status_and_its_issue() {
+        let invalid = Blocking {
+            code: Code::LocaleInvalid,
+            reason: None,
+            details: None,
+        };
+        let mut evaluation = Evaluation::default();
+        for raw in ["zz", "en-x-brand"] {
+            let causes = evaluation
+                .check(rejected(raw), Ok(()), |()| Err::<(), _>(invalid))
+                .unwrap()
+                .unwrap_err();
+            // Whatever depends on a candidate waits on its logical unit.
+            assert_eq!(
+                causes
+                    .keys()
+                    .map(|key| key.unit().clone())
+                    .collect::<Vec<_>>(),
+                [rejected(raw).logical()]
+            );
+        }
+        let logical = rejected("zz").logical();
+        assert_eq!(rejected("en-x-brand").logical(), logical);
+        assert_eq!(
+            evaluation.statuses().collect::<Vec<_>>(),
+            [(&logical, &Status::Evaluated)]
+        );
+        assert_eq!(
+            evaluation
+                .issues()
+                .map(|key| key.unit().clone())
+                .collect::<Vec<_>>(),
+            [logical]
+        );
+        assert_eq!(evaluation.candidates().count(), 2);
+        assert_eq!(evaluation.status(&rejected("zz")), Some(&Status::Evaluated));
+    }
+
+    /// D15:2381: the candidates that report one Finding Key give it one
+    /// payload. Unequal details are a resolver bug, not a payload to pick.
+    #[test]
+    fn candidates_that_report_one_key_with_unequal_details_are_a_resolver_bug() {
+        let found = |actual| Blocking::limit(exceeded(actual));
+        let mut evaluation = Evaluation::fabricated();
+        for raw in ["zz", "zy"] {
+            evaluation
+                .check(rejected(raw), Ok(()), |()| {
+                    Err::<(), _>(found(Actual::AtLeast(4)))
+                })
+                .unwrap()
+                .unwrap_err();
+        }
+        assert_eq!(
+            evaluation.check(rejected("en-x-brand"), Ok(()), |()| {
+                Err::<(), _>(found(Actual::AtLeast(5)))
+            }),
+            Err(EvaluationInvariant::UnequalPayload(rejected("en-x-brand")))
+        );
+        assert_eq!(evaluation.issues().count(), 1);
+        assert_eq!(evaluation.candidates().count(), 2);
+    }
+
+    /// D15:2184: a unit over several values evaluates every value its
+    /// prerequisites admit, and is not evaluated only when they exclude every
+    /// one, with every excluding cause.
+    #[test]
+    fn a_logical_unit_is_not_evaluated_only_when_every_candidate_is_excluded() {
+        let mut evaluation = Evaluation::default();
+        let negotiation = missing(&mut evaluation, slot(Slot::LocaleNegotiation));
+        let coverage = missing(&mut evaluation, slot(Slot::Coverage));
+        for (raw, causes) in [("zz", &negotiation), ("en-x-brand", &coverage)] {
+            evaluation
+                .check(
+                    rejected(raw),
+                    Err::<(), _>(causes.clone()),
+                    Ok::<(), Blocking>,
+                )
+                .unwrap()
+                .unwrap_err();
+        }
+        assert_eq!(
+            evaluation.status(&rejected("zz")),
+            Some(&Status::NotEvaluated(
+                negotiation.clone().union(coverage.clone())
+            ))
+        );
+        // A candidate its prerequisites admit makes the unit evaluated, a
+        // later one they exclude leaves it so, and each candidate keeps its
+        // own status.
+        evaluation
+            .check(rejected("x!"), Ok(()), Ok::<(), Blocking>)
+            .unwrap()
+            .unwrap();
+        assert_eq!(evaluation.status(&rejected("zz")), Some(&Status::Evaluated));
+        evaluation
+            .check(
+                rejected("yy"),
+                Err::<(), _>(coverage.clone()),
+                Ok::<(), Blocking>,
+            )
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(evaluation.status(&rejected("zz")), Some(&Status::Evaluated));
+        let candidates: BTreeMap<Unit, Status> = evaluation
+            .candidates()
+            .filter(|(unit, _)| unit.phase == Phase::LocaleResolution)
+            .map(|(unit, status)| (unit.clone(), status.clone()))
+            .collect();
+        assert_eq!(
+            candidates,
+            BTreeMap::from([
+                (rejected("zz"), Status::NotEvaluated(negotiation)),
+                (
+                    rejected("en-x-brand"),
+                    Status::NotEvaluated(coverage.clone())
+                ),
+                (rejected("x!"), Status::Evaluated),
+                (rejected("yy"), Status::NotEvaluated(coverage)),
+            ])
+        );
+    }
+
+    /// A cause comes before the unit over the dependent's logical subject,
+    /// not only before the dependent: a later check of that subject is never
+    /// a cause, though the raw spelling orders after the spelling that stands
+    /// for every one.
+    #[test]
+    fn a_cause_comes_before_the_logical_unit_of_its_dependent() {
+        let mut evaluation = Evaluation::fabricated();
+        let unique = |raw| {
+            crate::resolver::locales::unit(
+                crate::resolver::locales::LocaleSubject::RequestedLocale(
+                    crate::resolver::locales::fixtures::content(raw),
+                ),
+                Check::UniqueLocale,
+            )
+        };
+        let later = evaluation
+            .check(unique("a"), Ok(()), |()| {
+                Err::<(), _>(Blocking {
+                    code: Code::LocaleDuplicate,
+                    reason: None,
+                    details: None,
+                })
+            })
+            .unwrap()
+            .unwrap_err();
+        assert!(later.keys().all(|key| *key.unit() < rejected("zz")));
+        assert_eq!(
+            evaluation
+                .check(rejected("zz"), Err::<(), _>(later), Ok::<(), Blocking>)
+                .err(),
+            Some(EvaluationInvariant::CauseNotBefore(rejected("zz")))
+        );
+    }
+
+    #[test]
+    fn a_raw_unit_is_recorded_once_beside_the_other_candidates_of_its_unit() {
+        let mut evaluation = Evaluation::default();
+        evaluation
+            .check(rejected("zz"), Ok(()), Ok::<(), Blocking>)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            evaluation
+                .check(rejected("zz"), Ok(()), Ok::<(), Blocking>)
+                .err(),
+            Some(EvaluationInvariant::UnitRecordedTwice(rejected("zz")))
+        );
+        evaluation
+            .check(rejected("en-x-brand"), Ok(()), Ok::<(), Blocking>)
+            .unwrap()
+            .unwrap();
+        assert_eq!(evaluation.candidates().count(), 2);
+        assert_eq!(evaluation.statuses().count(), 1);
+        // A notice of one candidate belongs to the unit they share.
+        evaluation
+            .notice(rejected("en-x-brand"), Code::LocaleNonCanonical)
+            .unwrap();
+        assert_eq!(
+            evaluation
+                .notices()
+                .map(|key| key.unit().clone())
+                .collect::<Vec<_>>(),
+            [rejected("zz").logical()]
+        );
     }
 }

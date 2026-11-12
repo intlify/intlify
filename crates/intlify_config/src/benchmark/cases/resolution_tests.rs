@@ -45,11 +45,12 @@ fn names(locales: &[CanonicalLocale]) -> Vec<&str> {
     locales.iter().map(CanonicalLocale::as_str).collect()
 }
 
-/// A subject key's locale or rejected spelling.
+/// A subject key's locale, or `(no identity)` for the key that every
+/// spelling without one shares in a logical unit (Decision 015-174).
 fn key(key: &LocaleKey) -> String {
     match key {
         LocaleKey::Canonical(locale) => locale.as_str().to_owned(),
-        LocaleKey::Content(content) => content.as_str().to_owned(),
+        LocaleKey::Content(_) => "(no identity)".to_owned(),
     }
 }
 
@@ -253,7 +254,7 @@ fn a_coverage_selector_phase_7_counts_is_phase_8s_to_reject() {
     let resolved = resolved(&case(R::CoverageUncanonicalized));
     assert_eq!(
         issues(&resolved),
-        [("coverage zz".to_owned(), Code::LocaleInvalid)]
+        [("coverage (no identity)".to_owned(), Code::LocaleInvalid)]
     );
     let policies = resolved.result.as_ref().unwrap();
     assert!(policies.locales.project.is_ok());
@@ -521,7 +522,7 @@ fn blocked_recipes_keep_exact_subjects_codes_and_independent_checks() {
             R::InvalidRequested,
             3,
             None,
-            vec![("requested zz", invalid)],
+            vec![("requested (no identity)", invalid)],
         ),
         (R::InvalidDefault, 3, Some(1), vec![("default", invalid)]),
         (
@@ -530,7 +531,7 @@ fn blocked_recipes_keep_exact_subjects_codes_and_independent_checks() {
             None,
             vec![
                 ("requested en-US", duplicate),
-                ("requested zz", invalid),
+                ("requested (no identity)", invalid),
                 ("source", invalid),
             ],
         ),
@@ -540,7 +541,7 @@ fn blocked_recipes_keep_exact_subjects_codes_and_independent_checks() {
             None,
             vec![
                 ("requested en-US", duplicate),
-                ("requested zz", invalid),
+                ("requested (no identity)", invalid),
                 ("source", invalid),
             ],
         ),
@@ -555,11 +556,11 @@ fn blocked_recipes_keep_exact_subjects_codes_and_independent_checks() {
             21,
             Some(3),
             vec![
-                ("alias root", invalid),
-                ("alias root value zz", invalid),
+                ("alias (no identity)", invalid),
+                ("alias (no identity) value (no identity)", invalid),
                 // The key has no identity, so its candidate is never checked.
-                ("fallback en_US", invalid),
-                ("browser requested Latn", invalid),
+                ("fallback (no identity)", invalid),
+                ("browser requested (no identity)", invalid),
                 ("browser default", invalid),
             ],
         ),
@@ -614,18 +615,18 @@ fn the_identifier_bound_reports_a_shared_subjects_witness_and_a_fields_length() 
             R::Minimal,
             2,
             vec![
-                ("requested en", Actual::AtLeast(2)),
+                ("requested (no identity)", Actual::AtLeast(2)),
                 ("default", Actual::Exact(2)),
-                ("browser requested en", Actual::AtLeast(2)),
+                ("browser requested (no identity)", Actual::AtLeast(2)),
             ],
         ),
-        // 17 bytes become 22: the requested spelling stands for its content.
+        // 17 bytes become 22: the requested spelling then has no identity.
         (
             LimitKind::ResolutionCanonicalIdentifierBytes,
             R::ExpandingAlias,
             22,
             vec![
-                ("requested und-u-ca-islamicc", Actual::AtLeast(22)),
+                ("requested (no identity)", Actual::AtLeast(22)),
                 ("default", Actual::Exact(22)),
             ],
         ),
@@ -726,7 +727,8 @@ fn the_occurrence_bound_counts_every_role_at_its_exact_value_and_first_over() {
                 .statuses()
                 .filter(|(unit, _)| runs(unit))
                 .count(),
-            13
+            // The surface items of every rule share their units.
+            11
         );
         // Evaluated and waiting, per policy.
         let mut policies = [[0; 2]; 3];
@@ -739,8 +741,10 @@ fn the_occurrence_bound_counts_every_role_at_its_exact_value_and_first_over() {
             };
             policies[policy][usize::from(*status != Status::Evaluated)] += 1;
         }
-        // Coverage's rules and its table wait too.
-        assert_eq!(policies, [[1, 4], [1, 13], [7, 15]]);
+        // Coverage's rules and its table wait too. Past the bound no spelling
+        // has an identity, so the units of each scope share one subject
+        // (Decision 015-174).
+        assert_eq!(policies, [[1, 2], [1, 7], [5, 7]]);
     }
 }
 
@@ -961,7 +965,7 @@ fn describe_policy(subject: &Subject) -> String {
         Subject::Coverage(CoverageSubject::Locale(_, own)) => format!("coverage {}", key(own)),
         Subject::Coverage(CoverageSubject::SurfaceClass(_, own)) => match own {
             SurfaceKey::Member(member) => format!("surface {}", member.as_str()),
-            SurfaceKey::Content(content) => format!("surface {}", content.as_str()),
+            SurfaceKey::Content(_) => "surface (not a member)".to_owned(),
         },
         Subject::Coverage(CoverageSubject::Domain(domain)) => format!(
             "domain {} by {}",
@@ -1068,7 +1072,11 @@ fn phase_8_workloads_block_exactly_the_check_each_change_names() {
         ),
         (
             R::CoverageUnknownSurface,
-            vec![("surface footer", rule, Some(Reason::SurfaceClassUnknown))],
+            vec![(
+                "surface (not a member)",
+                rule,
+                Some(Reason::SurfaceClassUnknown),
+            )],
         ),
         (
             R::CoverageRepeatedSurface,
@@ -1108,7 +1116,11 @@ fn phase_8_workloads_block_exactly_the_check_each_change_names() {
                     sequence,
                     Some(Reason::IntentSourceDuplicate),
                 ),
-                ("surface footer", rule, Some(Reason::SurfaceClassUnknown)),
+                (
+                    "surface (not a member)",
+                    rule,
+                    Some(Reason::SurfaceClassUnknown),
+                ),
             ],
         ),
     ] {

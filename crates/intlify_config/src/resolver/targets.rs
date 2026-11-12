@@ -312,7 +312,7 @@ mod tests {
         fixture_limits, BoundId, ConfirmedPolicy, Group, ResolutionLimits,
     };
     use crate::resolver::locales::fixtures::{
-        canonical, canonicalizer, content, key, stand_in, target, waits_on,
+        canonical, canonicalizer, content, key, rejected, stand_in, target, waits_on,
     };
     use crate::resolver::locales::{self, resolve_locales, LocaleFields, LocaleSubject};
     use crate::resolver::resource_policy::DeclarationReferences;
@@ -844,8 +844,8 @@ mod tests {
                 );
                 assert_eq!(waits_on(&evaluation, &reference_unit("server")), None);
                 // Phase 7 canonicalizes none of the browser's spellings, which
-                // stand for themselves and wait on its ID, and the server's
-                // as ever.
+                // have no identity, so share one unit, and wait on its ID, and
+                // the server's as ever.
                 for subject in [
                     LocaleSubject::TargetRequestedLocale(target("browser"), content("ja")),
                     LocaleSubject::TargetRequestedLocale(target("browser"), content("en")),
@@ -914,8 +914,10 @@ mod tests {
         inputs.target("browser")["requestedLocales"] = json!(["ja", "en-x-brand"]);
         inputs.target("browser")["defaultRequestedLocale"] = json!("en_US");
         inputs.resolve(|evaluation, targets| {
+            // A spelling without an identity has the unit such spellings
+            // share under its target.
             let member = locales::unit(
-                LocaleSubject::TargetRequestedLocale(target("browser"), content("en-x-brand")),
+                LocaleSubject::TargetRequestedLocale(target("browser"), rejected()),
                 Check::CanonicalLocale,
             );
             let default = locales::unit(

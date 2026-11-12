@@ -238,6 +238,7 @@ mod tests {
     use crate::artifacts::envelope::{envelope_of, sealed};
     use crate::resolver::evaluation::{IssueKey, Status};
     use crate::resolver::limits::{fixture_limits, ConfirmedPolicy};
+    use crate::resolver::token::logical_member;
 
     const ROOM: CollectionLimits = CollectionLimits {
         member_bytes: u64::MAX,
@@ -311,9 +312,12 @@ mod tests {
 
     use CollectionSubject::{Group, Member};
 
-    /// The member key of `value`.
+    /// The member key the unit of `value` records: its tuple without the
+    /// semantic digest, which every body of its conflict group shares, or the
+    /// key every member of its JSON type without a tuple shares (Decisions
+    /// 015-174 and 015-177).
     fn key(value: &Value) -> MemberKey {
-        FormalMember::new(value.clone()).unwrap().key()
+        logical_member(&FormalMember::new(value.clone()).unwrap().key())
     }
 
     /// The conflict group of `value`, which establishes a tuple.

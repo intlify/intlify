@@ -1219,6 +1219,13 @@ pub(super) mod tests {
     }
 
     /// Every unit's status.
+    fn candidates(evaluation: &Evaluation) -> BTreeMap<Unit, Status> {
+        evaluation
+            .candidates()
+            .map(|(unit, status)| (unit.clone(), status.clone()))
+            .collect()
+    }
+
     fn statuses(evaluation: &Evaluation) -> BTreeMap<Unit, Status> {
         evaluation
             .statuses()
@@ -1226,28 +1233,32 @@ pub(super) mod tests {
             .collect()
     }
 
-    /// Each unit of two complete invocations blocks in turn. A unit then not
-    /// evaluated with the blocked unit's result among its causes, or not
-    /// recorded because only that result names its subject, waits on it: its
-    /// row reaches the blocked unit's row through the Check Registry's
-    /// prerequisites, and each prerequisite a row lists is such a wait.
+    /// Each candidate of two complete invocations blocks in turn, with the
+    /// other candidates of its unit. A candidate then not evaluated with the
+    /// blocked unit's result among its causes, or not recorded because only
+    /// that result names its subject, waits on it: its row reaches the blocked
+    /// unit's row through the Check Registry's prerequisites, and each
+    /// prerequisite a row lists is such a wait. Candidates show what a unit
+    /// over several values hides: it stays evaluated while any candidate is
+    /// (D15:2184).
     #[test]
     fn the_check_registry_lists_what_each_check_waits_on() {
         let mut waits = BTreeSet::new();
         for inputs in [Inputs::complete(), Inputs::two_groups()] {
-            let complete = inputs.resolve(|evaluation, _| statuses(&evaluation));
+            let complete = inputs.resolve(|evaluation, _| candidates(&evaluation));
             assert!(complete.values().all(|status| *status == Status::Evaluated));
             for blocked in complete.keys() {
                 let after = inputs.attempt_in(
                     Evaluation::blocking(blocked.clone()),
                     |evaluation, state| {
                         assert!(state.is_ok(), "{blocked:?}");
-                        statuses(&evaluation)
+                        candidates(&evaluation)
                     },
                 );
+                let logical = blocked.logical();
                 for (unit, status) in &after {
                     if let Status::NotEvaluated(causes) = status {
-                        if causes.keys().any(|cause| cause.unit() == blocked) {
+                        if causes.keys().any(|cause| *cause.unit() == logical) {
                             waits.insert((row_of(unit), row_of(blocked)));
                         }
                     }
