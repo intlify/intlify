@@ -15,6 +15,13 @@
 //! payload's UTF-8 bytes. A candidate that is missing, of another variant,
 //! unclassified, over the bound, or malformed is absence: it never fails the
 //! entry, emits no Finding, and leaves nothing behind.
+//!
+//! Evidence compares admitted locators by variant rank, `relative-path`,
+//! `safe-label`, then `safe-uri`, and then by exact payload bytes, after their
+//! absence, and views one as a single-member object keyed by its variant
+//! (D15:840, 2496).
+
+use serde_json::{json, Value};
 
 use crate::artifacts::count;
 use crate::input_limits::Bound;
@@ -29,6 +36,17 @@ pub(crate) enum LocatorVariant {
     SafeUri,
 }
 
+impl LocatorVariant {
+    /// 015's name of the variant.
+    pub(crate) const fn id(self) -> &'static str {
+        match self {
+            Self::RelativePath => "relative-path",
+            Self::SafeLabel => "safe-label",
+            Self::SafeUri => "safe-uri",
+        }
+    }
+}
+
 /// A locator as an adapter supplies it: its variant, its payload in the
 /// variant's canonical form, and whether the adapter classified the payload,
 /// and for a path its root, as non-secret.
@@ -39,8 +57,8 @@ pub(crate) struct LocatorCandidate<'a> {
     pub(crate) non_secret: bool,
 }
 
-/// An admitted locator: its variant and its exact payload.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// An admitted locator: its variant and its exact payload, in 015's order.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Locator {
     variant: LocatorVariant,
     payload: String,
@@ -53,6 +71,11 @@ impl Locator {
 
     pub(crate) fn payload(&self) -> &str {
         &self.payload
+    }
+
+    /// `{ variant: payload }` (D15:2496).
+    pub(crate) fn view(&self) -> Value {
+        json!({ self.variant.id(): self.payload })
     }
 }
 
@@ -200,6 +223,60 @@ mod tests {
         assert_eq!(
             read_file_locator(Some(path(payload)), bound(payload.len() - 1)),
             None
+        );
+    }
+
+    fn admitted(variant: LocatorVariant, payload: &str) -> Locator {
+        Locator {
+            variant,
+            payload: payload.to_owned(),
+        }
+    }
+
+    #[test]
+    fn a_locator_is_viewed_under_its_variant() {
+        assert_eq!(
+            roomy(path("config/intlify.json")).unwrap().view(),
+            json!({ "relative-path": "config/intlify.json" })
+        );
+        assert_eq!(
+            admitted(LocatorVariant::SafeLabel, "storefront config").view(),
+            json!({ "safe-label": "storefront config" })
+        );
+        assert_eq!(
+            admitted(LocatorVariant::SafeUri, "https://example.com/config").view(),
+            json!({ "safe-uri": "https://example.com/config" })
+        );
+    }
+
+    /// Absence, then variant rank, then exact payload bytes with a shorter
+    /// equal prefix first, never a normalized or case-folded spelling.
+    #[test]
+    fn locators_compare_by_variant_then_payload_bytes() {
+        use LocatorVariant::{RelativePath, SafeLabel, SafeUri};
+        let mut locators = vec![
+            Some(admitted(SafeUri, "a:b")),
+            Some(admitted(SafeLabel, "b")),
+            Some(admitted(RelativePath, "z/a")),
+            None,
+            Some(admitted(RelativePath, "z")),
+            Some(admitted(RelativePath, "Z")),
+            Some(admitted(SafeLabel, "A\u{30a}")),
+            Some(admitted(SafeLabel, "\u{c5}")),
+        ];
+        locators.sort();
+        assert_eq!(
+            locators,
+            [
+                None,
+                Some(admitted(RelativePath, "Z")),
+                Some(admitted(RelativePath, "z")),
+                Some(admitted(RelativePath, "z/a")),
+                Some(admitted(SafeLabel, "A\u{30a}")),
+                Some(admitted(SafeLabel, "b")),
+                Some(admitted(SafeLabel, "\u{c5}")),
+                Some(admitted(SafeUri, "a:b")),
+            ]
         );
     }
 
