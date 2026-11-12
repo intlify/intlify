@@ -9,6 +9,7 @@ use crate::model::{ProfileDeclaration, RequiredNullable};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::resolver::evaluation::{Status, Subject};
 use crate::resolver::resource_policy::{ArtifactSubject, PolicySubject};
+use crate::resolver::token::logical_member;
 
 use super::{LogicalWork, WorkFailure, WorkKind, WorkStage, WorkValue};
 
@@ -95,13 +96,14 @@ impl LogicalWork {
             .len();
         let artifact_bytes = sum(members.iter().map(FormalMember::canonical_bytes))?;
         let references = references(declaration);
-        // Each member key, the tuple a member establishes or else its body,
-        // has one unit under the capability and one under the policy, both
-        // recorded whatever the selection; the unit checks each of its
-        // distinct bodies.
+        // Each logical member key, the tuple a member establishes without its
+        // semantic digest or else its JSON type (Decisions 015-174 and
+        // 015-177), has one unit under the capability and one under the
+        // policy, both recorded whatever the selection; the unit checks each
+        // of its distinct bodies.
         let keys = members
             .iter()
-            .map(FormalMember::key)
+            .map(|member| logical_member(&member.key()))
             .collect::<BTreeSet<_>>()
             .len();
         let evaluation = &resolved.evaluation;

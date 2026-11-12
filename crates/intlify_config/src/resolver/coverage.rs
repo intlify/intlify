@@ -69,6 +69,13 @@ pub(crate) enum RuleMember {
 }
 
 impl RuleContent {
+    /// The content that stands for every rule in a logical subject: a rule is
+    /// an object, and `redacted-structure` keeps only that type, so every rule
+    /// shares one subject (Decision 015-174).
+    pub(crate) fn projected() -> Self {
+        Self(Vec::new())
+    }
+
     /// The rule's members, in the byte order of their names.
     pub(crate) fn members(&self) -> &[RuleMember] {
         &self.0
@@ -758,8 +765,8 @@ mod tests {
     use crate::resolver::evaluation::Status;
     use crate::resolver::fallback::FallbackSubject;
     use crate::resolver::locales::fixtures::{
-        canonical, canonicalizer, content, declaration, key, limits, notices, stand_in, units,
-        waits_on, Declaration,
+        canonical, canonicalizer, content, declaration, key, limits, notices, rejected, stand_in,
+        units, waits_on, Declaration,
     };
     use crate::resolver::locales::{self, resolve_locales, LocaleFields, LocaleSubject};
     use crate::resolver::specification::Slot;
@@ -967,8 +974,13 @@ mod tests {
         unit(subject, Check::WithinBound)
     }
 
+    // A rule has no identity before normalization, so every rule shares one
+    // logical unit, and so do the items of one key under every rule (Decision
+    // 015-174). These helpers give the logical units the evaluation records,
+    // whose rule and surface content no longer tell the raw values apart.
+
     fn locale_unit(owner: &RuleContent, key: LocaleKey, check: Check) -> Unit {
-        unit(CoverageSubject::Locale(owner.clone(), key), check)
+        unit(CoverageSubject::Locale(owner.clone(), key), check).logical()
     }
 
     fn member_unit(owner: &RuleContent, member: &str, check: Check) -> Unit {
@@ -976,6 +988,7 @@ mod tests {
             CoverageSubject::SurfaceClass(owner.clone(), SurfaceKey::Member(token(member))),
             check,
         )
+        .logical()
     }
 
     fn unknown_unit(owner: &RuleContent, raw: &str, check: Check) -> Unit {
@@ -983,6 +996,7 @@ mod tests {
             CoverageSubject::SurfaceClass(owner.clone(), SurfaceKey::Content(Content::new(raw))),
             check,
         )
+        .logical()
     }
 
     fn rule_unit(owner: &RuleContent) -> Unit {
@@ -990,6 +1004,7 @@ mod tests {
             CoverageSubject::Rule(owner.clone()),
             Check::NormalizedDomain,
         )
+        .logical()
     }
 
     fn domain_unit(domain: Domain) -> Unit {
@@ -1272,8 +1287,9 @@ mod tests {
         assert_eq!(units(&resolved.policy.unwrap_err()), [duplicate]);
     }
 
+    /// Every rule shares the one rule unit, identical rules included.
     #[test]
-    fn identical_or_aliased_rules_are_duplicates_and_identical_ones_share_a_subject() {
+    fn identical_or_aliased_rules_are_duplicates_and_share_the_one_rule_unit() {
         let fr = json!({"requestedLocales": ["fr"], "mode": "fallback-allowed"});
         let resolved = resolve(&declared(json!({"rules": [fr, fr]})));
         let owner = rule(&fr);
@@ -1407,13 +1423,10 @@ mod tests {
                     "project-profile-coverage-rule-invalid",
                     Some("surface-class-duplicate"),
                 ),
+                // `Nav` and `help` name no member, so they share one unit and
+                // give one issue.
                 (
                     unknown_unit(&owner, "Nav", Check::VocabularyMember),
-                    "project-profile-coverage-rule-invalid",
-                    Some("surface-class-unknown"),
-                ),
-                (
-                    unknown_unit(&owner, "help", Check::VocabularyMember),
                     "project-profile-coverage-rule-invalid",
                     Some("surface-class-unknown"),
                 ),
@@ -1438,7 +1451,6 @@ mod tests {
             units(&resolved.policy.unwrap_err()),
             [
                 member_unit(&owner, "nav", Check::UniqueSurfaceClass),
-                unknown_unit(&owner, "Nav", Check::VocabularyMember),
                 unknown_unit(&owner, "help", Check::VocabularyMember),
             ]
         );
@@ -1825,7 +1837,7 @@ mod tests {
             app["coverage"] = json!({"rules": [selector]});
         }));
         let invalid = locales::unit(
-            LocaleSubject::RequestedLocale(content("zz")),
+            LocaleSubject::RequestedLocale(rejected()),
             Check::CanonicalLocale,
         );
         assert_eq!(
@@ -1862,7 +1874,7 @@ mod tests {
         }));
         let owner = rule(&surface_only);
         let invalid = locales::unit(
-            LocaleSubject::RequestedLocale(content("zz")),
+            LocaleSubject::RequestedLocale(rejected()),
             Check::CanonicalLocale,
         );
         assert_eq!(

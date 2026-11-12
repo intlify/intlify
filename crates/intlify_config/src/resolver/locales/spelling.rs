@@ -384,8 +384,8 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::super::fixtures::{
-        canonical, canonicalizer, content, issues, key, notices, spelled, stand_in, target, units,
-        waits_on,
+        canonical, canonicalizer, content, issues, key, notices, rejected, spelled, stand_in,
+        target, units, waits_on,
     };
     use super::*;
     use crate::input_limits::Bound;
@@ -475,8 +475,11 @@ mod tests {
         );
     }
 
+    /// Each rejected spelling keeps its own key, but every one joins the one
+    /// unit of its scope that a spelling without an identity has (Decision
+    /// 015-174), so they give one issue.
     #[test]
-    fn a_rejected_spelling_stands_for_itself_and_is_an_issue_an_author_can_fix() {
+    fn rejected_spellings_share_one_unit_and_are_an_issue_an_author_can_fix() {
         let canonicalizer = canonicalizer(64);
         let mut evaluation = Evaluation::default();
         let (spelled, occurrences) = spell(
@@ -489,17 +492,17 @@ mod tests {
             keys(&spelled),
             [content("zz"), content("en-x-brand"), content("zz")]
         );
-        let invalid = |raw| {
-            (
-                requested_unit(content(raw)),
+        assert_eq!(
+            issues(&evaluation),
+            [(
+                requested_unit(rejected()),
                 "project-profile-locale-invalid",
                 None,
-            )
-        };
-        assert_eq!(issues(&evaluation), [invalid("en-x-brand"), invalid("zz")]);
+            )]
+        );
         assert_eq!(
             units(spelled[0].locale.as_ref().unwrap_err()),
-            [requested_unit(content("zz"))]
+            [requested_unit(rejected())]
         );
         assert_eq!(spelled[0].locale, spelled[2].locale);
         assert_eq!(notices(&evaluation), []);
@@ -517,19 +520,15 @@ mod tests {
         };
         // A requested locale's key can stand for several spellings, so past
         // the bound it reports only the first-over witness.
-        let over = |raw: &str, limit: u64| {
+        let over = |limit: u64| {
             (
-                requested_unit(content(raw)),
+                requested_unit(rejected()),
                 "project-profile-resource-limit-exceeded",
                 exceeded(limit, Actual::AtLeast(limit + 1)),
             )
         };
         // The raw spelling is checked before the provider sees it.
-        for (limit, found) in [
-            (5, vec![]),
-            (4, vec![over("EN-us", 4)]),
-            (2, vec![over("EN-us", 2)]),
-        ] {
+        for (limit, found) in [(5, vec![]), (4, vec![over(4)]), (2, vec![over(2)])] {
             let canonicalizer = canonicalizer(limit);
             let mut evaluation = Evaluation::default();
             spell(&mut evaluation, Ok(&canonicalizer), &["EN-us"])
@@ -538,7 +537,7 @@ mod tests {
             assert_eq!(issues(&evaluation), found, "{limit}");
         }
         // 17 bytes become 22, and the canonical spelling is checked too.
-        for (limit, found) in [(22, vec![]), (21, vec![over("und-u-ca-islamicc", 21)])] {
+        for (limit, found) in [(22, vec![]), (21, vec![over(21)])] {
             let canonicalizer = canonicalizer(limit);
             let mut evaluation = Evaluation::default();
             spell(&mut evaluation, Ok(&canonicalizer), &["und-u-ca-islamicc"])
@@ -569,8 +568,10 @@ mod tests {
         );
     }
 
+    /// Every spelling is then without an identity, so all of them are
+    /// candidates of one unit, which none of them can evaluate.
     #[test]
-    fn without_a_canonicalizer_every_subject_is_its_spelling_and_not_evaluated() {
+    fn without_a_canonicalizer_every_spelling_shares_one_unit_not_evaluated() {
         let causes = stand_in(Slot::LocaleCanonicalization);
         let mut evaluation = Evaluation::default();
         let (spelled, occurrences) =
@@ -589,7 +590,8 @@ mod tests {
                 Some(units(&causes))
             );
         }
-        assert_eq!(evaluation.statuses().count(), 2);
+        assert_eq!(evaluation.statuses().count(), 1);
+        assert_eq!(evaluation.candidates().count(), 2);
         assert_eq!(issues(&evaluation), []);
         assert_eq!(notices(&evaluation), []);
         assert!(occurrences.iter().all(|occurrence| !occurrence.corrected));
@@ -633,7 +635,7 @@ mod tests {
         // Without a canonical identity, a spelling cannot repeat another.
         assert_eq!(
             waits_on(&evaluation, &unique_unit(content("zz"))),
-            Some(vec![requested_unit(content("zz"))])
+            Some(vec![requested_unit(rejected())])
         );
         // Canonical keys order before contents, whatever the check.
         assert_eq!(
@@ -641,13 +643,15 @@ mod tests {
             [
                 unique_unit(key("en")),
                 unique_unit(key("he-IL")),
-                requested_unit(content("zz")),
+                requested_unit(rejected()),
             ]
         );
     }
 
+    /// A set without every identity waits on the one unit that every
+    /// spelling without an identity shares.
     #[test]
-    fn a_set_needs_every_canonical_locale_and_names_every_one_missing() {
+    fn a_set_needs_every_canonical_locale_and_waits_on_the_spellings_without_one() {
         let canonicalizer = canonicalizer(64);
         let mut evaluation = Evaluation::default();
         let spelled = spell(
@@ -671,10 +675,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             units(&set(&spelled).unwrap_err()),
-            [
-                requested_unit(content("Latn")),
-                requested_unit(content("zz"))
-            ]
+            [requested_unit(rejected())]
         );
         assert_eq!(set(&[]).map(|set| set.as_slice().len()), Ok(0));
     }

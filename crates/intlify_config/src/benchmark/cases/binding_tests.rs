@@ -230,7 +230,9 @@ fn each_blocked_recipe_reports_its_one_decision() {
     let unset = resolved(R::CollectionNotAdmitted);
     // The second copy of the trust policy, which the recipe adds last.
     let mut members = R::CollectionNotAdmitted.fixture().members;
-    let duplicated = FormalMember::new(members.pop().unwrap()).unwrap().key();
+    let duplicated = crate::resolver::token::logical_member(
+        &FormalMember::new(members.pop().unwrap()).unwrap().key(),
+    );
     assert!(unset.evaluation.issues().next().is_none());
     let causes = unset.result.unwrap().unwrap_err();
     assert_eq!(

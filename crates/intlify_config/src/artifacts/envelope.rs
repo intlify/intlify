@@ -183,6 +183,24 @@ impl AdmissionKey {
     pub(crate) fn as_bytes(&self) -> &[u8] {
         &self.0
     }
+
+    /// The key that stands for every member of this key's JSON type in a
+    /// logical subject: the type's framing tag alone, with `true` folded into
+    /// `false`, so the keys of one type are one and keys order by type
+    /// (Decision 015-174).
+    ///
+    /// # Panics
+    ///
+    /// Panics on an empty key. A canonical submitted body is one framed
+    /// value, so it has a tag.
+    pub(crate) fn projected(&self) -> Self {
+        let tag = match self.0.first() {
+            Some(0x03) => 0x02,
+            Some(&tag) => tag,
+            None => unreachable!("a canonical submitted body is one framed value"),
+        };
+        Self(Arc::from([tag].as_slice()))
+    }
 }
 
 /// A collection member past 015's pre-invocation boundary: a JSON value with

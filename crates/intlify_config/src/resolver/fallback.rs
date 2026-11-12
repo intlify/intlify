@@ -444,8 +444,8 @@ mod tests {
     use crate::input_limits::Bound;
     use crate::resolver::evaluation::{Actual, LimitExceeded, Status};
     use crate::resolver::locales::fixtures::{
-        canonical, canonicalizer, content, declaration, key, limits, notices, stand_in, units,
-        waits_on, Declaration,
+        canonical, canonicalizer, content, declaration, key, limits, notices, rejected, stand_in,
+        units, waits_on, Declaration,
     };
     use crate::resolver::locales::{self, resolve_locales, LocaleFields, LocaleSubject};
     use crate::resolver::specification::Slot;
@@ -817,8 +817,8 @@ mod tests {
             [(duplicate.clone(), "project-profile-locale-duplicate", None)]
         );
         // Position 0 holds `de` and `fr`, position 1 `de`, and position 2 only
-        // the Intent source. No literal has an identity, so each stands for
-        // its spelling.
+        // the Intent source. No literal has an identity, so the two literals
+        // share one unit.
         let waiting = [
             [sequence_unit(key("en"))].as_slice(),
             &candidate_units(&key("en"), 0),
@@ -838,7 +838,9 @@ mod tests {
             );
         }
         // The mapping, the key's two, and every unit that waits.
-        assert_eq!(statuses(&resolved.evaluation).len(), 3 + waiting.len());
+        let logical: std::collections::BTreeSet<Unit> = waiting.iter().map(Unit::logical).collect();
+        assert_eq!(logical.len(), waiting.len() - 1);
+        assert_eq!(statuses(&resolved.evaluation).len(), 3 + logical.len());
         assert_eq!(
             waits_on(
                 &resolved.evaluation,
@@ -856,7 +858,7 @@ mod tests {
             json!({"zz": ["de", "de"], "ja": ["zz"]}),
         ));
         let invalid_key = locales::unit(
-            LocaleSubject::MessageFallbackKey(content("zz")),
+            LocaleSubject::MessageFallbackKey(rejected()),
             Check::CanonicalLocale,
         );
         // The repeated `de` is never found: one position under a key without
@@ -1008,9 +1010,10 @@ mod tests {
         let over = resolved.policy.unwrap_err();
         assert_eq!(units(&over), [sources_unit()]);
         // The key's two units, its sequence, the two of the position both
-        // literals share, and a repeat check for each literal's spelling wait.
+        // literals share, and the repeat check that both literals' spellings
+        // share, having no identity, wait.
         let recorded = statuses(&resolved.evaluation);
-        assert_eq!(recorded.len(), 8);
+        assert_eq!(recorded.len(), 7);
         assert!(recorded[1..]
             .iter()
             .all(|(_, status)| status == &Status::NotEvaluated(over.clone())));
@@ -1189,7 +1192,7 @@ mod tests {
     fn a_requested_set_phase_7_could_not_form_leaves_only_membership_not_evaluated() {
         let resolved = resolve(&declared(&["ja", "zz"], json!({"ja": ["en"]})));
         let invalid = locales::unit(
-            LocaleSubject::RequestedLocale(content("zz")),
+            LocaleSubject::RequestedLocale(rejected()),
             Check::CanonicalLocale,
         );
         assert_eq!(

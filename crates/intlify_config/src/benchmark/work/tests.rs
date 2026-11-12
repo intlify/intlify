@@ -366,9 +366,10 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
             None,
             join(all([4, 8, 4, 1, 21, 0, 1, 0]), undeclared(Some(1))),
         ),
-        // Over the occurrence bound, every spelling stands for itself and
-        // waits on the bound; Phase 8 still counts what was declared, and its
-        // table waits on the requested set.
+        // Over the occurrence bound, no spelling has an identity, so the
+        // spellings of each scope share one unit, which waits on the bound;
+        // Phase 8 still counts what was declared, and its table waits on the
+        // requested set.
         (
             R::Multi,
             over(LimitKind::ResolutionLocaleOccurrences),
@@ -378,8 +379,8 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
                     Some(23),
                     Some(0),
                     None,
-                    Some(25),
-                    Some(17),
+                    Some(19),
+                    Some(11),
                     Some(1),
                     Some(0),
                 ],
@@ -426,15 +427,16 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
             ),
         ),
         // Two of the 21 spellings are fallback candidates and three coverage
-        // selectors, which Phase 8 canonicalizes: 53 Phase 8 units, nine of
-        // them cells, three the rules', and one the table's.
+        // selectors, which Phase 8 canonicalizes: 46 Phase 8 units, nine of
+        // them cells and one the table's. Every rule shares one unit, and so
+        // do the items of one key under every rule (Decision 015-174).
         (
             R::EveryRole,
             None,
-            join(all([21, 57, 16, 3, 82, 0, 0, 0]), every_role(true)),
+            join(all([21, 57, 16, 3, 75, 0, 0, 0]), every_role(true)),
         ),
         // Phase 8 still counts what was declared and checks each surface item:
-        // 9 of its 41 units run, and every unit needing a canonical locale
+        // 7 of its 23 units run, and every unit needing a canonical locale
         // waits on the bound, a fallback key's whole sequence and every rule
         // included.
         (
@@ -446,8 +448,8 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
                     Some(57),
                     Some(0),
                     None,
-                    Some(70),
-                    Some(57),
+                    Some(41),
+                    Some(30),
                     Some(1),
                     Some(0),
                 ],
@@ -457,7 +459,7 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
         (
             R::EveryRoleAliased,
             None,
-            join(all([21, 57, 16, 3, 82, 0, 0, 12]), every_role(true)),
+            join(all([21, 57, 16, 3, 75, 0, 0, 12]), every_role(true)),
         ),
         // The invalid alias key and destination and the invalid fallback key
         // leave eight Phase 8 units unevaluated, the key's whole sequence
@@ -465,20 +467,21 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
         (
             R::EveryRoleInvalid,
             None,
-            join(all([21, 78, 16, 3, 82, 9, 5, 0]), every_role(true)),
+            join(all([21, 78, 16, 3, 75, 9, 5, 0]), every_role(true)),
         ),
         (
             R::TargetDuplicate,
             None,
-            join(all([22, 62, 17, 3, 82, 0, 1, 1]), every_role(true)),
+            join(all([22, 62, 17, 3, 75, 0, 1, 1]), every_role(true)),
         ),
         // The rejected selector item leaves its rule without a domain, so
-        // its two other units, its rule's, the nine cells, and the table
-        // wait.
+        // its two other units, the nine cells, and the table wait, while the
+        // one unit every rule shares stays evaluated through the other rules
+        // (D15:2184).
         (
             R::CoverageUncanonicalized,
             None,
-            join(all([21, 57, 16, 3, 81, 13, 1, 0]), every_role(true)),
+            join(all([21, 57, 16, 3, 77, 12, 1, 0]), every_role(true)),
         ),
         (
             R::ManyTargets,

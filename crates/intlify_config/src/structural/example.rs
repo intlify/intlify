@@ -23,6 +23,7 @@ use crate::resolver::locales::{
     fixture_policy, resolve_locales, LocaleFields, LocaleInvariant, LocaleKey, Location,
     ResolvedLocales,
 };
+use crate::resolver::token::logical;
 
 use super::eval::IssueKind;
 use super::selection::{Selection, SelectionFailure, SelectorInput};
@@ -168,7 +169,9 @@ fn canonical(key: &LocaleKey) -> Option<&str> {
 }
 
 /// One blocking result as a display item, pointing at every spelling of its
-/// subject. A rejected spelling is never echoed.
+/// logical subject: every spelling whose subject has its projection, so a
+/// subject without an identity points at every spelling of its scope that has
+/// none (Decision 015-174). A rejected spelling is never echoed.
 fn locale_issue(
     issue: &IssueKey,
     evaluation: &Evaluation,
@@ -176,13 +179,15 @@ fn locale_issue(
     profile: &str,
     declaration: &Declaration,
 ) -> Value {
-    let Subject::Locale(subject) = &issue.unit().subject else {
+    let Subject::Locale(_) = &issue.unit().subject else {
         return diagnostic(issue.code().as_str(), "Locale resolution failed.", None);
     };
     let spellings = resolved
         .occurrences
         .iter()
-        .filter(|occurrence| occurrence.subject == *subject)
+        .filter(|occurrence| {
+            logical(&Subject::Locale(occurrence.subject.clone())) == issue.unit().subject
+        })
         .collect::<Vec<_>>();
     let locations = spellings
         .iter()

@@ -13,6 +13,7 @@ use crate::benchmark::operation::{Output, Prepared};
 use crate::benchmark::work::LogicalWork;
 use crate::resolver::artifact_resolution::{unit, CollectionSubject, ConflictKey};
 use crate::resolver::evaluation::{Check, Code, Reason, Status, Unit};
+use crate::resolver::token::logical_member;
 
 use ArtifactCollectionRecipe as R;
 
@@ -38,9 +39,11 @@ fn issues(resolved: &Resolved) -> Vec<(Unit, Code, Option<Reason>)> {
         .collect()
 }
 
-/// The unit of `check` over the member key of `value`.
+/// The unit of `check` over the member key of `value` that its unit records:
+/// its tuple without the semantic digest, or the key of its JSON type
+/// (Decisions 015-174 and 015-177).
 fn member(value: &Value, check: Check) -> Unit {
-    let key = FormalMember::new(value.clone()).unwrap().key();
+    let key = logical_member(&FormalMember::new(value.clone()).unwrap().key());
     unit(CollectionSubject::Member(key), check)
 }
 
@@ -199,7 +202,7 @@ fn each_blocked_recipe_reports_its_one_kind_of_failure() {
                 Some(Reason::EnvelopeInvalid),
             )],
         ),
-        // A member establishing no tuple has its body as its key.
+        // A member establishing no tuple has the key of its JSON type.
         (
             R::NoTuple,
             vec![(
@@ -297,14 +300,15 @@ fn the_scales_count_occurrences_bodies_and_units_apart() {
             R::RepeatedBodies,
             ["33", "1", "32", "2", "6", "1", unavailable],
         ),
-        // Two bodies in one group.
+        // Two bodies in one group, which share their member units without
+        // the semantic digest (Decision 015-177).
         (
             R::ArtifactConflict,
-            ["4", "3", "1", "4", "11", "1", unavailable],
+            ["4", "3", "1", "4", "9", "1", unavailable],
         ),
         (
             R::ManyConflicts,
-            ["65", "65", "0", "65", "163", "32", unavailable],
+            ["65", "65", "0", "65", "99", "32", unavailable],
         ),
         (
             R::EnvelopeInvalid,

@@ -219,8 +219,8 @@ mod tests {
     use crate::input_limits::Bound;
     use crate::resolver::evaluation::{Actual, LimitExceeded, Status};
     use crate::resolver::locales::fixtures::{
-        canonical, canonicalizer, content, declaration, key, limits, stand_in, target, units,
-        waits_on, Declaration,
+        canonical, canonicalizer, content, declaration, key, limits, rejected, stand_in, target,
+        units, waits_on, Declaration,
     };
     use crate::resolver::locales::{self, resolve_locales, LocaleFields, LocaleSubject};
     use crate::resolver::specification::Slot;
@@ -446,10 +446,7 @@ mod tests {
             &["en", "fr-FR"],
             json!({"EN": "zz", "en": "fr-FR"}),
         ));
-        let invalid = spelling_unit(LocaleSubject::NegotiationAliasValue(
-            key("en"),
-            content("zz"),
-        ));
+        let invalid = spelling_unit(LocaleSubject::NegotiationAliasValue(key("en"), rejected()));
         assert_eq!(
             waits_on(&resolved.evaluation, &key_unit(key("en"))),
             Some(vec![invalid.clone()])
@@ -597,11 +594,10 @@ mod tests {
             &["en", "fr-FR"],
             json!({"zz": "fr-FR", "fr": "zz"}),
         ));
-        let invalid_key = spelling_unit(LocaleSubject::NegotiationAliasKey(content("zz")));
-        let invalid_value = spelling_unit(LocaleSubject::NegotiationAliasValue(
-            key("fr"),
-            content("zz"),
-        ));
+        // Spellings without an identity have the units such spellings share.
+        let invalid_key = spelling_unit(LocaleSubject::NegotiationAliasKey(rejected()));
+        let invalid_value =
+            spelling_unit(LocaleSubject::NegotiationAliasValue(key("fr"), rejected()));
         assert_eq!(
             waits_on(&resolved.evaluation, &key_unit(content("zz"))),
             Some(vec![invalid_key.clone()])
@@ -633,7 +629,7 @@ mod tests {
             &["en", "zz"],
             json!({"fr": "fr-FR", "de": "fr-FR"}),
         ));
-        let invalid = spelling_unit(LocaleSubject::RequestedLocale(content("zz")));
+        let invalid = spelling_unit(LocaleSubject::RequestedLocale(rejected()));
         for destination in [
             destination_unit(key("de"), key("fr-FR")),
             destination_unit(key("fr"), key("fr-FR")),

@@ -55,6 +55,13 @@ impl Content {
         Self(Arc::from(spelling))
     }
 
+    /// The content that stands for every spelling without an identity in a
+    /// logical subject: a spelling is a string, and `redacted-structure`
+    /// keeps only that type (Decision 015-174).
+    pub(crate) fn projected() -> Self {
+        Self(Arc::from(""))
+    }
+
     /// The spelling itself, for a caller that compares or digests it; never
     /// for display.
     pub(crate) fn as_str(&self) -> &str {
@@ -547,6 +554,13 @@ pub(crate) mod fixtures {
         LocaleKey::Content(Content(Arc::from(raw)))
     }
 
+    /// The key every spelling without a canonical identity shares in a
+    /// logical unit: a spelling is a string, and `redacted-structure` keeps
+    /// only that type (Decision 015-174).
+    pub(crate) fn rejected() -> LocaleKey {
+        LocaleKey::Content(Content::projected())
+    }
+
     /// What Phase 7 hands on for a spelling with a canonical identity.
     pub(crate) fn spelled(spelling: &str) -> Spelled {
         Spelled {
@@ -660,8 +674,8 @@ mod tests {
     use serde_json::json;
 
     use super::fixtures::{
-        canonical, canonicalizer, content, declaration, issues, key, notices, policy, spelled,
-        stand_in, target, units, waits_on, Declaration,
+        canonical, canonicalizer, content, declaration, issues, key, notices, policy, rejected,
+        spelled, stand_in, target, units, waits_on, Declaration,
     };
     use super::*;
     use crate::fixtures::{complete_config, minimal_config};
@@ -979,14 +993,15 @@ mod tests {
                 None,
             )
         };
+        // `zz` has no identity, so its unit is the one such spellings share.
         let zz = unit(
-            LocaleSubject::RequestedLocale(content("zz")),
+            LocaleSubject::RequestedLocale(rejected()),
             Check::CanonicalLocale,
         );
         assert_eq!(
             issues(&evaluation),
             [
-                invalid(LocaleSubject::RequestedLocale(content("zz"))),
+                invalid(LocaleSubject::RequestedLocale(rejected())),
                 invalid(LocaleSubject::DefaultSourceLocale),
             ]
         );

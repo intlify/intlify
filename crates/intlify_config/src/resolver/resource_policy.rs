@@ -879,6 +879,7 @@ mod tests {
     };
     use crate::resolver::limits::{fixture_limits, SECTION};
     use crate::resolver::locales::fixtures::earlier;
+    use crate::resolver::token::logical_member;
     use crate::structural::selection::InvalidSelectorType;
 
     /// Limits no test reaches.
@@ -1217,12 +1218,14 @@ mod tests {
         Stage::Capability.unit(subject)
     }
 
-    /// The member keys of `values`, in their order.
+    /// The member keys the units of `values` record, in their order: a tuple
+    /// without its semantic digest, or the key every member of one JSON type
+    /// without a tuple shares (Decisions 015-174 and 015-177).
     fn keys_of(values: &[Value]) -> Vec<MemberKey> {
         collection(values)
             .members()
             .iter()
-            .map(FormalMember::key)
+            .map(|member| logical_member(&member.key()))
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect()
@@ -1390,7 +1393,8 @@ mod tests {
         assert_eq!(policy.limits().bounds(), policy_limits().bounds());
         // Every unit was evaluated, in 015's table order: the collection's
         // three counts, the references' count, one unit per member key (three
-        // tuples, then the two members that establish none), the collection's
+        // tuples, then the one key that the two members establishing none
+        // share, both being objects), the collection's
         // bytes, one unit per visible reference, and the references' bytes;
         // then the bootstrap: the metadata scan, candidate selection, the
         // candidate's depth, allocation, and validation work, its body
@@ -1406,7 +1410,7 @@ mod tests {
             keys.iter()
                 .map(|key| matches!(key, MemberKey::Tuple(_)))
                 .collect::<Vec<_>>(),
-            [true, true, true, false, false]
+            [true, true, true, false]
         );
         let mut expected: Vec<Unit> = [
             ArtifactSubject::Artifacts,
@@ -1627,7 +1631,8 @@ mod tests {
             .iter()
             .map(FormalMember::canonical_body)
             .collect();
-        assert_eq!((bodies.len(), keys_of(&inputs.members).len()), (6, 5));
+        // The two members without a tuple share one key as well.
+        assert_eq!((bodies.len(), keys_of(&inputs.members).len()), (6, 4));
         let largest = members
             .members()
             .iter()
@@ -1639,7 +1644,7 @@ mod tests {
         });
         let (evaluation, _) = inputs.run();
         // One unit for both bodies, and one result for it.
-        let tuple = MemberKey::Tuple(std::sync::Arc::new(tuple_of(&chosen())));
+        let tuple = logical_member(&MemberKey::Tuple(std::sync::Arc::new(tuple_of(&chosen()))));
         let crossed = capability_unit(ArtifactSubject::Artifact(tuple));
         assert_eq!(
             issues(&evaluation)
@@ -1840,7 +1845,7 @@ mod tests {
             )
         );
         // Equal occurrences share one artifact unit; both count toward the
-        // total.
+        // total. The two members without a tuple share one unit too.
         let artifacts = evaluation
             .statuses()
             .filter(|(unit, _)| {
@@ -1852,7 +1857,7 @@ mod tests {
                 )
             })
             .count();
-        assert_eq!(artifacts, 5);
+        assert_eq!(artifacts, 4);
         // Every occurrence still counts toward the occurrences and the bytes.
         let mut counted = Inputs::new();
         counted.members.push(chosen());
@@ -2201,8 +2206,9 @@ mod tests {
             MAX_DEPTH
         );
         assert_eq!(outcome.selector_length, Some(StringLengthFact::Exact(100)));
+        // The two members without a tuple share one recheck.
         let subjects = rechecked(&evaluation);
-        assert_eq!(subjects.len(), 29);
+        assert_eq!(subjects.len(), 28);
         for subject in subjects {
             assert_eq!(
                 waits_on(&evaluation, &recheck(subject)),
