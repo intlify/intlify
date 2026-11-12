@@ -118,14 +118,52 @@ impl SelectorInput {
 }
 
 /// 015's String Length Fact of a string selector under the final projection
-/// authority. `OverLimit` keeps no length.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// authority. `OverLimit` keeps no length. The derived order is 015's:
+/// `Exact` in ascending length, then `OverLimit` (D15:810).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum StringLengthFact {
     Exact(u64),
     OverLimit,
 }
 
+/// What a selector is, without its content: absent, a string, or one of the
+/// invalid types a binding established.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SelectorShape {
+    Absent,
+    String,
+    Invalid(InvalidSelectorType),
+}
+
 impl SelectorInput {
+    /// The selector's shape, which keeps none of its content.
+    pub(crate) const fn shape(&self) -> SelectorShape {
+        match self.kind {
+            SelectorKind::Absent => SelectorShape::Absent,
+            SelectorKind::String(_) | SelectorKind::OverLimitString => SelectorShape::String,
+            SelectorKind::InvalidType(kind) => SelectorShape::Invalid(kind),
+        }
+    }
+
+    /// The declared Profile ID among `declared` that the selector exactly
+    /// matches, when it is a complete string within `authority`: the ID a
+    /// `safe-profile-id` keeps, taken from the declaration rather than from the
+    /// selector (D15:807).
+    pub(crate) fn declared<'d>(
+        &self,
+        authority: Bound,
+        declared: impl IntoIterator<Item = &'d ProfileId>,
+    ) -> Option<&'d ProfileId> {
+        let SelectorKind::String(value) = &self.kind else {
+            return None;
+        };
+        let length = u64::try_from(value.len()).expect("bounded selector length");
+        if length > authority.get() {
+            return None;
+        }
+        declared.into_iter().find(|id| id.as_str() == value)
+    }
+
     /// The String Length Fact under `authority`: none for an absent or
     /// non-string selector, `Exact(n)` for a string of `n` bytes within
     /// `authority`, and otherwise `OverLimit`. A string past the bound it was
