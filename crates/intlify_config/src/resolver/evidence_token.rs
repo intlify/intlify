@@ -255,7 +255,7 @@ impl Redacted {
     }
 }
 
-/// A String Length Fact as a selector's view writes it (D15:2503).
+/// A String Length Fact as a selector's view writes it (D15:2505).
 fn length_view(length: StringLengthFact) -> Value {
     match length {
         StringLengthFact::Exact(bytes) => json!({ "exact": bytes.to_string() }),
@@ -485,7 +485,7 @@ mod tests {
             tokens.token(PROFILE, &second)
         );
         // Equal projections under different origins are different tokens
-        // (D15:3358), as are the two path-member kinds.
+        // (D15:3362), as are the two path-member kinds.
         assert_ne!(
             tokens.token(PROFILE, &first),
             tokens.token(PROFILE, &programmatic)
@@ -525,7 +525,7 @@ mod tests {
         assert_eq!(tokens.comparisons(), 21);
     }
 
-    /// D15:3359: a subject record and an evidence record with one digest form
+    /// D15:3362: a subject record and an evidence record with one digest form
     /// no colliding set.
     #[test]
     fn subject_and_evidence_records_never_share_a_set() {
