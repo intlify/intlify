@@ -25,12 +25,18 @@
 //! candidate of the key (D15:2381). A suggestion is a single-member object
 //! keyed by its kind (Decision 015-180).
 //!
+//! Accounting charges a retained ordinary record the bytes of its accounting
+//! view, `{ owner, record: { <record kind>: view } }`, which names the
+//! record's Evidence record owner as a unit view (D15:2518).
+//!
 //! Nothing outside the tests takes a view yet: the Findings and statuses of
 //! Resolution Evidence come later (plan 025 PRs 5d to 5h).
 
 use serde_json::{json, Map, Value};
 
-use crate::construction::registry::check::{check_id, details_members, kind_id, DetailsMember};
+use crate::construction::registry::check::{
+    check_id, details_members, kind_id, DetailsMember, RecordKind,
+};
 use crate::construction::registry::finding::{blocking, severity, suggestion_kind, SuggestionKind};
 use crate::input_limits::Bound;
 
@@ -211,6 +217,29 @@ impl<'a> RecordViews<'a> {
             .collect()
     }
 
+    /// The accounting view of a record of kind `kind` whose view is `view`
+    /// and whose Evidence record owner is `owner`: `{ owner, record: {
+    /// <record kind>: view } }` (D15:2518). Every view a test builds is
+    /// checked against the Check Registry: the row of `owner`'s check must
+    /// list the record kind (D15:2251).
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug that leaves `owner` without a view.
+    pub(crate) fn accounting(
+        &self,
+        owner: &Unit,
+        kind: RecordKind,
+        view: Value,
+    ) -> Result<Value, ViewInvariant> {
+        let unit = self.unit(owner)?;
+        #[cfg(test)]
+        owns(owner, kind);
+        let mut record = Map::new();
+        record.insert(kind.id().to_owned(), view);
+        Ok(json!({ "owner": unit, "record": record }))
+    }
+
     /// The token view of `unit`'s subject.
     fn subject(&self, unit: &Unit) -> Result<Value, ViewInvariant> {
         self.tokens
@@ -335,13 +364,25 @@ fn kind_name(kind: SuggestionKind) -> String {
     }
 }
 
+/// Asserts that the Check Registry row of `owner`'s check lets its units own
+/// records of `kind`.
+#[cfg(test)]
+fn owns(owner: &Unit, kind: RecordKind) {
+    use crate::construction::registry::check::testing::record_kinds;
+    assert!(
+        record_kinds(owner.subject.kind(), owner.check).contains(&kind),
+        "{owner:?} may not own a {} record, which its Check Registry row does not list",
+        kind.id()
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use intlify_shared_json::encoding::{digest_bytes, encode};
     use intlify_shared_json::token::hex;
     use serde_json::{json, Value};
 
-    use crate::construction::registry::check::DetailsMember;
+    use crate::construction::registry::check::{DetailsMember, RecordKind};
     use crate::input_limits::Bound;
     use crate::resolver::capability::{BootstrapBoundId, BootstrapGroup};
     use crate::resolver::evaluation::{
@@ -1017,6 +1058,52 @@ mod tests {
         assert_eq!(
             views.unit(&foreign),
             Err(ViewInvariant::CheckOutsideKind(foreign))
+        );
+    }
+
+    /// An accounting view names the record's Evidence record owner and keys
+    /// the record's view by its kind; an owner without a view leaves the
+    /// record without one.
+    #[test]
+    fn an_accounting_view_names_the_owner_and_keys_the_record_by_its_kind() {
+        let mut evaluation = Evaluation::default();
+        pass(&mut evaluation, vocabulary());
+        let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
+        let record = json!({ "kind": "specification-input" });
+        assert_eq!(
+            views
+                .accounting(&vocabulary(), RecordKind::EvidenceIndex, record.clone())
+                .unwrap(),
+            json!({
+                "owner": unit_view(
+                    "specification-admission",
+                    "vocabulary",
+                    VOCABULARY,
+                    "specification.vocabulary.intact",
+                ),
+                "record": { "evidence-index": record },
+            })
+        );
+        let unrecorded = requested(key("en"), Check::CanonicalLocale);
+        assert_eq!(
+            views.accounting(&unrecorded, RecordKind::FindingOccurrence, record),
+            Err(ViewInvariant::SubjectWithoutToken(unrecorded))
+        );
+    }
+
+    /// A test that charges a record to an owner whose Check Registry row does
+    /// not list the record's kind fails: only the decision table owns
+    /// Coverage Decision Evidence.
+    #[test]
+    #[should_panic(expected = "may not own a coverage-decision-evidence record")]
+    fn an_owner_whose_row_does_not_list_the_kind_fails_the_test() {
+        let mut evaluation = Evaluation::default();
+        pass(&mut evaluation, vocabulary());
+        let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
+        let _ = views.accounting(
+            &vocabulary(),
+            RecordKind::CoverageDecisionEvidence,
+            json!({}),
         );
     }
 }

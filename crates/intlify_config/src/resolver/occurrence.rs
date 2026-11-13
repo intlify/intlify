@@ -23,19 +23,25 @@
 //! ordinal, without the related Evidence (D15:256, 2703). Occurrences order by
 //! Finding, then by primary Evidence, then by ordinal (D15:2389).
 //!
+//! An occurrence's Evidence record owner is the unit of its Finding
+//! (D15:2205). Under that unit, the occurrence refers to its primary and
+//! related Evidence, each a record of the evidence index (D15:1972), and
+//! accounting charges the unit the occurrence's accounting view (D15:2518).
+//!
 //! A stage builds a selector's Evidence under the final selector authority
 //! before it makes the candidate (D15:819). The reporting slice's bounds come
-//! before grouping (D15:2209) and come with their own stage, as do the
-//! evidence index and the records' owners. Every occurrence a test builds is
-//! checked against the Finding Registry: its primary and related Evidence
-//! must have the kinds, origins, and shapes that its check and code's pair
-//! gives them.
+//! before grouping (D15:2209) and come with their own stage. Every occurrence
+//! a test builds is checked against the Finding Registry: its primary and
+//! related Evidence must have the kinds, origins, and shapes that its check
+//! and code's pair gives them.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Map, Value};
 
-use super::evaluation::{Code, IssueKey};
+use crate::construction::registry::check::RecordKind;
+
+use super::evaluation::{Code, IssueKey, Unit};
 use super::evidence::{Evidence, EvidenceProjection};
 use super::evidence_token::{EvidenceTokens, Redacted};
 use super::record_view::{RecordViews, ViewInvariant};
@@ -91,6 +97,19 @@ impl FindingOccurrence {
         (&self.finding, &self.primary, self.ordinal)
     }
 
+    /// The occurrence's Evidence record owner: the unit of its Finding.
+    pub(crate) const fn owner(&self) -> &Unit {
+        self.finding.unit()
+    }
+
+    /// The Evidence the occurrence refers to, its primary record and then its
+    /// related ones, each under its owner.
+    pub(crate) fn references(&self) -> impl Iterator<Item = (&Unit, &Evidence)> {
+        std::iter::once(&self.primary)
+            .chain(&self.related)
+            .map(|evidence| (self.owner(), evidence))
+    }
+
     /// `{ finding, primary, ordinal, related }` (D15:2479).
     ///
     /// # Errors
@@ -106,6 +125,20 @@ impl FindingOccurrence {
             Value::from(self.related.iter().map(Evidence::view).collect::<Vec<_>>()),
         );
         Ok(Value::Object(view))
+    }
+
+    /// The occurrence's accounting view, charged to its owner (D15:2518).
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug of a Finding Key or owner `views` cannot
+    /// present.
+    pub(crate) fn accounting(&self, views: &RecordViews<'_>) -> Result<Value, ViewInvariant> {
+        views.accounting(
+            self.owner(),
+            RecordKind::FindingOccurrence,
+            self.view(views)?,
+        )
     }
 }
 
@@ -478,6 +511,39 @@ mod tests {
         let without = built(&[candidate(&asserted, vocabulary_root(), Vec::new())]);
         assert_eq!(with[0].key(), without[0].key());
         assert_ne!(with[0], without[0]);
+    }
+
+    /// An occurrence is owned by the unit of its Finding, refers under that
+    /// unit to its primary and then its related Evidence, and charges it its
+    /// accounting view.
+    #[test]
+    fn an_occurrence_is_owned_by_its_findings_unit_and_refers_to_its_evidence() {
+        let mut evaluation = Evaluation::default();
+        let asserted = found(
+            &mut evaluation,
+            &vocabulary(Check::AssertedArtifact),
+            Code::IntentSurfaceClassVocabularyNotAdmitted,
+            Some(Reason::IdentityMismatch),
+        );
+        let built = built(&[candidate(&asserted, vocabulary_root(), vec![slot()])]);
+        let occurrence = &built[0];
+        let unit = asserted.unit();
+        assert_eq!(occurrence.owner(), unit);
+        assert_eq!(
+            occurrence.references().collect::<Vec<_>>(),
+            [
+                (unit, occurrence.primary()),
+                (unit, &occurrence.related()[0])
+            ]
+        );
+        let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
+        assert_eq!(
+            occurrence.accounting(&views).unwrap(),
+            json!({
+                "owner": views.unit(unit).unwrap(),
+                "record": { "finding-occurrence": occurrence.view(&views).unwrap() },
+            })
+        );
     }
 
     /// Occurrences order by Finding, then by primary Evidence, then by
