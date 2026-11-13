@@ -4,7 +4,7 @@
 //! 015's `file-source-identity-revision` boundary: a file entry's exact
 //! logical source identity and Source-content revision, admitted against the
 //! raw bytes they name or refused with one of the seven reasons of its row
-//! (D15:743, 3143; 015-149, 015-170).
+//! (D15:743, 3146; 015-149, 015-170).
 //!
 //! An identity is a versioned identity-domain tag, `:`, and a non-empty
 //! payload. The tag is a name, `.v`, and a decimal version without a leading

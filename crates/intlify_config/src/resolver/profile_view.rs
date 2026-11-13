@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! 015's Phase 14, `profile-projection`: a checked profile's canonical semantic
-//! projection, presented as its profile view (D15:1187-1237, 2136).
+//! projection, presented as its profile view (D15:1189-1239, 2142).
 //!
 //! The view is the closed, number-free JSON value with one member per semantic
 //! group, in the order the Profile Specification's `semanticGroups` lists
@@ -15,7 +15,7 @@
 //! field (D15:191). The profile semantic digest is 017's `H` over the view
 //! (D17:1436). The projection leaves out the Profile ID, the selector, the
 //! configuration schema version, authoring evidence, Findings, the Coverage
-//! Decision Basis and Evidence, and redundant authoring rules (D15:1206).
+//! Decision Basis and Evidence, and redundant authoring rules (D15:1208).
 
 use std::collections::BTreeMap;
 

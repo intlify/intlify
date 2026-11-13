@@ -1233,7 +1233,7 @@ mod tests {
             .filter(|kind| kind.declared_only())
             .map(|kind| (kind, kind.checks()))
             .collect();
-        // Each scope level runs the four keyword classes (D15:2167).
+        // Each scope level runs the four keyword classes (D15:2173).
         let fields: &[Check] = &[
             Check::RequiredField,
             Check::FieldType,
@@ -1245,14 +1245,14 @@ mod tests {
         assert_eq!(
             declared,
             [
-                // The owners rank first in their phases (D15:2510).
+                // The owners rank first in their phases (D15:2516).
                 (
                     SubjectKind::EntryDependencies,
                     &[Check::EstablishedSlots][..]
                 ),
                 // The bootstrap bounds before the checks they protect, then
-                // the five root-value bounds in table order (D15:1870,
-                // 1993, 2000, 2350).
+                // the five root-value bounds in table order (D15:1876,
+                // 1999, 2006, 2356).
                 (
                     SubjectKind::CompleteInput,
                     &[
@@ -1272,7 +1272,7 @@ mod tests {
                     SubjectKind::MaterializedDependencies,
                     &[Check::EstablishedSlots][..]
                 ),
-                // Before every structural kind (D15:2124, 2167).
+                // Before every structural kind (D15:2130, 2173).
                 (
                     SubjectKind::ConfigurationSchemaSelection,
                     &[
@@ -1284,7 +1284,7 @@ mod tests {
                 ),
                 (SubjectKind::CapabilityStructuralAnalysis, capability),
                 // The scope levels and the identity maps' keys, parents first
-                // (D15:2167, 3340).
+                // (D15:2173, 3354).
                 (SubjectKind::RootField, fields),
                 (SubjectKind::ProfileKey, key),
                 (SubjectKind::ProfileField, fields),
@@ -1293,7 +1293,7 @@ mod tests {
                 (SubjectKind::DeploymentGroupKey, key),
                 (SubjectKind::GroupField, fields),
                 // The declarations and each declared ID, then the selector,
-                // checked apart from the IDs (D15:1879, 1880, 1984).
+                // checked apart from the IDs (D15:1885, 1886, 1990).
                 (SubjectKind::CapabilityProfiles, capability),
                 (SubjectKind::CapabilityProfileId, capability),
                 (
@@ -1306,7 +1306,7 @@ mod tests {
                     ][..],
                 ),
                 // One singleton whose Finding's reason names the domain
-                // (D15:2353, 2402).
+                // (D15:2359, 2408).
                 (
                     SubjectKind::DiagnosticDomain,
                     &[Check::CompleteReporting][..]

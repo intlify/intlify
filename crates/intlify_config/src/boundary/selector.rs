@@ -4,7 +4,7 @@
 //! 015's `external-profile-selector-binding` boundary: the binding's closed
 //! report of what it established about the host selector, admitted as the
 //! normalized External Profile Selector Input or refused with one of the
-//! three reasons of its row (D15:307, 3142; 015-167).
+//! three reasons of its row (D15:307, 3145; 015-167).
 //!
 //! The report is exactly one of six variants. `absent`, a `string` within the
 //! bound, `over-limit-string`, and `invalid-type` with one of the five type

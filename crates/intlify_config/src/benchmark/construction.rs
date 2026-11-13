@@ -6,7 +6,7 @@
 //! The construction interval admits the complete construction authority and
 //! builds the immutable resolver; it ends when the resolver exists. The
 //! identity interval derives that resolver's Resolver Construction Identity,
-//! which the construction interval excludes (D15:2755, 2766). A refused
+//! which the construction interval excludes (D15:2764, 2775). A refused
 //! construction is an expected result, not a harness failure: the refusal is
 //! observed, and the input it hands back is released after the end read.
 

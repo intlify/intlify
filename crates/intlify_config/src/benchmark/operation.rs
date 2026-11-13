@@ -125,7 +125,7 @@ impl Operation {
         }
     }
     /// The pair and boundary of the peak live memory measured over this
-    /// operation's interval (D15:2764). Only a fresh resolver construction has
+    /// operation's interval (D15:2773). Only a fresh resolver construction has
     /// one yet; a complete invocation's comes with that boundary.
     pub(super) const fn peak_memory(self) -> Option<PeakMemory> {
         match self {

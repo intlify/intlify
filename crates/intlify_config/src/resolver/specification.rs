@@ -91,7 +91,7 @@ pub(crate) struct SpecificationInput<Id> {
 
 /// The Active Project Profile Specification: the identity and revision a
 /// `project-profile` assertion must name, and the semantic digest of the body
-/// construction admitted, which a checked profile's view carries (D15:1187).
+/// construction admitted, which a checked profile's view carries (D15:1189).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ActiveProfileSpecification<Id> {
     pub(crate) specification: VersionedIdentity<Id>,
@@ -250,7 +250,7 @@ pub(crate) struct AdmittedSpecifications<Id, P: Provider> {
 /// artifacts the pre-invocation boundary already admitted as envelopes; here
 /// the vocabulary must be intact and the one its slot asserts, and the rest of
 /// the data is read under the capability's `localeData` bounds, `data_limits`,
-/// and must carry the dataset the admitted specification admits (D15:3160).
+/// and must carry the dataset the admitted specification admits (D15:3165).
 pub(crate) fn admit_specifications<Id, D>(
     evaluation: &mut Evaluation,
     supported: &SupportedSpecifications<Id>,
@@ -1008,7 +1008,7 @@ mod tests {
 
     /// The boundary admitted only the envelope, so the rest is read in the
     /// data's unit, under the capability's `localeData` bounds, and data whose
-    /// rest does not read is not admitted there (D15:3160).
+    /// rest does not read is not admitted there (D15:3165).
     #[test]
     fn the_rest_of_the_data_is_read_under_the_locale_data_bounds() {
         let read = Admission::run_with(

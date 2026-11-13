@@ -22,7 +22,7 @@
 //! submitted schema artifact, which no validation reads; and one
 //! cross-authority check is one rule applied to one item it compares.
 //! Totals use checked unsigned arithmetic: a total past `u64` exceeds every
-//! bound (D15:1991).
+//! bound (D15:1997).
 
 use serde_json::Value;
 

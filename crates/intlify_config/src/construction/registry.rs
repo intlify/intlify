@@ -26,10 +26,10 @@
 //! Registry come with the Evidence stages.
 //!
 //! The container is written here too ([`container`]): under each role, in
-//! role order, the tuple of the member this crate writes for it (D15:2260).
+//! role order, the tuple of the member this crate writes for it (D15:2266).
 //! The resolver's dispatch tables write every member, so the committed
 //! bytes and the file digests compiled in keep the tables and the package
-//! the same (D15:2273). Construction's last row compares the package it
+//! the same (D15:2279). Construction's last row compares the package it
 //! admitted with those digests.
 
 pub(crate) mod check;
@@ -269,7 +269,7 @@ fn admit_member<'a>(
 /// The package's container, given each member's bytes in role order: under
 /// each role, in role order, the identity and revision the Root Package
 /// admits for the role and the file digest of its member's bytes
-/// (D15:2260).
+/// (D15:2266).
 pub(crate) fn container(members: [&[u8]; 6]) -> Value {
     let admission = ConstructionAdmission::revision_zero();
     let mut listed = Map::new();
@@ -466,7 +466,7 @@ mod tests {
     }
 
     /// The committed container lists each member's tuple, as construction
-    /// admits it, in role order (D15:2260).
+    /// admits it, in role order (D15:2266).
     #[test]
     fn the_container_lists_each_members_tuple_in_role_order() {
         let members = members();

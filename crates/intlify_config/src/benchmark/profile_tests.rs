@@ -246,7 +246,7 @@ fn the_memory_profile_measures_each_construction_case_at_its_peak() {
     let profile = AdmittedProfile::memory_smoke(&registry);
     let document = profile.document();
     // The construction cases, in registry order; the identity cases' interval
-    // is not the construction's (D15:2766).
+    // is not the construction's (D15:2775).
     let construction = registry
         .declarations()
         .filter(|declaration| declaration.operation == Operation::ConstructionAuthorityAdmission)

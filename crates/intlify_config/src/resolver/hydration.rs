@@ -155,7 +155,7 @@ impl ResolvedHydration {
 /// the targets Phase 11 resolved, and the groups Phase 12 resolved. Every unit
 /// waits on the relations' bound, and every unit of a group on the group's
 /// bounds. Each endpoint's checks wait on that endpoint alone, and each check
-/// of a relation on just the facts it compares (D15:2359): a relation between
+/// of a relation on just the facts it compares (D15:2365): a relation between
 /// equal endpoints, or with an endpoint outside its group, still compares
 /// their locales and Target Profiles.
 pub(crate) fn validate_hydration(

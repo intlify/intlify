@@ -16,7 +16,7 @@ cargo test -p intlify_config --lib construction::validator
 - **Visits.** A validation visits each instance node once. The schema nodes applied to a node are its seeds, with every node they apply to the same instance: the node a `$ref` names, the members of `allOf`, `anyOf`, and `oneOf`, `not`, `if` with its `then` and `else`, and the schema of each dependency whose name the object has. The root's seed is the schema's root. Any other node's seeds are the nodes that the nodes applied to its parent name for it through `properties`, `patternProperties`, `additionalProperties`, `items`, `additionalItems`, and `contains`. A node no schema node applies to is not visited.
 - **Order.** The children are visited first, and then the applied nodes are decided in the schema's order, each after the nodes it applies in place. Every branch is decided whatever the others decide, `then` and `else` alike, so that what the nodes ask of the children is known before the children are visited.
 - **Keywords.** Numbers are compared as exact decimals, and an integer is a number without a fraction, however it is written. A string's length is its code points. A `pattern` is matched anywhere in the string. Two values are equal when they are of one type and equal as that type, objects whatever the order of their members. `format`, `contentMediaType`, and `contentEncoding` are annotations and are not checked.
-- **Result.** A validation answers only whether the instance is valid: a failed construction carries no details but the bound it exceeded (D15:3086).
+- **Result.** A validation answers only whether the instance is valid: a failed construction carries no details but the bound it exceeded (D15:3100).
 
 ## The pairs
 

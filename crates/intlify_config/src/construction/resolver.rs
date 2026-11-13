@@ -6,9 +6,9 @@
 //! Construction is given its input and keeps it: every component's declared
 //! tuple and exact bytes stay beside the authorities construction admitted,
 //! since staleness compares two retained inputs by value and replay needs
-//! the complete input again (D15:2575, 2583). The resolver takes the input
+//! the complete input again (D15:2581, 2589). The resolver takes the input
 //! rather than copying it, so construction holds no second copy of what the
-//! caller acquired (D15:2796). Nothing changes the resolver after
+//! caller acquired (D15:2805). Nothing changes the resolver after
 //! construction.
 //!
 //! What the resolver supports in each specification slot comes from the
