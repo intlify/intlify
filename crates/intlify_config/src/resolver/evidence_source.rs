@@ -137,8 +137,9 @@ impl SourceSpan {
     }
 }
 
-/// `bytes` as lowercase hexadecimal digits, two per byte.
-fn hex(bytes: &[u8]) -> String {
+/// `bytes` as lowercase hexadecimal digits, two per byte, as a view writes a
+/// byte string that need not be UTF-8 (D15:2452).
+pub(crate) fn hex(bytes: &[u8]) -> String {
     let mut text = String::with_capacity(bytes.len() * 2);
     for byte in bytes {
         write!(text, "{byte:02x}").expect("writing to a String does not fail");
