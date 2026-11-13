@@ -721,6 +721,96 @@ pub(crate) fn are_reachable(rows: &[FindingRow], policies: &[DisclosurePolicy]) 
         .all(|shape| carried.contains(&shape) || decisions.contains(shape))
 }
 
+/// What a test's occurrences may carry.
+#[cfg(test)]
+pub(crate) mod testing {
+    use crate::resolver::evaluation::Code;
+    use crate::resolver::evidence::Evidence;
+    use crate::resolver::origin::SafeOriginKind;
+
+    use super::{find, policy, KeyKind, PathShape};
+
+    /// A resolver-input record's shape: its origin, its fixed roles, and the
+    /// kind of the key that ends it.
+    type Seen = (SafeOriginKind, Vec<String>, Option<KeyKind>);
+
+    /// Why the pair of `check` and `code` does not let an occurrence carry
+    /// `primary` and `related`, or `None` when it does: the pair must exist,
+    /// name the primary record's kind as primary and each related record's
+    /// kind as related, and give each record's origin, or for a resolver
+    /// input its shape, which names its origin.
+    pub(crate) fn refusal(
+        check: &str,
+        code: Code,
+        primary: &Evidence,
+        related: &[&Evidence],
+    ) -> Option<String> {
+        let Some(pair) = find(check, code) else {
+            return Some(format!("{check} does not report {}", code.as_str()));
+        };
+        if pair.primary != Some(primary.kind()) {
+            return Some(format!(
+                "the primary kind is {:?}, not {:?}",
+                pair.primary,
+                primary.kind()
+            ));
+        }
+        if let Some(record) = related
+            .iter()
+            .find(|record| !pair.related.contains(&record.kind()))
+        {
+            return Some(format!(
+                "the related kinds {:?} leave out {:?}",
+                pair.related,
+                record.kind()
+            ));
+        }
+        std::iter::once(primary)
+            .chain(related.iter().copied())
+            .find_map(|record| {
+                let kind = record.kind();
+                if policy::resolver_input(kind) {
+                    // A shape names its origin.
+                    let seen = seen(record);
+                    (!pair.paths(kind).iter().any(|shape| same(shape, &seen)))
+                        .then(|| format!("{kind:?} does not carry {seen:?}"))
+                } else {
+                    (!pair.origins(kind).contains(&record.origin()))
+                        .then(|| format!("{kind:?} does not come through {:?}", record.origin()))
+                }
+            })
+    }
+
+    fn seen(record: &Evidence) -> Seen {
+        let view = record.view();
+        let segments = view["component"].as_array().cloned().unwrap_or_default();
+        let roles = segments
+            .iter()
+            .filter_map(|segment| segment.get("fixed-role")?.as_str().map(str::to_owned))
+            .collect();
+        let key = segments.last().and_then(|segment| {
+            if segment.get("safe-key").is_some() {
+                Some(KeyKind::SafeKey)
+            } else if segment.get("redacted-key").is_some() {
+                Some(KeyKind::RedactedKey)
+            } else {
+                None
+            }
+        });
+        (record.origin(), roles, key)
+    }
+
+    fn same(shape: &PathShape, seen: &Seen) -> bool {
+        shape.origin == seen.0
+            && shape
+                .roles
+                .iter()
+                .map(|role| role.role.as_str())
+                .eq(seen.1.iter().map(String::as_str))
+            && shape.key == seen.2
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
