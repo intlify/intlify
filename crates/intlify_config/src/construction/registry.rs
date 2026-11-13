@@ -34,6 +34,7 @@
 
 pub(crate) mod check;
 pub(crate) mod finding;
+pub(crate) mod policy;
 pub(crate) mod safe_origin;
 
 use std::collections::BTreeMap;
@@ -63,7 +64,7 @@ pub(crate) const PATH: &str = "registries/package-v0.json";
 
 /// The container's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:e604d509e8aaf2ebb7e396d25bbcd96bef87dfb3aa80bf202ec272317155e94b";
+    "sha256:bf6db515125812d9be0ef4ee8cdfd000f9c345e5e5a3012acf1e8090569eee46";
 
 /// A rank's spelling in a registry: a shortest decimal string.
 pub(crate) const RANK_PATTERN: &str = "^(0|[1-9][0-9]*)$";
@@ -210,8 +211,12 @@ pub(crate) fn admit(
             .ok_or(CROSS_REFERENCES_ROW)?;
     let checks =
         CheckRegistry::read(registry(RegistryRole::CheckRegistry)).ok_or(CROSS_REFERENCES_ROW)?;
-    let findings = FindingRegistry::read(registry(RegistryRole::FindingRegistry), &checks)
-        .ok_or(CROSS_REFERENCES_ROW)?;
+    let findings = FindingRegistry::read(
+        registry(RegistryRole::FindingRegistry),
+        &checks,
+        &safe_origin_kinds,
+    )
+    .ok_or(CROSS_REFERENCES_ROW)?;
     Ok(AdmittedPackage {
         declared: checked.declared,
         members,
@@ -769,6 +774,43 @@ mod tests {
             (
                 "a check that lists nothing",
                 members_with(R::CheckRegistry, &dropped),
+            ),
+        ] {
+            // The schemas admit both; the cross-references do not.
+            assert_eq!(checked(&package(&members)), Some(41), "{case}");
+        }
+    }
+
+    #[test]
+    fn the_finding_registry_policies_must_be_015s_under_the_admitted_origins() {
+        // A selector's redacted value disclosed literally.
+        let mut literal: Value = serde_json::from_slice(FINDINGS).unwrap();
+        for policy in literal["policies"].as_array_mut().unwrap() {
+            for component in policy["components"].as_array_mut().unwrap() {
+                if component["component"] == "selector.redacted-value" {
+                    component["disclosure"] = json!("non-secret-literal");
+                    component.as_object_mut().unwrap().remove("tokenProjection");
+                }
+            }
+        }
+        let literal = serde_json::to_vec_pretty(&literal).unwrap();
+        // A Safe Origin Kind Registry under which the vocabulary no longer
+        // supplies the artifact input the policies point into.
+        let mut narrowed: Value = serde_json::from_slice(SAFE_ORIGINS).unwrap();
+        for row in narrowed["rows"].as_array_mut().unwrap() {
+            if row["id"] == "intent-surface-class-vocabulary" {
+                row["permittedEvidenceKinds"] = json!(["specification-input"]);
+            }
+        }
+        let narrowed = serde_json::to_vec_pretty(&narrowed).unwrap();
+        for (case, members) in [
+            (
+                "a redacted value disclosed literally",
+                members_with(R::FindingRegistry, &literal),
+            ),
+            (
+                "an origin the kind may not use",
+                members_with(R::SafeOriginKindRegistry, &narrowed),
             ),
         ] {
             // The schemas admit both; the cross-references do not.

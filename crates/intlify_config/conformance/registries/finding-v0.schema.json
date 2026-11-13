@@ -1,9 +1,16 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "FindingRegistry",
-  "description": "The registry's body.",
+  "description": "The registry's body: the disclosure policies, one for each evidence kind,\nand the rows (D15:2233).",
   "type": "object",
   "properties": {
+    "policies": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/DisclosurePolicy"
+      },
+      "minItems": 1
+    },
     "rows": {
       "type": "array",
       "items": {
@@ -14,9 +21,265 @@
   },
   "additionalProperties": false,
   "required": [
+    "policies",
     "rows"
   ],
   "definitions": {
+    "DisclosurePolicy": {
+      "description": "One evidence kind's disclosure policy.",
+      "type": "object",
+      "properties": {
+        "evidenceKind": {
+          "$ref": "#/definitions/EvidenceKind"
+        },
+        "required": {
+          "description": "The members every Evidence of the kind has.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Member"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "components": {
+          "description": "Each component the kind's view can retain, in view order.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ComponentPolicy"
+          },
+          "minItems": 1
+        },
+        "paths": {
+          "description": "For a resolver-input kind, the component path shapes some retained\nEvidence can carry, in Evidence order.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PathShape"
+          },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "evidenceKind",
+        "required",
+        "components"
+      ]
+    },
+    "EvidenceKind": {
+      "description": "What an origin-bearing Evidence item describes.",
+      "type": "string",
+      "enum": [
+        "entry-source",
+        "configuration-value",
+        "profile-selector",
+        "specification-input",
+        "artifact-input",
+        "verification-input",
+        "implementation-capability"
+      ]
+    },
+    "Member": {
+      "description": "A member of an Evidence view (D15:2481).",
+      "type": "string",
+      "enum": [
+        "source",
+        "locator",
+        "path",
+        "value",
+        "span",
+        "selector",
+        "component"
+      ]
+    },
+    "ComponentPolicy": {
+      "description": "How a policy discloses one component.",
+      "type": "object",
+      "properties": {
+        "component": {
+          "$ref": "#/definitions/Component"
+        },
+        "disclosure": {
+          "$ref": "#/definitions/Disclosure"
+        },
+        "nonSecretWhen": {
+          "description": "For a literal component whose content is not fixed, the\nclassifications under which that content counts as non-secret.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/NonSecretClass"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "tokenProjection": {
+          "description": "For a redacted component, the projection whose token replaces it.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/TokenKind"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "component",
+        "disclosure"
+      ]
+    },
+    "Component": {
+      "description": "A component an Evidence view can retain: a leaf variant of one of its\nmembers, in the order of the view's members and of each member's\nvariants (D15:2492).",
+      "type": "string",
+      "enum": [
+        "source.safe-opaque",
+        "source.redacted",
+        "locator.relative-path",
+        "locator.safe-label",
+        "locator.safe-uri",
+        "path.safe-member",
+        "path.array-index",
+        "path.redacted-member",
+        "value.exact-json-pointer",
+        "value.redacted-logical-path.safe-member",
+        "value.redacted-logical-path.array-index",
+        "value.redacted-logical-path.redacted-member",
+        "span",
+        "selector.absent",
+        "selector.safe-profile-id",
+        "selector.redacted-value",
+        "component.fixed-role",
+        "component.safe-key",
+        "component.redacted-key"
+      ]
+    },
+    "Disclosure": {
+      "description": "One of the two disclosure policies of a component (D15:720).",
+      "type": "string",
+      "enum": [
+        "non-secret-literal",
+        "redacted-structure"
+      ]
+    },
+    "NonSecretClass": {
+      "description": "Why a literal component's content counts as non-secret.",
+      "oneOf": [
+        {
+          "description": "The adapter or frontend that owns the identity's domain marks it\nnon-secret (Decision 015-185).",
+          "type": "string",
+          "const": "owner-marked-identity"
+        },
+        {
+          "description": "The supplying adapter classifies the canonical locator non-secret\n(D15:766).",
+          "type": "string",
+          "const": "adapter-classified-locator"
+        },
+        {
+          "description": "The member name is defined by the configuration schema (D15:776).",
+          "type": "string",
+          "const": "schema-defined-name"
+        },
+        {
+          "description": "A `profiles`, `targetProfiles`, or `deploymentGroups` key that matches\nthe identifier syntax within the capability's byte bound (D15:776).",
+          "type": "string",
+          "const": "identifier-key"
+        },
+        {
+          "description": "A `localeNegotiation.aliases` or `messageFallback` key for which the\nadmitted canonicalization data returns a canonical identifier\n(D15:776).",
+          "type": "string",
+          "const": "canonical-locale-key"
+        },
+        {
+          "description": "A selector that exactly matches a declared Profile ID (D15:807).",
+          "type": "string",
+          "const": "declared-profile-id"
+        },
+        {
+          "description": "A vocabulary member's canonical vocabulary identity (D15:824).",
+          "type": "string",
+          "const": "vocabulary-identity"
+        },
+        {
+          "description": "An admitted envelope's canonical exact-reference identity (D15:824).",
+          "type": "string",
+          "const": "admitted-exact-reference"
+        }
+      ]
+    },
+    "TokenKind": {
+      "description": "The evidence kind a token's record names: the projection of the component\nthe token replaces, or `profile-selector` for a selector's value. The\nFinding Registry's disclosure policies name it by its ID.",
+      "type": "string",
+      "enum": [
+        "source-identity",
+        "logical-input-path-member",
+        "value-path-member",
+        "resolver-input-component-key",
+        "profile-selector"
+      ]
+    },
+    "PathShape": {
+      "description": "A component path shape: the origin, the fixed roles, and the key that\nends it, if one does.",
+      "type": "object",
+      "properties": {
+        "origin": {
+          "$ref": "#/definitions/SafeOriginKind"
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RoleShape"
+          }
+        },
+        "key": {
+          "$ref": "#/definitions/KeyKind"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "origin",
+        "roles"
+      ]
+    },
+    "SafeOriginKind": {
+      "description": "The fixed input boundary that supplied an origin-bearing Evidence item,\ndeclared in rank order.",
+      "type": "string",
+      "enum": [
+        "configuration-file",
+        "configuration-programmatic",
+        "profile-selector-cli",
+        "profile-selector-programmatic",
+        "profile-resolution-specification-input",
+        "intent-surface-class-vocabulary",
+        "locale-canonicalization-data",
+        "profile-resolution-artifact-collection",
+        "resource-limit-policy-verification",
+        "implementation-capability"
+      ]
+    },
+    "RoleShape": {
+      "description": "A fixed role of a component path, with its rank within its parent path\n(D15:823).",
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rank": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "rank"
+      ]
+    },
+    "KeyKind": {
+      "description": "The key that ends a component path shape.",
+      "type": "string",
+      "enum": [
+        "safe-key",
+        "redacted-key"
+      ]
+    },
     "FindingRow": {
       "description": "One row: one Finding code, the checks that may report it, and how it\nreports.",
       "type": "object",

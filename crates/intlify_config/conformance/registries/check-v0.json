@@ -5514,6 +5514,7 @@
       "possibleFindingCodes": [],
       "possibleEvidenceRecordKinds": [
         "coverage-decision-evidence",
+        "evidence-index",
         "shared-evaluation-status",
         "coverage-decision-basis"
       ],

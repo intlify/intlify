@@ -115,7 +115,7 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:ec9c7573aa6cc6a0c214af84b4922f1ab1e097b14ad6efcd31c09436202a10a4";
+    "sha256:151b85d565e9b51a082fbd5abe24b70af000832efa6424b44cb7d3f4c65bf814";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
@@ -1634,9 +1634,11 @@ fn owned_dependencies(kind: SubjectKind) -> Vec<OwnedDependency> {
 /// evidence index they refer to (D15:2207, 2385), and in entry admission
 /// also the causes of a Shared projection that cannot materialize
 /// (D15:1165); both coverage decision records for the decision table
-/// (Decision 015-161); and the dependency records the check owns. Reporting
-/// finalization owns no ordinary record: its domains' terminal Finding and
-/// state take their reserved slots (D15:2408).
+/// (Decision 015-161), with the evidence index records its Coverage
+/// Decision Evidence refers to, which it owns when no earlier unit refers
+/// to them (D15:1609, 1972); and the dependency records the check owns.
+/// Reporting finalization owns no ordinary record: its domains' terminal
+/// Finding and state take their reserved slots (D15:2408).
 fn record_kinds(kind: SubjectKind, codes: &[Code], owned: &[OwnedDependency]) -> Vec<RecordKind> {
     use RecordKind as R;
     let phase = kind.phase();
@@ -1668,7 +1670,11 @@ fn record_kinds(kind: SubjectKind, codes: &[Code], owned: &[OwnedDependency]) ->
         }
     }
     if kind == SubjectKind::CoverageTable {
-        kinds.extend([R::CoverageDecisionEvidence, R::CoverageDecisionBasis]);
+        kinds.extend([
+            R::CoverageDecisionEvidence,
+            R::EvidenceIndex,
+            R::CoverageDecisionBasis,
+        ]);
     }
     kinds.into_iter().collect()
 }
@@ -2754,11 +2760,13 @@ mod tests {
                 R::SharedUnavailabilityCause
             ]
         );
-        // The decision table owns both coverage decision records.
+        // The decision table owns both coverage decision records, and the
+        // evidence index records its Coverage Decision Evidence refers to.
         assert_eq!(
             records(K::CoverageTable, Check::CompleteTable),
             [
                 R::CoverageDecisionEvidence,
+                R::EvidenceIndex,
                 R::SharedEvaluationStatus,
                 R::CoverageDecisionBasis
             ]
@@ -2803,9 +2811,18 @@ mod tests {
             };
             assert!(kinds.contains(&status), "{}", row.check_id);
             let reports = !row.possible_finding_codes.is_empty();
-            for kind in [finding, R::FindingOccurrence, R::EvidenceIndex] {
+            for kind in [finding, R::FindingOccurrence] {
                 assert_eq!(kinds.contains(&kind), reports, "{} {kind:?}", row.check_id);
             }
+            // The decision table also refers to the evidence index, from its
+            // Coverage Decision Evidence.
+            let table = row.subject_kind == SubjectKind::CoverageTable;
+            assert_eq!(
+                kinds.contains(&R::EvidenceIndex),
+                reports || table,
+                "{}",
+                row.check_id
+            );
         }
     }
 
