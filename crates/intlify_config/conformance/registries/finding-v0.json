@@ -1432,6 +1432,31 @@
         "complete-input"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "entry.input.well-formed-json",
+          "kind": "entry-source"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "entry.input.well-formed-json",
+          "kinds": []
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "entry-source"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "entry-source",
+          "origins": [
+            "configuration-file"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1445,6 +1470,33 @@
         "complete-input"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "entry.input.unique-members",
+          "kind": "entry-source"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "entry.input.unique-members",
+          "kinds": [
+            "entry-source"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "entry-source"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "entry-source",
+          "origins": [
+            "configuration-file"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1468,6 +1520,32 @@
         "sparse-array",
         "cycle"
       ],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "entry.input.json-compatible",
+          "kind": "entry-source"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "entry.input.json-compatible",
+          "kinds": []
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "entry-source"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "entry-source",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1481,6 +1559,32 @@
         "configuration-schema-selection"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "structural.schema-selection.supported-schema-version",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "structural.schema-selection.supported-schema-version",
+          "kinds": []
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1502,6 +1606,64 @@
         "group-field"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "structural.schema-selection.present-schema-version",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "structural.root.required-field",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "structural.profile.required-field",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "structural.target.required-field",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "structural.group.required-field",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "structural.schema-selection.present-schema-version",
+          "kinds": []
+        },
+        {
+          "checkId": "structural.root.required-field",
+          "kinds": []
+        },
+        {
+          "checkId": "structural.profile.required-field",
+          "kinds": []
+        },
+        {
+          "checkId": "structural.target.required-field",
+          "kinds": []
+        },
+        {
+          "checkId": "structural.group.required-field",
+          "kinds": []
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1524,6 +1686,72 @@
         "group-field"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "structural.schema-selection.object-root",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "structural.schema-selection.string-schema-version",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "structural.root.field-type",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "structural.profile.field-type",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "structural.target.field-type",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "structural.group.field-type",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "structural.schema-selection.object-root",
+          "kinds": []
+        },
+        {
+          "checkId": "structural.schema-selection.string-schema-version",
+          "kinds": []
+        },
+        {
+          "checkId": "structural.root.field-type",
+          "kinds": []
+        },
+        {
+          "checkId": "structural.profile.field-type",
+          "kinds": []
+        },
+        {
+          "checkId": "structural.target.field-type",
+          "kinds": []
+        },
+        {
+          "checkId": "structural.group.field-type",
+          "kinds": []
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1549,6 +1777,80 @@
         "group-field"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "structural.root.field-value",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "structural.profile-key.field-value",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "structural.profile.field-value",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "structural.target-key.field-value",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "structural.target.field-value",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "structural.group-key.field-value",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "structural.group.field-value",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "structural.root.field-value",
+          "kinds": []
+        },
+        {
+          "checkId": "structural.profile-key.field-value",
+          "kinds": []
+        },
+        {
+          "checkId": "structural.profile.field-value",
+          "kinds": []
+        },
+        {
+          "checkId": "structural.target-key.field-value",
+          "kinds": []
+        },
+        {
+          "checkId": "structural.target.field-value",
+          "kinds": []
+        },
+        {
+          "checkId": "structural.group-key.field-value",
+          "kinds": []
+        },
+        {
+          "checkId": "structural.group.field-value",
+          "kinds": []
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1568,6 +1870,56 @@
         "group-field"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "structural.root.known-field",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "structural.profile.known-field",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "structural.target.known-field",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "structural.group.known-field",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "structural.root.known-field",
+          "kinds": []
+        },
+        {
+          "checkId": "structural.profile.known-field",
+          "kinds": []
+        },
+        {
+          "checkId": "structural.target.known-field",
+          "kinds": []
+        },
+        {
+          "checkId": "structural.group.known-field",
+          "kinds": []
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1581,6 +1933,44 @@
         "profile-selector"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "selection.selector.required",
+          "kind": "profile-selector"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "selection.selector.required",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        },
+        {
+          "evidenceKind": "profile-selector"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        },
+        {
+          "evidenceKind": "profile-selector",
+          "origins": [
+            "profile-selector-cli",
+            "profile-selector-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1594,6 +1984,44 @@
         "profile-selector"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "selection.selector.valid",
+          "kind": "profile-selector"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "selection.selector.valid",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        },
+        {
+          "evidenceKind": "profile-selector"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        },
+        {
+          "evidenceKind": "profile-selector",
+          "origins": [
+            "profile-selector-cli",
+            "profile-selector-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1607,6 +2035,44 @@
         "profile-selector"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "selection.selector.declared",
+          "kind": "profile-selector"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "selection.selector.declared",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        },
+        {
+          "evidenceKind": "profile-selector"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        },
+        {
+          "evidenceKind": "profile-selector",
+          "origins": [
+            "profile-selector-cli",
+            "profile-selector-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1636,6 +2102,161 @@
       "allowedReasons": [
         "missing-required-slot"
       ],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "specification.project-profile.supported",
+          "kind": "specification-input"
+        },
+        {
+          "checkId": "specification.locale-canonicalization.supported",
+          "kind": "specification-input"
+        },
+        {
+          "checkId": "specification.locale-negotiation.supported",
+          "kind": "specification-input"
+        },
+        {
+          "checkId": "specification.message-locale-fallback.supported",
+          "kind": "specification-input"
+        },
+        {
+          "checkId": "specification.coverage.supported",
+          "kind": "specification-input"
+        },
+        {
+          "checkId": "specification.intent-surface-class-vocabulary.supported",
+          "kind": "specification-input"
+        },
+        {
+          "checkId": "specification.delivery-graph.supported",
+          "kind": "specification-input"
+        },
+        {
+          "checkId": "specification.delivery-placement.supported",
+          "kind": "specification-input"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "specification.project-profile.supported",
+          "kinds": []
+        },
+        {
+          "checkId": "specification.locale-canonicalization.supported",
+          "kinds": []
+        },
+        {
+          "checkId": "specification.locale-negotiation.supported",
+          "kinds": []
+        },
+        {
+          "checkId": "specification.message-locale-fallback.supported",
+          "kinds": []
+        },
+        {
+          "checkId": "specification.coverage.supported",
+          "kinds": []
+        },
+        {
+          "checkId": "specification.intent-surface-class-vocabulary.supported",
+          "kinds": []
+        },
+        {
+          "checkId": "specification.delivery-graph.supported",
+          "kinds": []
+        },
+        {
+          "checkId": "specification.delivery-placement.supported",
+          "kinds": []
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "specification-input",
+          "paths": [
+            {
+              "origin": "profile-resolution-specification-input",
+              "roles": [
+                {
+                  "role": "project-profile",
+                  "rank": "0"
+                }
+              ]
+            },
+            {
+              "origin": "profile-resolution-specification-input",
+              "roles": [
+                {
+                  "role": "locale-canonicalization",
+                  "rank": "1"
+                }
+              ]
+            },
+            {
+              "origin": "profile-resolution-specification-input",
+              "roles": [
+                {
+                  "role": "locale-negotiation",
+                  "rank": "2"
+                }
+              ]
+            },
+            {
+              "origin": "profile-resolution-specification-input",
+              "roles": [
+                {
+                  "role": "message-locale-fallback",
+                  "rank": "3"
+                }
+              ]
+            },
+            {
+              "origin": "profile-resolution-specification-input",
+              "roles": [
+                {
+                  "role": "coverage",
+                  "rank": "4"
+                }
+              ]
+            },
+            {
+              "origin": "profile-resolution-specification-input",
+              "roles": [
+                {
+                  "role": "intent-surface-class-vocabulary",
+                  "rank": "5"
+                }
+              ]
+            },
+            {
+              "origin": "profile-resolution-specification-input",
+              "roles": [
+                {
+                  "role": "delivery-graph",
+                  "rank": "6"
+                }
+              ]
+            },
+            {
+              "origin": "profile-resolution-specification-input",
+              "roles": [
+                {
+                  "role": "delivery-placement",
+                  "rank": "7"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "specification-input",
+          "origins": [
+            "profile-resolution-specification-input"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1651,6 +2272,42 @@
       "allowedReasons": [
         "unsupported",
         "incompatible"
+      ],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "specification.project-profile.supported",
+          "kind": "specification-input"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "specification.project-profile.supported",
+          "kinds": []
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "specification-input",
+          "paths": [
+            {
+              "origin": "profile-resolution-specification-input",
+              "roles": [
+                {
+                  "role": "project-profile",
+                  "rank": "0"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "specification-input",
+          "origins": [
+            "profile-resolution-specification-input"
+          ]
+        }
       ],
       "suggestionKind": "none"
     },
@@ -1668,6 +2325,42 @@
         "unsupported",
         "incompatible"
       ],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "specification.locale-canonicalization.supported",
+          "kind": "specification-input"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "specification.locale-canonicalization.supported",
+          "kinds": []
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "specification-input",
+          "paths": [
+            {
+              "origin": "profile-resolution-specification-input",
+              "roles": [
+                {
+                  "role": "locale-canonicalization",
+                  "rank": "1"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "specification-input",
+          "origins": [
+            "profile-resolution-specification-input"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1681,6 +2374,59 @@
         "canonicalization-data"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "specification.locale-data.matching",
+          "kind": "artifact-input"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "specification.locale-data.matching",
+          "kinds": [
+            "specification-input"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "specification-input",
+          "paths": [
+            {
+              "origin": "profile-resolution-specification-input",
+              "roles": [
+                {
+                  "role": "locale-canonicalization",
+                  "rank": "1"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "paths": [
+            {
+              "origin": "locale-canonicalization-data",
+              "roles": []
+            }
+          ]
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "specification-input",
+          "origins": [
+            "profile-resolution-specification-input"
+          ]
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "origins": [
+            "locale-canonicalization-data"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1696,6 +2442,42 @@
       "allowedReasons": [
         "unsupported",
         "incompatible"
+      ],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "specification.locale-negotiation.supported",
+          "kind": "specification-input"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "specification.locale-negotiation.supported",
+          "kinds": []
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "specification-input",
+          "paths": [
+            {
+              "origin": "profile-resolution-specification-input",
+              "roles": [
+                {
+                  "role": "locale-negotiation",
+                  "rank": "2"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "specification-input",
+          "origins": [
+            "profile-resolution-specification-input"
+          ]
+        }
       ],
       "suggestionKind": "none"
     },
@@ -1713,6 +2495,42 @@
         "unsupported",
         "incompatible"
       ],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "specification.message-locale-fallback.supported",
+          "kind": "specification-input"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "specification.message-locale-fallback.supported",
+          "kinds": []
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "specification-input",
+          "paths": [
+            {
+              "origin": "profile-resolution-specification-input",
+              "roles": [
+                {
+                  "role": "message-locale-fallback",
+                  "rank": "3"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "specification-input",
+          "origins": [
+            "profile-resolution-specification-input"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1728,6 +2546,42 @@
       "allowedReasons": [
         "unsupported",
         "incompatible"
+      ],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "specification.coverage.supported",
+          "kind": "specification-input"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "specification.coverage.supported",
+          "kinds": []
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "specification-input",
+          "paths": [
+            {
+              "origin": "profile-resolution-specification-input",
+              "roles": [
+                {
+                  "role": "coverage",
+                  "rank": "4"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "specification-input",
+          "origins": [
+            "profile-resolution-specification-input"
+          ]
+        }
       ],
       "suggestionKind": "none"
     },
@@ -1746,6 +2600,59 @@
       "allowedReasons": [
         "unsupported",
         "incompatible"
+      ],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "specification.delivery-graph.supported",
+          "kind": "specification-input"
+        },
+        {
+          "checkId": "specification.delivery-placement.supported",
+          "kind": "specification-input"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "specification.delivery-graph.supported",
+          "kinds": []
+        },
+        {
+          "checkId": "specification.delivery-placement.supported",
+          "kinds": []
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "specification-input",
+          "paths": [
+            {
+              "origin": "profile-resolution-specification-input",
+              "roles": [
+                {
+                  "role": "delivery-graph",
+                  "rank": "6"
+                }
+              ]
+            },
+            {
+              "origin": "profile-resolution-specification-input",
+              "roles": [
+                {
+                  "role": "delivery-placement",
+                  "rank": "7"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "specification-input",
+          "origins": [
+            "profile-resolution-specification-input"
+          ]
+        }
       ],
       "suggestionKind": "none"
     },
@@ -1768,6 +2675,87 @@
         "identity-mismatch",
         "revision-mismatch",
         "digest-mismatch"
+      ],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "specification.vocabulary.intact",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "specification.vocabulary.asserted",
+          "kind": "artifact-input"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "specification.vocabulary.intact",
+          "kinds": []
+        },
+        {
+          "checkId": "specification.vocabulary.asserted",
+          "kinds": [
+            "specification-input"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "specification-input",
+          "paths": [
+            {
+              "origin": "profile-resolution-specification-input",
+              "roles": [
+                {
+                  "role": "intent-surface-class-vocabulary",
+                  "rank": "5"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "paths": [
+            {
+              "origin": "intent-surface-class-vocabulary",
+              "roles": []
+            },
+            {
+              "origin": "intent-surface-class-vocabulary",
+              "roles": [
+                {
+                  "role": "vocabulary-member",
+                  "rank": "0"
+                }
+              ],
+              "key": "safe-key"
+            },
+            {
+              "origin": "intent-surface-class-vocabulary",
+              "roles": [
+                {
+                  "role": "vocabulary-member",
+                  "rank": "0"
+                }
+              ],
+              "key": "redacted-key"
+            }
+          ]
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "specification-input",
+          "origins": [
+            "profile-resolution-specification-input"
+          ]
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "origins": [
+            "intent-surface-class-vocabulary"
+          ]
+        }
       ],
       "suggestionKind": "none"
     },
@@ -1800,6 +2788,104 @@
         "coverage-locale"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "locale.requested.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.default-source.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.default-requested.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.alias-key.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.alias-destination.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.fallback-key.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.target-requested.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.target-default-requested.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "fallback.candidate.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "coverage.locale.canonical",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "locale.requested.canonical",
+          "kinds": []
+        },
+        {
+          "checkId": "locale.default-source.canonical",
+          "kinds": []
+        },
+        {
+          "checkId": "locale.default-requested.canonical",
+          "kinds": []
+        },
+        {
+          "checkId": "locale.alias-key.canonical",
+          "kinds": []
+        },
+        {
+          "checkId": "locale.alias-destination.canonical",
+          "kinds": []
+        },
+        {
+          "checkId": "locale.fallback-key.canonical",
+          "kinds": []
+        },
+        {
+          "checkId": "locale.target-requested.canonical",
+          "kinds": []
+        },
+        {
+          "checkId": "locale.target-default-requested.canonical",
+          "kinds": []
+        },
+        {
+          "checkId": "fallback.candidate.canonical",
+          "kinds": []
+        },
+        {
+          "checkId": "coverage.locale.canonical",
+          "kinds": []
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1831,6 +2917,104 @@
         "coverage-locale"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "locale.requested.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.default-source.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.default-requested.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.alias-key.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.alias-destination.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.fallback-key.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.target-requested.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.target-default-requested.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "fallback.candidate.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "coverage.locale.canonical",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "locale.requested.canonical",
+          "kinds": []
+        },
+        {
+          "checkId": "locale.default-source.canonical",
+          "kinds": []
+        },
+        {
+          "checkId": "locale.default-requested.canonical",
+          "kinds": []
+        },
+        {
+          "checkId": "locale.alias-key.canonical",
+          "kinds": []
+        },
+        {
+          "checkId": "locale.alias-destination.canonical",
+          "kinds": []
+        },
+        {
+          "checkId": "locale.fallback-key.canonical",
+          "kinds": []
+        },
+        {
+          "checkId": "locale.target-requested.canonical",
+          "kinds": []
+        },
+        {
+          "checkId": "locale.target-default-requested.canonical",
+          "kinds": []
+        },
+        {
+          "checkId": "fallback.candidate.canonical",
+          "kinds": []
+        },
+        {
+          "checkId": "coverage.locale.canonical",
+          "kinds": []
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "canonical-locale-replacement"
     },
     {
@@ -1850,6 +3034,64 @@
         "coverage-locale"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "locale.requested.unique",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.target-requested.unique",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "fallback.source.unique",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "coverage.locale.unique",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "locale.requested.unique",
+          "kinds": [
+            "configuration-value"
+          ]
+        },
+        {
+          "checkId": "locale.target-requested.unique",
+          "kinds": [
+            "configuration-value"
+          ]
+        },
+        {
+          "checkId": "fallback.source.unique",
+          "kinds": [
+            "configuration-value"
+          ]
+        },
+        {
+          "checkId": "coverage.locale.unique",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1863,6 +3105,34 @@
         "default-requested-locale"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "locale.default-requested.member",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "locale.default-requested.member",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1876,6 +3146,34 @@
         "target"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "target.requested-locales.project-subset",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "target.requested-locales.project-subset",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1892,6 +3190,34 @@
         "explicit-override",
         "inherited-project-default"
       ],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "target.effective-default.supported",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "target.effective-default.supported",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1905,6 +3231,55 @@
         "target"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "target.requested-locales.directed",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "target.requested-locales.directed",
+          "kinds": [
+            "artifact-input"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "paths": [
+            {
+              "origin": "profile-resolution-artifact-collection",
+              "roles": [
+                {
+                  "role": "artifact-member",
+                  "rank": "0"
+                }
+              ],
+              "key": "safe-key"
+            }
+          ]
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "origins": [
+            "profile-resolution-artifact-collection"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1921,6 +3296,34 @@
         "same-destination",
         "conflicting-destination"
       ],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "negotiation.alias-key.unique",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "negotiation.alias-key.unique",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1934,6 +3337,34 @@
         "negotiation-destination"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "negotiation.destination.member",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "negotiation.destination.member",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1947,6 +3378,34 @@
         "fallback-source"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "fallback.source.member",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "fallback.source.member",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1968,6 +3427,54 @@
         "literal-duplicate",
         "intent-source-duplicate"
       ],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "fallback.candidate.distinct-from-source",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "fallback.literal.unique",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "fallback.intent-source.unique",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "fallback.candidate.distinct-from-source",
+          "kinds": [
+            "configuration-value"
+          ]
+        },
+        {
+          "checkId": "fallback.literal.unique",
+          "kinds": [
+            "configuration-value"
+          ]
+        },
+        {
+          "checkId": "fallback.intent-source.unique",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -1988,6 +3495,69 @@
         "surface-class-unknown",
         "surface-class-duplicate"
       ],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "coverage.locale.member",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "coverage.surface-class.vocabulary-member",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "coverage.surface-class.unique",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "coverage.locale.member",
+          "kinds": [
+            "configuration-value"
+          ]
+        },
+        {
+          "checkId": "coverage.surface-class.vocabulary-member",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "coverage.surface-class.unique",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "paths": [
+            {
+              "origin": "intent-surface-class-vocabulary",
+              "roles": []
+            }
+          ]
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "origins": [
+            "intent-surface-class-vocabulary"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -2001,6 +3571,34 @@
         "coverage-domain"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "coverage.domain.unique",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "coverage.domain.unique",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -2014,6 +3612,34 @@
         "coverage-cell"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "coverage.cell.effective-mode",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "coverage.cell.effective-mode",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -2040,6 +3666,89 @@
         "role-kind-mismatch",
         "digest-mismatch"
       ],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "resource-policy.resource-limits.bootstrap-candidate",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "artifact.policy-reference.resolved",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "artifact.target-profile-reference.resolved",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "resource-policy.resource-limits.bootstrap-candidate",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "artifact.policy-reference.resolved",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "artifact.target-profile-reference.resolved",
+          "kinds": [
+            "artifact-input"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "paths": [
+            {
+              "origin": "profile-resolution-artifact-collection",
+              "roles": []
+            },
+            {
+              "origin": "profile-resolution-artifact-collection",
+              "roles": [
+                {
+                  "role": "artifact-member",
+                  "rank": "0"
+                }
+              ],
+              "key": "safe-key"
+            },
+            {
+              "origin": "profile-resolution-artifact-collection",
+              "roles": [
+                {
+                  "role": "artifact-member",
+                  "rank": "0"
+                }
+              ],
+              "key": "redacted-key"
+            }
+          ]
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "origins": [
+            "profile-resolution-artifact-collection"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -2063,6 +3772,79 @@
         "duplicate-envelope",
         "conflicting-content"
       ],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "resource-policy.resource-limits.bootstrap-candidate",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "artifact.member.admissible",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "artifact.member.single-occurrence",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "artifact.conflict-group.consistent-content",
+          "kind": "artifact-input"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "resource-policy.resource-limits.bootstrap-candidate",
+          "kinds": [
+            "configuration-value"
+          ]
+        },
+        {
+          "checkId": "artifact.member.admissible",
+          "kinds": []
+        },
+        {
+          "checkId": "artifact.member.single-occurrence",
+          "kinds": []
+        },
+        {
+          "checkId": "artifact.conflict-group.consistent-content",
+          "kinds": []
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "paths": [
+            {
+              "origin": "profile-resolution-artifact-collection",
+              "roles": [
+                {
+                  "role": "artifact-member",
+                  "rank": "0"
+                }
+              ],
+              "key": "redacted-key"
+            }
+          ]
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "origins": [
+            "profile-resolution-artifact-collection"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -2076,6 +3858,34 @@
         "group-member"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "group.member.known",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "group.member.known",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -2089,6 +3899,34 @@
         "group-member"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "group.member.unique",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "group.member.unique",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -2102,6 +3940,34 @@
         "assignment"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "group.target.single-group",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "group.target.single-group",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -2115,6 +3981,34 @@
         "assignment"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "group.target.single-group",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "group.target.single-group",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -2143,6 +4037,103 @@
         "client-capability-missing",
         "dual-role"
       ],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "hydration.endpoint.known",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "hydration.endpoint.same-group",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "hydration.endpoint.role",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "hydration.relation.distinct-endpoints",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "hydration.relation.unique",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "hydration.target.single-role",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "hydration.endpoint.known",
+          "kinds": [
+            "configuration-value"
+          ]
+        },
+        {
+          "checkId": "hydration.endpoint.same-group",
+          "kinds": [
+            "configuration-value"
+          ]
+        },
+        {
+          "checkId": "hydration.endpoint.role",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "hydration.relation.distinct-endpoints",
+          "kinds": []
+        },
+        {
+          "checkId": "hydration.relation.unique",
+          "kinds": [
+            "configuration-value"
+          ]
+        },
+        {
+          "checkId": "hydration.target.single-role",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "paths": [
+            {
+              "origin": "profile-resolution-artifact-collection",
+              "roles": [
+                {
+                  "role": "artifact-member",
+                  "rank": "0"
+                }
+              ],
+              "key": "safe-key"
+            }
+          ]
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "origins": [
+            "profile-resolution-artifact-collection"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -2160,6 +4151,44 @@
         "requested-locales",
         "effective-default"
       ],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "hydration.relation.same-requested-locales",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "hydration.relation.same-effective-default",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "hydration.relation.same-requested-locales",
+          "kinds": [
+            "configuration-value"
+          ]
+        },
+        {
+          "checkId": "hydration.relation.same-effective-default",
+          "kinds": [
+            "configuration-value"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -2173,6 +4202,55 @@
         "relation"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "hydration.relation.static-compatibility",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "hydration.relation.static-compatibility",
+          "kinds": [
+            "artifact-input"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "paths": [
+            {
+              "origin": "profile-resolution-artifact-collection",
+              "roles": [
+                {
+                  "role": "artifact-member",
+                  "rank": "0"
+                }
+              ],
+              "key": "safe-key"
+            }
+          ]
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "origins": [
+            "profile-resolution-artifact-collection"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -2191,6 +4269,76 @@
         "project-profile-resolution-missing",
         "project-profile-resolution-invalid"
       ],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "resource-policy.resource-limits.candidate-body",
+          "kind": "artifact-input"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "resource-policy.resource-limits.candidate-body",
+          "kinds": [
+            "configuration-value",
+            "verification-input"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "paths": [
+            {
+              "origin": "profile-resolution-artifact-collection",
+              "roles": [
+                {
+                  "role": "artifact-member",
+                  "rank": "0"
+                }
+              ],
+              "key": "redacted-key"
+            }
+          ]
+        },
+        {
+          "evidenceKind": "verification-input",
+          "paths": [
+            {
+              "origin": "resource-limit-policy-verification",
+              "roles": [
+                {
+                  "role": "pins",
+                  "rank": "1"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "origins": [
+            "profile-resolution-artifact-collection"
+          ]
+        },
+        {
+          "evidenceKind": "verification-input",
+          "origins": [
+            "resource-limit-policy-verification"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -2204,6 +4352,1023 @@
         "resource-limits"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "resource-policy.resource-limits.compatible",
+          "kind": "artifact-input"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "resource-policy.resource-limits.compatible",
+          "kinds": [
+            "configuration-value",
+            "implementation-capability"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "configuration-value"
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "paths": [
+            {
+              "origin": "profile-resolution-artifact-collection",
+              "roles": [
+                {
+                  "role": "artifact-member",
+                  "rank": "0"
+                }
+              ],
+              "key": "safe-key"
+            }
+          ]
+        },
+        {
+          "evidenceKind": "implementation-capability",
+          "paths": [
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "configurationInput",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxNodes",
+                  "rank": "0"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "configurationInput",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxDepth",
+                  "rank": "1"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "configurationInput",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxCollectionEntries",
+                  "rank": "2"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "configurationInput",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxTotalStringBytes",
+                  "rank": "3"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "configurationInput",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxSingleStringBytes",
+                  "rank": "4"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "configurationInput",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxProfiles",
+                  "rank": "5"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "configurationInput",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxProfileIdBytes",
+                  "rank": "6"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "configurationInput",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxStructuralAnalysisUnits",
+                  "rank": "7"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "localeResolution",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxLocaleIdentifierBytes",
+                  "rank": "0"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "localeResolution",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxLocaleOccurrences",
+                  "rank": "1"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "localeResolution",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxRequestedLocales",
+                  "rank": "2"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "localeResolution",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxNegotiationAliases",
+                  "rank": "3"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "localeResolution",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxFallbackSources",
+                  "rank": "4"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "localeResolution",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxFallbackCandidatesPerSource",
+                  "rank": "5"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "localeResolution",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxCoverageRules",
+                  "rank": "6"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "localeResolution",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxCoverageLocaleSelectorOccurrences",
+                  "rank": "7"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "localeResolution",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxCoverageSurfaceSelectorOccurrences",
+                  "rank": "8"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "localeResolution",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxCoverageDecisionCells",
+                  "rank": "9"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "localeResolution",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxCoverageRuleCellComparisons",
+                  "rank": "10"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "artifactAdmission",
+                  "rank": "2"
+                },
+                {
+                  "role": "maxArtifacts",
+                  "rank": "0"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "artifactAdmission",
+                  "rank": "2"
+                },
+                {
+                  "role": "maxPolicyArtifacts",
+                  "rank": "1"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "artifactAdmission",
+                  "rank": "2"
+                },
+                {
+                  "role": "maxTargetProfileArtifacts",
+                  "rank": "2"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "artifactAdmission",
+                  "rank": "2"
+                },
+                {
+                  "role": "maxArtifactReferences",
+                  "rank": "3"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "artifactAdmission",
+                  "rank": "2"
+                },
+                {
+                  "role": "maxSingleArtifactCanonicalBytes",
+                  "rank": "4"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "artifactAdmission",
+                  "rank": "2"
+                },
+                {
+                  "role": "maxTotalArtifactCanonicalBytes",
+                  "rank": "5"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "artifactAdmission",
+                  "rank": "2"
+                },
+                {
+                  "role": "maxSingleReferenceCanonicalBytes",
+                  "rank": "6"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "artifactAdmission",
+                  "rank": "2"
+                },
+                {
+                  "role": "maxTotalReferenceCanonicalBytes",
+                  "rank": "7"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "targetGrouping",
+                  "rank": "3"
+                },
+                {
+                  "role": "maxTargetProfiles",
+                  "rank": "0"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "targetGrouping",
+                  "rank": "3"
+                },
+                {
+                  "role": "maxTargetIdBytes",
+                  "rank": "1"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "targetGrouping",
+                  "rank": "3"
+                },
+                {
+                  "role": "maxDeploymentGroups",
+                  "rank": "2"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "targetGrouping",
+                  "rank": "3"
+                },
+                {
+                  "role": "maxGroupIdBytes",
+                  "rank": "3"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "targetGrouping",
+                  "rank": "3"
+                },
+                {
+                  "role": "maxMembersPerGroup",
+                  "rank": "4"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "targetGrouping",
+                  "rank": "3"
+                },
+                {
+                  "role": "maxMembershipOccurrences",
+                  "rank": "5"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "targetGrouping",
+                  "rank": "3"
+                },
+                {
+                  "role": "maxHydrationRelations",
+                  "rank": "6"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "diagnostics",
+                  "rank": "4"
+                },
+                {
+                  "role": "entry",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxFindingOccurrences",
+                  "rank": "0"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "diagnostics",
+                  "rank": "4"
+                },
+                {
+                  "role": "entry",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxFindings",
+                  "rank": "1"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "diagnostics",
+                  "rank": "4"
+                },
+                {
+                  "role": "entry",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxRelatedEvidencePerOccurrenceGroup",
+                  "rank": "2"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "diagnostics",
+                  "rank": "4"
+                },
+                {
+                  "role": "entry",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxRelatedEvidenceOccurrences",
+                  "rank": "3"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "diagnostics",
+                  "rank": "4"
+                },
+                {
+                  "role": "entry",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxSingleEvidenceBytes",
+                  "rank": "4"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "diagnostics",
+                  "rank": "4"
+                },
+                {
+                  "role": "entry",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxTotalEvidenceBytes",
+                  "rank": "5"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "diagnostics",
+                  "rank": "4"
+                },
+                {
+                  "role": "entry",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxEvaluationStatusEntries",
+                  "rank": "6"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "diagnostics",
+                  "rank": "4"
+                },
+                {
+                  "role": "entry",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxSuppressionCausesPerStatus",
+                  "rank": "7"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "diagnostics",
+                  "rank": "4"
+                },
+                {
+                  "role": "entry",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxSuppressionCauseOccurrences",
+                  "rank": "8"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "diagnostics",
+                  "rank": "4"
+                },
+                {
+                  "role": "entry",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxRecords",
+                  "rank": "9"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "diagnostics",
+                  "rank": "4"
+                },
+                {
+                  "role": "entry",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxTotalCanonicalBytes",
+                  "rank": "10"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "diagnostics",
+                  "rank": "4"
+                },
+                {
+                  "role": "shared",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxFindingOccurrences",
+                  "rank": "0"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "diagnostics",
+                  "rank": "4"
+                },
+                {
+                  "role": "shared",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxFindings",
+                  "rank": "1"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "diagnostics",
+                  "rank": "4"
+                },
+                {
+                  "role": "shared",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxEvaluationStatusEntries",
+                  "rank": "2"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "diagnostics",
+                  "rank": "4"
+                },
+                {
+                  "role": "shared",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxSuppressionCausesPerStatus",
+                  "rank": "3"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "diagnostics",
+                  "rank": "4"
+                },
+                {
+                  "role": "shared",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxSuppressionCauseOccurrences",
+                  "rank": "4"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "diagnostics",
+                  "rank": "4"
+                },
+                {
+                  "role": "shared",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxRecords",
+                  "rank": "5"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "diagnostics",
+                  "rank": "4"
+                },
+                {
+                  "role": "shared",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxTotalCanonicalBytes",
+                  "rank": "6"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "origins": [
+            "profile-resolution-artifact-collection"
+          ]
+        },
+        {
+          "evidenceKind": "implementation-capability",
+          "origins": [
+            "implementation-capability"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -2223,6 +5388,234 @@
         "resource-limits"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "entry.input.within-file-bytes",
+          "kind": "entry-source"
+        },
+        {
+          "checkId": "entry.input.within-parser-tokens",
+          "kind": "entry-source"
+        },
+        {
+          "checkId": "resource-policy.resource-limits.within-metadata-scan",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "resource-policy.resource-limits.within-envelope-depth",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "resource-policy.resource-limits.within-decoded-allocation",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "resource-policy.resource-limits.within-validation-work",
+          "kind": "artifact-input"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "entry.input.within-file-bytes",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "entry.input.within-parser-tokens",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "resource-policy.resource-limits.within-metadata-scan",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "resource-policy.resource-limits.within-envelope-depth",
+          "kinds": [
+            "configuration-value",
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "resource-policy.resource-limits.within-decoded-allocation",
+          "kinds": [
+            "configuration-value",
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "resource-policy.resource-limits.within-validation-work",
+          "kinds": [
+            "configuration-value",
+            "implementation-capability"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "entry-source"
+        },
+        {
+          "evidenceKind": "configuration-value"
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "paths": [
+            {
+              "origin": "profile-resolution-artifact-collection",
+              "roles": []
+            },
+            {
+              "origin": "profile-resolution-artifact-collection",
+              "roles": [
+                {
+                  "role": "artifact-member",
+                  "rank": "0"
+                }
+              ],
+              "key": "redacted-key"
+            }
+          ]
+        },
+        {
+          "evidenceKind": "implementation-capability",
+          "paths": [
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "rawInput",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxFileBytes",
+                  "rank": "0"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "rawInput",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxParserTokens",
+                  "rank": "1"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "artifactBootstrap",
+                  "rank": "3"
+                },
+                {
+                  "role": "maxEnvelopeDepth",
+                  "rank": "0"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "artifactBootstrap",
+                  "rank": "3"
+                },
+                {
+                  "role": "maxDecodedAllocationBytes",
+                  "rank": "1"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "artifactBootstrap",
+                  "rank": "3"
+                },
+                {
+                  "role": "maxMetadataScanUnits",
+                  "rank": "2"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "artifactBootstrap",
+                  "rank": "3"
+                },
+                {
+                  "role": "maxValidationWorkUnits",
+                  "rank": "3"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "entry-source",
+          "origins": [
+            "configuration-file"
+          ]
+        },
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "origins": [
+            "profile-resolution-artifact-collection"
+          ]
+        },
+        {
+          "evidenceKind": "implementation-capability",
+          "origins": [
+            "implementation-capability"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -2360,6 +5753,1014 @@
         "relation-endpoint"
       ],
       "allowedReasons": [],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "entry.input.within-nodes",
+          "kind": "entry-source"
+        },
+        {
+          "checkId": "entry.input.within-depth",
+          "kind": "entry-source"
+        },
+        {
+          "checkId": "entry.input.within-collection-entries",
+          "kind": "entry-source"
+        },
+        {
+          "checkId": "entry.input.within-total-string-bytes",
+          "kind": "entry-source"
+        },
+        {
+          "checkId": "entry.input.within-single-string-bytes",
+          "kind": "entry-source"
+        },
+        {
+          "checkId": "structural.analysis.within-capability",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "selection.profiles.within-capability",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "selection.profile-id.within-capability",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "selection.selector.within-capability",
+          "kind": "profile-selector"
+        },
+        {
+          "checkId": "resource-policy.artifacts.within-capability",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "resource-policy.policy-artifacts.within-capability",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "resource-policy.target-profile-artifacts.within-capability",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "resource-policy.references.within-capability",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "resource-policy.artifact.within-capability",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "resource-policy.artifact-bytes.within-capability",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "resource-policy.policy-reference.within-capability",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "resource-policy.target-profile-reference.within-capability",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "resource-policy.reference-bytes.within-capability",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "resource-policy.root-nodes.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "resource-policy.root-depth.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "resource-policy.root-collection-entries.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "resource-policy.root-string-bytes.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "resource-policy.root-longest-string.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "resource-policy.profiles.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "resource-policy.profile-id.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "resource-policy.selector.within-bound",
+          "kind": "profile-selector"
+        },
+        {
+          "checkId": "resource-policy.structural-analysis.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "resource-policy.artifacts.within-bound",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "resource-policy.policy-artifacts.within-bound",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "resource-policy.target-profile-artifacts.within-bound",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "resource-policy.references.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "resource-policy.artifact.within-bound",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "resource-policy.artifact-bytes.within-bound",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "resource-policy.policy-reference.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "resource-policy.target-profile-reference.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "resource-policy.reference-bytes.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.occurrences.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.requested.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.requested-set.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.default-source.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.default-requested.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.alias-key.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.alias-destination.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.fallback-key.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.target-profiles.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.target-id.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.target-requested.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "locale.target-default-requested.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "negotiation.aliases.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "fallback.sources.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "fallback.sequence.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "fallback.candidate.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "coverage.rules.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "coverage.locale-selectors.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "coverage.surface-selectors.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "coverage.locale.canonical",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "coverage.cells.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "coverage.comparisons.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "group.groups.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "group.memberships.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "group.group-id.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "group.members.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "group.member.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "hydration.relations.within-bound",
+          "kind": "configuration-value"
+        },
+        {
+          "checkId": "hydration.endpoint.within-bound",
+          "kind": "configuration-value"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "entry.input.within-nodes",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "entry.input.within-depth",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "entry.input.within-collection-entries",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "entry.input.within-total-string-bytes",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "entry.input.within-single-string-bytes",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "structural.analysis.within-capability",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "selection.profiles.within-capability",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "selection.profile-id.within-capability",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "selection.selector.within-capability",
+          "kinds": [
+            "configuration-value",
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "resource-policy.artifacts.within-capability",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "resource-policy.policy-artifacts.within-capability",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "resource-policy.target-profile-artifacts.within-capability",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "resource-policy.references.within-capability",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "resource-policy.artifact.within-capability",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "resource-policy.artifact-bytes.within-capability",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "resource-policy.policy-reference.within-capability",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "resource-policy.target-profile-reference.within-capability",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "resource-policy.reference-bytes.within-capability",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "resource-policy.root-nodes.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "resource-policy.root-depth.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "resource-policy.root-collection-entries.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "resource-policy.root-string-bytes.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "resource-policy.root-longest-string.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "resource-policy.profiles.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "resource-policy.profile-id.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "resource-policy.selector.within-bound",
+          "kinds": [
+            "configuration-value",
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "resource-policy.structural-analysis.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "resource-policy.artifacts.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "resource-policy.policy-artifacts.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "resource-policy.target-profile-artifacts.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "resource-policy.references.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "resource-policy.artifact.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "resource-policy.artifact-bytes.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "resource-policy.policy-reference.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "resource-policy.target-profile-reference.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "resource-policy.reference-bytes.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "locale.occurrences.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "locale.requested.canonical",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "locale.requested-set.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "locale.default-source.canonical",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "locale.default-requested.canonical",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "locale.alias-key.canonical",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "locale.alias-destination.canonical",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "locale.fallback-key.canonical",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "locale.target-profiles.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "locale.target-id.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "locale.target-requested.canonical",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "locale.target-default-requested.canonical",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "negotiation.aliases.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "fallback.sources.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "fallback.sequence.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "fallback.candidate.canonical",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "coverage.rules.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "coverage.locale-selectors.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "coverage.surface-selectors.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "coverage.locale.canonical",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "coverage.cells.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "coverage.comparisons.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "group.groups.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "group.memberships.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "group.group-id.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "group.members.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "group.member.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "hydration.relations.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        },
+        {
+          "checkId": "hydration.endpoint.within-bound",
+          "kinds": [
+            "artifact-input"
+          ]
+        }
+      ],
+      "evidenceDisclosurePolicies": [
+        {
+          "evidenceKind": "entry-source"
+        },
+        {
+          "evidenceKind": "configuration-value"
+        },
+        {
+          "evidenceKind": "profile-selector"
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "paths": [
+            {
+              "origin": "profile-resolution-artifact-collection",
+              "roles": []
+            },
+            {
+              "origin": "profile-resolution-artifact-collection",
+              "roles": [
+                {
+                  "role": "artifact-member",
+                  "rank": "0"
+                }
+              ],
+              "key": "safe-key"
+            },
+            {
+              "origin": "profile-resolution-artifact-collection",
+              "roles": [
+                {
+                  "role": "artifact-member",
+                  "rank": "0"
+                }
+              ],
+              "key": "redacted-key"
+            }
+          ]
+        },
+        {
+          "evidenceKind": "implementation-capability",
+          "paths": [
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "configurationInput",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxNodes",
+                  "rank": "0"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "configurationInput",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxDepth",
+                  "rank": "1"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "configurationInput",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxCollectionEntries",
+                  "rank": "2"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "configurationInput",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxTotalStringBytes",
+                  "rank": "3"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "configurationInput",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxSingleStringBytes",
+                  "rank": "4"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "configurationInput",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxProfiles",
+                  "rank": "5"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "configurationInput",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxProfileIdBytes",
+                  "rank": "6"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "configurationInput",
+                  "rank": "0"
+                },
+                {
+                  "role": "maxStructuralAnalysisUnits",
+                  "rank": "7"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "artifactAdmission",
+                  "rank": "2"
+                },
+                {
+                  "role": "maxArtifacts",
+                  "rank": "0"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "artifactAdmission",
+                  "rank": "2"
+                },
+                {
+                  "role": "maxPolicyArtifacts",
+                  "rank": "1"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "artifactAdmission",
+                  "rank": "2"
+                },
+                {
+                  "role": "maxTargetProfileArtifacts",
+                  "rank": "2"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "artifactAdmission",
+                  "rank": "2"
+                },
+                {
+                  "role": "maxArtifactReferences",
+                  "rank": "3"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "artifactAdmission",
+                  "rank": "2"
+                },
+                {
+                  "role": "maxSingleArtifactCanonicalBytes",
+                  "rank": "4"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "artifactAdmission",
+                  "rank": "2"
+                },
+                {
+                  "role": "maxTotalArtifactCanonicalBytes",
+                  "rank": "5"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "artifactAdmission",
+                  "rank": "2"
+                },
+                {
+                  "role": "maxSingleReferenceCanonicalBytes",
+                  "rank": "6"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "policyComparable",
+                  "rank": "0"
+                },
+                {
+                  "role": "artifactAdmission",
+                  "rank": "2"
+                },
+                {
+                  "role": "maxTotalReferenceCanonicalBytes",
+                  "rank": "7"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "allowedSafeOriginKindsByEvidenceKind": [
+        {
+          "evidenceKind": "entry-source",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        },
+        {
+          "evidenceKind": "configuration-value",
+          "origins": [
+            "configuration-file",
+            "configuration-programmatic"
+          ]
+        },
+        {
+          "evidenceKind": "profile-selector",
+          "origins": [
+            "profile-selector-cli",
+            "profile-selector-programmatic"
+          ]
+        },
+        {
+          "evidenceKind": "artifact-input",
+          "origins": [
+            "profile-resolution-artifact-collection"
+          ]
+        },
+        {
+          "evidenceKind": "implementation-capability",
+          "origins": [
+            "implementation-capability"
+          ]
+        }
+      ],
       "suggestionKind": "none"
     },
     {
@@ -2376,6 +6777,20 @@
         "entry",
         "shared"
       ],
+      "occurrencePrimaryEvidenceKindByCheck": [
+        {
+          "checkId": "reporting.diagnostic-domain.complete",
+          "kind": "none"
+        }
+      ],
+      "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "reporting.diagnostic-domain.complete",
+          "kinds": []
+        }
+      ],
+      "evidenceDisclosurePolicies": [],
+      "allowedSafeOriginKindsByEvidenceKind": [],
       "suggestionKind": "none"
     }
   ]

@@ -34,6 +34,7 @@
 
 pub(crate) mod check;
 pub(crate) mod finding;
+pub(crate) mod occurrence;
 pub(crate) mod policy;
 pub(crate) mod safe_origin;
 
@@ -64,7 +65,7 @@ pub(crate) const PATH: &str = "registries/package-v0.json";
 
 /// The container's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:bf6db515125812d9be0ef4ee8cdfd000f9c345e5e5a3012acf1e8090569eee46";
+    "sha256:9da7a0ce938fb70940f462da29ad832fde29e541ed3f6e42b3e1a4242aa7845e";
 
 /// A rank's spelling in a registry: a shortest decimal string.
 pub(crate) const RANK_PATTERN: &str = "^(0|[1-9][0-9]*)$";
@@ -778,6 +779,51 @@ mod tests {
         ] {
             // The schemas admit both; the cross-references do not.
             assert_eq!(checked(&package(&members)), Some(41), "{case}");
+        }
+    }
+
+    #[test]
+    fn the_finding_registry_rows_occurrence_evidence_must_be_015s() {
+        let committed: Value = serde_json::from_slice(FINDINGS).unwrap();
+        let with = |code: &str, change: &dyn Fn(&mut Value)| {
+            let mut registry = committed.clone();
+            for row in registry["rows"].as_array_mut().unwrap() {
+                if row["code"] == code {
+                    change(row);
+                }
+            }
+            serde_json::to_vec_pretty(&registry).unwrap()
+        };
+        // A selector Finding that relates no declaration though its row still
+        // names their policy, and the one row that carries the pins without
+        // them, closed by itself, so that the policy pins a shape no Evidence
+        // carries.
+        let unrelated = with("project-profile-selector-unknown", &|row| {
+            row["occurrenceRelatedEvidenceKindsByCheck"][0]["kinds"] = json!([]);
+        });
+        let unreachable = with("project-profile-resource-policy-not-admitted", &|row| {
+            row["occurrenceRelatedEvidenceKindsByCheck"][0]["kinds"] =
+                json!(["configuration-value"]);
+            for column in [
+                "evidenceDisclosurePolicies",
+                "allowedSafeOriginKindsByEvidenceKind",
+            ] {
+                row[column]
+                    .as_array_mut()
+                    .unwrap()
+                    .retain(|entry| entry["evidenceKind"] != "verification-input");
+            }
+        });
+        for (case, bytes) in [
+            ("a related kind left out", unrelated),
+            ("a shape no Evidence carries", unreachable),
+        ] {
+            // The schema admits both; the cross-references do not.
+            assert_eq!(
+                checked(&package(&members_with(R::FindingRegistry, &bytes))),
+                Some(41),
+                "{case}"
+            );
         }
     }
 

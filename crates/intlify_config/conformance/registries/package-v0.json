@@ -13,7 +13,7 @@
     "finding-registry-schema": {
       "identity": "intlify-project-profile-finding-registry-schema",
       "revision": "0",
-      "digest": "sha256:d578a105e9f9e6928d0d5081edc02bf7e3eda034b1808a8f3baf4ca20944a4fe"
+      "digest": "sha256:42bc288412afc35c849bd1af7a85179740bbe8f91147f8993c7fa7bf0d1c43ec"
     },
     "safe-origin-kind-registry": {
       "identity": "intlify-project-profile-safe-origin-kind-registry",
@@ -28,7 +28,7 @@
     "finding-registry": {
       "identity": "intlify-project-profile-finding-registry",
       "revision": "0",
-      "digest": "sha256:2a749220586ad7b121c538fb38a48318ed3fcee8ecac0518704c31ce8ac693f8"
+      "digest": "sha256:2a669b7940f28b5a3bb971614fcde0bfb9f7a7a1699f1ef7472fd876834a2e6a"
     }
   }
 }

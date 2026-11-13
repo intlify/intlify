@@ -1,25 +1,26 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! The Finding Registry and its schema, as far as the evidence kinds'
-//! disclosure policies and each code's checks, severity, blocking state,
-//! subject kinds, reasons, and suggestion kind go.
+//! The Finding Registry and its schema: the evidence kinds' disclosure
+//! policies, and one row for each code with its checks, severity, blocking
+//! state, subject kinds, reasons, occurrence Evidence, and suggestion kind.
 //!
-//! Design 015's Finding Registry has a table of one disclosure policy for
-//! each evidence kind, which `policy` writes, and one row for each of its
-//! codes (D15:2233, 2276). Revision `"0"` writes the rows from 015's codes, in
-//! table order, and from the Check Registry: a code's checks are the rows
-//! that list it, in row order; its subject kinds are those rows' kinds, in
-//! the order they first appear; and its reasons are the ones 015's tables
-//! give it, in their order, which are exactly those its checks list. Every
-//! blocking code is an `error`, and `project-profile-locale-non-canonical`,
-//! the one code that blocks nothing, is a `warning` (D15:2229) that suggests
-//! the exact canonical replacement (D15:2308); no other code suggests
-//! anything. The rows' occurrence Evidence fields come with their own stage.
+//! Design 015's Finding Registry has a table of one disclosure policy for each
+//! evidence kind, which `policy` writes, and one row for each of its codes
+//! (D15:2233, 2276). Revision `"0"` writes the rows from 015's codes, in table
+//! order, and from the Check Registry: a code's checks are the rows that list
+//! it, in row order; its subject kinds are those rows' kinds, in the order they
+//! first appear; and its reasons are the ones 015's tables give it, in their
+//! order, which are exactly those its checks list. Every blocking code is an
+//! `error`, and `project-profile-locale-non-canonical`, the one code that
+//! blocks nothing, is a `warning` (D15:2229) that suggests the exact canonical
+//! replacement (D15:2308); no other code suggests anything. The four occurrence
+//! Evidence columns come from `occurrence`.
 //!
 //! Construction reads the registry it admitted with the registry
 //! cross-references (row 41), after the Check Registry, and refuses one this
-//! type cannot read, whose policies are not 015's as `policy` checks them, or
+//! type cannot read, whose policies are not 015's as `policy` checks them,
+//! whose occurrence Evidence columns are not as `occurrence` checks them, or
 //! whose rows do not relate to the Check Registry as 015 requires: every code
 //! has exactly one row (D15:2276); a code's checks are exactly the rows that
 //! list it, so that check-to-Finding and Finding-to-check relate symmetrically
@@ -41,6 +42,7 @@ use crate::resolver::evaluation::{Code, Reason};
 use crate::resolver::subject::SubjectKind;
 
 use super::check::{CheckRegistry, CheckRow, CHECK_ID_PATTERN};
+use super::occurrence::{self, OriginEntry, PolicyEntry, PrimaryEntry, RelatedEntry};
 use super::policy::{self, DisclosurePolicy};
 use super::safe_origin::SafeOriginKindRegistry;
 
@@ -61,11 +63,11 @@ pub(crate) const SCHEMA_PATH: &str = "registries/finding-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:2a749220586ad7b121c538fb38a48318ed3fcee8ecac0518704c31ce8ac693f8";
+    "sha256:2a669b7940f28b5a3bb971614fcde0bfb9f7a7a1699f1ef7472fd876834a2e6a";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
-    "sha256:d578a105e9f9e6928d0d5081edc02bf7e3eda034b1808a8f3baf4ca20944a4fe";
+    "sha256:42bc288412afc35c849bd1af7a85179740bbe8f91147f8993c7fa7bf0d1c43ec";
 
 /// A Finding's severity: `error` for every blocking code, and `warning` for
 /// the one code that blocks nothing.
@@ -107,6 +109,19 @@ pub(crate) struct FindingRow {
     /// code without stable reasons.
     #[schemars(extend("uniqueItems" = true))]
     pub(crate) allowed_reasons: Vec<Reason>,
+    /// For each check, in `allowedCheckIds` order, the primary evidence kind
+    /// of its occurrences.
+    #[schemars(length(min = 1))]
+    pub(crate) occurrence_primary_evidence_kind_by_check: Vec<PrimaryEntry>,
+    /// For each check, in `allowedCheckIds` order, the related evidence
+    /// kinds of its occurrences.
+    #[schemars(length(min = 1))]
+    pub(crate) occurrence_related_evidence_kinds_by_check: Vec<RelatedEntry>,
+    /// The disclosure policy of each evidence kind the two columns before
+    /// name, with a resolver-input kind's shapes.
+    pub(crate) evidence_disclosure_policies: Vec<PolicyEntry>,
+    /// The Safe Origin Kinds the row allows each of those kinds.
+    pub(crate) allowed_safe_origin_kinds_by_evidence_kind: Vec<OriginEntry>,
     pub(crate) suggestion_kind: SuggestionKind,
 }
 
@@ -141,13 +156,19 @@ impl FindingRegistry {
                         kinds.push(row.subject_kind);
                     }
                 }
+                let ids: Vec<String> = listing.iter().map(|row| row.check_id.clone()).collect();
+                let columns = occurrence::columns(code, &ids);
                 FindingRow {
                     code,
-                    allowed_check_ids: listing.iter().map(|row| row.check_id.clone()).collect(),
+                    allowed_check_ids: ids,
                     severity: severity(code),
                     blocking: blocking(code),
                     allowed_subject_kinds: kinds,
                     allowed_reasons: code.reasons().to_vec(),
+                    occurrence_primary_evidence_kind_by_check: columns.primary,
+                    occurrence_related_evidence_kinds_by_check: columns.related,
+                    evidence_disclosure_policies: columns.policies,
+                    allowed_safe_origin_kinds_by_evidence_kind: columns.origins,
                     suggestion_kind: suggestion_kind(code),
                 }
             })
@@ -161,16 +182,24 @@ impl FindingRegistry {
     /// Read a registry its admitted schema accepted, as the closed graph
     /// needs it, against the Check Registry and the Safe Origin Kind
     /// Registry the package admitted: a registry this type cannot read, one
-    /// whose rows do not relate to `checks` as 015 requires, or one whose
-    /// policies 015 does not allow under `origins`, is not part of one.
+    /// whose rows do not relate to `checks` as 015 requires, one whose
+    /// policies or occurrence Evidence columns 015 does not allow under
+    /// `origins`, or one that pins a shape no Evidence can carry, is not
+    /// part of one.
     pub(crate) fn read(
         value: &Value,
         checks: &CheckRegistry,
         origins: &SafeOriginKindRegistry,
     ) -> Option<Self> {
         let registry = decode::typed::<Self>(value.clone()).ok()?;
-        (registry.is_closed(checks) && policy::are_closed(&registry.policies, origins))
-            .then_some(registry)
+        (registry.is_closed(checks)
+            && policy::are_closed(&registry.policies, origins)
+            && registry
+                .rows
+                .iter()
+                .all(|row| occurrence::row_is_closed(row, &registry.policies, origins))
+            && occurrence::are_reachable(&registry.rows, &registry.policies))
+        .then_some(registry)
     }
 
     /// Whether every code has exactly one row, whose checks are exactly the
@@ -404,6 +433,35 @@ mod tests {
                     "coverage-locale"
                 ],
                 "allowedReasons": [],
+                "occurrencePrimaryEvidenceKindByCheck": [
+                    { "checkId": "locale.requested.canonical", "kind": "configuration-value" },
+                    { "checkId": "locale.default-source.canonical", "kind": "configuration-value" },
+                    { "checkId": "locale.default-requested.canonical", "kind": "configuration-value" },
+                    { "checkId": "locale.alias-key.canonical", "kind": "configuration-value" },
+                    { "checkId": "locale.alias-destination.canonical", "kind": "configuration-value" },
+                    { "checkId": "locale.fallback-key.canonical", "kind": "configuration-value" },
+                    { "checkId": "locale.target-requested.canonical", "kind": "configuration-value" },
+                    { "checkId": "locale.target-default-requested.canonical", "kind": "configuration-value" },
+                    { "checkId": "fallback.candidate.canonical", "kind": "configuration-value" },
+                    { "checkId": "coverage.locale.canonical", "kind": "configuration-value" }
+                ],
+                "occurrenceRelatedEvidenceKindsByCheck": [
+                    { "checkId": "locale.requested.canonical", "kinds": [] },
+                    { "checkId": "locale.default-source.canonical", "kinds": [] },
+                    { "checkId": "locale.default-requested.canonical", "kinds": [] },
+                    { "checkId": "locale.alias-key.canonical", "kinds": [] },
+                    { "checkId": "locale.alias-destination.canonical", "kinds": [] },
+                    { "checkId": "locale.fallback-key.canonical", "kinds": [] },
+                    { "checkId": "locale.target-requested.canonical", "kinds": [] },
+                    { "checkId": "locale.target-default-requested.canonical", "kinds": [] },
+                    { "checkId": "fallback.candidate.canonical", "kinds": [] },
+                    { "checkId": "coverage.locale.canonical", "kinds": [] }
+                ],
+                "evidenceDisclosurePolicies": [{ "evidenceKind": "configuration-value" }],
+                "allowedSafeOriginKindsByEvidenceKind": [{
+                    "evidenceKind": "configuration-value",
+                    "origins": ["configuration-file", "configuration-programmatic"]
+                }],
                 "suggestionKind": "canonical-locale-replacement"
             })
         );
@@ -521,9 +579,16 @@ mod tests {
                 "{case}"
             );
         }
-        // The order of a code's checks is the registry's to say.
+        // The order of a code's checks is the registry's to say, and the
+        // per-check columns follow it.
         let reordered = changed(code, |row| {
-            row["allowedCheckIds"].as_array_mut().unwrap().reverse();
+            for column in [
+                "allowedCheckIds",
+                "occurrencePrimaryEvidenceKindByCheck",
+                "occurrenceRelatedEvidenceKindsByCheck",
+            ] {
+                row[column].as_array_mut().unwrap().reverse();
+            }
         });
         assert!(FindingRegistry::read(&reordered, &checks(), &origins()).is_some());
     }
@@ -606,6 +671,13 @@ mod tests {
             "specification-input"
         );
         assert_eq!(registry["policies"][4]["paths"][1]["key"], "safe-key");
+        // The first row has no shape, and the twelfth row's first policy has
+        // some.
+        assert_eq!(registry["rows"][0]["code"], "project-profile-json-invalid");
+        assert_eq!(
+            registry["rows"][11]["evidenceDisclosurePolicies"][0]["evidenceKind"],
+            "specification-input"
+        );
         for (case, value) in [
             ("no rows", changed(&|value| value["rows"] = json!([]))),
             (
@@ -787,20 +859,127 @@ mod tests {
                 "an unknown suggestion kind",
                 changed(&|value| value["rows"][0]["suggestionKind"] = json!("replacement")),
             ),
+            (
+                "a row without its primary kinds",
+                changed(&|value| {
+                    value["rows"][0]
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("occurrencePrimaryEvidenceKindByCheck");
+                }),
+            ),
+            (
+                "no primary entry",
+                changed(&|value| {
+                    value["rows"][0]["occurrencePrimaryEvidenceKindByCheck"] = json!([]);
+                }),
+            ),
+            (
+                "a primary entry's other member",
+                changed(&|value| {
+                    value["rows"][0]["occurrencePrimaryEvidenceKindByCheck"][0]["note"] =
+                        json!("note");
+                }),
+            ),
+            (
+                "an unknown primary kind",
+                changed(&|value| {
+                    value["rows"][0]["occurrencePrimaryEvidenceKindByCheck"][0]["kind"] =
+                        json!("secret");
+                }),
+            ),
+            (
+                "a primary check that is no check ID",
+                changed(&|value| {
+                    value["rows"][0]["occurrencePrimaryEvidenceKindByCheck"][0]["checkId"] =
+                        json!("a.b");
+                }),
+            ),
+            (
+                "no related entry",
+                changed(&|value| {
+                    value["rows"][0]["occurrenceRelatedEvidenceKindsByCheck"] = json!([]);
+                }),
+            ),
+            (
+                "none as a related kind",
+                changed(&|value| {
+                    value["rows"][0]["occurrenceRelatedEvidenceKindsByCheck"][0]["kinds"] =
+                        json!(["none"]);
+                }),
+            ),
+            (
+                "a related kind twice",
+                changed(&|value| {
+                    value["rows"][0]["occurrenceRelatedEvidenceKindsByCheck"][0]["kinds"] =
+                        json!(["entry-source", "entry-source"]);
+                }),
+            ),
+            (
+                "a policy entry's other member",
+                changed(&|value| {
+                    value["rows"][0]["evidenceDisclosurePolicies"][0]["note"] = json!("note");
+                }),
+            ),
+            (
+                "no shape",
+                changed(&|value| {
+                    value["rows"][11]["evidenceDisclosurePolicies"][0]["paths"] = json!([]);
+                }),
+            ),
+            (
+                "a shape's other member",
+                changed(&|value| {
+                    value["rows"][11]["evidenceDisclosurePolicies"][0]["paths"][0]["note"] =
+                        json!("note");
+                }),
+            ),
+            (
+                "an origin entry's other member",
+                changed(&|value| {
+                    value["rows"][0]["allowedSafeOriginKindsByEvidenceKind"][0]["note"] =
+                        json!("note");
+                }),
+            ),
+            (
+                "no origin",
+                changed(&|value| {
+                    value["rows"][0]["allowedSafeOriginKindsByEvidenceKind"][0]["origins"] =
+                        json!([]);
+                }),
+            ),
+            (
+                "an origin twice",
+                changed(&|value| {
+                    value["rows"][0]["allowedSafeOriginKindsByEvidenceKind"][0]["origins"] =
+                        json!(["configuration-file", "configuration-file"]);
+                }),
+            ),
+            (
+                "an unknown origin",
+                changed(&|value| {
+                    value["rows"][0]["allowedSafeOriginKindsByEvidenceKind"][0]["origins"] =
+                        json!(["cli"]);
+                }),
+            ),
         ] {
             assert!(!read.validate(&value).valid, "{case}");
             assert!(!oracle.is_valid(&value), "{case}");
         }
         // Whether the rows relate to the Check Registry, and whether the
-        // policies are 015's, is not the schema's to say.
+        // policies and the occurrence Evidence columns are 015's, is not the
+        // schema's to say.
         let unrelated = changed(&|value| value["rows"][0]["allowedCheckIds"] = json!(["a.b.c"]));
+        let misaligned = changed(&|value| {
+            value["rows"][0]["occurrencePrimaryEvidenceKindByCheck"][0]["checkId"] = json!("a.b.c");
+        });
         let departing = changed(&|value| {
             value["policies"][0]["components"]
                 .as_array_mut()
                 .unwrap()
                 .pop();
         });
-        for value in [unrelated, departing] {
+        for value in [unrelated, misaligned, departing] {
             assert!(read.validate(&value).valid);
             assert!(oracle.is_valid(&value));
         }
