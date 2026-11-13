@@ -654,9 +654,10 @@ pub(crate) fn row_is_closed(
             .all(|entry| origins_are_closed(entry, row, origins))
 }
 
-/// Whether a policy entry's shapes are, for a resolver-input kind, a
-/// non-empty list of shapes its policy pins, each once and in Evidence
-/// order, and for any other kind empty.
+/// Whether a policy entry's shapes are, for a resolver-input kind, shapes
+/// its policy pins, each once and in Evidence order, and for any other kind
+/// none. That a resolver-input kind has some shape follows from its origins,
+/// which are at least one and exactly those of its shapes.
 fn paths_are_closed(entry: &PolicyEntry, policies: &[DisclosurePolicy]) -> bool {
     if !policy::resolver_input(entry.evidence_kind) {
         return entry.paths.is_empty();
@@ -665,8 +666,7 @@ fn paths_are_closed(entry: &PolicyEntry, policies: &[DisclosurePolicy]) -> bool 
         .iter()
         .find(|policy| policy.evidence_kind == entry.evidence_kind)
         .map_or(&[][..], |policy| &policy.paths[..]);
-    !entry.paths.is_empty()
-        && entry.paths.iter().all(|shape| pinned.contains(shape))
+    entry.paths.iter().all(|shape| pinned.contains(shape))
         && entry
             .paths
             .windows(2)
@@ -986,6 +986,21 @@ mod tests {
     /// A change to a row.
     type Change<'a> = dyn Fn(&mut FindingRow) + 'a;
 
+    /// Name configuration-value's policy and origins in `row`, so that a
+    /// change to its per-check columns that names the kind leaves the
+    /// columns consistent with each other.
+    fn name_configuration(row: &mut FindingRow) {
+        row.evidence_disclosure_policies.push(PolicyEntry {
+            evidence_kind: CV,
+            paths: Vec::new(),
+        });
+        row.allowed_safe_origin_kinds_by_evidence_kind
+            .push(OriginEntry {
+                evidence_kind: CV,
+                origins: CONFIGURATION.to_vec(),
+            });
+    }
+
     /// Construction refuses a row whose columns depart from 015.
     #[test]
     fn rows_that_depart_from_015_are_not_closed() {
@@ -997,7 +1012,7 @@ mod tests {
         };
         let mode = PathShape::of(&ComponentPath::verification(VerificationRole::Mode));
         let rle = Code::ResourceLimitExceeded;
-        let cases: [(&str, Code, &Change<'_>); 16] = [
+        let cases: [(&str, Code, &Change<'_>); 21] = [
             ("checks out of order", rle, &|row| {
                 row.occurrence_primary_evidence_kind_by_check.swap(0, 1);
             }),
@@ -1022,6 +1037,40 @@ mod tests {
                     row.occurrence_related_evidence_kinds_by_check[0].kinds = vec![CV];
                 },
             ),
+            (
+                "none on another code, closed by itself",
+                Code::JsonInvalid,
+                &|row| {
+                    row.occurrence_primary_evidence_kind_by_check[0].kind = PrimaryKind::None;
+                    row.evidence_disclosure_policies.clear();
+                    row.allowed_safe_origin_kinds_by_evidence_kind.clear();
+                },
+            ),
+            (
+                "a kind on the terminal code, closed by itself",
+                Code::ReportingLimitExceeded,
+                &|row| {
+                    row.occurrence_primary_evidence_kind_by_check[0].kind =
+                        PrimaryKind::ConfigurationValue;
+                    name_configuration(row);
+                },
+            ),
+            (
+                "a related kind after none, closed by itself",
+                Code::ReportingLimitExceeded,
+                &|row| {
+                    row.occurrence_related_evidence_kinds_by_check[0].kinds = vec![CV];
+                    name_configuration(row);
+                },
+            ),
+            ("an origin entry missing", rle, &|row| {
+                row.allowed_safe_origin_kinds_by_evidence_kind.pop();
+            }),
+            ("a shape twice", Code::BootstrapLimitExceeded, &|row| {
+                let paths = &mut row.evidence_disclosure_policies.last_mut().unwrap().paths;
+                let first = paths[0].clone();
+                paths.insert(0, first);
+            }),
             ("related kinds out of order", rle, &|row| {
                 row.occurrence_related_evidence_kinds_by_check[0].kinds = vec![IC, CV];
             }),
