@@ -5,23 +5,24 @@
 //! Evidence, an ordinary Finding was observed (D15:253-256, 2385-2389).
 //!
 //! Every Finding candidate but the terminal reporting Finding contributes one
-//! occurrence candidate, from the unit that found it, with its primary
-//! Evidence and its related Evidence as projected before the invocation's
-//! evidence tokens are assigned (D15:2385). The caller assigns those tokens
-//! once, to every candidate's redacted components together with those of the
-//! invocation's other final Evidence projections, such as Coverage Decision
+//! occurrence candidate, from the unit that found it, with its primary Evidence
+//! and its related Evidence as projected before the invocation's evidence
+//! tokens are assigned (D15:2385). The evaluation keeps the candidate of every
+//! blocking result that carried what it observed. The caller assigns those
+//! tokens once, to every candidate's redacted components together with those of
+//! the invocation's other final Evidence projections, such as Coverage Decision
 //! Evidence's, so that one component keeps one token in every record
 //! (D15:2194). The occurrences retain each record under them, and then group
-//! the candidates that share a Finding Key and a primary Evidence,
-//! whose view is its identity (D15:2505). Within a group, related Evidence is
-//! merged and deduplicated in Evidence order without any record equal to the
-//! primary one (Decision 015-193), and the candidates' multiplicity becomes
-//! the ordinals `0..n-1`, which follow neither physical nor worker order
-//! (D15:2387). Each ordinal is one record, `{ finding, primary, ordinal,
-//! related }` (D15:2479), whose ordinal is a decimal string (D15:2452). The
-//! Finding Occurrence Key is the Finding Key, the primary Evidence, and the
-//! ordinal, without the related Evidence (D15:256, 2703). Occurrences order by
-//! Finding, then by primary Evidence, then by ordinal (D15:2389).
+//! the candidates that share a Finding Key and a primary Evidence, whose view
+//! is its identity (D15:2505). Within a group, related Evidence is merged and
+//! deduplicated in Evidence order without any record equal to the primary one
+//! (Decision 015-193), and the candidates' multiplicity becomes the ordinals
+//! `0..n-1`, which follow neither physical nor worker order (D15:2387). Each
+//! ordinal is one record, `{ finding, primary, ordinal, related }` (D15:2479),
+//! whose ordinal is a decimal string (D15:2452). The Finding Occurrence Key is
+//! the Finding Key, the primary Evidence, and the ordinal, without the related
+//! Evidence (D15:256, 2703). Occurrences order by Finding, then by primary
+//! Evidence, then by ordinal (D15:2389).
 //!
 //! An occurrence's Evidence record owner is the unit of its Finding
 //! (D15:2205). Under that unit, the occurrence refers to its primary and
@@ -49,7 +50,7 @@ use super::token::Specification;
 
 /// A Finding Occurrence candidate: the Finding its unit found, with the
 /// primary and related Evidence the unit observed it through.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct OccurrenceCandidate {
     pub(crate) finding: IssueKey,
     pub(crate) primary: EvidenceProjection,
