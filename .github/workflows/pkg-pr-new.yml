@@ -18,8 +18,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A change to design documents alone changes no package, so it builds and
+  # publishes nothing. scripts/detect-docs-only-change.mjs decides, as in CI.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+    steps:
+      - name: Checkout codes
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Detect a design-document-only change
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/detect-docs-only-change.mjs
+
   build-napi:
     name: Build @intlify/ox-mf2-napi (${{ matrix.label }})
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -118,6 +142,8 @@ jobs:
 
   build-format-napi:
     name: Build @intlify/format-napi (${{ matrix.label }})
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:

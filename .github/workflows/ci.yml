@@ -17,9 +17,36 @@ permissions:
   contents: read
 
 jobs:
+  # A change to design documents alone (Markdown under design/ and files
+  # under design/assets/) runs Lint (design docs) and skips the builds and
+  # tests. scripts/detect-docs-only-change.mjs decides, comparing as GitHub's
+  # path filters do: from the merge base for a pull request, from the commit
+  # before a push. A manual run has no base, so every job runs.
+  changes:
+    runs-on: ubuntu-latest
+    name: Detect changes
+    timeout-minutes: 5
+    outputs:
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+    steps:
+      - name: Checkout codes
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Detect a design-document-only change
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/detect-docs-only-change.mjs
+
   lint:
     runs-on: ${{ matrix.os }}
     name: Lint (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -68,9 +95,40 @@ jobs:
       - name: Check
         run: vpr --no-cache -v check
 
+  # Of the checks in vp check, only Oxfmt reads design documents: it checks
+  # the Markdown and skips the figures. The Typos workflow spell-checks every
+  # pull request.
+  lint-docs:
+    runs-on: ubuntu-latest
+    name: Lint (design docs)
+    needs: changes
+    if: needs.changes.outputs.docs_only == 'true'
+    timeout-minutes: 10
+    steps:
+      - name: Checkout codes
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup Vite Plus
+        uses: voidzero-dev/setup-vp@9fd26ff49f9b5e6276c2b493da4454ad4527f7f4 # v1.20.0
+        with:
+          node-version: 24
+          cache: true
+          run-install: false
+
+      - name: Install dependencies
+        run: vp install --frozen-lockfile
+
+      - name: Check formatting
+        run: vp fmt --check
+
   test:
     runs-on: ${{ matrix.os }}
     name: Test (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -196,6 +254,8 @@ jobs:
   cli-validation:
     runs-on: ${{ matrix.os }}
     name: CLI validation (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -248,6 +308,8 @@ jobs:
   binding-package-smoke:
     runs-on: ubuntu-latest
     name: Binding package smoke
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     timeout-minutes: 15
     steps:
       - name: Checkout codes
@@ -291,6 +353,8 @@ jobs:
   binding-benchmark-smoke:
     runs-on: ubuntu-latest
     name: Binding benchmark smoke
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     timeout-minutes: 20
     steps:
       - name: Checkout codes
@@ -339,6 +403,8 @@ jobs:
   binding-benchmark-e2e-smoke:
     runs-on: ubuntu-latest
     name: Binding benchmark E2E smoke
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     timeout-minutes: 20
     steps:
       - name: Checkout codes
