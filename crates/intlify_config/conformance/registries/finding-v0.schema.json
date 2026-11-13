@@ -320,6 +320,36 @@
           },
           "uniqueItems": true
         },
+        "occurrencePrimaryEvidenceKindByCheck": {
+          "description": "For each check, in `allowedCheckIds` order, the primary evidence kind\nof its occurrences.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PrimaryEntry"
+          },
+          "minItems": 1
+        },
+        "occurrenceRelatedEvidenceKindsByCheck": {
+          "description": "For each check, in `allowedCheckIds` order, the related evidence\nkinds of its occurrences.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RelatedEntry"
+          },
+          "minItems": 1
+        },
+        "evidenceDisclosurePolicies": {
+          "description": "The disclosure policy of each evidence kind the two columns before\nname, with a resolver-input kind's shapes.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PolicyEntry"
+          }
+        },
+        "allowedSafeOriginKindsByEvidenceKind": {
+          "description": "The Safe Origin Kinds the row allows each of those kinds.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OriginEntry"
+          }
+        },
         "suggestionKind": {
           "$ref": "#/definitions/SuggestionKind"
         }
@@ -332,6 +362,10 @@
         "blocking",
         "allowedSubjectKinds",
         "allowedReasons",
+        "occurrencePrimaryEvidenceKindByCheck",
+        "occurrenceRelatedEvidenceKindsByCheck",
+        "evidenceDisclosurePolicies",
+        "allowedSafeOriginKindsByEvidenceKind",
         "suggestionKind"
       ]
     },
@@ -571,6 +605,102 @@
         "project-profile-resolution-invalid",
         "entry",
         "shared"
+      ]
+    },
+    "PrimaryEntry": {
+      "description": "One check's primary evidence kind.",
+      "type": "object",
+      "properties": {
+        "checkId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*\\.[a-z][a-z0-9]*(-[a-z0-9]+)*\\.[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+        },
+        "kind": {
+          "$ref": "#/definitions/PrimaryKind"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "checkId",
+        "kind"
+      ]
+    },
+    "PrimaryKind": {
+      "description": "A check's primary evidence kind, or `none` for the terminal reporting\nFinding (D15:2249).",
+      "type": "string",
+      "enum": [
+        "entry-source",
+        "configuration-value",
+        "profile-selector",
+        "specification-input",
+        "artifact-input",
+        "verification-input",
+        "implementation-capability",
+        "none"
+      ]
+    },
+    "RelatedEntry": {
+      "description": "One check's related evidence kinds, in the order of the admitted\nevidence kinds.",
+      "type": "object",
+      "properties": {
+        "checkId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*\\.[a-z][a-z0-9]*(-[a-z0-9]+)*\\.[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+        },
+        "kinds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EvidenceKind"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "checkId",
+        "kinds"
+      ]
+    },
+    "PolicyEntry": {
+      "description": "The disclosure policy of one evidence kind the row names, with, for a\nresolver-input kind, the component path shapes its occurrences can\ncarry, in Evidence order.",
+      "type": "object",
+      "properties": {
+        "evidenceKind": {
+          "$ref": "#/definitions/EvidenceKind"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PathShape"
+          },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "evidenceKind"
+      ]
+    },
+    "OriginEntry": {
+      "description": "The Safe Origin Kinds the row allows one evidence kind, in rank order.",
+      "type": "object",
+      "properties": {
+        "evidenceKind": {
+          "$ref": "#/definitions/EvidenceKind"
+        },
+        "origins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SafeOriginKind"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "evidenceKind",
+        "origins"
       ]
     },
     "SuggestionKind": {

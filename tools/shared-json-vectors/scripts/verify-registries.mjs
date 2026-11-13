@@ -1392,6 +1392,146 @@ const pinnedShapes = findingPolicies.reduce(
   (count, policy) => count + (policy.paths?.length ?? 0),
   0
 )
+
+// The rows' occurrence Evidence. For each check, in the row's check order,
+// the primary kind is one of the seven or, only for the terminal reporting
+// code, `none` with no related kind, and the related kinds follow the
+// admitted order without repeats. The policies and the origins name exactly
+// those kinds, in that order. A resolver-input kind's shapes are ones its
+// policy pins, in Evidence order, and its origins exactly theirs; another
+// kind has no shape. Every origin is one the Safe Origin Kind table lets the
+// kind use, in rank order. Every shape a policy pins is one some row carries,
+// or Coverage Decision Evidence: the Coverage Specification input. Of the
+// kinds 015 names, a root-value bound before materialization is
+// `entry-source`, an over-limit selector `profile-selector`, and a selector
+// Finding relates the declarations, `configuration-value`.
+const TERMINAL = 'project-profile-reporting-limit-exceeded'
+const RESOURCE_LIMIT = 'project-profile-resource-limit-exceeded'
+const RESOLVER_INPUTS = EVIDENCE_KINDS.slice(3)
+const ORIGIN_IDS = SAFE_ORIGIN_KINDS.map(([id]) => id)
+const increasing = (items, rank) =>
+  items.every((item, index) => index === 0 || rank(items[index - 1]) < rank(item))
+const shapeKey = shape => JSON.stringify(shape)
+const pinnedByKind = new Map(
+  findingPolicies.map(policy => [policy.evidenceKind, (policy.paths ?? []).map(shapeKey)])
+)
+const carried = new Set()
+let occurrenceChecks = 0
+for (const row of findingRows) {
+  const where = `finding registry: ${row.code}`
+  const primary = row.occurrencePrimaryEvidenceKindByCheck ?? []
+  const related = row.occurrenceRelatedEvidenceKindsByCheck ?? []
+  occurrenceChecks += primary.length
+  if (
+    !isDeepStrictEqual(
+      primary.map(entry => entry.checkId),
+      row.allowedCheckIds
+    ) ||
+    !isDeepStrictEqual(
+      related.map(entry => entry.checkId),
+      row.allowedCheckIds
+    )
+  ) {
+    fail(`${where}: the per-check columns do not list its checks in their order`)
+  }
+  const named = new Set()
+  for (const [index, entry] of primary.entries()) {
+    const kinds = related[index]?.kinds ?? []
+    if (
+      (entry.kind === 'none') !== (row.code === TERMINAL) ||
+      (entry.kind === 'none' && kinds.length > 0)
+    ) {
+      fail(`${where}: ${entry.checkId} has a primary kind 015 does not give it`)
+    }
+    if (!increasing(kinds, kind => EVIDENCE_KINDS.indexOf(kind))) {
+      fail(
+        `${where}: ${entry.checkId}'s related kinds are not in the admitted order without repeats`
+      )
+    }
+    for (const kind of [entry.kind, ...kinds]) {
+      if (kind !== 'none') {
+        named.add(kind)
+      }
+    }
+    if (
+      row.code === RESOURCE_LIMIT &&
+      ((entry.checkId.startsWith('entry.input.') && entry.kind !== 'entry-source') ||
+        (entry.checkId.includes('.selector.') && entry.kind !== 'profile-selector'))
+    ) {
+      fail(`${where}: ${entry.checkId} does not report with the kind 015 names`)
+    }
+    if (entry.kind === 'profile-selector' && !kinds.includes('configuration-value')) {
+      fail(`${where}: ${entry.checkId} does not relate the profile declarations`)
+    }
+  }
+  const kinds = EVIDENCE_KINDS.filter(kind => named.has(kind))
+  const policies = row.evidenceDisclosurePolicies ?? []
+  const origins = row.allowedSafeOriginKindsByEvidenceKind ?? []
+  if (
+    !isDeepStrictEqual(
+      policies.map(entry => entry.evidenceKind),
+      kinds
+    ) ||
+    !isDeepStrictEqual(
+      origins.map(entry => entry.evidenceKind),
+      kinds
+    )
+  ) {
+    fail(
+      `${where}: the policies and origins do not name exactly the kinds of its checks, in their order`
+    )
+  }
+  for (const entry of policies) {
+    const paths = (entry.paths ?? []).map(shapeKey)
+    const pins = pinnedByKind.get(entry.evidenceKind) ?? []
+    const closed = RESOLVER_INPUTS.includes(entry.evidenceKind)
+      ? paths.length > 0 &&
+        paths.every(path => pins.includes(path)) &&
+        increasing(paths, path => pins.indexOf(path))
+      : paths.length === 0
+    if (!closed) {
+      fail(
+        `${where}: the shapes of ${entry.evidenceKind} are not ones its policy pins, in their order`
+      )
+    }
+    for (const path of paths) {
+      carried.add(path)
+    }
+  }
+  for (const entry of origins) {
+    const shaped = (
+      policies.find(policy => policy.evidenceKind === entry.evidenceKind)?.paths ?? []
+    )
+      .map(shape => shape.origin)
+      .filter((origin, index, all) => all.indexOf(origin) === index)
+      .sort((left, right) => ORIGIN_IDS.indexOf(left) - ORIGIN_IDS.indexOf(right))
+    const permitted = (entry.origins ?? []).every(origin =>
+      (SAFE_ORIGIN_KINDS.find(([id]) => id === origin)?.[1] ?? []).includes(entry.evidenceKind)
+    )
+    if (
+      (entry.origins ?? []).length === 0 ||
+      !permitted ||
+      !increasing(entry.origins, origin => ORIGIN_IDS.indexOf(origin)) ||
+      (RESOLVER_INPUTS.includes(entry.evidenceKind) && !isDeepStrictEqual(entry.origins, shaped))
+    ) {
+      fail(
+        `${where}: the origins of ${entry.evidenceKind} are not those 015 lets it use, in rank order`
+      )
+    }
+  }
+}
+const coverageDecision = shapeKey({
+  origin: 'profile-resolution-specification-input',
+  roles: [role('coverage', SLOTS.indexOf('coverage'))]
+})
+for (const policy of findingPolicies) {
+  for (const shape of policy.paths ?? []) {
+    const key = shapeKey(shape)
+    if (!carried.has(key) && key !== coverageDecision) {
+      fail(`finding registry: ${policy.evidenceKind} pins a shape no Evidence carries`)
+    }
+  }
+}
 if (fileDigest(findingRegistryBytes) !== pinned(findingSource, 'DIGEST')) {
   fail(
     `finding registry: the file digest ${fileDigest(findingRegistryBytes)} is not the pinned ${pinned(findingSource, 'DIGEST')}`
@@ -1495,6 +1635,10 @@ if (
     'blocking',
     'allowedSubjectKinds',
     'allowedReasons',
+    'occurrencePrimaryEvidenceKindByCheck',
+    'occurrenceRelatedEvidenceKindsByCheck',
+    'evidenceDisclosurePolicies',
+    'allowedSafeOriginKindsByEvidenceKind',
     'suggestionKind'
   ])
 ) {
@@ -1526,6 +1670,58 @@ if (
   ])
 ) {
   fail("finding registry schema: a row's members are not closed over 015's vocabularies")
+}
+// The occurrence Evidence columns: a per-check entry closes over its check
+// and its kind or kinds, a policy entry over its kind and shapes, and an
+// origin entry over its kind and origins.
+const primaryColumn = findingProperty('occurrencePrimaryEvidenceKindByCheck')
+const relatedColumn = findingProperty('occurrenceRelatedEvidenceKindsByCheck')
+const policyColumn = findingProperty('evidenceDisclosurePolicies')
+const originColumn = findingProperty('allowedSafeOriginKindsByEvidenceKind')
+const primaryEntry = follow(findingSchema, primaryColumn?.items)
+const relatedEntry = follow(findingSchema, relatedColumn?.items)
+const policyEntry = follow(findingSchema, policyColumn?.items)
+const originEntry = follow(findingSchema, originColumn?.items)
+if (
+  !closes(primaryEntry, ['checkId', 'kind']) ||
+  !closes(relatedEntry, ['checkId', 'kinds']) ||
+  !closes(policyEntry, ['evidenceKind'], ['paths']) ||
+  !closes(originEntry, ['evidenceKind', 'origins'])
+) {
+  fail('finding registry schema: an occurrence Evidence entry is not closed')
+}
+const relatedKinds = relatedEntry?.properties?.kinds
+const entryPaths = policyEntry?.properties?.paths
+const entryOrigins = originEntry?.properties?.origins
+if (
+  primaryColumn?.type !== 'array' ||
+  primaryColumn.minItems !== 1 ||
+  relatedColumn?.type !== 'array' ||
+  relatedColumn.minItems !== 1 ||
+  policyColumn?.type !== 'array' ||
+  originColumn?.type !== 'array' ||
+  primaryEntry?.properties?.checkId?.pattern !== CHECK_ID_PATTERN ||
+  relatedEntry?.properties?.checkId?.pattern !== CHECK_ID_PATTERN ||
+  !isDeepStrictEqual(findingVocabulary(primaryEntry?.properties?.kind), [
+    ...EVIDENCE_KINDS,
+    'none'
+  ]) ||
+  relatedKinds?.type !== 'array' ||
+  relatedKinds.uniqueItems !== true ||
+  !isDeepStrictEqual(findingVocabulary(relatedKinds.items), EVIDENCE_KINDS) ||
+  !isDeepStrictEqual(findingVocabulary(policyEntry?.properties?.evidenceKind), EVIDENCE_KINDS) ||
+  entryPaths?.type !== 'array' ||
+  entryPaths.minItems !== 1 ||
+  follow(findingSchema, entryPaths.items) !== shapeSchema ||
+  !isDeepStrictEqual(findingVocabulary(originEntry?.properties?.evidenceKind), EVIDENCE_KINDS) ||
+  entryOrigins?.type !== 'array' ||
+  entryOrigins.minItems !== 1 ||
+  entryOrigins.uniqueItems !== true ||
+  !isDeepStrictEqual(findingVocabulary(entryOrigins.items), ORIGIN_IDS)
+) {
+  fail(
+    "finding registry schema: the occurrence Evidence columns are not closed over 015's vocabularies"
+  )
 }
 if (fileDigest(findingSchemaBytes) !== pinned(findingSource, 'SCHEMA_DIGEST')) {
   fail(
@@ -1574,5 +1770,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `registries agree: ${expected.rows.length} safe origin kinds, ${EVIDENCE_KINDS.length} evidence kinds, ${checkRows.length} checks of ${kinds.size} subject kinds with ${prerequisiteCount} prerequisites, reporting ${reportedCodes.size} codes with ${new Set([...reachedReasons.values()].flatMap(reached => [...reached])).size} reasons, owning ${owners.size} dependency records, and deriving ${keyOnlyRows} rows' payloads from their keys alone; ${findingRows.length} Finding Registry rows agree with them, beside ${findingPolicies.length} disclosure policies pinning ${pinnedShapes} path shapes; the package lists its ${ROLES.length} members`
+  `registries agree: ${expected.rows.length} safe origin kinds, ${EVIDENCE_KINDS.length} evidence kinds, ${checkRows.length} checks of ${kinds.size} subject kinds with ${prerequisiteCount} prerequisites, reporting ${reportedCodes.size} codes with ${new Set([...reachedReasons.values()].flatMap(reached => [...reached])).size} reasons, owning ${owners.size} dependency records, and deriving ${keyOnlyRows} rows' payloads from their keys alone; ${findingRows.length} Finding Registry rows agree with them, beside ${findingPolicies.length} disclosure policies pinning ${pinnedShapes} path shapes, and give ${occurrenceChecks} checks' occurrence Evidence, carrying every pinned shape; the package lists its ${ROLES.length} members`
 )

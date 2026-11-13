@@ -15,7 +15,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// What an origin-bearing Evidence item describes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum EvidenceKind {
     EntrySource,

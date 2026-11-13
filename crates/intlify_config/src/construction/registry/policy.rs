@@ -32,8 +32,9 @@
 //! components are exactly those the kind's view has, each disclosed as 015
 //! requires, and whose path shapes are ones the Resolver Input Component
 //! Path builds for an origin the Safe Origin Kind Registry lets the kind
-//! use, each once and in Evidence order. Which Finding Occurrence carries
-//! each shape is the rows' to show.
+//! use, each once and in Evidence order. The rows show which Finding
+//! Occurrences carry each shape, and `occurrence` checks that some row, or
+//! Coverage Decision Evidence, carries every one.
 
 use std::cmp::Ordering;
 
@@ -259,7 +260,7 @@ pub(crate) struct PathShape {
 
 impl PathShape {
     /// The shape of `path`.
-    fn of(path: &ComponentPath) -> Self {
+    pub(crate) fn of(path: &ComponentPath) -> Self {
         Self {
             origin: path.origin(),
             roles: path
@@ -280,7 +281,7 @@ impl PathShape {
     /// Evidence order: the origin's rank, then the roles by rank with a
     /// shorter equal prefix first, then the key, `safe-key` first (D15:823,
     /// 827). `None` when a rank is not a shortest decimal string.
-    fn order(&self, other: &Self) -> Option<Ordering> {
+    pub(crate) fn order(&self, other: &Self) -> Option<Ordering> {
         let ranks = |shape: &Self| {
             shape
                 .roles
@@ -374,7 +375,7 @@ fn paths_are_closed(
 }
 
 /// Whether Evidence of `kind` points into a resolver input.
-const fn resolver_input(kind: EvidenceKind) -> bool {
+pub(crate) const fn resolver_input(kind: EvidenceKind) -> bool {
     matches!(
         kind,
         EvidenceKind::SpecificationInput
@@ -515,18 +516,25 @@ fn origin_shapes(origin: SafeOriginKind) -> Vec<PathShape> {
 /// For the vocabulary and the artifact collection, a member with each key:
 /// an admitted identity's, then a redacted one (D15:832, 834).
 fn member_shapes(origin: SafeOriginKind) -> Vec<PathShape> {
-    let member = |key: Key| match origin {
-        SafeOriginKind::IntentSurfaceClassVocabulary => ComponentPath::vocabulary_member(key).ok(),
-        SafeOriginKind::ProfileResolutionArtifactCollection => {
-            ComponentPath::artifact_member(key).ok()
-        }
-        _ => None,
-    };
-    [Key::Identity(json!("")), Key::Unsafe(JsonType::Object)]
+    [KeyKind::SafeKey, KeyKind::RedactedKey]
         .into_iter()
-        .filter_map(member)
-        .map(|path| PathShape::of(&path))
+        .filter_map(|key| member_shape(origin, key))
         .collect()
+}
+
+/// The shape of a member of the vocabulary or the artifact collection with
+/// a key of `key`'s kind; none for another origin.
+pub(crate) fn member_shape(origin: SafeOriginKind, key: KeyKind) -> Option<PathShape> {
+    let key = match key {
+        KeyKind::SafeKey => Key::Identity(json!("")),
+        KeyKind::RedactedKey => Key::Unsafe(JsonType::Object),
+    };
+    let path = match origin {
+        SafeOriginKind::IntentSurfaceClassVocabulary => ComponentPath::vocabulary_member(key),
+        SafeOriginKind::ProfileResolutionArtifactCollection => ComponentPath::artifact_member(key),
+        _ => return None,
+    };
+    path.ok().map(|path| PathShape::of(&path))
 }
 
 /// Every shape the Resolver Input Component Path builds: each resolver
