@@ -463,9 +463,8 @@ mod tests {
         assert_eq!(built[0].related(), built[1].related());
     }
 
-    /// Related Evidence does not identify an occurrence: two groups whose
-    /// related Evidence differs have keys that differ only by ordinal, while
-    /// the records differ.
+    /// Related Evidence does not identify an occurrence: changing it changes
+    /// the record but not the key (D15:2385).
     #[test]
     fn the_key_leaves_related_evidence_out() {
         let mut evaluation = Evaluation::default();
