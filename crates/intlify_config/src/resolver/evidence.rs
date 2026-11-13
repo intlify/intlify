@@ -265,6 +265,11 @@ pub(crate) struct Evidence {
 }
 
 impl Evidence {
+    /// The record's Safe Origin Kind.
+    pub(crate) const fn origin(&self) -> SafeOriginKind {
+        self.origin
+    }
+
     /// The record's evidence kind: the one its origin permits, or for a
     /// configuration origin whether it is Entry Source or Materialized Value
     /// Evidence.
