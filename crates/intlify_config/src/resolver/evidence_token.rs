@@ -67,7 +67,7 @@ impl TokenKind {
     /// kind: configuration sources carry identities and path members, the
     /// vocabulary and the artifact collection carry the only keyed component
     /// paths (D15:832, 834), and the selector slots carry selectors.
-    const fn admits(self, origin: SafeOriginKind) -> bool {
+    pub(crate) const fn admits(self, origin: SafeOriginKind) -> bool {
         use SafeOriginKind as O;
         match self {
             Self::SourceIdentity | Self::InputPathMember | Self::ValuePathMember => {
@@ -258,7 +258,7 @@ impl Redacted {
 }
 
 /// A String Length Fact as a selector's view writes it (D15:2505).
-fn length_view(length: StringLengthFact) -> Value {
+pub(crate) fn length_view(length: StringLengthFact) -> Value {
     match length {
         StringLengthFact::Exact(bytes) => json!({ "exact": bytes.to_string() }),
         StringLengthFact::OverLimit => json!("over-limit"),
