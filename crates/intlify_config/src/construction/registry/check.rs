@@ -203,6 +203,26 @@ pub(crate) enum RecordKind {
     MaterializedDependency,
 }
 
+impl RecordKind {
+    /// The record kind's ID, as a row and an accounting view spell it.
+    pub(crate) const fn id(self) -> &'static str {
+        match self {
+            Self::EntryFinding => "entry-finding",
+            Self::EntryEvaluationStatus => "entry-evaluation-status",
+            Self::FindingOccurrence => "finding-occurrence",
+            Self::CoverageDecisionEvidence => "coverage-decision-evidence",
+            Self::EvidenceIndex => "evidence-index",
+            Self::EntryDependency => "entry-dependency",
+            Self::SharedUnavailabilityCause => "shared-unavailability-cause",
+            Self::SharedFinding => "shared-finding",
+            Self::SharedEvaluationStatus => "shared-evaluation-status",
+            Self::CoverageDecisionBasis => "coverage-decision-basis",
+            Self::SemanticDependency => "semantic-dependency",
+            Self::MaterializedDependency => "materialized-dependency",
+        }
+    }
+}
+
 /// A dependency record a row's units own, as its record kind and ID.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
@@ -2000,11 +2020,21 @@ pub(crate) mod testing {
 
     use crate::resolver::evaluation::Code;
 
-    use super::{finding_codes, CheckRegistry, Derivation, Reason};
+    use super::{finding_codes, CheckRegistry, Derivation, Reason, RecordKind};
 
     /// The Finding codes `check` of `kind` may report.
     pub(crate) fn possible_codes(kind: SubjectKind, check: Check) -> &'static [Code] {
         finding_codes(kind)[rank(kind, check)]
+    }
+
+    /// The ordinary Evidence record kinds the units of `check` of `kind` may
+    /// own.
+    pub(crate) fn record_kinds(kind: SubjectKind, check: Check) -> Vec<RecordKind> {
+        super::record_kinds(
+            kind,
+            possible_codes(kind, check),
+            &super::owned_dependencies(kind),
+        )
     }
 
     /// What the payloads of `check` of `kind` derive from.
@@ -2823,6 +2853,30 @@ mod tests {
                 "{}",
                 row.check_id
             );
+        }
+    }
+
+    /// Each record kind's ID is its spelling, and the record kinds a test
+    /// lets a unit own are its row's.
+    #[test]
+    fn record_kinds_spell_their_ids_and_tests_own_the_rows_kinds() {
+        let owned: BTreeSet<RecordKind> = registry()
+            .rows
+            .iter()
+            .flat_map(|row| row.possible_evidence_record_kinds.iter().copied())
+            .collect();
+        assert_eq!(owned.len(), 12);
+        for kind in owned {
+            assert_eq!(serde_json::to_value(kind).unwrap(), json!(kind.id()));
+        }
+        for kind in SubjectKind::ALL {
+            for &check in kind.checks() {
+                assert_eq!(
+                    super::testing::record_kinds(kind, check),
+                    records(kind, check),
+                    "{kind:?} {check:?}"
+                );
+            }
         }
     }
 
