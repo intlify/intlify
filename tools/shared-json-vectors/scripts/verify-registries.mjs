@@ -1395,8 +1395,8 @@ const pinnedShapes = findingPolicies.reduce(
 
 // The rows' occurrence Evidence. For each check, in the row's check order,
 // the primary kind is one of the seven or, only for the terminal reporting
-// code, `none` with no related kind, and the related kinds follow the
-// admitted order without repeats. The policies and the origins name exactly
+// code, `none` with no related kind, and the related kinds are some of the
+// seven, in the admitted order without repeats. The policies and the origins name exactly
 // those kinds, in that order. A resolver-input kind's shapes are ones its
 // policy pins, in Evidence order, and its origins exactly theirs; another
 // kind has no shape. Every origin is one the Safe Origin Kind table lets the
@@ -1438,10 +1438,14 @@ for (const row of findingRows) {
   for (const [index, entry] of primary.entries()) {
     const kinds = related[index]?.kinds ?? []
     if (
+      ![...EVIDENCE_KINDS, 'none'].includes(entry.kind) ||
       (entry.kind === 'none') !== (row.code === TERMINAL) ||
       (entry.kind === 'none' && kinds.length > 0)
     ) {
       fail(`${where}: ${entry.checkId} has a primary kind 015 does not give it`)
+    }
+    if (!kinds.every(kind => EVIDENCE_KINDS.includes(kind))) {
+      fail(`${where}: ${entry.checkId} has a related kind that is none of the seven`)
     }
     if (!increasing(kinds, kind => EVIDENCE_KINDS.indexOf(kind))) {
       fail(
