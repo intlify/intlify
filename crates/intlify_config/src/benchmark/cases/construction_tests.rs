@@ -135,7 +135,7 @@ fn each_refused_recipe_is_refused_at_its_own_row() {
 }
 
 /// The inputs that construct differ only in bytes the identity does not
-/// commit: one construction, observed once, with one identity (D15:2583).
+/// commit: one construction, observed once, with one identity (D15:2589).
 #[test]
 fn the_inputs_that_construct_are_one_construction() {
     let construction = Operation::ConstructionAuthorityAdmission;

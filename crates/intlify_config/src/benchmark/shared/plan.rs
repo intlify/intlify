@@ -241,7 +241,7 @@ impl CaseProjection {
 
     /// The peak live memory of a case's interval: the same fixture, variant,
     /// workload, and execution state as its duration, under the memory pair,
-    /// the construction domain (D15:2796), and the observer's method.
+    /// the construction domain (D15:2805), and the observer's method.
     fn memory(
         expected: &FixtureExpectation,
         profile_revision: &str,

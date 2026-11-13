@@ -5,7 +5,7 @@
 //! The enclosing owner supplies admitted immutable data and identities; reading
 //! 017's Locale Canonicalization Data Artifact is the adapter's job, not this
 //! module's. An adapter reads the envelope at 015's pre-invocation boundary and
-//! leaves the rest to specification admission as [`FormalData`] (D15:3160). A binding keeps what a checked profile would retain (the
+//! leaves the rest to specification admission as [`FormalData`] (D15:3165). A binding keeps what a checked profile would retain (the
 //! specification and the dataset it admits) apart from facts about the admitted
 //! artifact, which make a binding reproducible but never enter profile semantics.
 //! Behind the non-default `icu4x` feature, `icu4x` makes the ICU4X 2.2.0
@@ -181,7 +181,7 @@ pub(crate) struct LocaleDataLimits {
 /// under the capability's `localeData` bounds, and a failure there, a payload
 /// limit, the integrity, a payload, or the dataset, is
 /// `project-profile-locale-data-not-admitted`, a Resolver Case and not a
-/// boundary failure (D15:3160).
+/// boundary failure (D15:3165).
 pub(crate) trait FormalData {
     type Provider: Provider;
 

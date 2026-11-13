@@ -34,7 +34,7 @@ pub(in crate::benchmark) enum ConstructionRecipe {
     /// The committed input.
     Committed,
     /// The Profile Specification written with other bytes: one construction
-    /// (D15:2583).
+    /// (D15:2589).
     ProfileSpecificationLayout,
     /// One more schema, which the set does not map and no row reads.
     UnmappedSchema,

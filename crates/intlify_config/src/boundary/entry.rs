@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! 015's admission of a file Entry Admission Input Set in a step of its own
-//! (015-172, D15:3156).
+//! (015-172, D15:3159).
 //!
 //! A file entry has two typed input slots. The `configuration-file` slot's
 //! value is the raw configuration bytes with their exact logical source

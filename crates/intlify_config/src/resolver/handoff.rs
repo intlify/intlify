@@ -1,14 +1,14 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! What 015 hands 020 for Group ID selection (D15:1861, D15:2415): every
+//! What 015 hands 020 for Group ID selection (D15:2084, D15:2719): every
 //! Deployment Compatibility Group with each member's checked supported
 //! requested-locale subset and effective default, and the Resolved Profile
 //! Artifact Bindings that planning one group consumes, its members' Target
 //! Profiles and the Resource Limit Policy. Neither selects a group. 020 admits
 //! the selector, permitting omission only when the profile has one group, and
 //! the selector and the group it selects never enter the profile's state
-//! (D15:3085). The Handoff Vectors in `fixtures/handoff/` fix both projections
+//! (D15:3411). The Handoff Vectors in `fixtures/handoff/` fix both projections
 //! against the resolver; 020 verifies what each selector selects.
 //!
 //! A profile whose targets did not all resolve, or whose groups do not
@@ -88,7 +88,7 @@ pub(crate) fn group_facts<'a, Id>(
 }
 
 /// The bindings planning `group` consumes (015's Requirement planner row,
-/// D15:2415): each member's Target Profile and the selected Resource Limit
+/// D15:2719): each member's Target Profile and the selected Resource Limit
 /// Policy, in the tuples' order, a tuple several references share once.
 /// `None` when the profile has no such group.
 pub(crate) fn planning_bindings<'s, Id>(
@@ -145,7 +145,7 @@ mod tests {
     enum Relationship {
         /// This group, with every member planned.
         Selected(&'static str),
-        /// No group, by the rule 015 states (D15:1861).
+        /// No group, by the rule 015 states (D15:2084).
         Rejected(&'static str),
     }
 
@@ -176,7 +176,7 @@ mod tests {
     }
 
     /// Each of the six selector forms over a profile with one group and over
-    /// one with two (D15:1861, D20:110).
+    /// one with two (D15:2084, D20:110).
     const VECTORS: [Vector; 12] = {
         use Relationship::{Rejected, Selected};
         [

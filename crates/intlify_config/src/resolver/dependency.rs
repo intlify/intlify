@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! The owners of design 015's semantic dependency records (D15:2510,
+//! The owners of design 015's semantic dependency records (D15:2516,
 //! 015-161). Each semantic group of the profile view has one singleton unit in
 //! the phase of the last check that establishes the group. The unit ranks
 //! after that check's kind and waits on the group's checks, so it is evaluated
@@ -11,7 +11,7 @@
 //! An owner finds nothing of its own, and nothing waits on it. Not the records
 //! themselves: Resolution Evidence builds them, each under its owner. The
 //! materialized and entry dependencies name the closed input slots 015 lists
-//! (D15:2501), [`MaterializedSlot`] and [`EntrySlot`].
+//! (D15:2507), [`MaterializedSlot`] and [`EntrySlot`].
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

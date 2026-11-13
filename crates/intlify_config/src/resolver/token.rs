@@ -276,7 +276,7 @@ pub(crate) struct RedactedToken {
 
 impl RedactedToken {
     /// The token's view, `{ token, collision? }`, the ordinal as a decimal
-    /// string (D15:2450, 2468).
+    /// string (D15:2452, 2468).
     pub(crate) fn view(&self) -> Value {
         let mut view = serde_json::Map::new();
         view.insert(

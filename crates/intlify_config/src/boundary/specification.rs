@@ -4,7 +4,7 @@
 //! 015's `profile-resolution-specification-input` boundary: the raw form of
 //! the Profile Resolution Specification Input that 015-165 fixes, read into
 //! the typed input the resolver takes or refused with one of the five reasons
-//! of its row (D15:1123, 3136).
+//! of its row (D15:1123, 3139).
 //!
 //! The form is one JSON object with at most one member per specification
 //! slot, named as the slot is. A slot's value is `{ identity, revision }`, and

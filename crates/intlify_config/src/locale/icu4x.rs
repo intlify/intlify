@@ -10,7 +10,7 @@
 //!
 //! [`Icu4xData::read`] is 015's `locale-canonicalization-data-artifact`
 //! pre-invocation boundary, the manifest's envelope alone; specification
-//! admission reads the rest through [`FormalData`] (D15:3160).
+//! admission reads the rest through [`FormalData`] (D15:3165).
 //! [`Icu4xProvider::admit`] does both at once, for callers outside an
 //! invocation.
 

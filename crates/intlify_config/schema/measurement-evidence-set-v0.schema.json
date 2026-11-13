@@ -806,7 +806,7 @@
         },
         {
           "const": "profile-specification-layout",
-          "description": "The Profile Specification written with other bytes: one construction\n(D15:2583).",
+          "description": "The Profile Specification written with other bytes: one construction\n(D15:2589).",
           "type": "string"
         },
         {

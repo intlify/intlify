@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! 015's admission of the Common Invocation Input Set in one step (015-168,
-//! D15:3156).
+//! D15:3159).
 //!
 //! The set has six components: the Profile Resolution Specification Input,
 //! the Intent Surface-Class Vocabulary Artifact, the Locale Canonicalization
@@ -10,7 +10,7 @@
 //! Resource Limit Policy Verification Input, and the Admitted Implementation
 //! Capability. A binding submits each in its typed input slot, which fixes one
 //! Safe Origin Kind, with its candidate for that kind beside the value
-//! (D15:200, 3154).
+//! (D15:200, 3157).
 //!
 //! The capability is admitted first, because every other value's boundary
 //! reads its `inputBoundary` bounds (D15:1106). When it is refused, those

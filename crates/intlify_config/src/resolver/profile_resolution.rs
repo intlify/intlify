@@ -8,7 +8,7 @@
 //! admitted, so a blocking result leaves only the checks that depend on it not
 //! evaluated. Once the phases that establish a semantic group have run, the
 //! entry records the unit that owns the group's semantic dependency, which
-//! waits on what they established (D15:2510). The `profileSpecification`
+//! waits on what they established (D15:2516). The `profileSpecification`
 //! group's owner is a unit of Phase 2 that waits on Phase 0 alone.
 //!
 //! Phases 1 to 3 record no other units yet, so the entry starts from their
@@ -141,7 +141,7 @@ pub(crate) struct SemanticState<'s, Id> {
     pub(crate) specifications: Admitted<SpecificationSet<Id>>,
     /// Phase 5: the canonicalization specification and the dataset the
     /// canonicalization data was bound under, which a checked profile
-    /// retains (D15:1311).
+    /// retains (D15:1313).
     pub(crate) canonicalization: Admitted<SemanticPins<Id>>,
     /// Phase 5: the admitted vocabulary.
     pub(crate) vocabulary: Admitted<SurfaceVocabulary>,
@@ -2081,7 +2081,7 @@ pub(super) mod tests {
     /// The capability's `localeData` bounds reach Phase 5, which reads the
     /// rest of the data past the boundary under them. Data whose rest does
     /// not read is not admitted, a Finding of the data's unit rather than a
-    /// refusal before invocation (D15:3160).
+    /// refusal before invocation (D15:3165).
     #[test]
     fn phase_5_reads_the_data_under_the_capabilitys_locale_data_bounds() {
         struct Behind(LocaleDataLimits);

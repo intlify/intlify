@@ -202,7 +202,7 @@ fn a_complete_case_keeps_every_declared_relation() {
 }
 
 /// Each change of the example reaches the decision its name says, and any
-/// other failure it proves on its own (D15:2359): `ssr` as a client lacks the
+/// other failure it proves on its own (D15:2365): `ssr` as a client lacks the
 /// client's role, and `phone` and `worker` are no members of `web`, whose
 /// Target Profiles declare no role.
 #[test]

@@ -4,7 +4,7 @@
 //! 015's `safe-origin-kind` boundary: the Safe Origin Kind candidate a binding
 //! supplies beside the value of one typed input slot, admitted as the kind
 //! that slot fixes or refused with one of the four reasons of its row
-//! (D15:718, 3141, 3154; 015-166).
+//! (D15:718, 3144, 3157; 015-166).
 //!
 //! Each typed input slot fixes one Safe Origin Kind, so the slot is named by
 //! that kind. Only that kind's exact ID is admitted. A candidate that differs

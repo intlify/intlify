@@ -16,7 +16,7 @@
 //! `rci0_` and the unpadded base64url of its 32 bytes.
 //!
 //! The construction interval ends when the authorities are admitted and
-//! excludes the identity (D15:2766), so the identity is derived from the
+//! excludes the identity (D15:2775), so the identity is derived from the
 //! admitted authorities as a step of its own.
 
 use intlify_shared_json::encoding::digest_bytes;

@@ -6,10 +6,10 @@
 //!
 //! Revision `"0"` evaluates staleness as one function of two retained input
 //! sets, never of a stored key, and compares the construction contexts first
-//! (D15:2583). Unequal Resolver Construction Identities make the earlier
+//! (D15:2589). Unequal Resolver Construction Identities make the earlier
 //! construction `construction-stale`. Equal identities over authorities that
 //! differ in what the identity commits are construction-authority corruption,
-//! `corrupt`, which forbids reuse (D15:2575): the bytes of every artifact the
+//! `corrupt`, which forbids reuse (D15:2581): the bytes of every artifact the
 //! identity commits by its file digest, and the Profile Specification's body
 //! value, which it commits by its semantic digest. Bytes the identity does not
 //! commit leave one construction: a Profile Specification written with other
@@ -145,7 +145,7 @@ mod tests {
     }
 
     /// The identity commits the Profile Specification's body value, not its
-    /// bytes, and no schema the set does not map (D15:2583).
+    /// bytes, and no schema the set does not map (D15:2589).
     #[test]
     fn bytes_the_identity_does_not_commit_leave_one_construction() {
         let earlier = built(committed::input());

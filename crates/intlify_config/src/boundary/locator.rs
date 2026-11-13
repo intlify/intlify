@@ -3,7 +3,7 @@
 
 //! 015's Portable Source Locator admission for a file entry: a candidate
 //! admitted as the entry's `relative-path` locator, or treated exactly as
-//! locator absence (D15:762-768; 015-081, 015-171).
+//! locator absence (D15:762-766; 015-081, 015-171).
 //!
 //! The adapter constructs the canonical form and classifies it; the core only
 //! validates the variant, the classification, the bound, and the payload, and
