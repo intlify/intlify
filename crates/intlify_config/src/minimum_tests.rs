@@ -103,17 +103,39 @@ fn strict_bytes_reach_only_the_selected_declarations_locale_resolution() {
     assert_eq!(locales.evaluation.notices().count(), 2);
 }
 
+/// The kind of a strict entry failure that has exactly one fact.
+fn failure_kind(failure: &InputFailure) -> &'static str {
+    use crate::materialize::Incompatibility;
+    match failure {
+        InputFailure::InvalidUtf8 { .. } => "invalid-utf8",
+        InputFailure::Syntax { .. } => "syntax",
+        InputFailure::Inadmissible(facts) => match (
+            facts.duplicates.as_slice(),
+            facts.incompatible.as_slice(),
+            facts.violations.as_slice(),
+        ) {
+            ([_], [], []) => "duplicate",
+            ([], [value], []) => match value.reason {
+                Incompatibility::InvalidUnicode => "invalid-unicode",
+                Incompatibility::NonPortableNumber => "non-portable-number",
+            },
+            _ => "several",
+        },
+        _ => "another",
+    }
+}
+
 #[test]
 fn invalid_raw_inputs_stop_before_structure_selection_and_locale_processing() {
     for (bytes, expected) in [
-        (&b"\xff"[..], InputFailure::InvalidUtf8),
-        (&b"{"[..], InputFailure::Syntax),
-        (&b"{} null"[..], InputFailure::Syntax),
-        (&b"{/* comment */}"[..], InputFailure::Syntax),
-        (&br#"{"x":1,}"#[..], InputFailure::Syntax),
-        (&br#"{"x":1,"\u0078":2}"#[..], InputFailure::DuplicateMember),
-        (&br#""\uD800""#[..], InputFailure::NonScalarString),
-        (&b"9007199254740992"[..], InputFailure::NonPortableNumber),
+        (&b"\xff"[..], "invalid-utf8"),
+        (&b"{"[..], "syntax"),
+        (&b"{} null"[..], "syntax"),
+        (&b"{/* comment */}"[..], "syntax"),
+        (&br#"{"x":1,}"#[..], "syntax"),
+        (&br#"{"x":1,"\u0078":2}"#[..], "duplicate"),
+        (&br#""\uD800""#[..], "invalid-unicode"),
+        (&b"9007199254740992"[..], "non-portable-number"),
     ] {
         let result = runner().run(Arc::from(bytes), Some("app"));
         assert_eq!(result.steps, [Step::Materialize]);
@@ -121,7 +143,7 @@ fn invalid_raw_inputs_stop_before_structure_selection_and_locale_processing() {
         let Outcome::Materialization(error) = result.outcome else {
             panic!("wrong stopping point")
         };
-        assert_eq!(error.reason, expected);
+        assert_eq!(failure_kind(&error.reason), expected);
     }
 }
 
@@ -424,12 +446,11 @@ fn resource_edges_stop_at_their_owning_stage_without_later_semantic_work() {
     let Outcome::Materialization(error) = result.outcome else {
         unreachable!()
     };
-    let InputFailure::ResourceLimits(violations) = error.reason else {
+    let InputFailure::FileBytes(violation) = error.reason else {
         unreachable!()
     };
-    assert_eq!(violations.len(), 1);
-    assert_eq!(violations[0].bound, InputBound::FileBytes);
-    assert_eq!(violations[0].actual, bytes.len() as u64);
+    assert_eq!(violation.bound, InputBound::FileBytes);
+    assert_eq!(violation.actual, bytes.len() as u64);
 
     let mut multiple = minimal_config();
     multiple["profiles"]["other"] = multiple["profiles"]["app"].clone();

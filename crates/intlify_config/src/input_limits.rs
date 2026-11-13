@@ -136,6 +136,9 @@ pub(crate) struct ValueCounts {
 impl ValueLimits {
     /// Bound-centric summaries over a complete parsed domain, in 015 table order.
     /// These are not Finding records: occurrence projection is a later stage.
+    /// A total is exact; the single-string bound, which 015 checks one
+    /// occurrence at a time under a key that stands for every string, reports
+    /// its first-over witness `limit + 1` (D15:1884, 2203).
     pub(crate) fn violations(self, counts: ValueCounts) -> Vec<LimitViolation> {
         [
             (InputBound::Nodes, self.max_nodes, counts.nodes),
@@ -158,11 +161,22 @@ impl ValueLimits {
         ]
         .into_iter()
         .filter_map(|(bound, limit, actual)| {
-            (actual > limit.get()).then_some(LimitViolation {
-                bound,
-                limit,
-                actual,
-                relation: CountRelation::Exact,
+            (actual > limit.get()).then_some(if bound == InputBound::SingleStringBytes {
+                LimitViolation {
+                    bound,
+                    limit,
+                    // `Bound` excludes `u64::MAX`, so the witness is
+                    // representable.
+                    actual: limit.get() + 1,
+                    relation: CountRelation::AtLeast,
+                }
+            } else {
+                LimitViolation {
+                    bound,
+                    limit,
+                    actual,
+                    relation: CountRelation::Exact,
+                }
             })
         })
         .collect()

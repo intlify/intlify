@@ -421,13 +421,20 @@ fn formal_reference_strings_remain_subject_to_entry_capacity() {
     let Err(error) = materialize_file(source, capacity) else {
         panic!("first-over input must not materialize")
     };
-    let InputFailure::ResourceLimits(violations) = error.reason else {
+    let InputFailure::Inadmissible(facts) = error.reason else {
         panic!("input bound expected")
     };
-    assert_eq!(violations.len(), 1);
-    assert_eq!(violations[0].bound, InputBound::SingleStringBytes);
-    assert_eq!(violations[0].actual, 71);
-    assert_eq!(violations[0].relation, CountRelation::Exact);
+    assert_eq!(facts.violations.len(), 1);
+    assert_eq!(facts.violations[0].bound, InputBound::SingleStringBytes);
+    // The single-string bound reports its first-over witness, and every pin
+    // past it is an occurrence.
+    assert_eq!(facts.violations[0].actual, 71);
+    assert_eq!(facts.violations[0].relation, CountRelation::AtLeast);
+    assert!(!facts.long_strings.is_empty());
+    assert!(facts
+        .long_strings
+        .iter()
+        .all(|span| span.end_byte() - span.start_byte() == 73));
 }
 
 #[test]

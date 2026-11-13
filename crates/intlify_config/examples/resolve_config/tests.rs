@@ -122,6 +122,23 @@ fn bounded_read_rejects_oversize_instead_of_accepting_a_prefix() {
 }
 
 #[test]
+fn every_duplicate_member_is_a_diagnostic_beside_the_first_member() {
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    file.write_all(br#"{"a":1,"b":2,"a":3,"a":4}"#).unwrap();
+    let (code, output) = run([file.path().as_os_str().to_owned(), "--json".into()]).unwrap();
+    assert_eq!(code, 1);
+    let value: Value = serde_json::from_str(&output).unwrap();
+    assert_eq!(value["stage"], "materialize");
+    let diagnostics = value["diagnostics"].as_array().unwrap();
+    assert_eq!(diagnostics.len(), 2);
+    for (diagnostic, start) in diagnostics.iter().zip([13, 19]) {
+        assert_eq!(diagnostic["code"], "DuplicateMember");
+        assert_eq!(diagnostic["position"]["startByte"], start);
+        assert_eq!(diagnostic["relatedPosition"]["startByte"], 1);
+    }
+}
+
+#[test]
 fn missing_files_and_directories_are_io_errors() {
     let dir = tempfile::tempdir().unwrap();
     assert!(run([dir.path().join("missing.json").into_os_string()]).is_err());

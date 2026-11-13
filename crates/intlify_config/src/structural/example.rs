@@ -14,7 +14,7 @@ use crate::input_limits::{Bound, InputLimits, RawInputLimits, ValueLimits};
 use crate::locale::fixtures::{fixture_pins, FixtureProvider};
 use crate::locale::{CanonicalLocale, CanonicalizationFailure, Canonicalizer, ProviderFailure};
 use crate::materialize::{
-    materialize_file, ByteSpan, InputFailure, MaterializedDocument, NodeKind,
+    materialize_file, ByteSpan, Incompatibility, InputFailure, MaterializedDocument, NodeKind,
 };
 use crate::model::ProfileDeclaration;
 use crate::references::{PolicyReference, TargetProfileReference};
@@ -80,6 +80,62 @@ fn located(mut item: Value, source: &[u8], span: Option<ByteSpan>) -> Value {
         item["position"] = position(source, span);
     }
     item
+}
+
+/// One diagnostic for each fact strict file entry reported, in its order: the
+/// failure that stopped parsing, or every duplicate member and value outside
+/// the JSON-compatible domain of the complete file, and otherwise each
+/// root-value bound it exceeds.
+fn entry_diagnostics(source: &[u8], failure: &InputFailure) -> Vec<Value> {
+    let rejected = |code: &str, span: Option<ByteSpan>| {
+        located(
+            diagnostic(
+                code,
+                format!("Strict JSON input was rejected: {code}"),
+                None,
+            ),
+            source,
+            span,
+        )
+    };
+    match failure {
+        InputFailure::FileBytes(_) => vec![rejected("InputLimit", None)],
+        InputFailure::ParserTokens { span, .. } => vec![rejected("InputLimit", Some(*span))],
+        InputFailure::InvalidUtf8 { span } => vec![rejected("InvalidUtf8", Some(*span))],
+        InputFailure::Syntax { span } => vec![rejected("InvalidJson", Some(*span))],
+        InputFailure::AccountingOverflow { span } => {
+            vec![rejected("AccountingOverflow", Some(*span))]
+        }
+        InputFailure::Inadmissible(facts) => {
+            let mut items: Vec<Value> = facts
+                .duplicates
+                .iter()
+                .map(|duplicate| {
+                    let mut item = rejected("DuplicateMember", Some(duplicate.key));
+                    if let Some(&first) = duplicate.others.first() {
+                        item["relatedPosition"] = position(source, first);
+                    }
+                    item
+                })
+                .collect();
+            items.extend(facts.incompatible.iter().map(|value| {
+                let code = match value.reason {
+                    Incompatibility::InvalidUnicode => "NonScalarString",
+                    Incompatibility::NonPortableNumber => "NonPortableNumber",
+                };
+                rejected(code, Some(value.span))
+            }));
+            if items.is_empty() {
+                items.extend(
+                    facts
+                        .violations
+                        .iter()
+                        .map(|_| rejected("InputLimit", None)),
+                );
+            }
+            items
+        }
+    }
 }
 
 /// The span of the value `pointer` names, or of its member's key when `key`.
@@ -258,28 +314,7 @@ pub fn resolve(source: &[u8], selector: Option<&str>) -> Result<Value, String> {
     let doc = match materialize_file(Arc::from(source), input_limits()) {
         Ok(doc) => Arc::new(doc),
         Err(error) => {
-            let code = match &error.reason {
-                InputFailure::InvalidUtf8 => "InvalidUtf8",
-                InputFailure::Syntax => "InvalidJson",
-                InputFailure::DuplicateMember => "DuplicateMember",
-                InputFailure::NonScalarString => "NonScalarString",
-                InputFailure::NonPortableNumber => "NonPortableNumber",
-                InputFailure::ResourceLimits(_) => "InputLimit",
-                InputFailure::AccountingOverflow => "AccountingOverflow",
-            };
-            let mut item = located(
-                diagnostic(
-                    code,
-                    format!("Strict JSON input was rejected: {:?}", error.reason),
-                    None,
-                ),
-                source,
-                error.span,
-            );
-            if let Some(span) = error.related_span {
-                item["relatedPosition"] = position(source, span);
-            }
-            output["diagnostics"] = json!([item]);
+            output["diagnostics"] = Value::Array(entry_diagnostics(source, &error.reason));
             return Ok(output);
         }
     };
