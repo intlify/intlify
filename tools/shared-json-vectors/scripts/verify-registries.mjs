@@ -6,12 +6,14 @@
  * digests. This script shares no code with it. It builds the Safe Origin Kind
  * Registry from its own copy of design 015's table. It checks that the Check
  * Registry's rows agree with each other the way 015's registry rules require
- * and carry 015's five example check IDs, without rebuilding the rows, and
- * that the Finding Registry's rows agree with them and with its own copy of
- * 015's code tables. It checks that each schema closes its container, every
- * row, and its vocabularies, builds the package's container from the
- * members' file digests, hashes every artifact, and reads the pinned digests
- * out of the crate's source. It does not read the design document.
+ * and carry 015's five example check IDs, without rebuilding the rows, that
+ * the Finding Registry's rows agree with them and with its own copy of 015's
+ * code tables, and that its disclosure policies are the ones its own copy of
+ * 015's Evidence views and of the capability bound tables gives. It checks
+ * that each schema closes its container, every row and policy, and its
+ * vocabularies, builds the package's container from the members' file
+ * digests, hashes every artifact, and reads the pinned digests out of the
+ * crate's source. It does not read the design document.
  */
 
 import { createHash } from 'node:crypto'
@@ -19,6 +21,8 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
+
+import { BOOTSTRAP_GROUPS, POLICY_GROUPS } from './resolution-bounds.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const crate = resolve(here, '../../../crates/intlify_config')
@@ -387,6 +391,99 @@ const SAFE_ORIGIN_KINDS = [
   ['implementation-capability', ['implementation-capability']]
 ]
 
+/** The members of design 015's Evidence views, in view order. */
+const MEMBERS = ['source', 'locator', 'path', 'value', 'span', 'selector', 'component']
+
+/**
+ * The components of design 015's Evidence views: each member's leaf
+ * variants, in the order of the view's members and of each member's
+ * variants, with the projection whose token replaces a redacted one.
+ *
+ * @type {[string, string, string | undefined][]}
+ */
+const COMPONENTS = [
+  ['source', 'source.safe-opaque', undefined],
+  ['source', 'source.redacted', 'source-identity'],
+  ['locator', 'locator.relative-path', undefined],
+  ['locator', 'locator.safe-label', undefined],
+  ['locator', 'locator.safe-uri', undefined],
+  ['path', 'path.safe-member', undefined],
+  ['path', 'path.array-index', undefined],
+  ['path', 'path.redacted-member', 'logical-input-path-member'],
+  ['value', 'value.exact-json-pointer', undefined],
+  ['value', 'value.redacted-logical-path.safe-member', undefined],
+  ['value', 'value.redacted-logical-path.array-index', undefined],
+  ['value', 'value.redacted-logical-path.redacted-member', 'value-path-member'],
+  ['span', 'span', undefined],
+  ['selector', 'selector.absent', undefined],
+  ['selector', 'selector.safe-profile-id', undefined],
+  ['selector', 'selector.redacted-value', 'profile-selector'],
+  ['component', 'component.fixed-role', undefined],
+  ['component', 'component.safe-key', undefined],
+  ['component', 'component.redacted-key', 'resolver-input-component-key']
+]
+
+/**
+ * For each evidence kind, the members every Evidence of the kind has and the
+ * members its view can have.
+ *
+ * @type {Record<string, [string[], string[]]>}
+ */
+const VIEW_MEMBERS = {
+  'entry-source': [['source'], ['source', 'locator', 'path', 'span']],
+  'configuration-value': [
+    ['source', 'value'],
+    ['source', 'locator', 'value', 'span']
+  ],
+  'profile-selector': [['selector'], ['selector']],
+  'specification-input': [['component'], ['component']],
+  'artifact-input': [['component'], ['component']],
+  'verification-input': [['component'], ['component']],
+  'implementation-capability': [['component'], ['component']]
+}
+
+/**
+ * The registry's names for 015's conditions under which a literal
+ * component's content counts as non-secret: an owner-marked identity, an
+ * adapter-classified locator, a schema-defined name, an identifier key, a
+ * canonical locale key, a declared Profile ID, a vocabulary identity, and an
+ * admitted exact reference.
+ */
+const NON_SECRET_CLASSES = [
+  'owner-marked-identity',
+  'adapter-classified-locator',
+  'schema-defined-name',
+  'identifier-key',
+  'canonical-locale-key',
+  'declared-profile-id',
+  'vocabulary-identity',
+  'admitted-exact-reference'
+]
+
+/**
+ * The evidence kinds a Redacted evidence token's record can name: 015's four
+ * component projections, in its order, then a selector's.
+ */
+const TOKEN_KINDS = [
+  'source-identity',
+  'logical-input-path-member',
+  'value-path-member',
+  'resolver-input-component-key',
+  'profile-selector'
+]
+
+/** Design 015's Specification Input slots, in slot order. */
+const SLOTS = [
+  'project-profile',
+  'locale-canonicalization',
+  'locale-negotiation',
+  'message-locale-fallback',
+  'coverage',
+  'intent-surface-class-vocabulary',
+  'delivery-graph',
+  'delivery-placement'
+]
+
 /** Design 015's six Registry Package roles, in role order. */
 const ROLES = [
   'safe-origin-kind-registry-schema',
@@ -438,18 +535,19 @@ function follow(schema, node) {
 
 /**
  * Whether a schema object is a closed object that requires exactly these
- * members.
+ * members and may also have the optional ones after them.
  *
  * @param node - The schema object.
- * @param members - The member names, in order.
+ * @param members - The required member names, in order.
+ * @param optional - The optional member names, in order.
  * @returns Whether it closes them.
  */
-function closes(node, members) {
+function closes(node, members, optional = []) {
   return (
     node?.type === 'object' &&
     node.additionalProperties === false &&
     isDeepStrictEqual(node.required, members) &&
-    isDeepStrictEqual(Object.keys(node.properties ?? {}), members)
+    isDeepStrictEqual(Object.keys(node.properties ?? {}), [...members, ...optional])
   )
 }
 
@@ -758,7 +856,8 @@ const ENTRY_PHASES = ['resolver-bootstrap-admission', 'entry-admission']
  * reports codes a Finding in that domain with the Entry domain's occurrences
  * and evidence index, in entry admission also the causes of a Shared
  * projection that cannot materialize; both coverage decision records for the
- * decision table; and the kinds of the dependency records the check owns.
+ * decision table, with the evidence index its Coverage Decision Evidence
+ * refers to; and the kinds of the dependency records the check owns.
  *
  * @param row - A Check Registry row.
  * @returns The record kinds, in 015's order.
@@ -779,6 +878,7 @@ function expectedRecordKinds(row) {
   }
   if (row.subjectKind === 'coverage-table') {
     expected.add('coverage-decision-evidence')
+    expected.add('evidence-index')
     expected.add('coverage-decision-basis')
   }
   for (const owned of row.ownedDependencies ?? []) {
@@ -1126,15 +1226,182 @@ for (const row of findingRows) {
     fail(`${where}: the suggestion kind is not 015's`)
   }
 }
+
+/**
+ * The classifications under which a literal component counts as non-secret:
+ * only Entry Source Evidence has path members, and it precedes the
+ * canonicalization data, so none of them is a canonical locale key; only the
+ * artifact input has keys.
+ *
+ * @param component - A component.
+ * @returns The classifications, none for fixed or redacted content.
+ */
+function classes(component) {
+  switch (component) {
+    case 'source.safe-opaque':
+      return ['owner-marked-identity']
+    case 'locator.relative-path':
+    case 'locator.safe-label':
+    case 'locator.safe-uri':
+      return ['adapter-classified-locator']
+    case 'path.safe-member':
+      return ['schema-defined-name', 'identifier-key']
+    case 'value.exact-json-pointer':
+    case 'value.redacted-logical-path.safe-member':
+      return ['schema-defined-name', 'identifier-key', 'canonical-locale-key']
+    case 'selector.safe-profile-id':
+      return ['declared-profile-id']
+    case 'component.safe-key':
+      return ['vocabulary-identity', 'admitted-exact-reference']
+    default:
+      return []
+  }
+}
+
+/**
+ * A fixed role of a component path shape.
+ *
+ * @param name - The role ID.
+ * @param rank - Its rank within its parent path.
+ * @returns The role.
+ */
+const role = (name, rank) => ({ role: name, rank: String(rank) })
+
+/**
+ * The component path shapes some retained Evidence of a kind can carry, in
+ * Evidence order: every Specification Input slot; the vocabulary's root and
+ * members, the canonicalization data's root, and the artifact collection's
+ * root and members, each member with an admitted key and then a redacted
+ * one; the verification input's `pins`; and every `policyComparable` bound
+ * with the `bootstrapOnly` bounds of `rawInput` and `artifactBootstrap`.
+ * The `diagnostics` groups share one parent role, ranked where the first of
+ * them stands.
+ *
+ * @param kind - An evidence kind.
+ * @returns The shapes, none for a kind that is no resolver input.
+ */
+function reachablePaths(kind) {
+  switch (kind) {
+    case 'specification-input':
+      return SLOTS.map((slot, rank) => ({
+        origin: 'profile-resolution-specification-input',
+        roles: [role(slot, rank)]
+      }))
+    case 'artifact-input': {
+      const member = (origin, name) => [
+        { origin, roles: [] },
+        { origin, roles: [role(name, 0)], key: 'safe-key' },
+        { origin, roles: [role(name, 0)], key: 'redacted-key' }
+      ]
+      return [
+        ...member('intent-surface-class-vocabulary', 'vocabulary-member'),
+        { origin: 'locale-canonicalization-data', roles: [] },
+        ...member('profile-resolution-artifact-collection', 'artifact-member')
+      ]
+    }
+    case 'verification-input':
+      return [{ origin: 'resource-limit-policy-verification', roles: [role('pins', 1)] }]
+    case 'implementation-capability': {
+      const origin = 'implementation-capability'
+      const diagnostics = POLICY_GROUPS.findIndex(([path]) => path.startsWith('diagnostics.'))
+      const comparable = POLICY_GROUPS.flatMap(([path, bounds], group) => {
+        const parent = path.startsWith('diagnostics.')
+          ? [
+              role('diagnostics', diagnostics),
+              role(path.slice('diagnostics.'.length), group - diagnostics)
+            ]
+          : [role(path, group)]
+        return bounds.map(([name], rank) => ({
+          origin,
+          roles: [role('policyComparable', 0), ...parent, role(name, rank)]
+        }))
+      })
+      const bootstrap = BOOTSTRAP_GROUPS.flatMap(([path, bounds], group) =>
+        ['rawInput', 'artifactBootstrap'].includes(path)
+          ? bounds.map(([name], rank) => ({
+              origin,
+              roles: [role('bootstrapOnly', 1), role(path, group), role(name, rank)]
+            }))
+          : []
+      )
+      return [...comparable, ...bootstrap]
+    }
+    default:
+      return []
+  }
+}
+
+/**
+ * One evidence kind's disclosure policy as 015 gives it: the members every
+ * Evidence of the kind has, each component its view can retain, in view
+ * order, disclosed literally unless a projection's token replaces it, and,
+ * for a resolver-input kind, the path shapes its Evidence can carry.
+ *
+ * @param kind - An evidence kind.
+ * @returns The policy.
+ */
+function policyOf(kind) {
+  const [required, members] = VIEW_MEMBERS[kind]
+  const components = COMPONENTS.filter(
+    ([member, component]) =>
+      members.includes(member) &&
+      (kind === 'artifact-input' ||
+        !['component.safe-key', 'component.redacted-key'].includes(component))
+  ).map(([, component, projection]) => {
+    const policy = {
+      component,
+      disclosure: projection ? 'redacted-structure' : 'non-secret-literal'
+    }
+    const when = classes(component)
+    if (when.length > 0) {
+      policy.nonSecretWhen = when
+    }
+    if (projection) {
+      policy.tokenProjection = projection
+    }
+    return policy
+  })
+  const policy = { evidenceKind: kind, required, components }
+  const paths = reachablePaths(kind)
+  if (paths.length > 0) {
+    policy.paths = paths
+  }
+  return policy
+}
+
+// The Finding Registry's disclosure policies: one for each of 015's evidence
+// kinds, in its order, as `policyOf` gives them, and no path shape into an
+// origin the Safe Origin Kind table does not let the kind use.
+const findingPolicies = findingRegistry.policies ?? []
+if (!isDeepStrictEqual(findingPolicies, EVIDENCE_KINDS.map(policyOf))) {
+  fail(
+    "finding registry: the disclosure policies are not one for each of 015's evidence kinds, as 015 discloses them"
+  )
+}
+for (const policy of findingPolicies) {
+  for (const shape of policy.paths ?? []) {
+    const permitted = SAFE_ORIGIN_KINDS.find(([id]) => id === shape.origin)?.[1] ?? []
+    if (!permitted.includes(policy.evidenceKind)) {
+      fail(
+        `finding registry: ${policy.evidenceKind} pins a path into ${shape.origin}, which it may not use`
+      )
+    }
+  }
+}
+const pinnedShapes = findingPolicies.reduce(
+  (count, policy) => count + (policy.paths?.length ?? 0),
+  0
+)
 if (fileDigest(findingRegistryBytes) !== pinned(findingSource, 'DIGEST')) {
   fail(
     `finding registry: the file digest ${fileDigest(findingRegistryBytes)} is not the pinned ${pinned(findingSource, 'DIGEST')}`
   )
 }
 
-// The Finding Registry's schema: Draft 7, closing the container and every row,
-// and the vocabularies of codes, severities, subject kinds, reasons, and
-// suggestion kinds.
+// The Finding Registry's schema: Draft 7, closing the container, every
+// policy, and every row, and the vocabularies of evidence kinds, members,
+// components, disclosures, classifications, projections, origins, keys,
+// codes, severities, subject kinds, reasons, and suggestion kinds.
 const findingSchema = JSON.parse(findingSchemaBytes.toString('utf8'))
 const findingVocabulary = node => {
   const definition = follow(findingSchema, node)
@@ -1143,8 +1410,77 @@ const findingVocabulary = node => {
 if (findingSchema.$schema !== DRAFT_7) {
   fail(`finding registry schema: $schema ${findingSchema.$schema}`)
 }
-if (!closes(findingSchema, ['rows'])) {
+if (!closes(findingSchema, ['policies', 'rows'])) {
   fail('finding registry schema: the container is not closed')
+}
+const findingPoliciesSchema = findingSchema.properties?.policies
+if (findingPoliciesSchema?.type !== 'array' || findingPoliciesSchema.minItems !== 1) {
+  fail('finding registry schema: the policies are not a non-empty array')
+}
+const policySchema = follow(findingSchema, findingPoliciesSchema?.items)
+const componentSchema = follow(findingSchema, policySchema?.properties?.components?.items)
+const shapeSchema = follow(findingSchema, policySchema?.properties?.paths?.items)
+const roleSchema = follow(findingSchema, shapeSchema?.properties?.roles?.items)
+if (
+  !closes(policySchema, ['evidenceKind', 'required', 'components'], ['paths']) ||
+  !closes(componentSchema, ['component', 'disclosure'], ['nonSecretWhen', 'tokenProjection']) ||
+  !closes(shapeSchema, ['origin', 'roles'], ['key']) ||
+  !closes(roleSchema, ['role', 'rank'])
+) {
+  fail('finding registry schema: a policy is not closed')
+}
+const constants = node =>
+  follow(findingSchema, node)?.oneOf?.map(variant =>
+    variant.type === 'string' ? variant.const : undefined
+  )
+const policyProperty = name => policySchema?.properties?.[name]
+const componentProperty = name => componentSchema?.properties?.[name]
+const shapeProperty = name => shapeSchema?.properties?.[name]
+const requiredMembers = policyProperty('required')
+const policyComponents = policyProperty('components')
+const policyPaths = policyProperty('paths')
+const nonSecretWhen = componentProperty('nonSecretWhen')
+const shapeRoles = shapeProperty('roles')
+const roleName = roleSchema?.properties?.role
+const roleRank = roleSchema?.properties?.rank
+if (
+  !isDeepStrictEqual(findingVocabulary(policyProperty('evidenceKind')), EVIDENCE_KINDS) ||
+  requiredMembers?.type !== 'array' ||
+  requiredMembers.minItems !== 1 ||
+  requiredMembers.uniqueItems !== true ||
+  !isDeepStrictEqual(findingVocabulary(requiredMembers.items), MEMBERS) ||
+  policyComponents?.type !== 'array' ||
+  policyComponents.minItems !== 1 ||
+  policyPaths?.type !== 'array' ||
+  policyPaths.minItems !== 1 ||
+  !isDeepStrictEqual(
+    findingVocabulary(componentProperty('component')),
+    COMPONENTS.map(([, component]) => component)
+  ) ||
+  !isDeepStrictEqual(findingVocabulary(componentProperty('disclosure')), [
+    'non-secret-literal',
+    'redacted-structure'
+  ]) ||
+  nonSecretWhen?.type !== 'array' ||
+  nonSecretWhen.minItems !== 1 ||
+  nonSecretWhen.uniqueItems !== true ||
+  !isDeepStrictEqual(constants(nonSecretWhen.items), NON_SECRET_CLASSES) ||
+  !isDeepStrictEqual(
+    findingVocabulary(componentProperty('tokenProjection')?.allOf?.[0]),
+    TOKEN_KINDS
+  ) ||
+  !isDeepStrictEqual(
+    findingVocabulary(shapeProperty('origin')),
+    SAFE_ORIGIN_KINDS.map(([id]) => id)
+  ) ||
+  shapeRoles?.type !== 'array' ||
+  !isDeepStrictEqual(findingVocabulary(shapeProperty('key')), ['safe-key', 'redacted-key']) ||
+  roleName?.type !== 'string' ||
+  roleName.minLength !== 1 ||
+  roleRank?.type !== 'string' ||
+  roleRank.pattern !== RANK_PATTERN
+) {
+  fail("finding registry schema: a policy's members are not closed over 015's vocabularies")
 }
 const findingRowsSchema = findingSchema.properties?.rows
 if (findingRowsSchema?.type !== 'array' || findingRowsSchema.minItems !== 1) {
@@ -1238,5 +1574,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `registries agree: ${expected.rows.length} safe origin kinds, ${EVIDENCE_KINDS.length} evidence kinds, ${checkRows.length} checks of ${kinds.size} subject kinds with ${prerequisiteCount} prerequisites, reporting ${reportedCodes.size} codes with ${new Set([...reachedReasons.values()].flatMap(reached => [...reached])).size} reasons, owning ${owners.size} dependency records, and deriving ${keyOnlyRows} rows' payloads from their keys alone; ${findingRows.length} Finding Registry rows agree with them; the package lists its ${ROLES.length} members`
+  `registries agree: ${expected.rows.length} safe origin kinds, ${EVIDENCE_KINDS.length} evidence kinds, ${checkRows.length} checks of ${kinds.size} subject kinds with ${prerequisiteCount} prerequisites, reporting ${reportedCodes.size} codes with ${new Set([...reachedReasons.values()].flatMap(reached => [...reached])).size} reasons, owning ${owners.size} dependency records, and deriving ${keyOnlyRows} rows' payloads from their keys alone; ${findingRows.length} Finding Registry rows agree with them, beside ${findingPolicies.length} disclosure policies pinning ${pinnedShapes} path shapes; the package lists its ${ROLES.length} members`
 )

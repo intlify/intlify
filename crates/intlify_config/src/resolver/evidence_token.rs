@@ -27,6 +27,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use intlify_shared_json::encoding::encode;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
 use crate::boundary::source::ExactIdentity;
@@ -41,13 +43,21 @@ use super::token::{number, Digest, RedactedToken, Specification};
 const DISCLOSURE_POLICY: &str = "redacted-structure";
 
 /// The evidence kind a token's record names: the projection of the component
-/// the token replaces, or `profile-selector` for a selector's value.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+/// the token replaces, or `profile-selector` for a selector's value. The
+/// Finding Registry's disclosure policies name it by its ID.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 pub(crate) enum TokenKind {
+    #[serde(rename = "source-identity")]
     SourceIdentity,
+    #[serde(rename = "logical-input-path-member")]
     InputPathMember,
+    #[serde(rename = "value-path-member")]
     ValuePathMember,
+    #[serde(rename = "resolver-input-component-key")]
     ComponentKey,
+    #[serde(rename = "profile-selector")]
     ProfileSelector,
 }
 
@@ -446,6 +456,20 @@ mod tests {
             );
         }
         assert_eq!(tokens.comparisons(), 0);
+    }
+
+    /// The Finding Registry names a kind by the ID its records frame.
+    #[test]
+    fn a_token_kind_is_written_as_its_id() {
+        for kind in [
+            TokenKind::SourceIdentity,
+            TokenKind::InputPathMember,
+            TokenKind::ValuePathMember,
+            TokenKind::ComponentKey,
+            TokenKind::ProfileSelector,
+        ] {
+            assert_eq!(serde_json::to_value(kind).unwrap(), json!(kind.id()));
+        }
     }
 
     #[test]

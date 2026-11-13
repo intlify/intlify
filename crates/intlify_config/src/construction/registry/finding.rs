@@ -1,11 +1,13 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! The Finding Registry and its schema, as far as each code's checks,
-//! severity, blocking state, subject kinds, reasons, and suggestion kind go.
+//! The Finding Registry and its schema, as far as the evidence kinds'
+//! disclosure policies and each code's checks, severity, blocking state,
+//! subject kinds, reasons, and suggestion kind go.
 //!
-//! Design 015's Finding Registry has one row for each of its codes
-//! (D15:2233, 2276). Revision `"0"` writes the rows from 015's codes, in
+//! Design 015's Finding Registry has a table of one disclosure policy for
+//! each evidence kind, which `policy` writes, and one row for each of its
+//! codes (D15:2233, 2276). Revision `"0"` writes the rows from 015's codes, in
 //! table order, and from the Check Registry: a code's checks are the rows
 //! that list it, in row order; its subject kinds are those rows' kinds, in
 //! the order they first appear; and its reasons are the ones 015's tables
@@ -17,14 +19,15 @@
 //!
 //! Construction reads the registry it admitted with the registry
 //! cross-references (row 41), after the Check Registry, and refuses one this
-//! type cannot read or whose rows do not relate to the Check Registry as 015
-//! requires: every code has exactly one row (D15:2276); a code's checks are
-//! exactly the rows that list it, so that check-to-Finding and
-//! Finding-to-check relate symmetrically (D15:2277); and its subject kinds
-//! and reasons are exactly those of its checks. A row's severity, blocking
-//! state, and suggestion kind are the registry's values, which the file
-//! digest compiled in fixes. Every evaluation a test runs asserts that a
-//! blocking result's code blocks and a notice's does not.
+//! type cannot read, whose policies are not 015's as `policy` checks them, or
+//! whose rows do not relate to the Check Registry as 015 requires: every code
+//! has exactly one row (D15:2276); a code's checks are exactly the rows that
+//! list it, so that check-to-Finding and Finding-to-check relate symmetrically
+//! (D15:2277); and its subject kinds and reasons are exactly those of its
+//! checks. A row's severity, blocking state, and suggestion kind are the
+//! registry's values, which the file digest compiled in fixes. Every evaluation
+//! a test runs asserts that a blocking result's code blocks and a notice's does
+//! not.
 
 use std::collections::BTreeSet;
 
@@ -38,6 +41,8 @@ use crate::resolver::evaluation::{Code, Reason};
 use crate::resolver::subject::SubjectKind;
 
 use super::check::{CheckRegistry, CheckRow, CHECK_ID_PATTERN};
+use super::policy::{self, DisclosurePolicy};
+use super::safe_origin::SafeOriginKindRegistry;
 
 /// The registry's identity.
 pub(crate) const IDENTITY: &str = "intlify-project-profile-finding-registry";
@@ -56,11 +61,11 @@ pub(crate) const SCHEMA_PATH: &str = "registries/finding-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:d5edabe903428bbd867bf363af683e29de6b50ab2c323cfeba516a9bf999fe0e";
+    "sha256:2a749220586ad7b121c538fb38a48318ed3fcee8ecac0518704c31ce8ac693f8";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
-    "sha256:7a54e536bf4938d207afbf96bad7669f25622ab59b4873829709bfe36e8f6e5e";
+    "sha256:d578a105e9f9e6928d0d5081edc02bf7e3eda034b1808a8f3baf4ca20944a4fe";
 
 /// A Finding's severity: `error` for every blocking code, and `warning` for
 /// the one code that blocks nothing.
@@ -105,22 +110,26 @@ pub(crate) struct FindingRow {
     pub(crate) suggestion_kind: SuggestionKind,
 }
 
-/// The registry's body.
+/// The registry's body: the disclosure policies, one for each evidence kind,
+/// and the rows (D15:2233).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct FindingRegistry {
+    #[schemars(length(min = 1))]
+    pub(crate) policies: Vec<DisclosurePolicy>,
     #[schemars(length(min = 1))]
     pub(crate) rows: Vec<FindingRow>,
 }
 
 impl FindingRegistry {
-    /// The revision-`"0"` registry: one row for each of 015's codes, in
-    /// table order, related to the revision-`"0"` Check Registry.
+    /// The revision-`"0"` registry: the disclosure policies, and one row for
+    /// each of 015's codes, in table order, related to the revision-`"0"`
+    /// Check Registry.
     pub(crate) fn revision_zero() -> Self {
         Self::of(&CheckRegistry::revision_zero())
     }
 
-    /// The rows `checks` relates each code to.
+    /// The policies, and the rows `checks` relates each code to.
     fn of(checks: &CheckRegistry) -> Self {
         let rows = Code::ALL
             .into_iter()
@@ -143,16 +152,25 @@ impl FindingRegistry {
                 }
             })
             .collect();
-        Self { rows }
+        Self {
+            policies: policy::revision_zero(),
+            rows,
+        }
     }
 
     /// Read a registry its admitted schema accepted, as the closed graph
-    /// needs it, against the Check Registry the package admitted: a registry
-    /// this type cannot read, or one whose rows do not relate to `checks` as
-    /// 015 requires, is not part of one.
-    pub(crate) fn read(value: &Value, checks: &CheckRegistry) -> Option<Self> {
+    /// needs it, against the Check Registry and the Safe Origin Kind
+    /// Registry the package admitted: a registry this type cannot read, one
+    /// whose rows do not relate to `checks` as 015 requires, or one whose
+    /// policies 015 does not allow under `origins`, is not part of one.
+    pub(crate) fn read(
+        value: &Value,
+        checks: &CheckRegistry,
+        origins: &SafeOriginKindRegistry,
+    ) -> Option<Self> {
         let registry = decode::typed::<Self>(value.clone()).ok()?;
-        registry.is_closed(checks).then_some(registry)
+        (registry.is_closed(checks) && policy::are_closed(&registry.policies, origins))
+            .then_some(registry)
     }
 
     /// Whether every code has exactly one row, whose checks are exactly the
@@ -255,6 +273,10 @@ mod tests {
 
     fn checks() -> CheckRegistry {
         CheckRegistry::revision_zero()
+    }
+
+    fn origins() -> SafeOriginKindRegistry {
+        SafeOriginKindRegistry::revision_zero()
     }
 
     /// The row of `code`.
@@ -406,7 +428,10 @@ mod tests {
     #[test]
     fn construction_reads_the_registry_against_the_check_registry() {
         let value = serde_json::to_value(registry()).unwrap();
-        assert_eq!(FindingRegistry::read(&value, &checks()), Some(registry()));
+        assert_eq!(
+            FindingRegistry::read(&value, &checks(), &origins()),
+            Some(registry())
+        );
         // A registry this type cannot read is not part of one.
         for (case, value) in [
             (
@@ -424,7 +449,11 @@ mod tests {
                 changed(Code::JsonInvalid, |row| row["severity"] = json!("fatal")),
             ),
         ] {
-            assert_eq!(FindingRegistry::read(&value, &checks()), None, "{case}");
+            assert_eq!(
+                FindingRegistry::read(&value, &checks(), &origins()),
+                None,
+                "{case}"
+            );
         }
     }
 
@@ -439,7 +468,11 @@ mod tests {
             ("a code without a row", missing),
             ("a code twice", repeated),
         ] {
-            assert_eq!(FindingRegistry::read(&value, &checks()), None, "{case}");
+            assert_eq!(
+                FindingRegistry::read(&value, &checks(), &origins()),
+                None,
+                "{case}"
+            );
         }
     }
 
@@ -482,13 +515,17 @@ mod tests {
                 }),
             ),
         ] {
-            assert_eq!(FindingRegistry::read(&value, &checks()), None, "{case}");
+            assert_eq!(
+                FindingRegistry::read(&value, &checks(), &origins()),
+                None,
+                "{case}"
+            );
         }
         // The order of a code's checks is the registry's to say.
         let reordered = changed(code, |row| {
             row["allowedCheckIds"].as_array_mut().unwrap().reverse();
         });
-        assert!(FindingRegistry::read(&reordered, &checks()).is_some());
+        assert!(FindingRegistry::read(&reordered, &checks(), &origins()).is_some());
     }
 
     #[test]
@@ -526,7 +563,11 @@ mod tests {
                 }),
             ),
         ] {
-            assert_eq!(FindingRegistry::read(&value, &checks()), None, "{case}");
+            assert_eq!(
+                FindingRegistry::read(&value, &checks(), &origins()),
+                None,
+                "{case}"
+            );
         }
     }
 
@@ -541,7 +582,7 @@ mod tests {
     }
 
     #[test]
-    fn the_schema_closes_the_container_every_row_and_the_vocabularies() {
+    fn the_schema_closes_the_container_every_policy_and_row_and_the_vocabularies() {
         let document = schema().unwrap();
         assert_eq!(document["$schema"], DRAFT_7);
         let read = Schema::compile(&document).unwrap();
@@ -554,8 +595,140 @@ mod tests {
             change(&mut value);
             value
         };
+        // The entry source's first component is literal and its second
+        // redacted; the specification input pins slots, and the artifact
+        // input's second shape is a member with an admitted key.
+        let components = &registry["policies"][0]["components"];
+        assert_eq!(components[0]["component"], "source.safe-opaque");
+        assert_eq!(components[1]["component"], "source.redacted");
+        assert_eq!(
+            registry["policies"][3]["evidenceKind"],
+            "specification-input"
+        );
+        assert_eq!(registry["policies"][4]["paths"][1]["key"], "safe-key");
         for (case, value) in [
-            ("no rows", json!({ "rows": [] })),
+            ("no rows", changed(&|value| value["rows"] = json!([]))),
+            (
+                "no policies member",
+                changed(&|value| {
+                    value.as_object_mut().unwrap().remove("policies");
+                }),
+            ),
+            (
+                "no policies",
+                changed(&|value| value["policies"] = json!([])),
+            ),
+            (
+                "a policy's other member",
+                changed(&|value| value["policies"][0]["note"] = json!("note")),
+            ),
+            (
+                "an unknown evidence kind",
+                changed(&|value| value["policies"][0]["evidenceKind"] = json!("secret")),
+            ),
+            (
+                "no required member",
+                changed(&|value| value["policies"][0]["required"] = json!([])),
+            ),
+            (
+                "a required member twice",
+                changed(&|value| value["policies"][0]["required"] = json!(["source", "source"])),
+            ),
+            (
+                "an unknown member",
+                changed(&|value| value["policies"][0]["required"] = json!(["note"])),
+            ),
+            (
+                "no component",
+                changed(&|value| value["policies"][0]["components"] = json!([])),
+            ),
+            (
+                "a component's other member",
+                changed(&|value| value["policies"][0]["components"][0]["note"] = json!("note")),
+            ),
+            (
+                "an unknown component",
+                changed(&|value| {
+                    value["policies"][0]["components"][0]["component"] = json!("source.raw");
+                }),
+            ),
+            (
+                "an unknown disclosure",
+                changed(&|value| {
+                    value["policies"][0]["components"][0]["disclosure"] = json!("hashed");
+                }),
+            ),
+            (
+                "no classification",
+                changed(&|value| {
+                    value["policies"][0]["components"][0]["nonSecretWhen"] = json!([]);
+                }),
+            ),
+            (
+                "a classification twice",
+                changed(&|value| {
+                    value["policies"][0]["components"][0]["nonSecretWhen"] =
+                        json!(["owner-marked-identity", "owner-marked-identity"]);
+                }),
+            ),
+            (
+                "an unknown classification",
+                changed(&|value| {
+                    value["policies"][0]["components"][0]["nonSecretWhen"] =
+                        json!(["caller-classified"]);
+                }),
+            ),
+            (
+                "a null projection",
+                changed(&|value| {
+                    value["policies"][0]["components"][1]["tokenProjection"] = Value::Null;
+                }),
+            ),
+            (
+                "an unknown projection",
+                changed(&|value| {
+                    value["policies"][0]["components"][1]["tokenProjection"] = json!("raw");
+                }),
+            ),
+            (
+                "no path",
+                changed(&|value| value["policies"][3]["paths"] = json!([])),
+            ),
+            (
+                "a path's other member",
+                changed(&|value| value["policies"][3]["paths"][0]["note"] = json!("note")),
+            ),
+            (
+                "an unknown origin",
+                changed(&|value| value["policies"][3]["paths"][0]["origin"] = json!("cli")),
+            ),
+            (
+                "a role without its rank",
+                changed(&|value| {
+                    value["policies"][3]["paths"][0]["roles"][0]
+                        .as_object_mut()
+                        .unwrap()
+                        .remove("rank");
+                }),
+            ),
+            (
+                "a rank that is no rank",
+                changed(&|value| {
+                    value["policies"][3]["paths"][0]["roles"][0]["rank"] = json!("01");
+                }),
+            ),
+            (
+                "an empty role",
+                changed(&|value| value["policies"][3]["paths"][0]["roles"][0]["role"] = json!("")),
+            ),
+            (
+                "a null key",
+                changed(&|value| value["policies"][4]["paths"][1]["key"] = Value::Null),
+            ),
+            (
+                "an unknown key",
+                changed(&|value| value["policies"][4]["paths"][1]["key"] = json!("hashed-key")),
+            ),
             (
                 "another member",
                 changed(&|value| value["note"] = json!("note")),
@@ -618,10 +791,18 @@ mod tests {
             assert!(!read.validate(&value).valid, "{case}");
             assert!(!oracle.is_valid(&value), "{case}");
         }
-        // Whether the rows relate to the Check Registry is not the schema's
-        // to say.
+        // Whether the rows relate to the Check Registry, and whether the
+        // policies are 015's, is not the schema's to say.
         let unrelated = changed(&|value| value["rows"][0]["allowedCheckIds"] = json!(["a.b.c"]));
-        assert!(read.validate(&unrelated).valid);
-        assert!(oracle.is_valid(&unrelated));
+        let departing = changed(&|value| {
+            value["policies"][0]["components"]
+                .as_array_mut()
+                .unwrap()
+                .pop();
+        });
+        for value in [unrelated, departing] {
+            assert!(read.validate(&value).valid);
+            assert!(oracle.is_valid(&value));
+        }
     }
 }

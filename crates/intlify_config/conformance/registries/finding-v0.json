@@ -1,4 +1,1425 @@
 {
+  "policies": [
+    {
+      "evidenceKind": "entry-source",
+      "required": [
+        "source"
+      ],
+      "components": [
+        {
+          "component": "source.safe-opaque",
+          "disclosure": "non-secret-literal",
+          "nonSecretWhen": [
+            "owner-marked-identity"
+          ]
+        },
+        {
+          "component": "source.redacted",
+          "disclosure": "redacted-structure",
+          "tokenProjection": "source-identity"
+        },
+        {
+          "component": "locator.relative-path",
+          "disclosure": "non-secret-literal",
+          "nonSecretWhen": [
+            "adapter-classified-locator"
+          ]
+        },
+        {
+          "component": "locator.safe-label",
+          "disclosure": "non-secret-literal",
+          "nonSecretWhen": [
+            "adapter-classified-locator"
+          ]
+        },
+        {
+          "component": "locator.safe-uri",
+          "disclosure": "non-secret-literal",
+          "nonSecretWhen": [
+            "adapter-classified-locator"
+          ]
+        },
+        {
+          "component": "path.safe-member",
+          "disclosure": "non-secret-literal",
+          "nonSecretWhen": [
+            "schema-defined-name",
+            "identifier-key"
+          ]
+        },
+        {
+          "component": "path.array-index",
+          "disclosure": "non-secret-literal"
+        },
+        {
+          "component": "path.redacted-member",
+          "disclosure": "redacted-structure",
+          "tokenProjection": "logical-input-path-member"
+        },
+        {
+          "component": "span",
+          "disclosure": "non-secret-literal"
+        }
+      ]
+    },
+    {
+      "evidenceKind": "configuration-value",
+      "required": [
+        "source",
+        "value"
+      ],
+      "components": [
+        {
+          "component": "source.safe-opaque",
+          "disclosure": "non-secret-literal",
+          "nonSecretWhen": [
+            "owner-marked-identity"
+          ]
+        },
+        {
+          "component": "source.redacted",
+          "disclosure": "redacted-structure",
+          "tokenProjection": "source-identity"
+        },
+        {
+          "component": "locator.relative-path",
+          "disclosure": "non-secret-literal",
+          "nonSecretWhen": [
+            "adapter-classified-locator"
+          ]
+        },
+        {
+          "component": "locator.safe-label",
+          "disclosure": "non-secret-literal",
+          "nonSecretWhen": [
+            "adapter-classified-locator"
+          ]
+        },
+        {
+          "component": "locator.safe-uri",
+          "disclosure": "non-secret-literal",
+          "nonSecretWhen": [
+            "adapter-classified-locator"
+          ]
+        },
+        {
+          "component": "value.exact-json-pointer",
+          "disclosure": "non-secret-literal",
+          "nonSecretWhen": [
+            "schema-defined-name",
+            "identifier-key",
+            "canonical-locale-key"
+          ]
+        },
+        {
+          "component": "value.redacted-logical-path.safe-member",
+          "disclosure": "non-secret-literal",
+          "nonSecretWhen": [
+            "schema-defined-name",
+            "identifier-key",
+            "canonical-locale-key"
+          ]
+        },
+        {
+          "component": "value.redacted-logical-path.array-index",
+          "disclosure": "non-secret-literal"
+        },
+        {
+          "component": "value.redacted-logical-path.redacted-member",
+          "disclosure": "redacted-structure",
+          "tokenProjection": "value-path-member"
+        },
+        {
+          "component": "span",
+          "disclosure": "non-secret-literal"
+        }
+      ]
+    },
+    {
+      "evidenceKind": "profile-selector",
+      "required": [
+        "selector"
+      ],
+      "components": [
+        {
+          "component": "selector.absent",
+          "disclosure": "non-secret-literal"
+        },
+        {
+          "component": "selector.safe-profile-id",
+          "disclosure": "non-secret-literal",
+          "nonSecretWhen": [
+            "declared-profile-id"
+          ]
+        },
+        {
+          "component": "selector.redacted-value",
+          "disclosure": "redacted-structure",
+          "tokenProjection": "profile-selector"
+        }
+      ]
+    },
+    {
+      "evidenceKind": "specification-input",
+      "required": [
+        "component"
+      ],
+      "components": [
+        {
+          "component": "component.fixed-role",
+          "disclosure": "non-secret-literal"
+        }
+      ],
+      "paths": [
+        {
+          "origin": "profile-resolution-specification-input",
+          "roles": [
+            {
+              "role": "project-profile",
+              "rank": "0"
+            }
+          ]
+        },
+        {
+          "origin": "profile-resolution-specification-input",
+          "roles": [
+            {
+              "role": "locale-canonicalization",
+              "rank": "1"
+            }
+          ]
+        },
+        {
+          "origin": "profile-resolution-specification-input",
+          "roles": [
+            {
+              "role": "locale-negotiation",
+              "rank": "2"
+            }
+          ]
+        },
+        {
+          "origin": "profile-resolution-specification-input",
+          "roles": [
+            {
+              "role": "message-locale-fallback",
+              "rank": "3"
+            }
+          ]
+        },
+        {
+          "origin": "profile-resolution-specification-input",
+          "roles": [
+            {
+              "role": "coverage",
+              "rank": "4"
+            }
+          ]
+        },
+        {
+          "origin": "profile-resolution-specification-input",
+          "roles": [
+            {
+              "role": "intent-surface-class-vocabulary",
+              "rank": "5"
+            }
+          ]
+        },
+        {
+          "origin": "profile-resolution-specification-input",
+          "roles": [
+            {
+              "role": "delivery-graph",
+              "rank": "6"
+            }
+          ]
+        },
+        {
+          "origin": "profile-resolution-specification-input",
+          "roles": [
+            {
+              "role": "delivery-placement",
+              "rank": "7"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "evidenceKind": "artifact-input",
+      "required": [
+        "component"
+      ],
+      "components": [
+        {
+          "component": "component.fixed-role",
+          "disclosure": "non-secret-literal"
+        },
+        {
+          "component": "component.safe-key",
+          "disclosure": "non-secret-literal",
+          "nonSecretWhen": [
+            "vocabulary-identity",
+            "admitted-exact-reference"
+          ]
+        },
+        {
+          "component": "component.redacted-key",
+          "disclosure": "redacted-structure",
+          "tokenProjection": "resolver-input-component-key"
+        }
+      ],
+      "paths": [
+        {
+          "origin": "intent-surface-class-vocabulary",
+          "roles": []
+        },
+        {
+          "origin": "intent-surface-class-vocabulary",
+          "roles": [
+            {
+              "role": "vocabulary-member",
+              "rank": "0"
+            }
+          ],
+          "key": "safe-key"
+        },
+        {
+          "origin": "intent-surface-class-vocabulary",
+          "roles": [
+            {
+              "role": "vocabulary-member",
+              "rank": "0"
+            }
+          ],
+          "key": "redacted-key"
+        },
+        {
+          "origin": "locale-canonicalization-data",
+          "roles": []
+        },
+        {
+          "origin": "profile-resolution-artifact-collection",
+          "roles": []
+        },
+        {
+          "origin": "profile-resolution-artifact-collection",
+          "roles": [
+            {
+              "role": "artifact-member",
+              "rank": "0"
+            }
+          ],
+          "key": "safe-key"
+        },
+        {
+          "origin": "profile-resolution-artifact-collection",
+          "roles": [
+            {
+              "role": "artifact-member",
+              "rank": "0"
+            }
+          ],
+          "key": "redacted-key"
+        }
+      ]
+    },
+    {
+      "evidenceKind": "verification-input",
+      "required": [
+        "component"
+      ],
+      "components": [
+        {
+          "component": "component.fixed-role",
+          "disclosure": "non-secret-literal"
+        }
+      ],
+      "paths": [
+        {
+          "origin": "resource-limit-policy-verification",
+          "roles": [
+            {
+              "role": "pins",
+              "rank": "1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "evidenceKind": "implementation-capability",
+      "required": [
+        "component"
+      ],
+      "components": [
+        {
+          "component": "component.fixed-role",
+          "disclosure": "non-secret-literal"
+        }
+      ],
+      "paths": [
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "configurationInput",
+              "rank": "0"
+            },
+            {
+              "role": "maxNodes",
+              "rank": "0"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "configurationInput",
+              "rank": "0"
+            },
+            {
+              "role": "maxDepth",
+              "rank": "1"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "configurationInput",
+              "rank": "0"
+            },
+            {
+              "role": "maxCollectionEntries",
+              "rank": "2"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "configurationInput",
+              "rank": "0"
+            },
+            {
+              "role": "maxTotalStringBytes",
+              "rank": "3"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "configurationInput",
+              "rank": "0"
+            },
+            {
+              "role": "maxSingleStringBytes",
+              "rank": "4"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "configurationInput",
+              "rank": "0"
+            },
+            {
+              "role": "maxProfiles",
+              "rank": "5"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "configurationInput",
+              "rank": "0"
+            },
+            {
+              "role": "maxProfileIdBytes",
+              "rank": "6"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "configurationInput",
+              "rank": "0"
+            },
+            {
+              "role": "maxStructuralAnalysisUnits",
+              "rank": "7"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "localeResolution",
+              "rank": "1"
+            },
+            {
+              "role": "maxLocaleIdentifierBytes",
+              "rank": "0"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "localeResolution",
+              "rank": "1"
+            },
+            {
+              "role": "maxLocaleOccurrences",
+              "rank": "1"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "localeResolution",
+              "rank": "1"
+            },
+            {
+              "role": "maxRequestedLocales",
+              "rank": "2"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "localeResolution",
+              "rank": "1"
+            },
+            {
+              "role": "maxNegotiationAliases",
+              "rank": "3"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "localeResolution",
+              "rank": "1"
+            },
+            {
+              "role": "maxFallbackSources",
+              "rank": "4"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "localeResolution",
+              "rank": "1"
+            },
+            {
+              "role": "maxFallbackCandidatesPerSource",
+              "rank": "5"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "localeResolution",
+              "rank": "1"
+            },
+            {
+              "role": "maxCoverageRules",
+              "rank": "6"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "localeResolution",
+              "rank": "1"
+            },
+            {
+              "role": "maxCoverageLocaleSelectorOccurrences",
+              "rank": "7"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "localeResolution",
+              "rank": "1"
+            },
+            {
+              "role": "maxCoverageSurfaceSelectorOccurrences",
+              "rank": "8"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "localeResolution",
+              "rank": "1"
+            },
+            {
+              "role": "maxCoverageDecisionCells",
+              "rank": "9"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "localeResolution",
+              "rank": "1"
+            },
+            {
+              "role": "maxCoverageRuleCellComparisons",
+              "rank": "10"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "artifactAdmission",
+              "rank": "2"
+            },
+            {
+              "role": "maxArtifacts",
+              "rank": "0"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "artifactAdmission",
+              "rank": "2"
+            },
+            {
+              "role": "maxPolicyArtifacts",
+              "rank": "1"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "artifactAdmission",
+              "rank": "2"
+            },
+            {
+              "role": "maxTargetProfileArtifacts",
+              "rank": "2"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "artifactAdmission",
+              "rank": "2"
+            },
+            {
+              "role": "maxArtifactReferences",
+              "rank": "3"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "artifactAdmission",
+              "rank": "2"
+            },
+            {
+              "role": "maxSingleArtifactCanonicalBytes",
+              "rank": "4"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "artifactAdmission",
+              "rank": "2"
+            },
+            {
+              "role": "maxTotalArtifactCanonicalBytes",
+              "rank": "5"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "artifactAdmission",
+              "rank": "2"
+            },
+            {
+              "role": "maxSingleReferenceCanonicalBytes",
+              "rank": "6"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "artifactAdmission",
+              "rank": "2"
+            },
+            {
+              "role": "maxTotalReferenceCanonicalBytes",
+              "rank": "7"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "targetGrouping",
+              "rank": "3"
+            },
+            {
+              "role": "maxTargetProfiles",
+              "rank": "0"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "targetGrouping",
+              "rank": "3"
+            },
+            {
+              "role": "maxTargetIdBytes",
+              "rank": "1"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "targetGrouping",
+              "rank": "3"
+            },
+            {
+              "role": "maxDeploymentGroups",
+              "rank": "2"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "targetGrouping",
+              "rank": "3"
+            },
+            {
+              "role": "maxGroupIdBytes",
+              "rank": "3"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "targetGrouping",
+              "rank": "3"
+            },
+            {
+              "role": "maxMembersPerGroup",
+              "rank": "4"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "targetGrouping",
+              "rank": "3"
+            },
+            {
+              "role": "maxMembershipOccurrences",
+              "rank": "5"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "targetGrouping",
+              "rank": "3"
+            },
+            {
+              "role": "maxHydrationRelations",
+              "rank": "6"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "diagnostics",
+              "rank": "4"
+            },
+            {
+              "role": "entry",
+              "rank": "0"
+            },
+            {
+              "role": "maxFindingOccurrences",
+              "rank": "0"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "diagnostics",
+              "rank": "4"
+            },
+            {
+              "role": "entry",
+              "rank": "0"
+            },
+            {
+              "role": "maxFindings",
+              "rank": "1"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "diagnostics",
+              "rank": "4"
+            },
+            {
+              "role": "entry",
+              "rank": "0"
+            },
+            {
+              "role": "maxRelatedEvidencePerOccurrenceGroup",
+              "rank": "2"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "diagnostics",
+              "rank": "4"
+            },
+            {
+              "role": "entry",
+              "rank": "0"
+            },
+            {
+              "role": "maxRelatedEvidenceOccurrences",
+              "rank": "3"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "diagnostics",
+              "rank": "4"
+            },
+            {
+              "role": "entry",
+              "rank": "0"
+            },
+            {
+              "role": "maxSingleEvidenceBytes",
+              "rank": "4"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "diagnostics",
+              "rank": "4"
+            },
+            {
+              "role": "entry",
+              "rank": "0"
+            },
+            {
+              "role": "maxTotalEvidenceBytes",
+              "rank": "5"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "diagnostics",
+              "rank": "4"
+            },
+            {
+              "role": "entry",
+              "rank": "0"
+            },
+            {
+              "role": "maxEvaluationStatusEntries",
+              "rank": "6"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "diagnostics",
+              "rank": "4"
+            },
+            {
+              "role": "entry",
+              "rank": "0"
+            },
+            {
+              "role": "maxSuppressionCausesPerStatus",
+              "rank": "7"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "diagnostics",
+              "rank": "4"
+            },
+            {
+              "role": "entry",
+              "rank": "0"
+            },
+            {
+              "role": "maxSuppressionCauseOccurrences",
+              "rank": "8"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "diagnostics",
+              "rank": "4"
+            },
+            {
+              "role": "entry",
+              "rank": "0"
+            },
+            {
+              "role": "maxRecords",
+              "rank": "9"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "diagnostics",
+              "rank": "4"
+            },
+            {
+              "role": "entry",
+              "rank": "0"
+            },
+            {
+              "role": "maxTotalCanonicalBytes",
+              "rank": "10"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "diagnostics",
+              "rank": "4"
+            },
+            {
+              "role": "shared",
+              "rank": "1"
+            },
+            {
+              "role": "maxFindingOccurrences",
+              "rank": "0"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "diagnostics",
+              "rank": "4"
+            },
+            {
+              "role": "shared",
+              "rank": "1"
+            },
+            {
+              "role": "maxFindings",
+              "rank": "1"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "diagnostics",
+              "rank": "4"
+            },
+            {
+              "role": "shared",
+              "rank": "1"
+            },
+            {
+              "role": "maxEvaluationStatusEntries",
+              "rank": "2"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "diagnostics",
+              "rank": "4"
+            },
+            {
+              "role": "shared",
+              "rank": "1"
+            },
+            {
+              "role": "maxSuppressionCausesPerStatus",
+              "rank": "3"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "diagnostics",
+              "rank": "4"
+            },
+            {
+              "role": "shared",
+              "rank": "1"
+            },
+            {
+              "role": "maxSuppressionCauseOccurrences",
+              "rank": "4"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "diagnostics",
+              "rank": "4"
+            },
+            {
+              "role": "shared",
+              "rank": "1"
+            },
+            {
+              "role": "maxRecords",
+              "rank": "5"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "policyComparable",
+              "rank": "0"
+            },
+            {
+              "role": "diagnostics",
+              "rank": "4"
+            },
+            {
+              "role": "shared",
+              "rank": "1"
+            },
+            {
+              "role": "maxTotalCanonicalBytes",
+              "rank": "6"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "rawInput",
+              "rank": "0"
+            },
+            {
+              "role": "maxFileBytes",
+              "rank": "0"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "rawInput",
+              "rank": "0"
+            },
+            {
+              "role": "maxParserTokens",
+              "rank": "1"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "artifactBootstrap",
+              "rank": "3"
+            },
+            {
+              "role": "maxEnvelopeDepth",
+              "rank": "0"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "artifactBootstrap",
+              "rank": "3"
+            },
+            {
+              "role": "maxDecodedAllocationBytes",
+              "rank": "1"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "artifactBootstrap",
+              "rank": "3"
+            },
+            {
+              "role": "maxMetadataScanUnits",
+              "rank": "2"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "artifactBootstrap",
+              "rank": "3"
+            },
+            {
+              "role": "maxValidationWorkUnits",
+              "rank": "3"
+            }
+          ]
+        }
+      ]
+    }
+  ],
   "rows": [
     {
       "code": "project-profile-json-invalid",

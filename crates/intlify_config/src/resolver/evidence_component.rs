@@ -80,6 +80,14 @@ pub(crate) enum VerificationRole {
     Pins,
 }
 
+/// Which key ends a component path: an admitted identity's, or a redacted
+/// one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum KeyShape {
+    Safe,
+    Redacted,
+}
+
 /// A path segment as Evidence projects it, before tokens are assigned.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Segment {
@@ -250,6 +258,27 @@ impl ComponentPath {
         self.origin
     }
 
+    /// The path's fixed roles with their ranks, in path order: with
+    /// `key_shape`, the shape the Finding Registry pins (D15:838).
+    pub(crate) fn roles(&self) -> Vec<(&'static str, u64)> {
+        self.segments
+            .iter()
+            .filter_map(|segment| match segment {
+                Segment::FixedRole(role) => Some((role.id, role.rank)),
+                Segment::SafeKey(_) | Segment::RedactedKey(_) => None,
+            })
+            .collect()
+    }
+
+    /// Which key ends the path, if one does.
+    pub(crate) fn key_shape(&self) -> Option<KeyShape> {
+        self.segments.last().and_then(|segment| match segment {
+            Segment::FixedRole(_) => None,
+            Segment::SafeKey(_) => Some(KeyShape::Safe),
+            Segment::RedactedKey(_) => Some(KeyShape::Redacted),
+        })
+    }
+
     /// The components that tokens replace, one per redacted key.
     pub(crate) fn redacted(&self) -> impl Iterator<Item = &Redacted> {
         self.segments.iter().filter_map(|segment| match segment {
@@ -339,8 +368,8 @@ mod tests {
     use std::sync::Arc;
 
     use super::{
-        ComponentInvariant, ComponentPath, Key, PathComponent, ResolverInputComponentPath, Role,
-        VerificationRole,
+        ComponentInvariant, ComponentPath, Key, KeyShape, PathComponent,
+        ResolverInputComponentPath, Role, VerificationRole,
     };
 
     const PROFILE: Specification<'static> = Specification {
@@ -512,6 +541,50 @@ mod tests {
                 .origin(),
         ];
         assert_eq!(origins, O::ALL[4..]);
+    }
+
+    /// A path's shape is its fixed roles with their ranks and the key that
+    /// ends it, if any: what the Finding Registry pins.
+    #[test]
+    fn a_paths_shape_is_its_ranked_roles_and_its_key() {
+        let shape = |path: &ComponentPath| (path.roles(), path.key_shape());
+        assert_eq!(
+            shape(&ComponentPath::root(O::ProfileResolutionArtifactCollection).unwrap()),
+            (vec![], None)
+        );
+        assert_eq!(
+            shape(&ComponentPath::specification(Slot::Coverage)),
+            (vec![("coverage", 4)], None)
+        );
+        assert_eq!(
+            shape(&ComponentPath::vocabulary_member(Key::Identity(json!("checkout"))).unwrap()),
+            (vec![("vocabulary-member", 0)], Some(KeyShape::Safe))
+        );
+        assert_eq!(
+            shape(&ComponentPath::artifact_member(Key::Unsafe(JsonType::Object)).unwrap()),
+            (vec![("artifact-member", 0)], Some(KeyShape::Redacted))
+        );
+        assert_eq!(
+            shape(&ComponentPath::verification(VerificationRole::Pins)),
+            (vec![("pins", 1)], None)
+        );
+        assert_eq!(
+            shape(
+                &ComponentPath::capability(policy(Group::DiagnosticsEntry, "maxFindings")).unwrap()
+            )
+            .0[..3],
+            [("policyComparable", 0), ("diagnostics", 4), ("entry", 0)]
+        );
+        assert_eq!(
+            shape(
+                &ComponentPath::capability(bootstrap(BootstrapGroup::RawInput, "maxFileBytes"))
+                    .unwrap()
+            ),
+            (
+                vec![("bootstrapOnly", 1), ("rawInput", 0), ("maxFileBytes", 0)],
+                None
+            )
+        );
     }
 
     #[test]

@@ -505,14 +505,18 @@ fn schema_work_input(
     input
 }
 
-/// The committed input whose Safe Origin Kind Registry's schema is `anyOf`
-/// subschemas and whose three registries are each given a member of zeros,
-/// each zero adding its registry schema's nodes to the registry validation
-/// work. `sizes` are the zeros in the Safe Origin Kind, Check, and Finding
-/// Registries.
+/// The committed input whose three registry schemas are `anyOf` subschemas
+/// and whose three registries are each given a member of zeros, each zero
+/// adding its registry schema's nodes to the registry validation work. The
+/// Safe Origin Kind Registry's schema has `1 << 15` subschemas, and the
+/// Check and Finding Registries' two and one, so the steps do not follow the
+/// committed schemas. `sizes` are the zeros in the Safe Origin Kind, Check,
+/// and Finding Registries.
 fn registry_work_input(sizes: [u64; 3]) -> ConstructionInput {
     let mut members = REGISTRY_MEMBERS.map(<[u8]>::to_vec);
     members[0] = any_of(1 << 15, "{}");
+    members[1] = any_of(2, "{}");
+    members[2] = any_of(1, "{}");
     for (index, size) in (3..).zip(sizes) {
         let mut registry = value(REGISTRY_MEMBERS[index]);
         registry["pad"] = (0..size).map(|_| json!(0)).collect();
