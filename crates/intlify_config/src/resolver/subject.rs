@@ -9,10 +9,9 @@
 //! a kind's registry ID is its name in kebab case, and the Check Registry
 //! gives it its key strategy, owning scope, parent, and projection. A later
 //! change may split or merge kinds as 015's subject-key rules require.
-//! The kinds of structural admission's identity-map keys and profile, Target
-//! ID, and Group ID entries, of profile selection, and of reporting
-//! finalization are declared for the registry before the resolver records
-//! their units ([`SubjectKind::declared_only`]).
+//! The kinds of profile selection and reporting finalization are declared for
+//! the registry before the resolver records their units
+//! ([`SubjectKind::declared_only`]).
 
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -732,20 +731,12 @@ impl SubjectKind {
     }
 
     /// Whether the kind is declared for the Check Registry while the resolver
-    /// records no unit of it yet: structural admission's identity-map keys
-    /// and the levels below the root, and profile selection, build their
-    /// units with their Findings, and reporting finalization with the
-    /// outcome.
+    /// records no unit of it yet: profile selection builds its units with its
+    /// Findings, and reporting finalization with the outcome.
     pub(crate) const fn declared_only(self) -> bool {
         matches!(
             self,
-            Self::ProfileKey
-                | Self::ProfileField
-                | Self::TargetProfileKey
-                | Self::TargetField
-                | Self::DeploymentGroupKey
-                | Self::GroupField
-                | Self::CapabilityProfiles
+            Self::CapabilityProfiles
                 | Self::CapabilityProfileId
                 | Self::ProfileSelector
                 | Self::DiagnosticDomain
@@ -799,6 +790,12 @@ impl Subject {
             Self::StructuralCapability => SubjectKind::CapabilityStructuralAnalysis,
             Self::Structural(subject) => match subject {
                 StructuralSubject::RootField(_) => SubjectKind::RootField,
+                StructuralSubject::ProfileKey(_) => SubjectKind::ProfileKey,
+                StructuralSubject::ProfileField(..) => SubjectKind::ProfileField,
+                StructuralSubject::TargetProfileKey(..) => SubjectKind::TargetProfileKey,
+                StructuralSubject::TargetField(..) => SubjectKind::TargetField,
+                StructuralSubject::DeploymentGroupKey(..) => SubjectKind::DeploymentGroupKey,
+                StructuralSubject::GroupField(..) => SubjectKind::GroupField,
             },
             Self::Vocabulary => SubjectKind::Vocabulary,
             Self::CanonicalizationData => SubjectKind::CanonicalizationData,
@@ -991,6 +988,7 @@ mod tests {
     use crate::resolver::identity::DeclarationField;
     use crate::resolver::locales::fixtures::{canonical, content, key, target};
     use crate::resolver::resource_policy::PolicySlot;
+    use crate::resolver::structural_admission::{EntryKey, Field};
 
     /// One subject of every kind but the normalized coverage domain, which
     /// only coverage can build, and the kinds declared only, which have no
@@ -1026,6 +1024,29 @@ mod tests {
             Subject::SchemaSelection,
             Subject::StructuralCapability,
             Subject::Structural(StructuralSubject::root(&["profiles"])),
+            Subject::Structural(StructuralSubject::ProfileKey(EntryKey::identity("app"))),
+            Subject::Structural(StructuralSubject::ProfileField(
+                EntryKey::identity("app"),
+                Field::of(&["projectId"]),
+            )),
+            Subject::Structural(StructuralSubject::TargetProfileKey(
+                EntryKey::identity("app"),
+                EntryKey::Content(None),
+            )),
+            Subject::Structural(StructuralSubject::TargetField(
+                EntryKey::identity("app"),
+                EntryKey::identity("browser"),
+                Field::of(&["requestedLocales", "*"]),
+            )),
+            Subject::Structural(StructuralSubject::DeploymentGroupKey(
+                EntryKey::Content(None),
+                EntryKey::identity("web"),
+            )),
+            Subject::Structural(StructuralSubject::GroupField(
+                EntryKey::identity("app"),
+                EntryKey::identity("web"),
+                Field::of(&["members"]),
+            )),
             owner(SemanticGroup::ProfileSpecification),
             capability(ArtifactSubject::Artifacts),
             capability(ArtifactSubject::PolicyArtifacts),
@@ -1227,24 +1248,14 @@ mod tests {
         assert_eq!(SubjectKind::ConfigurationSchemaSelection.rank(), 1);
     }
 
-    /// The kinds declared only are structural admission's identity-map keys
-    /// and levels below the root, and the kinds of profile selection and
-    /// reporting finalization: Phase 2 records its owner, the schema
-    /// selection, the analysis's measure, the root's fields, and the
-    /// `profileSpecification` group's owner.
+    /// The kinds declared only are those of profile selection and reporting
+    /// finalization: Phase 2 records every kind of its own.
     #[test]
     fn the_kinds_declared_only_are_those_without_units_yet() {
         for kind in SubjectKind::ALL {
             let unrecorded = matches!(
                 kind.phase(),
-                Phase::StructuralAdmission | Phase::ProfileSelection | Phase::ReportingFinalization
-            ) && !matches!(
-                kind,
-                SubjectKind::MaterializedDependencies
-                    | SubjectKind::ConfigurationSchemaSelection
-                    | SubjectKind::CapabilityStructuralAnalysis
-                    | SubjectKind::RootField
-                    | SubjectKind::ProfileSpecificationDependency
+                Phase::ProfileSelection | Phase::ReportingFinalization
             );
             assert_eq!(kind.declared_only(), unrecorded, "{kind:?}");
         }

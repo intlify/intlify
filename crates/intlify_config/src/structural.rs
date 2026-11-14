@@ -243,6 +243,21 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
     pub(crate) fn facts(&self) -> Option<&facts::Facts> {
         self.evaluation.as_ref().map(|e| &e.facts)
     }
+    /// The key of the identity map entry `entry` when it has the identifier
+    /// syntax: the admitted canonical identity that keys the entry's
+    /// subjects (D15:2181, 2184). None for a key without the syntax.
+    pub(crate) fn admitted_key(&self, entry: &facts::Entry) -> Option<&str> {
+        if !entry.admitted {
+            return None;
+        }
+        let NodeKind::Object(members) = self.doc.node(entry.map).kind() else {
+            return None;
+        };
+        members
+            .iter()
+            .find(|(_, member)| member.value() == entry.value)
+            .map(|(name, _)| name.as_str())
+    }
     /// The materialized root's value counts, which Phase 4 rechecks.
     pub(crate) fn value_counts(&self) -> ValueCounts {
         self.doc.counts().value

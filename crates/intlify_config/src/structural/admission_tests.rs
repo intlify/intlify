@@ -340,3 +340,26 @@ fn an_analysis_keeps_its_candidates_only_when_the_schema_guided_walk_ran() {
     assert!(!unselected.version_selected());
     assert!(unselected.facts().is_none());
 }
+
+/// An entry's key keys the subjects under it only with the identifier
+/// syntax: the analysis names an admitted key and no other (D15:2181, 2184).
+#[test]
+fn the_analysis_names_only_an_admitted_key() {
+    use super::facts::{At, Check, Level};
+    let mut value = minimal_config();
+    value["profiles"]["Bad Key"] = value["profiles"]["app"].clone();
+    let analysis = analyze_fixture(&value);
+    let facts = analysis.facts().unwrap();
+    let mut keys: Vec<(bool, Option<&str>)> = facts
+        .identified()
+        .filter_map(|(_, candidate)| match (candidate.check, candidate.at) {
+            (Check::Key, At::Key(scope)) if facts.scope(scope).level == Level::Profile => {
+                let entry = facts.scope(scope).entry.unwrap();
+                Some((entry.admitted, analysis.admitted_key(&entry)))
+            }
+            _ => None,
+        })
+        .collect();
+    keys.sort_unstable();
+    assert_eq!(keys, [(false, None), (true, Some("app"))]);
+}

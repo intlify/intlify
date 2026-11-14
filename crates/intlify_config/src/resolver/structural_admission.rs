@@ -13,26 +13,33 @@
 //! `profileSpecification` group's owner, the phase's last kind, waits on
 //! Phase 0 alone (D15:2516).
 //!
-//! Each evaluation of a structural check the analysis found at the root is
-//! a candidate of the unit over its field's logical path: a required member,
-//! a value's type, a value's closed constraints, or the root's undeclared
-//! members (D15:2173, 2184). A candidate waits on the type check of the
-//! value that holds it, or of its own value, and the root's own type check
-//! waits on the analysis's measure (D15:2149, Decision 015-195). A value
-//! whose type check failed is that check's to report, so its other checks
-//! are not evaluated (D15:2184).
+//! Each evaluation of a structural check the analysis found is a candidate
+//! of a unit of its scope level (D15:2173): a required member, a value's
+//! type, a value's closed constraints, or an object's undeclared members, at
+//! a field of the root, of a profile entry, of a Target ID entry, or of a
+//! Group ID entry, by the field's logical path from its entry, and the key
+//! of an entry of `profiles`, `targetProfiles`, or `deploymentGroups`. An
+//! entry's admitted key scopes the subjects under it by its identity, and a
+//! key without the identifier syntax by its Subject content projection, so
+//! such entries of one map join one unit while each stays a candidate of its
+//! own (D15:2184, 2190). A candidate waits on the type check of the value
+//! that holds it, or of its own value, a key on its map's type check, and
+//! the root's own type check on the analysis's measure (D15:2149, Decision
+//! 015-195). A value whose type check failed is that check's to report, so
+//! its other checks are not evaluated (D15:2184).
 //!
-//! The identity maps' keys and the fields of their entries come with their
-//! units (plan 025 PR 5f-2d-2); until then the analysis these checks admit
-//! is what later phases read, and a configuration structural admission does
-//! not admit whole starts no semantic phase. Phase 2's Findings carry their
+//! The analysis these checks admit is what later phases read, and a
+//! configuration structural admission does not admit whole starts no
+//! semantic phase (plan 025 PR 5f-2f). Phase 2's Findings carry their
 //! occurrences once its Evidence comes (plan 025 PR 5f-2e).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::materialize::MaterializedDocument;
-use crate::structural::facts::{self, At, CandidateId, Facts, FieldPathId, Level, Outcome};
+use crate::materialize::{ByteSpan, MaterializedDocument};
+use crate::structural::facts::{
+    self, At, CandidateId, Entry, Facts, FieldPathId, Level, Outcome, ScopeId,
+};
 use crate::structural::{
     AdmissionInvariant, AuthoringSchema, StructuralAnalysis, StructuralFailure, StructuralLimits,
 };
@@ -67,21 +74,75 @@ pub(crate) const CAPABILITY: Unit = Unit {
     check: Check::WithinCapability,
 };
 
-/// A subject of structural admission's scope levels: a field of the root, by
-/// its logical path (D15:2173, 2180). The identity maps' keys and the fields
-/// of their entries come with their units (plan 025 PR 5f-2d-2).
+/// A subject of structural admission's scope levels (D15:2173, 2180): a
+/// field of the root or of an identity map's entry, by its logical path from
+/// the entry, or the key of an entry of `profiles`, of a profile's
+/// `targetProfiles`, or of its `deploymentGroups`. The keys of the entries
+/// that hold a subject scope it, the outermost first (D15:2190).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum StructuralSubject {
     /// A field of the root.
     RootField(Field),
+    /// The key of an entry of `profiles`.
+    ProfileKey(EntryKey),
+    /// A field of a profile entry, under the profile's key.
+    ProfileField(EntryKey, Field),
+    /// The key of an entry of a profile's `targetProfiles`, under the
+    /// profile's key.
+    TargetProfileKey(EntryKey, EntryKey),
+    /// A field of a Target ID entry, under the profile's and the target's
+    /// keys.
+    TargetField(EntryKey, EntryKey, Field),
+    /// The key of an entry of a profile's `deploymentGroups`, under the
+    /// profile's key.
+    DeploymentGroupKey(EntryKey, EntryKey),
+    /// A field of a Group ID entry, under the profile's and the group's keys.
+    GroupField(EntryKey, EntryKey, Field),
 }
 
 impl StructuralSubject {
     /// The logical subject, which every raw candidate of the unit joins: the
-    /// field without where a candidate looked (D15:2184).
+    /// subject without where a candidate looked, and each key without an
+    /// identity as its content projection alone (D15:2184, 2190).
     pub(crate) fn logical(&self) -> Self {
         match self {
             Self::RootField(field) => Self::RootField(field.logical()),
+            Self::ProfileKey(profile) => Self::ProfileKey(profile.logical()),
+            Self::ProfileField(profile, field) => {
+                Self::ProfileField(profile.logical(), field.logical())
+            }
+            Self::TargetProfileKey(profile, target) => {
+                Self::TargetProfileKey(profile.logical(), target.logical())
+            }
+            Self::TargetField(profile, target, field) => {
+                Self::TargetField(profile.logical(), target.logical(), field.logical())
+            }
+            Self::DeploymentGroupKey(profile, group) => {
+                Self::DeploymentGroupKey(profile.logical(), group.logical())
+            }
+            Self::GroupField(profile, group, field) => {
+                Self::GroupField(profile.logical(), group.logical(), field.logical())
+            }
+        }
+    }
+}
+
+/// The key of an identity map's entry (D15:2181, 2184): its admitted
+/// canonical identity, or, for a key without the identifier syntax, its
+/// Subject content projection, a string, with where one raw entry's key is.
+/// Identities order before content, and by their bytes.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum EntryKey {
+    Identity(Arc<str>),
+    /// None for the logical subject.
+    Content(Option<ByteSpan>),
+}
+
+impl EntryKey {
+    fn logical(&self) -> Self {
+        match self {
+            Self::Identity(identity) => Self::Identity(Arc::clone(identity)),
+            Self::Content(_) => Self::Content(None),
         }
     }
 }
@@ -191,9 +252,9 @@ pub(crate) fn admit_structure<Policy, Target>(
         return Err(StructuralInvariant::UnreportedFailure);
     }
     // An analysis past the capability stopped before its candidates, which
-    // alone name the fields' subjects.
+    // alone name the scope levels' subjects.
     if let Some(facts) = analysis.facts() {
-        root_fields(evaluation, facts, &within)?;
+        scope_levels(evaluation, &analysis, facts, &within)?;
     }
     // The assertion Phase 0 admitted never selects structure: only the owner
     // of the group it establishes waits on it.
@@ -205,29 +266,25 @@ pub(crate) fn admit_structure<Policy, Target>(
     Ok(within.map(|()| analysis))
 }
 
-/// Records each candidate the analysis found at the root as one candidate of
-/// the unit over its field's logical path. A candidate waits on the result
-/// of the type check it needs, and the root's own type check on `measured`,
-/// the analysis's measure (D15:2149, 2184).
-fn root_fields(
+/// Records each candidate the analysis found as one candidate of the unit
+/// over its subject at its scope level. A candidate waits on the result of
+/// the type check it needs, and the root's own type check on `measured`, the
+/// analysis's measure (D15:2149, 2184).
+fn scope_levels<Policy, Target>(
     evaluation: &mut Evaluation,
+    analysis: &StructuralAnalysis<Policy, Target>,
     facts: &Facts,
     measured: &Admitted<()>,
 ) -> Result<(), EvaluationInvariant> {
     let mut paths: BTreeMap<Option<FieldPathId>, Arc<[Box<str>]>> = BTreeMap::new();
+    let mut scopes: BTreeMap<ScopeId, Vec<EntryKey>> = BTreeMap::new();
     let mut typed: BTreeMap<CandidateId, Admitted<()>> = BTreeMap::new();
     for (id, candidate) in facts.identified() {
-        if facts.scope(candidate.scope).level != Level::Root {
-            continue;
-        }
         let (check, code) = match candidate.check {
             facts::Check::Required => (Check::RequiredField, Code::RequiredFieldMissing),
             facts::Check::Type => (Check::FieldType, Code::FieldTypeInvalid),
-            facts::Check::Value => (Check::FieldValue, Code::FieldValueInvalid),
+            facts::Check::Value | facts::Check::Key => (Check::FieldValue, Code::FieldValueInvalid),
             facts::Check::Known => (Check::KnownField, Code::UnknownField),
-            // The keys of `profiles` come with their units (plan 025 PR
-            // 5f-2d-2).
-            facts::Check::Key => continue,
         };
         // The walk records a candidate after the type check it needs.
         let prerequisite = match candidate.after {
@@ -237,22 +294,38 @@ fn root_fields(
                 .clone(),
             None => measured.clone(),
         };
-        let path = paths
-            .entry(candidate.path)
-            .or_insert_with(|| {
-                facts
-                    .steps(candidate.path)
-                    .into_iter()
-                    .map(|step| Box::from(step.name()))
-                    .collect()
-            })
-            .clone();
-        let unit = Unit {
-            phase: Phase::StructuralAdmission,
-            subject: Subject::Structural(StructuralSubject::RootField(Field {
+        // A key's subject is its entry's; a field's, its scope's.
+        let entry = match (candidate.check, candidate.at) {
+            (facts::Check::Key, At::Key(entry)) => Some(entry),
+            _ => None,
+        };
+        let scope = entry.unwrap_or(candidate.scope);
+        let level = facts.scope(scope).level;
+        let keys = scopes
+            .entry(scope)
+            .or_insert_with(|| entry_keys(analysis, facts, scope));
+        let subject = if entry.is_some() {
+            key_subject(level, keys)
+        } else {
+            let path = paths
+                .entry(candidate.path)
+                .or_insert_with(|| {
+                    facts
+                        .steps(candidate.path)
+                        .into_iter()
+                        .map(|step| Box::from(step.name()))
+                        .collect()
+                })
+                .clone();
+            let field = Field {
                 path,
                 at: Some(candidate.at),
-            })),
+            };
+            field_subject(level, keys, field)
+        };
+        let unit = Unit {
+            phase: Phase::StructuralAdmission,
+            subject: Subject::Structural(subject),
             check,
         };
         let result = evaluation.check(unit, prerequisite, |()| match candidate.outcome {
@@ -266,6 +339,73 @@ fn root_fields(
         }
     }
     Ok(())
+}
+
+/// The keys of the entries that hold `scope`, the outermost first: none for
+/// the root.
+fn entry_keys<Policy, Target>(
+    analysis: &StructuralAnalysis<Policy, Target>,
+    facts: &Facts,
+    scope: ScopeId,
+) -> Vec<EntryKey> {
+    let mut keys = Vec::new();
+    let mut next = Some(scope);
+    while let Some(id) = next {
+        let scope = facts.scope(id);
+        if let Some(entry) = scope.entry {
+            keys.push(entry_key(analysis, &entry));
+        }
+        next = scope.parent;
+    }
+    keys.reverse();
+    keys
+}
+
+/// The key of `entry`: its identity when it has the identifier syntax, and
+/// otherwise its content projection with where its key is.
+fn entry_key<Policy, Target>(
+    analysis: &StructuralAnalysis<Policy, Target>,
+    entry: &Entry,
+) -> EntryKey {
+    if entry.admitted {
+        let key = analysis
+            .admitted_key(entry)
+            .expect("an admitted entry is a member of its map");
+        EntryKey::Identity(Arc::from(key))
+    } else {
+        EntryKey::Content(Some(entry.key))
+    }
+}
+
+/// The subject of the key of an entry at `level`, under `keys`, the keys of
+/// the entries that hold it, then its own.
+fn key_subject(level: Level, keys: &[EntryKey]) -> StructuralSubject {
+    match (level, keys) {
+        (Level::Profile, [profile]) => StructuralSubject::ProfileKey(profile.clone()),
+        (Level::Target, [profile, target]) => {
+            StructuralSubject::TargetProfileKey(profile.clone(), target.clone())
+        }
+        (Level::Group, [profile, group]) => {
+            StructuralSubject::DeploymentGroupKey(profile.clone(), group.clone())
+        }
+        _ => unreachable!("an entry's keys are those of the entries above it and its own"),
+    }
+}
+
+/// The subject of `field` at a scope of `level`, under `keys`, the keys of
+/// the entries that hold the scope.
+fn field_subject(level: Level, keys: &[EntryKey], field: Field) -> StructuralSubject {
+    match (level, keys) {
+        (Level::Root, []) => StructuralSubject::RootField(field),
+        (Level::Profile, [profile]) => StructuralSubject::ProfileField(profile.clone(), field),
+        (Level::Target, [profile, target]) => {
+            StructuralSubject::TargetField(profile.clone(), target.clone(), field)
+        }
+        (Level::Group, [profile, group]) => {
+            StructuralSubject::GroupField(profile.clone(), group.clone(), field)
+        }
+        _ => unreachable!("a scope's keys are those of the entries that hold it"),
+    }
 }
 
 /// A structural check's result: `code` when the analysis found its failure.
@@ -304,10 +444,26 @@ fn exceeded<Policy, Target>(analysis: &StructuralAnalysis<Policy, Target>) -> Op
 impl StructuralSubject {
     /// The logical subject of the root's field at `path`.
     pub(crate) fn root(path: &[&str]) -> Self {
-        Self::RootField(Field {
+        Self::RootField(Field::of(path))
+    }
+}
+
+#[cfg(test)]
+impl Field {
+    /// The logical field at `path`.
+    pub(crate) fn of(path: &[&str]) -> Self {
+        Self {
             path: path.iter().map(|&name| Box::from(name)).collect(),
             at: None,
-        })
+        }
+    }
+}
+
+#[cfg(test)]
+impl EntryKey {
+    /// The admitted key `key`.
+    pub(crate) fn identity(key: &str) -> Self {
+        Self::Identity(Arc::from(key))
     }
 }
 
@@ -333,8 +489,11 @@ mod tests {
     use crate::structural::{AuthoringSchema, StructuralLimits};
 
     use super::{
-        admit_structure, selection, StructuralInvariant, StructuralSubject, CAPABILITY, OWNER,
+        admit_structure, selection, EntryKey, Field, StructuralInvariant, StructuralSubject,
+        CAPABILITY, OWNER,
     };
+
+    use StructuralSubject as S;
 
     type Schema = AuthoringSchema<FixturePolicyReference, FixtureTargetReference>;
 
@@ -424,11 +583,38 @@ mod tests {
 
     /// The unit of `check` over the root's field at `path`.
     fn root(path: &[&str], check: Check) -> Unit {
+        level(StructuralSubject::root(path), check)
+    }
+
+    /// The unit of `check` over `subject`.
+    fn level(subject: StructuralSubject, check: Check) -> Unit {
         Unit {
             phase: Phase::StructuralAdmission,
-            subject: Subject::Structural(StructuralSubject::root(path)),
+            subject: Subject::Structural(subject),
             check,
         }
+    }
+
+    /// The unit of `check` over the field of the profile `app` at `path`.
+    fn app(path: &[&str], check: Check) -> Unit {
+        level(
+            S::ProfileField(EntryKey::identity("app"), Field::of(path)),
+            check,
+        )
+    }
+
+    /// Whether `unit` is of a level below the root: an identity map's key or
+    /// a field of its entry.
+    fn below_root(unit: &Unit) -> bool {
+        matches!(&unit.subject, Subject::Structural(subject) if !matches!(subject, S::RootField(_)))
+    }
+
+    /// How many candidates the unit `unit` over a logical subject has.
+    fn candidates(evaluation: &Evaluation, unit: &Unit) -> usize {
+        evaluation
+            .candidates()
+            .filter(|(raw, _)| raw.logical() == *unit)
+            .count()
     }
 
     /// The units of the root's fields of a configuration without `$schema`:
@@ -468,7 +654,15 @@ mod tests {
         let mut expected = units();
         expected.extend(root_units());
         expected.sort();
-        assert_eq!(statuses.keys().cloned().collect::<Vec<_>>(), expected);
+        assert_eq!(
+            statuses
+                .keys()
+                .filter(|unit| !below_root(unit))
+                .cloned()
+                .collect::<Vec<_>>(),
+            expected
+        );
+        assert!(statuses.keys().any(below_root));
         assert!(statuses.values().all(Option::is_none));
     }
 
@@ -534,19 +728,34 @@ mod tests {
         assert_eq!(statuses[&root(&["profiles"], Check::RequiredField)], None);
     }
 
-    /// The root's own type check waits on the analysis's measure, and every
-    /// other check of its fields on the type check of the value that holds
-    /// the field, or of its own value (D15:2149, Decision 015-195).
+    /// Whether a unit waits on the one a test makes block.
+    type Waits<'a> = &'a dyn Fn(&Unit) -> bool;
+
+    /// The root's own type check waits on the analysis's measure, every other
+    /// check of a field on the type check of the value that holds the field,
+    /// or of its own value, an entry's value's type check and its key on the
+    /// map's type check, and so every check under an entry on what its entry
+    /// waits on (D15:2149, Decision 015-195).
     #[test]
-    fn the_roots_fields_wait_on_the_type_checks_they_need() {
-        for (blocked, waiting) in [
-            (CAPABILITY, root_units()),
-            (root(&[], Check::FieldType), root_units()[1..].to_vec()),
-            (
-                root(&["profiles"], Check::FieldType),
-                vec![root(&["profiles"], Check::FieldValue)],
-            ),
-        ] {
+    fn each_check_of_the_scope_levels_waits_on_the_type_checks_it_needs() {
+        let structural = |unit: &Unit| matches!(unit.subject, Subject::Structural(_));
+        let typed = root(&[], Check::FieldType);
+        let profiles = root(&["profiles"], Check::FieldType);
+        let entry = app(&[], Check::FieldType);
+        let cases: [(&Unit, Waits<'_>); 4] = [
+            (&CAPABILITY, &structural),
+            (&typed, &|unit| structural(unit) && *unit != typed),
+            (&profiles, &|unit| {
+                below_root(unit) || *unit == root(&["profiles"], Check::FieldValue)
+            }),
+            // The key of the entry waits on its map, not on the entry's value.
+            (&entry, &|unit| {
+                below_root(unit)
+                    && *unit != entry
+                    && !matches!(unit.subject, Subject::Structural(S::ProfileKey(_)))
+            }),
+        ];
+        for (blocked, waits) in cases {
             let (evaluation, _) = admitted_in(
                 Evaluation::blocking(blocked.clone()),
                 &minimal_config(),
@@ -554,10 +763,158 @@ mod tests {
                 Ok(()),
             );
             for (unit, causes) in statuses(&evaluation) {
-                let expected = waiting.contains(&unit).then(|| vec![blocked.check]);
+                let expected = waits(&unit).then(|| vec![blocked.check]);
                 assert_eq!(causes, expected, "{blocked:?}: {unit:?}");
             }
         }
+    }
+
+    /// Each identity map's entry scopes the subjects under it by its key, and
+    /// its key is a unit of its own: a profile's, and a target's or a group's
+    /// under it (D15:2173, 2190).
+    #[test]
+    fn each_entry_scopes_its_fields_and_has_a_key_of_its_own() {
+        let (evaluation, _) = admitted(&minimal_config(), 1_000_000);
+        let statuses = statuses(&evaluation);
+        let key = EntryKey::identity;
+        for unit in [
+            level(S::ProfileKey(key("app")), Check::FieldValue),
+            app(&[], Check::FieldType),
+            app(&["projectId"], Check::RequiredField),
+            app(&["requestedLocales", "*"], Check::FieldType),
+            level(
+                S::TargetProfileKey(key("app"), key("browser")),
+                Check::FieldValue,
+            ),
+            level(
+                S::TargetField(key("app"), key("browser"), Field::of(&["profile"])),
+                Check::RequiredField,
+            ),
+            level(
+                S::DeploymentGroupKey(key("app"), key("web")),
+                Check::FieldValue,
+            ),
+            level(
+                S::GroupField(key("app"), key("web"), Field::of(&["members", "*"])),
+                Check::FieldValue,
+            ),
+        ] {
+            assert_eq!(statuses.get(&unit), Some(&None), "{unit:?}");
+        }
+    }
+
+    /// Keys without the identifier syntax share one unit, of their content
+    /// projection, while each entry stays a candidate of its own, and so do
+    /// the fields under them; an admitted key keeps its fields apart
+    /// (D15:2184, 2190).
+    #[test]
+    fn entries_whose_keys_fail_join_one_unit_with_a_candidate_each() {
+        let mut value = minimal_config();
+        let declaration = value["profiles"]["app"].clone();
+        value["profiles"]["Bad Key"] = declaration.clone();
+        value["profiles"]["Other Key"] = declaration;
+        let (evaluation, _) = admitted(&value, 1_000_000);
+        let failing = level(S::ProfileKey(EntryKey::Content(None)), Check::FieldValue);
+        assert_eq!(
+            issues(&evaluation),
+            [(failing.clone(), Code::FieldValueInvalid)]
+        );
+        assert_eq!(candidates(&evaluation, &failing), 2);
+        let project = |key| {
+            level(
+                S::ProfileField(key, Field::of(&["projectId"])),
+                Check::FieldType,
+            )
+        };
+        assert_eq!(
+            candidates(&evaluation, &project(EntryKey::Content(None))),
+            2
+        );
+        assert_eq!(
+            candidates(&evaluation, &project(EntryKey::identity("app"))),
+            1
+        );
+        assert_eq!(
+            statuses(&evaluation)[&project(EntryKey::Content(None))],
+            None
+        );
+    }
+
+    /// So do the keys of a profile's targets and groups that fail, each under
+    /// the profile's key, and the fields under them (D15:2190).
+    #[test]
+    fn target_and_group_entries_whose_keys_fail_join_one_unit_each() {
+        let mut value = minimal_config();
+        let declaration = &mut value["profiles"]["app"];
+        let target = declaration["targetProfiles"]["browser"].clone();
+        declaration["targetProfiles"]["Bad Target"] = target.clone();
+        declaration["targetProfiles"]["Other Target"] = target;
+        let group = declaration["deploymentGroups"]["web"].clone();
+        declaration["deploymentGroups"]["Bad Group"] = group.clone();
+        declaration["deploymentGroups"]["Other Group"] = group;
+        let (evaluation, _) = admitted(&value, 1_000_000);
+        let app = || EntryKey::identity("app");
+        let failing = || EntryKey::Content(None);
+        let target_key = level(S::TargetProfileKey(app(), failing()), Check::FieldValue);
+        let group_key = level(S::DeploymentGroupKey(app(), failing()), Check::FieldValue);
+        assert_eq!(
+            issues(&evaluation),
+            [
+                (target_key.clone(), Code::FieldValueInvalid),
+                (group_key.clone(), Code::FieldValueInvalid),
+            ]
+        );
+        for unit in [
+            target_key,
+            group_key,
+            level(
+                S::TargetField(app(), failing(), Field::of(&["profile"])),
+                Check::RequiredField,
+            ),
+            level(
+                S::GroupField(app(), failing(), Field::of(&["members"])),
+                Check::RequiredField,
+            ),
+        ] {
+            assert_eq!(candidates(&evaluation, &unit), 2, "{unit:?}");
+        }
+    }
+
+    /// A field of another type under an entry leaves its closed value to its
+    /// type check, and its elements form no unit (D15:2184).
+    #[test]
+    fn a_field_of_another_type_under_an_entry_has_no_units_below_it() {
+        let mut value = minimal_config();
+        value["profiles"]["app"]["requestedLocales"] = json!("en");
+        let (evaluation, _) = admitted(&value, 1_000_000);
+        assert_eq!(
+            issues(&evaluation),
+            [(
+                app(&["requestedLocales"], Check::FieldType),
+                Code::FieldTypeInvalid
+            )]
+        );
+        let statuses = statuses(&evaluation);
+        assert_eq!(
+            statuses[&app(&["requestedLocales"], Check::FieldValue)],
+            Some(vec![Check::FieldType])
+        );
+        assert!(!statuses.contains_key(&app(&["requestedLocales", "*"], Check::FieldType)));
+    }
+
+    /// Every element of an array is a candidate of the one unit over the
+    /// path with `*`, which reports one Finding when any fails (D15:2184).
+    #[test]
+    fn the_elements_of_an_array_join_one_unit() {
+        let mut value = minimal_config();
+        value["profiles"]["app"]["requestedLocales"] = json!(["en", 1, "ja"]);
+        let (evaluation, _) = admitted(&value, 1_000_000);
+        let element = app(&["requestedLocales", "*"], Check::FieldType);
+        assert_eq!(
+            issues(&evaluation),
+            [(element.clone(), Code::FieldTypeInvalid)]
+        );
+        assert_eq!(candidates(&evaluation, &element), 3);
     }
 
     /// Every undeclared member of the root is a candidate of the one unit of

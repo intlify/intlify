@@ -39,17 +39,18 @@
 //! root-value bounds on both. Structural admission's schema selection waits
 //! along its checks, a `schemaVersion` member on an object root, its string on
 //! the member, and a supported schema on the string, and the analysis's measure
-//! on the supported schema (D15:2008, 2130). A check of the root's fields waits
-//! on the type check of the value that holds the field, or of the field's own
-//! value, and the root's own type check on the analysis's measure (D15:2149,
-//! 2184). The kinds declared only list no prerequisite until their units exist.
-//! No row of a Shared phase lists a check of entry admission: without a value
-//! from entry admission there is no Shared projection, whose absence the
-//! entry's Findings explain, and the phase's first unit requires no check
-//! (D15:2369, 2516). No row of a later phase lists a check of structural
-//! admission or profile selection yet: the resolver starts from a configuration
-//! structural admission admitted whole and the declaration profile selection
-//! selected.
+//! on the supported schema (D15:2008, 2130). A check of a scope level's fields
+//! waits on the type check of the value that holds the field, or of the field's
+//! own value, and an identity map's key on its map's type check; an entry's
+//! value is typed under its map's type check, and the root under the analysis's
+//! measure (D15:2149, 2184). The kinds declared only list no prerequisite until
+//! their units exist. No row of a Shared phase lists a check of entry
+//! admission: without a value from entry admission there is no Shared
+//! projection, whose absence the entry's Findings explain, and the phase's
+//! first unit requires no check (D15:2369, 2516). No row of a later phase lists
+//! a check of structural admission or profile selection yet: the resolver
+//! starts from a configuration structural admission admitted whole and the
+//! declaration profile selection selected.
 //!
 //! A row's Finding codes are those its units may report, a notice included,
 //! in 015's table order: what the resolver's checks report, and for the kinds
@@ -133,7 +134,7 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:3311dd0f5308945cf64a7c60321f1a8bc12fd3d0c2d72dff692c144a6046c2bc";
+    "sha256:6103f9bc6fa41de72b83a26334043e9372c7a7fee75c41e3aa27ea37d341460d";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
@@ -1146,10 +1147,11 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         K::CapabilityStructuralAnalysis => {
             &[&["structural.schema-selection.supported-schema-version"]]
         }
-        // A root field's checks wait on the type check of the value that
-        // holds the field, or of the field's own value; the root's own type
-        // check waits on the analysis's measure. A type check thus waits on
-        // the same check of the path that contains it (D15:2149, 2184,
+        // A scope level's checks wait on the type check of the value that
+        // holds the field, or of the field's own value, and a key on the type
+        // check of its map; an entry's value is typed under its map's type,
+        // and the root under the analysis's measure. A type check thus waits
+        // on the same check of the path that contains it (D15:2149, 2184,
         // Decision 015-195).
         K::RootField => &[
             &["structural.root.field-type"],
@@ -1159,6 +1161,35 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
             ],
             &["structural.root.field-type"],
             &["structural.root.field-type"],
+        ],
+        K::ProfileKey => &[&["structural.root.field-type"]],
+        K::ProfileField => &[
+            &["structural.profile.field-type"],
+            &[
+                "structural.root.field-type",
+                "structural.profile.field-type",
+            ],
+            &["structural.profile.field-type"],
+            &["structural.profile.field-type"],
+        ],
+        K::TargetProfileKey | K::DeploymentGroupKey => &[&["structural.profile.field-type"]],
+        K::TargetField => &[
+            &["structural.target.field-type"],
+            &[
+                "structural.profile.field-type",
+                "structural.target.field-type",
+            ],
+            &["structural.target.field-type"],
+            &["structural.target.field-type"],
+        ],
+        K::GroupField => &[
+            &["structural.group.field-type"],
+            &[
+                "structural.profile.field-type",
+                "structural.group.field-type",
+            ],
+            &["structural.group.field-type"],
+            &["structural.group.field-type"],
         ],
         // The parser's tokens wait on the file's bytes and strict JSON on the
         // tokens; duplicate members and the JSON-compatible domain need a
@@ -1471,13 +1502,8 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
             "hydration.target.single-role",
         ]],
         // Declared only: their units come with their phases' Findings.
-        K::ProfileKey
-        | K::TargetProfileKey
-        | K::DeploymentGroupKey
-        | K::CapabilityProfiles
-        | K::CapabilityProfileId
-        | K::DiagnosticDomain => &[NOT_YET],
-        K::ProfileField | K::TargetField | K::GroupField | K::ProfileSelector => &[NOT_YET; 4],
+        K::CapabilityProfiles | K::CapabilityProfileId | K::DiagnosticDomain => &[NOT_YET],
+        K::ProfileSelector => &[NOT_YET; 4],
     }
 }
 
@@ -2649,7 +2675,7 @@ mod tests {
             .filter(|row| row.subject_kind.declared_only())
             .map(|row| row.check_id.as_str())
             .collect();
-        assert_eq!(declared.len(), 22);
+        assert_eq!(declared.len(), 7);
         for row in &rows {
             if row.subject_kind.declared_only() {
                 assert!(row.prerequisite_check_ids.is_empty(), "{}", row.check_id);

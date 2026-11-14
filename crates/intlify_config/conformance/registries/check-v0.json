@@ -888,7 +888,9 @@
       "owningScope": "profiles",
       "subjectKindRank": "4",
       "checkRank": "0",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.root.field-type"
+      ],
       "possibleFindingCodes": [
         "project-profile-field-value-invalid"
       ],
@@ -926,7 +928,9 @@
       },
       "subjectKindRank": "5",
       "checkRank": "0",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.profile.field-type"
+      ],
       "possibleFindingCodes": [
         "project-profile-required-field-missing"
       ],
@@ -964,7 +968,10 @@
       },
       "subjectKindRank": "5",
       "checkRank": "1",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.root.field-type",
+        "structural.profile.field-type"
+      ],
       "possibleFindingCodes": [
         "project-profile-field-type-invalid"
       ],
@@ -1002,7 +1009,9 @@
       },
       "subjectKindRank": "5",
       "checkRank": "2",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.profile.field-type"
+      ],
       "possibleFindingCodes": [
         "project-profile-field-value-invalid"
       ],
@@ -1040,7 +1049,9 @@
       },
       "subjectKindRank": "5",
       "checkRank": "3",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.profile.field-type"
+      ],
       "possibleFindingCodes": [
         "project-profile-unknown-field"
       ],
@@ -1078,7 +1089,9 @@
       },
       "subjectKindRank": "6",
       "checkRank": "0",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.profile.field-type"
+      ],
       "possibleFindingCodes": [
         "project-profile-field-value-invalid"
       ],
@@ -1116,7 +1129,9 @@
       },
       "subjectKindRank": "7",
       "checkRank": "0",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.target.field-type"
+      ],
       "possibleFindingCodes": [
         "project-profile-required-field-missing"
       ],
@@ -1154,7 +1169,10 @@
       },
       "subjectKindRank": "7",
       "checkRank": "1",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.profile.field-type",
+        "structural.target.field-type"
+      ],
       "possibleFindingCodes": [
         "project-profile-field-type-invalid"
       ],
@@ -1192,7 +1210,9 @@
       },
       "subjectKindRank": "7",
       "checkRank": "2",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.target.field-type"
+      ],
       "possibleFindingCodes": [
         "project-profile-field-value-invalid"
       ],
@@ -1230,7 +1250,9 @@
       },
       "subjectKindRank": "7",
       "checkRank": "3",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.target.field-type"
+      ],
       "possibleFindingCodes": [
         "project-profile-unknown-field"
       ],
@@ -1268,7 +1290,9 @@
       },
       "subjectKindRank": "8",
       "checkRank": "0",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.profile.field-type"
+      ],
       "possibleFindingCodes": [
         "project-profile-field-value-invalid"
       ],
@@ -1306,7 +1330,9 @@
       },
       "subjectKindRank": "9",
       "checkRank": "0",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.group.field-type"
+      ],
       "possibleFindingCodes": [
         "project-profile-required-field-missing"
       ],
@@ -1344,7 +1370,10 @@
       },
       "subjectKindRank": "9",
       "checkRank": "1",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.profile.field-type",
+        "structural.group.field-type"
+      ],
       "possibleFindingCodes": [
         "project-profile-field-type-invalid"
       ],
@@ -1382,7 +1411,9 @@
       },
       "subjectKindRank": "9",
       "checkRank": "2",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.group.field-type"
+      ],
       "possibleFindingCodes": [
         "project-profile-field-value-invalid"
       ],
@@ -1420,7 +1451,9 @@
       },
       "subjectKindRank": "9",
       "checkRank": "3",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.group.field-type"
+      ],
       "possibleFindingCodes": [
         "project-profile-unknown-field"
       ],
