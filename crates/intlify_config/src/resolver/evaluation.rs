@@ -45,6 +45,7 @@ use super::limits::BoundId;
 use super::locales::LocaleSubject;
 use super::negotiation::NegotiationSubject;
 use super::occurrence::OccurrenceCandidate;
+use super::profile_selection::SelectionSubject;
 use super::resource_policy::{PolicySubject, ReferenceField};
 use super::specification::Slot;
 use super::structural_admission::StructuralSubject;
@@ -140,6 +141,8 @@ pub(crate) enum Subject {
     StructuralCapability,
     /// A field of one of structural admission's scope levels.
     Structural(StructuralSubject),
+    /// The declarations, or one declared Profile ID, under the capability.
+    Selection(SelectionSubject),
     /// The Intent Surface-Class Vocabulary Artifact, a singleton.
     Vocabulary,
     /// The Locale Canonicalization Data Artifact, a singleton.

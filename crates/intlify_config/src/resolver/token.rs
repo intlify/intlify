@@ -55,6 +55,7 @@ use super::groups::GroupSubject;
 use super::hydration::{EndpointField, HydrationSubject};
 use super::locales::{Content, LocaleKey, LocaleSubject};
 use super::negotiation::NegotiationSubject;
+use super::profile_selection::SelectionSubject;
 use super::resource_policy::{ArtifactSubject, PolicySubject, ReferenceField};
 use super::structural_admission::{EntryKey, Field, StructuralSubject};
 use super::subject::SubjectKind;
@@ -119,6 +120,7 @@ pub(crate) fn logical(subject: &Subject) -> Subject {
         | Subject::MaterializedDependencies
         | Subject::SchemaSelection
         | Subject::StructuralCapability
+        | Subject::Selection(_)
         | Subject::Vocabulary
         | Subject::CanonicalizationData
         | Subject::DeclarationField(_)
@@ -426,6 +428,10 @@ fn own(subject: &Subject) -> (Own<'_>, Option<Subject>) {
         | Subject::CanonicalizationData
         | Subject::SemanticDependency(_) => alone(Own::Singleton),
         Subject::Structural(structural) => structural_own(structural),
+        Subject::Selection(selection) => alone(match selection {
+            SelectionSubject::Profiles => Own::Singleton,
+            SelectionSubject::ProfileId(profile) => identity(profile.as_str()),
+        }),
         Subject::ResourcePolicy(policy) => alone(match policy {
             PolicySubject::Capability(artifact) | PolicySubject::Recheck(artifact) => {
                 match artifact {
@@ -670,6 +676,7 @@ mod tests {
     use crate::resolver::locales::fixtures::{canonical, content, key, target};
     use crate::resolver::locales::{Content, LocaleSubject};
     use crate::resolver::negotiation::NegotiationSubject;
+    use crate::resolver::profile_selection::SelectionSubject;
     use crate::resolver::resource_policy::{
         ArtifactSubject, PolicySlot, PolicySubject, ReferenceField,
     };
@@ -789,6 +796,10 @@ mod tests {
                 EntryKey::identity("app"),
                 EntryKey::Content(None),
                 Field::of(&["members"]),
+            )),
+            Subject::Selection(SelectionSubject::Profiles),
+            Subject::Selection(SelectionSubject::ProfileId(
+                serde_json::from_value::<ProfileId>(json!("app")).unwrap(),
             )),
             Subject::Vocabulary,
             Subject::CanonicalizationData,
@@ -1045,6 +1056,16 @@ mod tests {
                     parent(json!({ "identity": "app" }), site.clone()),
                     json!([]),
                 ),
+            ),
+            (
+                Subject::Selection(SelectionSubject::Profiles),
+                json!("capability-profiles"),
+            ),
+            (
+                Subject::Selection(SelectionSubject::ProfileId(
+                    serde_json::from_value::<ProfileId>(json!("app")).unwrap(),
+                )),
+                json!({ "identity": "app" }),
             ),
             (Subject::Vocabulary, json!("vocabulary")),
             (

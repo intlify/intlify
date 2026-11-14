@@ -37,6 +37,7 @@ pub(crate) mod negotiation;
 pub(crate) mod occurrence;
 pub(crate) mod origin;
 pub(crate) mod profile_resolution;
+pub(crate) mod profile_selection;
 pub(crate) mod profile_view;
 pub(crate) mod record_view;
 pub(crate) mod resource_policy;

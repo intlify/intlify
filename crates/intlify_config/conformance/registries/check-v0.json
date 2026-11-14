@@ -1516,7 +1516,9 @@
       "owningScope": "capability-profiles",
       "subjectKindRank": "0",
       "checkRank": "0",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.root.required-field"
+      ],
       "possibleFindingCodes": [
         "project-profile-resource-limit-exceeded"
       ],
@@ -1555,7 +1557,9 @@
       "owningScope": "profiles",
       "subjectKindRank": "1",
       "checkRank": "0",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.profile-key.field-value"
+      ],
       "possibleFindingCodes": [
         "project-profile-resource-limit-exceeded"
       ],

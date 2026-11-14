@@ -43,8 +43,11 @@
 //! waits on the type check of the value that holds the field, or of the field's
 //! own value, and an identity map's key on its map's type check; an entry's
 //! value is typed under its map's type check, and the root under the analysis's
-//! measure (D15:2149, 2184). The kinds declared only list no prerequisite until
-//! their units exist. No row of a Shared phase lists a check of entry
+//! measure (D15:2149, 2184). Profile selection counts the declarations once
+//! structural admission admitted the `profiles` object, and checks a declared
+//! Profile ID once it admitted the key, which alone names the ID's subject
+//! (D15:2131, 2184). The kinds declared only list no prerequisite until their
+//! units exist. No row of a Shared phase lists a check of entry
 //! admission: without a value from entry admission there is no Shared
 //! projection, whose absence the entry's Findings explain, and the phase's
 //! first unit requires no check (D15:2369, 2516). No row of a later phase lists
@@ -134,7 +137,7 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:6103f9bc6fa41de72b83a26334043e9372c7a7fee75c41e3aa27ea37d341460d";
+    "sha256:77f72567b363eae78b1ca620ebf6c2d38683809f413541fa6eb8584f5f564104";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
@@ -1501,8 +1504,14 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
             "hydration.relation.static-compatibility",
             "hydration.target.single-role",
         ]],
+        // Profile selection counts the declarations once structural
+        // admission admitted the `profiles` object, its required check
+        // waiting on the type checks, and checks a declared Profile ID once
+        // it admitted the key (D15:2131, 2184).
+        K::CapabilityProfiles => &[&["structural.root.required-field"]],
+        K::CapabilityProfileId => &[&["structural.profile-key.field-value"]],
         // Declared only: their units come with their phases' Findings.
-        K::CapabilityProfiles | K::CapabilityProfileId | K::DiagnosticDomain => &[NOT_YET],
+        K::DiagnosticDomain => &[NOT_YET],
         K::ProfileSelector => &[NOT_YET; 4],
     }
 }
@@ -2675,7 +2684,7 @@ mod tests {
             .filter(|row| row.subject_kind.declared_only())
             .map(|row| row.check_id.as_str())
             .collect();
-        assert_eq!(declared.len(), 7);
+        assert_eq!(declared.len(), 5);
         for row in &rows {
             if row.subject_kind.declared_only() {
                 assert!(row.prerequisite_check_ids.is_empty(), "{}", row.check_id);
