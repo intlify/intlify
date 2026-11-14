@@ -7,9 +7,9 @@
 //! limits, decoding only member names needed for duplicate detection. It stops
 //! only at the token bound or the first byte that is not UTF-8 or not strict
 //! JSON; past a duplicate member or a value outside the JSON-compatible domain
-//! it continues, and reports every one in the complete file (D15:802, Decision
-//! 015-150). Complete logical counts are checked before constructing any
-//! materialized value nodes. Rejected input never yields an authoritative
+//! it continues, and reports every one in the complete file with its internal
+//! structural path (D15:802, Decision 015-150). Complete logical counts are
+//! checked before constructing any materialized value nodes. Rejected input never yields an authoritative
 //! prefix. The index and parser stack use ordinary safe collections; nested
 //! values contain indices, so successful and failed cleanup do not recurse.
 //!
@@ -166,7 +166,8 @@ pub(crate) enum InputFailure {
 
 /// What keeps a completely parsed file from being materialized, each in source
 /// order: every duplicate member, every value outside the JSON-compatible
-/// domain, and every root-value bound the complete value exceeds.
+/// domain, and every root-value bound the complete value exceeds, with the
+/// internal structural paths the facts were found at.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Inadmissible {
     pub(crate) duplicates: Vec<DuplicateMember>,
@@ -176,24 +177,83 @@ pub(crate) struct Inadmissible {
     pub(crate) violations: Vec<LimitViolation>,
     /// Each string value and member name longer than `maxSingleStringBytes`,
     /// which 015 checks one occurrence at a time.
-    pub(crate) long_strings: Vec<ByteSpan>,
+    pub(crate) long_strings: Vec<LongString>,
+    pub(crate) paths: Paths,
 }
 
-/// A member of an object after the first member with its name: its key, and
-/// the keys of every other member with the name, the first included
-/// (Decision 015-194).
+/// A member of an object after the first member with its name: its key, the
+/// keys of every other member with the name, the first included (Decision
+/// 015-194), and its own path, which ends at its key.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DuplicateMember {
     pub(crate) key: ByteSpan,
     pub(crate) others: Vec<ByteSpan>,
+    pub(crate) path: PathId,
 }
 
 /// A string value or member name outside the Unicode scalar domain, or a
-/// number outside the Portable JSON Number domain, at its token (D15:2289).
+/// number outside the Portable JSON Number domain, at its token and at the
+/// path of the value or member (D15:2289).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct IncompatibleValue {
     pub(crate) reason: Incompatibility,
     pub(crate) span: ByteSpan,
+    pub(crate) path: Option<PathId>,
+}
+
+/// A string value or member name longer than `maxSingleStringBytes`, at its
+/// token and at the path of the value or member.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct LongString {
+    pub(crate) span: ByteSpan,
+    pub(crate) path: Option<PathId>,
+}
+
+/// One step of an internal structural path from the root: a member, by the
+/// span of its key, or an array element, by its index from 0. A step holds no
+/// member name, so no path exposes one (D15:776).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PathStep {
+    Member(ByteSpan),
+    Index(u64),
+}
+
+/// A member or array element of a completely parsed file, in its [`Paths`].
+/// The root, which no step reaches, is the absence of one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PathId(usize);
+
+/// The internal structural paths a completely parsed file's facts were found
+/// at (D15:802): each member and array element on one of them, after the one
+/// that contains it, so facts share their common prefixes.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct Paths(Vec<(Option<PathId>, PathStep)>);
+
+impl Paths {
+    /// The steps from the root to `place`, none for the root.
+    pub(crate) fn steps(&self, place: Option<PathId>) -> Vec<PathStep> {
+        let mut steps = Vec::new();
+        let mut next = place;
+        while let Some(PathId(index)) = next {
+            let (parent, step) = self.0[index];
+            steps.push(step);
+            next = parent;
+        }
+        steps.reverse();
+        steps
+    }
+
+    /// How many members and elements the paths hold.
+    #[cfg(test)]
+    pub(crate) fn entered(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Enters `step` after `parent`.
+    fn push(&mut self, parent: Option<PathId>, step: PathStep) -> PathId {
+        self.0.push((parent, step));
+        PathId(self.0.len() - 1)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -252,6 +312,7 @@ pub(crate) fn materialize_file(
                 incompatible: parsed.incompatible,
                 violations,
                 long_strings: parsed.long_strings,
+                paths: parsed.paths,
             })),
             progress: progress(
                 parsed.counts.parser_tokens,

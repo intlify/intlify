@@ -6,16 +6,19 @@
 //! counting. Parsing stops only at the token bound or at the first byte that
 //! is not UTF-8 or not strict JSON. Past a duplicate member, a lone surrogate,
 //! or a number outside the Portable JSON Number domain it continues, so the
-//! complete file's facts are known (D15:802, Decision 015-150). The raw-token
-//! index and active member-name indexes are bounded by the raw capability.
-//! Materialized value allocation starts only after this pass and admission of
-//! the complete value both succeed.
+//! complete file's facts are known (D15:802, Decision 015-150). Each fact
+//! keeps the internal structural path of its value or member: the parser
+//! follows the current path, and enters it into [`Paths`] only when a fact
+//! is found there, so a file without facts enters none. The raw-token index,
+//! the current path, and active member-name indexes are bounded by the raw
+//! capability. Materialized value allocation starts only after this pass and
+//! admission of the complete value both succeed.
 
 use std::collections::BTreeMap;
 
 use super::{
     byte_count, lex::Lexer, ByteSpan, DuplicateMember, Incompatibility, IncompatibleValue,
-    InputCounts, InputFailure, Token, TokenKind,
+    InputCounts, InputFailure, LongString, PathId, PathStep, Paths, Token, TokenKind,
 };
 use crate::input_limits::{Bound, RawInputLimits, ValueCounts};
 
@@ -31,9 +34,11 @@ enum Action {
     ArrayNext {
         depth: u64,
         allow_end: bool,
+        index: u64,
     },
     ArrayDelimiter {
         depth: u64,
+        index: u64,
     },
     ObjectNext {
         seen: SeenMembers,
@@ -53,7 +58,8 @@ pub(super) struct Parsed {
     pub(super) duplicates: Vec<DuplicateMember>,
     pub(super) incompatible: Vec<IncompatibleValue>,
     /// Each string value and member name longer than the single-string bound.
-    pub(super) long_strings: Vec<ByteSpan>,
+    pub(super) long_strings: Vec<LongString>,
+    pub(super) paths: Paths,
 }
 
 /// Why parsing stopped, and how many tokens it visited.
@@ -77,6 +83,8 @@ pub(super) fn parse(
         duplicates: Vec::new(),
         incompatible: Vec::new(),
         long_strings: Vec::new(),
+        path: Vec::new(),
+        paths: Paths::default(),
     };
     match parser.parse() {
         Ok(()) => Ok(parser.finish()),
@@ -96,7 +104,16 @@ struct Parser<'source> {
     max_single_string_bytes: Bound,
     duplicates: Vec<DuplicateMember>,
     incompatible: Vec<IncompatibleValue>,
-    long_strings: Vec<ByteSpan>,
+    long_strings: Vec<LongString>,
+    /// The current path: the steps to the value or member being parsed, each
+    /// with its place once a fact needed it.
+    path: Vec<(PathStep, Option<PathId>)>,
+    paths: Paths,
+}
+
+/// The length of the path to a value at `depth`, the root's being 1.
+fn length(depth: u64) -> usize {
+    usize::try_from(depth).expect("a depth is at most the parser stack's length") - 1
 }
 
 impl Parser<'_> {
@@ -108,8 +125,12 @@ impl Parser<'_> {
                     let token = self.token()?;
                     self.value(depth, token)?;
                 }
-                Action::ArrayNext { depth, allow_end } => self.array_next(depth, allow_end)?,
-                Action::ArrayDelimiter { depth } => self.array_delimiter(depth)?,
+                Action::ArrayNext {
+                    depth,
+                    allow_end,
+                    index,
+                } => self.array_next(depth, allow_end, index)?,
+                Action::ArrayDelimiter { depth, index } => self.array_delimiter(depth, index)?,
                 Action::ObjectNext {
                     seen,
                     depth,
@@ -137,7 +158,25 @@ impl Parser<'_> {
             duplicates: self.duplicates,
             incompatible: self.incompatible,
             long_strings: self.long_strings,
+            paths: self.paths,
         }
+    }
+
+    /// Enters a member or element of the container at `depth`: the steps to
+    /// the container, then `step`.
+    fn enter(&mut self, depth: u64, step: PathStep) {
+        self.path.truncate(length(depth));
+        self.path.push((step, None));
+    }
+
+    /// The place of the value or member whose path is the first `length`
+    /// steps of the current path, entered into `paths` with its prefixes.
+    fn place(&mut self, length: usize) -> Option<PathId> {
+        let mut parent = None;
+        for (step, place) in &mut self.path[..length] {
+            parent = Some(*place.get_or_insert_with(|| self.paths.push(parent, *step)));
+        }
+        parent
     }
 
     fn token(&mut self) -> Result<Token, InputFailure> {
@@ -148,17 +187,26 @@ impl Parser<'_> {
 
     /// Counts a string value or member name, and records whether it is
     /// longer than the single-string bound or outside the Unicode scalar
-    /// domain.
-    fn string(&mut self, decoded: u64, scalar: bool, span: ByteSpan) -> Result<(), InputFailure> {
+    /// domain, at the place whose path is the first `length` steps.
+    fn string(
+        &mut self,
+        decoded: u64,
+        scalar: bool,
+        span: ByteSpan,
+        length: usize,
+    ) -> Result<(), InputFailure> {
         self.counts.total_string_bytes = self.lexer.add(self.counts.total_string_bytes, decoded)?;
         self.counts.single_string_bytes = self.counts.single_string_bytes.max(decoded);
         if decoded > self.max_single_string_bytes.get() {
-            self.long_strings.push(span);
+            let path = self.place(length);
+            self.long_strings.push(LongString { span, path });
         }
         if !scalar {
+            let path = self.place(length);
             self.incompatible.push(IncompatibleValue {
                 reason: Incompatibility::InvalidUnicode,
                 span,
+                path,
             });
         }
         Ok(())
@@ -167,14 +215,21 @@ impl Parser<'_> {
     fn value(&mut self, depth: u64, token: Token) -> Result<(), InputFailure> {
         match token.kind {
             TokenKind::Null | TokenKind::Boolean(_) | TokenKind::Number(Some(_)) => {}
-            TokenKind::Number(None) => self.incompatible.push(IncompatibleValue {
-                reason: Incompatibility::NonPortableNumber,
-                span: token.span,
-            }),
-            TokenKind::String { decoded, scalar } => self.string(decoded, scalar, token.span)?,
+            TokenKind::Number(None) => {
+                let path = self.place(length(depth));
+                self.incompatible.push(IncompatibleValue {
+                    reason: Incompatibility::NonPortableNumber,
+                    span: token.span,
+                    path,
+                });
+            }
+            TokenKind::String { decoded, scalar } => {
+                self.string(decoded, scalar, token.span, length(depth))?;
+            }
             TokenKind::OpenArray => self.actions.push(Action::ArrayNext {
                 depth,
                 allow_end: true,
+                index: 0,
             }),
             TokenKind::OpenObject => self.actions.push(Action::ObjectNext {
                 seen: SeenMembers::new(),
@@ -188,23 +243,25 @@ impl Parser<'_> {
         Ok(())
     }
 
-    fn array_next(&mut self, depth: u64, allow_end: bool) -> Result<(), InputFailure> {
+    fn array_next(&mut self, depth: u64, allow_end: bool, index: u64) -> Result<(), InputFailure> {
         let token = self.token()?;
         if allow_end && matches!(token.kind, TokenKind::CloseArray) {
             return Ok(());
         }
-        self.actions.push(Action::ArrayDelimiter { depth });
+        self.actions.push(Action::ArrayDelimiter { depth, index });
         self.counts.collection_entries = self.lexer.add(self.counts.collection_entries, 1)?;
+        self.enter(depth, PathStep::Index(index));
         self.value(self.lexer.add(depth, 1)?, token)
     }
 
-    fn array_delimiter(&mut self, depth: u64) -> Result<(), InputFailure> {
+    fn array_delimiter(&mut self, depth: u64, index: u64) -> Result<(), InputFailure> {
         let token = self.token()?;
         match token.kind {
             TokenKind::CloseArray => {}
             TokenKind::Comma => self.actions.push(Action::ArrayNext {
                 depth,
                 allow_end: false,
+                index: self.lexer.add(index, 1)?,
             }),
             _ => return Err(InputFailure::Syntax { span: token.span }),
         }
@@ -219,13 +276,14 @@ impl Parser<'_> {
     ) -> Result<(), InputFailure> {
         let token = self.token()?;
         if allow_end && matches!(token.kind, TokenKind::CloseObject) {
-            self.close(seen);
+            self.close(seen, depth);
             return Ok(());
         }
         let TokenKind::String { decoded, scalar } = token.kind else {
             return Err(InputFailure::Syntax { span: token.span });
         };
-        self.string(decoded, scalar, token.span)?;
+        self.enter(depth, PathStep::Member(token.span));
+        self.string(decoded, scalar, token.span, length(depth) + 1)?;
         seen.entry(name_units(self.source, token.span))
             .or_default()
             .push(token.span);
@@ -244,7 +302,7 @@ impl Parser<'_> {
     fn object_delimiter(&mut self, seen: SeenMembers, depth: u64) -> Result<(), InputFailure> {
         let token = self.token()?;
         match token.kind {
-            TokenKind::CloseObject => self.close(seen),
+            TokenKind::CloseObject => self.close(seen, depth),
             TokenKind::Comma => self.actions.push(Action::ObjectNext {
                 seen,
                 depth,
@@ -255,11 +313,14 @@ impl Parser<'_> {
         Ok(())
     }
 
-    /// Records the duplicates of a closed object: each member after the first
-    /// with its name, with every other member of the name, the first
-    /// included, as the others (Decision 015-194).
-    fn close(&mut self, seen: SeenMembers) {
+    /// Records the duplicates of the closed object at `depth`: each member
+    /// after the first with its name, with every other member of the name,
+    /// the first included, as the others (Decision 015-194), at the object's
+    /// path and then its key.
+    fn close(&mut self, seen: SeenMembers, depth: u64) {
+        let mut object = None;
         for spans in seen.into_values().filter(|spans| spans.len() > 1) {
+            let object = *object.get_or_insert_with(|| self.place(length(depth)));
             for (index, &key) in spans.iter().enumerate().skip(1) {
                 let others = spans
                     .iter()
@@ -267,7 +328,8 @@ impl Parser<'_> {
                     .filter(|&(other, _)| other != index)
                     .map(|(_, &span)| span)
                     .collect();
-                self.duplicates.push(DuplicateMember { key, others });
+                let path = self.paths.push(object, PathStep::Member(key));
+                self.duplicates.push(DuplicateMember { key, others, path });
             }
         }
     }

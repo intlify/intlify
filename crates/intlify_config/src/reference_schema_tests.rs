@@ -434,7 +434,7 @@ fn formal_reference_strings_remain_subject_to_entry_capacity() {
     assert!(facts
         .long_strings
         .iter()
-        .all(|span| span.end_byte() - span.start_byte() == 73));
+        .all(|string| string.span.end_byte() - string.span.start_byte() == 73));
 }
 
 #[test]
