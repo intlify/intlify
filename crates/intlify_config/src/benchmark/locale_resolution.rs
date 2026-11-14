@@ -517,6 +517,7 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Subject::MaterializedDependencies
         | Subject::SchemaSelection
         | Subject::StructuralCapability
+        | Subject::Structural(_)
         | Subject::Vocabulary
         | Subject::CanonicalizationData
         | Subject::ResourcePolicy(_)

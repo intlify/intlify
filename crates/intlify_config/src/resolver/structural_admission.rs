@@ -13,15 +13,26 @@
 //! `profileSpecification` group's owner, the phase's last kind, waits on
 //! Phase 0 alone (D15:2516).
 //!
-//! The scope levels' units come with their Findings (plan 025 PR 5f-2d);
-//! until then the analysis these checks admit is what later phases read, and
-//! a configuration structural admission does not admit whole starts no
-//! semantic phase. Phase 2's Findings carry their occurrences once its
-//! Evidence comes (plan 025 PR 5f-2e).
+//! Each evaluation of a structural check the analysis found at the root is
+//! a candidate of the unit over its field's logical path: a required member,
+//! a value's type, a value's closed constraints, or the root's undeclared
+//! members (D15:2173, 2184). A candidate waits on the type check of the
+//! value that holds it, or of its own value, and the root's own type check
+//! waits on the analysis's measure (D15:2149, Decision 015-195). A value
+//! whose type check failed is that check's to report, so its other checks
+//! are not evaluated (D15:2184).
+//!
+//! The identity maps' keys and the fields of their entries come with their
+//! units (plan 025 PR 5f-2d-2); until then the analysis these checks admit
+//! is what later phases read, and a configuration structural admission does
+//! not admit whole starts no semantic phase. Phase 2's Findings carry their
+//! occurrences once its Evidence comes (plan 025 PR 5f-2e).
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::materialize::MaterializedDocument;
+use crate::structural::facts::{self, At, CandidateId, Facts, FieldPathId, Level, Outcome};
 use crate::structural::{
     AdmissionInvariant, AuthoringSchema, StructuralAnalysis, StructuralFailure, StructuralLimits,
 };
@@ -55,6 +66,46 @@ pub(crate) const CAPABILITY: Unit = Unit {
     subject: Subject::StructuralCapability,
     check: Check::WithinCapability,
 };
+
+/// A subject of structural admission's scope levels: a field of the root, by
+/// its logical path (D15:2173, 2180). The identity maps' keys and the fields
+/// of their entries come with their units (plan 025 PR 5f-2d-2).
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum StructuralSubject {
+    /// A field of the root.
+    RootField(Field),
+}
+
+impl StructuralSubject {
+    /// The logical subject, which every raw candidate of the unit joins: the
+    /// field without where a candidate looked (D15:2184).
+    pub(crate) fn logical(&self) -> Self {
+        match self {
+            Self::RootField(field) => Self::RootField(field.logical()),
+        }
+    }
+}
+
+/// A field: its logical path from its entry, in the schema's member names
+/// and `*` for an array element or an entry of a map whose keys are not
+/// identities, and where one raw candidate of its unit looked (D15:2180,
+/// 2184). Paths order segment by segment by their bytes, a shorter exact
+/// prefix first.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Field {
+    pub(crate) path: Arc<[Box<str>]>,
+    /// None for the logical subject.
+    pub(crate) at: Option<At>,
+}
+
+impl Field {
+    fn logical(&self) -> Self {
+        Self {
+            path: Arc::clone(&self.path),
+            at: None,
+        }
+    }
+}
 
 /// The bound the analysis is measured against.
 const UNITS: BoundId = BoundId {
@@ -139,6 +190,11 @@ pub(crate) fn admit_structure<Policy, Target>(
     if within.is_ok() && analysis.structural_units().is_none() {
         return Err(StructuralInvariant::UnreportedFailure);
     }
+    // An analysis past the capability stopped before its candidates, which
+    // alone name the fields' subjects.
+    if let Some(facts) = analysis.facts() {
+        root_fields(evaluation, facts, &within)?;
+    }
     // The assertion Phase 0 admitted never selects structure: only the owner
     // of the group it establishes waits on it.
     own(
@@ -149,8 +205,71 @@ pub(crate) fn admit_structure<Policy, Target>(
     Ok(within.map(|()| analysis))
 }
 
-/// The selection check's result: `code` when the analysis found its failure.
-/// The code's field is the path the check reads, which the unit names.
+/// Records each candidate the analysis found at the root as one candidate of
+/// the unit over its field's logical path. A candidate waits on the result
+/// of the type check it needs, and the root's own type check on `measured`,
+/// the analysis's measure (D15:2149, 2184).
+fn root_fields(
+    evaluation: &mut Evaluation,
+    facts: &Facts,
+    measured: &Admitted<()>,
+) -> Result<(), EvaluationInvariant> {
+    let mut paths: BTreeMap<Option<FieldPathId>, Arc<[Box<str>]>> = BTreeMap::new();
+    let mut typed: BTreeMap<CandidateId, Admitted<()>> = BTreeMap::new();
+    for (id, candidate) in facts.identified() {
+        if facts.scope(candidate.scope).level != Level::Root {
+            continue;
+        }
+        let (check, code) = match candidate.check {
+            facts::Check::Required => (Check::RequiredField, Code::RequiredFieldMissing),
+            facts::Check::Type => (Check::FieldType, Code::FieldTypeInvalid),
+            facts::Check::Value => (Check::FieldValue, Code::FieldValueInvalid),
+            facts::Check::Known => (Check::KnownField, Code::UnknownField),
+            // The keys of `profiles` come with their units (plan 025 PR
+            // 5f-2d-2).
+            facts::Check::Key => continue,
+        };
+        // The walk records a candidate after the type check it needs.
+        let prerequisite = match candidate.after {
+            Some(after) => typed
+                .get(&after)
+                .expect("a type check is recorded before what needs it")
+                .clone(),
+            None => measured.clone(),
+        };
+        let path = paths
+            .entry(candidate.path)
+            .or_insert_with(|| {
+                facts
+                    .steps(candidate.path)
+                    .into_iter()
+                    .map(|step| Box::from(step.name()))
+                    .collect()
+            })
+            .clone();
+        let unit = Unit {
+            phase: Phase::StructuralAdmission,
+            subject: Subject::Structural(StructuralSubject::RootField(Field {
+                path,
+                at: Some(candidate.at),
+            })),
+            check,
+        };
+        let result = evaluation.check(unit, prerequisite, |()| match candidate.outcome {
+            Outcome::Passed => Ok(()),
+            Outcome::Failed => rejected(true, code),
+            // The value's failed type check is what it needs.
+            Outcome::Excluded => unreachable!("an excluded value's type check failed"),
+        })?;
+        if candidate.check == facts::Check::Type {
+            typed.insert(id, result);
+        }
+    }
+    Ok(())
+}
+
+/// A structural check's result: `code` when the analysis found its failure.
+/// The code's field is the path the unit names.
 const fn rejected(failed: bool, code: Code) -> Result<(), Blocking> {
     if failed {
         Err(Blocking {
@@ -182,6 +301,17 @@ fn exceeded<Policy, Target>(analysis: &StructuralAnalysis<Policy, Target>) -> Op
 }
 
 #[cfg(test)]
+impl StructuralSubject {
+    /// The logical subject of the root's field at `path`.
+    pub(crate) fn root(path: &[&str]) -> Self {
+        Self::RootField(Field {
+            path: path.iter().map(|&name| Box::from(name)).collect(),
+            at: None,
+        })
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
     use std::sync::Arc;
@@ -202,7 +332,9 @@ mod tests {
     use crate::resolver::subject::SubjectKind;
     use crate::structural::{AuthoringSchema, StructuralLimits};
 
-    use super::{admit_structure, selection, StructuralInvariant, CAPABILITY, OWNER};
+    use super::{
+        admit_structure, selection, StructuralInvariant, StructuralSubject, CAPABILITY, OWNER,
+    };
 
     type Schema = AuthoringSchema<FixturePolicyReference, FixtureTargetReference>;
 
@@ -226,9 +358,18 @@ mod tests {
         units: u64,
         project_profile: Admitted<()>,
     ) -> (Evaluation, Result<u64, Causes>) {
+        admitted_in(Evaluation::default(), value, units, project_profile)
+    }
+
+    /// Phase 2 as [`admitted_after`] runs it, recording into `evaluation`.
+    fn admitted_in(
+        mut evaluation: Evaluation,
+        value: &Value,
+        units: u64,
+        project_profile: Admitted<()>,
+    ) -> (Evaluation, Result<u64, Causes>) {
         let bytes = serde_json::to_vec(value).unwrap();
         let document = materialize_file(Arc::from(bytes), limits()).unwrap();
-        let mut evaluation = Evaluation::default();
         let analysis = admit_structure(
             &mut evaluation,
             document,
@@ -273,6 +414,37 @@ mod tests {
             .collect()
     }
 
+    /// Every blocking result, as its unit and code.
+    fn issues(evaluation: &Evaluation) -> Vec<(Unit, Code)> {
+        evaluation
+            .issues()
+            .map(|key| (key.unit().clone(), key.code()))
+            .collect()
+    }
+
+    /// The unit of `check` over the root's field at `path`.
+    fn root(path: &[&str], check: Check) -> Unit {
+        Unit {
+            phase: Phase::StructuralAdmission,
+            subject: Subject::Structural(StructuralSubject::root(path)),
+            check,
+        }
+    }
+
+    /// The units of the root's fields of a configuration without `$schema`:
+    /// the root's type and known members, and the required member, type, and
+    /// closed value of `profiles` and of `schemaVersion`.
+    fn root_units() -> Vec<Unit> {
+        let mut units = vec![root(&[], Check::FieldType), root(&[], Check::KnownField)];
+        for name in ["profiles", "schemaVersion"] {
+            units.extend(
+                [Check::RequiredField, Check::FieldType, Check::FieldValue]
+                    .map(|check| root(&[name], check)),
+            );
+        }
+        units
+    }
+
     /// The units of Phase 2's kinds before the scope levels, and the
     /// `profileSpecification` group's owner.
     fn units() -> Vec<Unit> {
@@ -293,8 +465,118 @@ mod tests {
         assert!(count.unwrap() > 0);
         assert_eq!(found(&evaluation), []);
         let statuses = statuses(&evaluation);
-        assert_eq!(statuses.keys().cloned().collect::<Vec<_>>(), units());
+        let mut expected = units();
+        expected.extend(root_units());
+        expected.sort();
+        assert_eq!(statuses.keys().cloned().collect::<Vec<_>>(), expected);
         assert!(statuses.values().all(Option::is_none));
+    }
+
+    /// Each check of the root's fields reports what it finds under the unit
+    /// over the field's path: the missing member's, the value's, or that of
+    /// the object an undeclared member is in (D15:2184, 2291-2294).
+    #[test]
+    fn each_root_check_reports_under_its_fields_path() {
+        let edit = |change: fn(&mut Value)| {
+            let mut value = minimal_config();
+            change(&mut value);
+            value
+        };
+        for (value, unit, code) in [
+            (
+                edit(|value| {
+                    value.as_object_mut().unwrap().remove("profiles");
+                }),
+                root(&["profiles"], Check::RequiredField),
+                Code::RequiredFieldMissing,
+            ),
+            (
+                edit(|value| value["$schema"] = json!(1)),
+                root(&["$schema"], Check::FieldType),
+                Code::FieldTypeInvalid,
+            ),
+            (
+                edit(|value| value["profiles"] = json!({})),
+                root(&["profiles"], Check::FieldValue),
+                Code::FieldValueInvalid,
+            ),
+            (
+                edit(|value| value["extra"] = json!(true)),
+                root(&[], Check::KnownField),
+                Code::UnknownField,
+            ),
+        ] {
+            let (evaluation, count) = admitted(&value, 1_000_000);
+            assert!(count.is_ok(), "{unit:?}");
+            assert_eq!(issues(&evaluation), [(unit.clone(), code)]);
+            assert!(statuses(&evaluation).values().all(Option::is_none));
+        }
+    }
+
+    /// A value whose type check failed is that check's to report: its closed
+    /// value is not evaluated, and waits on the type check (D15:2184).
+    #[test]
+    fn a_value_of_another_type_leaves_its_closed_value_to_its_type_check() {
+        let mut value = minimal_config();
+        value["profiles"] = json!(["app"]);
+        let (evaluation, _) = admitted(&value, 1_000_000);
+        let typed = root(&["profiles"], Check::FieldType);
+        assert_eq!(
+            issues(&evaluation),
+            [(typed.clone(), Code::FieldTypeInvalid)]
+        );
+        let statuses = statuses(&evaluation);
+        assert_eq!(
+            statuses[&root(&["profiles"], Check::FieldValue)],
+            Some(vec![Check::FieldType])
+        );
+        assert_eq!(statuses[&typed], None);
+        assert_eq!(statuses[&root(&["profiles"], Check::RequiredField)], None);
+    }
+
+    /// The root's own type check waits on the analysis's measure, and every
+    /// other check of its fields on the type check of the value that holds
+    /// the field, or of its own value (D15:2149, Decision 015-195).
+    #[test]
+    fn the_roots_fields_wait_on_the_type_checks_they_need() {
+        for (blocked, waiting) in [
+            (CAPABILITY, root_units()),
+            (root(&[], Check::FieldType), root_units()[1..].to_vec()),
+            (
+                root(&["profiles"], Check::FieldType),
+                vec![root(&["profiles"], Check::FieldValue)],
+            ),
+        ] {
+            let (evaluation, _) = admitted_in(
+                Evaluation::blocking(blocked.clone()),
+                &minimal_config(),
+                1_000_000,
+                Ok(()),
+            );
+            for (unit, causes) in statuses(&evaluation) {
+                let expected = waiting.contains(&unit).then(|| vec![blocked.check]);
+                assert_eq!(causes, expected, "{blocked:?}: {unit:?}");
+            }
+        }
+    }
+
+    /// Every undeclared member of the root is a candidate of the one unit of
+    /// the root's known members, which reports one Finding (D15:2184).
+    #[test]
+    fn the_undeclared_members_of_the_root_join_one_unit() {
+        let mut value = minimal_config();
+        value["extra"] = json!(true);
+        value["other"] = json!(null);
+        let (evaluation, _) = admitted(&value, 1_000_000);
+        let known = root(&[], Check::KnownField);
+        let candidates: Vec<&Unit> = evaluation
+            .candidates()
+            .map(|(unit, _)| unit)
+            .filter(|unit| unit.logical() == known)
+            .collect();
+        assert_eq!(candidates.len(), 2);
+        assert_ne!(candidates[0], candidates[1]);
+        assert_eq!(issues(&evaluation), [(known, Code::UnknownField)]);
     }
 
     /// Each failure of the selection holds back the checks after it, through

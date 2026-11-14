@@ -9,9 +9,10 @@
 //! a kind's registry ID is its name in kebab case, and the Check Registry
 //! gives it its key strategy, owning scope, parent, and projection. A later
 //! change may split or merge kinds as 015's subject-key rules require.
-//! The kinds of entry admission, structural admission, profile selection, and
-//! reporting finalization are declared for the registry before the resolver
-//! records their units ([`SubjectKind::declared_only`]).
+//! The kinds of structural admission's identity-map keys and profile, Target
+//! ID, and Group ID entries, of profile selection, and of reporting
+//! finalization are declared for the registry before the resolver records
+//! their units ([`SubjectKind::declared_only`]).
 
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -31,6 +32,7 @@ use super::locales::LocaleSubject;
 use super::negotiation::NegotiationSubject;
 use super::resource_policy::{ArtifactSubject, PolicySubject, ReferenceField};
 use super::specification::Slot;
+use super::structural_admission::StructuralSubject;
 use super::targets::TargetSubject;
 
 /// The kind of a unit's subject, declared phase by phase in rank order. Its
@@ -730,14 +732,14 @@ impl SubjectKind {
     }
 
     /// Whether the kind is declared for the Check Registry while the resolver
-    /// records no unit of it yet: structural admission's scope levels and
-    /// profile selection build their units with their Findings, and reporting
-    /// finalization with the outcome.
+    /// records no unit of it yet: structural admission's identity-map keys
+    /// and the levels below the root, and profile selection, build their
+    /// units with their Findings, and reporting finalization with the
+    /// outcome.
     pub(crate) const fn declared_only(self) -> bool {
         matches!(
             self,
-            Self::RootField
-                | Self::ProfileKey
+            Self::ProfileKey
                 | Self::ProfileField
                 | Self::TargetProfileKey
                 | Self::TargetField
@@ -795,6 +797,9 @@ impl Subject {
             Self::MaterializedDependencies => SubjectKind::MaterializedDependencies,
             Self::SchemaSelection => SubjectKind::ConfigurationSchemaSelection,
             Self::StructuralCapability => SubjectKind::CapabilityStructuralAnalysis,
+            Self::Structural(subject) => match subject {
+                StructuralSubject::RootField(_) => SubjectKind::RootField,
+            },
             Self::Vocabulary => SubjectKind::Vocabulary,
             Self::CanonicalizationData => SubjectKind::CanonicalizationData,
             Self::ResourcePolicy(subject) => match subject {
@@ -948,6 +953,7 @@ impl Ord for Subject {
                     own.cmp(theirs)
                 }
                 (Self::ArtifactReference(own), Self::ArtifactReference(theirs)) => own.cmp(theirs),
+                (Self::Structural(own), Self::Structural(theirs)) => own.cmp(theirs),
                 (Self::Target(own), Self::Target(theirs)) => own.cmp(theirs),
                 (Self::Group(own), Self::Group(theirs)) => own.cmp(theirs),
                 (Self::Hydration(own), Self::Hydration(theirs)) => own.cmp(theirs),
@@ -1019,6 +1025,7 @@ mod tests {
             Subject::MaterializedDependencies,
             Subject::SchemaSelection,
             Subject::StructuralCapability,
+            Subject::Structural(StructuralSubject::root(&["profiles"])),
             owner(SemanticGroup::ProfileSpecification),
             capability(ArtifactSubject::Artifacts),
             capability(ArtifactSubject::PolicyArtifacts),
@@ -1220,10 +1227,11 @@ mod tests {
         assert_eq!(SubjectKind::ConfigurationSchemaSelection.rank(), 1);
     }
 
-    /// The kinds declared only are structural admission's scope levels and
-    /// the kinds of profile selection and reporting finalization: Phase 2
-    /// records its owner, the schema selection, the analysis's measure, and
-    /// the `profileSpecification` group's owner.
+    /// The kinds declared only are structural admission's identity-map keys
+    /// and levels below the root, and the kinds of profile selection and
+    /// reporting finalization: Phase 2 records its owner, the schema
+    /// selection, the analysis's measure, the root's fields, and the
+    /// `profileSpecification` group's owner.
     #[test]
     fn the_kinds_declared_only_are_those_without_units_yet() {
         for kind in SubjectKind::ALL {
@@ -1235,6 +1243,7 @@ mod tests {
                 SubjectKind::MaterializedDependencies
                     | SubjectKind::ConfigurationSchemaSelection
                     | SubjectKind::CapabilityStructuralAnalysis
+                    | SubjectKind::RootField
                     | SubjectKind::ProfileSpecificationDependency
             );
             assert_eq!(kind.declared_only(), unrecorded, "{kind:?}");

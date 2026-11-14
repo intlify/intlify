@@ -22,7 +22,8 @@ use crate::materialize::{ByteSpan, MaterializedDocument, NodeId, NodeKind, Objec
 use crate::model::valid_identity;
 
 use super::facts::{
-    At, Candidate, Check, Entry, Facts, FieldPathId, FieldStep, Level, Outcome, ScopeId,
+    At, Candidate, CandidateId, Check, Entry, Facts, FieldPathId, FieldStep, Level, Outcome,
+    ScopeId,
 };
 use super::program::{Additional, SchemaId, SchemaNode, SchemaProgram, ValueType};
 
@@ -121,17 +122,21 @@ pub(super) fn evaluate(
     })
 }
 
-/// Where the walk is: the scope whose entry a path starts from, and the path.
+/// Where the walk is: the scope whose entry a path starts from, the path,
+/// and the type check of the value that contains the position, which an
+/// evaluation there needs; none at the root.
 #[derive(Debug, Clone, Copy)]
 struct Position {
     scope: ScopeId,
     path: Option<FieldPathId>,
+    typed: Option<CandidateId>,
 }
 
 impl Position {
     const ROOT: Self = Self {
         scope: Facts::ROOT,
         path: None,
+        typed: None,
     };
 }
 
@@ -222,16 +227,25 @@ impl<'input> Walker<'input> {
         self.collect && self.branches == 0
     }
 
-    fn record(&mut self, check: Check, position: Position, at: At, outcome: Outcome) {
-        if self.recording() {
+    /// Records a candidate that needs the type check `position` names, and
+    /// gives its ID when this walk records candidates.
+    fn record(
+        &mut self,
+        check: Check,
+        position: Position,
+        at: At,
+        outcome: Outcome,
+    ) -> Option<CandidateId> {
+        self.recording().then(|| {
             self.facts.push(Candidate {
                 check,
                 scope: position.scope,
                 path: position.path,
                 at,
                 outcome,
-            });
-        }
+                after: position.typed,
+            })
+        })
     }
 
     /// The position of the member `name` the schema defines.
@@ -250,8 +264,8 @@ impl<'input> Walker<'input> {
             return position;
         }
         Position {
-            scope: position.scope,
             path: Some(self.facts.enter(position.path, step())),
+            ..position
         }
     }
 
@@ -298,14 +312,18 @@ impl<'input> Walker<'input> {
         );
         let key = self.any(position);
         self.record(Check::Key, key, At::Key(scope), Outcome::of(admitted));
-        Position { scope, path: None }
+        Position {
+            scope,
+            path: None,
+            ..position
+        }
     }
 
     fn walk(
         &mut self,
         id: SchemaId,
         subject: NodeId,
-        position: Position,
+        mut position: Position,
     ) -> Result<bool, EvaluationFailure> {
         let program = self.program;
         let doc = self.doc;
@@ -328,12 +346,15 @@ impl<'input> Walker<'input> {
         if let Some(expected) = schema.value_type {
             self.unit()?;
             let matches = type_matches(expected, value);
-            self.record(
+            // The value's other checks, and its members, need its type.
+            if let Some(typed) = self.record(
                 Check::Type,
                 position,
                 At::Value(subject),
                 Outcome::of(matches),
-            );
+            ) {
+                position.typed = Some(typed);
+            }
             if !matches {
                 self.value_issue(IssueKind::TypeInvalid, id, subject);
                 self.fragment(id, subject, FragmentState::TypeUnavailable);

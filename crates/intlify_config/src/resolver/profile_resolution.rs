@@ -15,10 +15,11 @@
 //! group's owner is a unit of Phase 2, which [`super::structural_admission`]
 //! records.
 //!
-//! Phase 2 records its scope levels' units, and Phase 3 its units, with their
-//! Findings later (plan 025 PR 5f-2d, 5f-3), so the entry starts from their
-//! complete results: a configuration structural admission admitted whole, and
-//! the declaration Phase 3 provisionally selected in it. What the entry
+//! Phase 2 records the units of its identity-map keys and of the levels below
+//! the root, and Phase 3 its units, with their Findings later (plan 025 PRs
+//! 5f-2d-2, 5f-3), so the entry starts from their complete results: a
+//! configuration structural admission admitted whole, and the declaration
+//! Phase 3 provisionally selected in it. What the entry
 //! returns is crate-private semantic state, not a `LocalizationProjectProfile`,
 //! a checked or blocked outcome, or Resolution Evidence. The profile
 //! projection is 015's Implementation Phase 5.
@@ -1248,6 +1249,30 @@ pub(super) mod tests {
 
     /// The state with Phase 7's occurrences, which carry their Entry
     /// locations, replaced by their subjects in order.
+    /// What `evaluation` records apart from where in the file a structural
+    /// candidate looked, which follows the file's order: each unit's status,
+    /// each candidate's under its logical unit, and every Finding, notice,
+    /// and occurrence candidate.
+    fn unplaced(evaluation: &Evaluation) -> impl PartialEq + std::fmt::Debug + '_ {
+        let mut candidates: Vec<(Unit, Option<Vec<IssueKey>>)> = evaluation
+            .candidates()
+            .map(|(unit, status)| {
+                let causes = match status {
+                    Status::Evaluated => None,
+                    Status::NotEvaluated(causes) => Some(causes.keys().cloned().collect()),
+                };
+                (unit.logical(), causes)
+            })
+            .collect();
+        candidates.sort();
+        (
+            statuses(evaluation),
+            candidates,
+            evaluation.findings(),
+            evaluation.occurrence_candidates(),
+        )
+    }
+
     fn unlocated(
         mut state: SemanticState<'_, Id>,
     ) -> (Vec<(LocaleSubject, bool)>, SemanticState<'_, Id>) {
@@ -1395,8 +1420,12 @@ pub(super) mod tests {
                 .all(|(_, status)| *status == Status::Evaluated));
             // Phase 1 records its owner and the complete input's ten checks
             // (D15:1876, 2129, 2516), and Phase 2 its owner, the schema
-            // selection's four checks, the analysis's measure, and the
-            // `profileSpecification` group's owner (D15:2130, 2516).
+            // selection's four checks, the analysis's measure, nine units of
+            // the root's fields, and the `profileSpecification` group's owner
+            // (D15:2130, 2173, 2516): the types of the root, `$schema`,
+            // `profiles`, and `schemaVersion`, the two required members, the
+            // closed values of `profiles` and `schemaVersion`, and the root's
+            // known members.
             let phases: BTreeSet<Phase> =
                 evaluation.statuses().map(|(unit, _)| unit.phase).collect();
             let mut ran = BTreeSet::from(PHASES);
@@ -1409,7 +1438,7 @@ pub(super) mod tests {
                     .count()
             };
             assert_eq!(count(Phase::EntryAdmission), 11);
-            assert_eq!(count(Phase::StructuralAdmission), 7);
+            assert_eq!(count(Phase::StructuralAdmission), 16);
             assert_eq!(unestablished(&evaluation), []);
             let project = state.locales.project.as_ref().unwrap();
             assert_eq!(spellings(project.requested().as_slice()), ["en", "ja"]);
@@ -2259,7 +2288,7 @@ pub(super) mod tests {
             );
             authored.resolve(|first_evaluation, first| {
                 reordered.resolve(|second_evaluation, second| {
-                    assert_eq!(first_evaluation, second_evaluation);
+                    assert_eq!(unplaced(&first_evaluation), unplaced(&second_evaluation));
                     assert_eq!(unlocated(first), unlocated(second));
                 });
             });

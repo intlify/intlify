@@ -28,22 +28,28 @@
 //! unit waits on a check whose result it needs, and is not evaluated without
 //! it, or whose result alone names its subjects, and is then not recorded. A
 //! row lists, in row order, the checks it waits on that none of the others it
-//! lists already waits on. A check under the admitted Resource Limit Policy
-//! waits on every Policy recheck (D15:1677). Entry admission's complete
-//! input waits along the stages of strict file entry: the parser's tokens on
-//! the file's bytes, strict JSON on the tokens, duplicate members and the
-//! JSON-compatible domain on strict JSON, and the five root-value bounds on
-//! both. Structural admission's schema selection waits along its checks, a
-//! `schemaVersion` member on an object root, its string on the member, and a
-//! supported schema on the string, and the analysis's measure on the
-//! supported schema (D15:2008, 2130). The kinds declared only list no
-//! prerequisite until their units exist. No row of a Shared phase lists a
-//! check of entry admission: without a value from entry admission there is no
-//! Shared projection, whose absence the entry's Findings explain, and the
-//! phase's first unit requires no check (D15:2369, 2516). No row of a later
-//! phase lists a check of structural admission or profile selection yet: the
-//! resolver starts from a configuration structural admission admitted whole
-//! and the declaration profile selection selected.
+//! lists already waits on: earlier rows, and rows of its own kind, whose units
+//! an earlier subject may run at any check rank, such as the path that contains
+//! a field; a row whose units wait on the same check of an earlier subject
+//! lists itself (D15:2149, Decision 015-195). A check under the admitted
+//! Resource Limit Policy waits on every Policy recheck (D15:1677). Entry
+//! admission's complete input waits along the stages of strict file entry: the
+//! parser's tokens on the file's bytes, strict JSON on the tokens, duplicate
+//! members and the JSON-compatible domain on strict JSON, and the five
+//! root-value bounds on both. Structural admission's schema selection waits
+//! along its checks, a `schemaVersion` member on an object root, its string on
+//! the member, and a supported schema on the string, and the analysis's measure
+//! on the supported schema (D15:2008, 2130). A check of the root's fields waits
+//! on the type check of the value that holds the field, or of the field's own
+//! value, and the root's own type check on the analysis's measure (D15:2149,
+//! 2184). The kinds declared only list no prerequisite until their units exist.
+//! No row of a Shared phase lists a check of entry admission: without a value
+//! from entry admission there is no Shared projection, whose absence the
+//! entry's Findings explain, and the phase's first unit requires no check
+//! (D15:2369, 2516). No row of a later phase lists a check of structural
+//! admission or profile selection yet: the resolver starts from a configuration
+//! structural admission admitted whole and the declaration profile selection
+//! selected.
 //!
 //! A row's Finding codes are those its units may report, a notice included,
 //! in 015's table order: what the resolver's checks report, and for the kinds
@@ -85,7 +91,8 @@
 //! rows in the same or an earlier phase (D15:2175), from which following
 //! parents ends at an unscoped kind; a prerequisite names a row once, never
 //! one of a later phase or of a kind its phase ranks later, and following
-//! prerequisites never comes back to a row; every dependency record is owned
+//! prerequisites never comes back to a row by way of another row, while a row
+//! may name itself (Decision 015-195); every dependency record is owned
 //! by exactly one row, which lists its record kind (D15:2275); and a row's
 //! payload strategy covers exactly the codes it may report, in their order
 //! (D15:2173). A row of
@@ -126,7 +133,7 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:4372210264228b61162758d05c6bf3878089b4683a1ee6d48c43b125ccd199f0";
+    "sha256:3311dd0f5308945cf64a7c60321f1a8bc12fd3d0c2d72dff692c144a6046c2bc";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
@@ -516,9 +523,10 @@ fn parents_end(domains: &BTreeMap<(Phase, SubjectKind), Domain<'_>>) -> bool {
 }
 
 /// Whether every prerequisite names a row once, never one whose units follow
-/// all of its dependent's in canonical unit order, and whether following
-/// prerequisites from any row ends, so that no row waits on itself
-/// (D15:2275).
+/// all of its dependent's in canonical unit order, and whether following the
+/// prerequisites that name other rows ends, so that no prerequisite cycle
+/// joins distinct rows (D15:2275). A row may name itself, whose units wait on
+/// the same check of an earlier subject (Decision 015-195).
 fn prerequisites_end(rows: &[CheckRow]) -> bool {
     let named: BTreeMap<&str, &CheckRow> = rows
         .iter()
@@ -533,14 +541,17 @@ fn prerequisites_end(rows: &[CheckRow]) -> bool {
         for id in &row.prerequisite_check_ids {
             match named.get(id.as_str()) {
                 Some(prerequisite) if listed.insert(id.as_str()) && !follows(prerequisite, row) => {
-                    dependents
-                        .entry(id.as_str())
-                        .or_default()
-                        .push(row.check_id.as_str());
+                    if *id != row.check_id {
+                        dependents
+                            .entry(id.as_str())
+                            .or_default()
+                            .push(row.check_id.as_str());
+                    }
                 }
                 _ => return false,
             }
         }
+        listed.remove(row.check_id.as_str());
         pending.insert(row.check_id.as_str(), listed.len());
     }
     let mut ended: Vec<&str> = pending
@@ -1135,6 +1146,20 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         K::CapabilityStructuralAnalysis => {
             &[&["structural.schema-selection.supported-schema-version"]]
         }
+        // A root field's checks wait on the type check of the value that
+        // holds the field, or of the field's own value; the root's own type
+        // check waits on the analysis's measure. A type check thus waits on
+        // the same check of the path that contains it (D15:2149, 2184,
+        // Decision 015-195).
+        K::RootField => &[
+            &["structural.root.field-type"],
+            &[
+                "structural.analysis.within-capability",
+                "structural.root.field-type",
+            ],
+            &["structural.root.field-type"],
+            &["structural.root.field-type"],
+        ],
         // The parser's tokens wait on the file's bytes and strict JSON on the
         // tokens; duplicate members and the JSON-compatible domain need a
         // syntactically parsed file, and the root-value bounds measure the
@@ -1452,9 +1477,7 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         | K::CapabilityProfiles
         | K::CapabilityProfileId
         | K::DiagnosticDomain => &[NOT_YET],
-        K::RootField | K::ProfileField | K::TargetField | K::GroupField | K::ProfileSelector => {
-            &[NOT_YET; 4]
-        }
+        K::ProfileField | K::TargetField | K::GroupField | K::ProfileSelector => &[NOT_YET; 4],
     }
 }
 
@@ -2569,7 +2592,7 @@ mod tests {
     }
 
     #[test]
-    fn prerequisites_are_earlier_rows_in_row_order_and_none_waits_on_another() {
+    fn prerequisites_are_earlier_or_own_kind_rows_in_row_order_and_none_waits_on_another() {
         let registry = registry();
         let place: BTreeMap<&str, usize> = registry
             .rows
@@ -2584,9 +2607,16 @@ mod tests {
                 .iter()
                 .map(|id| place[id.as_str()])
                 .collect();
-            // A row of the same kind is listed only with a lower check rank.
+            // An earlier row, or a row of the same kind, whose units an
+            // earlier subject may run at any check rank, itself included
+            // (D15:2149, Decision 015-195).
             assert!(
-                listed.iter().all(|&earlier| earlier < index),
+                listed.iter().all(|&at| {
+                    let prerequisite = &registry.rows[at];
+                    at < index
+                        || (prerequisite.phase_id == row.phase_id
+                            && prerequisite.subject_kind == row.subject_kind)
+                }),
                 "{}",
                 row.check_id
             );
@@ -2595,10 +2625,14 @@ mod tests {
                 "{}",
                 row.check_id
             );
+            // Through its own units a row reaches what it lists; another row
+            // it lists reaches nothing else it lists.
             for first in &row.prerequisite_check_ids {
                 for second in &row.prerequisite_check_ids {
                     assert!(
-                        !requirements[first.as_str()].contains(second.as_str()),
+                        *first == row.check_id
+                            || first == second
+                            || !requirements[first.as_str()].contains(second.as_str()),
                         "{} lists {first}, which waits on {second}",
                         row.check_id
                     );
@@ -2615,7 +2649,7 @@ mod tests {
             .filter(|row| row.subject_kind.declared_only())
             .map(|row| row.check_id.as_str())
             .collect();
-        assert_eq!(declared.len(), 26);
+        assert_eq!(declared.len(), 22);
         for row in &rows {
             if row.subject_kind.declared_only() {
                 assert!(row.prerequisite_check_ids.is_empty(), "{}", row.check_id);
@@ -3724,12 +3758,17 @@ mod tests {
         assert!(CheckRegistry::read(&value).is_some());
     }
 
+    /// A row may name itself, whose units wait on the same check of an
+    /// earlier subject; no cycle may join distinct rows (D15:2275, Decision
+    /// 015-195).
     #[test]
-    fn no_row_waits_on_itself_through_its_prerequisites() {
+    fn a_row_may_name_itself_while_no_cycle_joins_distinct_rows() {
         let unique = "hydration.relation.unique";
         let distinct = "hydration.relation.distinct-endpoints";
-        let itself = waiting(unique, &[unique]);
-        assert_eq!(CheckRegistry::read(&itself), None);
+        let itself = waiting(unique, &[distinct, unique]);
+        assert!(CheckRegistry::read(&itself).is_some());
+        let twice = waiting(unique, &[unique, unique]);
+        assert_eq!(CheckRegistry::read(&twice), None);
         let each_other = changed(
             |row| row["checkId"] == unique || row["checkId"] == distinct,
             |row| {

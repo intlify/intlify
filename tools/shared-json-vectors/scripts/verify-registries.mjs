@@ -790,36 +790,68 @@ for (const [name] of kinds) {
     fail(`check registry: ${name}'s parents lead back to ${current}`)
   }
 }
-// A row's prerequisites name earlier rows, so none is a cycle, each once and
-// in row order, and none is one another listed prerequisite already waits on.
+// A row's prerequisites name earlier rows, or rows of its own kind, whose
+// units an earlier subject may run at any check rank, itself included
+// (D15:2149, Decision 015-195), each once and in row order. Following those
+// that name other rows never comes back to a row, since no cycle may join
+// distinct rows (D15:2275), and none is one another listed prerequisite,
+// other than the row itself, already waits on.
 const rowIndex = new Map(checkRows.map((row, index) => [row.checkId, index]))
-const requirements = new Map()
+const others = new Map()
 let prerequisiteCount = 0
 for (const [index, row] of checkRows.entries()) {
   const where = `check registry: ${row.checkId}`
   const listed = row.prerequisiteCheckIds ?? []
   prerequisiteCount += listed.length
   const places = listed.map(id => rowIndex.get(id))
-  if (places.some(place => place === undefined || place >= index)) {
-    fail(`${where}: a prerequisite is no earlier row`)
-    requirements.set(row.checkId, new Set())
+  const ownKind = place =>
+    checkRows[place].phaseId === row.phaseId && checkRows[place].subjectKind === row.subjectKind
+  if (places.some(place => place === undefined || (place >= index && !ownKind(place)))) {
+    fail(`${where}: a prerequisite is neither an earlier row nor one of its kind`)
+    others.set(row.checkId, [])
     continue
   }
   if (places.some((place, at) => at > 0 && place <= places[at - 1])) {
     fail(`${where}: the prerequisites are not in row order, each once`)
   }
+  others.set(
+    row.checkId,
+    listed.filter(id => id !== row.checkId)
+  )
+}
+// What each row waits on through the rows it lists other than itself.
+const requirements = new Map()
+const following = new Set()
+const reach = id => {
+  if (requirements.has(id)) {
+    return requirements.get(id)
+  }
+  if (following.has(id)) {
+    fail(`check registry: ${id} comes back to itself through other rows`)
+    return new Set()
+  }
+  following.add(id)
   const reached = new Set()
-  for (const id of listed) {
-    for (const required of requirements.get(id)) {
+  for (const prerequisite of others.get(id)) {
+    reached.add(prerequisite)
+    for (const required of reach(prerequisite)) {
       reached.add(required)
     }
   }
+  following.delete(id)
+  requirements.set(id, reached)
+  return reached
+}
+for (const row of checkRows) {
+  reach(row.checkId)
+}
+for (const row of checkRows) {
+  const listed = others.get(row.checkId)
   for (const id of listed) {
-    if (reached.has(id)) {
-      fail(`${where}: lists ${id}, which another prerequisite waits on`)
+    if (listed.some(other => other !== id && requirements.get(other).has(id))) {
+      fail(`check registry: ${row.checkId}: lists ${id}, which another prerequisite waits on`)
     }
   }
-  requirements.set(row.checkId, new Set([...reached, ...listed]))
 }
 // A row's Finding codes are 015's, each once and in the order of its tables,
 // and every code is some row's.

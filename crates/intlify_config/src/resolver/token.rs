@@ -56,6 +56,7 @@ use super::hydration::{EndpointField, HydrationSubject};
 use super::locales::{Content, LocaleKey, LocaleSubject};
 use super::negotiation::NegotiationSubject;
 use super::resource_policy::{ArtifactSubject, PolicySubject, ReferenceField};
+use super::structural_admission::StructuralSubject;
 use super::subject::SubjectKind;
 use super::targets::TargetSubject;
 
@@ -69,11 +70,12 @@ pub(crate) struct Specification<'a> {
 
 /// A subject's own key, before a parent scopes it.
 #[derive(Debug)]
-enum Own {
+enum Own<'a> {
     /// A singleton, which is its subject kind ID.
     Singleton,
-    /// A logical field: its path of schema member names.
-    Field(Vec<&'static str>),
+    /// A logical field: its path of schema member names, with `*` for an
+    /// array element or an entry of a map whose keys are not identities.
+    Field(Vec<&'a str>),
     /// An admitted canonical identity, in its view.
     Identity(Value),
     /// A value without an identity, which `redacted-structure` projects to
@@ -127,6 +129,7 @@ pub(crate) fn logical(subject: &Subject) -> Subject {
         | Subject::Hydration(_)
         | Subject::SemanticDependency(_)
         | Subject::ArtifactCollection(CollectionSubject::Group(_)) => subject.clone(),
+        Subject::Structural(structural) => Subject::Structural(structural.logical()),
         Subject::ResourcePolicy(policy) => Subject::ResourcePolicy(match policy {
             PolicySubject::Capability(ArtifactSubject::Artifact(key)) => {
                 PolicySubject::Capability(ArtifactSubject::Artifact(logical_member(key)))
@@ -373,7 +376,7 @@ pub(crate) fn number<K: Ord>(
 }
 
 /// The own key of `subject` and the subject that scopes it.
-fn own(subject: &Subject) -> (Own, Option<Subject>) {
+fn own(subject: &Subject) -> (Own<'_>, Option<Subject>) {
     let alone = |own| (own, None);
     match subject {
         Subject::Slot(_)
@@ -385,6 +388,9 @@ fn own(subject: &Subject) -> (Own, Option<Subject>) {
         | Subject::Vocabulary
         | Subject::CanonicalizationData
         | Subject::SemanticDependency(_) => alone(Own::Singleton),
+        Subject::Structural(StructuralSubject::RootField(field)) => {
+            alone(Own::Field(field.path.iter().map(|name| &**name).collect()))
+        }
         Subject::ResourcePolicy(policy) => alone(match policy {
             PolicySubject::Capability(artifact) | PolicySubject::Recheck(artifact) => {
                 match artifact {
@@ -433,7 +439,7 @@ fn own(subject: &Subject) -> (Own, Option<Subject>) {
     }
 }
 
-fn locale_subject(subject: &LocaleSubject) -> (Own, Option<Subject>) {
+fn locale_subject(subject: &LocaleSubject) -> (Own<'_>, Option<Subject>) {
     let under_target =
         |target: &TargetId| Some(Subject::Locale(LocaleSubject::TargetId(target.clone())));
     match subject {
@@ -462,7 +468,7 @@ fn locale_subject(subject: &LocaleSubject) -> (Own, Option<Subject>) {
     }
 }
 
-fn fallback_subject(subject: &FallbackSubject) -> (Own, Option<Subject>) {
+fn fallback_subject(subject: &FallbackSubject) -> (Own<'_>, Option<Subject>) {
     let under =
         |source: &LocaleKey| Some(Subject::Fallback(FallbackSubject::Source(source.clone())));
     match subject {
@@ -480,7 +486,7 @@ fn fallback_subject(subject: &FallbackSubject) -> (Own, Option<Subject>) {
     }
 }
 
-fn coverage_subject(subject: &CoverageSubject) -> (Own, Option<Subject>) {
+fn coverage_subject(subject: &CoverageSubject) -> (Own<'_>, Option<Subject>) {
     let under = |rule: &RuleContent| Some(Subject::Coverage(CoverageSubject::Rule(rule.clone())));
     match subject {
         CoverageSubject::Rules => (Own::Field(vec!["coverage", "rules"]), None),
@@ -508,7 +514,7 @@ fn coverage_subject(subject: &CoverageSubject) -> (Own, Option<Subject>) {
     }
 }
 
-fn group_subject(subject: &GroupSubject) -> (Own, Option<Subject>) {
+fn group_subject(subject: &GroupSubject) -> (Own<'_>, Option<Subject>) {
     let under =
         |group: &DeploymentGroupId| Some(Subject::Group(GroupSubject::Group(group.clone())));
     match subject {
@@ -521,7 +527,7 @@ fn group_subject(subject: &GroupSubject) -> (Own, Option<Subject>) {
     }
 }
 
-fn hydration_subject(subject: &HydrationSubject) -> (Own, Option<Subject>) {
+fn hydration_subject(subject: &HydrationSubject) -> (Own<'_>, Option<Subject>) {
     let under =
         |group: &DeploymentGroupId| Some(Subject::Group(GroupSubject::Group(group.clone())));
     match subject {
@@ -546,12 +552,12 @@ fn hydration_subject(subject: &HydrationSubject) -> (Own, Option<Subject>) {
 }
 
 /// A single identity, which is its string.
-fn identity(value: &str) -> Own {
+fn identity(value: &str) -> Own<'static> {
     Own::Identity(Value::String(value.to_owned()))
 }
 
 /// A locale's canonical identity, or a spelling without one.
-fn locale_key(key: &LocaleKey) -> Own {
+fn locale_key(key: &LocaleKey) -> Own<'static> {
     match key {
         LocaleKey::Canonical(locale) => identity(locale.as_str()),
         LocaleKey::Content(_) => Own::Content("string"),
@@ -560,7 +566,7 @@ fn locale_key(key: &LocaleKey) -> Own {
 
 /// A collection member: the conflict-group view of its tuple, without the
 /// semantic digest, or the JSON type of a member without one.
-fn member(key: &MemberKey) -> Own {
+fn member(key: &MemberKey) -> Own<'static> {
     match key {
         MemberKey::Tuple(tuple) => Own::Identity(conflict(&ConflictKey::of(tuple))),
         MemberKey::Content(content) => Own::Content(json_type(content)),
@@ -568,7 +574,7 @@ fn member(key: &MemberKey) -> Own {
 }
 
 /// A reference: a `policies` slot's field path, or a target's Target ID.
-fn reference(field: &ReferenceField) -> Own {
+fn reference(field: &ReferenceField) -> Own<'static> {
     match field {
         ReferenceField::Policy(slot) => Own::Field(vec!["policies", slot.name()]),
         ReferenceField::TargetProfile(target) => identity(target.as_str()),
@@ -633,6 +639,7 @@ mod tests {
         ArtifactSubject, PolicySlot, PolicySubject, ReferenceField,
     };
     use crate::resolver::specification::Slot;
+    use crate::resolver::structural_admission::StructuralSubject;
     use crate::resolver::subject::SubjectKind;
     use crate::resolver::targets::TargetSubject;
 
@@ -724,6 +731,7 @@ mod tests {
             Subject::MaterializedDependencies,
             Subject::SchemaSelection,
             Subject::StructuralCapability,
+            Subject::Structural(StructuralSubject::root(&["profiles"])),
             Subject::Vocabulary,
             Subject::CanonicalizationData,
         ]);
@@ -923,6 +931,11 @@ mod tests {
             (
                 Subject::StructuralCapability,
                 json!("capability-structural-analysis"),
+            ),
+            (Subject::Structural(StructuralSubject::root(&[])), json!([])),
+            (
+                Subject::Structural(StructuralSubject::root(&["schemaVersion"])),
+                json!(["schemaVersion"]),
             ),
             (Subject::Vocabulary, json!("vocabulary")),
             (
