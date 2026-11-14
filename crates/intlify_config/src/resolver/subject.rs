@@ -9,9 +9,8 @@
 //! a kind's registry ID is its name in kebab case, and the Check Registry
 //! gives it its key strategy, owning scope, parent, and projection. A later
 //! change may split or merge kinds as 015's subject-key rules require.
-//! The kinds of the profile selector and of reporting finalization are
-//! declared for the registry before the resolver records their units
-//! ([`SubjectKind::declared_only`]).
+//! The kinds of reporting finalization are declared for the registry before
+//! the resolver records their units ([`SubjectKind::declared_only`]).
 
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -732,10 +731,10 @@ impl SubjectKind {
     }
 
     /// Whether the kind is declared for the Check Registry while the resolver
-    /// records no unit of it yet: the selector builds its units with the
-    /// selection they gate, and reporting finalization with the outcome.
+    /// records no unit of it yet: reporting finalization builds its units
+    /// with the outcome.
     pub(crate) const fn declared_only(self) -> bool {
-        matches!(self, Self::ProfileSelector | Self::DiagnosticDomain)
+        matches!(self, Self::DiagnosticDomain)
     }
 
     /// The kind's place among its phase's kinds.
@@ -795,6 +794,7 @@ impl Subject {
             Self::Selection(subject) => match subject {
                 SelectionSubject::Profiles => SubjectKind::CapabilityProfiles,
                 SelectionSubject::ProfileId(_) => SubjectKind::CapabilityProfileId,
+                SelectionSubject::Selector => SubjectKind::ProfileSelector,
             },
             Self::Vocabulary => SubjectKind::Vocabulary,
             Self::CanonicalizationData => SubjectKind::CanonicalizationData,
@@ -1050,6 +1050,7 @@ mod tests {
             owner(SemanticGroup::ProfileSpecification),
             Subject::Selection(SelectionSubject::Profiles),
             Subject::Selection(SelectionSubject::ProfileId(profile.clone())),
+            Subject::Selection(SelectionSubject::Selector),
             capability(ArtifactSubject::Artifacts),
             capability(ArtifactSubject::PolicyArtifacts),
             capability(ArtifactSubject::TargetProfileArtifacts),
@@ -1250,14 +1251,12 @@ mod tests {
         assert_eq!(SubjectKind::ConfigurationSchemaSelection.rank(), 1);
     }
 
-    /// The kinds declared only are the profile selector's and reporting
-    /// finalization's: profile selection records its checks of the
-    /// declarations, and the earlier phases every kind of their own.
+    /// The kinds declared only are reporting finalization's: the earlier
+    /// phases record every kind of their own.
     #[test]
     fn the_kinds_declared_only_are_those_without_units_yet() {
         for kind in SubjectKind::ALL {
-            let unrecorded = kind == SubjectKind::ProfileSelector
-                || kind.phase() == Phase::ReportingFinalization;
+            let unrecorded = kind.phase() == Phase::ReportingFinalization;
             assert_eq!(kind.declared_only(), unrecorded, "{kind:?}");
         }
     }

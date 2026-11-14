@@ -38,14 +38,15 @@
 //! identifier syntax is redacted while the names its entry's schema defines
 //! are kept (D15:776, 2184).
 //!
-//! Later phases read the analysis these checks admit: profile selection,
-//! which counts the declarations once the checks admitted the `profiles`
-//! object ([`profiles`]) and checks a declared Profile ID once they admitted
-//! its key ([`profile_key`]) (D15:2131, 2184); the semantic phases the
-//! declaration Phase 3 selected once the checks under its key admitted it
-//! whole ([`declaration`]), whatever else of the root they rejected; and
-//! profile projection, which needs a complete `IntlifyConfig`, the whole root
-//! ([`whole`]) (D15:2142, 2367).
+//! Later phases read the analysis these checks admit. Profile selection
+//! counts the declarations once the checks admitted the `profiles` object
+//! ([`profiles`]), checks a declared Profile ID once they admitted its key
+//! ([`profile_key`]), compares the selector with the declarations once the
+//! object holds one ([`nonempty_profiles`]), and selects a declaration once
+//! the checks under its key admitted it whole ([`declaration`]), the only
+//! one when its key is admitted ([`profile_keys`]), whatever else of the
+//! root they rejected (D15:2131, 2184, 2363). Profile projection needs a
+//! complete `IntlifyConfig`, the whole root ([`whole`]) (D15:2142, 2367).
 
 use std::cell::OnceCell;
 use std::collections::BTreeMap;
@@ -247,6 +248,33 @@ pub(crate) fn profiles(evaluation: &Evaluation) -> Admitted<()> {
                 && matches!(&*field.path, [name] if &**name == "profiles")
         }
         _ => false,
+    })
+}
+
+/// Whether structural admission admitted the closed constraints of the
+/// root's `profiles` object, so that it holds a declaration, which profile
+/// selection's checks of the selector assume (D15:450, 2363). Otherwise the
+/// causes.
+pub(crate) fn nonempty_profiles(evaluation: &Evaluation) -> Admitted<()> {
+    evaluation.admitted_within(|unit| match &unit.subject {
+        Subject::Structural(StructuralSubject::RootField(field)) => {
+            unit.check == Check::FieldValue
+                && matches!(&*field.path, [name] if &**name == "profiles")
+        }
+        _ => false,
+    })
+}
+
+/// Whether structural admission admitted every key of the root's `profiles`
+/// object as an identity. Otherwise the causes: the Findings of the keys
+/// without the identifier syntax, and the causes of each not evaluated
+/// (D15:2184).
+pub(crate) fn profile_keys(evaluation: &Evaluation) -> Admitted<()> {
+    evaluation.admitted_within(|unit| {
+        matches!(
+            unit.subject,
+            Subject::Structural(StructuralSubject::ProfileKey(_))
+        )
     })
 }
 

@@ -68,12 +68,12 @@ type Config = IntlifyConfig<PolicyReference, TargetProfileReference>;
 type Declaration = ProfileDeclaration<PolicyReference, TargetProfileReference>;
 
 /// One invocation's configuration past Phases 1 to 3, as the semantic phases
-/// read it: the declaration Phase 3 provisionally selected, which structural
-/// admission admitted whole whatever else of the root it rejected (D15:2367,
-/// 3434), the `resourceLimits` reference it selected with, the selector, what
-/// Phase 4 rechecks of those phases' measures, and whether structural
-/// admission admitted the whole root, which profile projection needs
-/// (D15:2142).
+/// read it: the declaration Phase 3 provisionally selected once structural
+/// admission admitted it whole, whatever else of the root it rejected
+/// (D15:2367, 3434), the `resourceLimits` reference it selected with, the
+/// selector, what Phase 4 rechecks of those phases' measures, and whether
+/// structural admission admitted the whole root, which profile projection
+/// needs (D15:2142).
 pub(crate) struct SelectedConfiguration<'a> {
     declaration: Declaration,
     resource_limits: &'a PolicyReference,
@@ -89,11 +89,9 @@ pub(crate) struct SelectedConfiguration<'a> {
 }
 
 impl<'a> SelectedConfiguration<'a> {
-    /// The configuration of `analysis` when Phase 3 provisionally selected one
-    /// of its declarations with `selector` and `admitted` holds, the checks of
-    /// structural admission having admitted that declaration whole; none
-    /// otherwise, and then no semantic phase starts yet (plan 025
-    /// interpretation #205). `whole` is whether they admitted the whole root.
+    /// The configuration of `analysis` once Phase 3 provisionally selected
+    /// one of its declarations, `selection`, with `selector`. `whole` is
+    /// whether structural admission admitted the whole root.
     ///
     /// # Errors
     ///
@@ -102,12 +100,8 @@ impl<'a> SelectedConfiguration<'a> {
     pub(crate) fn new(
         analysis: &Analysis,
         (selector, selection): (&'a SelectorInput, &'a ProvisionalSelection<PolicyReference>),
-        admitted: &Admitted<()>,
         whole: Admitted<()>,
-    ) -> Result<Option<Self>, ResolverInvariant> {
-        if admitted.is_err() {
-            return Ok(None);
-        }
+    ) -> Result<Self, ResolverInvariant> {
         let unreported = || ResolverInvariant::Structural(StructuralInvariant::UnreportedFailure);
         let admission =
             |invariant| ResolverInvariant::Structural(StructuralInvariant::Admission(invariant));
@@ -119,7 +113,7 @@ impl<'a> SelectedConfiguration<'a> {
             .declarations()
             .map_err(admission)?
             .ok_or_else(unreported)?;
-        Ok(Some(Self {
+        Ok(Self {
             declaration,
             resource_limits: selection.resource_limits(),
             selector,
@@ -128,7 +122,7 @@ impl<'a> SelectedConfiguration<'a> {
             profile_ids,
             structural_units: analysis.structural_units().ok_or_else(unreported)?,
             whole,
-        }))
+        })
     }
 
     fn references(&self) -> DeclarationReferences<'_> {
@@ -521,17 +515,17 @@ pub(super) mod tests {
     use crate::resolver::groups::{self, GroupSubject};
     use crate::resolver::hydration::{self, HydrationSubject};
     use crate::resolver::limits::{fixture_limits, ResolutionLimits, SECTION};
-    use crate::resolver::locales::fixtures::{canonical, earlier};
+    use crate::resolver::locales::fixtures::canonical;
     use crate::resolver::locales::{self, LocaleKey, LocaleSubject, Location};
-    use crate::resolver::profile_selection::{bound_declarations, capability, SelectionSubject};
+    use crate::resolver::profile_selection::{
+        capability, select_profile, selector, SelectionSubject,
+    };
     use crate::resolver::profile_view::{project, ProfileView};
     use crate::resolver::resource_policy::{self, PolicySlot, PolicySubject, ReferenceField};
     use crate::resolver::specification::{
         admit_project_profile, ActiveProfileSpecification, Slot, VocabularyAssertion, DATA,
     };
-    use crate::resolver::structural_admission::{
-        admit_structure, declaration, selection, whole, CAPABILITY,
-    };
+    use crate::resolver::structural_admission::{admit_structure, selection, whole, CAPABILITY};
     use crate::resolver::subject::SubjectKind;
     use crate::resolver::targets::{self, TargetSubject};
     use crate::structural::selection::{Selection, StringLengthFact};
@@ -933,9 +927,7 @@ pub(super) mod tests {
                 panic!("{} is not selected", self.selected);
             };
             let configuration =
-                SelectedConfiguration::new(&analysis, (&selector, &selection), &Ok(()), Ok(()))
-                    .unwrap()
-                    .unwrap();
+                SelectedConfiguration::new(&analysis, (&selector, &selection), Ok(())).unwrap();
             self.invoked(|invocation| run(&configuration, invocation))
         }
 
@@ -1096,9 +1088,9 @@ pub(super) mod tests {
     /// the model's configuration schema under `structural`, Phase 3 selecting
     /// `selector`'s declaration, and the semantic phases over the
     /// configuration. Without a value there is no Shared projection (D15:2369),
-    /// and without a selected declaration structural admission admitted whole,
-    /// no semantic phase starts yet (plan 025 interpretation #205): either way
-    /// there is no semantic state.
+    /// and without a declaration Phase 3 selected, which needs structural
+    /// admission to admit it whole, no semantic phase starts yet (plan 025
+    /// interpretation #205): either way there is no semantic state.
     fn invoke_entry<'s, P, D>(
         evaluation: &mut Evaluation,
         (file, limits): (&EntryFile<'_>, InputLimits),
@@ -1126,27 +1118,16 @@ pub(super) mod tests {
             structural,
             held(project_profile.as_ref()),
         )?;
-        // Phase 3 checks the declarations whatever Phase 2 admitted, with its
-        // causes where it admitted nothing (D15:2131).
-        bound_declarations(evaluation, structure.as_ref().ok(), structural)?;
-        let Ok(analysis) = structure else {
+        // Phase 3 records its checks whatever Phase 2 admitted, with its
+        // causes where it admitted nothing (D15:2131). The semantic phases
+        // start from the declaration it selects once structural admission
+        // admitted it whole, whatever else of the root it rejected.
+        let selection = select_profile(evaluation, structure.as_ref().ok(), selector, structural)?;
+        let (Ok(analysis), Ok(selection)) = (structure, selection) else {
             return Ok(None);
         };
-        let Ok(Selection::Selected(selection)) = analysis.select(selector) else {
-            return Ok(None);
-        };
-        // The semantic phases start from the selected declaration once the
-        // checks admitted it whole, whatever else of the root they rejected.
-        let admitted = declaration(evaluation, selection.id().as_str());
-        let Some(configuration) = SelectedConfiguration::new(
-            &analysis,
-            (selector, &selection),
-            &admitted,
-            whole(evaluation),
-        )?
-        else {
-            return Ok(None);
-        };
+        let configuration =
+            SelectedConfiguration::new(&analysis, (selector, &selection), whole(evaluation))?;
         resolve_profile(
             evaluation,
             &project_profile,
@@ -1430,8 +1411,9 @@ pub(super) mod tests {
     /// When the schema selection selects no schema, Phase 2 records its
     /// owner, the selection's checks, the analysis's measure waiting on the
     /// failed check, and the `profileSpecification` group's owner; Phase 3
-    /// its count of the declarations, waiting on the same check, and no
-    /// Profile ID; and no semantic phase starts (D15:2130, 2131).
+    /// its count of the declarations and the selector's checks that compare
+    /// it with them, waiting on the same check, and no Profile ID; and no
+    /// semantic phase starts (D15:2130, 2131).
     #[test]
     fn a_configuration_without_a_selected_schema_starts_no_semantic_phase() {
         let mut inputs = Inputs::complete();
@@ -1464,7 +1446,12 @@ pub(super) mod tests {
                 .collect();
             assert_eq!(
                 waiting,
-                [&CAPABILITY, &capability(SelectionSubject::Profiles)]
+                [
+                    &CAPABILITY,
+                    &capability(SelectionSubject::Profiles),
+                    &selector(Check::RequiredSelector),
+                    &selector(Check::DeclaredSelector),
+                ]
             );
             for unit in waiting {
                 let Some(Status::NotEvaluated(causes)) = evaluation.status(unit) else {
@@ -1534,9 +1521,10 @@ pub(super) mod tests {
                 ])
             );
             assert_eq!(count(Phase::StructuralAdmission), 232);
-            // Phase 3 counts the declarations and checks the one Profile ID
-            // (D15:1885, 1886).
-            assert_eq!(count(Phase::ProfileSelection), 2);
+            // Phase 3 counts the declarations, checks the one Profile ID, and
+            // runs the four checks of the string selector (D15:1885, 1886,
+            // 2295-2297, Decision 015-196).
+            assert_eq!(count(Phase::ProfileSelection), 6);
             assert_eq!(unestablished(&evaluation), []);
             let project = state.locales.project.as_ref().unwrap();
             assert_eq!(spellings(project.requested().as_slice()), ["en", "ja"]);
@@ -2461,8 +2449,11 @@ pub(super) mod tests {
         }
     }
 
+    /// The semantic phases read the declaration Phase 3 selected from the
+    /// analysis: checks that select a declaration the analysis does not admit
+    /// are a resolver bug.
     #[test]
-    fn only_a_declaration_the_checks_admitted_whole_starts_a_resolution() {
+    fn a_selected_declaration_the_analysis_lacks_is_a_resolver_bug() {
         let complete = Inputs::complete();
         let capability = capability_limits();
         let analysis = analyze(&complete.config, &capability);
@@ -2476,20 +2467,14 @@ pub(super) mod tests {
         let Ok(Selection::Selected(selection)) = analysis.select(&selector) else {
             panic!("web is not selected");
         };
-        let configuration = |analysis, admitted: Admitted<()>| {
-            SelectedConfiguration::new(analysis, (&selector, &selection), &admitted, Ok(()))
-        };
-        assert!(configuration(&analysis, Ok(())).unwrap().is_some());
-        // The checks did not admit the declaration whole.
-        let causes = earlier(Code::FieldTypeInvalid);
-        assert!(configuration(&analysis, Err(causes)).unwrap().is_none());
-        // Checks that admit a declaration the analysis does not are a
-        // resolver bug.
+        let configuration =
+            |analysis| SelectedConfiguration::new(analysis, (&selector, &selection), Ok(()));
+        assert!(configuration(&analysis).is_ok());
         let mut partial = complete.config.clone();
         partial["profiles"]["web"]["projectId"] = json!("Store Front");
         let partial = analyze(&partial, &capability);
         assert_eq!(
-            configuration(&partial, Ok(())).err(),
+            configuration(&partial).err(),
             Some(ResolverInvariant::Structural(
                 StructuralInvariant::UnreportedFailure
             ))
