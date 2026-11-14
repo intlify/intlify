@@ -462,7 +462,8 @@ pub(super) mod tests {
     use crate::profile_fixtures::complete_config;
     use crate::resolver::delivery::PlacementMode;
     use crate::resolver::dependency::{self, SemanticGroup};
-    use crate::resolver::entry::{admit_entry, OWNER};
+    use crate::resolver::entry::fixtures::FileFixture;
+    use crate::resolver::entry::{admit_entry, input, EntryFile, OWNER};
     use crate::resolver::evaluation::{
         Check, Code, IssueKey, Phase, Reason, Status, Subject, Unit,
     };
@@ -917,12 +918,14 @@ pub(super) mod tests {
                 Result<Option<SemanticState<'_, Id>>, ResolverInvariant>,
             ) -> R,
         ) -> R {
-            let entry = entry_input(&self.config, &self.capability);
+            let (bytes, limits) = entry_input(&self.config, &self.capability);
+            let fixture = FileFixture::new(&self.capability);
+            let file = fixture.file(bytes);
             self.prepared(|configuration, invocation| {
                 let mut set = None;
                 let state = invoke_entry(
                     &mut evaluation,
-                    entry,
+                    (&file, limits),
                     configuration,
                     invocation,
                     FixtureProvider::new(),
@@ -961,13 +964,15 @@ pub(super) mod tests {
             &self,
             inspect: impl FnOnce(Evaluation, Admitted<ProfileView>) -> R,
         ) -> R {
-            let entry = entry_input(&self.config, &self.capability);
+            let (bytes, limits) = entry_input(&self.config, &self.capability);
+            let fixture = FileFixture::new(&self.capability);
+            let file = fixture.file(bytes);
             self.prepared(|configuration, invocation| {
                 let mut evaluation = Evaluation::default();
                 let mut set = None;
                 let state = invoke_entry(
                     &mut evaluation,
-                    entry,
+                    (&file, limits),
                     configuration,
                     invocation,
                     FixtureProvider::new(),
@@ -1015,13 +1020,13 @@ pub(super) mod tests {
     }
 
     /// One invocation over `evaluation` from its entry: Phase 0, then Phase 1
-    /// over the file `source` under `limits`, which `configuration` was
-    /// prepared from, and the semantic phases over `configuration` when
-    /// Phase 1 admits the file. When it does not, there is no Shared
-    /// projection, and so no semantic state.
+    /// over `file` under `limits`, which `configuration` was prepared from,
+    /// and the semantic phases over `configuration` when Phase 1 admits the
+    /// file. When it does not, there is no Shared projection, and so no
+    /// semantic state.
     fn invoke_entry<'s, P, D>(
         evaluation: &mut Evaluation,
-        (source, limits): (Arc<[u8]>, InputLimits),
+        (file, limits): (&EntryFile<'_>, InputLimits),
         configuration: &CompleteConfiguration<'_>,
         invocation: &Invocation<'s, P::Identity>,
         data: D,
@@ -1034,7 +1039,7 @@ pub(super) mod tests {
     {
         let project_profile =
             admit_project_profile(evaluation, invocation.supported, invocation.specifications)?;
-        if admit_entry(evaluation, source, limits)?.is_err() {
+        if admit_entry(evaluation, file, limits)?.is_err() {
             return Ok(None);
         }
         resolve_profile(
@@ -1212,12 +1217,12 @@ pub(super) mod tests {
     #[test]
     fn entry_keeps_evaluation_defects_apart_from_its_own() {
         let inputs = Inputs::complete();
-        let (source, limits) = entry_input(&inputs.config, &inputs.capability);
+        let (bytes, limits) = entry_input(&inputs.config, &inputs.capability);
+        let fixture = FileFixture::new(&inputs.capability);
+        let file = fixture.file(bytes);
         let mut evaluation = Evaluation::default();
-        assert!(admit_entry(&mut evaluation, Arc::clone(&source), limits)
-            .unwrap()
-            .is_ok());
-        let Err(twice) = admit_entry(&mut evaluation, source, limits) else {
+        assert!(admit_entry(&mut evaluation, &file, limits).unwrap().is_ok());
+        let Err(twice) = admit_entry(&mut evaluation, &file, limits) else {
             panic!("Phase 1 records its units once");
         };
         assert_eq!(
@@ -1230,6 +1235,36 @@ pub(super) mod tests {
         );
     }
 
+    /// When Phase 1 admits no value, the Shared projection is unavailable for
+    /// Phase 1's blocking Findings alone: Phase 0's explain no missing value
+    /// (D15:1165, 2369).
+    #[test]
+    fn the_shared_projection_is_unavailable_for_phase_1s_findings_alone() {
+        let mut inputs = Inputs::complete();
+        inputs.specifications.project_profile = None;
+        let (_, limits) = entry_input(&inputs.config, &inputs.capability);
+        let fixture = FileFixture::new(&inputs.capability);
+        let file = fixture.file(Arc::from(&br#"{"schemaVersion":"#[..]));
+        inputs.prepared(|_, invocation| {
+            let mut evaluation = Evaluation::default();
+            admit_project_profile(
+                &mut evaluation,
+                invocation.supported,
+                invocation.specifications,
+            )
+            .unwrap()
+            .unwrap_err();
+            let Ok(Err(causes)) = admit_entry(&mut evaluation, &file, limits) else {
+                panic!("the file is not strict JSON");
+            };
+            assert_eq!(
+                causes.keys().map(IssueKey::unit).collect::<Vec<_>>(),
+                [&input(Check::WellFormedJson)]
+            );
+            assert_eq!(evaluation.issues().count(), 2);
+        });
+    }
+
     /// When strict file entry admits no value there is no Shared projection,
     /// so no unit after Phase 1 is recorded, while Phase 0 and Phase 1 keep
     /// their statuses and Findings (D15:2145, 2369).
@@ -1237,12 +1272,14 @@ pub(super) mod tests {
     fn without_an_entered_value_no_unit_after_entry_is_recorded() {
         let inputs = Inputs::complete();
         let (_, limits) = entry_input(&inputs.config, &inputs.capability);
+        let fixture = FileFixture::new(&inputs.capability);
+        let file = fixture.file(Arc::from(&br#"{"schemaVersion":"#[..]));
         inputs.prepared(|configuration, invocation| {
             let mut evaluation = Evaluation::default();
             let mut set = None;
             let state = invoke_entry(
                 &mut evaluation,
-                (Arc::from(&br#"{"schemaVersion":"#[..]), limits),
+                (&file, limits),
                 configuration,
                 invocation,
                 FixtureProvider::new(),

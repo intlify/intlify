@@ -127,6 +127,20 @@ impl<'a> RecordViews<'a> {
         Ok(Value::Object(view))
     }
 
+    /// The view of the Shared-unavailability cause that names the blocking
+    /// Entry Finding `key`: `{ cause }` (D15:2369, 2488). The unit of `key`
+    /// owns it (D15:2207).
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug that leaves the unit of `key` without a view.
+    pub(crate) fn shared_unavailability_cause(
+        &self,
+        key: &IssueKey,
+    ) -> Result<Value, ViewInvariant> {
+        Ok(json!({ "cause": self.finding_key(key)? }))
+    }
+
     /// The view of `unit`'s evaluation status, `{ unit, state, causes? }`,
     /// with causes exactly when it is not evaluated.
     ///

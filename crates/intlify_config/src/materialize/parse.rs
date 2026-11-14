@@ -338,7 +338,7 @@ impl Parser<'_> {
 /// The UTF-16 code units of the value of the string token at `span`, which
 /// strict tokenization already validated: escapes decode to their units, a
 /// lone surrogate included, and other bytes are UTF-8 scalars.
-fn name_units(source: &[u8], span: ByteSpan) -> Vec<u16> {
+pub(super) fn name_units(source: &[u8], span: ByteSpan) -> Vec<u16> {
     let start = usize::try_from(span.start_byte()).expect("parser-proven source offset");
     let end = usize::try_from(span.end_byte()).expect("parser-proven source offset");
     let mut rest = &source[start + 1..end - 1];

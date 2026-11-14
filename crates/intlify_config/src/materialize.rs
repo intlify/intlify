@@ -330,6 +330,14 @@ pub(crate) fn materialize_file(
     })
 }
 
+/// The name of the member whose key is at `key` in the parsed `source`, for
+/// classification only: a lone surrogate becomes U+FFFD, so a name outside
+/// the Unicode scalar domain is never schema-defined or a valid identifier,
+/// and its member stays unsafe (D15:776).
+pub(crate) fn member_name(source: &[u8], key: ByteSpan) -> String {
+    String::from_utf16_lossy(&parse::name_units(source, key))
+}
+
 mod lex;
 mod parse;
 mod typed;
