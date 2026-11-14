@@ -10341,598 +10341,6 @@
     {
       "declaration": {
         "operation": "structural-analysis",
-        "fixture": "two-profiles",
-        "fixtureRevision": "0",
-        "limit": ["profiles", "exact"],
-        "selector": "absent",
-        "expectedKind": "structural-complete"
-      },
-      "inputContext": "e72bfe3c658ebd1f2d5d97e8c92ffb96ad4f440c95f68c831ec53571a7663a68",
-      "result": {
-        "shared": "e92890ba054057d47676e6123926dc1ac9848c97d858b9ae10a611a57cf8f384",
-        "entry": "e885ae618ed20a0b93710116c305845d6849ea457a83a8d29c39ea397b72867b"
-      },
-      "logicalWork": "13478ac51ae5560ed1163decf2499f8f03db89dbbf5ccb66f02ec5c706ac14e7",
-      "work": {
-        "profileIdentity": "intlify-config-minimum-input-work",
-        "profileRevision": "0",
-        "operation": "structural-analysis",
-        "facts": [
-          {
-            "kind": "raw-file-bytes",
-            "unit": "octet",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "3088"
-            }
-          },
-          {
-            "kind": "parser-tokens-visited",
-            "unit": "parser-token",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "421"
-            }
-          },
-          {
-            "kind": "logical-value-nodes",
-            "unit": "logical-value",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "109"
-            }
-          },
-          {
-            "kind": "maximum-value-depth",
-            "unit": "value-level",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "7"
-            }
-          },
-          {
-            "kind": "collection-entries",
-            "unit": "collection-entry",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "108"
-            }
-          },
-          {
-            "kind": "total-decoded-string-bytes",
-            "unit": "utf8-octet",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2480"
-            }
-          },
-          {
-            "kind": "maximum-decoded-string-bytes",
-            "unit": "utf8-octet",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "71"
-            }
-          },
-          {
-            "kind": "profile-declarations",
-            "unit": "profile-declaration",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "maximum-declared-profile-id-bytes",
-            "unit": "utf8-octet",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "5"
-            }
-          },
-          {
-            "kind": "structural-analysis-units",
-            "unit": "applicable-keyword-subject",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "380"
-            }
-          },
-          {
-            "kind": "retained-admission-issues",
-            "unit": "retained-record",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "0"
-            }
-          },
-          {
-            "kind": "retained-schema-fragments",
-            "unit": "retained-record",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "223"
-            }
-          },
-          {
-            "kind": "retained-schema-issues-including-alternatives",
-            "unit": "retained-record",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "0"
-            }
-          },
-          {
-            "kind": "selector-id-bytes",
-            "unit": "utf8-octet",
-            "stage": "not-applicable",
-            "observation": {
-              "state": "not-applicable"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "declaration": {
-        "operation": "structural-analysis",
-        "fixture": "two-profiles",
-        "fixtureRevision": "0",
-        "limit": ["profiles", "first-over"],
-        "selector": "absent",
-        "expectedKind": "structural-blocked"
-      },
-      "inputContext": "73bcd3a81c0b1969414142ccb3fec00e6c85d64dc94da1ba4d576f963f78acba",
-      "result": {
-        "shared": "543314e8e34bd2f03ca83144fc1130bd3ad73d79104cd2d93d2fb8a15b00c357",
-        "entry": "4b3e4cb9d36fe0ef8038a4d470457fe016d8cbbed3b578b84cb4044613899428"
-      },
-      "logicalWork": "b741f4bf9aaafc7787f365dfa0c5cb6efbcd9a3774e3afa88cbe9022f11e287a",
-      "work": {
-        "profileIdentity": "intlify-config-minimum-input-work",
-        "profileRevision": "0",
-        "operation": "structural-analysis",
-        "facts": [
-          {
-            "kind": "raw-file-bytes",
-            "unit": "octet",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "3088"
-            }
-          },
-          {
-            "kind": "parser-tokens-visited",
-            "unit": "parser-token",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "421"
-            }
-          },
-          {
-            "kind": "logical-value-nodes",
-            "unit": "logical-value",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "109"
-            }
-          },
-          {
-            "kind": "maximum-value-depth",
-            "unit": "value-level",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "7"
-            }
-          },
-          {
-            "kind": "collection-entries",
-            "unit": "collection-entry",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "108"
-            }
-          },
-          {
-            "kind": "total-decoded-string-bytes",
-            "unit": "utf8-octet",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "2480"
-            }
-          },
-          {
-            "kind": "maximum-decoded-string-bytes",
-            "unit": "utf8-octet",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "71"
-            }
-          },
-          {
-            "kind": "profile-declarations",
-            "unit": "profile-declaration",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "2"
-            }
-          },
-          {
-            "kind": "maximum-declared-profile-id-bytes",
-            "unit": "utf8-octet",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "5"
-            }
-          },
-          {
-            "kind": "structural-analysis-units",
-            "unit": "applicable-keyword-subject",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "7"
-            }
-          },
-          {
-            "kind": "retained-admission-issues",
-            "unit": "retained-record",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "1"
-            }
-          },
-          {
-            "kind": "retained-schema-fragments",
-            "unit": "retained-record",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "4"
-            }
-          },
-          {
-            "kind": "retained-schema-issues-including-alternatives",
-            "unit": "retained-record",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "0"
-            }
-          },
-          {
-            "kind": "selector-id-bytes",
-            "unit": "utf8-octet",
-            "stage": "not-applicable",
-            "observation": {
-              "state": "not-applicable"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "declaration": {
-        "operation": "structural-analysis",
-        "fixture": "minimal",
-        "fixtureRevision": "0",
-        "limit": ["profile-id-bytes", "exact"],
-        "selector": "absent",
-        "expectedKind": "structural-complete"
-      },
-      "inputContext": "d864b3bd648558e1fdbae867353f098d9b37ff35511d0dfe783ca808a293b1ef",
-      "result": {
-        "shared": "78a406e4bdfbd12839f815e86fccda009a7fa61213e0d1cc5307c8335866b717",
-        "entry": "2012d733479df5da420603d6a728653eb949c85e11c3daf1b3b93ccb78363d47"
-      },
-      "logicalWork": "5aae81737fc41d36fa88142fa9b07face23b073c5f76af716f79e7f993a6ace0",
-      "work": {
-        "profileIdentity": "intlify-config-minimum-input-work",
-        "profileRevision": "0",
-        "operation": "structural-analysis",
-        "facts": [
-          {
-            "kind": "raw-file-bytes",
-            "unit": "octet",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "1560"
-            }
-          },
-          {
-            "kind": "parser-tokens-visited",
-            "unit": "parser-token",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "215"
-            }
-          },
-          {
-            "kind": "logical-value-nodes",
-            "unit": "logical-value",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "56"
-            }
-          },
-          {
-            "kind": "maximum-value-depth",
-            "unit": "value-level",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "7"
-            }
-          },
-          {
-            "kind": "collection-entries",
-            "unit": "collection-entry",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "55"
-            }
-          },
-          {
-            "kind": "total-decoded-string-bytes",
-            "unit": "utf8-octet",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "1250"
-            }
-          },
-          {
-            "kind": "maximum-decoded-string-bytes",
-            "unit": "utf8-octet",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "71"
-            }
-          },
-          {
-            "kind": "profile-declarations",
-            "unit": "profile-declaration",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "1"
-            }
-          },
-          {
-            "kind": "maximum-declared-profile-id-bytes",
-            "unit": "utf8-octet",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "3"
-            }
-          },
-          {
-            "kind": "structural-analysis-units",
-            "unit": "applicable-keyword-subject",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "196"
-            }
-          },
-          {
-            "kind": "retained-admission-issues",
-            "unit": "retained-record",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "0"
-            }
-          },
-          {
-            "kind": "retained-schema-fragments",
-            "unit": "retained-record",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "114"
-            }
-          },
-          {
-            "kind": "retained-schema-issues-including-alternatives",
-            "unit": "retained-record",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "0"
-            }
-          },
-          {
-            "kind": "selector-id-bytes",
-            "unit": "utf8-octet",
-            "stage": "not-applicable",
-            "observation": {
-              "state": "not-applicable"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "declaration": {
-        "operation": "structural-analysis",
-        "fixture": "minimal",
-        "fixtureRevision": "0",
-        "limit": ["profile-id-bytes", "first-over"],
-        "selector": "absent",
-        "expectedKind": "structural-blocked"
-      },
-      "inputContext": "f94525f3ef0b9b5b37c0e60f128e0a2c3d96be38b79eb463278a79a24b50ac9f",
-      "result": {
-        "shared": "7ad8606e8f98d8451f02ec7fdb2605d2f7250c2ba779eea92d66f1248e136b26",
-        "entry": "03a60519d4c86bb87294825701f99eb1708e6ecedf5c0b4adb75257b2af0540d"
-      },
-      "logicalWork": "ca7ebbf6127e4d3d4164c5ac0517decb3d7aecd2a776bfdc57513a5386ab95d3",
-      "work": {
-        "profileIdentity": "intlify-config-minimum-input-work",
-        "profileRevision": "0",
-        "operation": "structural-analysis",
-        "facts": [
-          {
-            "kind": "raw-file-bytes",
-            "unit": "octet",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "1560"
-            }
-          },
-          {
-            "kind": "parser-tokens-visited",
-            "unit": "parser-token",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "215"
-            }
-          },
-          {
-            "kind": "logical-value-nodes",
-            "unit": "logical-value",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "56"
-            }
-          },
-          {
-            "kind": "maximum-value-depth",
-            "unit": "value-level",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "7"
-            }
-          },
-          {
-            "kind": "collection-entries",
-            "unit": "collection-entry",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "55"
-            }
-          },
-          {
-            "kind": "total-decoded-string-bytes",
-            "unit": "utf8-octet",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "1250"
-            }
-          },
-          {
-            "kind": "maximum-decoded-string-bytes",
-            "unit": "utf8-octet",
-            "stage": "prepared-input",
-            "observation": {
-              "state": "exact",
-              "value": "71"
-            }
-          },
-          {
-            "kind": "profile-declarations",
-            "unit": "profile-declaration",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "1"
-            }
-          },
-          {
-            "kind": "maximum-declared-profile-id-bytes",
-            "unit": "utf8-octet",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "3"
-            }
-          },
-          {
-            "kind": "structural-analysis-units",
-            "unit": "applicable-keyword-subject",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "12"
-            }
-          },
-          {
-            "kind": "retained-admission-issues",
-            "unit": "retained-record",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "1"
-            }
-          },
-          {
-            "kind": "retained-schema-fragments",
-            "unit": "retained-record",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "6"
-            }
-          },
-          {
-            "kind": "retained-schema-issues-including-alternatives",
-            "unit": "retained-record",
-            "stage": "operation-result",
-            "observation": {
-              "state": "exact",
-              "value": "0"
-            }
-          },
-          {
-            "kind": "selector-id-bytes",
-            "unit": "utf8-octet",
-            "stage": "not-applicable",
-            "observation": {
-              "state": "not-applicable"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "declaration": {
-        "operation": "structural-analysis",
         "fixture": "minimal",
         "fixtureRevision": "0",
         "limit": ["structural-units", "exact"],
@@ -11210,6 +10618,600 @@
             "kind": "retained-schema-issues-including-alternatives",
             "unit": "retained-record",
             "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "selector-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "not-applicable",
+            "observation": {
+              "state": "not-applicable"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "profile-selection",
+        "fixture": "two-profiles",
+        "fixtureRevision": "0",
+        "limit": ["profiles", "exact"],
+        "selector": "app",
+        "expectedKind": "selected"
+      },
+      "inputContext": "3348f7b6eeeea83e1870ee10dbc6f2c7054f9bcf12792af8e29e134564430175",
+      "result": {
+        "shared": "d5df6cf8fc20c262d2be180905855a7fc9f8e747abf45b4de33b278c605dc73c",
+        "entry": "1b676053d98b8436ad2758f42966c7386660da22446e4fe8d5c5a44b77d729ed"
+      },
+      "logicalWork": "9049176617f8e0dbf99fb4093f9465cce7710cc60ec9732dc8df0beb32e0b1e9",
+      "work": {
+        "profileIdentity": "intlify-config-minimum-input-work",
+        "profileRevision": "0",
+        "operation": "profile-selection",
+        "facts": [
+          {
+            "kind": "raw-file-bytes",
+            "unit": "octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3088"
+            }
+          },
+          {
+            "kind": "parser-tokens-visited",
+            "unit": "parser-token",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "421"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "109"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "108"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2480"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "profile-declarations",
+            "unit": "profile-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "maximum-declared-profile-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "structural-analysis-units",
+            "unit": "applicable-keyword-subject",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "380"
+            }
+          },
+          {
+            "kind": "retained-admission-issues",
+            "unit": "retained-record",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "retained-schema-fragments",
+            "unit": "retained-record",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "223"
+            }
+          },
+          {
+            "kind": "retained-schema-issues-including-alternatives",
+            "unit": "retained-record",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "selector-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "profile-selection",
+        "fixture": "two-profiles",
+        "fixtureRevision": "0",
+        "limit": ["profiles", "first-over"],
+        "selector": "app",
+        "expectedKind": "selection-unavailable"
+      },
+      "inputContext": "ed984935d8a9acafe2693842b107cbca2ddca42b9ce521d21d2d3e94caeeb41a",
+      "result": {
+        "shared": "5a09442cbc3e743817aa7ad78c9e3ebac71a127867ed934fca422c433e88d125",
+        "entry": null
+      },
+      "logicalWork": "9049176617f8e0dbf99fb4093f9465cce7710cc60ec9732dc8df0beb32e0b1e9",
+      "work": {
+        "profileIdentity": "intlify-config-minimum-input-work",
+        "profileRevision": "0",
+        "operation": "profile-selection",
+        "facts": [
+          {
+            "kind": "raw-file-bytes",
+            "unit": "octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3088"
+            }
+          },
+          {
+            "kind": "parser-tokens-visited",
+            "unit": "parser-token",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "421"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "109"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "108"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2480"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "profile-declarations",
+            "unit": "profile-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "maximum-declared-profile-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "structural-analysis-units",
+            "unit": "applicable-keyword-subject",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "380"
+            }
+          },
+          {
+            "kind": "retained-admission-issues",
+            "unit": "retained-record",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "retained-schema-fragments",
+            "unit": "retained-record",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "223"
+            }
+          },
+          {
+            "kind": "retained-schema-issues-including-alternatives",
+            "unit": "retained-record",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "selector-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "profile-selection",
+        "fixture": "minimal",
+        "fixtureRevision": "0",
+        "limit": ["profile-id-bytes", "exact"],
+        "selector": "absent",
+        "expectedKind": "selected"
+      },
+      "inputContext": "ca3fb22298830734408718bdb380fe48dca93f46fb1cf91cffa21d0e437e5c7e",
+      "result": {
+        "shared": "d5df6cf8fc20c262d2be180905855a7fc9f8e747abf45b4de33b278c605dc73c",
+        "entry": "1b676053d98b8436ad2758f42966c7386660da22446e4fe8d5c5a44b77d729ed"
+      },
+      "logicalWork": "7e30507912de9fbb767016104888d67af782583cf2572c884fec242fa225a3ff",
+      "work": {
+        "profileIdentity": "intlify-config-minimum-input-work",
+        "profileRevision": "0",
+        "operation": "profile-selection",
+        "facts": [
+          {
+            "kind": "raw-file-bytes",
+            "unit": "octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1560"
+            }
+          },
+          {
+            "kind": "parser-tokens-visited",
+            "unit": "parser-token",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "215"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "56"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "55"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1250"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "profile-declarations",
+            "unit": "profile-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "maximum-declared-profile-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "structural-analysis-units",
+            "unit": "applicable-keyword-subject",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "196"
+            }
+          },
+          {
+            "kind": "retained-admission-issues",
+            "unit": "retained-record",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "retained-schema-fragments",
+            "unit": "retained-record",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "114"
+            }
+          },
+          {
+            "kind": "retained-schema-issues-including-alternatives",
+            "unit": "retained-record",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "selector-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "not-applicable",
+            "observation": {
+              "state": "not-applicable"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "profile-selection",
+        "fixture": "minimal",
+        "fixtureRevision": "0",
+        "limit": ["profile-id-bytes", "first-over"],
+        "selector": "absent",
+        "expectedKind": "selection-unavailable"
+      },
+      "inputContext": "14301e60ee62f9856084161f432ca489c6a876c629b8c177dfed3de0d81bc3de",
+      "result": {
+        "shared": "fdd26964182e0567d90a6f42b30035cacd9c76bbfc1947b96efb98f02442fc96",
+        "entry": null
+      },
+      "logicalWork": "7e30507912de9fbb767016104888d67af782583cf2572c884fec242fa225a3ff",
+      "work": {
+        "profileIdentity": "intlify-config-minimum-input-work",
+        "profileRevision": "0",
+        "operation": "profile-selection",
+        "facts": [
+          {
+            "kind": "raw-file-bytes",
+            "unit": "octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1560"
+            }
+          },
+          {
+            "kind": "parser-tokens-visited",
+            "unit": "parser-token",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "215"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "56"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "55"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1250"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "profile-declarations",
+            "unit": "profile-declaration",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "maximum-declared-profile-id-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "structural-analysis-units",
+            "unit": "applicable-keyword-subject",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "196"
+            }
+          },
+          {
+            "kind": "retained-admission-issues",
+            "unit": "retained-record",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "retained-schema-fragments",
+            "unit": "retained-record",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "114"
+            }
+          },
+          {
+            "kind": "retained-schema-issues-including-alternatives",
+            "unit": "retained-record",
+            "stage": "prepared-input",
             "observation": {
               "state": "exact",
               "value": "0"

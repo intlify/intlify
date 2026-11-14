@@ -82,12 +82,11 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
         if let Some(profiles) = self.profiles {
             shared.uint(order[&profiles]);
         }
-        let mut excluded: Vec<_> = self.excluded.iter().map(|id| order[id]).collect();
-        excluded.sort_unstable();
-        shared.uint(u64::try_from(excluded.len()).expect("bounded exclusions"));
-        for rank in excluded {
-            shared.uint(rank);
-        }
+        // Structural admission excludes no declaration: profile selection
+        // applies `maxProfiles` and `maxProfileIdBytes`. The frame keeps the
+        // empty exclusion count it had, so an analysis whose result did not
+        // change keeps its encoding.
+        shared.uint(0);
         shared.uint(u64::try_from(self.issues.len()).expect("bounded admission issues"));
         for issue in &self.issues {
             match issue.reason {
@@ -95,16 +94,6 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
                 StructuralFailure::SchemaVersionMissing => shared.uint(1),
                 StructuralFailure::SchemaVersionTypeInvalid => shared.uint(2),
                 StructuralFailure::SchemaVersionUnsupported => shared.uint(3),
-                StructuralFailure::ProfilesLimit { limit, actual } => {
-                    shared.uint(4);
-                    shared.uint(limit.get());
-                    shared.uint(actual);
-                }
-                StructuralFailure::ProfileIdLimit { limit, actual } => {
-                    shared.uint(5);
-                    shared.uint(limit.get());
-                    shared.uint(actual);
-                }
                 StructuralFailure::StructuralWorkLimit { limit, actual } => {
                     shared.uint(6);
                     shared.uint(limit.get());
@@ -125,7 +114,6 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
                     FragmentState::Admitted => 0,
                     FragmentState::Invalid => 1,
                     FragmentState::TypeUnavailable => 2,
-                    FragmentState::ResourceUnavailable => 3,
                 });
             }
             observe_issues(

@@ -16,7 +16,7 @@ use super::{AuthoringSchema, StructuralAnalysis, StructuralFailure, StructuralLi
 
 pub(crate) type FixtureAnalysis =
     StructuralAnalysis<FixturePolicyReference, FixtureTargetReference>;
-type FixtureSchema = AuthoringSchema<FixturePolicyReference, FixtureTargetReference>;
+pub(crate) type FixtureSchema = AuthoringSchema<FixturePolicyReference, FixtureTargetReference>;
 
 pub(super) fn limits() -> StructuralLimits {
     // Explicit finite test capacity, never an implicit production default.
@@ -183,46 +183,30 @@ fn a_passing_alternative_does_not_admit_an_invalid_enclosing_field() {
     assert!(analysis.construct().unwrap().is_none());
 }
 
+/// D15:1885-1887: `maxProfiles` and `maxProfileIdBytes` are profile
+/// selection's bounds, so structural admission evaluates every declaration
+/// whatever their values; selection applies them (`selection::tests`).
 #[test]
-fn profile_count_and_id_bounds_accept_exact_and_report_all_independent_overruns() {
+fn the_profile_bounds_leave_structural_admission_complete() {
     let mut value = minimal_config();
     value["profiles"]["bpp"] = value["profiles"]["app"].clone();
     let schema = FixtureSchema::for_model().unwrap();
     let doc = document(&value);
     let mut capacity = limits();
-    capacity.max_profiles = Bound::new(2).unwrap();
-    capacity.max_profile_id_bytes = Bound::new(3).unwrap();
-    assert!(schema
-        .analyze(Arc::clone(&doc), capacity)
-        .unwrap()
-        .is_complete());
     capacity.max_profiles = Bound::new(1).unwrap();
     capacity.max_profile_id_bytes = Bound::new(2).unwrap();
     let analysis = schema.analyze(doc, capacity).unwrap();
-    assert!(!analysis.is_complete());
-    assert_eq!(analysis.issues().len(), 3);
-    assert_eq!(
-        analysis.issues()[0].reason,
-        StructuralFailure::ProfilesLimit {
-            limit: capacity.max_profiles,
-            actual: 2
-        }
-    );
-    for issue in &analysis.issues()[1..] {
-        assert_eq!(
-            issue.reason,
-            StructuralFailure::ProfileIdLimit {
-                limit: capacity.max_profile_id_bytes,
-                actual: 3
-            }
-        );
-    }
-    assert!(analysis.profile("app").unwrap().is_none());
-    assert!(analysis.construct().unwrap().is_none());
+    assert!(analysis.is_complete());
+    assert!(analysis.issues().is_empty());
+    assert!(analysis.profile("app").unwrap().is_some());
+    assert!(analysis.construct().unwrap().is_some());
 }
 
+/// A Profile ID past `maxProfileIdBytes` is still a declaration structural
+/// admission checks: its key's syntax, and the other declarations, without
+/// disclosing the key.
 #[test]
-fn id_overrun_prevents_key_validation_and_descendant_work_but_not_other_profiles() {
+fn an_over_long_profile_id_is_still_checked_structurally() {
     let mut value = minimal_config();
     value["profiles"]["PRIVATE-KEY"] = json!({"unknown":"private-value"});
     let mut capacity = limits();
@@ -231,45 +215,11 @@ fn id_overrun_prevents_key_validation_and_descendant_work_but_not_other_profiles
         .unwrap()
         .analyze(document(&value), capacity)
         .unwrap();
-    assert_eq!(analysis.issues().len(), 1);
-    assert!(matches!(
-        analysis.issues()[0].reason,
-        StructuralFailure::ProfileIdLimit { actual: 11, .. }
-    ));
-    assert_eq!(analysis.schema_issue_count(), 0);
+    assert!(analysis.issues().is_empty());
+    assert_eq!(analysis.schema_issue_count(), 1);
     assert!(analysis.profile("app").unwrap().is_some());
     assert!(analysis.construct().unwrap().is_none());
     assert!(!format!("{:?}", analysis.issues()).contains("PRIVATE-KEY"));
-}
-
-#[test]
-fn raw_id_bytes_are_counted_before_syntax_admission_and_escape_spelling_is_not_the_unit() {
-    let mut value = minimal_config();
-    value["profiles"]["日本"] = value["profiles"]["app"].clone();
-    let mut capacity = limits();
-    capacity.max_profile_id_bytes = Bound::new(5).unwrap();
-    let schema = FixtureSchema::for_model().unwrap();
-    let analysis = schema.analyze(document(&value), capacity).unwrap();
-    assert_eq!(
-        analysis.issues()[0].reason,
-        StructuralFailure::ProfileIdLimit {
-            limit: capacity.max_profile_id_bytes,
-            actual: 6
-        }
-    );
-    let raw = serde_json::to_string(&value)
-        .unwrap()
-        .replace("日本", "\\u65e5\\u672c");
-    let doc = Arc::new(
-        materialize_file(
-            Arc::from(raw.into_bytes()),
-            crate::materialize_tests::limits(),
-        )
-        .unwrap(),
-    );
-    let escaped = schema.analyze(doc, capacity).unwrap();
-    assert_eq!(analysis.issues()[0].reason, escaped.issues()[0].reason);
-    assert!(escaped.construct().unwrap().is_none());
 }
 
 #[test]
@@ -324,7 +274,7 @@ fn result_owns_input_and_binding_and_repeated_invocations_do_not_share_state() {
         .unwrap()
         .is_complete());
     let mut lower = limits();
-    lower.max_profile_id_bytes = Bound::new(1).unwrap();
+    lower.max_structural_analysis_units = Bound::new(1).unwrap();
     assert!(!schema
         .analyze(document(&minimal_config()), lower)
         .unwrap()

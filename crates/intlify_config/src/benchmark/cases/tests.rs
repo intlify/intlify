@@ -6,7 +6,9 @@ use std::sync::Arc;
 
 use crate::input_limits::Bound;
 use crate::materialize::materialize_file;
-use crate::structural::selection::{InvalidSelectorType, Selection, SelectorInput};
+use crate::structural::selection::{
+    InvalidSelectorType, Selection, SelectionPrerequisite, SelectorInput,
+};
 use crate::structural::StructuralLimits;
 
 use super::prepare::{configuration_schema, prepare, PreparationFailure};
@@ -52,6 +54,7 @@ fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
     for limit in LimitKind::ENTRY
         .into_iter()
         .chain(LimitKind::STRUCTURAL)
+        .chain(LimitKind::SELECTION)
         .chain([
             LimitKind::LocaleRawIdentifierBytes,
             LimitKind::LocaleCanonicalIdentifierBytes,
@@ -250,14 +253,25 @@ fn every_finite_case_prepares_its_exact_result_and_work_including_all_limit_edge
                     }
                     Output::Structural(Ok(analysis)) => {
                         assert_eq!(analysis.issues().len(), 1);
-                        let (StructuralFailure::ProfilesLimit { limit, actual }
-                        | StructuralFailure::ProfileIdLimit { limit, actual }
-                        | StructuralFailure::StructuralWorkLimit { limit, actual }) =
+                        let StructuralFailure::StructuralWorkLimit { limit, actual } =
                             analysis.issues()[0].reason
                         else {
                             panic!("wrong structural rejection");
                         };
                         assert_eq!(actual, limit.get() + 1);
+                    }
+                    // Selection applies `maxProfiles` to every declaration and
+                    // `maxProfileIdBytes` to the one it selects, and one past
+                    // either selects nothing.
+                    Output::Select(Ok(Selection::Unavailable(prerequisite))) => {
+                        assert_eq!(
+                            *prerequisite,
+                            if kind == LimitKind::Profiles {
+                                SelectionPrerequisite::ProfilesLimit
+                            } else {
+                                SelectionPrerequisite::DeclarationIdentity
+                            }
+                        );
                     }
                     Output::Locale(Err(crate::locale::CanonicalizationFailure::ByteLimit {
                         limit,

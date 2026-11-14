@@ -3,7 +3,10 @@
 
 //! Private, provisional profile selection. No retained selector projection,
 //! final Finding, or checked Profile is produced here; Phase 4 rechecks the
-//! selector under the final projection authority.
+//! selector under the final projection authority. Selection applies the
+//! pre-policy `maxProfiles` to every declaration and `maxProfileIdBytes` to
+//! the declaration it selects and to the selector, which 015 gives
+//! `profile-selection` (D15:1885, 1886, Decision 015-162).
 
 use serde::de::{value::BorrowedStrDeserializer, DeserializeOwned};
 use serde::Deserialize;
@@ -292,12 +295,14 @@ impl<Policy: DeserializeOwned, Target> StructuralAnalysis<Policy, Target> {
         let Some(container) = self.profiles else {
             return Ok(Selection::Unavailable(SelectionPrerequisite::ProfilesShape));
         };
-        if self.excluded.contains(&container) {
-            return Ok(Selection::Unavailable(SelectionPrerequisite::ProfilesLimit));
-        }
         let NodeKind::Object(profiles) = self.doc.node(container).kind() else {
             return Ok(Selection::Unavailable(SelectionPrerequisite::ProfilesShape));
         };
+        // Every declaration counts (D15:1885).
+        let count = u64::try_from(profiles.len()).expect("materialized collection count fits u64");
+        if count > self.limits.max_profiles.get() {
+            return Ok(Selection::Unavailable(SelectionPrerequisite::ProfilesLimit));
+        }
         if profiles.is_empty() {
             return Ok(Selection::Unavailable(SelectionPrerequisite::ProfilesShape));
         }
@@ -315,7 +320,10 @@ impl<Policy: DeserializeOwned, Target> StructuralAnalysis<Policy, Target> {
             }
             profiles.first_key_value().expect("non-empty profile map")
         };
-        if self.excluded.contains(&member.value()) || !valid_identity(id) {
+        // The selected declaration's ID is within `maxProfileIdBytes` and
+        // has the identifier syntax (D15:1886).
+        let id_bytes = u64::try_from(id.len()).expect("materialized key length fits u64");
+        if id_bytes > self.limits.max_profile_id_bytes.get() || !valid_identity(id) {
             return Ok(Selection::Unavailable(
                 SelectionPrerequisite::DeclarationIdentity,
             ));

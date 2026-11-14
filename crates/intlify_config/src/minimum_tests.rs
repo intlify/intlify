@@ -15,7 +15,7 @@ use crate::resolver::evaluation::{Actual, Code, Evaluation, Status, Subject};
 use crate::resolver::locales::{
     LocaleInvariant, LocaleKey, LocaleSet, LocaleSubject, Location, ResolvedLocales,
 };
-use crate::structural::selection::SelectionFailure;
+use crate::structural::selection::{SelectionFailure, SelectionPrerequisite};
 use crate::structural::StructuralFailure;
 
 mod harness;
@@ -456,18 +456,14 @@ fn resource_edges_stop_at_their_owning_stage_without_later_semantic_work() {
     multiple["profiles"]["other"] = multiple["profiles"]["app"].clone();
     let mut limits = FixtureLimits::finite();
     limits.structural.max_profiles = Bound::new(1).unwrap();
+    // Profile selection, not structural admission, counts the declarations
+    // (D15:1885).
     let result = FixtureRunner::new(limits).run(source(&multiple), Some("app"));
-    assert_eq!(result.steps, [Step::Materialize, Step::Structural]);
-    let Outcome::Structural(analysis) = result.outcome else {
+    assert_eq!(result.steps, Step::ALL[..4]);
+    let Outcome::SelectionUnavailable(prerequisite) = result.outcome else {
         unreachable!()
     };
-    assert_eq!(
-        analysis.issues()[0].reason,
-        StructuralFailure::ProfilesLimit {
-            limit: Bound::new(1).unwrap(),
-            actual: 2
-        }
-    );
+    assert_eq!(prerequisite, SelectionPrerequisite::ProfilesLimit);
 
     // The project's requested and default locales, and the browser
     // target's requested locale.

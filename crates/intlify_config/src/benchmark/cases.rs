@@ -100,7 +100,9 @@ impl LimitKind {
         Self::TotalStringBytes,
         Self::SingleStringBytes,
     ];
-    const STRUCTURAL: [Self; 3] = [Self::Profiles, Self::ProfileIdBytes, Self::StructuralUnits];
+    const STRUCTURAL: [Self; 1] = [Self::StructuralUnits];
+    /// The pre-policy bounds of `profile-selection` (D15:1885, 1886).
+    const SELECTION: [Self; 2] = [Self::Profiles, Self::ProfileIdBytes];
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -515,6 +517,7 @@ pub(super) fn declarations() -> Vec<Declaration> {
     for (operation, limits) in [
         (Operation::FileMaterialization, &LimitKind::ENTRY[..]),
         (Operation::StructuralAnalysis, &LimitKind::STRUCTURAL[..]),
+        (Operation::ProfileSelection, &LimitKind::SELECTION[..]),
     ] {
         for &limit in limits {
             for edge in [LimitEdge::Exact, LimitEdge::FirstOver] {
@@ -525,17 +528,22 @@ pub(super) fn declarations() -> Vec<Declaration> {
                     (Operation::FileMaterialization, LimitEdge::FirstOver) => {
                         ExpectedKind::EntryFailure
                     }
+                    (Operation::ProfileSelection, LimitEdge::Exact) => ExpectedKind::Selected,
+                    (Operation::ProfileSelection, LimitEdge::FirstOver) => {
+                        ExpectedKind::SelectionUnavailable
+                    }
                     (_, LimitEdge::Exact) => ExpectedKind::StructuralComplete,
                     (_, LimitEdge::FirstOver) => ExpectedKind::StructuralBlocked,
                 };
                 // Two profiles make first-over representable with a positive
-                // bound. No case fabricates a zero ResourceBoundValue.
-                let fixture = if limit == LimitKind::Profiles {
-                    Recipe::TwoProfiles
+                // bound, and need the selector to name one. No case fabricates
+                // a zero ResourceBoundValue.
+                let (fixture, selector) = if limit == LimitKind::Profiles {
+                    (Recipe::TwoProfiles, Selector::App)
                 } else {
-                    Recipe::Minimal
+                    (Recipe::Minimal, Selector::Absent)
                 };
-                let mut case = declaration(operation, fixture, Selector::Absent, expected);
+                let mut case = declaration(operation, fixture, selector, expected);
                 case.limit = Some((limit, edge));
                 cases.push(case);
             }

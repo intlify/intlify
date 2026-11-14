@@ -10,8 +10,6 @@
 //! This is an internal schema operation, not configuration-version admission or
 //! final Finding/Evidence construction. Consumers cannot obtain a checked Profile.
 
-use std::collections::BTreeSet;
-
 use crate::input_limits::Bound;
 use crate::materialize::{ByteSpan, MaterializedDocument, NodeId, NodeKind};
 use crate::model::valid_identity;
@@ -51,7 +49,6 @@ pub(super) enum FragmentState {
     Admitted,
     Invalid,
     TypeUnavailable,
-    ResourceUnavailable,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -82,21 +79,10 @@ pub(super) fn evaluate(
     subject: NodeId,
     max_units: Bound,
 ) -> Result<SchemaEvaluation, EvaluationFailure> {
-    evaluate_with_exclusions(program, doc, schema, subject, max_units, &BTreeSet::new())
-}
-
-pub(super) fn evaluate_with_exclusions(
-    program: &SchemaProgram,
-    doc: &MaterializedDocument,
-    schema: SchemaId,
-    subject: NodeId,
-    max_units: Bound,
-    excluded: &BTreeSet<NodeId>,
-) -> Result<SchemaEvaluation, EvaluationFailure> {
     // The immutable schema graph is finite/non-cyclic; materialization already
     // bounded the whole value domain. This pass counts the complete applicable
     // domain without constructing issues, fragments, or owned authoring values.
-    let mut preflight = Walker::new(program, doc, false, excluded);
+    let mut preflight = Walker::new(program, doc, false);
     preflight.walk(schema, subject)?;
     let expected = preflight.units;
     if expected > max_units.get() {
@@ -105,7 +91,7 @@ pub(super) fn evaluate_with_exclusions(
             actual: expected,
         });
     }
-    let mut evaluation = Walker::new(program, doc, true, excluded);
+    let mut evaluation = Walker::new(program, doc, true);
     let admitted = evaluation.walk(schema, subject)?;
     if evaluation.units != expected {
         return Err(EvaluationFailure::AccountingMismatch);
@@ -125,7 +111,6 @@ struct Walker<'input> {
     units: u64,
     issues: Vec<SchemaIssue>,
     fragments: Vec<FragmentAdmission>,
-    excluded: &'input BTreeSet<NodeId>,
 }
 
 impl<'input> Walker<'input> {
@@ -133,7 +118,6 @@ impl<'input> Walker<'input> {
         program: &'input SchemaProgram,
         doc: &'input MaterializedDocument,
         collect: bool,
-        excluded: &'input BTreeSet<NodeId>,
     ) -> Self {
         Self {
             program,
@@ -142,7 +126,6 @@ impl<'input> Walker<'input> {
             units: 0,
             issues: Vec::new(),
             fragments: Vec::new(),
-            excluded,
         }
     }
 
@@ -198,10 +181,6 @@ impl<'input> Walker<'input> {
     }
 
     fn walk(&mut self, id: SchemaId, subject: NodeId) -> Result<bool, EvaluationFailure> {
-        if self.excluded.contains(&subject) {
-            self.fragment(id, subject, FragmentState::ResourceUnavailable);
-            return Ok(false);
-        }
         let program = self.program;
         let doc = self.doc;
         let schema = program.node(id);
@@ -347,13 +326,6 @@ impl<'input> Walker<'input> {
         // Materialized object iteration is unsigned UTF-8 key order. The value
         // tree's physical node IDs and source member order never choose checks.
         for (name, member) in members {
-            // Admission has independently proved this member or domain exceeds
-            // a bound. Do not scan its key pattern or inspect its descendants.
-            if self.excluded.contains(&member.value()) {
-                self.fragment(id, member.value(), FragmentState::ResourceUnavailable);
-                admitted = false;
-                continue;
-            }
             let mut matched = false;
             if let Some(child) = schema.properties.as_ref().and_then(|known| known.get(name)) {
                 admitted &= self.walk(*child, member.value())?;
