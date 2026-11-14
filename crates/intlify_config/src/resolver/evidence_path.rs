@@ -718,7 +718,8 @@ mod tests {
 
     /// Each ID key is kept when it matches the identifier syntax and is within
     /// the capability's bound for its own identifier; the schema goes on below
-    /// a key over the bound, but not below one outside the syntax.
+    /// a key over the bound, and below one outside the syntax, whose entry
+    /// structural admission evaluates (D15:2184).
     #[test]
     fn an_id_key_is_kept_within_its_identifiers_bound() {
         let comparable = comparable();
@@ -731,7 +732,7 @@ mod tests {
         assert_eq!(key(&profiles("Ap"))[1], Step::Unsafe, "outside the syntax");
         let below = |id| [profiles(id), vec![Edge::Member("targetProfiles")]].concat();
         assert_eq!(key(&below("apps"))[2], Step::Safe("targetProfiles"));
-        assert_eq!(key(&below("Ap"))[2], Step::Unsafe);
+        assert_eq!(key(&below("Ap"))[2], Step::Safe("targetProfiles"));
         let target = |id| {
             [
                 profiles("app"),
