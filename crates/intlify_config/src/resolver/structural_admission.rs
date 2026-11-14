@@ -46,7 +46,7 @@ use std::cell::OnceCell;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::materialize::{ByteSpan, MaterializedDocument, NodeId, NodeKind, ObjectMember};
+use crate::materialize::{ByteSpan, MaterializedDocument, NodeId, NodeKind};
 use crate::structural::facts::{
     self, At, Candidate, CandidateId, Entry, Facts, FieldPathId, Level, Outcome, ScopeId,
 };
@@ -461,12 +461,19 @@ fn found(observed: Option<Observation>, code: Code) -> Result<(), Found> {
 /// file Phase 1 read, at the Portable Value Locator of what a check looked at
 /// and the span of its token (D15:790). A value's locator is its internal
 /// path from the root, each member classified, so an unsafe name is never
-/// retained; every value's parent is found once, when a Finding first needs
-/// one.
+/// retained. The document is indexed once, when a Finding first needs it.
 struct Observer<'f, 'd> {
     file: &'f EntryFile<'f>,
     document: &'d MaterializedDocument,
-    parents: OnceCell<BTreeMap<NodeId, (NodeId, Edge<'d>)>>,
+    tree: OnceCell<Tree<'d>>,
+}
+
+/// The materialized document indexed for observation: each value's parent
+/// and the edge from it, a member's name or an element's index, and each
+/// member's name by the span of its key, which is the member's alone.
+struct Tree<'d> {
+    parents: BTreeMap<NodeId, (NodeId, Edge<'d>)>,
+    names: BTreeMap<ByteSpan, &'d str>,
 }
 
 impl<'f, 'd> Observer<'f, 'd> {
@@ -474,40 +481,45 @@ impl<'f, 'd> Observer<'f, 'd> {
         Self {
             file,
             document,
-            parents: OnceCell::new(),
+            tree: OnceCell::new(),
         }
     }
 
-    /// Each value's parent and the edge from it: a member's name or an
-    /// element's index.
-    fn parents(&self) -> &BTreeMap<NodeId, (NodeId, Edge<'d>)> {
-        self.parents.get_or_init(|| {
-            let mut parents = BTreeMap::new();
+    /// The document's index, built in one walk the first time.
+    fn tree(&self) -> &Tree<'d> {
+        self.tree.get_or_init(|| {
+            let mut tree = Tree {
+                parents: BTreeMap::new(),
+                names: BTreeMap::new(),
+            };
             let mut pending = vec![self.document.root()];
             while let Some(node) = pending.pop() {
                 match self.document.node(node).kind() {
                     NodeKind::Object(members) => {
                         for (name, member) in members {
-                            parents.insert(member.value(), (node, Edge::Member(name.as_str())));
+                            let name = name.as_str();
+                            tree.parents
+                                .insert(member.value(), (node, Edge::Member(name)));
+                            tree.names.insert(member.key_span(), name);
                             pending.push(member.value());
                         }
                     }
                     NodeKind::Array(items) => {
                         for (index, &item) in (0u64..).zip(items) {
-                            parents.insert(item, (node, Edge::Index(index)));
+                            tree.parents.insert(item, (node, Edge::Index(index)));
                             pending.push(item);
                         }
                     }
                     _ => {}
                 }
             }
-            parents
+            tree
         })
     }
 
     /// The internal path from the root to `node`.
     fn path(&self, node: NodeId) -> Vec<Edge<'d>> {
-        let parents = self.parents();
+        let parents = &self.tree().parents;
         let mut edges = Vec::new();
         let mut next = node;
         while let Some(&(parent, edge)) = parents.get(&next) {
@@ -518,16 +530,13 @@ impl<'f, 'd> Observer<'f, 'd> {
         edges
     }
 
-    /// The name of the member of `object` that `matches` picks.
-    fn member(&self, object: NodeId, matches: impl Fn(&ObjectMember) -> bool) -> &'d str {
-        let NodeKind::Object(members) = self.document.node(object).kind() else {
-            unreachable!("a member's holder is an object")
-        };
-        members
-            .iter()
-            .find(|(_, member)| matches(member))
-            .map(|(name, _)| name.as_str())
-            .expect("the member is one of its object's")
+    /// The name of the member whose key is at `key`.
+    fn name(&self, key: ByteSpan) -> &'d str {
+        self.tree()
+            .names
+            .get(&key)
+            .copied()
+            .expect("a key's span is its member's")
     }
 
     /// What a check observed at `edges`, at the token `span`.
@@ -603,9 +612,7 @@ impl<'f, 'd> Observer<'f, 'd> {
             }
             At::Member { object, key } => {
                 let mut edges = self.path(object);
-                edges.push(Edge::Member(
-                    self.member(object, |member| member.key_span() == key),
-                ));
+                edges.push(Edge::Member(self.name(key)));
                 self.observation(&edges, key)
             }
             At::Key(scope) => {
@@ -614,9 +621,7 @@ impl<'f, 'd> Observer<'f, 'd> {
                     .entry
                     .expect("a key's scope is its entry's");
                 let mut edges = self.path(entry.map);
-                edges.push(Edge::Member(
-                    self.member(entry.map, |member| member.value() == entry.value),
-                ));
+                edges.push(Edge::Member(self.name(entry.key)));
                 self.observation(&edges, entry.key)
             }
         }
@@ -1407,6 +1412,37 @@ mod tests {
             views[1].0
         );
         assert_eq!(views[1].1, span(&source, br#""only""#));
+    }
+
+    /// Several undeclared members of one object, and several malformed keys
+    /// of one map, are each observed at its own key, redacted (D15:790).
+    #[test]
+    fn each_member_of_one_object_is_observed_at_its_own_key() {
+        let mut value = minimal_config();
+        value["extra"] = json!(true);
+        value["more"] = json!(false);
+        let declaration = value["profiles"]["app"].clone();
+        value["profiles"]["app key"] = declaration.clone();
+        value["profiles"]["web key"] = declaration;
+        let (source, found) = observed(&value, 1_000_000);
+        let views: Vec<(Value, Value)> = found
+            .iter()
+            .map(|occurrence| located(occurrence.primary()))
+            .collect();
+        assert_eq!(views.len(), 4);
+        for (key, safe) in [
+            (&br#""extra""#[..], &[None][..]),
+            (br#""more""#, &[None]),
+            (br#""app key""#, &[Some("profiles"), None]),
+            (br#""web key""#, &[Some("profiles"), None]),
+        ] {
+            let at = span(&source, key);
+            let (path, _) = views
+                .iter()
+                .find(|(_, span)| *span == at)
+                .unwrap_or_else(|| panic!("{at} is observed"));
+            assert!(redacted_path(path, safe), "{path}");
+        }
     }
 
     /// The schema selection observes the root, or its `schemaVersion` member
