@@ -21,6 +21,7 @@ pub(crate) use place::{Edge, Place};
 use program::{ProgramError, SchemaId, SchemaProgram};
 
 mod eval;
+pub(crate) mod facts;
 mod place;
 mod program;
 pub(crate) mod selection;
@@ -196,6 +197,7 @@ impl<Policy, Target> AuthoringSchema<Policy, Target> {
             Err(EvaluationFailure::AccountingOverflow | EvaluationFailure::AccountingMismatch) => {
                 return Err(AdmissionInvariant::WorkAccounting)
             }
+            Err(EvaluationFailure::ScopeLayout) => return Err(AdmissionInvariant::ModelLayout),
         }
         Ok(result)
     }
@@ -236,6 +238,10 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
     }
     pub(crate) fn structural_units(&self) -> Option<u64> {
         self.evaluation.as_ref().map(|e| e.units)
+    }
+    /// The candidates of the schema-guided analysis, when it ran.
+    pub(crate) fn facts(&self) -> Option<&facts::Facts> {
+        self.evaluation.as_ref().map(|e| &e.facts)
     }
     /// The materialized root's value counts, which Phase 4 rechecks.
     pub(crate) fn value_counts(&self) -> ValueCounts {

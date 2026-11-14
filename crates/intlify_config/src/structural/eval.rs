@@ -9,11 +9,20 @@
 //! All anyOf branches are visited, so finding a match does not change accounting.
 //! This is an internal schema operation, not configuration-version admission or
 //! final Finding/Evidence construction. Consumers cannot obtain a checked Profile.
+//!
+//! The evaluation also records a candidate for each applicable evaluation of a
+//! structural check (D15:2173), keyed by the identity map entry that scopes it
+//! and its logical field path from that entry (D15:2184). An `anyOf` is one
+//! closed-value evaluation of its value: what its branches evaluate records no
+//! candidate.
 
 use crate::input_limits::Bound;
-use crate::materialize::{ByteSpan, MaterializedDocument, NodeId, NodeKind};
+use crate::materialize::{ByteSpan, MaterializedDocument, NodeId, NodeKind, ObjectMember};
 use crate::model::valid_identity;
 
+use super::facts::{
+    At, Candidate, Check, Entry, Facts, FieldPathId, FieldStep, Level, Outcome, ScopeId,
+};
 use super::program::{Additional, SchemaId, SchemaNode, SchemaProgram, ValueType};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,9 +69,14 @@ pub(super) struct FragmentAdmission {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum EvaluationFailure {
-    WorkLimit { limit: Bound, actual: u64 },
+    WorkLimit {
+        limit: Bound,
+        actual: u64,
+    },
     AccountingOverflow,
     AccountingMismatch,
+    /// An identity map outside the positions of 015's scope levels.
+    ScopeLayout,
 }
 
 pub(super) struct SchemaEvaluation {
@@ -70,6 +84,7 @@ pub(super) struct SchemaEvaluation {
     pub(super) units: u64,
     pub(super) issues: Vec<SchemaIssue>,
     pub(super) fragments: Vec<FragmentAdmission>,
+    pub(super) facts: Facts,
 }
 
 pub(super) fn evaluate(
@@ -83,7 +98,7 @@ pub(super) fn evaluate(
     // bounded the whole value domain. This pass counts the complete applicable
     // domain without constructing issues, fragments, or owned authoring values.
     let mut preflight = Walker::new(program, doc, false);
-    preflight.walk(schema, subject)?;
+    preflight.walk(schema, subject, Position::ROOT)?;
     let expected = preflight.units;
     if expected > max_units.get() {
         return Err(EvaluationFailure::WorkLimit {
@@ -92,7 +107,7 @@ pub(super) fn evaluate(
         });
     }
     let mut evaluation = Walker::new(program, doc, true);
-    let admitted = evaluation.walk(schema, subject)?;
+    let admitted = evaluation.walk(schema, subject, Position::ROOT)?;
     if evaluation.units != expected {
         return Err(EvaluationFailure::AccountingMismatch);
     }
@@ -101,7 +116,22 @@ pub(super) fn evaluate(
         units: expected,
         issues: evaluation.issues,
         fragments: evaluation.fragments,
+        facts: evaluation.facts,
     })
+}
+
+/// Where the walk is: the scope whose entry a path starts from, and the path.
+#[derive(Debug, Clone, Copy)]
+struct Position {
+    scope: ScopeId,
+    path: Option<FieldPathId>,
+}
+
+impl Position {
+    const ROOT: Self = Self {
+        scope: Facts::ROOT,
+        path: None,
+    };
 }
 
 struct Walker<'input> {
@@ -111,6 +141,9 @@ struct Walker<'input> {
     units: u64,
     issues: Vec<SchemaIssue>,
     fragments: Vec<FragmentAdmission>,
+    facts: Facts,
+    /// How many `anyOf` branches the walk is inside.
+    branches: usize,
 }
 
 impl<'input> Walker<'input> {
@@ -126,6 +159,8 @@ impl<'input> Walker<'input> {
             units: 0,
             issues: Vec::new(),
             fragments: Vec::new(),
+            facts: Facts::new(),
+            branches: 0,
         }
     }
 
@@ -180,14 +215,104 @@ impl<'input> Walker<'input> {
         }
     }
 
-    fn walk(&mut self, id: SchemaId, subject: NodeId) -> Result<bool, EvaluationFailure> {
+    /// Whether this walk records candidates: the collecting walk, outside
+    /// every `anyOf` branch.
+    const fn recording(&self) -> bool {
+        self.collect && self.branches == 0
+    }
+
+    fn record(&mut self, check: Check, position: Position, at: At, outcome: Outcome) {
+        if self.recording() {
+            self.facts.push(Candidate {
+                check,
+                scope: position.scope,
+                path: position.path,
+                at,
+                outcome,
+            });
+        }
+    }
+
+    /// The position of the member `name` the schema defines.
+    fn member(&mut self, position: Position, name: &str) -> Position {
+        self.step(position, || FieldStep::Member(name.into()))
+    }
+
+    /// The position of an array element, or of an entry of a map whose keys
+    /// are not identities.
+    fn any(&mut self, position: Position) -> Position {
+        self.step(position, || FieldStep::Any)
+    }
+
+    fn step(&mut self, position: Position, step: impl FnOnce() -> FieldStep) -> Position {
+        if !self.recording() {
+            return position;
+        }
+        Position {
+            scope: position.scope,
+            path: Some(self.facts.enter(position.path, step())),
+        }
+    }
+
+    /// The level of the entries of the identity map at `position`: 015's
+    /// scope levels are the root, an entry of its `profiles`, and an entry of
+    /// a declaration's `targetProfiles` or `deploymentGroups` (D15:2173).
+    fn level_below(&self, position: Position) -> Result<Level, EvaluationFailure> {
+        let level = self.facts.scope(position.scope).level;
+        let steps = self.facts.steps(position.path);
+        let [FieldStep::Member(name)] = steps.as_slice() else {
+            return Err(EvaluationFailure::ScopeLayout);
+        };
+        match (level, &**name) {
+            (Level::Root, "profiles") => Ok(Level::Profile),
+            (Level::Profile, "targetProfiles") => Ok(Level::Target),
+            (Level::Profile, "deploymentGroups") => Ok(Level::Group),
+            _ => Err(EvaluationFailure::ScopeLayout),
+        }
+    }
+
+    /// Records the key of an identity map entry, whose map is at `position`,
+    /// and gives the position of the entry's value: the empty path under the
+    /// entry (D15:2184).
+    fn entry(
+        &mut self,
+        position: Position,
+        level: Option<Level>,
+        map: NodeId,
+        member: &ObjectMember,
+        admitted: bool,
+    ) -> Position {
+        let Some(level) = level else {
+            return position;
+        };
+        let scope = self.facts.enter_scope(
+            level,
+            position.scope,
+            Entry {
+                map,
+                value: member.value(),
+                key: member.key_span(),
+                admitted,
+            },
+        );
+        let key = self.any(position);
+        self.record(Check::Key, key, At::Key(scope), Outcome::of(admitted));
+        Position { scope, path: None }
+    }
+
+    fn walk(
+        &mut self,
+        id: SchemaId,
+        subject: NodeId,
+        position: Position,
+    ) -> Result<bool, EvaluationFailure> {
         let program = self.program;
         let doc = self.doc;
         let schema = program.node(id);
         let value = doc.node(subject).kind();
         if let Some(reference) = schema.reference {
             self.unit()?;
-            let admitted = self.walk(reference, subject)?;
+            let admitted = self.walk(reference, subject, position)?;
             self.fragment(
                 id,
                 subject,
@@ -201,55 +326,98 @@ impl<'input> Walker<'input> {
         }
         if let Some(expected) = schema.value_type {
             self.unit()?;
-            if !type_matches(expected, value) {
+            let matches = type_matches(expected, value);
+            self.record(
+                Check::Type,
+                position,
+                At::Value(subject),
+                Outcome::of(matches),
+            );
+            if !matches {
                 self.value_issue(IssueKind::TypeInvalid, id, subject);
                 self.fragment(id, subject, FragmentState::TypeUnavailable);
+                // The checks of the same path that need the type leave this
+                // value to the type check (D15:2184).
+                if constrains_value(schema) {
+                    self.record(
+                        Check::Value,
+                        position,
+                        At::Value(subject),
+                        Outcome::Excluded,
+                    );
+                }
+                if closes_members(schema) {
+                    self.record(
+                        Check::Known,
+                        position,
+                        At::Value(subject),
+                        Outcome::Excluded,
+                    );
+                }
                 return Ok(false);
             }
         }
         let mut admitted = true;
+        // Whether every closed-value constraint that applied passed; none when
+        // none applied.
+        let mut constrained = None;
         if let Some(allowed) = &schema.enum_strings {
             self.unit()?;
-            if self.collect && !matches!(value, NodeKind::String(text) if allowed.contains(text)) {
+            let passed =
+                !self.collect || matches!(value, NodeKind::String(text) if allowed.contains(text));
+            if !passed {
                 self.value_issue(IssueKind::ValueInvalid, id, subject);
                 admitted = false;
             }
+            meet(&mut constrained, passed);
         }
         if let (Some(pattern), NodeKind::String(text)) = (schema.string_pattern, value) {
             self.unit()?;
-            if self.collect && !pattern.matches(text) {
+            let passed = !self.collect || pattern.matches(text);
+            if !passed {
                 self.value_issue(IssueKind::ValueInvalid, id, subject);
                 admitted = false;
             }
+            meet(&mut constrained, passed);
         }
         match value {
             NodeKind::Array(items) => {
                 if let Some(minimum) = schema.min_items {
                     self.unit()?;
-                    if self.collect
-                        && u64::try_from(items.len()).expect("bounded array length") < minimum
-                    {
+                    let passed = !self.collect
+                        || u64::try_from(items.len()).expect("bounded array length") >= minimum;
+                    if !passed {
                         self.value_issue(IssueKind::ValueInvalid, id, subject);
                         admitted = false;
                     }
+                    meet(&mut constrained, passed);
                 }
                 if let Some(child) = schema.items {
                     self.unit()?;
+                    let element = self.any(position);
                     for &item in items {
-                        admitted &= self.walk(child, item)?;
+                        admitted &= self.walk(child, item, element)?;
                     }
                 }
             }
-            NodeKind::Object(_) => admitted &= self.object(schema, id, subject)?,
+            NodeKind::Object(_) => {
+                let (members_admitted, minimum) = self.object(schema, id, subject, position)?;
+                admitted &= members_admitted;
+                if let Some(passed) = minimum {
+                    meet(&mut constrained, passed);
+                }
+            }
             _ => {}
         }
         if let Some(branches) = &schema.any_of {
             self.unit()?;
             let before = self.issues.len();
             let mut matched = false;
+            self.branches += 1;
             for &branch in branches {
-                matched |= self.walk(branch, subject)?;
+                matched |= self.walk(branch, subject, position)?;
             }
+            self.branches -= 1;
             if self.collect {
                 if matched {
                     self.issues.truncate(before);
@@ -263,6 +431,15 @@ impl<'input> Walker<'input> {
                 }
             }
             admitted &= matched;
+            meet(&mut constrained, matched);
+        }
+        if let Some(passed) = constrained {
+            self.record(
+                Check::Value,
+                position,
+                At::Value(subject),
+                Outcome::of(passed),
+            );
         }
         self.fragment(
             id,
@@ -276,31 +453,44 @@ impl<'input> Walker<'input> {
         Ok(admitted)
     }
 
+    /// The object's own constraints and members: whether they are admitted,
+    /// and whether its minimum member count, when it has one, is met.
     fn object(
         &mut self,
         schema: &SchemaNode,
         id: SchemaId,
         subject: NodeId,
-    ) -> Result<bool, EvaluationFailure> {
+        position: Position,
+    ) -> Result<(bool, Option<bool>), EvaluationFailure> {
         let doc = self.doc;
         let NodeKind::Object(members) = doc.node(subject).kind() else {
             unreachable!()
         };
         let mut admitted = true;
+        let mut minimum_met = None;
         if let Some(minimum) = schema.min_properties {
             self.unit()?;
-            if self.collect
-                && u64::try_from(members.len()).expect("bounded object length") < minimum
-            {
+            let passed = !self.collect
+                || u64::try_from(members.len()).expect("bounded object length") >= minimum;
+            if !passed {
                 self.value_issue(IssueKind::ValueInvalid, id, subject);
                 admitted = false;
             }
+            minimum_met = Some(passed);
         }
         if let Some(required) = &schema.required {
             self.unit()?;
             if self.collect {
                 for name in required {
-                    if !members.contains_key(name) {
+                    let field = self.member(position, name);
+                    if let Some(member) = members.get(name) {
+                        self.record(
+                            Check::Required,
+                            field,
+                            At::Value(member.value()),
+                            Outcome::Passed,
+                        );
+                    } else {
                         self.issue(
                             IssueKind::RequiredFieldMissing,
                             id,
@@ -310,6 +500,12 @@ impl<'input> Walker<'input> {
                             Some(name),
                         );
                         admitted = false;
+                        self.record(
+                            Check::Required,
+                            field,
+                            At::Missing { object: subject },
+                            Outcome::Failed,
+                        );
                     }
                 }
             }
@@ -323,22 +519,31 @@ impl<'input> Walker<'input> {
         if schema.additional.is_some() {
             self.unit()?;
         }
+        // The scope level of the entries, for an identity map.
+        let level = match schema.identity_values {
+            Some(_) if self.recording() => Some(self.level_below(position)?),
+            _ => None,
+        };
+        let mut undeclared = false;
         // Materialized object iteration is unsigned UTF-8 key order. The value
         // tree's physical node IDs and source member order never choose checks.
         for (name, member) in members {
             let mut matched = false;
             if let Some(child) = schema.properties.as_ref().and_then(|known| known.get(name)) {
-                admitted &= self.walk(*child, member.value())?;
+                let field = self.member(position, name);
+                admitted &= self.walk(*child, member.value(), field)?;
                 matched = true;
             }
             if let Some(child) = schema.identity_values.filter(|_| valid_identity(name)) {
-                admitted &= self.walk(child, member.value())?;
+                let entry = self.entry(position, level, subject, member, true);
+                admitted &= self.walk(child, member.value(), entry)?;
                 matched = true;
             }
             if !matched {
                 match schema.additional {
                     Some(Additional::Schema(child)) => {
-                        admitted &= self.walk(child, member.value())?;
+                        let entry = self.any(position);
+                        admitted &= self.walk(child, member.value(), entry)?;
                     }
                     Some(Additional::Forbidden) => {
                         let kind = if schema.identity_values.is_some() {
@@ -355,13 +560,52 @@ impl<'input> Walker<'input> {
                             None,
                         );
                         admitted = false;
+                        if schema.identity_values.is_some() {
+                            // A key without the identifier syntax.
+                            self.entry(position, level, subject, member, false);
+                        } else {
+                            self.record(
+                                Check::Known,
+                                position,
+                                At::Member {
+                                    object: subject,
+                                    key: member.key_span(),
+                                },
+                                Outcome::Failed,
+                            );
+                            undeclared = true;
+                        }
                     }
                     None => {}
                 }
             }
         }
-        Ok(admitted)
+        if closes_members(schema) && !undeclared {
+            self.record(Check::Known, position, At::Value(subject), Outcome::Passed);
+        }
+        Ok((admitted, minimum_met))
     }
+}
+
+/// Folds one closed-value constraint's result into the value's.
+fn meet(constrained: &mut Option<bool>, passed: bool) {
+    *constrained = Some(constrained.unwrap_or(true) && passed);
+}
+
+/// Whether `schema` has a closed-value constraint: an enumeration, a pattern,
+/// a minimum item or member count, or a set of alternatives.
+const fn constrains_value(schema: &SchemaNode) -> bool {
+    schema.enum_strings.is_some()
+        || schema.string_pattern.is_some()
+        || schema.min_items.is_some()
+        || schema.min_properties.is_some()
+        || schema.any_of.is_some()
+}
+
+/// Whether `schema` closes an object's members, other than an identity map,
+/// whose closedness is its keys' check.
+const fn closes_members(schema: &SchemaNode) -> bool {
+    schema.identity_values.is_none() && matches!(schema.additional, Some(Additional::Forbidden))
 }
 
 fn type_matches(expected: ValueType, value: &NodeKind) -> bool {

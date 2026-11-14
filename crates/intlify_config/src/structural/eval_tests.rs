@@ -13,6 +13,8 @@ use crate::materialize_tests::limits;
 use super::eval::{
     evaluate, EvaluationFailure, FragmentState, IssueKind, LocationRole, SchemaEvaluation,
 };
+use super::facts::tests::names;
+use super::facts::{At, Check, Facts, Level, Outcome};
 use super::program::SchemaProgram;
 
 fn program() -> SchemaProgram {
@@ -182,7 +184,7 @@ fn unsafe_unknown_or_invalid_dynamic_keys_never_enter_issue_text() {
         .issues
         .iter()
         .all(|i| i.role == LocationRole::MemberKey && i.missing_field.is_none()));
-    let rendered = format!("{:?}", result.issues);
+    let rendered = format!("{:?} {:?}", result.issues, result.facts);
     for excluded in [
         "private-token",
         "private-value",
@@ -219,6 +221,7 @@ fn object_member_order_does_not_change_logical_work() {
     let reversed = run(&program, &materialize(&Value::Object(reordered)));
     assert!(original.admitted && reversed.admitted);
     assert_eq!(original.units, reversed.units);
+    assert_eq!(shapes(&original), shapes(&reversed));
 }
 
 /// The `app` declaration's member `name` as materialized from `doc`.
@@ -291,4 +294,429 @@ fn an_explicitly_empty_fallback_sequence_is_an_invalid_value_where_it_is_declare
             .collect::<Vec<_>>(),
         [(IssueKind::ValueInvalid, sequence, LocationRole::Value)]
     );
+}
+
+/// What each candidate of `result` checked: its check, its scope's level, its
+/// path from the scope's entry as text, and its outcome.
+fn shapes(result: &SchemaEvaluation) -> Vec<(Check, Level, String, Outcome)> {
+    let facts = &result.facts;
+    facts
+        .candidates()
+        .iter()
+        .map(|candidate| {
+            (
+                candidate.check,
+                facts.scope(candidate.scope).level,
+                names(facts, candidate.path).join("/"),
+                candidate.outcome,
+            )
+        })
+        .collect()
+}
+
+/// The checks and outcomes of `result`'s candidates at `path` under an entry
+/// of `level`, in the order they were recorded.
+fn at(result: &SchemaEvaluation, level: Level, path: &str) -> Vec<(Check, Outcome)> {
+    shapes(result)
+        .into_iter()
+        .filter(|shape| shape.1 == level && shape.2 == path)
+        .map(|shape| (shape.0, shape.3))
+        .collect()
+}
+
+/// Where the key of `owner`'s member `name` is.
+fn key_span(doc: &MaterializedDocument, owner: NodeId, name: &str) -> crate::materialize::ByteSpan {
+    let NodeKind::Object(members) = doc.node(owner).kind() else {
+        panic!()
+    };
+    members[name].key_span()
+}
+
+fn compiled(schema: &Value) -> SchemaProgram {
+    SchemaProgram::compile(schema).unwrap()
+}
+
+#[test]
+fn a_complete_configuration_records_each_check_where_it_applies() {
+    use Check::{Key, Known, Required, Type, Value};
+    use Level::{Group, Profile, Root, Target};
+    let doc = materialize(&minimal_config());
+    let result = run(&program(), &doc);
+    assert!(result.admitted);
+    let shapes = shapes(&result);
+    assert!(shapes.iter().all(|shape| shape.3 == Outcome::Passed));
+    for (check, level, path) in [
+        (Type, Root, ""),
+        (Required, Root, "schemaVersion"),
+        (Required, Root, "profiles"),
+        (Known, Root, ""),
+        (Type, Root, "profiles"),
+        (Value, Root, "profiles"),
+        (Key, Root, "profiles/*"),
+        // An identity map entry's value is the empty path under the entry.
+        (Type, Profile, ""),
+        (Known, Profile, ""),
+        (Required, Profile, "projectId"),
+        (Type, Profile, "requestedLocales"),
+        (Value, Profile, "requestedLocales"),
+        (Type, Profile, "requestedLocales/*"),
+        (Key, Profile, "targetProfiles/*"),
+        (Key, Profile, "deploymentGroups/*"),
+        (Type, Target, ""),
+        (Type, Target, "requestedLocales/*"),
+        (Type, Group, ""),
+        (Type, Group, "members/*"),
+    ] {
+        let shape = (check, level, path.to_owned(), Outcome::Passed);
+        assert!(shapes.contains(&shape), "{shape:?}");
+    }
+    // An identity map's closedness is its keys' check.
+    for (level, path) in [
+        (Root, "profiles"),
+        (Profile, "targetProfiles"),
+        (Profile, "deploymentGroups"),
+    ] {
+        assert!(!at(&result, level, path)
+            .iter()
+            .any(|shape| shape.0 == Known));
+    }
+    // Each key scopes its entry, under the scope its map is in.
+    let facts = &result.facts;
+    let profiles = member(&doc, doc.root(), "profiles");
+    let app = member(&doc, profiles, "app");
+    let keys: Vec<_> = facts
+        .candidates()
+        .iter()
+        .filter(|candidate| candidate.check == Key)
+        .collect();
+    assert_eq!(keys.len(), 3);
+    for key in keys {
+        let At::Key(scope) = key.at else {
+            panic!("{key:?}")
+        };
+        let scope = facts.scope(scope);
+        let entry = scope.entry.unwrap();
+        assert!(entry.admitted);
+        assert_eq!(scope.parent, Some(key.scope));
+        let (map, name) = match scope.level {
+            Profile => {
+                assert_eq!(key.scope, Facts::ROOT);
+                (profiles, "app")
+            }
+            Target => (declaration_member(&doc, "targetProfiles"), "browser"),
+            Group => (declaration_member(&doc, "deploymentGroups"), "web"),
+            Root => panic!("{key:?}"),
+        };
+        if scope.level != Profile {
+            assert_eq!(facts.scope(key.scope).entry.unwrap().value, app);
+        }
+        assert_eq!(entry.map, map);
+        assert_eq!(entry.value, member(&doc, map, name));
+        assert_eq!(entry.key, key_span(&doc, map, name));
+    }
+}
+
+#[test]
+fn a_missing_member_fails_its_required_check_at_its_own_path() {
+    let mut value = minimal_config();
+    value["profiles"]["app"]
+        .as_object_mut()
+        .unwrap()
+        .remove("requestedLocales");
+    let doc = materialize(&value);
+    let result = run(&program(), &doc);
+    let facts = &result.facts;
+    let app = member(&doc, member(&doc, doc.root(), "profiles"), "app");
+    let failed: Vec<_> = facts
+        .candidates()
+        .iter()
+        .filter(|candidate| candidate.outcome != Outcome::Passed)
+        .collect();
+    assert_eq!(failed.len(), 1);
+    assert_eq!(failed[0].check, Check::Required);
+    assert_eq!(failed[0].outcome, Outcome::Failed);
+    assert_eq!(failed[0].at, At::Missing { object: app });
+    assert_eq!(names(facts, failed[0].path), ["requestedLocales"]);
+    assert_eq!(facts.scope(failed[0].scope).level, Level::Profile);
+    // A present member's candidate is at its value.
+    let project = member(&doc, app, "projectId");
+    assert!(facts
+        .candidates()
+        .iter()
+        .any(|candidate| candidate.check == Check::Required
+            && candidate.at == At::Value(project)
+            && names(facts, candidate.path) == ["projectId"]));
+}
+
+#[test]
+fn each_undeclared_member_fails_the_known_check_of_its_object() {
+    let mut value = minimal_config();
+    value["extra-a"] = json!(1);
+    value["extra-b"] = json!(2);
+    let doc = materialize(&value);
+    let result = run(&program(), &doc);
+    let known: Vec<_> = result
+        .facts
+        .candidates()
+        .iter()
+        .filter(|candidate| {
+            candidate.check == Check::Known
+                && candidate.scope == Facts::ROOT
+                && candidate.path.is_none()
+        })
+        .collect();
+    assert_eq!(known.len(), 2, "one per member, and none that passes");
+    for (candidate, name) in known.iter().zip(["extra-a", "extra-b"]) {
+        assert_eq!(candidate.outcome, Outcome::Failed);
+        assert_eq!(
+            candidate.at,
+            At::Member {
+                object: doc.root(),
+                key: key_span(&doc, doc.root(), name)
+            }
+        );
+    }
+    assert_eq!(
+        at(&result, Level::Profile, ""),
+        [
+            (Check::Type, Outcome::Passed),
+            (Check::Known, Outcome::Passed)
+        ]
+    );
+}
+
+#[test]
+fn a_type_failure_excludes_its_paths_other_checks_and_records_nothing_below() {
+    let mut value = minimal_config();
+    value["profiles"]["app"]["requestedLocales"] = json!("en");
+    value["profiles"]["app"]["policies"] = json!(7);
+    let doc = materialize(&value);
+    let result = run(&program(), &doc);
+    assert_eq!(
+        at(&result, Level::Profile, "requestedLocales"),
+        [
+            (Check::Required, Outcome::Passed),
+            (Check::Type, Outcome::Failed),
+            (Check::Value, Outcome::Excluded)
+        ]
+    );
+    assert_eq!(
+        at(&result, Level::Profile, "policies"),
+        [
+            (Check::Required, Outcome::Passed),
+            (Check::Type, Outcome::Failed),
+            (Check::Known, Outcome::Excluded)
+        ]
+    );
+    assert!(
+        !shapes(&result).iter().any(|shape| shape.1 == Level::Profile
+            && (shape.2.starts_with("requestedLocales/") || shape.2.starts_with("policies/")))
+    );
+    let values = [
+        At::Value(declaration_member(&doc, "policies")),
+        At::Value(declaration_member(&doc, "requestedLocales")),
+    ];
+    for outcome in [Outcome::Failed, Outcome::Excluded] {
+        let at: Vec<_> = result
+            .facts
+            .candidates()
+            .iter()
+            .filter(|candidate| candidate.outcome == outcome)
+            .map(|candidate| candidate.at)
+            .collect();
+        assert_eq!(at, values, "{outcome:?}");
+    }
+}
+
+#[test]
+fn an_any_of_is_one_value_check_and_its_branches_record_no_candidate() {
+    let mut value = complete_config();
+    value["profiles"]["app"]["messageFallback"]["ja"] =
+        json!(["en", {"kind": "intent-source-locale"}, 42]);
+    value["profiles"]["app"]["coverage"]["rules"] = json!([{"mode": "fallback-allowed"}]);
+    let doc = materialize(&value);
+    let result = run(&program(), &doc);
+    assert_eq!(
+        at(&result, Level::Profile, "messageFallback/*/*"),
+        [
+            (Check::Value, Outcome::Passed),
+            (Check::Value, Outcome::Passed),
+            (Check::Value, Outcome::Failed)
+        ]
+    );
+    // A coverage rule with neither selector fails its required alternative.
+    assert_eq!(
+        at(&result, Level::Profile, "coverage/rules/*"),
+        [
+            (Check::Type, Outcome::Passed),
+            (Check::Known, Outcome::Passed),
+            (Check::Value, Outcome::Failed)
+        ]
+    );
+    assert_eq!(
+        at(&result, Level::Profile, "coverage/rules/*/mode"),
+        [
+            (Check::Required, Outcome::Passed),
+            (Check::Type, Outcome::Passed),
+            (Check::Value, Outcome::Passed)
+        ]
+    );
+    let shapes = shapes(&result);
+    assert!(!shapes
+        .iter()
+        .any(|shape| shape.2.starts_with("messageFallback/*/*/")
+            || shape.2 == "coverage/rules/*/requestedLocales"
+            || shape.2 == "coverage/rules/*/intentSurfaceClasses"));
+}
+
+#[test]
+fn identity_keys_are_checked_under_their_map_and_scope_their_entries() {
+    let mut value = minimal_config();
+    value["profiles"]["Bad Key"] = value["profiles"]["app"].clone();
+    let doc = materialize(&value);
+    let result = run(&program(), &doc);
+    let facts = &result.facts;
+    let profiles = member(&doc, doc.root(), "profiles");
+    let keys: Vec<_> = facts
+        .candidates()
+        .iter()
+        .filter(|candidate| candidate.check == Check::Key && candidate.scope == Facts::ROOT)
+        .collect();
+    assert_eq!(keys.len(), 2);
+    for (key, (name, admitted)) in keys.iter().zip([("Bad Key", false), ("app", true)]) {
+        assert_eq!(names(facts, key.path), ["profiles", "*"]);
+        assert_eq!(key.outcome, Outcome::of(admitted));
+        let At::Key(scope) = key.at else {
+            panic!("{key:?}")
+        };
+        let entry = facts.scope(scope).entry.unwrap();
+        assert_eq!(entry.admitted, admitted);
+        assert_eq!(entry.map, profiles);
+        assert_eq!(entry.value, member(&doc, profiles, name));
+        assert_eq!(entry.key, key_span(&doc, profiles, name));
+        assert_eq!(facts.scope(scope).level, Level::Profile);
+        // Only an admitted key's entry is evaluated yet.
+        assert_eq!(
+            facts
+                .candidates()
+                .iter()
+                .any(|candidate| candidate.scope == scope),
+            admitted,
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn an_identity_map_outside_015s_scope_levels_is_a_layout_error() {
+    let identities = json!({
+        "type": "object",
+        "patternProperties": {crate::model::ID_PATTERN: {}},
+        "additionalProperties": false
+    });
+    let draft = "http://json-schema.org/draft-07/schema#";
+    for (schema, value) in [
+        (
+            json!({"$schema": draft, "type": "object", "properties": {"other": identities}}),
+            json!({"other": {"a": 1}}),
+        ),
+        (
+            json!({"$schema": draft, "type": "object", "properties": {"profiles": {
+                "type": "object", "properties": {"profiles": identities}
+            }}}),
+            json!({"profiles": {"profiles": {"a": 1}}}),
+        ),
+    ] {
+        let program = compiled(&schema);
+        let doc = materialize(&value);
+        let failure = evaluate(
+            &program,
+            &doc,
+            program.root(),
+            doc.root(),
+            Bound::new(1_000).unwrap(),
+        )
+        .err();
+        assert_eq!(failure, Some(EvaluationFailure::ScopeLayout), "{value}");
+    }
+}
+
+#[test]
+fn a_value_fails_its_closed_value_check_when_any_constraint_fails() {
+    let program = compiled(&json!({
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "string",
+        "enum": ["Upper", "lower"],
+        "pattern": crate::model::ID_PATTERN
+    }));
+    for (value, passed) in [("lower", true), ("Upper", false), ("other", false)] {
+        let result = run(&program, &materialize(&json!(value)));
+        let checks: Vec<_> = result
+            .facts
+            .candidates()
+            .iter()
+            .map(|candidate| (candidate.check, candidate.outcome))
+            .collect();
+        assert_eq!(
+            checks,
+            [
+                (Check::Type, Outcome::Passed),
+                (Check::Value, Outcome::of(passed))
+            ],
+            "{value}"
+        );
+    }
+}
+
+#[test]
+fn each_closed_value_constraint_leaves_a_mistyped_value_to_its_type_check() {
+    use Check::{Known, Required, Type, Value};
+    use Outcome::{Excluded, Failed, Passed};
+    let mut value = complete_config();
+    let app = &mut value["profiles"]["app"];
+    // A pattern, an enumeration, alternatives of a closed object, and the
+    // minimum member count of an identity map.
+    app["projectId"] = json!(5);
+    app["coverage"]["defaultMode"] = json!(5);
+    app["coverage"]["rules"] = json!(["x"]);
+    app["targetProfiles"] = json!("x");
+    let result = run(&program(), &materialize(&value));
+    for (path, expected) in [
+        (
+            "projectId",
+            vec![(Required, Passed), (Type, Failed), (Value, Excluded)],
+        ),
+        (
+            "coverage/defaultMode",
+            vec![(Type, Failed), (Value, Excluded)],
+        ),
+        (
+            "coverage/rules/*",
+            vec![(Type, Failed), (Value, Excluded), (Known, Excluded)],
+        ),
+        (
+            "targetProfiles",
+            vec![(Required, Passed), (Type, Failed), (Value, Excluded)],
+        ),
+    ] {
+        assert_eq!(at(&result, Level::Profile, path), expected, "{path}");
+    }
+}
+
+#[test]
+fn an_identity_map_without_entries_fails_its_minimum_member_count() {
+    let mut value = minimal_config();
+    value["profiles"]["app"]["targetProfiles"] = json!({});
+    let result = run(&program(), &materialize(&value));
+    assert_eq!(
+        at(&result, Level::Profile, "targetProfiles"),
+        [
+            (Check::Required, Outcome::Passed),
+            (Check::Type, Outcome::Passed),
+            (Check::Value, Outcome::Failed)
+        ]
+    );
+    assert!(!shapes(&result).iter().any(|shape| shape.0 == Check::Key
+        && shape.1 == Level::Profile
+        && shape.2 == "targetProfiles/*"));
 }

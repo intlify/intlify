@@ -286,3 +286,29 @@ fn result_owns_input_and_binding_and_repeated_invocations_do_not_share_state() {
     assert_eq!(first.structural_units(), repeated.structural_units());
     assert_eq!(first.construct().unwrap(), repeated.construct().unwrap());
 }
+
+/// Structural admission scopes its subjects by 015's levels: an identity map
+/// elsewhere is a schema it cannot analyze.
+#[test]
+fn an_identity_map_outside_the_scope_levels_is_a_model_layout_error() {
+    let mut body = crate::schema::draft7_schema::<FixtureConfig>().unwrap();
+    body["properties"]["other"] = body["properties"]["profiles"].clone();
+    let schema =
+        FixtureSchema::compile(crate::model::CONFIGURATION_SCHEMA_VERSION.to_owned(), body)
+            .unwrap();
+    let mut value = minimal_config();
+    value["other"] = json!({"a": {}});
+    assert_eq!(
+        schema.analyze(document(&value), limits()).err(),
+        Some(super::AdmissionInvariant::ModelLayout)
+    );
+}
+
+#[test]
+fn an_analysis_keeps_its_candidates_only_when_the_schema_guided_walk_ran() {
+    let analysis = analyze_fixture(&minimal_config());
+    assert!(!analysis.facts().unwrap().candidates().is_empty());
+    let unselected = analyze_fixture(&json!({"schemaVersion": "9", "profiles": {}}));
+    assert!(!unselected.version_selected());
+    assert!(unselected.facts().is_none());
+}
