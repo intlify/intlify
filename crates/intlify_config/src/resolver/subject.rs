@@ -9,8 +9,8 @@
 //! a kind's registry ID is its name in kebab case, and the Check Registry
 //! gives it its key strategy, owning scope, parent, and projection. A later
 //! change may split or merge kinds as 015's subject-key rules require.
-//! The kinds of profile selection and reporting finalization are declared for
-//! the registry before the resolver records their units
+//! The kinds of the profile selector and of reporting finalization are
+//! declared for the registry before the resolver records their units
 //! ([`SubjectKind::declared_only`]).
 
 use std::borrow::Cow;
@@ -29,6 +29,7 @@ use super::groups::GroupSubject;
 use super::hydration::HydrationSubject;
 use super::locales::LocaleSubject;
 use super::negotiation::NegotiationSubject;
+use super::profile_selection::SelectionSubject;
 use super::resource_policy::{ArtifactSubject, PolicySubject, ReferenceField};
 use super::specification::Slot;
 use super::structural_admission::StructuralSubject;
@@ -731,16 +732,10 @@ impl SubjectKind {
     }
 
     /// Whether the kind is declared for the Check Registry while the resolver
-    /// records no unit of it yet: profile selection builds its units with its
-    /// Findings, and reporting finalization with the outcome.
+    /// records no unit of it yet: the selector builds its units with the
+    /// selection they gate, and reporting finalization with the outcome.
     pub(crate) const fn declared_only(self) -> bool {
-        matches!(
-            self,
-            Self::CapabilityProfiles
-                | Self::CapabilityProfileId
-                | Self::ProfileSelector
-                | Self::DiagnosticDomain
-        )
+        matches!(self, Self::ProfileSelector | Self::DiagnosticDomain)
     }
 
     /// The kind's place among its phase's kinds.
@@ -796,6 +791,10 @@ impl Subject {
                 StructuralSubject::TargetField(..) => SubjectKind::TargetField,
                 StructuralSubject::DeploymentGroupKey(..) => SubjectKind::DeploymentGroupKey,
                 StructuralSubject::GroupField(..) => SubjectKind::GroupField,
+            },
+            Self::Selection(subject) => match subject {
+                SelectionSubject::Profiles => SubjectKind::CapabilityProfiles,
+                SelectionSubject::ProfileId(_) => SubjectKind::CapabilityProfileId,
             },
             Self::Vocabulary => SubjectKind::Vocabulary,
             Self::CanonicalizationData => SubjectKind::CanonicalizationData,
@@ -951,6 +950,7 @@ impl Ord for Subject {
                 }
                 (Self::ArtifactReference(own), Self::ArtifactReference(theirs)) => own.cmp(theirs),
                 (Self::Structural(own), Self::Structural(theirs)) => own.cmp(theirs),
+                (Self::Selection(own), Self::Selection(theirs)) => own.cmp(theirs),
                 (Self::Target(own), Self::Target(theirs)) => own.cmp(theirs),
                 (Self::Group(own), Self::Group(theirs)) => own.cmp(theirs),
                 (Self::Hydration(own), Self::Hydration(theirs)) => own.cmp(theirs),
@@ -1048,6 +1048,8 @@ mod tests {
                 Field::of(&["members"]),
             )),
             owner(SemanticGroup::ProfileSpecification),
+            Subject::Selection(SelectionSubject::Profiles),
+            Subject::Selection(SelectionSubject::ProfileId(profile.clone())),
             capability(ArtifactSubject::Artifacts),
             capability(ArtifactSubject::PolicyArtifacts),
             capability(ArtifactSubject::TargetProfileArtifacts),
@@ -1248,15 +1250,14 @@ mod tests {
         assert_eq!(SubjectKind::ConfigurationSchemaSelection.rank(), 1);
     }
 
-    /// The kinds declared only are those of profile selection and reporting
-    /// finalization: Phase 2 records every kind of its own.
+    /// The kinds declared only are the profile selector's and reporting
+    /// finalization's: profile selection records its checks of the
+    /// declarations, and the earlier phases every kind of their own.
     #[test]
     fn the_kinds_declared_only_are_those_without_units_yet() {
         for kind in SubjectKind::ALL {
-            let unrecorded = matches!(
-                kind.phase(),
-                Phase::ProfileSelection | Phase::ReportingFinalization
-            );
+            let unrecorded = kind == SubjectKind::ProfileSelector
+                || kind.phase() == Phase::ReportingFinalization;
             assert_eq!(kind.declared_only(), unrecorded, "{kind:?}");
         }
     }

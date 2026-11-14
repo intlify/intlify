@@ -518,6 +518,7 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Subject::SchemaSelection
         | Subject::StructuralCapability
         | Subject::Structural(_)
+        | Subject::Selection(_)
         | Subject::Vocabulary
         | Subject::CanonicalizationData
         | Subject::ResourcePolicy(_)

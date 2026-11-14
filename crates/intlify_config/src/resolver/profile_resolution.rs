@@ -51,6 +51,7 @@ use super::hydration::{validate_hydration, ResolvedHydration};
 use super::identity::{resolve_project_identity, ProjectIdentity};
 use super::locales::{resolve_locales, LocaleFields, LocaleInvariant, ResolvedLocales};
 use super::negotiation::{resolve_negotiation, NegotiationProfile};
+use super::profile_selection::ProfileSelectionInvariant;
 use super::resource_policy::{
     admit_resource_policy, ConfigurationMeasures, DeclarationReferences, PolicyInvariant,
     PolicyOutcome,
@@ -220,6 +221,17 @@ pub(crate) enum ResolverInvariant {
     Entry(EntryInvariant),
     /// Phase 2 found a defect of structural admission itself.
     Structural(StructuralInvariant),
+    /// Phase 3 found a defect of profile selection itself.
+    ProfileSelection(ProfileSelectionInvariant),
+}
+
+impl From<ProfileSelectionInvariant> for ResolverInvariant {
+    fn from(invariant: ProfileSelectionInvariant) -> Self {
+        match invariant {
+            ProfileSelectionInvariant::Evaluation(invariant) => Self::Evaluation(invariant),
+            invariant => Self::ProfileSelection(invariant),
+        }
+    }
 }
 
 impl From<StructuralInvariant> for ResolverInvariant {
@@ -511,6 +523,7 @@ pub(super) mod tests {
     use crate::resolver::limits::{fixture_limits, ResolutionLimits, SECTION};
     use crate::resolver::locales::fixtures::{canonical, earlier};
     use crate::resolver::locales::{self, LocaleKey, LocaleSubject, Location};
+    use crate::resolver::profile_selection::{bound_declarations, capability, SelectionSubject};
     use crate::resolver::profile_view::{project, ProfileView};
     use crate::resolver::resource_policy::{self, PolicySlot, PolicySubject, ReferenceField};
     use crate::resolver::specification::{
@@ -1105,15 +1118,18 @@ pub(super) mod tests {
             return Ok(None);
         };
         let schema = Schema::for_model().unwrap();
-        let Ok(analysis) = admit_structure(
+        let structure = admit_structure(
             evaluation,
             file,
             document,
             &schema,
             structural,
             held(project_profile.as_ref()),
-        )?
-        else {
+        )?;
+        // Phase 3 checks the declarations whatever Phase 2 admitted, with its
+        // causes where it admitted nothing (D15:2131).
+        bound_declarations(evaluation, structure.as_ref().ok(), structural)?;
+        let Ok(analysis) = structure else {
             return Ok(None);
         };
         let Ok(Selection::Selected(selection)) = analysis.select(selector) else {
@@ -1413,8 +1429,9 @@ pub(super) mod tests {
 
     /// When the schema selection selects no schema, Phase 2 records its
     /// owner, the selection's checks, the analysis's measure waiting on the
-    /// failed check, and the `profileSpecification` group's owner, and no
-    /// semantic phase starts (D15:2130).
+    /// failed check, and the `profileSpecification` group's owner; Phase 3
+    /// its count of the declarations, waiting on the same check, and no
+    /// Profile ID; and no semantic phase starts (D15:2130, 2131).
     #[test]
     fn a_configuration_without_a_selected_schema_starts_no_semantic_phase() {
         let mut inputs = Inputs::complete();
@@ -1428,7 +1445,8 @@ pub(super) mod tests {
                 BTreeSet::from([
                     Phase::ResolverBootstrapAdmission,
                     Phase::EntryAdmission,
-                    Phase::StructuralAdmission
+                    Phase::StructuralAdmission,
+                    Phase::ProfileSelection,
                 ])
             );
             assert_eq!(
@@ -1444,7 +1462,17 @@ pub(super) mod tests {
                 .filter(|(_, status)| matches!(status, Status::NotEvaluated(_)))
                 .map(|(unit, _)| unit)
                 .collect();
-            assert_eq!(waiting, [&CAPABILITY]);
+            assert_eq!(
+                waiting,
+                [&CAPABILITY, &capability(SelectionSubject::Profiles)]
+            );
+            for unit in waiting {
+                let Some(Status::NotEvaluated(causes)) = evaluation.status(unit) else {
+                    panic!("{unit:?} waits");
+                };
+                let units: Vec<&Unit> = causes.keys().map(IssueKey::unit).collect();
+                assert_eq!(units, [&selection(Check::SupportedSchemaVersion)]);
+            }
         });
     }
 
@@ -1470,7 +1498,11 @@ pub(super) mod tests {
             let phases: BTreeSet<Phase> =
                 evaluation.statuses().map(|(unit, _)| unit.phase).collect();
             let mut ran = BTreeSet::from(PHASES);
-            ran.extend([Phase::EntryAdmission, Phase::StructuralAdmission]);
+            ran.extend([
+                Phase::EntryAdmission,
+                Phase::StructuralAdmission,
+                Phase::ProfileSelection,
+            ]);
             assert_eq!(phases, ran);
             let count = |phase| {
                 evaluation
@@ -1502,6 +1534,9 @@ pub(super) mod tests {
                 ])
             );
             assert_eq!(count(Phase::StructuralAdmission), 232);
+            // Phase 3 counts the declarations and checks the one Profile ID
+            // (D15:1885, 1886).
+            assert_eq!(count(Phase::ProfileSelection), 2);
             assert_eq!(unestablished(&evaluation), []);
             let project = state.locales.project.as_ref().unwrap();
             assert_eq!(spellings(project.requested().as_slice()), ["en", "ja"]);
@@ -2507,7 +2542,7 @@ pub(super) mod tests {
 
     /// A structural failure inside the selected declaration starts no
     /// semantic phase yet: they will read its admitted fields field by field
-    /// (plan 025 interpretation #205).
+    /// (plan 025 interpretation #205). Phase 3 still checks the declarations.
     #[test]
     fn a_failure_inside_the_selected_declaration_starts_no_semantic_phase() {
         let mut inputs = Inputs::complete();
@@ -2518,7 +2553,7 @@ pub(super) mod tests {
             assert_eq!(structural.len(), 1, "{structural:?}");
             assert!(evaluation
                 .statuses()
-                .all(|(unit, _)| unit.phase <= Phase::StructuralAdmission));
+                .all(|(unit, _)| unit.phase <= Phase::ProfileSelection));
         });
     }
 

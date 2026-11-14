@@ -38,9 +38,12 @@
 //! identifier syntax is redacted while the names its entry's schema defines
 //! are kept (D15:776, 2184).
 //!
-//! Later phases read the analysis these checks admit: the semantic phases the
+//! Later phases read the analysis these checks admit: profile selection,
+//! which counts the declarations once the checks admitted the `profiles`
+//! object ([`profiles`]) and checks a declared Profile ID once they admitted
+//! its key ([`profile_key`]) (D15:2131, 2184); the semantic phases the
 //! declaration Phase 3 selected once the checks under its key admitted it
-//! whole ([`declaration`]), whatever else of the root they rejected, and
+//! whole ([`declaration`]), whatever else of the root they rejected; and
 //! profile projection, which needs a complete `IntlifyConfig`, the whole root
 //! ([`whole`]) (D15:2142, 2367).
 
@@ -230,6 +233,32 @@ pub(crate) fn whole(evaluation: &Evaluation) -> Admitted<()> {
             Subject::SchemaSelection | Subject::StructuralCapability | Subject::Structural(_)
         )
     })
+}
+
+/// Whether structural admission admitted the root's `profiles` object,
+/// which profile selection reads: the root's schema selected, its analysis
+/// within the capability, and the member present with its type. Otherwise
+/// the causes (D15:2131, 2367).
+pub(crate) fn profiles(evaluation: &Evaluation) -> Admitted<()> {
+    evaluation.admitted_within(|unit| match &unit.subject {
+        Subject::SchemaSelection | Subject::StructuralCapability => true,
+        Subject::Structural(StructuralSubject::RootField(field)) => {
+            matches!(unit.check, Check::RequiredField | Check::FieldType)
+                && matches!(&*field.path, [name] if &**name == "profiles")
+        }
+        _ => false,
+    })
+}
+
+/// The unit of the key check of the `profiles` entry whose key is `id`.
+pub(crate) fn profile_key(id: &str) -> Unit {
+    Unit {
+        phase: Phase::StructuralAdmission,
+        subject: Subject::Structural(StructuralSubject::ProfileKey(EntryKey::Identity(
+            Arc::from(id),
+        ))),
+        check: Check::FieldValue,
+    }
 }
 
 /// The bound the analysis is measured against.
