@@ -38,9 +38,11 @@
 //! identifier syntax is redacted while the names its entry's schema defines
 //! are kept (D15:776, 2184).
 //!
-//! The analysis these checks admit is what later phases read, and a
-//! configuration structural admission does not admit whole starts no
-//! semantic phase (plan 025 PR 5f-2f).
+//! Later phases read the analysis these checks admit: the semantic phases the
+//! declaration Phase 3 selected once the checks under its key admitted it
+//! whole ([`declaration`]), whatever else of the root they rejected, and
+//! profile projection, which needs a complete `IntlifyConfig`, the whole root
+//! ([`whole`]) (D15:2142, 2367).
 
 use std::cell::OnceCell;
 use std::collections::BTreeMap;
@@ -118,6 +120,25 @@ pub(crate) enum StructuralSubject {
 }
 
 impl StructuralSubject {
+    /// The admitted Profile ID of the declaration that holds the subject:
+    /// none for the root's fields and under a key without the identifier
+    /// syntax.
+    fn declaration(&self) -> Option<&str> {
+        let (Self::ProfileKey(profile)
+        | Self::ProfileField(profile, _)
+        | Self::TargetProfileKey(profile, _)
+        | Self::TargetField(profile, _, _)
+        | Self::DeploymentGroupKey(profile, _)
+        | Self::GroupField(profile, _, _)) = self
+        else {
+            return None;
+        };
+        match profile {
+            EntryKey::Identity(id) => Some(id),
+            EntryKey::Content(_) => None,
+        }
+    }
+
     /// The logical subject, which every raw candidate of the unit joins: the
     /// subject without where a candidate looked, and each key without an
     /// identity as its content projection alone (D15:2184, 2190).
@@ -183,6 +204,32 @@ impl Field {
             at: None,
         }
     }
+}
+
+/// Whether structural admission admitted the declaration `id` whole, its key
+/// and every field under it, the checks that need them included: every unit
+/// under its key evaluated without a blocking result. Otherwise the causes:
+/// each such unit's blocking results, and the causes of each not evaluated
+/// (D15:2131, 2367).
+pub(crate) fn declaration(evaluation: &Evaluation, id: &str) -> Admitted<()> {
+    evaluation.admitted_within(|unit| match &unit.subject {
+        Subject::Structural(subject) => subject.declaration() == Some(id),
+        _ => false,
+    })
+}
+
+/// Whether structural admission admitted the whole root, which a complete
+/// `IntlifyConfig` and so a profile projection need: every structural check
+/// evaluated without a blocking result. Otherwise the causes: every blocking
+/// result of those checks, and the causes of each not evaluated (D15:2142,
+/// 2367).
+pub(crate) fn whole(evaluation: &Evaluation) -> Admitted<()> {
+    evaluation.admitted_within(|unit| {
+        matches!(
+            unit.subject,
+            Subject::SchemaSelection | Subject::StructuralCapability | Subject::Structural(_)
+        )
+    })
 }
 
 /// The bound the analysis is measured against.
@@ -702,8 +749,8 @@ mod tests {
     use crate::structural::{AuthoringSchema, StructuralLimits};
 
     use super::{
-        admit_structure, selection, EntryKey, Field, StructuralInvariant, StructuralSubject,
-        CAPABILITY, OWNER,
+        admit_structure, declaration, selection, whole, EntryKey, Field, StructuralInvariant,
+        StructuralSubject, CAPABILITY, OWNER,
     };
 
     use StructuralSubject as S;
@@ -1304,7 +1351,7 @@ mod tests {
     }
 
     /// The view of the whole of `source`, the root's span.
-    fn whole(source: &[u8]) -> Value {
+    fn root_span(source: &[u8]) -> Value {
         json!({ "start": "0", "end": source.len().to_string() })
     }
 
@@ -1343,7 +1390,10 @@ mod tests {
         let (source, found) = observed(&missing, 1_000_000);
         assert_eq!(
             located(found[0].primary()),
-            (json!({ "exact-json-pointer": "/profiles" }), whole(&source))
+            (
+                json!({ "exact-json-pointer": "/profiles" }),
+                root_span(&source)
+            )
         );
         // A member missing from an entry, at the entry's object.
         let mut nested = minimal_config();
@@ -1453,7 +1503,7 @@ mod tests {
         let (source, found) = observed(&json!([]), 1_000_000);
         assert_eq!(
             located(found[0].primary()),
-            (json!({ "exact-json-pointer": "" }), whole(&source))
+            (json!({ "exact-json-pointer": "" }), root_span(&source))
         );
         let mut missing = minimal_config();
         missing.as_object_mut().unwrap().remove("schemaVersion");
@@ -1462,7 +1512,7 @@ mod tests {
             located(found[0].primary()),
             (
                 json!({ "exact-json-pointer": "/schemaVersion" }),
-                whole(&source)
+                root_span(&source)
             )
         );
         let mut number = minimal_config();
@@ -1479,7 +1529,7 @@ mod tests {
         let (source, found) = observed(&minimal_config(), count.unwrap() - 1);
         assert_eq!(
             located(found[0].primary()),
-            (json!({ "exact-json-pointer": "" }), whole(&source))
+            (json!({ "exact-json-pointer": "" }), root_span(&source))
         );
         let tokens = EvidenceTokens::assign(PROFILE, redacted(&[]), &Sha256);
         let bound = crate::resolver::evidence::EvidenceProjection::resolver_input(
@@ -1492,6 +1542,63 @@ mod tests {
         .retained(PROFILE, &tokens)
         .unwrap();
         assert_eq!(found[0].related(), [bound]);
+    }
+
+    /// The keys of `causes`, as their units' checks and codes.
+    fn causes(admitted: Admitted<()>) -> Vec<(Unit, Code)> {
+        admitted
+            .unwrap_err()
+            .keys()
+            .map(|key| (key.unit().clone(), key.code()))
+            .collect()
+    }
+
+    /// A declaration is admitted whole when every unit under its key was
+    /// evaluated without a Finding: a failure under another declaration or
+    /// at the root leaves it admitted, while the whole root waits on every
+    /// structural Finding; a unit not evaluated holds it back with its causes
+    /// (D15:2131, 2142, 2367).
+    #[test]
+    fn a_declaration_is_admitted_whole_by_the_checks_under_its_key() {
+        let mut value = minimal_config();
+        let mut other = value["profiles"]["app"].clone();
+        other["requestedLocales"] = json!("en");
+        value["profiles"]["other"] = other;
+        let (evaluation, _) = admitted(&value, 1_000_000);
+        let failed = level(
+            S::ProfileField(
+                EntryKey::identity("other"),
+                Field::of(&["requestedLocales"]),
+            ),
+            Check::FieldType,
+        );
+        assert_eq!(declaration(&evaluation, "app"), Ok(()));
+        assert_eq!(
+            causes(declaration(&evaluation, "other")),
+            [(failed.clone(), Code::FieldTypeInvalid)]
+        );
+        assert_eq!(
+            causes(whole(&evaluation)),
+            [(failed, Code::FieldTypeInvalid)]
+        );
+        // A unit the declaration needs, made to block, holds back every unit
+        // under its key.
+        let profiles = root(&["profiles"], Check::FieldType);
+        let (evaluation, _) = admitted_in(
+            Evaluation::blocking(profiles.clone()),
+            &minimal_config(),
+            1_000_000,
+            Ok(()),
+        );
+        assert_eq!(
+            causes(declaration(&evaluation, "app"))
+                .into_iter()
+                .map(|(unit, _)| unit)
+                .collect::<Vec<_>>(),
+            [profiles]
+        );
+        let (evaluation, _) = admitted(&minimal_config(), 1_000_000);
+        assert_eq!(whole(&evaluation), Ok(()));
     }
 
     #[test]

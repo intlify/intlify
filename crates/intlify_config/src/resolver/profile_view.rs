@@ -226,9 +226,11 @@ struct Delivery {
 
 /// Phase 14 over one invocation's semantic state and the resolver's supported
 /// specifications: the view of the checked profile, or the causes of the
-/// semantic results it needs and does not have. It needs every semantic
-/// group, so it has a view exactly when every group's owner was evaluated, and
-/// otherwise waits on what those owners wait on.
+/// results it needs and does not have. It needs a complete `IntlifyConfig`,
+/// so structural admission must have admitted the whole root, and every
+/// semantic group (D15:2142, 2367): it has a view exactly when the root was
+/// admitted whole and every group's owner was evaluated, and otherwise waits
+/// on the structural Findings and on what those owners wait on.
 pub(crate) fn project<Id: AsRef<str>>(
     state: &SemanticState<'_, Id>,
     supported: &SupportedSpecifications<Id>,
@@ -248,19 +250,23 @@ pub(crate) fn project<Id: AsRef<str>>(
         both(targets(state), deployment_groups(state)),
         delivery(state),
     );
-    both(both(identities, policies), deployment).map(
+    let structure = state.structure.clone();
+    both(structure, both(both(identities, policies), deployment)).map(
         |(
+            (),
             (
                 (
-                    (profile_specification, project_identity),
-                    (locale_canonicalization, project_locales),
+                    (
+                        (profile_specification, project_identity),
+                        (locale_canonicalization, project_locales),
+                    ),
+                    (
+                        (locale_negotiation, message_fallback),
+                        (coverage, (required_policies, optional_policies)),
+                    ),
                 ),
-                (
-                    (locale_negotiation, message_fallback),
-                    (coverage, (required_policies, optional_policies)),
-                ),
+                ((targets, deployment_groups), delivery),
             ),
-            ((targets, deployment_groups), delivery),
         )| ProfileView {
             profile_specification,
             project_identity,

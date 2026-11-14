@@ -82,6 +82,11 @@ impl PreparedPolicy {
             },
             measures: ConfigurationMeasures {
                 value: Ok(self.analysis.benchmark_input_counts().value),
+                // A prepared configuration is complete: every declaration's
+                // key is a Profile ID.
+                declarations: Ok(
+                    u64::try_from(self.profile_ids.len()).expect("a collection's length fits u64")
+                ),
                 profile_ids: Ok(&self.profile_ids),
                 selector: &self.selector,
                 structural_units: Ok(structural_units),

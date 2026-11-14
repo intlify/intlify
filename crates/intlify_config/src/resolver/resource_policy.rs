@@ -246,7 +246,13 @@ impl DeclarationReferences<'_> {
 pub(crate) struct ConfigurationMeasures<'a> {
     /// The materialized root's value counts.
     pub(crate) value: Admitted<ValueCounts>,
-    /// Every declared Profile ID, in their unsigned byte order.
+    /// How many declarations the root's `profiles` object holds: every
+    /// declaration counts, one whose key lacks the identifier syntax included
+    /// (D15:1885).
+    pub(crate) declarations: Admitted<u64>,
+    /// Every declared Profile ID, in their unsigned byte order: a declaration
+    /// whose key lacks the identifier syntax has no subject in a later phase
+    /// (D15:1886, 2184).
     pub(crate) profile_ids: Admitted<&'a [ProfileId]>,
     /// The normalized External Profile Selector Input.
     pub(crate) selector: &'a SelectorInput,
@@ -594,7 +600,10 @@ fn configuration_bounds(
         recheck(PolicySubject::Profiles),
         MAX_PROFILES,
         structural.map(|limits| limits.max_profiles),
-        ids.map(|ids| Tally::of(ids.len())),
+        measures
+            .declarations
+            .as_ref()
+            .map(|&declarations| Tally::exactly(declarations)),
     )?;
     holds = and(holds, held);
     let id_limit = structural.map(|limits| limits.max_profile_id_bytes);
@@ -1041,6 +1050,7 @@ mod tests {
     /// What Phases 1 to 3 measured, as a test states it.
     struct Measures {
         value: Admitted<ValueCounts>,
+        declarations: Admitted<u64>,
         profile_ids: Admitted<Vec<ProfileId>>,
         selector: SelectorInput,
         structural_units: Admitted<u64>,
@@ -1057,6 +1067,7 @@ mod tests {
                     total_string_bytes: 400,
                     single_string_bytes: 30,
                 }),
+                declarations: Ok(2),
                 profile_ids: Ok(vec![profile("app"), profile("storefront")]),
                 selector: SelectorInput::string("app", observed(capability)),
                 structural_units: Ok(120),
@@ -1164,6 +1175,7 @@ mod tests {
             let mut evaluation = Evaluation::default();
             let measures = ConfigurationMeasures {
                 value: self.measures.value.clone(),
+                declarations: self.measures.declarations.clone(),
                 profile_ids: self.measures.profile_ids.as_deref().map_err(Causes::clone),
                 selector: &self.measures.selector,
                 structural_units: self.measures.structural_units.clone(),
@@ -2345,6 +2357,7 @@ mod tests {
         let fields = earlier(Code::LocaleDataNotAdmitted);
         let mut inputs = under(|_| {});
         inputs.measures.value = Err(root.clone());
+        inputs.measures.declarations = Err(declarations.clone());
         inputs.measures.profile_ids = Err(declarations.clone());
         inputs.measures.structural_units = Err(work.clone());
         inputs.policies = Err(fields.clone());
