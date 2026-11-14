@@ -148,6 +148,21 @@ impl SelectorInput {
         }
     }
 
+    /// The bound the selector was observed under.
+    pub(crate) const fn bound(&self) -> Bound {
+        self.bound
+    }
+
+    /// The complete string of a string selector within the bound it was
+    /// observed under, which profile selection's checks compare: none for an
+    /// absent, over-limit, or non-string selector. Never a Finding's payload.
+    pub(crate) fn text(&self) -> Option<&str> {
+        match &self.kind {
+            SelectorKind::String(text) => Some(text),
+            _ => None,
+        }
+    }
+
     /// The declared Profile ID among `declared` that the selector exactly
     /// matches, when it is a complete string within `authority`: the ID a
     /// `safe-profile-id` keeps, taken from the declaration rather than from the

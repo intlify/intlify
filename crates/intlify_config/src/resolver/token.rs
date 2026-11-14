@@ -429,7 +429,7 @@ fn own(subject: &Subject) -> (Own<'_>, Option<Subject>) {
         | Subject::SemanticDependency(_) => alone(Own::Singleton),
         Subject::Structural(structural) => structural_own(structural),
         Subject::Selection(selection) => alone(match selection {
-            SelectionSubject::Profiles => Own::Singleton,
+            SelectionSubject::Profiles | SelectionSubject::Selector => Own::Singleton,
             SelectionSubject::ProfileId(profile) => identity(profile.as_str()),
         }),
         Subject::ResourcePolicy(policy) => alone(match policy {
@@ -801,6 +801,7 @@ mod tests {
             Subject::Selection(SelectionSubject::ProfileId(
                 serde_json::from_value::<ProfileId>(json!("app")).unwrap(),
             )),
+            Subject::Selection(SelectionSubject::Selector),
             Subject::Vocabulary,
             Subject::CanonicalizationData,
         ]);
@@ -1066,6 +1067,10 @@ mod tests {
                     serde_json::from_value::<ProfileId>(json!("app")).unwrap(),
                 )),
                 json!({ "identity": "app" }),
+            ),
+            (
+                Subject::Selection(SelectionSubject::Selector),
+                json!("profile-selector"),
             ),
             (Subject::Vocabulary, json!("vocabulary")),
             (

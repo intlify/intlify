@@ -46,8 +46,11 @@
 //! measure (D15:2149, 2184). Profile selection counts the declarations once
 //! structural admission admitted the `profiles` object, and checks a declared
 //! Profile ID once it admitted the key, which alone names the ID's subject
-//! (D15:2131, 2184). The kinds declared only list no prerequisite until their
-//! units exist. No row of a Shared phase lists a check of entry
+//! (D15:2131, 2184). The selector's bound waits on nothing; comparing the
+//! selector with the declarations waits on their count and on `profiles`
+//! holding one, its Profile ID admission on the bound, and its declaration on
+//! that admission (D15:2296, 2363). The kinds declared only list no
+//! prerequisite until their units exist. No row of a Shared phase lists a check of entry
 //! admission: without a value from entry admission there is no Shared
 //! projection, whose absence the entry's Findings explain, and the phase's
 //! first unit requires no check (D15:2369, 2516). No row of a later phase lists
@@ -137,7 +140,7 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:77f72567b363eae78b1ca620ebf6c2d38683809f413541fa6eb8584f5f564104";
+    "sha256:56606250b73d831f5cf51627d94d4847283910760b6a73d7c4cfc69f0217a602";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
@@ -1510,9 +1513,25 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         // it admitted the key (D15:2131, 2184).
         K::CapabilityProfiles => &[&["structural.root.required-field"]],
         K::CapabilityProfileId => &[&["structural.profile-key.field-value"]],
-        // Declared only: their units come with their phases' Findings.
+        // The selector's bound waits on nothing. Comparing the selector with
+        // the declarations waits on their count and on `profiles` holding
+        // one, its Profile ID admission on the bound, and its declaration on
+        // that admission (D15:2131, 2296, 2363).
+        K::ProfileSelector => &[
+            NONE,
+            &[
+                "structural.root.field-value",
+                "selection.profiles.within-capability",
+            ],
+            &["selection.selector.within-capability"],
+            &[
+                "structural.root.field-value",
+                "selection.profiles.within-capability",
+                "selection.selector.valid",
+            ],
+        ],
+        // Declared only: its units come with the outcome.
         K::DiagnosticDomain => &[NOT_YET],
-        K::ProfileSelector => &[NOT_YET; 4],
     }
 }
 
@@ -2684,7 +2703,7 @@ mod tests {
             .filter(|row| row.subject_kind.declared_only())
             .map(|row| row.check_id.as_str())
             .collect();
-        assert_eq!(declared.len(), 5);
+        assert_eq!(declared.len(), 1);
         for row in &rows {
             if row.subject_kind.declared_only() {
                 assert!(row.prerequisite_check_ids.is_empty(), "{}", row.check_id);

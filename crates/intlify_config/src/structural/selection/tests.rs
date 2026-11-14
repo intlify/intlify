@@ -460,3 +460,18 @@ fn failed_and_repeated_selections_cannot_mutate_the_analysis_or_previous_result(
     assert_eq!(first.id(), repeated.id());
     assert_eq!(first.resource_limits(), repeated.resource_limits());
 }
+
+#[test]
+fn only_a_string_within_its_bound_has_a_text() {
+    let bound = Bound::new(4).unwrap();
+    assert_eq!(SelectorInput::absent(bound).bound(), bound);
+    assert_eq!(SelectorInput::string("app", bound).text(), Some("app"));
+    assert_eq!(SelectorInput::string("Ad M", bound).text(), Some("Ad M"));
+    assert_eq!(SelectorInput::string("storefront", bound).text(), None);
+    assert_eq!(SelectorInput::over_limit(bound).text(), None);
+    assert_eq!(SelectorInput::absent(bound).text(), None);
+    assert_eq!(
+        SelectorInput::invalid_type(InvalidSelectorType::Number, bound).text(),
+        None
+    );
+}

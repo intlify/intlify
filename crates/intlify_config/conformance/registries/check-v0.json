@@ -1637,7 +1637,10 @@
       "owningScope": "profile-selector",
       "subjectKindRank": "2",
       "checkRank": "1",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.root.field-value",
+        "selection.profiles.within-capability"
+      ],
       "possibleFindingCodes": [
         "project-profile-selector-required"
       ],
@@ -1669,7 +1672,9 @@
       "owningScope": "profile-selector",
       "subjectKindRank": "2",
       "checkRank": "2",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "selection.selector.within-capability"
+      ],
       "possibleFindingCodes": [
         "project-profile-selector-invalid"
       ],
@@ -1701,7 +1706,11 @@
       "owningScope": "profile-selector",
       "subjectKindRank": "2",
       "checkRank": "3",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.root.field-value",
+        "selection.profiles.within-capability",
+        "selection.selector.valid"
+      ],
       "possibleFindingCodes": [
         "project-profile-selector-unknown"
       ],
