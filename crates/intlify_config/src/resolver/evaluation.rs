@@ -12,6 +12,13 @@
 //! the suggestion its code makes. The candidates of one key carry equal
 //! details and suggestions, since a key determines its whole payload
 //! (D15:2381).
+//!
+//! One evaluation of a unit may find several blocking candidates: Findings
+//! with different codes or reasons, and occurrences of one Finding that a
+//! singleton subject checks independently (D15:2203, 2213-2221). In a phase
+//! whose Findings carry occurrence Evidence, each candidate also carries what
+//! it observed its value through, which becomes one Finding Occurrence
+//! candidate (D15:2385).
 
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -29,6 +36,7 @@ use super::artifact_resolution::CollectionSubject;
 use super::capability::BootstrapBoundId;
 use super::coverage::CoverageSubject;
 use super::dependency::SemanticGroup;
+use super::evidence::EvidenceProjection;
 use super::fallback::FallbackSubject;
 use super::groups::GroupSubject;
 use super::hydration::HydrationSubject;
@@ -36,6 +44,7 @@ use super::identity::DeclarationField;
 use super::limits::BoundId;
 use super::locales::LocaleSubject;
 use super::negotiation::NegotiationSubject;
+use super::occurrence::OccurrenceCandidate;
 use super::resource_policy::{PolicySubject, ReferenceField};
 use super::specification::Slot;
 use super::targets::TargetSubject;
@@ -939,6 +948,41 @@ impl Blocking {
     }
 }
 
+/// What one Finding candidate observed its value through: its primary
+/// Evidence and its related Evidence, as Evidence projects them before the
+/// invocation's evidence tokens are assigned.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Observation {
+    pub(crate) primary: EvidenceProjection,
+    pub(crate) related: Vec<EvidenceProjection>,
+}
+
+/// The blocking candidates one evaluation of a unit found, each with what it
+/// observed when its phase's Findings carry occurrence Evidence. Never empty.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Found(Vec<(Blocking, Option<Observation>)>);
+
+impl Found {
+    /// The candidate `blocking`, found through `observation`.
+    pub(crate) fn observed(blocking: Blocking, observation: Observation) -> Self {
+        Self(vec![(blocking, Some(observation))])
+    }
+
+    /// These candidates and those of `other`.
+    pub(crate) fn and(mut self, other: Self) -> Self {
+        self.0.extend(other.0);
+        self
+    }
+}
+
+impl From<Blocking> for Found {
+    /// The candidate `blocking`, in a phase whose Findings carry no occurrence
+    /// Evidence yet.
+    fn from(blocking: Blocking) -> Self {
+        Self(vec![(blocking, None)])
+    }
+}
+
 /// A non-blocking result an evaluated check found, which leaves the value it
 /// establishes available, with the safe suggestion its code makes.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1170,6 +1214,9 @@ pub(crate) struct Evaluation {
     candidates: BTreeMap<Unit, Status>,
     issues: BTreeMap<IssueKey, Option<Details>>,
     notices: BTreeMap<IssueKey, Option<Suggestion>>,
+    /// The Finding Occurrence candidate of every blocking candidate that
+    /// carried what it observed, in the order the units ran.
+    occurrences: Vec<OccurrenceCandidate>,
     /// The unit a test makes block.
     #[cfg(test)]
     blocked: Option<Unit>,
@@ -1308,6 +1355,26 @@ impl Evaluation {
         );
     }
 
+    /// Asserts that a blocking candidate of `unit` carries what it observed
+    /// exactly when the unit's phase is one whose Findings carry occurrence
+    /// Evidence so far. Unless a test made the result up or made the unit
+    /// block.
+    #[cfg(test)]
+    fn observes(&self, unit: &Unit, observed: bool) {
+        // The phases whose Findings carry occurrence Evidence so far; the
+        // others gain theirs phase by phase (plan 025 PRs 5f).
+        const OBSERVED: [Phase; 1] = [Phase::ResolverBootstrapAdmission];
+        if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
+            return;
+        }
+        assert_eq!(
+            observed,
+            OBSERVED.contains(&unit.phase),
+            "{unit:?} reports a blocking candidate {} what it observed, against its phase",
+            if observed { "with" } else { "without" }
+        );
+    }
+
     /// Runs `unit` when its prerequisite is admitted and records its status
     /// under the unit over its logical subject, as one candidate of it.
     /// A unit whose subject is of another phase's kind, that runs a check its
@@ -1323,6 +1390,24 @@ impl Evaluation {
         unit: Unit,
         prerequisite: Admitted<P>,
         evaluate: impl FnOnce(P) -> Result<T, Blocking>,
+    ) -> Result<Admitted<T>, EvaluationInvariant> {
+        self.check_found(unit, prerequisite, |value| {
+            evaluate(value).map_err(Found::from)
+        })
+    }
+
+    /// Runs `unit` as [`Self::check`] does, where `evaluate` may find several
+    /// blocking candidates, each with what it observed. Each candidate
+    /// reports its key with the payload every candidate of the key carries,
+    /// and its observation becomes one Finding Occurrence candidate; whatever
+    /// depends on the unit inherits every key it found. Candidates whose
+    /// payloads differ under one key are a resolver bug, and then nothing is
+    /// recorded.
+    pub(crate) fn check_found<P, T>(
+        &mut self,
+        unit: Unit,
+        prerequisite: Admitted<P>,
+        evaluate: impl FnOnce(P) -> Result<T, Found>,
     ) -> Result<Admitted<T>, EvaluationInvariant> {
         let kind = unit.subject.kind();
         if kind.phase() != unit.phase {
@@ -1346,11 +1431,11 @@ impl Evaluation {
         let evaluate = |value| {
             if self.blocked.as_ref().map(Unit::logical).as_ref() == Some(&unit) {
                 // Any code serves: the test reads only which unit blocked.
-                Err(Blocking {
+                Err(Found::from(Blocking {
                     code: Code::JsonInvalid,
                     reason: None,
                     details: None,
-                })
+                }))
             } else {
                 evaluate(value)
             }
@@ -1359,33 +1444,7 @@ impl Evaluation {
             Err(causes) => (Status::NotEvaluated(causes.clone()), Err(causes)),
             Ok(value) => match evaluate(value) {
                 Ok(value) => (Status::Evaluated, Ok(value)),
-                Err(Blocking {
-                    code,
-                    reason,
-                    details,
-                }) => {
-                    #[cfg(test)]
-                    self.registered(&unit, code, reason, details, None, true);
-                    let key = IssueKey {
-                        unit: unit.clone(),
-                        code,
-                        reason,
-                    };
-                    // A key that stands for several values derives its
-                    // details from itself alone, so every candidate that
-                    // reports it gives the same (Decision 015-157).
-                    match self.issues.entry(key.clone()) {
-                        Entry::Vacant(entry) => {
-                            entry.insert(details);
-                        }
-                        Entry::Occupied(entry) => {
-                            if *entry.get() != details {
-                                return Err(EvaluationInvariant::UnequalPayload(raw));
-                            }
-                        }
-                    }
-                    (Status::Evaluated, Err(Causes(BTreeSet::from([key]))))
-                }
+                Err(found) => (Status::Evaluated, Err(self.found(&raw, &unit, found)?)),
             },
         };
         self.candidates.insert(raw, status.clone());
@@ -1399,6 +1458,59 @@ impl Evaluation {
         };
         self.statuses.insert(unit, status);
         Ok(result)
+    }
+
+    /// Records the blocking candidates `found` of the logical `unit`, whose
+    /// candidate is `raw`, and returns the keys they report.
+    fn found(
+        &mut self,
+        raw: &Unit,
+        unit: &Unit,
+        Found(found): Found,
+    ) -> Result<Causes, EvaluationInvariant> {
+        let key = |blocking: &Blocking| IssueKey {
+            unit: unit.clone(),
+            code: blocking.code,
+            reason: blocking.reason,
+        };
+        let mut payloads: BTreeMap<IssueKey, Option<Details>> = BTreeMap::new();
+        for (blocking, observation) in &found {
+            #[cfg(test)]
+            {
+                self.registered(
+                    unit,
+                    blocking.code,
+                    blocking.reason,
+                    blocking.details,
+                    None,
+                    true,
+                );
+                self.observes(unit, observation.is_some());
+            }
+            #[cfg(not(test))]
+            let _ = observation;
+            // A key that stands for several values derives its details from
+            // itself alone, so every candidate that reports it gives the
+            // same (Decision 015-157).
+            let key = key(blocking);
+            let earlier = payloads.get(&key).or_else(|| self.issues.get(&key));
+            if earlier.is_some_and(|details| *details != blocking.details) {
+                return Err(EvaluationInvariant::UnequalPayload(raw.clone()));
+            }
+            payloads.insert(key, blocking.details);
+        }
+        for (blocking, observation) in found {
+            if let Some(Observation { primary, related }) = observation {
+                self.occurrences.push(OccurrenceCandidate {
+                    finding: key(&blocking),
+                    primary,
+                    related,
+                });
+            }
+        }
+        let keys = payloads.keys().cloned().collect();
+        self.issues.extend(payloads);
+        Ok(Causes(keys))
     }
 
     /// Records the non-blocking result `notice` of a unit `check` evaluated,
@@ -1482,6 +1594,12 @@ impl Evaluation {
 
     pub(crate) fn notices(&self) -> impl Iterator<Item = &IssueKey> {
         self.notices.keys()
+    }
+
+    /// The Finding Occurrence candidate of every blocking candidate that
+    /// carried what it observed.
+    pub(crate) fn occurrence_candidates(&self) -> &[OccurrenceCandidate] {
+        &self.occurrences
     }
 
     /// Every result found, blocking or not, with its details or suggestion,
@@ -2835,5 +2953,156 @@ mod tests {
                 .collect::<Vec<_>>(),
             [rejected("zz").logical()]
         );
+    }
+
+    /// Phase 0's one unit.
+    const BOOTSTRAP: Unit = Unit {
+        phase: Phase::ResolverBootstrapAdmission,
+        subject: Subject::Slot(Slot::ProjectProfile),
+        check: Check::SupportedAssertion,
+    };
+
+    /// A result observed through `path` of a resolver input, relating nothing.
+    fn through(path: crate::resolver::evidence_component::ComponentPath) -> Observation {
+        Observation {
+            primary: EvidenceProjection::resolver_input(path),
+            related: Vec::new(),
+        }
+    }
+
+    fn project_profile() -> Observation {
+        through(
+            crate::resolver::evidence_component::ComponentPath::specification(Slot::ProjectProfile),
+        )
+    }
+
+    const fn not_admitted(reason: Reason) -> Blocking {
+        Blocking {
+            code: Code::SpecificationNotAdmitted,
+            reason: Some(reason),
+            details: None,
+        }
+    }
+
+    /// One evaluation finds two results, each with what it observed: both
+    /// are Findings, each observation is an occurrence candidate of its own,
+    /// and what depends on the unit waits on both (D15:2213-2221, 2385).
+    #[test]
+    fn one_evaluation_can_find_several_results_each_with_its_observation() {
+        let mut evaluation = Evaluation::default();
+        let slot = project_profile();
+        let causes = evaluation
+            .check_found(BOOTSTRAP, Ok(()), |()| {
+                Err::<(), _>(
+                    Found::observed(not_admitted(Reason::Unsupported), slot.clone()).and(
+                        Found::observed(not_admitted(Reason::Incompatible), slot.clone()),
+                    ),
+                )
+            })
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(
+            causes.keys().map(IssueKey::reason).collect::<Vec<_>>(),
+            [Some(Reason::Incompatible), Some(Reason::Unsupported)]
+        );
+        assert_eq!(evaluation.issues().count(), 2);
+        assert_eq!(evaluation.status(&BOOTSTRAP), Some(&Status::Evaluated));
+        assert_eq!(
+            evaluation
+                .occurrence_candidates()
+                .iter()
+                .map(|candidate| (candidate.finding.reason(), &candidate.primary))
+                .collect::<Vec<_>>(),
+            [
+                (Some(Reason::Unsupported), &slot.primary),
+                (Some(Reason::Incompatible), &slot.primary)
+            ]
+        );
+        let owner = crate::resolver::dependency::unit(SemanticGroup::ProfileSpecification);
+        evaluation
+            .check(
+                owner.clone(),
+                Err::<(), _>(causes.clone()),
+                Ok::<(), Blocking>,
+            )
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(
+            evaluation.status(&owner),
+            Some(&Status::NotEvaluated(causes))
+        );
+    }
+
+    /// Candidates of one key, each observed through another location, are
+    /// one Finding with an occurrence candidate each (D15:2203, 2385).
+    #[test]
+    fn candidates_of_one_key_keep_an_observation_each() {
+        use crate::resolver::evidence_component::ComponentPath;
+        use crate::resolver::origin::SafeOriginKind;
+        let mut evaluation = Evaluation::default();
+        let slot = project_profile();
+        let root = through(
+            ComponentPath::root(SafeOriginKind::ProfileResolutionSpecificationInput).unwrap(),
+        );
+        evaluation
+            .check_found(BOOTSTRAP, Ok(()), |()| {
+                Err::<(), _>(
+                    Found::observed(MISSING, slot.clone())
+                        .and(Found::observed(MISSING, root.clone())),
+                )
+            })
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(evaluation.issues().count(), 1);
+        let candidates = evaluation.occurrence_candidates();
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates[0].finding, candidates[1].finding);
+        assert_eq!(
+            (&candidates[0].primary, &candidates[1].primary),
+            (&slot.primary, &root.primary)
+        );
+    }
+
+    /// D15:2381 within one evaluation: two candidates of one key with unequal
+    /// details are a resolver bug, and then nothing of the unit is recorded.
+    #[test]
+    fn unequal_candidates_of_one_evaluation_record_nothing() {
+        let found = |actual| Blocking::limit(exceeded(actual));
+        let slot = project_profile();
+        let mut evaluation = Evaluation::fabricated();
+        assert_eq!(
+            evaluation.check_found(rejected("zz"), Ok(()), |()| {
+                Err::<(), _>(
+                    Found::observed(found(Actual::AtLeast(4)), slot.clone())
+                        .and(Found::observed(found(Actual::AtLeast(5)), slot.clone())),
+                )
+            }),
+            Err(EvaluationInvariant::UnequalPayload(rejected("zz")))
+        );
+        assert_eq!(evaluation.issues().count(), 0);
+        assert_eq!(evaluation.candidates().count(), 0);
+        assert_eq!(evaluation.statuses().count(), 0);
+        assert!(evaluation.occurrence_candidates().is_empty());
+    }
+
+    /// A blocking candidate of a phase whose Findings carry occurrence
+    /// Evidence, as Phase 0's do, must carry what it observed.
+    #[test]
+    #[should_panic(expected = "without what it observed")]
+    fn a_candidate_of_an_observed_phase_without_an_observation_fails_the_test() {
+        missing(&mut Evaluation::default(), BOOTSTRAP);
+    }
+
+    /// A blocking candidate of a phase whose Findings carry no occurrence
+    /// Evidence yet carries no observation.
+    #[test]
+    #[should_panic(expected = "with what it observed")]
+    fn a_candidate_of_another_phase_with_an_observation_fails_the_test() {
+        let coverage = through(
+            crate::resolver::evidence_component::ComponentPath::specification(Slot::Coverage),
+        );
+        let _ = Evaluation::default().check_found(slot(Slot::Coverage), Ok(()), |()| {
+            Err::<(), _>(Found::observed(MISSING, coverage))
+        });
     }
 }

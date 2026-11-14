@@ -1,9 +1,11 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! 015's Semantic Profile Resolver over one invocation: Phase 0 and Phases 4
-//! to 13 of the Deterministic Resolution Algorithm, in 015's order, over one
-//! evaluation. Each phase takes the values the earlier ones admitted, or the
+//! 015's Semantic Profile Resolver over one invocation: Phases 4 to 13 of the
+//! Deterministic Resolution Algorithm, in 015's order, over one evaluation in
+//! which Phase 0 ran before configuration entry, so that its Finding and
+//! status remain whatever entry finds (D15:2145). Each phase takes the values
+//! the earlier ones admitted, or the
 //! causes of their absence, and evaluates every check whose prerequisites were
 //! admitted, so a blocking result leaves only the checks that depend on it not
 //! evaluated. Once the phases that establish a semantic group have run, the
@@ -23,7 +25,9 @@ use crate::artifacts::vocabulary::FormalVocabulary;
 use crate::boundary::capability::ImplementationCapability;
 use crate::boundary::verification::VerificationInput;
 use crate::input_limits::ValueCounts;
-use crate::locale::{CanonicalizationFailure, FormalData, Provider, SemanticPins};
+use crate::locale::{
+    CanonicalizationFailure, FormalData, Provider, SemanticPins, VersionedIdentity,
+};
 use crate::model::{IntlifyConfig, ProfileDeclaration, ProfileId};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::selection::{ProvisionalSelection, SelectionInvariant, SelectorInput};
@@ -46,8 +50,7 @@ use super::resource_policy::{
     PolicyOutcome,
 };
 use super::specification::{
-    admit_project_profile, admit_specifications, SpecificationInput, SpecificationSet,
-    SupportedSpecifications,
+    admit_specifications, SpecificationInput, SpecificationSet, SupportedSpecifications,
 };
 use super::targets::{resolve_targets, ResolvedTargets};
 use super::vocabulary::SurfaceVocabulary;
@@ -204,14 +207,16 @@ impl From<LocaleInvariant> for ResolverInvariant {
     }
 }
 
-/// Phase 0 and Phases 4 to 13 of one invocation over `evaluation`, in 015's
-/// order, with each semantic group's owner once the phases that establish
-/// the group have run. `data` is the canonicalization data past the
+/// Phases 4 to 13 of one invocation over `evaluation`, in 015's order, with
+/// each semantic group's owner once the phases that establish the group have
+/// run. `project_profile` is what Phase 0 admitted, which the invocation
+/// records before configuration entry. `data` is the canonicalization data past the
 /// pre-invocation boundary, which Phase 5 reads the rest of and binds. The
 /// Profile Resolution Artifact Set Phase 9 admits is kept in `set`, which the
 /// resolved references and the bindings borrow.
 pub(crate) fn resolve_profile<'s, P, D>(
     evaluation: &mut Evaluation,
+    project_profile: &Admitted<VersionedIdentity<P::Identity>>,
     configuration: &CompleteConfiguration<'_>,
     invocation: &Invocation<'s, P::Identity>,
     data: D,
@@ -226,8 +231,6 @@ where
     let declared = configuration.references();
     // The assertion never selects semantics: only the owner of the group it
     // establishes waits on Phase 0.
-    let project_profile =
-        admit_project_profile(evaluation, invocation.supported, invocation.specifications)?;
     own(
         evaluation,
         SemanticGroup::ProfileSpecification,
@@ -395,7 +398,7 @@ where
         ),
     )?;
     Ok(SemanticState {
-        specifications: SpecificationSet::new(&project_profile, &admitted),
+        specifications: SpecificationSet::new(project_profile, &admitted),
         canonicalization,
         vocabulary: admitted.vocabulary,
         policy,
@@ -458,7 +461,7 @@ pub(super) mod tests {
     use crate::resolver::profile_view::{project, ProfileView};
     use crate::resolver::resource_policy::{self, PolicySlot, PolicySubject, ReferenceField};
     use crate::resolver::specification::{
-        ActiveProfileSpecification, Slot, VocabularyAssertion, DATA,
+        admit_project_profile, ActiveProfileSpecification, Slot, VocabularyAssertion, DATA,
     };
     use crate::resolver::subject::SubjectKind;
     use crate::resolver::targets::{self, TargetSubject};
@@ -889,7 +892,7 @@ pub(super) mod tests {
         ) -> R {
             self.prepared(|configuration, invocation| {
                 let mut set = None;
-                let state = resolve_profile(
+                let state = invoke(
                     &mut evaluation,
                     configuration,
                     invocation,
@@ -929,7 +932,7 @@ pub(super) mod tests {
             self.prepared(|configuration, invocation| {
                 let mut evaluation = Evaluation::default();
                 let mut set = None;
-                let state = resolve_profile(
+                let state = invoke(
                     &mut evaluation,
                     configuration,
                     invocation,
@@ -947,6 +950,33 @@ pub(super) mod tests {
         pub(crate) fn view(&self) -> Admitted<ProfileView> {
             self.viewed(|_, view| view)
         }
+    }
+
+    /// One invocation's entry over `evaluation`: Phase 0, which runs before
+    /// configuration entry, and then the semantic phases over
+    /// `configuration`.
+    fn invoke<'s, P, D>(
+        evaluation: &mut Evaluation,
+        configuration: &CompleteConfiguration<'_>,
+        invocation: &Invocation<'s, P::Identity>,
+        data: D,
+        set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
+    ) -> Result<SemanticState<'s, P::Identity>, ResolverInvariant>
+    where
+        P: Provider,
+        P::Identity: AsRef<str>,
+        D: FormalData<Provider = P>,
+    {
+        let project_profile =
+            admit_project_profile(evaluation, invocation.supported, invocation.specifications)?;
+        resolve_profile(
+            evaluation,
+            &project_profile,
+            configuration,
+            invocation,
+            data,
+            set,
+        )
     }
 
     /// The check ID of the Check Registry row a unit belongs to.
@@ -1847,7 +1877,7 @@ pub(super) mod tests {
             };
             let mut evaluation = Evaluation::default();
             let mut set = None;
-            resolve_profile(
+            invoke(
                 &mut evaluation,
                 configuration,
                 &invocation,
@@ -2122,7 +2152,7 @@ pub(super) mod tests {
                 let mut evaluation = Evaluation::default();
                 let mut set = None;
                 let canonicalized =
-                    resolve_profile(&mut evaluation, configuration, &invocation, data, &mut set)
+                    invoke(&mut evaluation, configuration, &invocation, data, &mut set)
                         .unwrap()
                         .canonicalization
                         .is_ok();
@@ -2137,12 +2167,57 @@ pub(super) mod tests {
         });
     }
 
+    /// The invocation records Phase 0 before configuration entry: Phase 0's
+    /// status, Finding, and occurrence candidate stand when no configuration
+    /// follows, and the semantic phases record no Phase 0 unit of their own
+    /// (D15:2145).
+    #[test]
+    fn phase_0_is_recorded_apart_from_the_semantic_phases() {
+        let mut inputs = Inputs::complete();
+        inputs.specifications.project_profile = None;
+        inputs.prepared(|configuration, invocation| {
+            let mut alone = Evaluation::default();
+            admit_project_profile(&mut alone, invocation.supported, invocation.specifications)
+                .unwrap()
+                .unwrap_err();
+            assert_eq!(
+                alone
+                    .statuses()
+                    .map(|(unit, status)| (unit.clone(), status.clone()))
+                    .collect::<Vec<_>>(),
+                [(PHASE_0, Status::Evaluated)]
+            );
+            assert_eq!(
+                issues(&alone),
+                [(
+                    PHASE_0,
+                    Code::SpecificationInputIncomplete,
+                    Some(Reason::MissingRequiredSlot)
+                )]
+            );
+            assert_eq!(alone.occurrence_candidates().len(), 1);
+            let mut semantic = Evaluation::default();
+            let mut set = None;
+            resolve_profile(
+                &mut semantic,
+                &Ok(ACTIVE),
+                configuration,
+                invocation,
+                FixtureProvider::new(),
+                &mut set,
+            )
+            .unwrap();
+            assert_eq!(semantic.status(&PHASE_0), None);
+            assert!(semantic.occurrence_candidates().is_empty());
+        });
+    }
+
     #[test]
     fn an_evaluation_runs_one_invocation() {
         Inputs::complete().prepared(|configuration, invocation| {
             let mut evaluation = Evaluation::default();
             let (mut first, mut second) = (None, None);
-            assert!(resolve_profile(
+            assert!(invoke(
                 &mut evaluation,
                 configuration,
                 invocation,
@@ -2151,7 +2226,7 @@ pub(super) mod tests {
             )
             .is_ok());
             assert_eq!(
-                resolve_profile(
+                invoke(
                     &mut evaluation,
                     configuration,
                     invocation,

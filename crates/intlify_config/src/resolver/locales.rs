@@ -575,10 +575,11 @@ pub(crate) mod fixtures {
 
     /// Causes a caller passes for a value an earlier phase left unavailable.
     /// Those phases' keys arrive with them, so the key of a specification
-    /// slot, in the phase that checks it, stands in.
+    /// slot, in the phase that checks it, stands in. The result is made up,
+    /// so it carries nothing it observed.
     pub(crate) fn stand_in(slot: Slot) -> Causes {
         let subject = Subject::Slot(slot);
-        Evaluation::default()
+        Evaluation::fabricated()
             .check(
                 Unit {
                     phase: subject.kind().phase(),

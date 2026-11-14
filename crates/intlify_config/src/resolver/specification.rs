@@ -19,9 +19,11 @@ use crate::locale::{
 };
 
 use super::evaluation::{
-    both, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Phase, Reason,
-    Subject, Unit,
+    both, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Found,
+    Observation, Phase, Reason, Subject, Unit,
 };
+use super::evidence::EvidenceProjection;
+use super::evidence_component::ComponentPath;
 use super::limits::ConfirmedPolicy;
 use super::vocabulary::{admit_vocabulary, SurfaceVocabulary, ASSERTED, INTACT};
 
@@ -192,6 +194,20 @@ const fn not_admitted(code: Code, reason: SpecificationNotAdmitted) -> Blocking 
     }
 }
 
+/// The assertion of a slot whose supported value is the single specification
+/// identity `supported`, or the blocking result `code` reports otherwise.
+fn admit_slot<Id: Clone + Eq>(
+    code: Code,
+    asserted: Option<&VersionedIdentity<Id>>,
+    supported: &VersionedIdentity<Id>,
+) -> Result<VersionedIdentity<Id>, Blocking> {
+    let asserted = present(asserted)?;
+    match asserted.admit(supported) {
+        Ok(()) => Ok(asserted.clone()),
+        Err(reason) => Err(not_admitted(code, reason)),
+    }
+}
+
 /// One slot whose supported value is a single specification identity.
 fn specification_slot<Id: Clone + Eq>(
     evaluation: &mut Evaluation,
@@ -202,11 +218,7 @@ fn specification_slot<Id: Clone + Eq>(
     supported: &VersionedIdentity<Id>,
 ) -> Result<Admitted<VersionedIdentity<Id>>, EvaluationInvariant> {
     evaluation.check(unit, prerequisite, |()| {
-        let asserted = present(asserted)?;
-        match asserted.admit(supported) {
-            Ok(()) => Ok(asserted.clone()),
-            Err(reason) => Err(not_admitted(code, reason)),
-        }
+        admit_slot(code, asserted, supported)
     })
 }
 
@@ -214,18 +226,37 @@ fn specification_slot<Id: Clone + Eq>(
 /// Specification. The assertion never selects semantics and no semantic check
 /// depends on it, so a failure blocks the outcome and leaves only the owner of
 /// the `profileSpecification` group, which the assertion establishes, waiting.
+/// Phase 0 precedes configuration entry, so its Finding and status remain
+/// when configuration materialization fails (D15:2145). A failure is observed
+/// through the slot's Specification Input component, whether the assertion is
+/// absent or names another specification (D15:718, 831).
 pub(crate) fn admit_project_profile<Id: Clone + Eq>(
     evaluation: &mut Evaluation,
     supported: &SupportedSpecifications<Id>,
     input: &SpecificationInput<Id>,
 ) -> Result<Admitted<VersionedIdentity<Id>>, EvaluationInvariant> {
-    specification_slot(
-        evaluation,
-        unit(Phase::ResolverBootstrapAdmission, Slot::ProjectProfile),
-        Code::SpecificationNotAdmitted,
+    let slot = Slot::ProjectProfile;
+    evaluation.check_found(
+        unit(Phase::ResolverBootstrapAdmission, slot),
         Ok(()),
-        input.project_profile.as_ref(),
-        &supported.project_profile.specification,
+        |()| {
+            admit_slot(
+                Code::SpecificationNotAdmitted,
+                input.project_profile.as_ref(),
+                &supported.project_profile.specification,
+            )
+            .map_err(|blocking| {
+                Found::observed(
+                    blocking,
+                    Observation {
+                        primary: EvidenceProjection::resolver_input(ComponentPath::specification(
+                            slot,
+                        )),
+                        related: Vec::new(),
+                    },
+                )
+            })
+        },
     )
 }
 
@@ -1131,5 +1162,52 @@ mod tests {
             admission.specifications.locale_canonicalization,
             Ok(revised)
         );
+    }
+
+    /// Every Phase 0 failure is observed through the `project-profile` slot's
+    /// Specification Input component, relating nothing, whether the assertion
+    /// is absent or names another specification, and its occurrence carries
+    /// what the Finding Registry gives Phase 0's pair (D15:718, 831, 2145). An
+    /// admitted assertion is observed through nothing.
+    #[test]
+    fn a_phase_0_failure_is_observed_through_its_slot() {
+        use crate::resolver::evidence_token::EvidenceTokens;
+        use crate::resolver::occurrence::{occurrences, redacted};
+        use crate::resolver::token::{Sha256, Specification};
+        const PROFILE: Specification<'static> = Specification {
+            identity: "intlify-project-profile",
+            revision: "0",
+        };
+        for asserted in [
+            None,
+            Some(identity("another-profile-specification", "0")),
+            Some(identity(ACTIVE.identity, "1")),
+        ] {
+            let mut input = complete();
+            input.project_profile = asserted;
+            let mut evaluation = Evaluation::default();
+            admit_project_profile(&mut evaluation, &supported(), &input)
+                .unwrap()
+                .unwrap_err();
+            let candidates = evaluation.occurrence_candidates();
+            let tokens = EvidenceTokens::assign(PROFILE, redacted(candidates), &Sha256);
+            let built = occurrences(candidates, PROFILE, &tokens).unwrap();
+            assert_eq!(built.len(), 1);
+            assert_eq!(Some(built[0].finding()), evaluation.issues().next());
+            assert_eq!(
+                built[0].primary().view(),
+                json!({
+                    "kind": "specification-input",
+                    "origin": "profile-resolution-specification-input",
+                    "component": [{ "fixed-role": "project-profile" }],
+                })
+            );
+            assert!(built[0].related().is_empty());
+        }
+        let mut evaluation = Evaluation::default();
+        admit_project_profile(&mut evaluation, &supported(), &complete())
+            .unwrap()
+            .unwrap();
+        assert!(evaluation.occurrence_candidates().is_empty());
     }
 }
