@@ -339,19 +339,31 @@ fn member_value(finding: &Finding<'_>, member: DetailsMember) -> Option<Value> {
 }
 
 /// The schema-relative path of the field `unit` checks, as an array of the
-/// schema's member names (D15:2231): the root that the schema selection finds
-/// an object, and its `schemaVersion` member (D15:2291, 2292), and a scope
-/// level's field, its subject's path: the missing member's, the value's, or
-/// the object an undeclared member is in (D15:2184, 2291-2294).
+/// schema's member names, `*` standing for a map's entry (D15:2231): the root
+/// that the schema selection finds an object, and its `schemaVersion` member
+/// (D15:2291, 2292); a scope level's field, its subject's path from its
+/// entry, the missing member's, the value's, or the object an undeclared
+/// member is in (D15:2184, 2291-2294); and an identity map's key, the map's
+/// path from the entry that holds it with `*` for the entry, as structural
+/// admission spells a map's entries (D15:2184, 2231).
 fn field(unit: &Unit) -> Option<Value> {
+    use StructuralSubject as S;
     match (&unit.subject, unit.check) {
         (Subject::SchemaSelection, Check::ObjectRoot) => Some(json!([])),
         (Subject::SchemaSelection, Check::PresentSchemaVersion | Check::StringSchemaVersion) => {
             Some(json!(["schemaVersion"]))
         }
-        (Subject::Structural(StructuralSubject::RootField(field)), _) => {
-            Some(field.path.iter().map(|name| Value::from(&**name)).collect())
-        }
+        (Subject::Structural(subject), _) => Some(match subject {
+            S::RootField(field)
+            | S::ProfileField(_, field)
+            | S::TargetField(_, _, field)
+            | S::GroupField(_, _, field) => {
+                field.path.iter().map(|name| Value::from(&**name)).collect()
+            }
+            S::ProfileKey(_) => json!(["profiles", "*"]),
+            S::TargetProfileKey(..) => json!(["targetProfiles", "*"]),
+            S::DeploymentGroupKey(..) => json!(["deploymentGroups", "*"]),
+        }),
         _ => None,
     }
 }
@@ -1014,6 +1026,82 @@ mod tests {
                 Some(json!({ "field": ["$schema"] })),
                 Some(json!({ "field": ["profiles"] })),
                 Some(json!({ "field": ["profiles"] })),
+            ]
+        );
+    }
+
+    /// A Finding of a level below the root names its field's path from the
+    /// entry, and a key's Finding its map's path from the entry that holds
+    /// it with `*` for the entry (D15:2184, 2231).
+    #[test]
+    fn a_finding_below_the_root_names_its_path_from_the_entry() {
+        use crate::resolver::structural_admission::{EntryKey, Field, StructuralSubject as S};
+        let unit = |subject, check| Unit {
+            phase: Phase::StructuralAdmission,
+            subject: Subject::Structural(subject),
+            check,
+        };
+        let key = EntryKey::identity;
+        let mut evaluation = Evaluation::default();
+        for (unit, code) in [
+            (
+                unit(S::ProfileKey(EntryKey::Content(None)), Check::FieldValue),
+                Code::FieldValueInvalid,
+            ),
+            (
+                unit(
+                    S::ProfileField(key("app"), Field::of(&["requestedLocales", "*"])),
+                    Check::FieldType,
+                ),
+                Code::FieldTypeInvalid,
+            ),
+            (
+                unit(
+                    S::TargetProfileKey(key("app"), EntryKey::Content(None)),
+                    Check::FieldValue,
+                ),
+                Code::FieldValueInvalid,
+            ),
+            (
+                unit(
+                    S::TargetField(key("app"), key("web"), Field::of(&["profile"])),
+                    Check::RequiredField,
+                ),
+                Code::RequiredFieldMissing,
+            ),
+            (
+                unit(
+                    S::DeploymentGroupKey(key("app"), EntryKey::Content(None)),
+                    Check::FieldValue,
+                ),
+                Code::FieldValueInvalid,
+            ),
+            (
+                unit(
+                    S::GroupField(key("app"), key("site"), Field::of(&[])),
+                    Check::KnownField,
+                ),
+                Code::UnknownField,
+            ),
+        ] {
+            block(&mut evaluation, unit, code, None).unwrap_err();
+        }
+        let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
+        let details: Vec<Option<Value>> = views
+            .findings(&evaluation)
+            .unwrap()
+            .into_iter()
+            .map(|view| view.get("details").cloned())
+            .collect();
+        assert_eq!(
+            details,
+            [
+                Some(json!({ "field": ["profiles", "*"] })),
+                Some(json!({ "field": ["requestedLocales", "*"] })),
+                Some(json!({ "field": ["targetProfiles", "*"] })),
+                Some(json!({ "field": ["profile"] })),
+                Some(json!({ "field": ["deploymentGroups", "*"] })),
+                Some(json!({ "field": [] })),
             ]
         );
     }

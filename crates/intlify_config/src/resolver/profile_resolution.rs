@@ -15,11 +15,10 @@
 //! group's owner is a unit of Phase 2, which [`super::structural_admission`]
 //! records.
 //!
-//! Phase 2 records the units of its identity-map keys and of the levels below
-//! the root, and Phase 3 its units, with their Findings later (plan 025 PRs
-//! 5f-2d-2, 5f-3), so the entry starts from their complete results: a
+//! Phase 3 records its units with its Findings later (plan 025 PR 5f-3), and
+//! the semantic phases start from the complete results of Phases 2 and 3: a
 //! configuration structural admission admitted whole, and the declaration
-//! Phase 3 provisionally selected in it. What the entry
+//! Phase 3 provisionally selected in it (plan 025 PR 5f-2f). What the entry
 //! returns is crate-private semantic state, not a `LocalizationProjectProfile`,
 //! a checked or blocked outcome, or Resolution Evidence. The profile
 //! projection is 015's Implementation Phase 5.
@@ -1420,12 +1419,14 @@ pub(super) mod tests {
                 .all(|(_, status)| *status == Status::Evaluated));
             // Phase 1 records its owner and the complete input's ten checks
             // (D15:1876, 2129, 2516), and Phase 2 its owner, the schema
-            // selection's four checks, the analysis's measure, nine units of
-            // the root's fields, and the `profileSpecification` group's owner
-            // (D15:2130, 2173, 2516): the types of the root, `$schema`,
-            // `profiles`, and `schemaVersion`, the two required members, the
-            // closed values of `profiles` and `schemaVersion`, and the root's
-            // known members.
+            // selection's four checks, the analysis's measure, the units of
+            // its scope levels, and the `profileSpecification` group's owner
+            // (D15:2130, 2173, 2516). The root's nine are the types of the
+            // root, `$schema`, `profiles`, and `schemaVersion`, the two
+            // required members, the closed values of `profiles` and
+            // `schemaVersion`, and the root's known members; each entry's key
+            // is one unit, the profile's, its two targets', and its group's,
+            // and the fields under each entry are units of its own.
             let phases: BTreeSet<Phase> =
                 evaluation.statuses().map(|(unit, _)| unit.phase).collect();
             let mut ran = BTreeSet::from(PHASES);
@@ -1438,7 +1439,29 @@ pub(super) mod tests {
                     .count()
             };
             assert_eq!(count(Phase::EntryAdmission), 11);
-            assert_eq!(count(Phase::StructuralAdmission), 16);
+            let mut kinds: BTreeMap<SubjectKind, usize> = BTreeMap::new();
+            for (unit, _) in evaluation.statuses() {
+                if unit.phase == Phase::StructuralAdmission {
+                    *kinds.entry(unit.subject.kind()).or_default() += 1;
+                }
+            }
+            assert_eq!(
+                kinds,
+                BTreeMap::from([
+                    (SubjectKind::MaterializedDependencies, 1),
+                    (SubjectKind::ConfigurationSchemaSelection, 4),
+                    (SubjectKind::CapabilityStructuralAnalysis, 1),
+                    (SubjectKind::RootField, 9),
+                    (SubjectKind::ProfileKey, 1),
+                    (SubjectKind::ProfileField, 147),
+                    (SubjectKind::TargetProfileKey, 2),
+                    (SubjectKind::TargetField, 49),
+                    (SubjectKind::DeploymentGroupKey, 1),
+                    (SubjectKind::GroupField, 16),
+                    (SubjectKind::ProfileSpecificationDependency, 1),
+                ])
+            );
+            assert_eq!(count(Phase::StructuralAdmission), 232);
             assert_eq!(unestablished(&evaluation), []);
             let project = state.locales.project.as_ref().unwrap();
             assert_eq!(spellings(project.requested().as_slice()), ["en", "ja"]);

@@ -23,7 +23,7 @@
     "check-registry": {
       "identity": "intlify-project-profile-check-registry",
       "revision": "0",
-      "digest": "sha256:3311dd0f5308945cf64a7c60321f1a8bc12fd3d0c2d72dff692c144a6046c2bc"
+      "digest": "sha256:6103f9bc6fa41de72b83a26334043e9372c7a7fee75c41e3aa27ea37d341460d"
     },
     "finding-registry": {
       "identity": "intlify-project-profile-finding-registry",

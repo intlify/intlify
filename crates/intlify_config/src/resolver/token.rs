@@ -56,7 +56,7 @@ use super::hydration::{EndpointField, HydrationSubject};
 use super::locales::{Content, LocaleKey, LocaleSubject};
 use super::negotiation::NegotiationSubject;
 use super::resource_policy::{ArtifactSubject, PolicySubject, ReferenceField};
-use super::structural_admission::StructuralSubject;
+use super::structural_admission::{EntryKey, Field, StructuralSubject};
 use super::subject::SubjectKind;
 use super::targets::TargetSubject;
 
@@ -375,6 +375,43 @@ pub(crate) fn number<K: Ord>(
     (tokens, comparisons)
 }
 
+/// The own key of a subject of structural admission's scope levels and the
+/// key that scopes it: a field's path under its entry's key, and an entry's
+/// key under the key of the profile that holds the entry (D15:2173).
+fn structural_own(subject: &StructuralSubject) -> (Own<'_>, Option<Subject>) {
+    use StructuralSubject as S;
+    /// An identity in its view, or a key's content, which is a string.
+    fn key(key: &EntryKey) -> Own<'static> {
+        match key {
+            EntryKey::Identity(identity) => Own::Identity(Value::String(identity.to_string())),
+            EntryKey::Content(_) => Own::Content("string"),
+        }
+    }
+    fn field(field: &Field) -> Own<'_> {
+        Own::Field(field.path.iter().map(|name| &**name).collect())
+    }
+    let scoped = |parent| Some(Subject::Structural(parent));
+    match subject {
+        S::RootField(own) => (field(own), None),
+        S::ProfileKey(profile) => (key(profile), None),
+        S::ProfileField(profile, own) => (field(own), scoped(S::ProfileKey(profile.clone()))),
+        S::TargetProfileKey(profile, target) => {
+            (key(target), scoped(S::ProfileKey(profile.clone())))
+        }
+        S::TargetField(profile, target, own) => (
+            field(own),
+            scoped(S::TargetProfileKey(profile.clone(), target.clone())),
+        ),
+        S::DeploymentGroupKey(profile, group) => {
+            (key(group), scoped(S::ProfileKey(profile.clone())))
+        }
+        S::GroupField(profile, group, own) => (
+            field(own),
+            scoped(S::DeploymentGroupKey(profile.clone(), group.clone())),
+        ),
+    }
+}
+
 /// The own key of `subject` and the subject that scopes it.
 fn own(subject: &Subject) -> (Own<'_>, Option<Subject>) {
     let alone = |own| (own, None);
@@ -388,9 +425,7 @@ fn own(subject: &Subject) -> (Own<'_>, Option<Subject>) {
         | Subject::Vocabulary
         | Subject::CanonicalizationData
         | Subject::SemanticDependency(_) => alone(Own::Singleton),
-        Subject::Structural(StructuralSubject::RootField(field)) => {
-            alone(Own::Field(field.path.iter().map(|name| &**name).collect()))
-        }
+        Subject::Structural(structural) => structural_own(structural),
         Subject::ResourcePolicy(policy) => alone(match policy {
             PolicySubject::Capability(artifact) | PolicySubject::Recheck(artifact) => {
                 match artifact {
@@ -639,7 +674,7 @@ mod tests {
         ArtifactSubject, PolicySlot, PolicySubject, ReferenceField,
     };
     use crate::resolver::specification::Slot;
-    use crate::resolver::structural_admission::StructuralSubject;
+    use crate::resolver::structural_admission::{EntryKey, Field, StructuralSubject};
     use crate::resolver::subject::SubjectKind;
     use crate::resolver::targets::TargetSubject;
 
@@ -732,6 +767,29 @@ mod tests {
             Subject::SchemaSelection,
             Subject::StructuralCapability,
             Subject::Structural(StructuralSubject::root(&["profiles"])),
+            Subject::Structural(StructuralSubject::ProfileKey(EntryKey::Content(None))),
+            Subject::Structural(StructuralSubject::ProfileField(
+                EntryKey::identity("app"),
+                Field::of(&["projectId"]),
+            )),
+            Subject::Structural(StructuralSubject::TargetProfileKey(
+                EntryKey::identity("app"),
+                EntryKey::identity("web"),
+            )),
+            Subject::Structural(StructuralSubject::TargetField(
+                EntryKey::identity("app"),
+                EntryKey::identity("web"),
+                Field::of(&["requestedLocales", "*"]),
+            )),
+            Subject::Structural(StructuralSubject::DeploymentGroupKey(
+                EntryKey::identity("app"),
+                EntryKey::identity("site"),
+            )),
+            Subject::Structural(StructuralSubject::GroupField(
+                EntryKey::identity("app"),
+                EntryKey::Content(None),
+                Field::of(&["members"]),
+            )),
             Subject::Vocabulary,
             Subject::CanonicalizationData,
         ]);
@@ -936,6 +994,57 @@ mod tests {
             (
                 Subject::Structural(StructuralSubject::root(&["schemaVersion"])),
                 json!(["schemaVersion"]),
+            ),
+            (
+                Subject::Structural(StructuralSubject::ProfileKey(EntryKey::identity("app"))),
+                json!({ "identity": "app" }),
+            ),
+            (
+                Subject::Structural(StructuralSubject::ProfileKey(EntryKey::Content(None))),
+                string.clone(),
+            ),
+            (
+                Subject::Structural(StructuralSubject::ProfileField(
+                    EntryKey::Content(None),
+                    Field::of(&["policies", "trust"]),
+                )),
+                parent(string.clone(), json!(["policies", "trust"])),
+            ),
+            (
+                Subject::Structural(StructuralSubject::TargetProfileKey(
+                    EntryKey::identity("app"),
+                    EntryKey::identity("web"),
+                )),
+                parent(json!({ "identity": "app" }), web.clone()),
+            ),
+            (
+                Subject::Structural(StructuralSubject::TargetField(
+                    EntryKey::identity("app"),
+                    EntryKey::Content(None),
+                    Field::of(&["requestedLocales", "*"]),
+                )),
+                parent(
+                    parent(json!({ "identity": "app" }), string.clone()),
+                    json!(["requestedLocales", "*"]),
+                ),
+            ),
+            (
+                Subject::Structural(StructuralSubject::DeploymentGroupKey(
+                    EntryKey::identity("app"),
+                    EntryKey::identity("site"),
+                )),
+                parent(json!({ "identity": "app" }), site.clone()),
+            ),
+            (
+                Subject::Structural(StructuralSubject::GroupField(
+                    EntryKey::identity("app"),
+                    EntryKey::identity("site"),
+                    Field::of(&[]),
+                )),
+                parent(
+                    parent(json!({ "identity": "app" }), site.clone()),
+                    json!([]),
+                ),
             ),
             (Subject::Vocabulary, json!("vocabulary")),
             (
