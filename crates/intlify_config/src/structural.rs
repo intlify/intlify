@@ -11,11 +11,12 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use serde::de::DeserializeOwned;
+use serde::de::{value::BorrowedStrDeserializer, DeserializeOwned};
+use serde::Deserialize;
 
 use crate::input_limits::{Bound, ValueCounts};
-use crate::materialize::{ByteSpan, MaterializedDocument, NodeId, NodeKind};
-use crate::model::{valid_identity, IntlifyConfig, ProfileDeclaration};
+use crate::materialize::{ByteSpan, DecodeError, MaterializedDocument, NodeId, NodeKind};
+use crate::model::{valid_identity, IntlifyConfig, ProfileDeclaration, ProfileId};
 use eval::{EvaluationFailure, FragmentState, SchemaEvaluation};
 pub(crate) use place::{Edge, Place};
 use program::{ProgramError, SchemaId, SchemaProgram};
@@ -242,6 +243,37 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
     /// The candidates of the schema-guided analysis, when it ran.
     pub(crate) fn facts(&self) -> Option<&facts::Facts> {
         self.evaluation.as_ref().map(|e| &e.facts)
+    }
+    /// The declarations of the root's `profiles` object as the policy
+    /// rechecks them: how many there are, every declaration counted, and the
+    /// Profile ID of each whose key has the identifier syntax, in their
+    /// unsigned byte order. A later phase has no subject for a declaration
+    /// whose key lacks the syntax (D15:1885, 1886, 2184). None without a
+    /// selected version or a `profiles` object.
+    ///
+    /// # Errors
+    ///
+    /// Returns the defect of a key with the syntax that is no Profile ID.
+    pub(crate) fn declarations(&self) -> Result<Option<(u64, Vec<ProfileId>)>, AdmissionInvariant> {
+        if !self.selected_version {
+            return Ok(None);
+        }
+        let Some(container) = self.profiles else {
+            return Ok(None);
+        };
+        let NodeKind::Object(profiles) = self.doc.node(container).kind() else {
+            return Ok(None);
+        };
+        let count = u64::try_from(profiles.len()).expect("materialized collection count fits u64");
+        let ids = profiles
+            .keys()
+            .filter(|name| valid_identity(name))
+            .map(|name| {
+                ProfileId::deserialize(BorrowedStrDeserializer::<DecodeError>::new(name))
+                    .map_err(|_| AdmissionInvariant::AuthoringTypeMismatch)
+            })
+            .collect::<Result<_, _>>()?;
+        Ok(Some((count, ids)))
     }
     /// The key of the identity map entry `entry` when it has the identifier
     /// syntax: the admitted canonical identity that keys the entry's

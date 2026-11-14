@@ -16,9 +16,11 @@
 //! records.
 //!
 //! Phase 3 records its units with its Findings later (plan 025 PR 5f-3), and
-//! the semantic phases start from the complete results of Phases 2 and 3: a
-//! configuration structural admission admitted whole, and the declaration
-//! Phase 3 provisionally selected in it (plan 025 PR 5f-2f). What the entry
+//! the semantic phases start from the declaration Phase 3 provisionally
+//! selected once structural admission admitted it whole, whatever else of the
+//! root it rejected (D15:2367, 3434); they read its fields field by field
+//! later (plan 025 PRs 5f-4, 5f-5). Profile projection waits on the whole
+//! root (D15:2142). What the entry
 //! returns is crate-private semantic state, not a `LocalizationProjectProfile`,
 //! a checked or blocked outcome, or Resolution Evidence. The profile
 //! projection is 015's Implementation Phase 5.
@@ -64,48 +66,71 @@ type Analysis = StructuralAnalysis<PolicyReference, TargetProfileReference>;
 type Config = IntlifyConfig<PolicyReference, TargetProfileReference>;
 type Declaration = ProfileDeclaration<PolicyReference, TargetProfileReference>;
 
-/// One invocation's configuration past Phases 1 to 3: the declaration Phase 3
-/// provisionally selected in a configuration structural admission admitted
-/// whole, the `resourceLimits` reference it selected with, the selector, and
-/// what Phase 4 rechecks of those phases' measures.
-pub(crate) struct CompleteConfiguration<'a> {
-    declaration: &'a Declaration,
+/// One invocation's configuration past Phases 1 to 3, as the semantic phases
+/// read it: the declaration Phase 3 provisionally selected, which structural
+/// admission admitted whole whatever else of the root it rejected (D15:2367,
+/// 3434), the `resourceLimits` reference it selected with, the selector, what
+/// Phase 4 rechecks of those phases' measures, and whether structural
+/// admission admitted the whole root, which profile projection needs
+/// (D15:2142).
+pub(crate) struct SelectedConfiguration<'a> {
+    declaration: Declaration,
     resource_limits: &'a PolicyReference,
     selector: &'a SelectorInput,
     value: ValueCounts,
+    /// How many declarations the root's `profiles` object holds.
+    declarations: u64,
     /// Every declared Profile ID, in their unsigned byte order.
     profile_ids: Vec<ProfileId>,
     structural_units: u64,
+    /// Whether structural admission admitted the whole root, or the causes.
+    whole: Admitted<()>,
 }
 
-impl<'a> CompleteConfiguration<'a> {
-    /// The configuration when structural admission admitted the whole root of
-    /// `analysis`, `config` is the model it constructed, and Phase 3
-    /// provisionally selected one of its declarations with `selector`; none
-    /// otherwise. A configuration admitted only in part enters 015's
-    /// resolution with fragment admission statuses, which come with
-    /// Implementation Phase 5.
+impl<'a> SelectedConfiguration<'a> {
+    /// The configuration of `analysis` when Phase 3 provisionally selected one
+    /// of its declarations with `selector` and `admitted` holds, the checks of
+    /// structural admission having admitted that declaration whole; none
+    /// otherwise, and then no semantic phase starts yet (plan 025
+    /// interpretation #205). `whole` is whether they admitted the whole root.
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug of checks that admit a declaration the
+    /// analysis does not.
     pub(crate) fn new(
         analysis: &Analysis,
-        config: &'a Config,
-        selector: &'a SelectorInput,
-        selection: &'a ProvisionalSelection<PolicyReference>,
-    ) -> Option<Self> {
-        if !analysis.is_complete() {
-            return None;
+        (selector, selection): (&'a SelectorInput, &'a ProvisionalSelection<PolicyReference>),
+        admitted: &Admitted<()>,
+        whole: Admitted<()>,
+    ) -> Result<Option<Self>, ResolverInvariant> {
+        if admitted.is_err() {
+            return Ok(None);
         }
-        let profiles = config.profiles();
-        Some(Self {
-            declaration: profiles.get(selection.id())?,
+        let unreported = || ResolverInvariant::Structural(StructuralInvariant::UnreportedFailure);
+        let admission =
+            |invariant| ResolverInvariant::Structural(StructuralInvariant::Admission(invariant));
+        let declaration = analysis
+            .profile(selection.id().as_str())
+            .map_err(admission)?
+            .ok_or_else(unreported)?;
+        let (declarations, profile_ids) = analysis
+            .declarations()
+            .map_err(admission)?
+            .ok_or_else(unreported)?;
+        Ok(Some(Self {
+            declaration,
             resource_limits: selection.resource_limits(),
             selector,
             value: analysis.value_counts(),
-            profile_ids: profiles.iter().map(|(id, _)| id.clone()).collect(),
-            structural_units: analysis.structural_units()?,
-        })
+            declarations,
+            profile_ids,
+            structural_units: analysis.structural_units().ok_or_else(unreported)?,
+            whole,
+        }))
     }
 
-    fn references(&self) -> DeclarationReferences<'a> {
+    fn references(&self) -> DeclarationReferences<'_> {
         DeclarationReferences {
             policies: Ok(&self.declaration.policies),
             target_profiles: Ok(&self.declaration.target_profiles),
@@ -115,6 +140,7 @@ impl<'a> CompleteConfiguration<'a> {
     fn measures(&self) -> ConfigurationMeasures<'_> {
         ConfigurationMeasures {
             value: Ok(self.value),
+            declarations: Ok(self.declarations),
             profile_ids: Ok(&self.profile_ids),
             selector: self.selector,
             structural_units: Ok(self.structural_units),
@@ -142,6 +168,10 @@ pub(crate) struct Invocation<'a, Id> {
 /// kept; the pins it was bound under are.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct SemanticState<'s, Id> {
+    /// Phase 2: whether structural admission admitted the whole root, which a
+    /// complete `IntlifyConfig` and so profile projection need (D15:2142,
+    /// 2367).
+    pub(crate) structure: Admitted<()>,
     /// Phase 4: the confirmed policy, which also confirms the provisional
     /// selection, and the selector's String Length Fact.
     pub(crate) policy: PolicyOutcome,
@@ -244,7 +274,7 @@ impl From<LocaleInvariant> for ResolverInvariant {
 pub(crate) fn resolve_profile<'s, P, D>(
     evaluation: &mut Evaluation,
     project_profile: &Admitted<VersionedIdentity<P::Identity>>,
-    configuration: &CompleteConfiguration<'_>,
+    configuration: &SelectedConfiguration<'_>,
     invocation: &Invocation<'s, P::Identity>,
     data: D,
     set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
@@ -254,7 +284,7 @@ where
     P::Identity: AsRef<str>,
     D: FormalData<Provider = P>,
 {
-    let declaration = configuration.declaration;
+    let declaration = &configuration.declaration;
     let declared = configuration.references();
     let policy = admit_resource_policy(
         evaluation,
@@ -418,6 +448,7 @@ where
         ),
     )?;
     Ok(SemanticState {
+        structure: configuration.whole.clone(),
         specifications: SpecificationSet::new(project_profile, &admitted),
         canonicalization,
         vocabulary: admitted.vocabulary,
@@ -478,14 +509,16 @@ pub(super) mod tests {
     use crate::resolver::groups::{self, GroupSubject};
     use crate::resolver::hydration::{self, HydrationSubject};
     use crate::resolver::limits::{fixture_limits, ResolutionLimits, SECTION};
-    use crate::resolver::locales::fixtures::canonical;
+    use crate::resolver::locales::fixtures::{canonical, earlier};
     use crate::resolver::locales::{self, LocaleKey, LocaleSubject, Location};
     use crate::resolver::profile_view::{project, ProfileView};
     use crate::resolver::resource_policy::{self, PolicySlot, PolicySubject, ReferenceField};
     use crate::resolver::specification::{
         admit_project_profile, ActiveProfileSpecification, Slot, VocabularyAssertion, DATA,
     };
-    use crate::resolver::structural_admission::{admit_structure, selection, CAPABILITY};
+    use crate::resolver::structural_admission::{
+        admit_structure, declaration, selection, whole, CAPABILITY,
+    };
     use crate::resolver::subject::SubjectKind;
     use crate::resolver::targets::{self, TargetSubject};
     use crate::structural::selection::{Selection, StringLengthFact};
@@ -878,16 +911,18 @@ pub(super) mod tests {
         /// `run`.
         fn prepared<R>(
             &self,
-            run: impl FnOnce(&CompleteConfiguration<'_>, &Invocation<'_, Id>) -> R,
+            run: impl FnOnce(&SelectedConfiguration<'_>, &Invocation<'_, Id>) -> R,
         ) -> R {
             let analysis = analyze(&self.config, &self.capability);
-            let config = analysis.construct().unwrap().unwrap();
+            assert!(analysis.is_complete());
             let selector = self.selector();
             let Ok(Selection::Selected(selection)) = analysis.select(&selector) else {
                 panic!("{} is not selected", self.selected);
             };
             let configuration =
-                CompleteConfiguration::new(&analysis, &config, &selector, &selection).unwrap();
+                SelectedConfiguration::new(&analysis, (&selector, &selection), &Ok(()), Ok(()))
+                    .unwrap()
+                    .unwrap();
             self.invoked(|invocation| run(&configuration, invocation))
         }
 
@@ -1016,7 +1051,7 @@ pub(super) mod tests {
     /// the semantic phases over `configuration`.
     fn invoke<'s, P, D>(
         evaluation: &mut Evaluation,
-        configuration: &CompleteConfiguration<'_>,
+        configuration: &SelectedConfiguration<'_>,
         invocation: &Invocation<'s, P::Identity>,
         data: D,
         set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
@@ -1048,9 +1083,9 @@ pub(super) mod tests {
     /// the model's configuration schema under `structural`, Phase 3 selecting
     /// `selector`'s declaration, and the semantic phases over the
     /// configuration. Without a value there is no Shared projection (D15:2369),
-    /// and without a configuration structural admission admitted whole and its
-    /// selected declaration, no semantic phase starts yet (plan 025 PR 5f-2f):
-    /// either way there is no semantic state.
+    /// and without a selected declaration structural admission admitted whole,
+    /// no semantic phase starts yet (plan 025 interpretation #205): either way
+    /// there is no semantic state.
     fn invoke_entry<'s, P, D>(
         evaluation: &mut Evaluation,
         (file, limits): (&EntryFile<'_>, InputLimits),
@@ -1081,14 +1116,18 @@ pub(super) mod tests {
         else {
             return Ok(None);
         };
-        let Some(config) = analysis.construct().unwrap() else {
-            return Ok(None);
-        };
         let Ok(Selection::Selected(selection)) = analysis.select(selector) else {
             return Ok(None);
         };
-        let Some(configuration) =
-            CompleteConfiguration::new(&analysis, &config, selector, &selection)
+        // The semantic phases start from the selected declaration once the
+        // checks admitted it whole, whatever else of the root they rejected.
+        let admitted = declaration(evaluation, selection.id().as_str());
+        let Some(configuration) = SelectedConfiguration::new(
+            &analysis,
+            (selector, &selection),
+            &admitted,
+            whole(evaluation),
+        )?
         else {
             return Ok(None);
         };
@@ -1613,10 +1652,10 @@ pub(super) mod tests {
                 for unit in complete.keys().filter(|unit| !after.contains_key(unit)) {
                     // Without a value from entry admission there is no Shared
                     // projection, which no prerequisite names, and without a
-                    // configuration structural admission admitted whole no
-                    // semantic phase starts yet (plan 025 PR 5f-2f): the
-                    // phases the invocation did not reach wait on no
-                    // prerequisite.
+                    // selected declaration structural admission admitted
+                    // whole no semantic phase starts yet (plan 025
+                    // interpretation #205): the phases the invocation did not
+                    // reach wait on no prerequisite.
                     if reached.is_some_and(|reached| unit.phase > reached) {
                         continue;
                     }
@@ -2388,11 +2427,10 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn only_a_complete_configuration_with_its_selection_starts_a_resolution() {
+    fn only_a_declaration_the_checks_admitted_whole_starts_a_resolution() {
         let complete = Inputs::complete();
         let capability = capability_limits();
         let analysis = analyze(&complete.config, &capability);
-        let config = analysis.construct().unwrap().unwrap();
         let selector = SelectorInput::string(
             "web",
             capability
@@ -2403,20 +2441,122 @@ pub(super) mod tests {
         let Ok(Selection::Selected(selection)) = analysis.select(&selector) else {
             panic!("web is not selected");
         };
-        assert!(CompleteConfiguration::new(&analysis, &config, &selector, &selection).is_some());
-        // An analysis structural admission did not admit whole.
+        let configuration = |analysis, admitted: Admitted<()>| {
+            SelectedConfiguration::new(analysis, (&selector, &selection), &admitted, Ok(()))
+        };
+        assert!(configuration(&analysis, Ok(())).unwrap().is_some());
+        // The checks did not admit the declaration whole.
+        let causes = earlier(Code::FieldTypeInvalid);
+        assert!(configuration(&analysis, Err(causes)).unwrap().is_none());
+        // Checks that admit a declaration the analysis does not are a
+        // resolver bug.
         let mut partial = complete.config.clone();
         partial["profiles"]["web"]["projectId"] = json!("Store Front");
         let partial = analyze(&partial, &capability);
-        assert!(!partial.is_complete());
-        assert!(CompleteConfiguration::new(&partial, &config, &selector, &selection).is_none());
-        // A selection the model does not declare.
-        let mut other = complete.config.clone();
-        let profiles = other["profiles"].as_object_mut().unwrap();
-        let web = profiles.remove("web").unwrap();
-        profiles.insert("admin".into(), web);
-        let other = analyze(&other, &capability).construct().unwrap().unwrap();
-        assert!(CompleteConfiguration::new(&analysis, &other, &selector, &selection).is_none());
+        assert_eq!(
+            configuration(&partial, Ok(())).err(),
+            Some(ResolverInvariant::Structural(
+                StructuralInvariant::UnreportedFailure
+            ))
+        );
+    }
+
+    /// The structural Findings of phase 2, as their units and codes.
+    fn structural_issues(evaluation: &Evaluation) -> Vec<(Unit, Code)> {
+        issues(evaluation)
+            .into_iter()
+            .filter(|(unit, _, _)| unit.phase == Phase::StructuralAdmission)
+            .map(|(unit, code, _)| (unit, code))
+            .collect()
+    }
+
+    /// A structural failure outside the selected declaration leaves the
+    /// semantic phases running over the declaration, while profile
+    /// projection, which needs a complete `IntlifyConfig`, waits on the
+    /// structural Findings (D15:2142, 2367, 3434).
+    #[test]
+    fn a_failure_outside_the_selected_declaration_holds_back_only_the_view() {
+        let unselected = |inputs: &mut Inputs| {
+            let mut other = inputs.declaration().clone();
+            other["requestedLocales"] = json!("en");
+            inputs.config["profiles"]["admin"] = other;
+        };
+        let undeclared = |inputs: &mut Inputs| inputs.config["extra"] = json!(true);
+        for edit in [unselected, undeclared] {
+            let mut inputs = Inputs::complete();
+            edit(&mut inputs);
+            inputs.viewed(|evaluation, view| {
+                let structural = structural_issues(&evaluation);
+                assert_eq!(structural.len(), 1, "{structural:?}");
+                let expected: BTreeSet<IssueKey> = evaluation
+                    .issues()
+                    .filter(|key| key.unit().phase == Phase::StructuralAdmission)
+                    .cloned()
+                    .collect();
+                assert_eq!(keys(&view.unwrap_err()), expected);
+                // The semantic phases ran over the selected declaration.
+                assert!(evaluation
+                    .statuses()
+                    .any(|(unit, _)| unit.phase == Phase::HydrationValidation));
+                assert!(issues(&evaluation)
+                    .iter()
+                    .all(|(unit, _, _)| unit.phase == Phase::StructuralAdmission));
+            });
+        }
+    }
+
+    /// A structural failure inside the selected declaration starts no
+    /// semantic phase yet: they will read its admitted fields field by field
+    /// (plan 025 interpretation #205).
+    #[test]
+    fn a_failure_inside_the_selected_declaration_starts_no_semantic_phase() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["defaultSourceLocale"] = json!(1);
+        inputs.attempt(|evaluation, state| {
+            assert!(state.unwrap().is_none());
+            let structural = structural_issues(&evaluation);
+            assert_eq!(structural.len(), 1, "{structural:?}");
+            assert!(evaluation
+                .statuses()
+                .all(|(unit, _)| unit.phase <= Phase::StructuralAdmission));
+        });
+    }
+
+    /// A declaration whose key lacks the identifier syntax counts under the
+    /// policy's `maxProfiles`, while no later phase has a subject for its ID
+    /// (D15:1885, 1886, 2184).
+    #[test]
+    fn a_declaration_whose_key_fails_counts_without_an_id_subject() {
+        let mut inputs = Inputs::complete();
+        let copy = inputs.declaration().clone();
+        inputs.config["profiles"]["Admin Site"] = copy;
+        let mut limits = policy_limits();
+        limits.configuration_input.structural.max_profiles = bound(1);
+        inputs.select_policy(resource_limit_policy(&limits));
+        inputs.resolve(|evaluation, _| {
+            let count = evaluation
+                .issues()
+                .find(|key| key.unit().subject == Subject::ResourcePolicy(PolicySubject::Profiles))
+                .cloned()
+                .unwrap();
+            assert_eq!(
+                evaluation.limit(&count).map(|exceeded| exceeded.actual),
+                Some(crate::resolver::evaluation::Actual::Exact(2))
+            );
+            let ids: Vec<&PolicySubject> = evaluation
+                .statuses()
+                .filter_map(|(unit, _)| match &unit.subject {
+                    Subject::ResourcePolicy(subject @ PolicySubject::ProfileId(_)) => Some(subject),
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(
+                ids,
+                [&PolicySubject::ProfileId(
+                    serde_json::from_value(json!("web")).unwrap()
+                )]
+            );
+        });
     }
 
     #[test]

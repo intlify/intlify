@@ -1569,6 +1569,24 @@ impl Evaluation {
         Ok(())
     }
 
+    /// Whether every unit `within` picks was evaluated without a blocking
+    /// result, or the causes of those that were not: each such unit's
+    /// blocking results, and the causes of each not evaluated.
+    pub(crate) fn admitted_within(&self, within: impl Fn(&Unit) -> bool) -> Admitted<()> {
+        let mut keys = BTreeSet::new();
+        for (unit, status) in &self.statuses {
+            if let (true, Status::NotEvaluated(causes)) = (within(unit), status) {
+                keys.extend(causes.0.iter().cloned());
+            }
+        }
+        keys.extend(self.issues.keys().filter(|key| within(&key.unit)).cloned());
+        if keys.is_empty() {
+            Ok(())
+        } else {
+            Err(Causes(keys))
+        }
+    }
+
     /// The status of the unit over `unit`'s logical subject.
     pub(crate) fn status(&self, unit: &Unit) -> Option<&Status> {
         self.statuses.get(&unit.logical())

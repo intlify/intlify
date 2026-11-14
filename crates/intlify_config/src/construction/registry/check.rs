@@ -49,8 +49,8 @@
 //! projection, whose absence the entry's Findings explain, and the phase's
 //! first unit requires no check (D15:2369, 2516). No row of a later phase lists
 //! a check of structural admission or profile selection yet: the resolver
-//! starts from a configuration structural admission admitted whole and the
-//! declaration profile selection selected.
+//! starts from the declaration profile selection selected once structural
+//! admission admitted it whole.
 //!
 //! A row's Finding codes are those its units may report, a notice included,
 //! in 015's table order: what the resolver's checks report, and for the kinds
