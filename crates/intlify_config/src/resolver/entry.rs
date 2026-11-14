@@ -127,7 +127,33 @@ pub(crate) struct EntryFile<'a> {
     pub(crate) classify: &'a Classify,
 }
 
+/// The Safe Origin Kind of a file entry's External Profile Selector Input:
+/// the entry's `profile-selector-cli` slot (D15:804, 015-172).
+pub(crate) const SELECTOR_ORIGIN: SafeOriginKind = SafeOriginKind::ProfileSelectorCli;
+
 impl EntryFile<'_> {
+    /// Materialized Value Evidence in the file: the value at the internal
+    /// path `edges` from the root, each member classified, at the token
+    /// `span` (D15:776, 790).
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug that leaves the value without Evidence.
+    pub(crate) fn value_evidence(
+        &self,
+        edges: &[Edge<'_>],
+        span: ByteSpan,
+    ) -> Result<EvidenceProjection, EvidenceInvariant> {
+        let steps = (self.classify)(edges);
+        let span = SourceSpan::admit(span.start_byte(), span.end_byte(), &self.bytes);
+        EvidenceProjection::configuration_value(
+            SafeOriginKind::ConfigurationFile,
+            self.source,
+            &steps,
+            span,
+        )
+    }
+
     /// Entry Source Evidence at the internal path `path` when one was
     /// established, the root when it has no step, and at `span` (D15:768,
     /// 780-786).

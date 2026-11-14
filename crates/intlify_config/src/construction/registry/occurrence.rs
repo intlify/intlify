@@ -20,7 +20,7 @@
 //! a root-value bound applied before materialization is `entry-source`, an
 //! over-limit selector `profile-selector`, and a bound over the materialized
 //! configuration `configuration-value` (D15:2249); a selector Finding
-//! relates the applicable declarations as one location (D15:812); the
+//! relates the declarations as one location when available (D15:812); the
 //! bootstrap's mismatch candidates are related (D15:1734); and each
 //! conflicting locale spelling is primary with the others related
 //! (D15:2410). Elsewhere the primary Evidence is where the check observes
