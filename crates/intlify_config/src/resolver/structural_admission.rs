@@ -141,6 +141,20 @@ impl StructuralSubject {
         }
     }
 
+    /// Whether the subject lies under the declaration's field `name`: a field
+    /// whose path starts at it, or a key or field of an entry of the map it
+    /// names.
+    fn under(&self, name: &str) -> bool {
+        match self {
+            Self::ProfileField(_, field) => {
+                field.path.first().is_some_and(|first| &**first == name)
+            }
+            Self::TargetProfileKey(..) | Self::TargetField(..) => name == "targetProfiles",
+            Self::DeploymentGroupKey(..) | Self::GroupField(..) => name == "deploymentGroups",
+            Self::RootField(_) | Self::ProfileKey(_) => false,
+        }
+    }
+
     /// The logical subject, which every raw candidate of the unit joins: the
     /// subject without where a candidate looked, and each key without an
     /// identity as its content projection alone (D15:2184, 2190).
@@ -216,6 +230,19 @@ impl Field {
 pub(crate) fn declaration(evaluation: &Evaluation, id: &str) -> Admitted<()> {
     evaluation.admitted_within(|unit| match &unit.subject {
         Subject::Structural(subject) => subject.declaration() == Some(id),
+        _ => false,
+    })
+}
+
+/// Whether structural admission admitted the field `name` of the declaration
+/// `id`: every unit under the field evaluated without a blocking result, its
+/// own checks and those of the values below it, the keys and fields of the
+/// entries of `targetProfiles` and `deploymentGroups` included. Otherwise the
+/// causes. A field's failure suppresses only what reads that field
+/// (D15:2367, 3340).
+pub(crate) fn field(evaluation: &Evaluation, id: &str, name: &str) -> Admitted<()> {
+    evaluation.admitted_within(|unit| match &unit.subject {
+        Subject::Structural(subject) => subject.declaration() == Some(id) && subject.under(name),
         _ => false,
     })
 }

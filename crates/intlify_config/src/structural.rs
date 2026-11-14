@@ -409,6 +409,53 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
             .map(Some)
             .map_err(|_| AdmissionInvariant::AuthoringTypeMismatch)
     }
+
+    /// The member `name` of the declaration `id` as the analysis left it:
+    /// absent, admitted with its value, or present without an admitted
+    /// fragment. A declaration without an object value, or under a key
+    /// without the identifier syntax, has no member.
+    ///
+    /// # Errors
+    ///
+    /// Returns the defect of an admitted member its type cannot read, or of a
+    /// name the declaration's schema does not define.
+    pub(crate) fn profile_member<T: DeserializeOwned>(
+        &self,
+        id: &str,
+        name: &str,
+    ) -> Result<Member<T>, AdmissionInvariant> {
+        let schema = self
+            .binding
+            .program
+            .property(self.binding.declaration_schema, name)
+            .ok_or(AdmissionInvariant::ModelLayout)?;
+        let Some(subject) = self.profile_node(id) else {
+            return Ok(Member::Unadmitted);
+        };
+        let NodeKind::Object(values) = self.doc.node(subject).kind() else {
+            return Ok(Member::Unadmitted);
+        };
+        let Some(value) = values.get(name) else {
+            return Ok(Member::Absent);
+        };
+        if !self.admitted_fragment(schema, value.value()) {
+            return Ok(Member::Unadmitted);
+        }
+        self.doc
+            .decode(value.value())
+            .map(Member::Admitted)
+            .map_err(|_| AdmissionInvariant::AuthoringTypeMismatch)
+    }
+}
+
+/// A member of a declaration as structural analysis left it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Member<T> {
+    Absent,
+    Admitted(T),
+    /// Present, but its fragment was not admitted, or the declaration has no
+    /// object to hold it.
+    Unadmitted,
 }
 
 impl<Policy: DeserializeOwned, Target: DeserializeOwned> StructuralAnalysis<Policy, Target> {
