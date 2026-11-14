@@ -7,7 +7,6 @@
 //! generated from a model's types, isolated synthetic fixtures included, by
 //! the same admission mechanism.
 
-use std::collections::BTreeSet;
 use std::fmt;
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -33,6 +32,9 @@ pub mod example;
 mod observation;
 
 /// Explicit bounds for this stage, not a default or a formal capability body.
+/// Structural admission applies `max_structural_analysis_units`; provisional
+/// selection applies `max_profiles` and `max_profile_id_bytes`, which 015
+/// gives `profile-selection` (D15:1885, 1886, Decision 015-162).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[expect(clippy::struct_field_names, reason = "mirror the 015 bound IDs")]
 pub(crate) struct StructuralLimits {
@@ -47,8 +49,6 @@ pub(crate) enum StructuralFailure {
     SchemaVersionMissing,
     SchemaVersionTypeInvalid,
     SchemaVersionUnsupported,
-    ProfilesLimit { limit: Bound, actual: u64 },
-    ProfileIdLimit { limit: Bound, actual: u64 },
     StructuralWorkLimit { limit: Bound, actual: u64 },
 }
 
@@ -167,7 +167,6 @@ impl<Policy, Target> AuthoringSchema<Policy, Target> {
             issues: Vec::new(),
             selected_version: false,
             profiles: None,
-            excluded: BTreeSet::new(),
             evaluation: None,
             model: PhantomData,
         };
@@ -175,15 +174,17 @@ impl<Policy, Target> AuthoringSchema<Policy, Target> {
         if !result.selected_version {
             return Ok(result);
         }
-        result.preflight_profiles();
+        result.locate_profiles();
         let program = &self.binding.program;
-        match eval::evaluate_with_exclusions(
+        // Every applicable evaluation counts, the declarations past
+        // `maxProfiles` or with an ID past `maxProfileIdBytes` included: those
+        // bounds belong to profile selection (D15:1885-1887).
+        match eval::evaluate(
             program,
             &result.doc,
             program.root(),
             result.doc.root(),
             limits.max_structural_analysis_units,
-            &result.excluded,
         ) {
             Ok(evaluation) => result.evaluation = Some(evaluation),
             Err(EvaluationFailure::WorkLimit { limit, actual }) => {
@@ -209,7 +210,6 @@ pub(crate) struct StructuralAnalysis<Policy, Target> {
     issues: Vec<AdmissionIssue>,
     selected_version: bool,
     profiles: Option<NodeId>,
-    excluded: BTreeSet<NodeId>,
     evaluation: Option<SchemaEvaluation>,
     model: PhantomData<fn() -> (Policy, Target)>,
 }
@@ -285,44 +285,15 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
         }
     }
 
-    fn preflight_profiles(&mut self) {
+    /// Finds the root `profiles` member, which selection reads; whoever reads
+    /// it checks that it is an object.
+    fn locate_profiles(&mut self) {
         let NodeKind::Object(root) = self.doc.node(self.doc.root()).kind() else {
-            unreachable!()
+            unreachable!("a selected version has an object root")
         };
-        let Some(member) = root.get("profiles") else {
-            return;
-        };
-        let profile_node = self.doc.node(member.value());
-        let NodeKind::Object(profiles) = profile_node.kind() else {
-            return;
-        };
-        self.profiles = Some(member.value());
-        let count = u64::try_from(profiles.len()).expect("materialized collection count fits u64");
-        if count > self.limits.max_profiles.get() {
-            self.issues.push(AdmissionIssue {
-                reason: StructuralFailure::ProfilesLimit {
-                    limit: self.limits.max_profiles,
-                    actual: count,
-                },
-                span: profile_node.span(),
-            });
-            self.excluded.insert(member.value());
-        }
-        // Length metadata is already available in the bounded materialized tree.
-        // Keep every independently provable ID overrun, even when count also fails.
-        for (id, member) in profiles {
-            let length = u64::try_from(id.len()).expect("materialized key length fits u64");
-            if length > self.limits.max_profile_id_bytes.get() {
-                self.issues.push(AdmissionIssue {
-                    reason: StructuralFailure::ProfileIdLimit {
-                        limit: self.limits.max_profile_id_bytes,
-                        actual: length,
-                    },
-                    span: member.key_span(),
-                });
-                self.excluded.insert(member.value());
-            }
-        }
+        self.profiles = root
+            .get("profiles")
+            .map(crate::materialize::ObjectMember::value);
     }
 
     fn admitted_fragment(&self, schema: SchemaId, subject: NodeId) -> bool {
@@ -334,21 +305,13 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
     }
 
     fn profile_node(&self, id: &str) -> Option<NodeId> {
-        if !self.selected_version
-            || u64::try_from(id.len()).ok()? > self.limits.max_profile_id_bytes.get()
-            || !valid_identity(id)
-        {
+        if !self.selected_version || !valid_identity(id) {
             return None;
         }
-        let container = self.profiles?;
-        if self.excluded.contains(&container) {
-            return None;
-        }
-        let NodeKind::Object(profiles) = self.doc.node(container).kind() else {
+        let NodeKind::Object(profiles) = self.doc.node(self.profiles?).kind() else {
             return None;
         };
-        let node = profiles.get(id)?.value();
-        (!self.excluded.contains(&node)).then_some(node)
+        Some(profiles.get(id)?.value())
     }
 
     /// A field proof uses its exact owned-schema edge, never an arbitrary passing

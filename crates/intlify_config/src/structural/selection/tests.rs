@@ -350,6 +350,47 @@ fn count_overrun_and_unadmitted_only_identity_never_choose_a_partial_profile() {
     }
 }
 
+/// D15:1886: a declaration's ID bytes are its decoded name's UTF-8 bytes,
+/// not its escaped spelling's, and selection refuses a declaration past the
+/// bound.
+#[test]
+fn a_declarations_id_bytes_are_its_decoded_names() {
+    let raw = serde_json::to_string(&minimal_config())
+        .unwrap()
+        .replace(r#""app":"#, r#""\u0061pp":"#);
+    let doc = std::sync::Arc::new(
+        crate::materialize::materialize_file(
+            std::sync::Arc::from(raw.into_bytes()),
+            crate::materialize_tests::limits(),
+        )
+        .unwrap(),
+    );
+    let schema = crate::structural::admission_tests::FixtureSchema::for_model().unwrap();
+    let mut capacity = limits();
+    capacity.max_profile_id_bytes = Bound::new(3).unwrap();
+    let analysis = schema
+        .analyze(std::sync::Arc::clone(&doc), capacity)
+        .unwrap();
+    let bound = capacity.max_profile_id_bytes;
+    assert_eq!(
+        selected(analysis.select(&SelectorInput::absent(bound)).unwrap())
+            .id()
+            .as_str(),
+        "app"
+    );
+    capacity.max_profile_id_bytes = Bound::new(2).unwrap();
+    let analysis = schema.analyze(doc, capacity).unwrap();
+    assert!(analysis.is_complete());
+    assert_eq!(
+        unavailable(
+            analysis
+                .select(&SelectorInput::absent(capacity.max_profile_id_bytes))
+                .unwrap()
+        ),
+        SelectionPrerequisite::DeclarationIdentity
+    );
+}
+
 #[test]
 fn selected_declaration_boundary_and_resource_reference_are_independent_prerequisites() {
     let bound = limits().max_profile_id_bytes;

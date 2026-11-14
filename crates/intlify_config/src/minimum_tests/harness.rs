@@ -17,7 +17,9 @@ use crate::resolver::limits::ConfirmedPolicy;
 use crate::resolver::locales::{
     fixture_policy, resolve_locales, LocaleFields, LocaleInvariant, ResolvedLocales,
 };
-use crate::structural::selection::{Selection, SelectionFailure, SelectorInput};
+use crate::structural::selection::{
+    Selection, SelectionFailure, SelectionPrerequisite, SelectorInput,
+};
 use crate::structural::{AuthoringSchema, StructuralAnalysis, StructuralLimits};
 
 type Schema = AuthoringSchema<PolicyReference, TargetProfileReference>;
@@ -78,6 +80,9 @@ pub(super) enum Outcome {
     Materialization(MaterializationError),
     Structural(Analysis),
     Selection(SelectionFailure),
+    /// Selection's prerequisites hold no complete construction checks: the
+    /// profile bounds selection applies (D15:1885, 1886).
+    SelectionUnavailable(SelectionPrerequisite),
     Locale(Box<Locales>),
 }
 
@@ -161,8 +166,12 @@ impl FixtureRunner {
                     outcome: Outcome::Selection(failure),
                 }
             }
-            Selection::Unavailable(_) => {
-                panic!("selection prerequisites must exist after complete construction")
+            Selection::Unavailable(prerequisite) => {
+                return Run {
+                    steps,
+                    selected: None,
+                    outcome: Outcome::SelectionUnavailable(prerequisite),
+                }
             }
         };
         steps.push(Step::Locale);
