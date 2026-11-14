@@ -4,8 +4,12 @@
 //! Strict file entry for the private 015 path, independent of CLI compatibility.
 //!
 //! Parsing builds an invocation-owned flat token index under raw byte/token
-//! limits, decoding only member names needed for duplicate detection. Complete
-//! logical counts are checked before constructing any materialized value nodes. Rejected input never yields an authoritative
+//! limits, decoding only member names needed for duplicate detection. It stops
+//! only at the token bound or the first byte that is not UTF-8 or not strict
+//! JSON; past a duplicate member or a value outside the JSON-compatible domain
+//! it continues, and reports every one in the complete file (D15:802, Decision
+//! 015-150). Complete logical counts are checked before constructing any
+//! materialized value nodes. Rejected input never yields an authoritative
 //! prefix. The index and parser stack use ordinary safe collections; nested
 //! values contain indices, so successful and failed cleanup do not recurse.
 //!
@@ -137,15 +141,65 @@ impl MaterializedDocument {
     }
 }
 
+/// Why strict file entry produced no value. Each failure holds spans and
+/// counts only, never a member name or a value.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum InputFailure {
-    InvalidUtf8,
-    Syntax,
-    DuplicateMember,
-    NonScalarString,
+    /// The file is longer than `maxFileBytes`, exactly: nothing was parsed.
+    FileBytes(LimitViolation),
+    /// Tokenization reached `maxParserTokens`: `span` starts the first token
+    /// past it, the first-over witness.
+    ParserTokens {
+        violation: LimitViolation,
+        span: ByteSpan,
+    },
+    /// The first bytes that are not UTF-8: nothing after them was parsed.
+    InvalidUtf8 { span: ByteSpan },
+    /// The first byte or token that is not strict JSON, or the end of an
+    /// incomplete input: nothing after it was parsed.
+    Syntax { span: ByteSpan },
+    /// A count past `u64`, which the file's length bounds, so never reached.
+    AccountingOverflow { span: ByteSpan },
+    /// The complete file parsed, but its value is not admissible.
+    Inadmissible(Box<Inadmissible>),
+}
+
+/// What keeps a completely parsed file from being materialized, each in source
+/// order: every duplicate member, every value outside the JSON-compatible
+/// domain, and every root-value bound the complete value exceeds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Inadmissible {
+    pub(crate) duplicates: Vec<DuplicateMember>,
+    pub(crate) incompatible: Vec<IncompatibleValue>,
+    /// The root-value bounds exceeded, in 015's order: a total exactly, and
+    /// the single-string bound as its first-over witness.
+    pub(crate) violations: Vec<LimitViolation>,
+    /// Each string value and member name longer than `maxSingleStringBytes`,
+    /// which 015 checks one occurrence at a time.
+    pub(crate) long_strings: Vec<ByteSpan>,
+}
+
+/// A member of an object after the first member with its name: its key, and
+/// the keys of every other member with the name, the first included
+/// (Decision 015-194).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DuplicateMember {
+    pub(crate) key: ByteSpan,
+    pub(crate) others: Vec<ByteSpan>,
+}
+
+/// A string value or member name outside the Unicode scalar domain, or a
+/// number outside the Portable JSON Number domain, at its token (D15:2289).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct IncompatibleValue {
+    pub(crate) reason: Incompatibility,
+    pub(crate) span: ByteSpan,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Incompatibility {
+    InvalidUnicode,
     NonPortableNumber,
-    ResourceLimits(Vec<LimitViolation>),
-    AccountingOverflow,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -160,8 +214,6 @@ pub(crate) struct EntryProgress {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct MaterializationError {
     pub(crate) reason: InputFailure,
-    pub(crate) span: Option<ByteSpan>,
-    pub(crate) related_span: Option<ByteSpan>,
     pub(crate) progress: EntryProgress,
 }
 
@@ -170,49 +222,45 @@ pub(crate) fn materialize_file(
     limits: InputLimits,
 ) -> Result<MaterializedDocument, MaterializationError> {
     let file_bytes = byte_count(source.len());
-    let before_parse = EntryProgress {
+    let progress = |parser_tokens_visited, complete_value| EntryProgress {
         file_bytes,
-        parser_tokens_visited: 0,
-        complete_value: None,
+        parser_tokens_visited,
+        complete_value,
     };
     if file_bytes > limits.raw.max_file_bytes.get() {
         return Err(MaterializationError {
-            reason: InputFailure::ResourceLimits(vec![LimitViolation {
+            reason: InputFailure::FileBytes(LimitViolation {
                 bound: InputBound::FileBytes,
                 limit: limits.raw.max_file_bytes,
                 actual: file_bytes,
                 relation: CountRelation::Exact,
-            }]),
-            span: None,
-            related_span: None,
-            progress: before_parse,
+            }),
+            progress: progress(0, None),
         });
     }
-    let text = std::str::from_utf8(&source).map_err(|error| MaterializationError {
-        reason: InputFailure::InvalidUtf8,
-        span: Some(ByteSpan::from_offsets(
-            error.valid_up_to(),
-            error
-                .error_len()
-                .map_or(source.len(), |length| error.valid_up_to() + length),
-        )),
-        related_span: None,
-        progress: before_parse,
-    })?;
-    let parsed = parse::parse(text, limits.raw)?;
+    let parsed = parse::parse(&source, limits.raw, limits.value.max_single_string_bytes).map_err(
+        |stopped| MaterializationError {
+            reason: stopped.failure,
+            progress: progress(stopped.tokens, None),
+        },
+    )?;
     let violations = limits.value.violations(parsed.counts.value);
-    if !violations.is_empty() {
+    if !(parsed.duplicates.is_empty() && parsed.incompatible.is_empty() && violations.is_empty()) {
         return Err(MaterializationError {
-            reason: InputFailure::ResourceLimits(violations),
-            span: Some(ByteSpan::new(0, file_bytes)),
-            related_span: None,
-            progress: EntryProgress {
-                file_bytes,
-                parser_tokens_visited: parsed.counts.parser_tokens,
-                complete_value: Some(Box::new(parsed.counts.value)),
-            },
+            reason: InputFailure::Inadmissible(Box::new(Inadmissible {
+                duplicates: parsed.duplicates,
+                incompatible: parsed.incompatible,
+                violations,
+                long_strings: parsed.long_strings,
+            })),
+            progress: progress(
+                parsed.counts.parser_tokens,
+                Some(Box::new(parsed.counts.value)),
+            ),
         });
     }
+    let text =
+        std::str::from_utf8(&source).expect("strict tokenization validated every byte as UTF-8");
     let nodes = build_nodes(text, parsed.tokens, parsed.counts.value.nodes);
     Ok(MaterializedDocument {
         source,
@@ -238,11 +286,6 @@ impl MaterializedDocument {
     }
 }
 
-struct ParsedIndex {
-    tokens: Vec<Token>,
-    counts: InputCounts,
-}
-
 #[derive(Clone, Copy)]
 enum TokenKind {
     OpenArray,
@@ -253,9 +296,14 @@ enum TokenKind {
     Comma,
     Null,
     Boolean(bool),
-    Number(PortableNumber),
-    // Raw string token, with its decoded byte length but no owned string value.
-    String(u64),
+    /// `None` outside the Portable JSON Number domain.
+    Number(Option<PortableNumber>),
+    /// Raw string token, with its decoded byte length and whether its value
+    /// stays in the Unicode scalar domain, but no owned string value.
+    String {
+        decoded: u64,
+        scalar: bool,
+    },
 }
 
 #[derive(Clone, Copy)]
@@ -269,8 +317,9 @@ fn decode_string(source: &str, span: ByteSpan) -> String {
     let end = usize::try_from(span.end).expect("parser-proven source offset");
     let token = &source[start..end];
     if token.as_bytes().contains(&b'\\') {
-        // The lexer already validated this bounded token's syntax and Unicode
-        // scalar domain; serde is used only to decode strings, never numbers/maps.
+        // The lexer already validated this bounded token's syntax, and an
+        // admitted value has only Unicode scalars; serde is used only to
+        // decode strings, never numbers/maps.
         serde_json::from_str(token).expect("strictly validated string token")
     } else {
         token[1..token.len() - 1].to_owned()
@@ -304,7 +353,7 @@ fn build_nodes(source: &str, tokens: Vec<Token>, node_count: u64) -> Vec<Located
                 frame.expects_key = matches!(nodes[frame.owner.0].kind, NodeKind::Object(_));
                 continue;
             }
-            TokenKind::String(_) if stack.last().is_some_and(|frame| frame.expects_key) => {
+            TokenKind::String { .. } if stack.last().is_some_and(|frame| frame.expects_key) => {
                 let frame = stack.last_mut().expect("validated member name");
                 frame.pending_key = Some((decode_string(source, token.span), token.span));
                 frame.expects_key = false;
@@ -315,8 +364,10 @@ fn build_nodes(source: &str, tokens: Vec<Token>, node_count: u64) -> Vec<Located
         let kind = match token.kind {
             TokenKind::Null => NodeKind::Null,
             TokenKind::Boolean(value) => NodeKind::Boolean(value),
-            TokenKind::Number(value) => NodeKind::Number(value),
-            TokenKind::String(_) => NodeKind::String(decode_string(source, token.span)),
+            TokenKind::Number(value) => {
+                NodeKind::Number(value.expect("an admitted value has only portable numbers"))
+            }
+            TokenKind::String { .. } => NodeKind::String(decode_string(source, token.span)),
             TokenKind::OpenArray => NodeKind::Array(Vec::new()),
             TokenKind::OpenObject => NodeKind::Object(BTreeMap::new()),
             _ => unreachable!("validated value token"),

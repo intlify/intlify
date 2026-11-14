@@ -1,24 +1,27 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Bounded strict-JSON tokenization. String tokens carry a decoded byte length,
-//! not an allocated value. No arbitrary-precision serde number/map path is used.
+//! Bounded strict-JSON tokenization over raw bytes. UTF-8 is validated as the
+//! bytes are reached, so the first byte that is not UTF-8 or not strict JSON
+//! stops tokenization where it is (D15:802). A string token carries its
+//! decoded byte length and whether its value stays in the Unicode scalar
+//! domain, and a number token whether it is a Portable JSON Number, not an
+//! allocated value: a value outside the JSON-compatible domain is a fact the
+//! parser records, not a reason to stop. No arbitrary-precision serde number
+//! or map path is used.
 
-use super::{
-    byte_count, ByteSpan, EntryProgress, InputFailure, MaterializationError, PortableNumber, Token,
-    TokenKind,
-};
+use super::{byte_count, ByteSpan, InputFailure, PortableNumber, Token, TokenKind};
 use crate::input_limits::{Bound, CountRelation, InputBound, LimitViolation, RawInputLimits};
 
 pub(super) struct Lexer<'source> {
-    source: &'source str,
+    source: &'source [u8],
     offset: usize,
     tokens: u64,
     max_tokens: Bound,
 }
 
 impl<'source> Lexer<'source> {
-    pub(super) fn new(source: &'source str, limits: RawInputLimits) -> Self {
+    pub(super) fn new(source: &'source [u8], limits: RawInputLimits) -> Self {
         Self {
             source,
             offset: 0,
@@ -31,29 +34,19 @@ impl<'source> Lexer<'source> {
         self.tokens
     }
 
-    pub(super) fn finish(&mut self) -> Result<(), MaterializationError> {
+    pub(super) fn finish(&mut self) -> Result<(), InputFailure> {
         self.whitespace();
         if self.offset != self.source.len() {
-            return Err(self.error(InputFailure::Syntax, self.current_span()));
+            return Err(self.unexpected());
         }
         Ok(())
     }
-    pub(super) fn error(&self, reason: InputFailure, span: ByteSpan) -> MaterializationError {
-        MaterializationError {
-            reason,
-            span: Some(span),
-            related_span: None,
-            progress: EntryProgress {
-                file_bytes: byte_count(self.source.len()),
-                parser_tokens_visited: self.tokens,
-                complete_value: None,
-            },
-        }
-    }
 
-    pub(super) fn add(&self, left: u64, right: u64) -> Result<u64, MaterializationError> {
+    pub(super) fn add(&self, left: u64, right: u64) -> Result<u64, InputFailure> {
         left.checked_add(right)
-            .ok_or_else(|| self.error(InputFailure::AccountingOverflow, self.current_span()))
+            .ok_or_else(|| InputFailure::AccountingOverflow {
+                span: self.current_span(),
+            })
     }
 
     pub(super) fn current_span(&self) -> ByteSpan {
@@ -65,10 +58,47 @@ impl<'source> Lexer<'source> {
         ByteSpan::from_offsets(self.offset, end)
     }
 
+    /// The failure of the byte at the current offset, which strict JSON does
+    /// not allow there: its bytes when they are not UTF-8, and otherwise the
+    /// byte itself, or the end of the input.
+    fn unexpected(&self) -> InputFailure {
+        if self
+            .source
+            .get(self.offset)
+            .is_some_and(|byte| !byte.is_ascii())
+        {
+            if let Err(span) = self.scalar_width() {
+                return InputFailure::InvalidUtf8 { span };
+            }
+        }
+        InputFailure::Syntax {
+            span: self.current_span(),
+        }
+    }
+
+    /// The byte length of the UTF-8 scalar at the current offset, or the span
+    /// of the bytes that are not one, as `std` delimits them.
+    fn scalar_width(&self) -> Result<usize, ByteSpan> {
+        let start = self.offset;
+        let window = &self.source[start..self.source.len().min(start + 4)];
+        let valid = match std::str::from_utf8(window) {
+            Ok(text) => text,
+            Err(error) if error.valid_up_to() > 0 => {
+                std::str::from_utf8(&window[..error.valid_up_to()]).unwrap_or_default()
+            }
+            Err(error) => {
+                let end = error
+                    .error_len()
+                    .map_or(self.source.len(), |length| start + length);
+                return Err(ByteSpan::from_offsets(start, end));
+            }
+        };
+        Ok(valid.chars().next().map_or(1, char::len_utf8))
+    }
+
     fn whitespace(&mut self) {
         while self
             .source
-            .as_bytes()
             .get(self.offset)
             .is_some_and(|b| matches!(b, b' ' | b'\n' | b'\r' | b'\t'))
         {
@@ -76,22 +106,24 @@ impl<'source> Lexer<'source> {
         }
     }
 
-    pub(super) fn token(&mut self) -> Result<Token, MaterializationError> {
+    pub(super) fn token(&mut self) -> Result<Token, InputFailure> {
         self.whitespace();
         let start = self.offset;
-        let Some(&byte) = self.source.as_bytes().get(start) else {
-            return Err(self.error(InputFailure::Syntax, self.current_span()));
+        let Some(&byte) = self.source.get(start) else {
+            return Err(InputFailure::Syntax {
+                span: self.current_span(),
+            });
         };
         if self.tokens == self.max_tokens.get() {
-            return Err(self.error(
-                InputFailure::ResourceLimits(vec![LimitViolation {
+            return Err(InputFailure::ParserTokens {
+                violation: LimitViolation {
                     bound: InputBound::ParserTokens,
                     limit: self.max_tokens,
                     actual: self.max_tokens.get() + 1,
                     relation: CountRelation::AtLeast,
-                }]),
-                self.current_span(),
-            ));
+                },
+                span: self.current_span(),
+            });
         }
         self.tokens = self.add(self.tokens, 1)?;
         let kind = match byte {
@@ -131,9 +163,9 @@ impl<'source> Lexer<'source> {
                 self.literal(b"false")?;
                 TokenKind::Boolean(false)
             }
-            b'"' => TokenKind::String(self.string()?),
+            b'"' => self.string()?,
             b'-' | b'0'..=b'9' => TokenKind::Number(self.number()?),
-            _ => return Err(self.error(InputFailure::Syntax, self.current_span())),
+            _ => return Err(self.unexpected()),
         };
         Ok(Token {
             kind,
@@ -141,40 +173,40 @@ impl<'source> Lexer<'source> {
         })
     }
 
-    fn literal(&mut self, expected: &[u8]) -> Result<(), MaterializationError> {
+    fn literal(&mut self, expected: &[u8]) -> Result<(), InputFailure> {
         for &byte in expected {
-            if self.source.as_bytes().get(self.offset) != Some(&byte) {
-                return Err(self.error(InputFailure::Syntax, self.current_span()));
+            if self.source.get(self.offset) != Some(&byte) {
+                return Err(self.unexpected());
             }
             self.offset += 1;
         }
         Ok(())
     }
 
-    fn number(&mut self) -> Result<PortableNumber, MaterializationError> {
+    /// A number token, which is `None` outside the Portable JSON Number
+    /// domain.
+    fn number(&mut self) -> Result<Option<PortableNumber>, InputFailure> {
         let start = self.offset;
-        if self.source.as_bytes()[self.offset] == b'-' {
+        if self.source[self.offset] == b'-' {
             self.offset += 1;
         }
-        match self.source.as_bytes().get(self.offset) {
+        match self.source.get(self.offset) {
             Some(b'0') => self.offset += 1,
             Some(b'1'..=b'9') => self.digits(),
-            _ => return Err(self.error(InputFailure::Syntax, self.current_span())),
+            _ => return Err(self.unexpected()),
         }
-        if self.source.as_bytes().get(self.offset) == Some(&b'.') {
+        if self.source.get(self.offset) == Some(&b'.') {
             self.offset += 1;
             self.required_digits()?;
         }
         if self
             .source
-            .as_bytes()
             .get(self.offset)
             .is_some_and(|b| matches!(b, b'e' | b'E'))
         {
             self.offset += 1;
             if self
                 .source
-                .as_bytes()
                 .get(self.offset)
                 .is_some_and(|b| matches!(b, b'+' | b'-'))
             {
@@ -182,111 +214,128 @@ impl<'source> Lexer<'source> {
             }
             self.required_digits()?;
         }
-        PortableNumber::from_token(&self.source[start..self.offset]).ok_or_else(|| {
-            self.error(
-                InputFailure::NonPortableNumber,
-                ByteSpan::from_offsets(start, self.offset),
-            )
-        })
+        // The token is ASCII digits and signs, so it is UTF-8.
+        Ok(std::str::from_utf8(&self.source[start..self.offset])
+            .ok()
+            .and_then(PortableNumber::from_token))
     }
 
     fn digits(&mut self) {
-        while self
-            .source
-            .as_bytes()
-            .get(self.offset)
-            .is_some_and(u8::is_ascii_digit)
-        {
+        while self.source.get(self.offset).is_some_and(u8::is_ascii_digit) {
             self.offset += 1;
         }
     }
 
-    fn required_digits(&mut self) -> Result<(), MaterializationError> {
+    fn required_digits(&mut self) -> Result<(), InputFailure> {
         let start = self.offset;
         self.digits();
         if self.offset == start {
-            return Err(self.error(InputFailure::Syntax, self.current_span()));
+            return Err(self.unexpected());
         }
         Ok(())
     }
 
-    fn string(&mut self) -> Result<u64, MaterializationError> {
+    /// A string token: its decoded byte length, counting a lone surrogate as
+    /// the three bytes of its code point, and whether its value stays in the
+    /// Unicode scalar domain.
+    fn string(&mut self) -> Result<TokenKind, InputFailure> {
         self.offset += 1;
-        let mut decoded_bytes = 0_u64;
+        let mut decoded = 0_u64;
+        let mut scalar = true;
         loop {
-            let bytes = match self.source.as_bytes().get(self.offset) {
+            let bytes = match self.source.get(self.offset) {
                 Some(b'"') => {
                     self.offset += 1;
-                    return Ok(decoded_bytes);
+                    return Ok(TokenKind::String { decoded, scalar });
                 }
-                Some(b'\\') => self.escape()?,
+                Some(b'\\') => {
+                    let (bytes, in_domain) = self.escape()?;
+                    scalar &= in_domain;
+                    bytes
+                }
                 Some(0..=0x1f) | None => {
-                    return Err(self.error(InputFailure::Syntax, self.current_span()))
+                    return Err(InputFailure::Syntax {
+                        span: self.current_span(),
+                    })
+                }
+                Some(0x80..) => {
+                    let width = self
+                        .scalar_width()
+                        .map_err(|span| InputFailure::InvalidUtf8 { span })?;
+                    self.offset += width;
+                    byte_count(width)
                 }
                 Some(_) => {
                     self.offset += 1;
                     1
                 }
             };
-            // Whole-input UTF-8 admission lets unescaped bytes contribute one
-            // byte each, while escapes contribute the decoded scalar's length.
-            decoded_bytes = self.add(decoded_bytes, bytes)?;
+            decoded = self.add(decoded, bytes)?;
         }
     }
 
-    fn escape(&mut self) -> Result<u64, MaterializationError> {
-        let start = self.offset;
+    /// One escape: the byte length of what it decodes to, and whether that is
+    /// a Unicode scalar. A high surrogate pairs with an immediately following
+    /// low surrogate escape; any other surrogate stands alone.
+    fn escape(&mut self) -> Result<(u64, bool), InputFailure> {
         self.offset += 1;
-        match self.source.as_bytes().get(self.offset) {
+        match self.source.get(self.offset) {
             Some(b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't') => {
                 self.offset += 1;
-                Ok(1)
+                Ok((1, true))
             }
             Some(b'u') => {
                 self.offset += 1;
                 let unit = self.hex_unit()?;
                 if (0xd800..=0xdbff).contains(&unit) {
-                    if !self.source.as_bytes()[self.offset..].starts_with(b"\\u") {
-                        return Err(self.error(
-                            InputFailure::NonScalarString,
-                            ByteSpan::from_offsets(start, self.offset),
-                        ));
+                    if self.low_surrogate_follows() {
+                        self.offset += 6;
+                        return Ok((4, true));
                     }
-                    self.offset += 2;
-                    let low = self.hex_unit()?;
-                    if !(0xdc00..=0xdfff).contains(&low) {
-                        return Err(self.error(
-                            InputFailure::NonScalarString,
-                            ByteSpan::from_offsets(start, self.offset),
-                        ));
-                    }
-                    Ok(4)
+                    Ok((3, false))
                 } else if (0xdc00..=0xdfff).contains(&unit) {
-                    Err(self.error(
-                        InputFailure::NonScalarString,
-                        ByteSpan::from_offsets(start, self.offset),
-                    ))
+                    Ok((3, false))
                 } else {
                     let scalar =
                         char::from_u32(u32::from(unit)).expect("non-surrogate UTF-16 unit");
-                    Ok(byte_count(scalar.len_utf8()))
+                    Ok((byte_count(scalar.len_utf8()), true))
                 }
             }
-            _ => Err(self.error(InputFailure::Syntax, self.current_span())),
+            _ => Err(self.unexpected()),
         }
     }
-    fn hex_unit(&mut self) -> Result<u16, MaterializationError> {
+
+    /// Whether a `\u` escape of a low surrogate is at the current offset.
+    fn low_surrogate_follows(&self) -> bool {
+        let Some([b'\\', b'u', digits @ ..]) = self.source.get(self.offset..self.offset + 6) else {
+            return false;
+        };
+        digits
+            .iter()
+            .try_fold(0_u16, |unit, &byte| {
+                Some((unit << 4) | u16::from(hex_digit(byte)?))
+            })
+            .is_some_and(|unit| (0xdc00..=0xdfff).contains(&unit))
+    }
+
+    fn hex_unit(&mut self) -> Result<u16, InputFailure> {
         let mut unit = 0_u16;
         for _ in 0..4 {
-            let digit = match self.source.as_bytes().get(self.offset) {
-                Some(byte @ b'0'..=b'9') => byte - b'0',
-                Some(byte @ b'a'..=b'f') => byte - b'a' + 10,
-                Some(byte @ b'A'..=b'F') => byte - b'A' + 10,
-                _ => return Err(self.error(InputFailure::Syntax, self.current_span())),
+            let Some(digit) = self.source.get(self.offset).copied().and_then(hex_digit) else {
+                return Err(self.unexpected());
             };
             unit = (unit << 4) | u16::from(digit);
             self.offset += 1;
         }
         Ok(unit)
+    }
+}
+
+fn hex_digit(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
     }
 }

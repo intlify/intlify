@@ -239,8 +239,11 @@ fn every_finite_case_prepares_its_exact_result_and_work_including_all_limit_edge
             if edge == LimitEdge::FirstOver {
                 match &candidate.output {
                     Output::Entry(Err(error)) => {
-                        let InputFailure::ResourceLimits(violations) = &error.reason else {
-                            panic!("wrong rejection {declaration:?}");
+                        let violations = match &error.reason {
+                            InputFailure::FileBytes(violation)
+                            | InputFailure::ParserTokens { violation, .. } => vec![*violation],
+                            InputFailure::Inadmissible(facts) => facts.violations.clone(),
+                            _ => panic!("wrong rejection {declaration:?}"),
                         };
                         assert_eq!(violations.len(), 1);
                         assert_eq!(violations[0].actual, violations[0].limit.get() + 1);
@@ -346,7 +349,7 @@ fn every_finite_case_prepares_its_exact_result_and_work_including_all_limit_edge
 #[test]
 fn invalid_entry_recipes_have_exact_declared_failure_kinds_not_any_generic_failure() {
     use crate::benchmark::operation::Output;
-    use crate::materialize::InputFailure;
+    use crate::materialize::{Incompatibility, InputFailure};
     for declaration in declarations()
         .into_iter()
         .filter(|case| case.limit.is_none() && case.expected_kind == ExpectedKind::EntryFailure)
@@ -355,15 +358,33 @@ fn invalid_entry_recipes_have_exact_declared_failure_kinds_not_any_generic_failu
         let Output::Entry(Err(error)) = candidate.output else {
             panic!("expected raw-input failure");
         };
+        // Each recipe has exactly one fact of its kind and no other.
+        let found = match &error.reason {
+            InputFailure::InvalidUtf8 { .. } => "invalid-utf8",
+            InputFailure::Syntax { .. } => "syntax",
+            InputFailure::Inadmissible(facts) if facts.violations.is_empty() => {
+                match (facts.duplicates.as_slice(), facts.incompatible.as_slice()) {
+                    ([_], []) => "duplicate",
+                    ([], [value]) if value.reason == Incompatibility::InvalidUnicode => {
+                        "invalid-unicode"
+                    }
+                    ([], [value]) if value.reason == Incompatibility::NonPortableNumber => {
+                        "non-portable-number"
+                    }
+                    _ => "several",
+                }
+            }
+            _ => "another",
+        };
         let expected = match declaration.fixture {
-            Recipe::InvalidUtf8 => InputFailure::InvalidUtf8,
-            Recipe::InvalidJson | Recipe::TrailingToken => InputFailure::Syntax,
-            Recipe::DuplicateKey | Recipe::EscapedDuplicateKey => InputFailure::DuplicateMember,
-            Recipe::InvalidSurrogate => InputFailure::NonScalarString,
-            Recipe::NonPortableNumber => InputFailure::NonPortableNumber,
+            Recipe::InvalidUtf8 => "invalid-utf8",
+            Recipe::InvalidJson | Recipe::TrailingToken => "syntax",
+            Recipe::DuplicateKey | Recipe::EscapedDuplicateKey => "duplicate",
+            Recipe::InvalidSurrogate => "invalid-unicode",
+            Recipe::NonPortableNumber => "non-portable-number",
             _ => panic!("unexpected failing recipe"),
         };
-        assert_eq!(error.reason, expected);
+        assert_eq!(found, expected, "{declaration:?}");
     }
 }
 

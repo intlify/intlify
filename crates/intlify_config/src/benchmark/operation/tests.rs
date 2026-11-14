@@ -438,7 +438,7 @@ fn expected_blocked_operations_can_have_valid_completed_observations() {
         match &measured.output {
             Output::Entry(Err(error)) => assert!(matches!(
                 error.reason,
-                crate::materialize::InputFailure::Syntax
+                crate::materialize::InputFailure::Syntax { .. }
             )),
             Output::Structural(Ok(result)) => assert_eq!(
                 result.issues()[0].reason,

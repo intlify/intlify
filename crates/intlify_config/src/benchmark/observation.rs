@@ -12,10 +12,10 @@ use std::fmt;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 
-use crate::input_limits::{CountRelation, InputBound, ValueCounts};
+use crate::input_limits::{CountRelation, InputBound, LimitViolation, ValueCounts};
 use crate::materialize::{
-    ByteSpan, InputFailure, MaterializationError, MaterializedDocument, NodeId, NodeKind,
-    ObjectMember,
+    ByteSpan, Incompatibility, InputFailure, MaterializationError, MaterializedDocument, NodeId,
+    NodeKind, ObjectMember,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -253,38 +253,53 @@ pub(crate) fn document(doc: &MaterializedDocument) -> Observation {
 
 pub(crate) fn materialization_failure(error: &MaterializationError) -> Observation {
     let mut shared = Frame::new("materialization-failure");
+    let mut entry = Frame::new("materialization-failure-entry");
+    // A failure that stops parsing keeps the encoding it had when every
+    // failure did, and a completely parsed inadmissible file takes its own.
     match &error.reason {
-        InputFailure::InvalidUtf8 => shared.uint(0),
-        InputFailure::Syntax => shared.uint(1),
-        InputFailure::DuplicateMember => shared.uint(2),
-        InputFailure::NonScalarString => shared.uint(3),
-        InputFailure::NonPortableNumber => shared.uint(4),
-        InputFailure::AccountingOverflow => shared.uint(5),
-        InputFailure::ResourceLimits(violations) => {
-            shared.uint(6);
-            shared.uint(u64::try_from(violations.len()).expect("finite bounds"));
-            for violation in violations {
-                shared.uint(match violation.bound {
-                    InputBound::FileBytes => 0,
-                    InputBound::ParserTokens => 1,
-                    InputBound::Nodes => 2,
-                    InputBound::Depth => 3,
-                    InputBound::CollectionEntries => 4,
-                    InputBound::TotalStringBytes => 5,
-                    InputBound::SingleStringBytes => 6,
+        InputFailure::InvalidUtf8 { span } => stopped(&mut shared, &mut entry, 0, Some(*span)),
+        InputFailure::Syntax { span } => stopped(&mut shared, &mut entry, 1, Some(*span)),
+        InputFailure::AccountingOverflow { span } => {
+            stopped(&mut shared, &mut entry, 5, Some(*span));
+        }
+        InputFailure::FileBytes(violation) => {
+            stopped(&mut shared, &mut entry, 6, None);
+            shared.uint(1);
+            limit_violation(&mut shared, violation);
+        }
+        InputFailure::ParserTokens { violation, span } => {
+            stopped(&mut shared, &mut entry, 6, Some(*span));
+            shared.uint(1);
+            limit_violation(&mut shared, violation);
+        }
+        InputFailure::Inadmissible(facts) => {
+            shared.uint(7);
+            shared.uint(u64::try_from(facts.duplicates.len()).expect("finite duplicates"));
+            for duplicate in &facts.duplicates {
+                entry.span(duplicate.key);
+                entry.uint(u64::try_from(duplicate.others.len()).expect("finite members"));
+                for &other in &duplicate.others {
+                    entry.span(other);
+                }
+            }
+            shared.uint(u64::try_from(facts.incompatible.len()).expect("finite values"));
+            for value in &facts.incompatible {
+                shared.uint(match value.reason {
+                    Incompatibility::InvalidUnicode => 0,
+                    Incompatibility::NonPortableNumber => 1,
                 });
-                shared.uint(violation.limit.get());
-                shared.uint(violation.actual);
-                shared.uint(match violation.relation {
-                    CountRelation::Exact => 0,
-                    CountRelation::AtLeast => 1,
-                });
+                entry.span(value.span);
+            }
+            shared.uint(u64::try_from(facts.violations.len()).expect("finite bounds"));
+            for violation in &facts.violations {
+                limit_violation(&mut shared, violation);
+            }
+            entry.uint(u64::try_from(facts.long_strings.len()).expect("finite strings"));
+            for &span in &facts.long_strings {
+                entry.span(span);
             }
         }
     }
-    let mut entry = Frame::new("materialization-failure-entry");
-    entry.optional_span(error.span);
-    entry.optional_span(error.related_span);
     entry.uint(error.progress.file_bytes);
     entry.uint(error.progress.parser_tokens_visited);
     entry.flag(error.progress.complete_value.is_some());
@@ -295,4 +310,30 @@ pub(crate) fn materialization_failure(error: &MaterializationError) -> Observati
         shared: shared.finish(),
         entry: Some(entry.finish()),
     }
+}
+
+/// A failure that stopped parsing: its code, and where it stopped.
+fn stopped(shared: &mut Frame, entry: &mut Frame, code: u64, span: Option<ByteSpan>) {
+    shared.uint(code);
+    entry.optional_span(span);
+    // The place a second, related span had before duplicates were complete.
+    entry.optional_span(None);
+}
+
+fn limit_violation(frame: &mut Frame, violation: &LimitViolation) {
+    frame.uint(match violation.bound {
+        InputBound::FileBytes => 0,
+        InputBound::ParserTokens => 1,
+        InputBound::Nodes => 2,
+        InputBound::Depth => 3,
+        InputBound::CollectionEntries => 4,
+        InputBound::TotalStringBytes => 5,
+        InputBound::SingleStringBytes => 6,
+    });
+    frame.uint(violation.limit.get());
+    frame.uint(violation.actual);
+    frame.uint(match violation.relation {
+        CountRelation::Exact => 0,
+        CountRelation::AtLeast => 1,
+    });
 }
