@@ -15,7 +15,7 @@ use serde_json::Value;
 use crate::input_limits::{CountRelation, InputBound, LimitViolation, ValueCounts};
 use crate::materialize::{
     ByteSpan, Incompatibility, InputFailure, MaterializationError, MaterializedDocument, NodeId,
-    NodeKind, ObjectMember,
+    NodeKind, ObjectMember, PathId, PathStep, Paths,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -251,6 +251,25 @@ pub(crate) fn document(doc: &MaterializedDocument) -> Observation {
     }
 }
 
+/// The internal structural path of a fact: its steps from the root, a member
+/// by its key's span and an element by its index.
+fn path(frame: &mut Frame, paths: &Paths, place: Option<PathId>) {
+    let steps = paths.steps(place);
+    frame.uint(u64::try_from(steps.len()).expect("finite path"));
+    for step in steps {
+        match step {
+            PathStep::Member(key) => {
+                frame.uint(0);
+                frame.span(key);
+            }
+            PathStep::Index(index) => {
+                frame.uint(1);
+                frame.uint(index);
+            }
+        }
+    }
+}
+
 pub(crate) fn materialization_failure(error: &MaterializationError) -> Observation {
     let mut shared = Frame::new("materialization-failure");
     let mut entry = Frame::new("materialization-failure-entry");
@@ -281,6 +300,7 @@ pub(crate) fn materialization_failure(error: &MaterializationError) -> Observati
                 for &other in &duplicate.others {
                     entry.span(other);
                 }
+                path(&mut entry, &facts.paths, Some(duplicate.path));
             }
             shared.uint(u64::try_from(facts.incompatible.len()).expect("finite values"));
             for value in &facts.incompatible {
@@ -289,14 +309,16 @@ pub(crate) fn materialization_failure(error: &MaterializationError) -> Observati
                     Incompatibility::NonPortableNumber => 1,
                 });
                 entry.span(value.span);
+                path(&mut entry, &facts.paths, value.path);
             }
             shared.uint(u64::try_from(facts.violations.len()).expect("finite bounds"));
             for violation in &facts.violations {
                 limit_violation(&mut shared, violation);
             }
             entry.uint(u64::try_from(facts.long_strings.len()).expect("finite strings"));
-            for &span in &facts.long_strings {
-                entry.span(span);
+            for string in &facts.long_strings {
+                entry.span(string.span);
+                path(&mut entry, &facts.paths, string.path);
             }
         }
     }
@@ -336,4 +358,35 @@ fn limit_violation(frame: &mut Frame, violation: &LimitViolation) {
         CountRelation::Exact => 0,
         CountRelation::AtLeast => 1,
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::{path, Frame};
+    use crate::materialize::{materialize_file, ByteSpan, InputFailure};
+    use crate::materialize_tests::limits;
+
+    /// A fact's path frames its step count, then each member as 0 and its
+    /// key's span, and each array element as 1 and its index.
+    #[test]
+    fn a_path_frames_each_step_by_its_kind() {
+        let source = br#"{"a":[1e999]}"#;
+        let Err(error) = materialize_file(Arc::from(source.as_slice()), limits()) else {
+            panic!("the number is not portable");
+        };
+        let InputFailure::Inadmissible(facts) = error.reason else {
+            panic!("the file parses");
+        };
+        let mut framed = Frame::new("path");
+        path(&mut framed, &facts.paths, facts.incompatible[0].path);
+        let mut expected = Frame::new("path");
+        expected.uint(2);
+        expected.uint(0);
+        expected.span(ByteSpan::new(1, 4));
+        expected.uint(1);
+        expected.uint(0);
+        assert_eq!(framed.finish(), expected.finish());
+    }
 }

@@ -7,8 +7,8 @@ use crate::input_limits::{
     Bound, CountRelation, InputBound, InputLimits, RawInputLimits, ValueLimits,
 };
 use crate::materialize::{
-    materialize_file, ByteSpan, DuplicateMember, Inadmissible, Incompatibility, IncompatibleValue,
-    InputFailure, MaterializedDocument, NodeKind,
+    materialize_file, ByteSpan, Inadmissible, Incompatibility, InputFailure, MaterializedDocument,
+    NodeKind, PathStep,
 };
 
 // Explicit test-owned capacity, not a product default or admitted capability.
@@ -45,6 +45,48 @@ fn inadmissible(source: &[u8]) -> Inadmissible {
         InputFailure::Inadmissible(facts) => *facts,
         other => panic!("{source:?} stopped parsing: {other:?}"),
     }
+}
+
+/// Each duplicate of `facts`: its key, the other keys of its name, and the
+/// steps of its path.
+fn duplicates(facts: &Inadmissible) -> Vec<(ByteSpan, Vec<ByteSpan>, Vec<PathStep>)> {
+    facts
+        .duplicates
+        .iter()
+        .map(|duplicate| {
+            (
+                duplicate.key,
+                duplicate.others.clone(),
+                facts.paths.steps(Some(duplicate.path)),
+            )
+        })
+        .collect()
+}
+
+/// Each value of `facts` outside the JSON-compatible domain: its reason, its
+/// token, and the steps of its path.
+fn incompatible(facts: &Inadmissible) -> Vec<(Incompatibility, ByteSpan, Vec<PathStep>)> {
+    facts
+        .incompatible
+        .iter()
+        .map(|value| (value.reason, value.span, facts.paths.steps(value.path)))
+        .collect()
+}
+
+/// Each string of `facts` past the single-string bound: its token and the
+/// steps of its path.
+fn long_strings(facts: &Inadmissible) -> Vec<(ByteSpan, Vec<PathStep>)> {
+    facts
+        .long_strings
+        .iter()
+        .map(|string| (string.span, facts.paths.steps(string.path)))
+        .collect()
+}
+
+/// The step into the member whose key is `text` in `source`, at its `nth`
+/// occurrence.
+fn member(source: &[u8], text: &[u8], nth: usize) -> PathStep {
+    PathStep::Member(span_of(source, text, nth))
 }
 
 /// The span `text` occupies in `source`, at its `nth` occurrence.
@@ -91,11 +133,12 @@ fn portable_numbers_use_binary64_values_and_preserve_raw_tokens() {
         "18446744073709551615",
     ] {
         assert_eq!(
-            inadmissible(source.as_bytes()).incompatible,
-            [IncompatibleValue {
-                reason: Incompatibility::NonPortableNumber,
-                span: span_of(source.as_bytes(), source.as_bytes(), 0),
-            }]
+            incompatible(&inadmissible(source.as_bytes())),
+            [(
+                Incompatibility::NonPortableNumber,
+                span_of(source.as_bytes(), source.as_bytes(), 0),
+                vec![]
+            )]
         );
     }
 }
@@ -169,12 +212,16 @@ fn invalid_utf8_and_unicode_scalar_errors_have_byte_spans() {
         (r#"{"\ud800":0}"#, r#""\ud800""#),
         (r#""\ud800a""#, r#""\ud800a""#),
     ] {
+        let span = span_of(source.as_bytes(), token.as_bytes(), 0);
+        // A member name is at its member, and a root value at the root.
+        let path = if source.starts_with('{') {
+            vec![PathStep::Member(span)]
+        } else {
+            vec![]
+        };
         assert_eq!(
-            inadmissible(source.as_bytes()).incompatible,
-            [IncompatibleValue {
-                reason: Incompatibility::InvalidUnicode,
-                span: span_of(source.as_bytes(), token.as_bytes(), 0),
-            }],
+            incompatible(&inadmissible(source.as_bytes())),
+            [(Incompatibility::InvalidUnicode, span, path)],
             "{source}"
         );
     }
@@ -191,12 +238,14 @@ fn unicode_keys_are_decoded_before_scoped_duplicate_detection() {
         ),
     ] {
         let bytes = source.as_bytes();
+        let key = span_of(bytes, second.as_bytes(), 0);
         assert_eq!(
-            inadmissible(bytes).duplicates,
-            [DuplicateMember {
-                key: span_of(bytes, second.as_bytes(), 0),
-                others: vec![span_of(bytes, first.as_bytes(), 0)],
-            }]
+            duplicates(&inadmissible(bytes)),
+            [(
+                key,
+                vec![span_of(bytes, first.as_bytes(), 0)],
+                vec![PathStep::Member(key)]
+            )]
         );
     }
     let doc = document(r#"{"x":{"x":0},"X":1,"é":2,"e\u0301":3}"#);
@@ -306,10 +355,16 @@ fn logical_limits_accept_exact_and_report_all_complete_overruns_in_fixed_order()
         assert_eq!(violation.relation, relation);
     }
     assert_eq!(
-        facts.long_strings,
+        long_strings(&facts),
         [
-            span_of(source, br#""abc""#, 0),
-            span_of(source, br#""def""#, 0)
+            (
+                span_of(source, br#""abc""#, 0),
+                vec![member(source, br#""abc""#, 0)]
+            ),
+            (
+                span_of(source, br#""def""#, 0),
+                vec![member(source, br#""abc""#, 0), PathStep::Index(0)]
+            )
         ]
     );
 }
@@ -609,21 +664,17 @@ fn deep_object_indexes_also_cleanup_without_recursive_value_destruction() {
 fn every_duplicate_of_the_complete_file_relates_every_other_member_of_its_name() {
     let source = br#"{"a":1,"b":{"a":2,"a":3},"a":4,"a":5}"#;
     let key = |nth| span_of(source, br#""a""#, nth);
+    // Each duplicate is at its object's path and then its own key.
     assert_eq!(
-        inadmissible(source).duplicates,
+        duplicates(&inadmissible(source)),
         [
-            DuplicateMember {
-                key: key(2),
-                others: vec![key(1)],
-            },
-            DuplicateMember {
-                key: key(3),
-                others: vec![key(0), key(4)],
-            },
-            DuplicateMember {
-                key: key(4),
-                others: vec![key(0), key(3)],
-            },
+            (
+                key(2),
+                vec![key(1)],
+                vec![member(source, br#""b""#, 0), PathStep::Member(key(2))]
+            ),
+            (key(3), vec![key(0), key(4)], vec![PathStep::Member(key(3))]),
+            (key(4), vec![key(0), key(3)], vec![PathStep::Member(key(4))]),
         ]
     );
     // Duplicates follow the source, not the order of the names or of the
@@ -644,6 +695,78 @@ fn every_duplicate_of_the_complete_file_relates_every_other_member_of_its_name()
     );
 }
 
+/// D15:802: each fact keeps the internal structural path of its value or
+/// member, through arrays by index and objects by key, from the root.
+#[test]
+fn every_fact_keeps_the_path_of_its_value_or_member() {
+    let source = br#"[0,{"a":[1e999,{"b":"\ud800"}],"c":{"d":1,"d":2}},[[1e999]]]"#;
+    let facts = inadmissible(source);
+    let a = member(source, br#""a""#, 0);
+    assert_eq!(
+        incompatible(&facts),
+        [
+            (
+                Incompatibility::NonPortableNumber,
+                span_of(source, b"1e999", 0),
+                vec![PathStep::Index(1), a, PathStep::Index(0)]
+            ),
+            (
+                Incompatibility::InvalidUnicode,
+                span_of(source, br#""\ud800""#, 0),
+                vec![
+                    PathStep::Index(1),
+                    a,
+                    PathStep::Index(1),
+                    member(source, br#""b""#, 0)
+                ]
+            ),
+            (
+                Incompatibility::NonPortableNumber,
+                span_of(source, b"1e999", 1),
+                vec![PathStep::Index(2), PathStep::Index(0), PathStep::Index(0)]
+            ),
+        ]
+    );
+    let key = span_of(source, br#""d""#, 1);
+    assert_eq!(
+        duplicates(&facts),
+        [(
+            key,
+            vec![span_of(source, br#""d""#, 0)],
+            vec![
+                PathStep::Index(1),
+                member(source, br#""c""#, 0),
+                PathStep::Member(key)
+            ]
+        )]
+    );
+}
+
+/// Facts share the prefixes of their paths, and a file whose facts need no
+/// path enters none: parsing enters a member or element only when a fact is
+/// found under it.
+#[test]
+fn facts_share_their_paths_and_only_a_fact_enters_one() {
+    // "a", "b", and the three elements.
+    let facts = inadmissible(br#"{"a":{"b":[1e999,1e999,1e999]}}"#);
+    assert_eq!(facts.incompatible.len(), 3);
+    assert_eq!(facts.paths.entered(), 5);
+    // "x", and each duplicate's own key.
+    let facts = inadmissible(br#"{"x":{"k":1,"k":2,"k":3}}"#);
+    assert_eq!(facts.duplicates.len(), 2);
+    assert_eq!(facts.paths.entered(), 3);
+    let mut shallow = limits();
+    shallow.value.max_depth = Bound::new(1).unwrap();
+    let error = materialize_file(Arc::from(br#"{"a":[[1]]}"#.as_slice()), shallow)
+        .err()
+        .unwrap();
+    let InputFailure::Inadmissible(facts) = error.reason else {
+        panic!()
+    };
+    assert_eq!(facts.violations.len(), 1);
+    assert_eq!(facts.paths.entered(), 0);
+}
+
 /// Only a syntax or UTF-8 failure stops parsing: duplicates and values
 /// outside the JSON-compatible domain are all reported from the complete
 /// file, and none is reported from a file that is not strict JSON.
@@ -653,16 +776,18 @@ fn parsing_continues_past_duplicates_and_incompatible_values_but_not_syntax() {
     let facts = inadmissible(source);
     assert_eq!(facts.duplicates.len(), 1);
     assert_eq!(
-        facts.incompatible,
+        incompatible(&facts),
         [
-            IncompatibleValue {
-                reason: Incompatibility::NonPortableNumber,
-                span: span_of(source, b"1e999", 0),
-            },
-            IncompatibleValue {
-                reason: Incompatibility::InvalidUnicode,
-                span: span_of(source, br#""\udc00""#, 0),
-            },
+            (
+                Incompatibility::NonPortableNumber,
+                span_of(source, b"1e999", 0),
+                vec![member(source, br#""x""#, 1)]
+            ),
+            (
+                Incompatibility::InvalidUnicode,
+                span_of(source, br#""\udc00""#, 0),
+                vec![member(source, br#""y""#, 0)]
+            ),
         ]
     );
     assert!(facts.violations.is_empty());
@@ -750,10 +875,16 @@ fn long_strings_are_each_an_occurrence_under_a_first_over_witness() {
     assert_eq!(facts.violations[0].actual, 3);
     assert_eq!(facts.violations[0].relation, CountRelation::AtLeast);
     assert_eq!(
-        facts.long_strings,
+        long_strings(&facts),
         [
-            span_of(source, br#""xyzw""#, 0),
-            span_of(source, br#""pqr""#, 0)
+            (
+                span_of(source, br#""xyzw""#, 0),
+                vec![member(source, br#""ab""#, 0)]
+            ),
+            (
+                span_of(source, br#""pqr""#, 0),
+                vec![member(source, br#""c""#, 0), PathStep::Index(0)]
+            )
         ]
     );
     assert_eq!(
@@ -769,12 +900,14 @@ fn long_strings_are_each_an_occurrence_under_a_first_over_witness() {
 fn names_with_lone_surrogates_compare_by_their_code_units() {
     let source = br#"{"\ud800":0,"\ud800":1,"\udc00":2}"#;
     let facts = inadmissible(source);
+    let key = span_of(source, br#""\ud800""#, 1);
     assert_eq!(
-        facts.duplicates,
-        [DuplicateMember {
-            key: span_of(source, br#""\ud800""#, 1),
-            others: vec![span_of(source, br#""\ud800""#, 0)],
-        }]
+        duplicates(&facts),
+        [(
+            key,
+            vec![span_of(source, br#""\ud800""#, 0)],
+            vec![PathStep::Member(key)]
+        )]
     );
     assert_eq!(facts.incompatible.len(), 3);
     assert!(facts
