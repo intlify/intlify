@@ -129,6 +129,14 @@ pub(crate) enum Subject {
     /// The complete configuration input that strict file entry reads, a
     /// singleton.
     CompleteInput,
+    /// The owner of the materialized dependency records, a singleton.
+    MaterializedDependencies,
+    /// The Configuration Schema Selection the root's `schemaVersion` makes, a
+    /// singleton.
+    SchemaSelection,
+    /// The schema-guided structural analysis under the capability, a
+    /// singleton.
+    StructuralCapability,
     /// The Intent Surface-Class Vocabulary Artifact, a singleton.
     Vocabulary,
     /// The Locale Canonicalization Data Artifact, a singleton.

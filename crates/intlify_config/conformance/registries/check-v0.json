@@ -596,7 +596,9 @@
       "owningScope": "configuration-schema-selection",
       "subjectKindRank": "1",
       "checkRank": "1",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.schema-selection.object-root"
+      ],
       "possibleFindingCodes": [
         "project-profile-required-field-missing"
       ],
@@ -630,7 +632,9 @@
       "owningScope": "configuration-schema-selection",
       "subjectKindRank": "1",
       "checkRank": "2",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.schema-selection.present-schema-version"
+      ],
       "possibleFindingCodes": [
         "project-profile-field-type-invalid"
       ],
@@ -664,7 +668,9 @@
       "owningScope": "configuration-schema-selection",
       "subjectKindRank": "1",
       "checkRank": "3",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.schema-selection.string-schema-version"
+      ],
       "possibleFindingCodes": [
         "project-profile-schema-version-unsupported"
       ],
@@ -696,7 +702,9 @@
       "owningScope": "capability-structural-analysis",
       "subjectKindRank": "2",
       "checkRank": "0",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.schema-selection.supported-schema-version"
+      ],
       "possibleFindingCodes": [
         "project-profile-resource-limit-exceeded"
       ],

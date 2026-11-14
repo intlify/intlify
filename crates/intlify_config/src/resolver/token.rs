@@ -114,6 +114,9 @@ pub(crate) fn logical(subject: &Subject) -> Subject {
         Subject::Slot(_)
         | Subject::EntryDependencies
         | Subject::CompleteInput
+        | Subject::MaterializedDependencies
+        | Subject::SchemaSelection
+        | Subject::StructuralCapability
         | Subject::Vocabulary
         | Subject::CanonicalizationData
         | Subject::DeclarationField(_)
@@ -376,6 +379,9 @@ fn own(subject: &Subject) -> (Own, Option<Subject>) {
         Subject::Slot(_)
         | Subject::EntryDependencies
         | Subject::CompleteInput
+        | Subject::MaterializedDependencies
+        | Subject::SchemaSelection
+        | Subject::StructuralCapability
         | Subject::Vocabulary
         | Subject::CanonicalizationData
         | Subject::SemanticDependency(_) => alone(Own::Singleton),
@@ -715,6 +721,9 @@ mod tests {
         subjects.extend([
             Subject::EntryDependencies,
             Subject::CompleteInput,
+            Subject::MaterializedDependencies,
+            Subject::SchemaSelection,
+            Subject::StructuralCapability,
             Subject::Vocabulary,
             Subject::CanonicalizationData,
         ]);
@@ -903,6 +912,18 @@ mod tests {
             ),
             (Subject::EntryDependencies, json!("entry-dependencies")),
             (Subject::CompleteInput, json!("complete-input")),
+            (
+                Subject::MaterializedDependencies,
+                json!("materialized-dependencies"),
+            ),
+            (
+                Subject::SchemaSelection,
+                json!("configuration-schema-selection"),
+            ),
+            (
+                Subject::StructuralCapability,
+                json!("capability-structural-analysis"),
+            ),
             (Subject::Vocabulary, json!("vocabulary")),
             (
                 Subject::CanonicalizationData,
