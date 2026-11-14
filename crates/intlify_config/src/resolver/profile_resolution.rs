@@ -1072,6 +1072,7 @@ pub(super) mod tests {
         let schema = Schema::for_model().unwrap();
         let Ok(analysis) = admit_structure(
             evaluation,
+            file,
             document,
             &schema,
             structural,

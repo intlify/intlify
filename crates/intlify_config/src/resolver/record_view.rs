@@ -531,6 +531,40 @@ mod tests {
             .unwrap()
     }
 
+    /// Records the structural `unit` as finding `code`, observed at the root
+    /// of a configuration file, as Phase 2 observes what it finds.
+    fn block_observed(evaluation: &mut Evaluation, unit: Unit, code: Code) {
+        use crate::resolver::entry::fixtures::FileFixture;
+        use crate::resolver::evaluation::{Found, Observation};
+        use crate::resolver::evidence::EvidenceProjection;
+        use crate::resolver::limits::fixture_limits;
+        use crate::resolver::origin::SafeOriginKind;
+        let fixture = FileFixture::new(&fixture_limits(100));
+        let file = fixture.file(std::sync::Arc::from(&b"{}"[..]));
+        let primary = EvidenceProjection::configuration_value(
+            SafeOriginKind::ConfigurationFile,
+            file.source,
+            &[],
+            None,
+        )
+        .unwrap();
+        let blocking = Blocking {
+            code,
+            reason: None,
+            details: None,
+        };
+        let observation = Observation {
+            primary,
+            related: Vec::new(),
+        };
+        evaluation
+            .check_found(unit, Ok(()), |()| {
+                Err::<(), _>(Found::observed(blocking, observation))
+            })
+            .unwrap()
+            .unwrap_err();
+    }
+
     /// Records `unit` as finding nothing.
     fn pass(evaluation: &mut Evaluation, unit: Unit) {
         evaluation
@@ -966,7 +1000,7 @@ mod tests {
                 Code::SchemaVersionUnsupported,
             ),
         ] {
-            block(&mut evaluation, selection(check), code, None).unwrap_err();
+            block_observed(&mut evaluation, selection(check), code);
         }
         let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
         let details: Vec<Option<Value>> = views
@@ -1010,7 +1044,7 @@ mod tests {
                 Code::FieldValueInvalid,
             ),
         ] {
-            block(&mut evaluation, unit, code, None).unwrap_err();
+            block_observed(&mut evaluation, unit, code);
         }
         let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
         let details: Vec<Option<Value>> = views
@@ -1084,7 +1118,7 @@ mod tests {
                 Code::UnknownField,
             ),
         ] {
-            block(&mut evaluation, unit, code, None).unwrap_err();
+            block_observed(&mut evaluation, unit, code);
         }
         let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
         let details: Vec<Option<Value>> = views

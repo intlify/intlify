@@ -13,11 +13,10 @@
 //! `messageFallback` map is a locale key; whether the key itself is
 //! non-secret is the resolver's decision. A member of the same name at any
 //! other position holds no keyed map. Every other member is undefined, and so
-//! is every member below an undefined one or below an ID key that does not
-//! match the identifier syntax, where the schema describes nothing. An array
-//! index has no place: Evidence always keeps it.
-
-use crate::model::valid_identity;
+//! is every member below an undefined one, where the schema describes nothing.
+//! Below an ID key, the entry's schema goes on whether or not the key matches
+//! the identifier syntax: structural admission evaluates the entry's value
+//! under it (D15:2184). An array index has no place: Evidence always keeps it.
 
 use super::program::{Additional, SchemaId, SchemaProgram};
 
@@ -100,9 +99,7 @@ pub(super) fn places(program: &SchemaProgram, edges: &[Edge<'_>]) -> Vec<Option<
 fn member(program: &SchemaProgram, position: Position, name: &str) -> (Place, Option<Position>) {
     match position.role {
         Some(Role::Identifiers(place)) => {
-            let schema = program
-                .identity_values(position.schema)
-                .filter(|_| valid_identity(name));
+            let schema = program.identity_values(position.schema);
             // The value of a Profile ID key is a profile declaration.
             let role = (place == Place::ProfileId).then_some(Role::Declaration);
             (place, schema.map(|schema| Position { schema, role }))
@@ -281,11 +278,10 @@ mod tests {
         );
     }
 
-    /// The schema describes nothing below an unknown member, nor below an ID
-    /// key outside the identifier syntax, so every member there is undefined,
-    /// a schema-defined name included.
+    /// The schema describes nothing below an unknown member, so every member
+    /// there is undefined, a schema-defined name included.
     #[test]
-    fn nothing_below_an_unknown_member_or_a_malformed_id_is_defined() {
+    fn nothing_below_an_unknown_member_is_defined() {
         assert_eq!(
             of(&[
                 Member("secret"),
@@ -296,12 +292,33 @@ mod tests {
             [Some(Undefined), Some(Undefined), None, Some(Undefined)]
         );
         assert_eq!(
-            of(&[Member("profiles"), Member("App"), Member("targetProfiles")]),
-            [Some(Defined), Some(ProfileId), Some(Undefined)]
-        );
-        assert_eq!(
             of(&[Member("profiles"), Member("app"), Member("unknown")]),
             [Some(Defined), Some(ProfileId), Some(Undefined)]
+        );
+    }
+
+    /// Below an ID key outside the identifier syntax, the entry's schema goes
+    /// on, as structural admission evaluates the entry's value (D15:2184):
+    /// its names are defined, and its maps place their keys.
+    #[test]
+    fn the_entry_schema_goes_on_below_a_malformed_id() {
+        assert_eq!(
+            of(&[
+                Member("profiles"),
+                Member("App"),
+                Member("targetProfiles"),
+                Member("Web Target"),
+                Member("requestedLocales"),
+                Index(0),
+            ]),
+            [
+                Some(Defined),
+                Some(ProfileId),
+                Some(Defined),
+                Some(TargetId),
+                Some(Defined),
+                None,
+            ]
         );
     }
 

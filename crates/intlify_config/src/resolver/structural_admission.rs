@@ -28,28 +28,45 @@
 //! 015-195). A value whose type check failed is that check's to report, so
 //! its other checks are not evaluated (D15:2184).
 //!
+//! Each Finding Occurrence of Phase 2 is observed through Materialized Value
+//! Evidence in the file Phase 1 read (D15:790): a value at its token, a
+//! missing member at the object that lacks it followed by the member's
+//! schema-defined name, an undeclared member or an entry's key at the key's
+//! token, the schema selection at the root or its `schemaVersion` member, and
+//! the analysis's measure at the root beside the capability's bound. A
+//! locator classifies each member of its path, so a key without the
+//! identifier syntax is redacted while the names its entry's schema defines
+//! are kept (D15:776, 2184).
+//!
 //! The analysis these checks admit is what later phases read, and a
 //! configuration structural admission does not admit whole starts no
-//! semantic phase (plan 025 PR 5f-2f). Phase 2's Findings carry their
-//! occurrences once its Evidence comes (plan 025 PR 5f-2e).
+//! semantic phase (plan 025 PR 5f-2f).
 
+use std::cell::OnceCell;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::materialize::{ByteSpan, MaterializedDocument};
+use crate::materialize::{ByteSpan, MaterializedDocument, NodeId, NodeKind, ObjectMember};
 use crate::structural::facts::{
-    self, At, CandidateId, Entry, Facts, FieldPathId, Level, Outcome, ScopeId,
+    self, At, Candidate, CandidateId, Entry, Facts, FieldPathId, Level, Outcome, ScopeId,
 };
 use crate::structural::{
-    AdmissionInvariant, AuthoringSchema, StructuralAnalysis, StructuralFailure, StructuralLimits,
+    AdmissionInvariant, AuthoringSchema, Edge, StructuralAnalysis, StructuralFailure,
+    StructuralLimits,
 };
 
+use super::capability::CapabilityBound;
 use super::dependency::{own, SemanticGroup};
+use super::entry::EntryFile;
 use super::evaluation::{
-    Actual, Admitted, Blocking, Check, Code, Evaluation, EvaluationInvariant, LimitExceeded, Phase,
-    Subject, Unit,
+    Actual, Admitted, Blocking, Check, Code, Evaluation, EvaluationInvariant, Found, LimitExceeded,
+    Observation, Phase, Subject, Unit,
 };
+use super::evidence::{EvidenceInvariant, EvidenceProjection};
+use super::evidence_component::{ComponentInvariant, ComponentPath};
+use super::evidence_source::SourceSpan;
 use super::limits::{BoundId, Group};
+use super::origin::SafeOriginKind;
 
 /// The unit that owns the materialized dependency records.
 pub(crate) const OWNER: Unit = Unit {
@@ -180,6 +197,10 @@ pub(crate) enum StructuralInvariant {
     Evaluation(EvaluationInvariant),
     /// The schema-guided analysis found a defect of its own schema binding.
     Admission(AdmissionInvariant),
+    /// What a check found could not be projected as Evidence.
+    Evidence(EvidenceInvariant),
+    /// The capability's bound has no component path.
+    Component(ComponentInvariant),
     /// The analysis selected no schema, or stopped short of its work, for a
     /// reason no check reported.
     UnreportedFailure,
@@ -203,6 +224,7 @@ impl From<EvaluationInvariant> for StructuralInvariant {
 /// Returns the resolver bug Phase 2 found.
 pub(crate) fn admit_structure<Policy, Target>(
     evaluation: &mut Evaluation,
+    file: &EntryFile<'_>,
     document: MaterializedDocument,
     schema: &AuthoringSchema<Policy, Target>,
     limits: StructuralLimits,
@@ -211,42 +233,53 @@ pub(crate) fn admit_structure<Policy, Target>(
     // The owner records the materialized dependencies, and nothing waits on
     // it.
     let _: Admitted<()> = evaluation.check(OWNER, Ok(()), |()| Ok::<(), Blocking>(()))?;
+    let document = Arc::new(document);
     let analysis = schema
-        .analyze(Arc::new(document), limits)
+        .analyze(Arc::clone(&document), limits)
         .map_err(StructuralInvariant::Admission)?;
+    let observer = Observer::new(file, &document);
     let failed = |reason| analysis.issues().iter().any(|issue| issue.reason == reason);
-    let object = evaluation.check(selection(Check::ObjectRoot), Ok(()), |()| {
-        rejected(
-            failed(StructuralFailure::RootTypeInvalid),
-            Code::FieldTypeInvalid,
-        )
+    // Each selection check observes the root, or its `schemaVersion` member
+    // where the check reads it, present or missing.
+    let observed = failed(StructuralFailure::RootTypeInvalid)
+        .then(|| observer.root())
+        .transpose()?;
+    let object = evaluation.check_found(selection(Check::ObjectRoot), Ok(()), |()| {
+        found(observed, Code::FieldTypeInvalid)
     })?;
-    let present = evaluation.check(selection(Check::PresentSchemaVersion), object, |()| {
-        rejected(
-            failed(StructuralFailure::SchemaVersionMissing),
-            Code::RequiredFieldMissing,
-        )
+    let observed = failed(StructuralFailure::SchemaVersionMissing)
+        .then(|| observer.version())
+        .transpose()?;
+    let present = evaluation.check_found(selection(Check::PresentSchemaVersion), object, |()| {
+        found(observed, Code::RequiredFieldMissing)
     })?;
-    let string = evaluation.check(selection(Check::StringSchemaVersion), present, |()| {
-        rejected(
-            failed(StructuralFailure::SchemaVersionTypeInvalid),
-            Code::FieldTypeInvalid,
-        )
+    let observed = failed(StructuralFailure::SchemaVersionTypeInvalid)
+        .then(|| observer.version())
+        .transpose()?;
+    let string = evaluation.check_found(selection(Check::StringSchemaVersion), present, |()| {
+        found(observed, Code::FieldTypeInvalid)
     })?;
-    let supported = evaluation.check(selection(Check::SupportedSchemaVersion), string, |()| {
-        rejected(
-            failed(StructuralFailure::SchemaVersionUnsupported),
-            Code::SchemaVersionUnsupported,
-        )
-    })?;
+    let observed = failed(StructuralFailure::SchemaVersionUnsupported)
+        .then(|| observer.version())
+        .transpose()?;
+    let supported =
+        evaluation.check_found(selection(Check::SupportedSchemaVersion), string, |()| {
+            found(observed, Code::SchemaVersionUnsupported)
+        })?;
     // The checks decide, so a check a test makes block holds the analysis
     // back too; a schema the checks admit and the analysis did not select is
     // a resolver bug.
     if supported.is_ok() && !analysis.version_selected() {
         return Err(StructuralInvariant::UnreportedFailure);
     }
-    let within = evaluation.check(CAPABILITY, supported, |()| {
-        exceeded(&analysis).map_or(Ok(()), Err)
+    // The measure is observed at the root, beside the capability's bound.
+    let exceeded = exceeded(&analysis)
+        .map(|blocking| Ok::<_, StructuralInvariant>((blocking, observer.capability()?)))
+        .transpose()?;
+    let within = evaluation.check_found(CAPABILITY, supported, |()| {
+        exceeded.map_or(Ok(()), |(blocking, observation)| {
+            Err(Found::observed(blocking, observation))
+        })
     })?;
     if within.is_ok() && analysis.structural_units().is_none() {
         return Err(StructuralInvariant::UnreportedFailure);
@@ -254,7 +287,7 @@ pub(crate) fn admit_structure<Policy, Target>(
     // An analysis past the capability stopped before its candidates, which
     // alone name the scope levels' subjects.
     if let Some(facts) = analysis.facts() {
-        scope_levels(evaluation, &analysis, facts, &within)?;
+        scope_levels(evaluation, (&analysis, &observer), facts, &within)?;
     }
     // The assertion Phase 0 admitted never selects structure: only the owner
     // of the group it establishes waits on it.
@@ -272,10 +305,10 @@ pub(crate) fn admit_structure<Policy, Target>(
 /// analysis's measure (D15:2149, 2184).
 fn scope_levels<Policy, Target>(
     evaluation: &mut Evaluation,
-    analysis: &StructuralAnalysis<Policy, Target>,
+    (analysis, observer): (&StructuralAnalysis<Policy, Target>, &Observer<'_, '_>),
     facts: &Facts,
     measured: &Admitted<()>,
-) -> Result<(), EvaluationInvariant> {
+) -> Result<(), StructuralInvariant> {
     let mut paths: BTreeMap<Option<FieldPathId>, Arc<[Box<str>]>> = BTreeMap::new();
     let mut scopes: BTreeMap<ScopeId, Vec<EntryKey>> = BTreeMap::new();
     let mut typed: BTreeMap<CandidateId, Admitted<()>> = BTreeMap::new();
@@ -328,9 +361,11 @@ fn scope_levels<Policy, Target>(
             subject: Subject::Structural(subject),
             check,
         };
-        let result = evaluation.check(unit, prerequisite, |()| match candidate.outcome {
-            Outcome::Passed => Ok(()),
-            Outcome::Failed => rejected(true, code),
+        let observed = (candidate.outcome == Outcome::Failed)
+            .then(|| observer.candidate(facts, candidate))
+            .transpose()?;
+        let result = evaluation.check_found(unit, prerequisite, |()| match candidate.outcome {
+            Outcome::Passed | Outcome::Failed => found(observed, code),
             // The value's failed type check is what it needs.
             Outcome::Excluded => unreachable!("an excluded value's type check failed"),
         })?;
@@ -408,17 +443,183 @@ fn field_subject(level: Level, keys: &[EntryKey], field: Field) -> StructuralSub
     }
 }
 
-/// A structural check's result: `code` when the analysis found its failure.
-/// The code's field is the path the unit names.
-const fn rejected(failed: bool, code: Code) -> Result<(), Blocking> {
-    if failed {
-        Err(Blocking {
+/// A structural check's result: `code`, observed through `observed`, when
+/// the analysis found its failure there. The code's field is the path the
+/// unit names.
+fn found(observed: Option<Observation>, code: Code) -> Result<(), Found> {
+    observed.map_or(Ok(()), |observation| {
+        let blocking = Blocking {
             code,
             reason: None,
             details: None,
+        };
+        Err(Found::observed(blocking, observation))
+    })
+}
+
+/// Where Phase 2 observes what it finds: Materialized Value Evidence in the
+/// file Phase 1 read, at the Portable Value Locator of what a check looked at
+/// and the span of its token (D15:790). A value's locator is its internal
+/// path from the root, each member classified, so an unsafe name is never
+/// retained; every value's parent is found once, when a Finding first needs
+/// one.
+struct Observer<'f, 'd> {
+    file: &'f EntryFile<'f>,
+    document: &'d MaterializedDocument,
+    parents: OnceCell<BTreeMap<NodeId, (NodeId, Edge<'d>)>>,
+}
+
+impl<'f, 'd> Observer<'f, 'd> {
+    fn new(file: &'f EntryFile<'f>, document: &'d MaterializedDocument) -> Self {
+        Self {
+            file,
+            document,
+            parents: OnceCell::new(),
+        }
+    }
+
+    /// Each value's parent and the edge from it: a member's name or an
+    /// element's index.
+    fn parents(&self) -> &BTreeMap<NodeId, (NodeId, Edge<'d>)> {
+        self.parents.get_or_init(|| {
+            let mut parents = BTreeMap::new();
+            let mut pending = vec![self.document.root()];
+            while let Some(node) = pending.pop() {
+                match self.document.node(node).kind() {
+                    NodeKind::Object(members) => {
+                        for (name, member) in members {
+                            parents.insert(member.value(), (node, Edge::Member(name.as_str())));
+                            pending.push(member.value());
+                        }
+                    }
+                    NodeKind::Array(items) => {
+                        for (index, &item) in (0u64..).zip(items) {
+                            parents.insert(item, (node, Edge::Index(index)));
+                            pending.push(item);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            parents
         })
-    } else {
-        Ok(())
+    }
+
+    /// The internal path from the root to `node`.
+    fn path(&self, node: NodeId) -> Vec<Edge<'d>> {
+        let parents = self.parents();
+        let mut edges = Vec::new();
+        let mut next = node;
+        while let Some(&(parent, edge)) = parents.get(&next) {
+            edges.push(edge);
+            next = parent;
+        }
+        edges.reverse();
+        edges
+    }
+
+    /// The name of the member of `object` that `matches` picks.
+    fn member(&self, object: NodeId, matches: impl Fn(&ObjectMember) -> bool) -> &'d str {
+        let NodeKind::Object(members) = self.document.node(object).kind() else {
+            unreachable!("a member's holder is an object")
+        };
+        members
+            .iter()
+            .find(|(_, member)| matches(member))
+            .map(|(name, _)| name.as_str())
+            .expect("the member is one of its object's")
+    }
+
+    /// What a check observed at `edges`, at the token `span`.
+    fn observation(
+        &self,
+        edges: &[Edge<'_>],
+        span: ByteSpan,
+    ) -> Result<Observation, StructuralInvariant> {
+        let steps = (self.file.classify)(edges);
+        let span = SourceSpan::admit(span.start_byte(), span.end_byte(), &self.file.bytes);
+        let primary = EvidenceProjection::configuration_value(
+            SafeOriginKind::ConfigurationFile,
+            self.file.source,
+            &steps,
+            span,
+        )
+        .map_err(StructuralInvariant::Evidence)?;
+        Ok(Observation {
+            primary,
+            related: Vec::new(),
+        })
+    }
+
+    /// The root, at its token.
+    fn root(&self) -> Result<Observation, StructuralInvariant> {
+        let root = self.document.root();
+        self.observation(&[], self.document.node(root).span())
+    }
+
+    /// The root's `schemaVersion` member: at its value's token, or at the
+    /// root's when it is missing (D15:790).
+    fn version(&self) -> Result<Observation, StructuralInvariant> {
+        let root = self.document.root();
+        let span = match self.document.node(root).kind() {
+            NodeKind::Object(members) => members.get("schemaVersion").map_or_else(
+                || self.document.node(root).span(),
+                |member| self.document.node(member.value()).span(),
+            ),
+            _ => self.document.node(root).span(),
+        };
+        self.observation(&[Edge::Member("schemaVersion")], span)
+    }
+
+    /// The analysis's measure at the root, beside the capability's bound
+    /// (D15:836, 1887).
+    fn capability(&self) -> Result<Observation, StructuralInvariant> {
+        let bound = ComponentPath::capability(CapabilityBound::PolicyComparable(UNITS))
+            .map_err(StructuralInvariant::Component)?;
+        let mut observation = self.root()?;
+        observation
+            .related
+            .push(EvidenceProjection::resolver_input(bound));
+        Ok(observation)
+    }
+
+    /// What `candidate` looked at: its value at the value's token; a missing
+    /// member at the object that lacks it, followed by the member's
+    /// schema-defined name; an undeclared member, or an entry's key, at the
+    /// key's token (D15:790).
+    fn candidate(
+        &self,
+        facts: &Facts,
+        candidate: &Candidate,
+    ) -> Result<Observation, StructuralInvariant> {
+        match candidate.at {
+            At::Value(node) => self.observation(&self.path(node), self.document.node(node).span()),
+            At::Missing { object } => {
+                let steps = facts.steps(candidate.path);
+                let name = steps.last().expect("a missing member's path names it");
+                let mut edges: Vec<Edge<'_>> = self.path(object);
+                edges.push(Edge::Member(name.name()));
+                self.observation(&edges, self.document.node(object).span())
+            }
+            At::Member { object, key } => {
+                let mut edges = self.path(object);
+                edges.push(Edge::Member(
+                    self.member(object, |member| member.key_span() == key),
+                ));
+                self.observation(&edges, key)
+            }
+            At::Key(scope) => {
+                let entry = facts
+                    .scope(scope)
+                    .entry
+                    .expect("a key's scope is its entry's");
+                let mut edges = self.path(entry.map);
+                edges.push(Edge::Member(
+                    self.member(entry.map, |member| member.value() == entry.value),
+                ));
+                self.observation(&edges, entry.key)
+            }
+        }
     }
 }
 
@@ -478,14 +679,21 @@ mod tests {
     use crate::input_limits::Bound;
     use crate::materialize::materialize_file;
     use crate::materialize_tests::limits;
+    use crate::resolver::capability::CapabilityBound;
     use crate::resolver::dependency::{unit as owner_of, SemanticGroup};
+    use crate::resolver::entry::fixtures::FileFixture;
     use crate::resolver::evaluation::{
         Actual, Admitted, Blocking, Causes, Check, Code, Details, Evaluation, EvaluationInvariant,
         IssueKey, LimitExceeded, Phase, Reason, Status, Subject, Unit,
     };
-    use crate::resolver::limits::{BoundId, Group};
+    use crate::resolver::evidence::Evidence;
+    use crate::resolver::evidence_component::ComponentPath;
+    use crate::resolver::evidence_token::EvidenceTokens;
+    use crate::resolver::limits::{fixture_limits, BoundId, Group};
+    use crate::resolver::occurrence::{occurrences, redacted, FindingOccurrence};
     use crate::resolver::specification::Slot;
     use crate::resolver::subject::SubjectKind;
+    use crate::resolver::token::{Sha256, Specification};
     use crate::structural::{AuthoringSchema, StructuralLimits};
 
     use super::{
@@ -527,10 +735,12 @@ mod tests {
         units: u64,
         project_profile: Admitted<()>,
     ) -> (Evaluation, Result<u64, Causes>) {
-        let bytes = serde_json::to_vec(value).unwrap();
-        let document = materialize_file(Arc::from(bytes), limits()).unwrap();
+        let bytes: Arc<[u8]> = Arc::from(serde_json::to_vec(value).unwrap());
+        let document = materialize_file(Arc::clone(&bytes), limits()).unwrap();
+        let fixture = FileFixture::new(&fixture_limits(100));
         let analysis = admit_structure(
             &mut evaluation,
+            &fixture.file(bytes),
             document,
             &Schema::for_model().unwrap(),
             structural(units),
@@ -1056,15 +1266,209 @@ mod tests {
         );
     }
 
+    const PROFILE: Specification<'static> = Specification {
+        identity: "intlify-project-profile",
+        revision: "0",
+    };
+
+    /// The Finding Occurrences of what Phase 2 found in `value` under `units`
+    /// analysis units, in 015's order, each checked against its Finding
+    /// Registry row, with the file's bytes.
+    fn observed(value: &Value, units: u64) -> (Vec<u8>, Vec<FindingOccurrence>) {
+        let (evaluation, _) = admitted(value, units);
+        let candidates = evaluation.occurrence_candidates();
+        let tokens = EvidenceTokens::assign(PROFILE, redacted(candidates), &Sha256);
+        let occurrences = occurrences(candidates, PROFILE, &tokens).unwrap();
+        (serde_json::to_vec(value).unwrap(), occurrences)
+    }
+
+    /// Where `evidence` locates its value, and its span.
+    fn located(evidence: &Evidence) -> (Value, Value) {
+        let view = evidence.view();
+        (view["value"].clone(), view["span"].clone())
+    }
+
+    /// The view of the span `text` occupies in `source`, at its first
+    /// occurrence.
+    fn span(source: &[u8], text: &[u8]) -> Value {
+        let start = source
+            .windows(text.len())
+            .position(|window| window == text)
+            .unwrap();
+        json!({ "start": start.to_string(), "end": (start + text.len()).to_string() })
+    }
+
+    /// The view of the whole of `source`, the root's span.
+    fn whole(source: &[u8]) -> Value {
+        json!({ "start": "0", "end": source.len().to_string() })
+    }
+
+    /// Whether `value` is a redacted logical path whose segments are the safe
+    /// members `safe`, a redacted member at each `None`.
+    fn redacted_path(value: &Value, safe: &[Option<&str>]) -> bool {
+        let Some(segments) = value["redacted-logical-path"].as_array() else {
+            return false;
+        };
+        segments.len() == safe.len()
+            && segments.iter().zip(safe).all(|(segment, safe)| match safe {
+                Some(name) => *segment == json!({ "safe-member": name }),
+                None => segment.get("redacted-member").is_some(),
+            })
+    }
+
+    /// Each structural Finding is observed where its check looked: a value at
+    /// its token, a missing member at the object that lacks it followed by
+    /// the member's name, an undeclared member and a malformed key at the
+    /// key's token, redacted (D15:790).
+    #[test]
+    fn each_structural_finding_is_observed_where_its_check_looked() {
+        let mut typed = minimal_config();
+        typed["profiles"] = json!([]);
+        let (source, found) = observed(&typed, 1_000_000);
+        assert_eq!(found.len(), 1);
+        assert_eq!(
+            located(found[0].primary()),
+            (
+                json!({ "exact-json-pointer": "/profiles" }),
+                span(&source, b"[]")
+            )
+        );
+        let mut missing = minimal_config();
+        missing.as_object_mut().unwrap().remove("profiles");
+        let (source, found) = observed(&missing, 1_000_000);
+        assert_eq!(
+            located(found[0].primary()),
+            (json!({ "exact-json-pointer": "/profiles" }), whole(&source))
+        );
+        // A member missing from an entry, at the entry's object.
+        let mut nested = minimal_config();
+        nested["profiles"]["app"]
+            .as_object_mut()
+            .unwrap()
+            .remove("projectId");
+        let (source, found) = observed(&nested, 1_000_000);
+        let declaration = serde_json::to_vec(&nested["profiles"]["app"]).unwrap();
+        assert_eq!(
+            located(found[0].primary()),
+            (
+                json!({ "exact-json-pointer": "/profiles/app/projectId" }),
+                span(&source, &declaration)
+            )
+        );
+        let mut undeclared = minimal_config();
+        undeclared["extra"] = json!(true);
+        let (source, found) = observed(&undeclared, 1_000_000);
+        let (path, at) = located(found[0].primary());
+        assert!(redacted_path(&path, &[None]), "{path}");
+        assert_eq!(at, span(&source, br#""extra""#));
+        let mut elements = minimal_config();
+        elements["profiles"]["app"]["requestedLocales"] = json!(["en", 7]);
+        let (source, found) = observed(&elements, 1_000_000);
+        assert_eq!(
+            located(found[0].primary()),
+            (
+                json!({ "exact-json-pointer": "/profiles/app/requestedLocales/1" }),
+                span(&source, b"7")
+            )
+        );
+        assert!(found
+            .iter()
+            .all(|occurrence| occurrence.related().is_empty()));
+    }
+
+    /// A key without the identifier syntax is observed redacted at its token,
+    /// and the fields of its entry under their schema-defined names, which
+    /// structural admission evaluates there (D15:790, 2184).
+    #[test]
+    fn a_malformed_key_is_redacted_and_the_names_under_it_are_kept() {
+        let mut value = minimal_config();
+        let mut declaration = value["profiles"]["app"].clone();
+        declaration["requestedLocales"] = json!("only");
+        // After the admitted `app` in the map's order.
+        value["profiles"]["app key"] = declaration;
+        let (source, found) = observed(&value, 1_000_000);
+        let views: Vec<(Value, Value)> = found
+            .iter()
+            .map(|occurrence| located(occurrence.primary()))
+            .collect();
+        assert_eq!(views.len(), 2);
+        assert!(
+            redacted_path(&views[0].0, &[Some("profiles"), None]),
+            "{}",
+            views[0].0
+        );
+        assert_eq!(views[0].1, span(&source, br#""app key""#));
+        assert!(
+            redacted_path(
+                &views[1].0,
+                &[Some("profiles"), None, Some("requestedLocales")]
+            ),
+            "{}",
+            views[1].0
+        );
+        assert_eq!(views[1].1, span(&source, br#""only""#));
+    }
+
+    /// The schema selection observes the root, or its `schemaVersion` member
+    /// where its check reads it, and the analysis's measure the root beside
+    /// the capability's bound (D15:790, 836).
+    #[test]
+    fn the_selection_and_the_measure_are_observed_at_the_root() {
+        let (source, found) = observed(&json!([]), 1_000_000);
+        assert_eq!(
+            located(found[0].primary()),
+            (json!({ "exact-json-pointer": "" }), whole(&source))
+        );
+        let mut missing = minimal_config();
+        missing.as_object_mut().unwrap().remove("schemaVersion");
+        let (source, found) = observed(&missing, 1_000_000);
+        assert_eq!(
+            located(found[0].primary()),
+            (
+                json!({ "exact-json-pointer": "/schemaVersion" }),
+                whole(&source)
+            )
+        );
+        let mut number = minimal_config();
+        number["schemaVersion"] = json!(10);
+        let (source, found) = observed(&number, 1_000_000);
+        assert_eq!(
+            located(found[0].primary()),
+            (
+                json!({ "exact-json-pointer": "/schemaVersion" }),
+                span(&source, b"10")
+            )
+        );
+        let (_, count) = admitted(&minimal_config(), 1_000_000);
+        let (source, found) = observed(&minimal_config(), count.unwrap() - 1);
+        assert_eq!(
+            located(found[0].primary()),
+            (json!({ "exact-json-pointer": "" }), whole(&source))
+        );
+        let tokens = EvidenceTokens::assign(PROFILE, redacted(&[]), &Sha256);
+        let bound = crate::resolver::evidence::EvidenceProjection::resolver_input(
+            ComponentPath::capability(CapabilityBound::PolicyComparable(BoundId {
+                group: Group::ConfigurationInput,
+                name: "maxStructuralAnalysisUnits",
+            }))
+            .unwrap(),
+        )
+        .retained(PROFILE, &tokens)
+        .unwrap();
+        assert_eq!(found[0].related(), [bound]);
+    }
+
     #[test]
     fn phase_2_records_its_units_once() {
         let bytes = serde_json::to_vec(&minimal_config()).unwrap();
         let schema = Schema::for_model().unwrap();
         let mut evaluation = Evaluation::default();
+        let fixture = FileFixture::new(&fixture_limits(100));
         for twice in [false, true] {
             let document = materialize_file(Arc::from(bytes.clone()), limits()).unwrap();
             let result = admit_structure(
                 &mut evaluation,
+                &fixture.file(Arc::from(bytes.clone())),
                 document,
                 &schema,
                 structural(1_000_000),

@@ -1379,7 +1379,11 @@ impl Evaluation {
     fn observes(&self, unit: &Unit, observed: bool) {
         // The phases whose Findings carry occurrence Evidence so far; the
         // others gain theirs phase by phase (plan 025 PRs 5f).
-        const OBSERVED: [Phase; 2] = [Phase::ResolverBootstrapAdmission, Phase::EntryAdmission];
+        const OBSERVED: [Phase; 3] = [
+            Phase::ResolverBootstrapAdmission,
+            Phase::EntryAdmission,
+            Phase::StructuralAdmission,
+        ];
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
