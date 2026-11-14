@@ -14,7 +14,8 @@
 //! structural check (D15:2173), keyed by the identity map entry that scopes it
 //! and its logical field path from that entry (D15:2184). An `anyOf` is one
 //! closed-value evaluation of its value: what its branches evaluate records no
-//! candidate.
+//! candidate. The value of an entry whose key lacks the identifier syntax is
+//! evaluated as well, under that entry (D15:2184, 2190).
 
 use crate::input_limits::Bound;
 use crate::materialize::{ByteSpan, MaterializedDocument, NodeId, NodeKind, ObjectMember};
@@ -560,9 +561,13 @@ impl<'input> Walker<'input> {
                             None,
                         );
                         admitted = false;
-                        if schema.identity_values.is_some() {
-                            // A key without the identifier syntax.
-                            self.entry(position, level, subject, member, false);
+                        if let Some(child) = schema.identity_values {
+                            // A key without the identifier syntax still
+                            // scopes its value, which structural admission
+                            // evaluates, while later phases have no subject
+                            // for the entry (D15:2184, 2190).
+                            let entry = self.entry(position, level, subject, member, false);
+                            self.walk(child, member.value(), entry)?;
                         } else {
                             self.record(
                                 Check::Known,
