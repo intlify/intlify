@@ -112,6 +112,8 @@ pub(crate) fn projected(subject: &Subject) -> Value {
 pub(crate) fn logical(subject: &Subject) -> Subject {
     match subject {
         Subject::Slot(_)
+        | Subject::EntryDependencies
+        | Subject::CompleteInput
         | Subject::Vocabulary
         | Subject::CanonicalizationData
         | Subject::DeclarationField(_)
@@ -372,6 +374,8 @@ fn own(subject: &Subject) -> (Own, Option<Subject>) {
     let alone = |own| (own, None);
     match subject {
         Subject::Slot(_)
+        | Subject::EntryDependencies
+        | Subject::CompleteInput
         | Subject::Vocabulary
         | Subject::CanonicalizationData
         | Subject::SemanticDependency(_) => alone(Own::Singleton),
@@ -708,7 +712,12 @@ mod tests {
             ]
         };
         let mut subjects: Vec<Subject> = Slot::ALL.into_iter().map(Subject::Slot).collect();
-        subjects.extend([Subject::Vocabulary, Subject::CanonicalizationData]);
+        subjects.extend([
+            Subject::EntryDependencies,
+            Subject::CompleteInput,
+            Subject::Vocabulary,
+            Subject::CanonicalizationData,
+        ]);
         subjects.extend(
             artifact(tuple(1))
                 .into_iter()
@@ -892,6 +901,8 @@ mod tests {
                 Subject::Slot(Slot::ProjectProfile),
                 json!("project-profile-slot"),
             ),
+            (Subject::EntryDependencies, json!("entry-dependencies")),
+            (Subject::CompleteInput, json!("complete-input")),
             (Subject::Vocabulary, json!("vocabulary")),
             (
                 Subject::CanonicalizationData,

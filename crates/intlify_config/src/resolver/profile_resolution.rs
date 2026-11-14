@@ -4,16 +4,17 @@
 //! 015's Semantic Profile Resolver over one invocation: Phases 4 to 13 of the
 //! Deterministic Resolution Algorithm, in 015's order, over one evaluation in
 //! which Phase 0 ran before configuration entry, so that its Finding and
-//! status remain whatever entry finds (D15:2145). Each phase takes the values
-//! the earlier ones admitted, or the
-//! causes of their absence, and evaluates every check whose prerequisites were
-//! admitted, so a blocking result leaves only the checks that depend on it not
-//! evaluated. Once the phases that establish a semantic group have run, the
+//! status remain whatever entry finds (D15:2145), and Phase 1 then admitted
+//! the complete input ([`super::entry`]); without its value there is no Shared
+//! projection, and these phases do not run (D15:2369). Each phase takes the
+//! values the earlier ones admitted, or the causes of their absence, and
+//! evaluates every check whose prerequisites were admitted, so a blocking
+//! result leaves only the checks that depend on it not evaluated. Once the phases that establish a semantic group have run, the
 //! entry records the unit that owns the group's semantic dependency, which
 //! waits on what they established (D15:2516). The `profileSpecification`
 //! group's owner is a unit of Phase 2 that waits on Phase 0 alone.
 //!
-//! Phases 1 to 3 record no other units yet, so the entry starts from their
+//! Phases 2 and 3 record no other units yet, so the entry starts from their
 //! complete results: a configuration structural admission admitted whole, and
 //! the declaration Phase 3 provisionally selected in it. What the entry
 //! returns is crate-private semantic state, not a `LocalizationProjectProfile`,
@@ -37,6 +38,7 @@ use super::artifact_resolution::{admit_collection, ArtifactSet};
 use super::coverage::{resolve_coverage, CoveragePolicy};
 use super::delivery::{resolve_delivery, DeliveryPolicy};
 use super::dependency::{own, SemanticGroup, OPTIONAL_POLICIES, REQUIRED_POLICIES};
+use super::entry::EntryInvariant;
 use super::evaluation::{and, Admitted, Causes, Evaluation, EvaluationInvariant};
 use super::exact_resolution::{resolve_fields, ArtifactBindings, ResolvedReferences};
 use super::fallback::{resolve_fallback, MessageFallbackPolicy};
@@ -181,6 +183,17 @@ pub(crate) enum ResolverInvariant {
     Selection(SelectionInvariant),
     /// The provider failed in a way 015 never reports to an author.
     Canonicalization(CanonicalizationFailure),
+    /// Phase 1 found a defect of strict file entry itself.
+    Entry(EntryInvariant),
+}
+
+impl From<EntryInvariant> for ResolverInvariant {
+    fn from(invariant: EntryInvariant) -> Self {
+        match invariant {
+            EntryInvariant::Evaluation(invariant) => Self::Evaluation(invariant),
+            invariant => Self::Entry(invariant),
+        }
+    }
 }
 
 impl From<EvaluationInvariant> for ResolverInvariant {
@@ -449,6 +462,7 @@ pub(super) mod tests {
     use crate::profile_fixtures::complete_config;
     use crate::resolver::delivery::PlacementMode;
     use crate::resolver::dependency::{self, SemanticGroup};
+    use crate::resolver::entry::{admit_entry, OWNER};
     use crate::resolver::evaluation::{
         Check, Code, IssueKey, Phase, Reason, Status, Subject, Unit,
     };
@@ -630,17 +644,24 @@ pub(super) mod tests {
         }
     }
 
-    /// Phases 1 and 2 over `config` under the capability's
-    /// `configurationInput`.
-    fn analyze(config: &Value, capability: &ResolutionLimits) -> Analysis {
-        let input = InputLimits {
+    /// The file `config` is submitted as, and the bounds strict file entry
+    /// reads it under.
+    fn entry_input(config: &Value, capability: &ResolutionLimits) -> (Arc<[u8]>, InputLimits) {
+        let limits = InputLimits {
             raw: RawInputLimits {
                 max_file_bytes: bound(1_000_000),
                 max_parser_tokens: bound(1_000_000),
             },
             value: capability.configuration_input.value,
         };
-        let doc = materialize_file(Arc::from(serde_json::to_vec(config).unwrap()), input).unwrap();
+        (Arc::from(serde_json::to_vec(config).unwrap()), limits)
+    }
+
+    /// Phases 1 and 2 over `config` under the capability's
+    /// `configurationInput`.
+    fn analyze(config: &Value, capability: &ResolutionLimits) -> Analysis {
+        let (source, input) = entry_input(config, capability);
+        let doc = materialize_file(source, input).unwrap();
         Schema::for_model()
             .unwrap()
             .analyze(Arc::new(doc), capability.configuration_input.structural)
@@ -877,7 +898,10 @@ pub(super) mod tests {
         /// invocation recorded and what it returned.
         fn attempt<R>(
             &self,
-            inspect: impl FnOnce(Evaluation, Result<SemanticState<'_, Id>, ResolverInvariant>) -> R,
+            inspect: impl FnOnce(
+                Evaluation,
+                Result<Option<SemanticState<'_, Id>>, ResolverInvariant>,
+            ) -> R,
         ) -> R {
             self.attempt_in(Evaluation::default(), inspect)
         }
@@ -888,12 +912,17 @@ pub(super) mod tests {
         fn attempt_in<R>(
             &self,
             mut evaluation: Evaluation,
-            inspect: impl FnOnce(Evaluation, Result<SemanticState<'_, Id>, ResolverInvariant>) -> R,
+            inspect: impl FnOnce(
+                Evaluation,
+                Result<Option<SemanticState<'_, Id>>, ResolverInvariant>,
+            ) -> R,
         ) -> R {
+            let entry = entry_input(&self.config, &self.capability);
             self.prepared(|configuration, invocation| {
                 let mut set = None;
-                let state = invoke(
+                let state = invoke_entry(
                     &mut evaluation,
+                    entry,
                     configuration,
                     invocation,
                     FixtureProvider::new(),
@@ -920,7 +949,10 @@ pub(super) mod tests {
             &self,
             inspect: impl FnOnce(Evaluation, SemanticState<'_, Id>) -> R,
         ) -> R {
-            self.attempt(|evaluation, state| inspect(evaluation, state.unwrap()))
+            self.attempt(|evaluation, state| {
+                let state = state.unwrap().expect("entry admits the file");
+                inspect(evaluation, state)
+            })
         }
 
         /// Phase 14 over the entry's semantic state, for `inspect` with what
@@ -929,17 +961,20 @@ pub(super) mod tests {
             &self,
             inspect: impl FnOnce(Evaluation, Admitted<ProfileView>) -> R,
         ) -> R {
+            let entry = entry_input(&self.config, &self.capability);
             self.prepared(|configuration, invocation| {
                 let mut evaluation = Evaluation::default();
                 let mut set = None;
-                let state = invoke(
+                let state = invoke_entry(
                     &mut evaluation,
+                    entry,
                     configuration,
                     invocation,
                     FixtureProvider::new(),
                     &mut set,
                 )
-                .unwrap();
+                .unwrap()
+                .expect("entry admits the file");
                 let view = project(&state, invocation.supported);
                 inspect(evaluation, view)
             })
@@ -977,6 +1012,40 @@ pub(super) mod tests {
             data,
             set,
         )
+    }
+
+    /// One invocation over `evaluation` from its entry: Phase 0, then Phase 1
+    /// over the file `source` under `limits`, which `configuration` was
+    /// prepared from, and the semantic phases over `configuration` when
+    /// Phase 1 admits the file. When it does not, there is no Shared
+    /// projection, and so no semantic state.
+    fn invoke_entry<'s, P, D>(
+        evaluation: &mut Evaluation,
+        (source, limits): (Arc<[u8]>, InputLimits),
+        configuration: &CompleteConfiguration<'_>,
+        invocation: &Invocation<'s, P::Identity>,
+        data: D,
+        set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
+    ) -> Result<Option<SemanticState<'s, P::Identity>>, ResolverInvariant>
+    where
+        P: Provider,
+        P::Identity: AsRef<str>,
+        D: FormalData<Provider = P>,
+    {
+        let project_profile =
+            admit_project_profile(evaluation, invocation.supported, invocation.specifications)?;
+        if admit_entry(evaluation, source, limits)?.is_err() {
+            return Ok(None);
+        }
+        resolve_profile(
+            evaluation,
+            &project_profile,
+            configuration,
+            invocation,
+            data,
+            set,
+        )
+        .map(Some)
     }
 
     /// The check ID of the Check Registry row a unit belongs to.
@@ -1138,6 +1207,59 @@ pub(super) mod tests {
         (subjects, state)
     }
 
+    /// A defect Phase 1's evaluation finds is the evaluation's, as in every
+    /// other phase, and a defect of strict file entry is the entry's own.
+    #[test]
+    fn entry_keeps_evaluation_defects_apart_from_its_own() {
+        let inputs = Inputs::complete();
+        let (source, limits) = entry_input(&inputs.config, &inputs.capability);
+        let mut evaluation = Evaluation::default();
+        assert!(admit_entry(&mut evaluation, Arc::clone(&source), limits)
+            .unwrap()
+            .is_ok());
+        let Err(twice) = admit_entry(&mut evaluation, source, limits) else {
+            panic!("Phase 1 records its units once");
+        };
+        assert_eq!(
+            ResolverInvariant::from(twice),
+            ResolverInvariant::Evaluation(EvaluationInvariant::UnitRecordedTwice(OWNER))
+        );
+        assert_eq!(
+            ResolverInvariant::from(EntryInvariant::UnreportedFailure),
+            ResolverInvariant::Entry(EntryInvariant::UnreportedFailure)
+        );
+    }
+
+    /// When strict file entry admits no value there is no Shared projection,
+    /// so no unit after Phase 1 is recorded, while Phase 0 and Phase 1 keep
+    /// their statuses and Findings (D15:2145, 2369).
+    #[test]
+    fn without_an_entered_value_no_unit_after_entry_is_recorded() {
+        let inputs = Inputs::complete();
+        let (_, limits) = entry_input(&inputs.config, &inputs.capability);
+        inputs.prepared(|configuration, invocation| {
+            let mut evaluation = Evaluation::default();
+            let mut set = None;
+            let state = invoke_entry(
+                &mut evaluation,
+                (Arc::from(&br#"{"schemaVersion":"#[..]), limits),
+                configuration,
+                invocation,
+                FixtureProvider::new(),
+                &mut set,
+            );
+            assert!(matches!(state, Ok(None)));
+            let phases: BTreeSet<Phase> =
+                evaluation.statuses().map(|(unit, _)| unit.phase).collect();
+            assert_eq!(
+                phases,
+                BTreeSet::from([Phase::ResolverBootstrapAdmission, Phase::EntryAdmission])
+            );
+            let codes: Vec<Code> = evaluation.issues().map(IssueKey::code).collect();
+            assert_eq!(codes, [Code::JsonInvalid]);
+        });
+    }
+
     #[test]
     fn every_phase_admits_a_complete_invocation() {
         let inputs = Inputs::complete();
@@ -1147,12 +1269,19 @@ pub(super) mod tests {
             assert!(evaluation
                 .statuses()
                 .all(|(_, status)| *status == Status::Evaluated));
-            // Phase 2 records only the `profileSpecification` group's owner.
+            // Phase 1 records its owner and the complete input's ten checks
+            // (D15:1876, 2129, 2516), and Phase 2 only the
+            // `profileSpecification` group's owner.
             let phases: BTreeSet<Phase> =
                 evaluation.statuses().map(|(unit, _)| unit.phase).collect();
             let mut ran = BTreeSet::from(PHASES);
-            ran.insert(Phase::StructuralAdmission);
+            ran.extend([Phase::EntryAdmission, Phase::StructuralAdmission]);
             assert_eq!(phases, ran);
+            let entry = evaluation
+                .statuses()
+                .filter(|(unit, _)| unit.phase == Phase::EntryAdmission)
+                .count();
+            assert_eq!(entry, 11);
             assert_eq!(unestablished(&evaluation), []);
             let project = state.locales.project.as_ref().unwrap();
             assert_eq!(spellings(project.requested().as_slice()), ["en", "ja"]);
@@ -1278,11 +1407,12 @@ pub(super) mod tests {
             let complete = inputs.resolve(|evaluation, _| candidates(&evaluation));
             assert!(complete.values().all(|status| *status == Status::Evaluated));
             for blocked in complete.keys() {
-                let after = inputs.attempt_in(
+                let (after, shared) = inputs.attempt_in(
                     Evaluation::blocking(blocked.clone()),
                     |evaluation, state| {
-                        assert!(state.is_ok(), "{blocked:?}");
-                        candidates(&evaluation)
+                        let state =
+                            state.unwrap_or_else(|invariant| panic!("{blocked:?}: {invariant:?}"));
+                        (candidates(&evaluation), state.is_some())
                     },
                 );
                 let logical = blocked.logical();
@@ -1294,6 +1424,11 @@ pub(super) mod tests {
                     }
                 }
                 for unit in complete.keys().filter(|unit| !after.contains_key(unit)) {
+                    // Without a value from entry admission there is no Shared
+                    // projection, whose units no prerequisite names yet.
+                    if !shared && unit.phase > Phase::EntryAdmission {
+                        continue;
+                    }
                     waits.insert((row_of(unit), row_of(blocked)));
                 }
             }
