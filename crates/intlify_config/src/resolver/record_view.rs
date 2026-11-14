@@ -42,7 +42,7 @@ use crate::input_limits::Bound;
 
 use super::capability::CapabilityBound;
 use super::evaluation::{
-    Actual, Details, Evaluation, Finding, IssueKey, Status, Subject, Suggestion, Unit,
+    Actual, Check, Details, Evaluation, Finding, IssueKey, Status, Subject, Suggestion, Unit,
 };
 use super::specification::Slot;
 use super::token::{Digest, Specification, Tokens};
@@ -287,13 +287,13 @@ fn details(finding: &Finding<'_>) -> Result<Option<Value>, ViewInvariant> {
 
 /// The value of `member` in `finding`'s details, from its key or from the
 /// bound the result carries, or none when the finding has none. A count is
-/// its decimal string. A structural code's field arrives with the structural
-/// Findings (plan 025 PR 5f-2), so no result here has one.
+/// its decimal string, and a field its path from its key (D15:2231).
 fn member_value(finding: &Finding<'_>, member: DetailsMember) -> Option<Value> {
     use DetailsMember as M;
     let key = finding.key;
     let subject = &key.unit().subject;
     let value = match (member, finding.details) {
+        (M::Field, _) => return field(key.unit()),
         (M::Reason, _) => key.reason()?.as_str().to_owned(),
         (M::Slot, _) => match subject {
             Subject::Slot(slot) => slot.name().to_owned(),
@@ -335,6 +335,20 @@ fn member_value(finding: &Finding<'_>, member: DetailsMember) -> Option<Value> {
         _ => return None,
     };
     Some(Value::String(value))
+}
+
+/// The schema-relative path of the field `unit` checks, as an array of the
+/// schema's member names (D15:2231): the root that the schema selection finds
+/// an object, and its `schemaVersion` member (D15:2291, 2292). The scope
+/// levels' fields come with their units (plan 025 PR 5f-2d).
+fn field(unit: &Unit) -> Option<Value> {
+    match (&unit.subject, unit.check) {
+        (Subject::SchemaSelection, Check::ObjectRoot) => Some(json!([])),
+        (Subject::SchemaSelection, Check::PresentSchemaVersion | Check::StringSchemaVersion) => {
+            Some(json!(["schemaVersion"]))
+        }
+        _ => None,
+    }
 }
 
 /// The bound's value and the measured total of a result past a bound.
@@ -919,10 +933,46 @@ mod tests {
         );
     }
 
+    /// A schema selection Finding's field is the path its check reads: the
+    /// root it finds no object, or the root's `schemaVersion` member
+    /// (D15:2291, 2292).
+    #[test]
+    fn a_schema_selection_findings_field_is_the_path_its_check_reads() {
+        use crate::resolver::structural_admission::selection;
+        let mut evaluation = Evaluation::default();
+        for (check, code) in [
+            (Check::ObjectRoot, Code::FieldTypeInvalid),
+            (Check::PresentSchemaVersion, Code::RequiredFieldMissing),
+            (Check::StringSchemaVersion, Code::FieldTypeInvalid),
+            (
+                Check::SupportedSchemaVersion,
+                Code::SchemaVersionUnsupported,
+            ),
+        ] {
+            block(&mut evaluation, selection(check), code, None).unwrap_err();
+        }
+        let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
+        let details: Vec<Option<Value>> = views
+            .findings(&evaluation)
+            .unwrap()
+            .into_iter()
+            .map(|view| view.get("details").cloned())
+            .collect();
+        assert_eq!(
+            details,
+            [
+                Some(json!({ "field": [] })),
+                Some(json!({ "field": ["schemaVersion"] })),
+                Some(json!({ "field": ["schemaVersion"] })),
+                None,
+            ]
+        );
+    }
+
     #[test]
     fn a_finding_without_a_value_its_details_need_or_with_a_foreign_suggestion_has_no_view() {
         let mut evaluation = Evaluation::fabricated();
-        // A schema code's field arrives only with the structural Findings.
+        // A schema code over a subject that reads no field.
         block(
             &mut evaluation,
             vocabulary(),

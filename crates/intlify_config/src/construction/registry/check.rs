@@ -33,11 +33,17 @@
 //! input waits along the stages of strict file entry: the parser's tokens on
 //! the file's bytes, strict JSON on the tokens, duplicate members and the
 //! JSON-compatible domain on strict JSON, and the five root-value bounds on
-//! both. The kinds declared only list no prerequisite until their units
-//! exist, and no row of a later phase lists a check of entry admission,
-//! structural admission, or profile selection yet: without a value from entry
-//! admission there is no Shared projection (D15:2369), and the resolver starts
-//! from complete structural and selection results.
+//! both. Structural admission's schema selection waits along its checks, a
+//! `schemaVersion` member on an object root, its string on the member, and a
+//! supported schema on the string, and the analysis's measure on the
+//! supported schema (D15:2008, 2130). The kinds declared only list no
+//! prerequisite until their units exist. No row of a Shared phase lists a
+//! check of entry admission: without a value from entry admission there is no
+//! Shared projection, whose absence the entry's Findings explain, and the
+//! phase's first unit requires no check (D15:2369, 2516). No row of a later
+//! phase lists a check of structural admission or profile selection yet: the
+//! resolver starts from a configuration structural admission admitted whole
+//! and the declaration profile selection selected.
 //!
 //! A row's Finding codes are those its units may report, a notice included,
 //! in 015's table order: what the resolver's checks report, and for the kinds
@@ -120,7 +126,7 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:9f81e2259e9f6a6ae356bb53f78b2b12e74a7145dd8e597150b4fc191580d903";
+    "sha256:4372210264228b61162758d05c6bf3878089b4683a1ee6d48c43b125ccd199f0";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
@@ -1106,6 +1112,7 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
     match kind {
         K::ProjectProfileSlot
         | K::EntryDependencies
+        | K::MaterializedDependencies
         | K::CapabilityArtifacts
         | K::CapabilityPolicyArtifacts
         | K::CapabilityTargetProfileArtifacts
@@ -1116,6 +1123,18 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         | K::CapabilityTargetProfileReference
         | K::CapabilityReferenceBytes => &[NONE],
         K::ProfileSpecificationDependency => &[&["specification.project-profile.supported"]],
+        // The selection's checks wait on the one before them: a `schemaVersion`
+        // member of an object root, then its string (D15:2130, 2149). The
+        // analysis is measured under the schema the selection names (D15:2008).
+        K::ConfigurationSchemaSelection => &[
+            NONE,
+            &["structural.schema-selection.object-root"],
+            &["structural.schema-selection.present-schema-version"],
+            &["structural.schema-selection.string-schema-version"],
+        ],
+        K::CapabilityStructuralAnalysis => {
+            &[&["structural.schema-selection.supported-schema-version"]]
+        }
         // The parser's tokens wait on the file's bytes and strict JSON on the
         // tokens; duplicate members and the JSON-compatible domain need a
         // syntactically parsed file, and the root-value bounds measure the
@@ -1427,20 +1446,15 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
             "hydration.target.single-role",
         ]],
         // Declared only: their units come with their phases' Findings.
-        K::MaterializedDependencies
-        | K::CapabilityStructuralAnalysis
-        | K::ProfileKey
+        K::ProfileKey
         | K::TargetProfileKey
         | K::DeploymentGroupKey
         | K::CapabilityProfiles
         | K::CapabilityProfileId
         | K::DiagnosticDomain => &[NOT_YET],
-        K::ConfigurationSchemaSelection
-        | K::RootField
-        | K::ProfileField
-        | K::TargetField
-        | K::GroupField
-        | K::ProfileSelector => &[NOT_YET; 4],
+        K::RootField | K::ProfileField | K::TargetField | K::GroupField | K::ProfileSelector => {
+            &[NOT_YET; 4]
+        }
     }
 }
 
@@ -2601,7 +2615,7 @@ mod tests {
             .filter(|row| row.subject_kind.declared_only())
             .map(|row| row.check_id.as_str())
             .collect();
-        assert_eq!(declared.len(), 32);
+        assert_eq!(declared.len(), 26);
         for row in &rows {
             if row.subject_kind.declared_only() {
                 assert!(row.prerequisite_check_ids.is_empty(), "{}", row.check_id);

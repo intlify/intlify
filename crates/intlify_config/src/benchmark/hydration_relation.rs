@@ -330,6 +330,9 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         Subject::Slot(_)
         | Subject::EntryDependencies
         | Subject::CompleteInput
+        | Subject::MaterializedDependencies
+        | Subject::SchemaSelection
+        | Subject::StructuralCapability
         | Subject::Vocabulary
         | Subject::CanonicalizationData
         | Subject::ResourcePolicy(_)
@@ -460,6 +463,9 @@ fn causes(frame: &mut Frame, causes: &Causes) -> Result<(), OutputFailure> {
             Subject::Slot(_)
             | Subject::EntryDependencies
             | Subject::CompleteInput
+            | Subject::MaterializedDependencies
+            | Subject::SchemaSelection
+            | Subject::StructuralCapability
             | Subject::Vocabulary
             | Subject::CanonicalizationData
             | Subject::ResourcePolicy(_)

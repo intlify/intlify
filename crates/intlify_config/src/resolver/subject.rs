@@ -730,17 +730,13 @@ impl SubjectKind {
     }
 
     /// Whether the kind is declared for the Check Registry while the resolver
-    /// records no unit of it yet: entry admission, structural admission, and
+    /// records no unit of it yet: structural admission's scope levels and
     /// profile selection build their units with their Findings, and reporting
-    /// finalization with the outcome. Of these phases, only the owner of the
-    /// `profileSpecification` group, which waits on Phase 0 alone, is recorded.
+    /// finalization with the outcome.
     pub(crate) const fn declared_only(self) -> bool {
         matches!(
             self,
-            Self::MaterializedDependencies
-                | Self::ConfigurationSchemaSelection
-                | Self::CapabilityStructuralAnalysis
-                | Self::RootField
+            Self::RootField
                 | Self::ProfileKey
                 | Self::ProfileField
                 | Self::TargetProfileKey
@@ -796,6 +792,9 @@ impl Subject {
             },
             Self::EntryDependencies => SubjectKind::EntryDependencies,
             Self::CompleteInput => SubjectKind::CompleteInput,
+            Self::MaterializedDependencies => SubjectKind::MaterializedDependencies,
+            Self::SchemaSelection => SubjectKind::ConfigurationSchemaSelection,
+            Self::StructuralCapability => SubjectKind::CapabilityStructuralAnalysis,
             Self::Vocabulary => SubjectKind::Vocabulary,
             Self::CanonicalizationData => SubjectKind::CanonicalizationData,
             Self::ResourcePolicy(subject) => match subject {
@@ -954,6 +953,9 @@ impl Ord for Subject {
                 (Self::Hydration(own), Self::Hydration(theirs)) => own.cmp(theirs),
                 (Self::EntryDependencies, Self::EntryDependencies)
                 | (Self::CompleteInput, Self::CompleteInput)
+                | (Self::MaterializedDependencies, Self::MaterializedDependencies)
+                | (Self::SchemaSelection, Self::SchemaSelection)
+                | (Self::StructuralCapability, Self::StructuralCapability)
                 | (Self::Vocabulary, Self::Vocabulary)
                 | (Self::CanonicalizationData, Self::CanonicalizationData)
                 | (Self::DeliveryPlacement, Self::DeliveryPlacement)
@@ -1014,6 +1016,9 @@ mod tests {
             Subject::Slot(Slot::ProjectProfile),
             Subject::EntryDependencies,
             Subject::CompleteInput,
+            Subject::MaterializedDependencies,
+            Subject::SchemaSelection,
+            Subject::StructuralCapability,
             owner(SemanticGroup::ProfileSpecification),
             capability(ArtifactSubject::Artifacts),
             capability(ArtifactSubject::PolicyArtifacts),
@@ -1215,13 +1220,23 @@ mod tests {
         assert_eq!(SubjectKind::ConfigurationSchemaSelection.rank(), 1);
     }
 
+    /// The kinds declared only are structural admission's scope levels and
+    /// the kinds of profile selection and reporting finalization: Phase 2
+    /// records its owner, the schema selection, the analysis's measure, and
+    /// the `profileSpecification` group's owner.
     #[test]
-    fn the_kinds_declared_only_are_those_of_the_phases_without_units() {
+    fn the_kinds_declared_only_are_those_without_units_yet() {
         for kind in SubjectKind::ALL {
             let unrecorded = matches!(
                 kind.phase(),
                 Phase::StructuralAdmission | Phase::ProfileSelection | Phase::ReportingFinalization
-            ) && kind != SubjectKind::ProfileSpecificationDependency;
+            ) && !matches!(
+                kind,
+                SubjectKind::MaterializedDependencies
+                    | SubjectKind::ConfigurationSchemaSelection
+                    | SubjectKind::CapabilityStructuralAnalysis
+                    | SubjectKind::ProfileSpecificationDependency
+            );
             assert_eq!(kind.declared_only(), unrecorded, "{kind:?}");
         }
     }
@@ -1264,12 +1279,21 @@ mod tests {
         );
     }
 
-    /// The declared kinds in rank order, each with the checks 015 gives it.
+    /// The kinds of structural admission, but the `profileSpecification`
+    /// group's owner, and of profile selection and reporting finalization, in
+    /// rank order, each with the checks 015 gives it.
     #[test]
-    fn the_declared_kinds_run_the_checks_015_gives_them() {
+    fn the_structural_selection_and_reporting_kinds_run_the_checks_015_gives_them() {
         let declared: Vec<(SubjectKind, &[Check])> = SubjectKind::ALL
             .into_iter()
-            .filter(|kind| kind.declared_only())
+            .filter(|&kind| {
+                matches!(
+                    kind.phase(),
+                    Phase::StructuralAdmission
+                        | Phase::ProfileSelection
+                        | Phase::ReportingFinalization
+                ) && kind != SubjectKind::ProfileSpecificationDependency
+            })
             .map(|kind| (kind, kind.checks()))
             .collect();
         // Each scope level runs the four keyword classes (D15:2173).

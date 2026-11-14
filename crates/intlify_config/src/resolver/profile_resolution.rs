@@ -12,9 +12,11 @@
 //! result leaves only the checks that depend on it not evaluated. Once the phases that establish a semantic group have run, the
 //! entry records the unit that owns the group's semantic dependency, which
 //! waits on what they established (D15:2516). The `profileSpecification`
-//! group's owner is a unit of Phase 2 that waits on Phase 0 alone.
+//! group's owner is a unit of Phase 2, which [`super::structural_admission`]
+//! records.
 //!
-//! Phases 2 and 3 record no other units yet, so the entry starts from their
+//! Phase 2 records its scope levels' units, and Phase 3 its units, with their
+//! Findings later (plan 025 PR 5f-2d, 5f-3), so the entry starts from their
 //! complete results: a configuration structural admission admitted whole, and
 //! the declaration Phase 3 provisionally selected in it. What the entry
 //! returns is crate-private semantic state, not a `LocalizationProjectProfile`,
@@ -54,6 +56,7 @@ use super::resource_policy::{
 use super::specification::{
     admit_specifications, SpecificationInput, SpecificationSet, SupportedSpecifications,
 };
+use super::structural_admission::StructuralInvariant;
 use super::targets::{resolve_targets, ResolvedTargets};
 use super::vocabulary::SurfaceVocabulary;
 
@@ -185,6 +188,17 @@ pub(crate) enum ResolverInvariant {
     Canonicalization(CanonicalizationFailure),
     /// Phase 1 found a defect of strict file entry itself.
     Entry(EntryInvariant),
+    /// Phase 2 found a defect of structural admission itself.
+    Structural(StructuralInvariant),
+}
+
+impl From<StructuralInvariant> for ResolverInvariant {
+    fn from(invariant: StructuralInvariant) -> Self {
+        match invariant {
+            StructuralInvariant::Evaluation(invariant) => Self::Evaluation(invariant),
+            invariant => Self::Structural(invariant),
+        }
+    }
 }
 
 impl From<EntryInvariant> for ResolverInvariant {
@@ -242,13 +256,6 @@ where
 {
     let declaration = configuration.declaration;
     let declared = configuration.references();
-    // The assertion never selects semantics: only the owner of the group it
-    // establishes waits on Phase 0.
-    own(
-        evaluation,
-        SemanticGroup::ProfileSpecification,
-        held(project_profile.as_ref()),
-    )?;
     let policy = admit_resource_policy(
         evaluation,
         invocation.capability,
@@ -478,10 +485,11 @@ pub(super) mod tests {
     use crate::resolver::specification::{
         admit_project_profile, ActiveProfileSpecification, Slot, VocabularyAssertion, DATA,
     };
+    use crate::resolver::structural_admission::{admit_structure, selection, CAPABILITY};
     use crate::resolver::subject::SubjectKind;
     use crate::resolver::targets::{self, TargetSubject};
     use crate::structural::selection::{Selection, StringLengthFact};
-    use crate::structural::AuthoringSchema;
+    use crate::structural::{AuthoringSchema, StructuralLimits};
 
     type Id = &'static str;
     type Schema = AuthoringSchema<PolicyReference, TargetProfileReference>;
@@ -854,26 +862,37 @@ pub(super) mod tests {
             }
         }
 
-        /// Phases 1 to 3 over the configuration, selecting the declaration,
-        /// and the invocation's other inputs, for `run`.
+        /// The selector that names the declaration `selected`.
+        fn selector(&self) -> SelectorInput {
+            SelectorInput::string(
+                self.selected,
+                self.capability
+                    .configuration_input
+                    .structural
+                    .max_profile_id_bytes,
+            )
+        }
+
+        /// Phases 1 to 3 over the configuration outside any evaluation,
+        /// selecting the declaration, and the invocation's other inputs, for
+        /// `run`.
         fn prepared<R>(
             &self,
             run: impl FnOnce(&CompleteConfiguration<'_>, &Invocation<'_, Id>) -> R,
         ) -> R {
             let analysis = analyze(&self.config, &self.capability);
             let config = analysis.construct().unwrap().unwrap();
-            let selector = SelectorInput::string(
-                self.selected,
-                self.capability
-                    .configuration_input
-                    .structural
-                    .max_profile_id_bytes,
-            );
+            let selector = self.selector();
             let Ok(Selection::Selected(selection)) = analysis.select(&selector) else {
                 panic!("{} is not selected", self.selected);
             };
             let configuration =
                 CompleteConfiguration::new(&analysis, &config, &selector, &selection).unwrap();
+            self.invoked(|invocation| run(&configuration, invocation))
+        }
+
+        /// The invocation's inputs besides the configuration, for `run`.
+        fn invoked<R>(&self, run: impl FnOnce(&Invocation<'_, Id>) -> R) -> R {
             let supported = SupportedSpecifications::revision_zero(
                 ActiveProfileSpecification::fixture(ACTIVE),
                 Supported::new(vec![fixture_pins()]).unwrap(),
@@ -882,17 +901,14 @@ pub(super) mod tests {
             let collection = collection(&self.members);
             let vocabulary = formal_of(self.surfaces);
             let verification = VerificationInput::fixture_owned([self.pinned.clone()]);
-            run(
-                &configuration,
-                &Invocation {
-                    supported: &supported,
-                    specifications: &self.specifications,
-                    capability: &capability,
-                    verification: &verification,
-                    collection: &collection,
-                    vocabulary: &vocabulary,
-                },
-            )
+            run(&Invocation {
+                supported: &supported,
+                specifications: &self.specifications,
+                capability: &capability,
+                verification: &verification,
+                collection: &collection,
+                vocabulary: &vocabulary,
+            })
         }
 
         /// The entry over the prepared inputs; `inspect` reads what the
@@ -921,12 +937,13 @@ pub(super) mod tests {
             let (bytes, limits) = entry_input(&self.config, &self.capability);
             let fixture = FileFixture::new(&self.capability);
             let file = fixture.file(bytes);
-            self.prepared(|configuration, invocation| {
+            let selector = self.selector();
+            self.invoked(|invocation| {
                 let mut set = None;
                 let state = invoke_entry(
                     &mut evaluation,
                     (&file, limits),
-                    configuration,
+                    (self.capability.configuration_input.structural, &selector),
                     invocation,
                     FixtureProvider::new(),
                     &mut set,
@@ -967,13 +984,14 @@ pub(super) mod tests {
             let (bytes, limits) = entry_input(&self.config, &self.capability);
             let fixture = FileFixture::new(&self.capability);
             let file = fixture.file(bytes);
-            self.prepared(|configuration, invocation| {
+            let selector = self.selector();
+            self.invoked(|invocation| {
                 let mut evaluation = Evaluation::default();
                 let mut set = None;
                 let state = invoke_entry(
                     &mut evaluation,
                     (&file, limits),
-                    configuration,
+                    (self.capability.configuration_input.structural, &selector),
                     invocation,
                     FixtureProvider::new(),
                     &mut set,
@@ -992,9 +1010,10 @@ pub(super) mod tests {
         }
     }
 
-    /// One invocation's entry over `evaluation`: Phase 0, which runs before
-    /// configuration entry, and then the semantic phases over
-    /// `configuration`.
+    /// One invocation's entry over `evaluation` past a configuration prepared
+    /// outside it: Phase 0, which runs before configuration entry, the
+    /// `profileSpecification` group's owner that Phase 2 records, and then
+    /// the semantic phases over `configuration`.
     fn invoke<'s, P, D>(
         evaluation: &mut Evaluation,
         configuration: &CompleteConfiguration<'_>,
@@ -1009,6 +1028,11 @@ pub(super) mod tests {
     {
         let project_profile =
             admit_project_profile(evaluation, invocation.supported, invocation.specifications)?;
+        own(
+            evaluation,
+            SemanticGroup::ProfileSpecification,
+            held(project_profile.as_ref()),
+        )?;
         resolve_profile(
             evaluation,
             &project_profile,
@@ -1020,14 +1044,17 @@ pub(super) mod tests {
     }
 
     /// One invocation over `evaluation` from its entry: Phase 0, then Phase 1
-    /// over `file` under `limits`, which `configuration` was prepared from,
-    /// and the semantic phases over `configuration` when Phase 1 admits the
-    /// file. When it does not, there is no Shared projection, and so no
-    /// semantic state.
+    /// over `file` under `limits`, Phase 2 over the value Phase 1 admits with
+    /// the model's configuration schema under `structural`, Phase 3 selecting
+    /// `selector`'s declaration, and the semantic phases over the
+    /// configuration. Without a value there is no Shared projection (D15:2369),
+    /// and without a configuration structural admission admitted whole and its
+    /// selected declaration, no semantic phase starts yet (plan 025 PR 5f-2f):
+    /// either way there is no semantic state.
     fn invoke_entry<'s, P, D>(
         evaluation: &mut Evaluation,
         (file, limits): (&EntryFile<'_>, InputLimits),
-        configuration: &CompleteConfiguration<'_>,
+        (structural, selector): (StructuralLimits, &SelectorInput),
         invocation: &Invocation<'s, P::Identity>,
         data: D,
         set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
@@ -1039,13 +1066,35 @@ pub(super) mod tests {
     {
         let project_profile =
             admit_project_profile(evaluation, invocation.supported, invocation.specifications)?;
-        if admit_entry(evaluation, file, limits)?.is_err() {
+        let Ok(document) = admit_entry(evaluation, file, limits)? else {
             return Ok(None);
-        }
+        };
+        let schema = Schema::for_model().unwrap();
+        let Ok(analysis) = admit_structure(
+            evaluation,
+            document,
+            &schema,
+            structural,
+            held(project_profile.as_ref()),
+        )?
+        else {
+            return Ok(None);
+        };
+        let Some(config) = analysis.construct().unwrap() else {
+            return Ok(None);
+        };
+        let Ok(Selection::Selected(selection)) = analysis.select(selector) else {
+            return Ok(None);
+        };
+        let Some(configuration) =
+            CompleteConfiguration::new(&analysis, &config, selector, &selection)
+        else {
+            return Ok(None);
+        };
         resolve_profile(
             evaluation,
             &project_profile,
-            configuration,
+            &configuration,
             invocation,
             data,
             set,
@@ -1274,13 +1323,14 @@ pub(super) mod tests {
         let (_, limits) = entry_input(&inputs.config, &inputs.capability);
         let fixture = FileFixture::new(&inputs.capability);
         let file = fixture.file(Arc::from(&br#"{"schemaVersion":"#[..]));
-        inputs.prepared(|configuration, invocation| {
+        let selector = inputs.selector();
+        inputs.invoked(|invocation| {
             let mut evaluation = Evaluation::default();
             let mut set = None;
             let state = invoke_entry(
                 &mut evaluation,
                 (&file, limits),
-                configuration,
+                (inputs.capability.configuration_input.structural, &selector),
                 invocation,
                 FixtureProvider::new(),
                 &mut set,
@@ -1297,6 +1347,43 @@ pub(super) mod tests {
         });
     }
 
+    /// When the schema selection selects no schema, Phase 2 records its
+    /// owner, the selection's checks, the analysis's measure waiting on the
+    /// failed check, and the `profileSpecification` group's owner, and no
+    /// semantic phase starts (D15:2130).
+    #[test]
+    fn a_configuration_without_a_selected_schema_starts_no_semantic_phase() {
+        let mut inputs = Inputs::complete();
+        inputs.config["schemaVersion"] = json!("1");
+        inputs.attempt(|evaluation, state| {
+            assert!(matches!(state, Ok(None)));
+            let phases: BTreeSet<Phase> =
+                evaluation.statuses().map(|(unit, _)| unit.phase).collect();
+            assert_eq!(
+                phases,
+                BTreeSet::from([
+                    Phase::ResolverBootstrapAdmission,
+                    Phase::EntryAdmission,
+                    Phase::StructuralAdmission
+                ])
+            );
+            assert_eq!(
+                issues(&evaluation),
+                [(
+                    selection(Check::SupportedSchemaVersion),
+                    Code::SchemaVersionUnsupported,
+                    None
+                )]
+            );
+            let waiting: Vec<&Unit> = evaluation
+                .statuses()
+                .filter(|(_, status)| matches!(status, Status::NotEvaluated(_)))
+                .map(|(unit, _)| unit)
+                .collect();
+            assert_eq!(waiting, [&CAPABILITY]);
+        });
+    }
+
     #[test]
     fn every_phase_admits_a_complete_invocation() {
         let inputs = Inputs::complete();
@@ -1307,18 +1394,22 @@ pub(super) mod tests {
                 .statuses()
                 .all(|(_, status)| *status == Status::Evaluated));
             // Phase 1 records its owner and the complete input's ten checks
-            // (D15:1876, 2129, 2516), and Phase 2 only the
-            // `profileSpecification` group's owner.
+            // (D15:1876, 2129, 2516), and Phase 2 its owner, the schema
+            // selection's four checks, the analysis's measure, and the
+            // `profileSpecification` group's owner (D15:2130, 2516).
             let phases: BTreeSet<Phase> =
                 evaluation.statuses().map(|(unit, _)| unit.phase).collect();
             let mut ran = BTreeSet::from(PHASES);
             ran.extend([Phase::EntryAdmission, Phase::StructuralAdmission]);
             assert_eq!(phases, ran);
-            let entry = evaluation
-                .statuses()
-                .filter(|(unit, _)| unit.phase == Phase::EntryAdmission)
-                .count();
-            assert_eq!(entry, 11);
+            let count = |phase| {
+                evaluation
+                    .statuses()
+                    .filter(|(unit, _)| unit.phase == phase)
+                    .count()
+            };
+            assert_eq!(count(Phase::EntryAdmission), 11);
+            assert_eq!(count(Phase::StructuralAdmission), 7);
             assert_eq!(unestablished(&evaluation), []);
             let project = state.locales.project.as_ref().unwrap();
             assert_eq!(spellings(project.requested().as_slice()), ["en", "ja"]);
@@ -1444,12 +1535,18 @@ pub(super) mod tests {
             let complete = inputs.resolve(|evaluation, _| candidates(&evaluation));
             assert!(complete.values().all(|status| *status == Status::Evaluated));
             for blocked in complete.keys() {
-                let (after, shared) = inputs.attempt_in(
+                let (after, reached) = inputs.attempt_in(
                     Evaluation::blocking(blocked.clone()),
                     |evaluation, state| {
                         let state =
                             state.unwrap_or_else(|invariant| panic!("{blocked:?}: {invariant:?}"));
-                        (candidates(&evaluation), state.is_some())
+                        // The last phase the invocation reached, when it
+                        // stopped before the semantic phases.
+                        let reached = state
+                            .is_none()
+                            .then(|| evaluation.statuses().map(|(unit, _)| unit.phase).max())
+                            .flatten();
+                        (candidates(&evaluation), reached)
                     },
                 );
                 let logical = blocked.logical();
@@ -1462,8 +1559,12 @@ pub(super) mod tests {
                 }
                 for unit in complete.keys().filter(|unit| !after.contains_key(unit)) {
                     // Without a value from entry admission there is no Shared
-                    // projection, whose units no prerequisite names yet.
-                    if !shared && unit.phase > Phase::EntryAdmission {
+                    // projection, which no prerequisite names, and without a
+                    // configuration structural admission admitted whole no
+                    // semantic phase starts yet (plan 025 PR 5f-2f): the
+                    // phases the invocation did not reach wait on no
+                    // prerequisite.
+                    if reached.is_some_and(|reached| unit.phase > reached) {
                         continue;
                     }
                     waits.insert((row_of(unit), row_of(blocked)));
