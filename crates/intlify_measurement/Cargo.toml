@@ -49,7 +49,7 @@ allocation-counter = { version = "=0.8.1", optional = true }
 
 [target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
 # Locked safe clock and kernel-view APIs, for acquisition only.
-rustix = { version = "=1.1.5", features = ["system", "time"], optional = true }
+rustix = { version = "=1.1.6", features = ["system", "time"], optional = true }
 
 [dev-dependencies]
 # Independent Draft 7 oracle; no HTTP/file retrieval, TLS, or IDNA/ICU data.
