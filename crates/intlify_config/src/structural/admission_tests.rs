@@ -203,8 +203,8 @@ fn the_profile_bounds_leave_structural_admission_complete() {
 }
 
 /// A Profile ID past `maxProfileIdBytes` is still a declaration structural
-/// admission checks: its key's syntax, and the other declarations, without
-/// disclosing the key.
+/// admission checks: its key's syntax, its value, and the other
+/// declarations, without disclosing the key.
 #[test]
 fn an_over_long_profile_id_is_still_checked_structurally() {
     let mut value = minimal_config();
@@ -216,10 +216,38 @@ fn an_over_long_profile_id_is_still_checked_structurally() {
         .analyze(document(&value), capacity)
         .unwrap();
     assert!(analysis.issues().is_empty());
-    assert_eq!(analysis.schema_issue_count(), 1);
+    // The key, and under it, the value's undeclared member and the seven
+    // required members it lacks (D15:2184).
+    assert_eq!(analysis.schema_issue_count(), 9);
     assert!(analysis.profile("app").unwrap().is_some());
     assert!(analysis.construct().unwrap().is_none());
-    assert!(!format!("{:?}", analysis.issues()).contains("PRIVATE-KEY"));
+    let rendered = format!("{:?} {:?}", analysis.issues(), analysis.facts());
+    for excluded in ["PRIVATE-KEY", "private-value"] {
+        assert!(!rendered.contains(excluded), "{excluded}");
+    }
+}
+
+/// Structural admission evaluates a declaration whose key lacks the
+/// identifier syntax, but later phases have no subject for it (D15:2184).
+#[test]
+fn a_declaration_under_a_key_without_the_identifier_syntax_is_never_read() {
+    let mut value = minimal_config();
+    value["profiles"]["Bad Key"] = value["profiles"]["app"].clone();
+    let analysis = analyze_fixture(&value);
+    assert_eq!(analysis.schema_issue_count(), 1, "the key alone");
+    assert!(analysis.profile("Bad Key").unwrap().is_none());
+    assert!(analysis
+        .profile_field::<String>("Bad Key", &["projectId"])
+        .unwrap()
+        .is_none());
+    assert_eq!(
+        analysis
+            .profile_field::<String>("app", &["projectId"])
+            .unwrap()
+            .as_deref(),
+        Some("storefront")
+    );
+    assert!(analysis.construct().unwrap().is_none());
 }
 
 #[test]

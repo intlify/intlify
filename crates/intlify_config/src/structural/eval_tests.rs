@@ -179,11 +179,37 @@ fn unsafe_unknown_or_invalid_dynamic_keys_never_enter_issue_text() {
     let doc = materialize(&value);
     let result = run(&program(), &doc);
     assert!(!result.admitted);
-    assert_eq!(result.issues.len(), 2);
-    assert!(result
-        .issues
-        .iter()
-        .all(|i| i.role == LocationRole::MemberKey && i.missing_field.is_none()));
+    // The root's undeclared member and the invalid key, and under the key's
+    // entry, its undeclared member and the seven required members its value
+    // lacks (D15:2184). A key is never named, and a missing member only by
+    // the schema's own name.
+    assert_eq!(result.issues.len(), 10);
+    for issue in &result.issues {
+        match issue.role {
+            LocationRole::MemberKey => assert!(issue.missing_field.is_none()),
+            LocationRole::MissingField => assert!(matches!(
+                issue.missing_field.as_deref(),
+                Some(
+                    "projectId"
+                        | "selectionScope"
+                        | "requestedLocales"
+                        | "defaultRequestedLocale"
+                        | "policies"
+                        | "targetProfiles"
+                        | "deploymentGroups"
+                )
+            )),
+            LocationRole::Value => panic!("{issue:?}"),
+        }
+    }
+    assert_eq!(
+        result
+            .issues
+            .iter()
+            .filter(|issue| issue.role == LocationRole::MemberKey)
+            .count(),
+        3
+    );
     let rendered = format!("{:?} {:?}", result.issues, result.facts);
     for excluded in [
         "private-token",
@@ -595,16 +621,33 @@ fn identity_keys_are_checked_under_their_map_and_scope_their_entries() {
         assert_eq!(entry.value, member(&doc, profiles, name));
         assert_eq!(entry.key, key_span(&doc, profiles, name));
         assert_eq!(facts.scope(scope).level, Level::Profile);
-        // Only an admitted key's entry is evaluated yet.
-        assert_eq!(
-            facts
-                .candidates()
-                .iter()
-                .any(|candidate| candidate.scope == scope),
-            admitted,
-            "{name}"
-        );
     }
+    // Each entry's value is evaluated under its own scope, the failing key's
+    // included, so the two raw parents stay apart (D15:2184, 2190).
+    let scopes: Vec<_> = keys
+        .iter()
+        .map(|key| match key.at {
+            At::Key(scope) => scope,
+            _ => unreachable!("a key"),
+        })
+        .collect();
+    assert_ne!(scopes[0], scopes[1]);
+    let under = |scope| {
+        facts
+            .candidates()
+            .iter()
+            .filter(|candidate| candidate.scope == scope)
+            .map(|candidate| {
+                (
+                    candidate.check,
+                    names(facts, candidate.path),
+                    candidate.outcome,
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    assert!(under(scopes[0]).contains(&(Check::Type, Vec::new(), Outcome::Passed)));
+    assert_eq!(under(scopes[0]), under(scopes[1]));
 }
 
 #[test]
@@ -719,4 +762,20 @@ fn an_identity_map_without_entries_fails_its_minimum_member_count() {
     assert!(!shapes(&result).iter().any(|shape| shape.0 == Check::Key
         && shape.1 == Level::Profile
         && shape.2 == "targetProfiles/*"));
+}
+
+/// Every applicable evaluation counts even when another check blocks
+/// (D15:1887): the value of an entry whose key fails is the same work as the
+/// value of an entry whose key passes.
+#[test]
+fn a_failing_keys_value_counts_the_work_of_any_other_entry() {
+    let program = program();
+    let units = |name: &str| {
+        let mut value = minimal_config();
+        value["profiles"][name] = value["profiles"]["app"].clone();
+        run(&program, &materialize(&value)).units
+    };
+    let one = run(&program, &materialize(&minimal_config())).units;
+    assert!(units("zz") > one);
+    assert_eq!(units("Bad Key"), units("zz"));
 }

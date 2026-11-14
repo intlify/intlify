@@ -310,6 +310,9 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
         })
     }
 
+    /// The value of the declaration `id`. A key without the identifier syntax
+    /// has none: structural admission evaluates its value, but later phases
+    /// have no subject for the entry (D15:2184).
     fn profile_node(&self, id: &str) -> Option<NodeId> {
         if !self.selected_version || !valid_identity(id) {
             return None;
