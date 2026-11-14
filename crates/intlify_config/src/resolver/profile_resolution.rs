@@ -1122,7 +1122,13 @@ pub(super) mod tests {
         // causes where it admitted nothing (D15:2131). The semantic phases
         // start from the declaration it selects once structural admission
         // admitted it whole, whatever else of the root it rejected.
-        let selection = select_profile(evaluation, structure.as_ref().ok(), selector, structural)?;
+        let selection = select_profile(
+            evaluation,
+            file,
+            structure.as_ref().ok(),
+            selector,
+            structural,
+        )?;
         let (Ok(analysis), Ok(selection)) = (structure, selection) else {
             return Ok(None);
         };

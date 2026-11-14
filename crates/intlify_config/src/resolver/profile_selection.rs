@@ -24,6 +24,18 @@
 //! `profiles` object holding one, which structural admission reports
 //! (D15:2363).
 //!
+//! Each Finding Occurrence of Phase 3 is observed where its check looked: the
+//! declarations' count at the `profiles` object and a Profile ID's bytes at
+//! its key, through Materialized Value Evidence in the file Phase 1 read
+//! (D15:790), each beside the capability's bound (D15:836); the selector's
+//! checks at the selector, beside the declarations as one location once
+//! structural admission admitted them (D15:812; plan 025 interpretation
+//! #215), and the bound's beside the capability's bound too. A selector
+//! Finding leaves no declaration selected, and so no Resource Limit Policy,
+//! so the capability's bound Phase 3 runs under is the selector's final
+//! projection authority (D15:817; interpretation #217). Each check's result
+//! is decided before the check runs, so that only a failure is observed.
+//!
 //! The selection is the declaration the selector names, or the only one,
 //! once its Profile ID stays within the bound and structural admission
 //! admitted the declaration whole (plan 025 interpretation #205). The core's
@@ -35,17 +47,22 @@ use std::collections::BTreeMap;
 use serde::de::DeserializeOwned;
 
 use crate::input_limits::Bound;
+use crate::materialize::{ByteSpan, MaterializedDocument, NodeId, NodeKind};
 use crate::model::{valid_identity, ProfileId};
 use crate::structural::selection::{
     ProvisionalSelection, Selection, SelectionInvariant, SelectorInput, SelectorShape,
     StringLengthFact,
 };
-use crate::structural::{AdmissionInvariant, StructuralAnalysis, StructuralLimits};
+use crate::structural::{AdmissionInvariant, Edge, StructuralAnalysis, StructuralLimits};
 
+use super::capability::CapabilityBound;
+use super::entry::{EntryFile, SELECTOR_ORIGIN};
 use super::evaluation::{
-    both, Actual, Admitted, Blocking, Check, Code, Evaluation, EvaluationInvariant, Phase, Subject,
-    Unit,
+    both, Actual, Admitted, Blocking, Check, Code, Evaluation, EvaluationInvariant, Found,
+    Observation, Phase, Subject, Unit,
 };
+use super::evidence::{EvidenceInvariant, EvidenceProjection};
+use super::evidence_component::{ComponentInvariant, ComponentPath};
 use super::limits::{BoundId, Group};
 use super::structural_admission::{
     declaration, nonempty_profiles, profile_key, profile_keys, profiles,
@@ -109,6 +126,10 @@ pub(crate) enum ProfileSelectionInvariant {
     /// The core's provisional selection found a defect of its own, such as a
     /// selector observed under another bound.
     Selection(SelectionInvariant),
+    /// What a check found could not be projected as Evidence.
+    Evidence(EvidenceInvariant),
+    /// The capability's bound has no component path.
+    Component(ComponentInvariant),
     /// The checks admitted what the analysis, or the core's provisional
     /// selection, did not.
     UnreportedFailure,
@@ -120,8 +141,8 @@ impl From<EvaluationInvariant> for ProfileSelectionInvariant {
     }
 }
 
-/// Phase 3 over `analysis`, what Phase 2 admitted, if anything, with
-/// `input`, the selector, under `limits`, the capability's values: the
+/// Phase 3 over `analysis`, what Phase 2 admitted in `file`, if anything,
+/// with `input`, the selector, under `limits`, the capability's values: the
 /// declaration the checks select, provisionally, or the causes of its
 /// absence (D15:2131). Every check is recorded whatever the others found,
 /// those without what they need not evaluated with its causes.
@@ -131,6 +152,7 @@ impl From<EvaluationInvariant> for ProfileSelectionInvariant {
 /// Returns the resolver bug Phase 3 found.
 pub(crate) fn select_profile<Policy: DeserializeOwned, Target>(
     evaluation: &mut Evaluation,
+    file: &EntryFile<'_>,
     analysis: Option<&StructuralAnalysis<Policy, Target>>,
     input: &SelectorInput,
     limits: StructuralLimits,
@@ -147,11 +169,15 @@ pub(crate) fn select_profile<Policy: DeserializeOwned, Target>(
         .transpose()
         .map_err(ProfileSelectionInvariant::Admission)?
         .flatten();
-    let bounds = bound_declarations(evaluation, declarations.as_ref(), limits)?;
+    let observer = Observer {
+        file,
+        profiles: analysis.and_then(StructuralAnalysis::profiles_value),
+    };
+    let bounds = bound_declarations(evaluation, &observer, declarations.as_ref(), limits)?;
     let declared = declarations
         .as_ref()
         .map_or(&[][..], |(_, ids)| ids.as_slice());
-    let named = check_selector(evaluation, input, limit, &bounds.count, declared)?;
+    let named = check_selector(evaluation, &observer, input, &bounds, declared)?;
     let id = match named {
         Ok(Some(id)) => Ok(id),
         Ok(None) => sole(evaluation, declared)?,
@@ -201,6 +227,7 @@ struct Bounds {
 /// once they admitted its key, and has no subject otherwise (D15:1886, 2184).
 fn bound_declarations(
     evaluation: &mut Evaluation,
+    observer: &Observer<'_, '_>,
     declarations: Option<&(u64, Vec<ProfileId>)>,
     limits: StructuralLimits,
 ) -> Result<Bounds, ProfileSelectionInvariant> {
@@ -212,9 +239,17 @@ fn bound_declarations(
             .0),
         Err(causes) => Err(causes),
     };
-    let count = evaluation.check(capability(SelectionSubject::Profiles), count, |count| {
-        let limit = limits.max_profiles;
-        within(MAX_PROFILES, limit, actual(Tally::exactly(count), limit)).map(|()| count)
+    // A count not evaluated finds nothing.
+    let limit = limits.max_profiles;
+    let found = match &count {
+        Ok(count) => observed(
+            within(MAX_PROFILES, limit, actual(Tally::exactly(*count), limit)),
+            || beside(observer.declarations()?, MAX_PROFILES),
+        )?,
+        Err(_) => Ok(()),
+    };
+    let count = evaluation.check_found(capability(SelectionSubject::Profiles), count, |count| {
+        found.map(|()| count)
     })?;
     let mut ids = BTreeMap::new();
     for id in declarations.map_or(&[][..], |(_, ids)| ids.as_slice()) {
@@ -224,83 +259,89 @@ fn bound_declarations(
         if evaluation.admitted_within(|unit| *unit == key).is_err() {
             continue;
         }
-        let bytes = Tally::of(id.as_str().len());
-        let result = evaluation.check(
+        let limit = limits.max_profile_id_bytes;
+        let found = observed(
+            within(
+                MAX_PROFILE_ID_BYTES,
+                limit,
+                actual(Tally::of(id.as_str().len()), limit),
+            ),
+            || beside(observer.key(id)?, MAX_PROFILE_ID_BYTES),
+        )?;
+        let result = evaluation.check_found(
             capability(SelectionSubject::ProfileId(id.clone())),
             Ok(()),
-            |()| {
-                let limit = limits.max_profile_id_bytes;
-                within(MAX_PROFILE_ID_BYTES, limit, actual(bytes, limit))
-            },
+            |()| found,
         )?;
         ids.insert(id.clone(), result);
     }
     Ok(Bounds { count, ids })
 }
 
-/// The selector's checks under `limit`, each recorded only when the selector
-/// has what it examines (Decision 015-196): the declared Profile ID a
-/// supplied selector names, none for an absent selector once `count`, the
-/// declarations, requires none, or the causes of neither. `declared` is the
-/// declarations' Profile IDs.
+/// The selector's checks of `input` under its bound, each recorded only when
+/// the selector has what it examines (Decision 015-196): the declared Profile
+/// ID a supplied selector names, none for an absent selector once `bounds`,
+/// the declarations' checks, require none, or the causes of neither.
+/// `declared` is the declarations' Profile IDs.
 fn check_selector(
     evaluation: &mut Evaluation,
+    observer: &Observer<'_, '_>,
     input: &SelectorInput,
-    limit: Bound,
-    count: &Admitted<u64>,
+    bounds: &Bounds,
     declared: &[ProfileId],
 ) -> Result<Admitted<Option<ProfileId>>, ProfileSelectionInvariant> {
+    let limit = input.bound();
     // Comparing the selector with the declarations assumes that `profiles`
     // holds one (D15:2363).
-    let compared = both(count.clone(), nonempty_profiles(evaluation)).map(|(count, ())| count);
+    let compared =
+        both(bounds.count.clone(), nonempty_profiles(evaluation)).map(|(count, ())| count);
+    let available = profiles(evaluation).is_ok();
+    let observe = || observer.selector(input, limit, available);
     // The bound covers a string selector alone (D15:1886).
     let bounded = match input
         .length_fact(limit)
         .map_err(ProfileSelectionInvariant::Selection)?
     {
-        Some(length) => evaluation.check(selector(Check::WithinCapability), Ok(()), |()| {
+        Some(length) => {
             let actual = match length {
                 StringLengthFact::Exact(bytes) => Actual::Exact(bytes),
                 // An over-limit selector keeps no length, only the smallest
                 // first-over witness.
                 StringLengthFact::OverLimit => Actual::AtLeast(limit.get() + 1),
             };
-            within(MAX_PROFILE_ID_BYTES, limit, actual)
-        })?,
+            let found = observed(within(MAX_PROFILE_ID_BYTES, limit, actual), || {
+                beside(observe()?, MAX_PROFILE_ID_BYTES)
+            })?;
+            evaluation.check_found(selector(Check::WithinCapability), Ok(()), |()| found)?
+        }
         None => Ok(()),
     };
     let absent = input.shape() == SelectorShape::Absent;
-    let required = evaluation.check(
-        selector(Check::RequiredSelector),
-        compared.clone(),
-        |count| {
-            if absent && count > 1 {
-                Err(issue(Code::SelectorRequired))
-            } else {
-                Ok(())
-            }
-        },
-    )?;
+    let required = if matches!(&compared, Ok(count) if absent && *count > 1) {
+        Err(issue(Code::SelectorRequired))
+    } else {
+        Ok(())
+    };
+    let found = observed(required, observe)?;
+    let required =
+        evaluation.check_found(selector(Check::RequiredSelector), compared.clone(), |_| {
+            found
+        })?;
     if absent {
         return Ok(required.map(|()| None));
     }
     // An over-limit selector is the bound's to report (D15:2296).
-    let admitted = evaluation.check(selector(Check::ValidSelector), bounded, |()| {
-        input
-            .text()
-            .filter(|text| valid_identity(text))
-            .ok_or(issue(Code::SelectorInvalid))
-    })?;
-    let named = evaluation.check(
+    let text = input.text().filter(|text| valid_identity(text));
+    let found = observed(text.ok_or(issue(Code::SelectorInvalid)), observe)?;
+    let admitted = evaluation.check_found(selector(Check::ValidSelector), bounded, |()| found)?;
+    let named = text
+        .and_then(|text| declared.iter().find(|id| id.as_str() == text))
+        .cloned();
+    let found = observed(named.ok_or(issue(Code::SelectorUnknown)), observe)?;
+    let named = evaluation.check_found(
         selector(Check::DeclaredSelector),
         both(admitted, compared),
-        |(text, _)| {
-            declared
-                .iter()
-                .find(|id| id.as_str() == text)
-                .cloned()
-                .ok_or(issue(Code::SelectorUnknown))
-        },
+        |_| found,
     )?;
     // A supplied selector meets the requirement, and naming a declaration
     // waits on all the requirement waits on.
@@ -326,6 +367,109 @@ fn sole(
     }
 }
 
+/// A check's result, `result`, decided before the check runs, with its
+/// Finding observed through `observe`, so that a check that admits observes
+/// nothing.
+fn observed<T>(
+    result: Result<T, Blocking>,
+    observe: impl FnOnce() -> Result<Observation, ProfileSelectionInvariant>,
+) -> Result<Result<T, Found>, ProfileSelectionInvariant> {
+    Ok(match result {
+        Ok(value) => Ok(value),
+        Err(blocking) => Err(Found::observed(blocking, observe()?)),
+    })
+}
+
+/// `observation` beside the capability's `bound`, which a bound's Finding
+/// relates (D15:836).
+fn beside(
+    mut observation: Observation,
+    bound: BoundId,
+) -> Result<Observation, ProfileSelectionInvariant> {
+    let path = ComponentPath::capability(CapabilityBound::PolicyComparable(bound))
+        .map_err(ProfileSelectionInvariant::Component)?;
+    observation
+        .related
+        .push(EvidenceProjection::resolver_input(path));
+    Ok(observation)
+}
+
+/// Where Phase 3 observes what it finds: the file Phase 1 read, with the
+/// value of the root's `profiles` member in the materialized document, when
+/// structural admission found one.
+struct Observer<'f, 'd> {
+    file: &'f EntryFile<'f>,
+    profiles: Option<(&'d MaterializedDocument, NodeId)>,
+}
+
+impl Observer<'_, '_> {
+    /// The root's `profiles` object, at its token (D15:790).
+    fn declarations(&self) -> Result<Observation, ProfileSelectionInvariant> {
+        let (document, profiles) = self
+            .profiles
+            .ok_or(ProfileSelectionInvariant::UnreportedFailure)?;
+        self.value(&[Edge::Member("profiles")], document.node(profiles).span())
+    }
+
+    /// The key of `id` in the root's `profiles` object, at the key's token,
+    /// redacted once past the capability's bound (D15:776, 790; plan 025
+    /// interpretation #216).
+    fn key(&self, id: &ProfileId) -> Result<Observation, ProfileSelectionInvariant> {
+        let (document, profiles) = self
+            .profiles
+            .ok_or(ProfileSelectionInvariant::UnreportedFailure)?;
+        let NodeKind::Object(members) = document.node(profiles).kind() else {
+            return Err(ProfileSelectionInvariant::UnreportedFailure);
+        };
+        let member = members
+            .get(id.as_str())
+            .ok_or(ProfileSelectionInvariant::UnreportedFailure)?;
+        self.value(
+            &[Edge::Member("profiles"), Edge::Member(id.as_str())],
+            member.key_span(),
+        )
+    }
+
+    /// The selector, `input`, under the capability's bound `limit`, its final
+    /// projection authority (plan 025 interpretation #217); beside the
+    /// declarations when they are `available` (D15:812). A selector Finding
+    /// names no declaration, since a supplied selector naming a declared
+    /// Profile ID within the bound passes every check, so its projection is
+    /// never a safe Profile ID (D15:807).
+    fn selector(
+        &self,
+        input: &SelectorInput,
+        limit: Bound,
+        available: bool,
+    ) -> Result<Observation, ProfileSelectionInvariant> {
+        let primary =
+            EvidenceProjection::selector(SELECTOR_ORIGIN, input, limit, std::iter::empty())
+                .map_err(ProfileSelectionInvariant::Evidence)?;
+        let related = if available {
+            vec![self.declarations()?.primary]
+        } else {
+            Vec::new()
+        };
+        Ok(Observation { primary, related })
+    }
+
+    /// The value at the internal path `edges`, at the token `span`.
+    fn value(
+        &self,
+        edges: &[Edge<'_>],
+        span: ByteSpan,
+    ) -> Result<Observation, ProfileSelectionInvariant> {
+        let primary = self
+            .file
+            .value_evidence(edges, span)
+            .map_err(ProfileSelectionInvariant::Evidence)?;
+        Ok(Observation {
+            primary,
+            related: Vec::new(),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
@@ -338,15 +482,21 @@ mod tests {
     use crate::materialize::materialize_file;
     use crate::materialize_tests::limits as input_limits;
     use crate::model::ProfileId;
+    use crate::resolver::capability::CapabilityBound;
     use crate::resolver::entry::fixtures::FileFixture;
     use crate::resolver::evaluation::{
         Actual, Admitted, Check, Code, Details, Evaluation, IssueKey, LimitExceeded, Phase, Status,
         Subject, Unit,
     };
+    use crate::resolver::evidence::{Evidence, EvidenceProjection};
+    use crate::resolver::evidence_component::ComponentPath;
+    use crate::resolver::evidence_token::EvidenceTokens;
     use crate::resolver::limits::{fixture_limits, BoundId};
+    use crate::resolver::occurrence::{occurrences, redacted};
     use crate::resolver::structural_admission::{
         admit_structure, profile_key, selection, StructuralSubject,
     };
+    use crate::resolver::token::{Sha256, Specification};
     use crate::structural::selection::{InvalidSelectorType, SelectionInvariant, SelectorInput};
     use crate::structural::{AuthoringSchema, StructuralLimits};
 
@@ -385,19 +535,30 @@ mod tests {
     ) -> (Evaluation, Admitted<String>) {
         let bytes: Arc<[u8]> = Arc::from(serde_json::to_vec(value).unwrap());
         let document = materialize_file(Arc::clone(&bytes), input_limits()).unwrap();
-        let fixture = FileFixture::new(&fixture_limits(100));
+        // The capability's `policyComparable` bounds classify the file's
+        // members as well as bound Phase 3 (D15:776).
+        let mut comparable = fixture_limits(100);
+        comparable.configuration_input.structural = limits;
+        let fixture = FileFixture::new(&comparable);
+        let file = fixture.file(bytes);
         let analysis = admit_structure(
             &mut evaluation,
-            &fixture.file(bytes),
+            &file,
             document,
             &Schema::for_model().unwrap(),
             limits,
             Ok(()),
         )
         .unwrap();
-        let selected = select_profile(&mut evaluation, analysis.as_ref().ok(), input, limits)
-            .unwrap()
-            .map(|selection| selection.id().as_str().to_owned());
+        let selected = select_profile(
+            &mut evaluation,
+            &file,
+            analysis.as_ref().ok(),
+            input,
+            limits,
+        )
+        .unwrap()
+        .map(|selection| selection.id().as_str().to_owned());
         (evaluation, selected)
     }
 
@@ -890,14 +1051,220 @@ mod tests {
         let limits = bounds(1, 64);
         let input = SelectorInput::string("app", Bound::new(65).unwrap());
         let mut evaluation = Evaluation::default();
+        let fixture = FileFixture::new(&fixture_limits(100));
+        let file = fixture.file(Arc::from(&b"{}"[..]));
         let analysis: Option<
             &crate::structural::StructuralAnalysis<FixturePolicyReference, FixtureTargetReference>,
         > = None;
         assert_eq!(
-            select_profile(&mut evaluation, analysis, &input, limits).err(),
+            select_profile(&mut evaluation, &file, analysis, &input, limits).err(),
             Some(ProfileSelectionInvariant::Selection(
                 SelectionInvariant::BootstrapBoundMismatch
             ))
         );
+    }
+
+    const PROFILE: Specification<'static> = Specification {
+        identity: "intlify-project-profile",
+        revision: "0",
+    };
+
+    /// A Finding Occurrence's unit, with the views of its primary and related
+    /// Evidence.
+    type Observed = (Unit, Value, Vec<Value>);
+
+    /// What Phase 3 found over `value` under `limits` with `input`, each
+    /// Finding Occurrence in 015's order and checked against its Finding
+    /// Registry row, and the file's bytes.
+    fn observed(
+        value: &Value,
+        limits: StructuralLimits,
+        input: &SelectorInput,
+    ) -> (Vec<u8>, Vec<Observed>) {
+        let (evaluation, _) = selecting(value, limits, input);
+        let candidates = evaluation.occurrence_candidates();
+        let tokens = EvidenceTokens::assign(PROFILE, redacted(candidates), &Sha256);
+        let found = occurrences(candidates, PROFILE, &tokens)
+            .unwrap()
+            .iter()
+            .filter(|occurrence| occurrence.owner().phase == Phase::ProfileSelection)
+            .map(|occurrence| {
+                (
+                    occurrence.owner().clone(),
+                    occurrence.primary().view(),
+                    occurrence.related().iter().map(Evidence::view).collect(),
+                )
+            })
+            .collect();
+        (serde_json::to_vec(value).unwrap(), found)
+    }
+
+    /// The view of the span `text` occupies in `source`, at its first
+    /// occurrence.
+    fn span(source: &[u8], text: &[u8]) -> Value {
+        let start = source
+            .windows(text.len())
+            .position(|window| window == text)
+            .unwrap();
+        json!({ "start": start.to_string(), "end": (start + text.len()).to_string() })
+    }
+
+    /// Where the configuration-value Evidence `view` locates its value, and
+    /// its span.
+    fn located(view: &Value) -> (Value, Value) {
+        assert_eq!(view["kind"], "configuration-value", "{view}");
+        assert_eq!(view["origin"], "configuration-file", "{view}");
+        (view["value"].clone(), view["span"].clone())
+    }
+
+    /// Where `config`'s declarations are in `source`: the `profiles` object
+    /// at its token.
+    fn at_declarations(source: &[u8], config: &Value) -> (Value, Value) {
+        (
+            json!({ "exact-json-pointer": "/profiles" }),
+            span(source, &serde_json::to_vec(&config["profiles"]).unwrap()),
+        )
+    }
+
+    /// The view of the capability's `bound`, which a bound's Finding
+    /// relates.
+    fn bound_view(bound: BoundId) -> Value {
+        let tokens = EvidenceTokens::assign(PROFILE, redacted(&[]), &Sha256);
+        EvidenceProjection::resolver_input(
+            ComponentPath::capability(CapabilityBound::PolicyComparable(bound)).unwrap(),
+        )
+        .retained(PROFILE, &tokens)
+        .unwrap()
+        .view()
+    }
+
+    /// The declarations' count is observed at the `profiles` object, beside
+    /// the capability's bound (D15:790, 836).
+    #[test]
+    fn the_count_is_observed_at_the_declarations_beside_the_bound() {
+        let config = declared(&["app", "web"]);
+        let limits = bounds(1, 64);
+        let input = SelectorInput::string("app", limits.max_profile_id_bytes);
+        let (source, found) = observed(&config, limits, &input);
+        assert_eq!(found.len(), 1);
+        let (unit, primary, related) = &found[0];
+        assert_eq!(*unit, capability(SelectionSubject::Profiles));
+        assert_eq!(located(primary), at_declarations(&source, &config));
+        assert_eq!(*related, [bound_view(MAX_PROFILES)]);
+    }
+
+    /// A declared Profile ID past the bound is observed at its key, which the
+    /// same bound leaves unsafe and so redacted, beside the capability's
+    /// bound (D15:776, 790; plan 025 interpretation #216).
+    #[test]
+    fn a_profile_id_past_the_bound_is_observed_at_its_redacted_key() {
+        let config = declared(&["catalog"]);
+        let limits = bounds(1, 3);
+        let input = SelectorInput::absent(limits.max_profile_id_bytes);
+        let (source, found) = observed(&config, limits, &input);
+        assert_eq!(found.len(), 1);
+        let (unit, primary, related) = &found[0];
+        assert_eq!(*unit, capability(id("catalog")));
+        let (path, at) = located(primary);
+        let segments = path["redacted-logical-path"].as_array().unwrap();
+        assert_eq!(segments.len(), 2, "{path}");
+        assert_eq!(segments[0], json!({ "safe-member": "profiles" }));
+        assert!(segments[1].get("redacted-member").is_some(), "{path}");
+        assert_eq!(at, span(&source, br#""catalog""#));
+        assert_eq!(*related, [bound_view(MAX_PROFILE_ID_BYTES)]);
+    }
+
+    /// Each selector check is observed at the selector a file entry's
+    /// `profile-selector-cli` slot supplies, projected under the capability's
+    /// bound, beside the declarations, and the bound's beside the
+    /// capability's bound too (D15:804-812; plan 025 interpretations #215,
+    /// #217).
+    #[test]
+    fn each_selector_check_observes_the_selector_beside_the_declarations() {
+        let pair = declared(&["app", "web"]);
+        let one = declared(&["app"]);
+        let limits = bounds(2, 3);
+        let bound = limits.max_profile_id_bytes;
+        let capability = bound_view(MAX_PROFILE_ID_BYTES);
+        let cases = [
+            (
+                &pair,
+                SelectorInput::absent(bound),
+                Check::RequiredSelector,
+                json!({ "absent": null }),
+            ),
+            (
+                &one,
+                SelectorInput::string("catalog", bound),
+                Check::WithinCapability,
+                json!({ "redacted-value": { "type": "string", "length": "over-limit" } }),
+            ),
+            (
+                &one,
+                SelectorInput::invalid_type(InvalidSelectorType::Number, bound),
+                Check::ValidSelector,
+                json!({ "redacted-value": { "type": "number" } }),
+            ),
+            (
+                &one,
+                SelectorInput::string("A b", bound),
+                Check::ValidSelector,
+                json!({ "redacted-value": { "type": "string", "length": { "exact": "3" } } }),
+            ),
+            (
+                &one,
+                SelectorInput::string("web", bound),
+                Check::DeclaredSelector,
+                json!({ "redacted-value": { "type": "string", "length": { "exact": "3" } } }),
+            ),
+        ];
+        for (config, input, check, projection) in cases {
+            let (source, found) = observed(config, limits, &input);
+            assert_eq!(found.len(), 1, "{check:?}");
+            let (unit, primary, related) = &found[0];
+            assert_eq!(*unit, selector(check));
+            assert_eq!(primary["kind"], "profile-selector");
+            assert_eq!(primary["origin"], "profile-selector-cli");
+            // A redacted selector's token stands for its type and length
+            // alone.
+            let mut kept = primary["selector"].clone();
+            if let Some(value) = kept.get_mut("redacted-value") {
+                assert!(value.as_object_mut().unwrap().remove("token").is_some());
+            }
+            assert_eq!(kept, projection, "{check:?}");
+            let (values, bounds): (Vec<&Value>, Vec<&Value>) = related
+                .iter()
+                .partition(|view| view["kind"] == "configuration-value");
+            assert_eq!(
+                values.into_iter().map(located).collect::<Vec<_>>(),
+                [at_declarations(&source, config)]
+            );
+            let expected = if check == Check::WithinCapability {
+                vec![&capability]
+            } else {
+                Vec::new()
+            };
+            assert_eq!(bounds, expected, "{check:?}");
+        }
+    }
+
+    /// The declarations are related only once structural admission admitted
+    /// the `profiles` object (D15:812; plan 025 interpretation #215).
+    #[test]
+    fn the_declarations_are_related_only_once_admitted() {
+        let mut config = minimal_config();
+        config["profiles"] = json!([]);
+        let limits = bounds(1, 3);
+        let bound = limits.max_profile_id_bytes;
+        let number = SelectorInput::invalid_type(InvalidSelectorType::Number, bound);
+        let (_, found) = observed(&config, limits, &number);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].0, selector(Check::ValidSelector));
+        assert!(found[0].2.is_empty());
+        let over = SelectorInput::string("catalog", bound);
+        let (_, found) = observed(&config, limits, &over);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].0, selector(Check::WithinCapability));
+        assert_eq!(found[0].2, [bound_view(MAX_PROFILE_ID_BYTES)]);
     }
 }

@@ -290,6 +290,12 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
             .find(|(_, member)| member.value() == entry.value)
             .map(|(name, _)| name.as_str())
     }
+    /// The materialized document and the value of the root's `profiles`
+    /// member in it, which a later phase's Evidence locates (D15:790). None
+    /// without a selected version or the member.
+    pub(crate) fn profiles_value(&self) -> Option<(&MaterializedDocument, NodeId)> {
+        self.profiles.map(|value| (&*self.doc, value))
+    }
     /// The materialized root's value counts, which Phase 4 rechecks.
     pub(crate) fn value_counts(&self) -> ValueCounts {
         self.doc.counts().value

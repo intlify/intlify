@@ -70,9 +70,7 @@ use super::evaluation::{
 };
 use super::evidence::{EvidenceInvariant, EvidenceProjection};
 use super::evidence_component::{ComponentInvariant, ComponentPath};
-use super::evidence_source::SourceSpan;
 use super::limits::{BoundId, Group};
-use super::origin::SafeOriginKind;
 
 /// The unit that owns the materialized dependency records.
 pub(crate) const OWNER: Unit = Unit {
@@ -649,15 +647,10 @@ impl<'f, 'd> Observer<'f, 'd> {
         edges: &[Edge<'_>],
         span: ByteSpan,
     ) -> Result<Observation, StructuralInvariant> {
-        let steps = (self.file.classify)(edges);
-        let span = SourceSpan::admit(span.start_byte(), span.end_byte(), &self.file.bytes);
-        let primary = EvidenceProjection::configuration_value(
-            SafeOriginKind::ConfigurationFile,
-            self.file.source,
-            &steps,
-            span,
-        )
-        .map_err(StructuralInvariant::Evidence)?;
+        let primary = self
+            .file
+            .value_evidence(edges, span)
+            .map_err(StructuralInvariant::Evidence)?;
         Ok(Observation {
             primary,
             related: Vec::new(),
