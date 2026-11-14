@@ -512,6 +512,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
             coverage_subject(frame, own)?;
         }
         Subject::Slot(_)
+        | Subject::EntryDependencies
+        | Subject::CompleteInput
         | Subject::Vocabulary
         | Subject::CanonicalizationData
         | Subject::ResourcePolicy(_)

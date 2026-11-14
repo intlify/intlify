@@ -29,10 +29,15 @@
 //! it, or whose result alone names its subjects, and is then not recorded. A
 //! row lists, in row order, the checks it waits on that none of the others it
 //! lists already waits on. A check under the admitted Resource Limit Policy
-//! waits on every Policy recheck (D15:1677). The kinds declared only list no
-//! prerequisite until their units exist, and no row lists a check of
-//! structural admission or profile selection yet: the resolver starts from
-//! their complete results.
+//! waits on every Policy recheck (D15:1677). Entry admission's complete
+//! input waits along the stages of strict file entry: the parser's tokens on
+//! the file's bytes, strict JSON on the tokens, duplicate members and the
+//! JSON-compatible domain on strict JSON, and the five root-value bounds on
+//! both. The kinds declared only list no prerequisite until their units
+//! exist, and no row of a later phase lists a check of entry admission,
+//! structural admission, or profile selection yet: without a value from entry
+//! admission there is no Shared projection (D15:2369), and the resolver starts
+//! from complete structural and selection results.
 //!
 //! A row's Finding codes are those its units may report, a notice included,
 //! in 015's table order: what the resolver's checks report, and for the kinds
@@ -115,7 +120,7 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:151b85d565e9b51a082fbd5abe24b70af000832efa6424b44cb7d3f4c65bf814";
+    "sha256:9f81e2259e9f6a6ae356bb53f78b2b12e74a7145dd8e597150b4fc191580d903";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
@@ -1062,6 +1067,10 @@ const NONE: &[&str] = &[];
 /// its units exist.
 const NOT_YET: &[&str] = &[];
 
+/// What a root-value bound of the complete input waits on: a file without
+/// duplicate members or values outside the JSON-compatible domain.
+const MATERIALIZABLE: &[&str] = &["entry.input.unique-members", "entry.input.json-compatible"];
+
 /// What a check under the admitted Resource Limit Policy waits on: every
 /// Policy recheck, in row order (D15:1677).
 const CONFIRMED_POLICY: &[&str] = &[
@@ -1096,6 +1105,7 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
     use SubjectKind as K;
     match kind {
         K::ProjectProfileSlot
+        | K::EntryDependencies
         | K::CapabilityArtifacts
         | K::CapabilityPolicyArtifacts
         | K::CapabilityTargetProfileArtifacts
@@ -1106,6 +1116,23 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         | K::CapabilityTargetProfileReference
         | K::CapabilityReferenceBytes => &[NONE],
         K::ProfileSpecificationDependency => &[&["specification.project-profile.supported"]],
+        // The parser's tokens wait on the file's bytes and strict JSON on the
+        // tokens; duplicate members and the JSON-compatible domain need a
+        // syntactically parsed file, and the root-value bounds measure the
+        // root that entry materializes, so they wait on both (D15:802, 1794,
+        // 1795, 1876, 2289).
+        K::CompleteInput => &[
+            NONE,
+            &["entry.input.within-file-bytes"],
+            &["entry.input.within-parser-tokens"],
+            &["entry.input.well-formed-json"],
+            &["entry.input.well-formed-json"],
+            MATERIALIZABLE,
+            MATERIALIZABLE,
+            MATERIALIZABLE,
+            MATERIALIZABLE,
+            MATERIALIZABLE,
+        ],
         // The scan waits on the collection's bounds; selection, on the scan and
         // the reference's own bytes; and each later check, on the one before
         // it (Decision 015-164).
@@ -1400,8 +1427,7 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
             "hydration.target.single-role",
         ]],
         // Declared only: their units come with their phases' Findings.
-        K::EntryDependencies
-        | K::MaterializedDependencies
+        K::MaterializedDependencies
         | K::CapabilityStructuralAnalysis
         | K::ProfileKey
         | K::TargetProfileKey
@@ -1409,7 +1435,6 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         | K::CapabilityProfiles
         | K::CapabilityProfileId
         | K::DiagnosticDomain => &[NOT_YET],
-        K::CompleteInput => &[NOT_YET; 10],
         K::ConfigurationSchemaSelection
         | K::RootField
         | K::ProfileField
@@ -2474,9 +2499,26 @@ mod tests {
             prerequisites(K::CoverageDomain, Check::UniqueDomain),
             ["coverage.rule.normalized-domain"]
         );
-        // Phase 0, and the bounds before a policy is admitted, wait on nothing.
+        // The complete input's checks wait along the stages of strict file
+        // entry, and the root-value bounds on both checks of a parsed file.
+        assert_eq!(
+            prerequisites(K::CompleteInput, Check::WellFormedJson),
+            ["entry.input.within-parser-tokens"]
+        );
+        assert_eq!(
+            prerequisites(K::CompleteInput, Check::JsonCompatible),
+            ["entry.input.well-formed-json"]
+        );
+        assert_eq!(
+            prerequisites(K::CompleteInput, Check::WithinSingleStringBytes),
+            MATERIALIZABLE
+        );
+        // Phase 0, Phase 1's owner and the file's bytes, and the bounds before
+        // a policy is admitted, wait on nothing.
         for (kind, check) in [
             (K::ProjectProfileSlot, Check::SupportedAssertion),
+            (K::EntryDependencies, Check::EstablishedSlots),
+            (K::CompleteInput, Check::WithinFileBytes),
             (K::CapabilityArtifacts, Check::WithinCapability),
         ] {
             assert!(prerequisites(kind, check).is_empty(), "{kind:?}");
@@ -2559,7 +2601,7 @@ mod tests {
             .filter(|row| row.subject_kind.declared_only())
             .map(|row| row.check_id.as_str())
             .collect();
-        assert_eq!(declared.len(), 43);
+        assert_eq!(declared.len(), 32);
         for row in &rows {
             if row.subject_kind.declared_only() {
                 assert!(row.prerequisite_check_ids.is_empty(), "{}", row.check_id);
@@ -2631,10 +2673,10 @@ mod tests {
                 "{check:?}"
             );
         }
-        // The kinds declared only report what 015 gives their checks: the raw
-        // file's bounds are resolver-side bootstrap bounds (D15:2356), the
-        // root's are the policy's (D15:1876), and so is an over-long selector
-        // (D15:2296).
+        // Entry admission and the kinds declared only report what 015 gives
+        // their checks: the raw file's bounds are resolver-side bootstrap
+        // bounds (D15:2356), the root's are the policy's (D15:1876), and so is
+        // an over-long selector (D15:2296).
         for (kind, check, code) in [
             (
                 K::CompleteInput,

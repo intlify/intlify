@@ -124,6 +124,11 @@ impl Phase {
 pub(crate) enum Subject {
     /// One slot of the Profile Resolution Specification Input.
     Slot(Slot),
+    /// The owner of the entry dependency records, a singleton.
+    EntryDependencies,
+    /// The complete configuration input that strict file entry reads, a
+    /// singleton.
+    CompleteInput,
     /// The Intent Surface-Class Vocabulary Artifact, a singleton.
     Vocabulary,
     /// The Locale Canonicalization Data Artifact, a singleton.

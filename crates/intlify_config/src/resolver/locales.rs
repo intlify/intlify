@@ -600,8 +600,9 @@ pub(crate) mod fixtures {
     }
 
     /// Causes a phase before Phase 4 left behind, told apart by `code`.
-    /// Phases 1 to 3 record no units yet, so the key of Phase 0's one unit
-    /// with `code` stands in for theirs.
+    /// Phases 2 and 3 record no units yet, and Phase 4 never runs without
+    /// Phase 1's value, so the key of Phase 0's one unit with `code` stands in
+    /// for theirs.
     pub(crate) fn earlier(code: Code) -> Causes {
         let subject = Subject::Slot(Slot::ProjectProfile);
         Evaluation::fabricated()

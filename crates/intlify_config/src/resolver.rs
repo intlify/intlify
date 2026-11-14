@@ -16,6 +16,7 @@ pub(crate) mod capability;
 pub(crate) mod coverage;
 pub(crate) mod delivery;
 pub(crate) mod dependency;
+pub(crate) mod entry;
 pub(crate) mod evaluation;
 pub(crate) mod evidence;
 pub(crate) mod evidence_component;

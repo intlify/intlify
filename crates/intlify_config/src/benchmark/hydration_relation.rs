@@ -328,6 +328,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
             frame.text(target.as_str());
         }
         Subject::Slot(_)
+        | Subject::EntryDependencies
+        | Subject::CompleteInput
         | Subject::Vocabulary
         | Subject::CanonicalizationData
         | Subject::ResourcePolicy(_)
@@ -456,6 +458,8 @@ fn causes(frame: &mut Frame, causes: &Causes) -> Result<(), OutputFailure> {
                 resolved_binding::issue(frame, key)
             }
             Subject::Slot(_)
+            | Subject::EntryDependencies
+            | Subject::CompleteInput
             | Subject::Vocabulary
             | Subject::CanonicalizationData
             | Subject::ResourcePolicy(_)

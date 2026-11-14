@@ -737,9 +737,7 @@ impl SubjectKind {
     pub(crate) const fn declared_only(self) -> bool {
         matches!(
             self,
-            Self::EntryDependencies
-                | Self::CompleteInput
-                | Self::MaterializedDependencies
+            Self::MaterializedDependencies
                 | Self::ConfigurationSchemaSelection
                 | Self::CapabilityStructuralAnalysis
                 | Self::RootField
@@ -796,6 +794,8 @@ impl Subject {
                 Slot::DeliveryGraph => SubjectKind::DeliveryGraphSlot,
                 Slot::DeliveryPlacement => SubjectKind::DeliveryPlacementSlot,
             },
+            Self::EntryDependencies => SubjectKind::EntryDependencies,
+            Self::CompleteInput => SubjectKind::CompleteInput,
             Self::Vocabulary => SubjectKind::Vocabulary,
             Self::CanonicalizationData => SubjectKind::CanonicalizationData,
             Self::ResourcePolicy(subject) => match subject {
@@ -952,7 +952,9 @@ impl Ord for Subject {
                 (Self::Target(own), Self::Target(theirs)) => own.cmp(theirs),
                 (Self::Group(own), Self::Group(theirs)) => own.cmp(theirs),
                 (Self::Hydration(own), Self::Hydration(theirs)) => own.cmp(theirs),
-                (Self::Vocabulary, Self::Vocabulary)
+                (Self::EntryDependencies, Self::EntryDependencies)
+                | (Self::CompleteInput, Self::CompleteInput)
+                | (Self::Vocabulary, Self::Vocabulary)
                 | (Self::CanonicalizationData, Self::CanonicalizationData)
                 | (Self::DeliveryPlacement, Self::DeliveryPlacement)
                 | (Self::SemanticDependency(_), Self::SemanticDependency(_)) => Ordering::Equal,
@@ -1010,6 +1012,8 @@ mod tests {
         let owner = |group| Subject::SemanticDependency(group);
         vec![
             Subject::Slot(Slot::ProjectProfile),
+            Subject::EntryDependencies,
+            Subject::CompleteInput,
             owner(SemanticGroup::ProfileSpecification),
             capability(ArtifactSubject::Artifacts),
             capability(ArtifactSubject::PolicyArtifacts),
@@ -1216,36 +1220,24 @@ mod tests {
         for kind in SubjectKind::ALL {
             let unrecorded = matches!(
                 kind.phase(),
-                Phase::EntryAdmission
-                    | Phase::StructuralAdmission
-                    | Phase::ProfileSelection
-                    | Phase::ReportingFinalization
+                Phase::StructuralAdmission | Phase::ProfileSelection | Phase::ReportingFinalization
             ) && kind != SubjectKind::ProfileSpecificationDependency;
             assert_eq!(kind.declared_only(), unrecorded, "{kind:?}");
         }
     }
 
-    /// The declared kinds in rank order, each with the checks 015 gives it.
+    /// Phase 1's kinds in rank order, each with the checks 015 gives it.
     #[test]
-    fn the_declared_kinds_run_the_checks_015_gives_them() {
-        let declared: Vec<(SubjectKind, &[Check])> = SubjectKind::ALL
+    fn the_entry_kinds_run_the_checks_015_gives_them() {
+        let entry: Vec<(SubjectKind, &[Check])> = SubjectKind::ALL
             .into_iter()
-            .filter(|kind| kind.declared_only())
+            .filter(|kind| kind.phase() == Phase::EntryAdmission)
             .map(|kind| (kind, kind.checks()))
             .collect();
-        // Each scope level runs the four keyword classes (D15:2173).
-        let fields: &[Check] = &[
-            Check::RequiredField,
-            Check::FieldType,
-            Check::FieldValue,
-            Check::KnownField,
-        ];
-        let key: &[Check] = &[Check::FieldValue];
-        let capability: &[Check] = &[Check::WithinCapability];
         assert_eq!(
-            declared,
+            entry,
             [
-                // The owners rank first in their phases (D15:2516).
+                // The owner ranks first in its phase (D15:2516).
                 (
                     SubjectKind::EntryDependencies,
                     &[Check::EstablishedSlots][..]
@@ -1268,6 +1260,31 @@ mod tests {
                         Check::WithinSingleStringBytes,
                     ][..],
                 ),
+            ]
+        );
+    }
+
+    /// The declared kinds in rank order, each with the checks 015 gives it.
+    #[test]
+    fn the_declared_kinds_run_the_checks_015_gives_them() {
+        let declared: Vec<(SubjectKind, &[Check])> = SubjectKind::ALL
+            .into_iter()
+            .filter(|kind| kind.declared_only())
+            .map(|kind| (kind, kind.checks()))
+            .collect();
+        // Each scope level runs the four keyword classes (D15:2173).
+        let fields: &[Check] = &[
+            Check::RequiredField,
+            Check::FieldType,
+            Check::FieldValue,
+            Check::KnownField,
+        ];
+        let key: &[Check] = &[Check::FieldValue];
+        let capability: &[Check] = &[Check::WithinCapability];
+        assert_eq!(
+            declared,
+            [
+                // The owner ranks first in its phase (D15:2516).
                 (
                     SubjectKind::MaterializedDependencies,
                     &[Check::EstablishedSlots][..]

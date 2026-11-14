@@ -135,7 +135,9 @@
       "owningScope": "complete-input",
       "subjectKindRank": "1",
       "checkRank": "1",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "entry.input.within-file-bytes"
+      ],
       "possibleFindingCodes": [
         "project-profile-bootstrap-limit-exceeded"
       ],
@@ -173,7 +175,9 @@
       "owningScope": "complete-input",
       "subjectKindRank": "1",
       "checkRank": "2",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "entry.input.within-parser-tokens"
+      ],
       "possibleFindingCodes": [
         "project-profile-json-invalid"
       ],
@@ -206,7 +210,9 @@
       "owningScope": "complete-input",
       "subjectKindRank": "1",
       "checkRank": "3",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "entry.input.well-formed-json"
+      ],
       "possibleFindingCodes": [
         "project-profile-json-member-duplicate"
       ],
@@ -239,7 +245,9 @@
       "owningScope": "complete-input",
       "subjectKindRank": "1",
       "checkRank": "4",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "entry.input.well-formed-json"
+      ],
       "possibleFindingCodes": [
         "project-profile-input-not-json-compatible"
       ],
@@ -284,7 +292,10 @@
       "owningScope": "complete-input",
       "subjectKindRank": "1",
       "checkRank": "5",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "entry.input.unique-members",
+        "entry.input.json-compatible"
+      ],
       "possibleFindingCodes": [
         "project-profile-resource-limit-exceeded"
       ],
@@ -324,7 +335,10 @@
       "owningScope": "complete-input",
       "subjectKindRank": "1",
       "checkRank": "6",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "entry.input.unique-members",
+        "entry.input.json-compatible"
+      ],
       "possibleFindingCodes": [
         "project-profile-resource-limit-exceeded"
       ],
@@ -364,7 +378,10 @@
       "owningScope": "complete-input",
       "subjectKindRank": "1",
       "checkRank": "7",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "entry.input.unique-members",
+        "entry.input.json-compatible"
+      ],
       "possibleFindingCodes": [
         "project-profile-resource-limit-exceeded"
       ],
@@ -404,7 +421,10 @@
       "owningScope": "complete-input",
       "subjectKindRank": "1",
       "checkRank": "8",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "entry.input.unique-members",
+        "entry.input.json-compatible"
+      ],
       "possibleFindingCodes": [
         "project-profile-resource-limit-exceeded"
       ],
@@ -444,7 +464,10 @@
       "owningScope": "complete-input",
       "subjectKindRank": "1",
       "checkRank": "9",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "entry.input.unique-members",
+        "entry.input.json-compatible"
+      ],
       "possibleFindingCodes": [
         "project-profile-resource-limit-exceeded"
       ],
