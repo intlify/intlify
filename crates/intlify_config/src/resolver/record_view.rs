@@ -45,6 +45,7 @@ use super::evaluation::{
     Actual, Check, Details, Evaluation, Finding, IssueKey, Status, Subject, Suggestion, Unit,
 };
 use super::specification::Slot;
+use super::structural_admission::StructuralSubject;
 use super::token::{Digest, Specification, Tokens};
 
 /// A resolver bug that leaves a record without its view.
@@ -339,13 +340,17 @@ fn member_value(finding: &Finding<'_>, member: DetailsMember) -> Option<Value> {
 
 /// The schema-relative path of the field `unit` checks, as an array of the
 /// schema's member names (D15:2231): the root that the schema selection finds
-/// an object, and its `schemaVersion` member (D15:2291, 2292). The scope
-/// levels' fields come with their units (plan 025 PR 5f-2d).
+/// an object, and its `schemaVersion` member (D15:2291, 2292), and a scope
+/// level's field, its subject's path: the missing member's, the value's, or
+/// the object an undeclared member is in (D15:2184, 2291-2294).
 fn field(unit: &Unit) -> Option<Value> {
     match (&unit.subject, unit.check) {
         (Subject::SchemaSelection, Check::ObjectRoot) => Some(json!([])),
         (Subject::SchemaSelection, Check::PresentSchemaVersion | Check::StringSchemaVersion) => {
             Some(json!(["schemaVersion"]))
+        }
+        (Subject::Structural(StructuralSubject::RootField(field)), _) => {
+            Some(field.path.iter().map(|name| Value::from(&**name)).collect())
         }
         _ => None,
     }
@@ -965,6 +970,50 @@ mod tests {
                 Some(json!({ "field": ["schemaVersion"] })),
                 Some(json!({ "field": ["schemaVersion"] })),
                 None,
+            ]
+        );
+    }
+
+    /// A Finding of the root's fields names the path of its unit's subject:
+    /// the missing member's, the value's, or that of the object an undeclared
+    /// member is in (D15:2184, 2291-2294).
+    #[test]
+    fn a_root_field_findings_field_is_its_subjects_path() {
+        use crate::resolver::structural_admission::StructuralSubject;
+        let root = |path: &[&str], check| Unit {
+            phase: Phase::StructuralAdmission,
+            subject: Subject::Structural(StructuralSubject::root(path)),
+            check,
+        };
+        let mut evaluation = Evaluation::default();
+        for (unit, code) in [
+            (root(&[], Check::KnownField), Code::UnknownField),
+            (root(&["$schema"], Check::FieldType), Code::FieldTypeInvalid),
+            (
+                root(&["profiles"], Check::RequiredField),
+                Code::RequiredFieldMissing,
+            ),
+            (
+                root(&["profiles"], Check::FieldValue),
+                Code::FieldValueInvalid,
+            ),
+        ] {
+            block(&mut evaluation, unit, code, None).unwrap_err();
+        }
+        let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
+        let details: Vec<Option<Value>> = views
+            .findings(&evaluation)
+            .unwrap()
+            .into_iter()
+            .map(|view| view.get("details").cloned())
+            .collect();
+        assert_eq!(
+            details,
+            [
+                Some(json!({ "field": [] })),
+                Some(json!({ "field": ["$schema"] })),
+                Some(json!({ "field": ["profiles"] })),
+                Some(json!({ "field": ["profiles"] })),
             ]
         );
     }

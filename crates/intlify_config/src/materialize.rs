@@ -24,7 +24,7 @@ use std::sync::Arc;
 
 use crate::input_limits::{CountRelation, InputBound, InputLimits, LimitViolation, ValueCounts};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct ByteSpan {
     start: u64,
     end: u64,

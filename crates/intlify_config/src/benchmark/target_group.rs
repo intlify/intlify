@@ -369,6 +369,7 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Subject::MaterializedDependencies
         | Subject::SchemaSelection
         | Subject::StructuralCapability
+        | Subject::Structural(_)
         | Subject::Vocabulary
         | Subject::CanonicalizationData
         | Subject::ResourcePolicy(_)
@@ -498,6 +499,7 @@ fn causes(frame: &mut Frame, causes: &Causes) -> Result<(), OutputFailure> {
             | Subject::MaterializedDependencies
             | Subject::SchemaSelection
             | Subject::StructuralCapability
+            | Subject::Structural(_)
             | Subject::Vocabulary
             | Subject::CanonicalizationData
             | Subject::ResourcePolicy(_)

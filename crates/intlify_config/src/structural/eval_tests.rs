@@ -779,3 +779,60 @@ fn a_failing_keys_value_counts_the_work_of_any_other_entry() {
     assert!(units("zz") > one);
     assert_eq!(units("Bad Key"), units("zz"));
 }
+
+/// Each candidate needs the type check its evaluation depends on: its
+/// containing value's for a type, its value's own, or else the containing
+/// value's, for the other checks of its path, the object's for a required
+/// member, and the map's for a key (D15:2149, 2184).
+#[test]
+fn each_candidate_needs_the_type_check_it_depends_on() {
+    let mut value = complete_config();
+    value["profiles"]["app"]["requestedLocales"] = json!("en");
+    let result = run(&program(), &materialize(&value));
+    let facts = &result.facts;
+    let find = |check: Check, level: Level, path: &str| {
+        facts
+            .identified()
+            .find(|(_, candidate)| {
+                candidate.check == check
+                    && facts.scope(candidate.scope).level == level
+                    && names(facts, candidate.path).join("/") == path
+            })
+            .map(|(id, candidate)| (id, candidate.after))
+            .unwrap()
+    };
+    let (root, after) = find(Check::Type, Level::Root, "");
+    assert_eq!(after, None, "the measure admits the root's type");
+    let (profiles, after) = find(Check::Type, Level::Root, "profiles");
+    assert_eq!(after, Some(root));
+    assert_eq!(find(Check::Required, Level::Root, "profiles").1, Some(root));
+    assert_eq!(find(Check::Known, Level::Root, "").1, Some(root));
+    assert_eq!(
+        find(Check::Value, Level::Root, "profiles").1,
+        Some(profiles)
+    );
+    assert_eq!(
+        find(Check::Key, Level::Root, "profiles/*").1,
+        Some(profiles)
+    );
+    let (declaration, after) = find(Check::Type, Level::Profile, "");
+    assert_eq!(after, Some(profiles));
+    assert_eq!(
+        find(Check::Required, Level::Profile, "requestedLocales").1,
+        Some(declaration)
+    );
+    // A value whose schema has no type needs its container's.
+    let (sequence, _) = find(Check::Type, Level::Profile, "messageFallback/*");
+    assert_eq!(
+        find(Check::Value, Level::Profile, "messageFallback/*/*").1,
+        Some(sequence)
+    );
+    // An excluded check needs the type that excluded it.
+    let (locales, _) = find(Check::Type, Level::Profile, "requestedLocales");
+    let (_, excluded) = find(Check::Value, Level::Profile, "requestedLocales");
+    assert_eq!(excluded, Some(locales));
+    // Every candidate comes after the one it needs.
+    assert!(facts
+        .identified()
+        .all(|(id, candidate)| candidate.after.is_none_or(|after| after < id)));
+}

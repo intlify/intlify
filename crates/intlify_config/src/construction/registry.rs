@@ -65,7 +65,7 @@ pub(crate) const PATH: &str = "registries/package-v0.json";
 
 /// The container's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:6db32914cabc31dd2ca6c7760a683547d507765676d0fbb8a22436ea7be55236";
+    "sha256:a3d658fd7d96bef223e3d407c50ec0de8d1ce4a8a36878d9dbf21d04cd2529d3";
 
 /// A rank's spelling in a registry: a shortest decimal string.
 pub(crate) const RANK_PATTERN: &str = "^(0|[1-9][0-9]*)$";
@@ -704,8 +704,8 @@ mod tests {
     #[test]
     fn the_check_registry_must_form_a_closed_graph() {
         let committed: Value = serde_json::from_slice(CHECKS).unwrap();
-        // A repeated check ID, a relation that scopes itself, a check that
-        // waits on itself, and a dependency record with two owners.
+        // A repeated check ID, a relation that scopes itself, two checks that
+        // wait on each other, and a dependency record with two owners.
         let mut repeated = committed.clone();
         repeated["rows"][1]["checkId"] = committed["rows"][0]["checkId"].clone();
         repeated["rows"][1]["ruleId"] = committed["rows"][0]["ruleId"].clone();
@@ -720,6 +720,8 @@ mod tests {
         }
         for row in waiting["rows"].as_array_mut().unwrap() {
             if row["checkId"] == "hydration.relation.unique" {
+                row["prerequisiteCheckIds"] = json!(["hydration.relation.distinct-endpoints"]);
+            } else if row["checkId"] == "hydration.relation.distinct-endpoints" {
                 row["prerequisiteCheckIds"] = json!(["hydration.relation.unique"]);
             }
         }
@@ -734,7 +736,7 @@ mod tests {
         for (case, registry) in [
             ("repeated", repeated),
             ("circular", circular),
-            ("waiting on itself", waiting),
+            ("waiting on each other", waiting),
             ("owned twice", shared),
         ] {
             let bytes = serde_json::to_vec_pretty(&registry).unwrap();

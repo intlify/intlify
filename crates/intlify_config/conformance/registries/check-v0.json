@@ -743,7 +743,9 @@
       "owningScope": "root",
       "subjectKindRank": "3",
       "checkRank": "0",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.root.field-type"
+      ],
       "possibleFindingCodes": [
         "project-profile-required-field-missing"
       ],
@@ -777,7 +779,10 @@
       "owningScope": "root",
       "subjectKindRank": "3",
       "checkRank": "1",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.analysis.within-capability",
+        "structural.root.field-type"
+      ],
       "possibleFindingCodes": [
         "project-profile-field-type-invalid"
       ],
@@ -811,7 +816,9 @@
       "owningScope": "root",
       "subjectKindRank": "3",
       "checkRank": "2",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.root.field-type"
+      ],
       "possibleFindingCodes": [
         "project-profile-field-value-invalid"
       ],
@@ -845,7 +852,9 @@
       "owningScope": "root",
       "subjectKindRank": "3",
       "checkRank": "3",
-      "prerequisiteCheckIds": [],
+      "prerequisiteCheckIds": [
+        "structural.root.field-type"
+      ],
       "possibleFindingCodes": [
         "project-profile-unknown-field"
       ],

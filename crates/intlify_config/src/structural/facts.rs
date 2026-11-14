@@ -80,12 +80,23 @@ pub(crate) enum FieldStep {
     Any,
 }
 
+impl FieldStep {
+    /// The step as a `logical-field` path spells it: the member's name, or
+    /// `*` (D15:2184).
+    pub(crate) fn name(&self) -> &str {
+        match self {
+            Self::Member(name) => name,
+            Self::Any => "*",
+        }
+    }
+}
+
 /// A non-empty logical field path, by its last step in [`Facts`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct FieldPathId(usize);
 
 /// Where a candidate looked.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum At {
     /// A value.
     Value(NodeId),
@@ -116,6 +127,10 @@ impl Outcome {
     }
 }
 
+/// A candidate, by its position in [`Facts`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct CandidateId(usize);
+
 /// One applicable evaluation of a check: its subject is the path under the
 /// scope's entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -126,6 +141,12 @@ pub(crate) struct Candidate {
     pub(crate) path: Option<FieldPathId>,
     pub(crate) at: At,
     pub(crate) outcome: Outcome,
+    /// The type check this evaluation needs: the containing value's for a
+    /// type, the value's own, or else the containing value's, for a closed
+    /// value, a known member, or an excluded check, the object's for a
+    /// required member, and the map's for a key. None for the root's type,
+    /// which the analysis's measure admits (D15:2149, 2184).
+    pub(crate) after: Option<CandidateId>,
 }
 
 /// The candidates of one analysis, with the scopes and paths they name.
@@ -176,12 +197,22 @@ impl Facts {
         path
     }
 
-    pub(crate) fn push(&mut self, candidate: Candidate) {
+    pub(crate) fn push(&mut self, candidate: Candidate) -> CandidateId {
         self.candidates.push(candidate);
+        CandidateId(self.candidates.len() - 1)
     }
 
     pub(crate) fn candidates(&self) -> &[Candidate] {
         &self.candidates
+    }
+
+    /// Each candidate with its ID, in the order the walk recorded them: a
+    /// candidate comes after the one it needs.
+    pub(crate) fn identified(&self) -> impl Iterator<Item = (CandidateId, &Candidate)> {
+        self.candidates
+            .iter()
+            .enumerate()
+            .map(|(id, candidate)| (CandidateId(id), candidate))
     }
 
     pub(crate) fn scope(&self, id: ScopeId) -> Scope {
@@ -224,10 +255,7 @@ pub(crate) mod tests {
         facts
             .steps(path)
             .into_iter()
-            .map(|step| match step {
-                FieldStep::Member(name) => name.to_string(),
-                FieldStep::Any => "*".to_owned(),
-            })
+            .map(|step| step.name().to_owned())
             .collect()
     }
 
@@ -274,14 +302,24 @@ pub(crate) mod tests {
         assert_eq!(facts.scope(target).level, Level::Target);
         assert_eq!(facts.scope(target).entry, Some(entry(2)));
         assert_ne!(facts.scope(profile).entry, facts.scope(target).entry);
-        facts.push(super::Candidate {
+        let first = facts.push(super::Candidate {
             check: Check::Key,
             scope: profile,
             path: None,
             at: At::Key(target),
             outcome: Outcome::of(false),
+            after: None,
         });
-        assert_eq!(facts.candidates().len(), 1);
+        let second = facts.push(super::Candidate {
+            after: Some(first),
+            ..facts.candidates()[0]
+        });
+        assert_eq!(facts.candidates().len(), 2);
+        assert_eq!(
+            facts.identified().map(|(id, _)| id).collect::<Vec<_>>(),
+            [first, second]
+        );
+        assert_eq!(facts.candidates()[1].after, Some(first));
         assert_eq!(facts.candidates()[0].outcome, Outcome::Failed);
         assert_eq!(Outcome::of(true), Outcome::Passed);
     }

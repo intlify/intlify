@@ -47,6 +47,7 @@ use super::negotiation::NegotiationSubject;
 use super::occurrence::OccurrenceCandidate;
 use super::resource_policy::{PolicySubject, ReferenceField};
 use super::specification::Slot;
+use super::structural_admission::StructuralSubject;
 use super::targets::TargetSubject;
 
 /// 015's resolution phases, declared in rank order, each spelled as its ID.
@@ -137,6 +138,8 @@ pub(crate) enum Subject {
     /// The schema-guided structural analysis under the capability, a
     /// singleton.
     StructuralCapability,
+    /// A field of one of structural admission's scope levels.
+    Structural(StructuralSubject),
     /// The Intent Surface-Class Vocabulary Artifact, a singleton.
     Vocabulary,
     /// The Locale Canonicalization Data Artifact, a singleton.
