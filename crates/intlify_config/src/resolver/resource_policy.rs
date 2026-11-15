@@ -16,11 +16,13 @@
 //! Recounting the diagnostics under the policy waits for 015 Implementation
 //! Phase 5.
 //!
-//! The checks of the collection under the capability observe their Findings
-//! at the collection's root, or at each member past one artifact's bound under
-//! a key that keeps only its JSON type, beside the capability's bound
-//! (D15:834, 836; plan 025 interpretation #200). The other checks carry no
-//! occurrence Evidence yet (plan 025 PRs 5f-4c, 5f-4d).
+//! The checks under the capability observe their Findings beside the
+//! capability's bound: those of the collection at its root, or at each member
+//! past one artifact's bound under a key that keeps only its JSON type
+//! (D15:834, 836; plan 025 interpretation #200), and those of the selected
+//! declaration's references at the declaration, or at each reference's value,
+//! in the file Phase 1 read (D15:790, 1918, 1921-1922). The other checks carry
+//! no occurrence Evidence yet (plan 025 PRs 5f-4c-3, 5f-4d).
 
 use std::collections::BTreeMap;
 
@@ -38,6 +40,7 @@ use crate::structural::selection::{SelectionInvariant, SelectorInput, StringLeng
 use super::bootstrap::work::{self, WorkBound};
 use super::bootstrap::{admit_body, select_candidate, AdmittedResourcePolicy};
 use super::capability::CapabilityBound;
+use super::declaration_observer::{DeclarationObserver, ObserverInvariant};
 use super::evaluation::{
     and, both, Actual, Admitted, Blocking, Causes, Check, Evaluation, EvaluationInvariant, Found,
     Observation, Phase, Shortfall, Subject, Unit,
@@ -290,6 +293,9 @@ pub(crate) enum PolicyInvariant {
     Selection(SelectionInvariant),
     /// A bound or a member the Evidence names has no component path.
     Component(ComponentInvariant),
+    /// A value of the selected declaration a check looked at has no
+    /// Evidence.
+    Observer(ObserverInvariant),
 }
 
 impl From<EvaluationInvariant> for PolicyInvariant {
@@ -301,6 +307,12 @@ impl From<EvaluationInvariant> for PolicyInvariant {
 impl From<ComponentInvariant> for PolicyInvariant {
     fn from(invariant: ComponentInvariant) -> Self {
         Self::Component(invariant)
+    }
+}
+
+impl From<ObserverInvariant> for PolicyInvariant {
+    fn from(invariant: ObserverInvariant) -> Self {
+        Self::Observer(invariant)
     }
 }
 
@@ -374,6 +386,34 @@ impl Stage {
             Self::Policy => Ok(Vec::new()),
         }
     }
+
+    /// What this stage's unit of a bound over the selected declaration's
+    /// references observes: under the capability, the value at `path` under
+    /// the declaration, beside the capability's bound (D15:790, 836). A
+    /// recheck observes nothing yet, and nothing is observed without the
+    /// declaration's file.
+    fn at_declaration(
+        self,
+        observer: Option<&DeclarationObserver<'_>>,
+        path: &[&str],
+        bound: BoundId,
+    ) -> Result<Option<Observation>, PolicyInvariant> {
+        match (self, observer) {
+            (Self::Capability, Some(observer)) => Ok(Some(Observation {
+                primary: observer.value(path)?,
+                related: vec![capability_bound(CapabilityBound::PolicyComparable(bound))?],
+            })),
+            _ => Ok(None),
+        }
+    }
+}
+
+/// The path of a reference field's value under the declaration.
+fn reference_path(field: &ReferenceField) -> Vec<&str> {
+    match field {
+        ReferenceField::Policy(slot) => vec!["policies", slot.name()],
+        ReferenceField::TargetProfile(id) => vec!["targetProfiles", id.as_str(), "profile"],
+    }
 }
 
 /// Resolver-input Evidence of the submitted collection at its root (D15:834).
@@ -444,7 +484,7 @@ pub(crate) fn admit_resource_policy(
     capability: &ImplementationCapability,
     collection: &FormalCollection,
     resource_limits: Result<&PolicyReference, &Causes>,
-    references: &DeclarationReferences<'_>,
+    declared: (&DeclarationReferences<'_>, Option<&DeclarationObserver<'_>>),
     measures: &ConfigurationMeasures<'_>,
     verification: &VerificationInput,
 ) -> Result<PolicyOutcome, PolicyInvariant> {
@@ -454,7 +494,7 @@ pub(crate) fn admit_resource_policy(
         capability,
         &submitted,
         resource_limits,
-        references,
+        declared,
         verification,
     )?;
     // An admitted, compatible policy is the projection authority whatever its
@@ -485,7 +525,7 @@ pub(crate) fn admit_resource_policy(
         limits.map(|limits| &limits.artifact_admission),
         &submitted,
         resource_limits,
-        references,
+        declared,
     )?;
     let rechecked = and(configured, inspected.every);
     Ok(PolicyOutcome {
@@ -506,7 +546,7 @@ fn admit_and_compare(
     capability: &ImplementationCapability,
     submitted: &Submitted<'_>,
     resource_limits: Result<&PolicyReference, &Causes>,
-    references: &DeclarationReferences<'_>,
+    declared: (&DeclarationReferences<'_>, Option<&DeclarationObserver<'_>>),
     verification: &VerificationInput,
 ) -> Result<Admitted<AdmittedResourcePolicy>, PolicyInvariant> {
     let inspected = artifact_bounds(
@@ -515,7 +555,7 @@ fn admit_and_compare(
         Ok(&capability.policy_comparable().artifact_admission),
         submitted,
         resource_limits,
-        references,
+        declared,
     )?;
     let limits = &capability.bootstrap_only().artifact_bootstrap;
     // The scan reads the whole collection, not through the reference (D15:834,
@@ -650,21 +690,21 @@ fn witnessed_at(
 }
 
 /// One bound's unit over a count part of which may be unavailable: proved
-/// only once what is visible exceeds the bound.
+/// only once what is visible exceeds the bound. Its Finding is observed
+/// through `observed` where its check's Findings carry occurrence Evidence.
 fn measured(
     evaluation: &mut Evaluation,
     unit: Unit,
-    bound: BoundId,
-    limit: Result<Bound, &Causes>,
-    visible: Tally,
-    unavailable: Option<&Causes>,
+    (bound, limit): (BoundId, Result<Bound, &Causes>),
+    (visible, unavailable): (Tally, Option<&Causes>),
+    observed: Option<Observation>,
 ) -> Result<Admitted<()>, EvaluationInvariant> {
     let measured = match limit {
         Ok(limit) => measure(visible, unavailable.cloned(), limit).map(|actual| (limit, actual)),
         Err(causes) => Err(join(unavailable.cloned(), causes)),
     };
-    evaluation.check(unit, measured, |(limit, actual)| {
-        within(bound, limit, actual)
+    evaluation.check_found(unit, measured, |(limit, actual)| {
+        within(bound, limit, actual).map_err(|blocking| found(blocking, observed))
     })
 }
 
@@ -795,7 +835,7 @@ fn artifact_bounds(
     limits: Result<&ArtifactAdmissionLimits, &Causes>,
     submitted: &Submitted<'_>,
     resource_limits: Result<&PolicyReference, &Causes>,
-    references: &DeclarationReferences<'_>,
+    (references, observer): (&DeclarationReferences<'_>, Option<&DeclarationObserver<'_>>),
 ) -> Result<Inspected, PolicyInvariant> {
     let occurrences = occurrence_bounds(evaluation, stage, limits, submitted.members)?;
     let (visible, unavailable) = references.visible(
@@ -803,27 +843,41 @@ fn artifact_bounds(
         TargetProfileReference::canonical_bytes,
     );
     // The declaration's count and total never gate the decision for the
-    // selected reference.
+    // selected reference. Both count over the whole declaration (D15:1918,
+    // 1922).
     let count = measured(
         evaluation,
         stage.unit(ArtifactSubject::References),
-        MAX_ARTIFACT_REFERENCES,
-        limits.map(|limits| limits.max_artifact_references),
-        Tally::of(visible.len()),
-        unavailable.as_ref(),
+        (
+            MAX_ARTIFACT_REFERENCES,
+            limits.map(|limits| limits.max_artifact_references),
+        ),
+        (Tally::of(visible.len()), unavailable.as_ref()),
+        stage.at_declaration(observer, &[], MAX_ARTIFACT_REFERENCES)?,
     )?;
     let collection = and(
         occurrences,
         body_bounds(evaluation, stage, limits, submitted)?,
     );
-    let (own_bytes, each) = each_reference(evaluation, stage, limits, resource_limits, &visible)?;
+    let (own_bytes, each) = each_reference(
+        evaluation,
+        stage,
+        limits,
+        (resource_limits, &visible),
+        observer,
+    )?;
     let bytes = measured(
         evaluation,
         stage.unit(ArtifactSubject::ReferenceBytes),
-        MAX_TOTAL_REFERENCE_CANONICAL_BYTES,
-        limits.map(|limits| limits.max_total_reference_canonical_bytes),
-        total(visible.iter().map(|&(_, bytes)| Tally::exactly(bytes))),
-        unavailable.as_ref(),
+        (
+            MAX_TOTAL_REFERENCE_CANONICAL_BYTES,
+            limits.map(|limits| limits.max_total_reference_canonical_bytes),
+        ),
+        (
+            total(visible.iter().map(|&(_, bytes)| Tally::exactly(bytes))),
+            unavailable.as_ref(),
+        ),
+        stage.at_declaration(observer, &[], MAX_TOTAL_REFERENCE_CANONICAL_BYTES)?,
     )?;
     Ok(Inspected {
         every: and(and(collection.clone(), count), and(each, bytes)),
@@ -935,29 +989,43 @@ fn each_reference(
     evaluation: &mut Evaluation,
     stage: Stage,
     limits: Result<&ArtifactAdmissionLimits, &Causes>,
-    resource_limits: Result<&PolicyReference, &Causes>,
-    visible: &[(ReferenceField, u64)],
-) -> Result<(Admitted<()>, Admitted<()>), EvaluationInvariant> {
+    (resource_limits, visible): (Result<&PolicyReference, &Causes>, &[(ReferenceField, u64)]),
+    observer: Option<&DeclarationObserver<'_>>,
+) -> Result<(Admitted<()>, Admitted<()>), PolicyInvariant> {
     let single_limit = limits.map(|limits| limits.max_single_reference_canonical_bytes);
     let selected = ReferenceField::Policy(PolicySlot::ResourceLimits);
-    let own_bytes = bounded(
+    // Each reference is observed at its value (D15:1921).
+    let at = |field: &ReferenceField| {
+        // The selected reference is looked at only where selection admitted
+        // it, and every other one is visible.
+        if *field != selected || resource_limits.is_ok() {
+            stage.at_declaration(
+                observer,
+                &reference_path(field),
+                MAX_SINGLE_REFERENCE_CANONICAL_BYTES,
+            )
+        } else {
+            Ok(None)
+        }
+    };
+    let own_bytes = bounded_at(
         evaluation,
         stage.unit(ArtifactSubject::Reference(selected.clone())),
-        MAX_SINGLE_REFERENCE_CANONICAL_BYTES,
-        single_limit,
+        (MAX_SINGLE_REFERENCE_CANONICAL_BYTES, single_limit),
         resource_limits.map(|reference| Tally::exactly(reference.canonical_bytes())),
+        at(&selected)?,
     )?;
     let mut holds = own_bytes.clone();
     for (field, bytes) in visible {
         if *field == selected {
             continue;
         }
-        let held = bounded(
+        let held = bounded_at(
             evaluation,
             stage.unit(ArtifactSubject::Reference(field.clone())),
-            MAX_SINGLE_REFERENCE_CANONICAL_BYTES,
-            single_limit,
+            (MAX_SINGLE_REFERENCE_CANONICAL_BYTES, single_limit),
             Ok(Tally::exactly(*bytes)),
+            at(field)?,
         )?;
         holds = and(holds, held);
     }
@@ -1023,11 +1091,15 @@ mod tests {
     use serde_json::{json, Value};
 
     use std::collections::BTreeSet;
+    use std::sync::Arc;
 
     use super::*;
     use crate::artifacts::collection::{read_collection, CollectionLimits};
     use crate::artifacts::envelope::{envelope_of, ArtifactKind, ExactTuple};
+    use crate::materialize::{materialize_file, NodeKind};
+    use crate::materialize_tests::limits as input_limits;
     use crate::resolver::capability::ArtifactBootstrapLimits;
+    use crate::resolver::entry::fixtures::FileFixture;
     use crate::resolver::evaluation::{
         Actual, BootstrapLimitExceeded, Code, IssueKey, LimitExceeded, Reason, Status,
     };
@@ -1038,6 +1110,9 @@ mod tests {
     use crate::resolver::occurrence::{occurrences, redacted};
     use crate::resolver::token::{logical_member, Sha256, Specification};
     use crate::structural::selection::InvalidSelectorType;
+
+    /// The Profile ID of the selected declaration.
+    const SELECTED: &str = "web";
 
     /// Limits no test reaches.
     const ROOM: CollectionLimits = CollectionLimits {
@@ -1302,19 +1377,60 @@ mod tests {
             VerificationInput::fixture_owned([pin])
         }
 
+        /// The configuration a file holds with these inputs' references in
+        /// the selected declaration, [`SELECTED`], which a check of Phase 4
+        /// looks at: the selected reference even where the rest of `policies`
+        /// was not admitted.
+        fn config(&self) -> Value {
+            let mut declaration = json!({});
+            if let Ok(policies) = &self.policies {
+                declaration["policies"] = serde_json::to_value(policies).unwrap();
+            }
+            if let Ok(reference) = &self.resource_limits {
+                declaration["policies"]["resourceLimits"] =
+                    serde_json::to_value(reference).unwrap();
+            }
+            if let Ok(targets) = &self.targets {
+                declaration["targetProfiles"] = serde_json::to_value(targets).unwrap();
+            }
+            json!({ "profiles": { SELECTED: declaration } })
+        }
+
+        /// Runs `phase` with these inputs' references and where a check
+        /// looks at them in the file holding [`Self::config`].
+        fn observing<R>(
+            &self,
+            phase: impl FnOnce((&DeclarationReferences<'_>, Option<&DeclarationObserver<'_>>)) -> R,
+        ) -> R {
+            let bytes: Arc<[u8]> = Arc::from(serde_json::to_vec(&self.config()).unwrap());
+            let document = materialize_file(Arc::clone(&bytes), input_limits()).unwrap();
+            let NodeKind::Object(root) = document.node(document.root()).kind() else {
+                unreachable!("the configuration is an object")
+            };
+            let profiles = root.get("profiles").unwrap().value();
+            let fixture = FileFixture::new(&fixture_limits(10_000));
+            let file = fixture.file(bytes);
+            let observer =
+                DeclarationObserver::new(&file, (&document, profiles), SELECTED).unwrap();
+            phase((&self.references(), Some(&observer)))
+        }
+
         /// Phase 4 up to the comparison.
         fn run(&self) -> (Evaluation, Admitted<AdmittedResourcePolicy>) {
             let mut evaluation = Evaluation::default();
             let collection = collection(&self.members);
-            let admitted = admit_and_compare(
-                &mut evaluation,
-                &self.capability,
-                &Submitted::of(&collection),
-                self.resource_limits.as_ref(),
-                &self.references(),
-                &self.verification(),
-            )
-            .unwrap();
+            let admitted = self
+                .observing(|declared| {
+                    admit_and_compare(
+                        &mut evaluation,
+                        &self.capability,
+                        &Submitted::of(&collection),
+                        self.resource_limits.as_ref(),
+                        declared,
+                        &self.verification(),
+                    )
+                })
+                .unwrap();
             (evaluation, admitted)
         }
 
@@ -1328,15 +1444,17 @@ mod tests {
                 selector: &self.measures.selector,
                 structural_units: self.measures.structural_units.clone(),
             };
-            let outcome = admit_resource_policy(
-                &mut evaluation,
-                &self.capability,
-                &collection(&self.members),
-                self.resource_limits.as_ref(),
-                &self.references(),
-                &measures,
-                &self.verification(),
-            );
+            let outcome = self.observing(|declared| {
+                admit_resource_policy(
+                    &mut evaluation,
+                    &self.capability,
+                    &collection(&self.members),
+                    self.resource_limits.as_ref(),
+                    declared,
+                    &measures,
+                    &self.verification(),
+                )
+            });
             (evaluation, outcome)
         }
 
@@ -1990,6 +2108,114 @@ mod tests {
                 vec![limit],
                 0
             )]
+        );
+    }
+
+    /// The declaration's reference count and its references' total bytes are
+    /// observed at the selected declaration, beside the capability's bound
+    /// (D15:790, 836, 1918, 1922).
+    #[test]
+    fn the_declarations_reference_bounds_are_observed_at_the_declaration() {
+        type Edit = fn(&mut ArtifactAdmissionLimits);
+        let cases: [(ArtifactSubject, BoundId, Edit); 2] = [
+            (
+                ArtifactSubject::References,
+                MAX_ARTIFACT_REFERENCES,
+                |limits| {
+                    limits.max_artifact_references = bound(1);
+                },
+            ),
+            (
+                ArtifactSubject::ReferenceBytes,
+                MAX_TOTAL_REFERENCE_CANONICAL_BYTES,
+                |limits| limits.max_total_reference_canonical_bytes = bound(1),
+            ),
+        ];
+        for (subject, id, edit) in cases {
+            let mut inputs = Inputs::new();
+            inputs.capability = capability(edit);
+            let (evaluation, _) = inputs.run();
+            let (found, tokens) = occurrences_of(&evaluation);
+            let at = capability_unit(subject);
+            let declaration =
+                inputs.observing(|(_, observer)| observer.unwrap().value(&[]).unwrap());
+            let limit = view(
+                capability_bound(CapabilityBound::PolicyComparable(id)),
+                &tokens,
+            );
+            assert_eq!(
+                found
+                    .into_iter()
+                    .filter(|(unit, ..)| *unit == at)
+                    .collect::<Vec<_>>(),
+                [(at, view(Ok(declaration), &tokens), vec![limit], 0)],
+                "{}",
+                id.name
+            );
+        }
+    }
+
+    /// Each reference, the selected one included, is observed at its value
+    /// under the selected declaration, beside the capability's bound for one
+    /// reference (D15:790, 836, 1921).
+    #[test]
+    fn each_reference_is_observed_at_its_value() {
+        let mut inputs = Inputs::new();
+        inputs.capability = capability(|limits| {
+            limits.max_single_reference_canonical_bytes = bound(1);
+        });
+        let (evaluation, _) = inputs.run();
+        let (found, tokens) = occurrences_of(&evaluation);
+        let limit = view(
+            capability_bound(CapabilityBound::PolicyComparable(
+                MAX_SINGLE_REFERENCE_CANONICAL_BYTES,
+            )),
+            &tokens,
+        );
+        // Each reference's value, at the pointer of its path from the root.
+        let expected: Vec<(Unit, Value, Vec<Value>, u64)> = inputs.observing(|(references, _)| {
+            let (visible, _) = references.visible(|_| (), |_| ());
+            visible
+                .into_iter()
+                .map(|(field, ())| {
+                    let pointer = match &field {
+                        ReferenceField::Policy(slot) => {
+                            format!("/profiles/{SELECTED}/policies/{}", slot.name())
+                        }
+                        ReferenceField::TargetProfile(id) => {
+                            format!(
+                                "/profiles/{SELECTED}/targetProfiles/{}/profile",
+                                id.as_str()
+                            )
+                        }
+                    };
+                    (
+                        capability_unit(ArtifactSubject::Reference(field)),
+                        json!({ "exact-json-pointer": pointer }),
+                        vec![limit.clone()],
+                        0,
+                    )
+                })
+                .collect()
+        });
+        // Six present policy references, `providerRouting` being `null`, and
+        // two Target Profile references.
+        assert_eq!(expected.len(), 8);
+        assert_eq!(
+            found
+                .into_iter()
+                .filter(|(unit, ..)| matches!(
+                    unit.subject,
+                    Subject::ResourcePolicy(PolicySubject::Capability(ArtifactSubject::Reference(
+                        _
+                    )))
+                ))
+                .map(|(unit, primary, related, ordinal)| {
+                    assert_eq!(primary["origin"], "configuration-file", "{primary}");
+                    (unit, primary["value"].clone(), related, ordinal)
+                })
+                .collect::<Vec<_>>(),
+            expected
         );
     }
 
