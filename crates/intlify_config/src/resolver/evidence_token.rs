@@ -109,6 +109,18 @@ pub(crate) enum JsonType {
 }
 
 impl JsonType {
+    /// The type of `value`.
+    pub(crate) const fn of(value: &Value) -> Self {
+        match value {
+            Value::Null => Self::Null,
+            Value::Bool(_) => Self::Boolean,
+            Value::Number(_) => Self::Number,
+            Value::String(_) => Self::String,
+            Value::Array(_) => Self::Array,
+            Value::Object(_) => Self::Object,
+        }
+    }
+
     /// 015's tag.
     pub(crate) const fn id(self) -> &'static str {
         match self {
@@ -666,5 +678,21 @@ mod tests {
                 "profile-selector",
             ]
         );
+    }
+
+    /// Each JSON value has the type 015 tags it with.
+    #[test]
+    fn each_value_has_its_json_type() {
+        let typed = [
+            (json!(null), "null"),
+            (json!(true), "boolean"),
+            (json!(1), "number"),
+            (json!("a"), "string"),
+            (json!([]), "array"),
+            (json!({}), "object"),
+        ];
+        for (value, tag) in typed {
+            assert_eq!(JsonType::of(&value).id(), tag, "{value}");
+        }
     }
 }

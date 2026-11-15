@@ -15,7 +15,7 @@
 //!
 //! One evaluation of a unit may find several blocking candidates: Findings
 //! with different codes or reasons, and occurrences of one Finding that a
-//! singleton subject checks independently (D15:2203, 2213-2221). In a phase
+//! singleton subject checks independently (D15:2203, 2213-2221). For a check
 //! whose Findings carry occurrence Evidence, each candidate also carries what
 //! it observed its value through, which becomes one Finding Occurrence
 //! candidate (D15:2385).
@@ -977,7 +977,7 @@ pub(crate) struct Observation {
 }
 
 /// The blocking candidates one evaluation of a unit found, each with what it
-/// observed when its phase's Findings carry occurrence Evidence. Never empty.
+/// observed when its check's Findings carry occurrence Evidence. Never empty.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Found(Vec<(Blocking, Option<Observation>)>);
 
@@ -995,7 +995,7 @@ impl Found {
 }
 
 impl From<Blocking> for Found {
-    /// The candidate `blocking`, in a phase whose Findings carry no occurrence
+    /// The candidate `blocking`, of a check whose Findings carry no occurrence
     /// Evidence yet.
     fn from(blocking: Blocking) -> Self {
         Self(vec![(blocking, None)])
@@ -1375,13 +1375,15 @@ impl Evaluation {
     }
 
     /// Asserts that a blocking candidate of `unit` carries what it observed
-    /// exactly when the unit's phase is one whose Findings carry occurrence
+    /// exactly when the unit's check is one whose Findings carry occurrence
     /// Evidence so far. Unless a test made the result up or made the unit
     /// block.
     #[cfg(test)]
     fn observes(&self, unit: &Unit, observed: bool) {
-        // The phases whose Findings carry occurrence Evidence so far; the
-        // others gain theirs phase by phase (plan 025 PRs 5f).
+        use super::resource_policy::ArtifactSubject as A;
+        // The phases whose Findings carry occurrence Evidence so far, and
+        // Phase 4's checks of the collection under the capability; the others
+        // gain theirs check by check (plan 025 PRs 5f).
         const OBSERVED: [Phase; 4] = [
             Phase::ResolverBootstrapAdmission,
             Phase::EntryAdmission,
@@ -1391,10 +1393,24 @@ impl Evaluation {
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
+        let collection = match &unit.subject {
+            Subject::ResourcePolicy(PolicySubject::Capability(subject)) => matches!(
+                subject,
+                A::Artifacts
+                    | A::PolicyArtifacts
+                    | A::TargetProfileArtifacts
+                    | A::Artifact(_)
+                    | A::ArtifactBytes
+            ),
+            Subject::ResourcePolicy(PolicySubject::ResourceLimits) => {
+                unit.check == Check::WithinMetadataScan
+            }
+            _ => false,
+        };
         assert_eq!(
             observed,
-            OBSERVED.contains(&unit.phase),
-            "{unit:?} reports a blocking candidate {} what it observed, against its phase",
+            OBSERVED.contains(&unit.phase) || collection,
+            "{unit:?} reports a blocking candidate {} what it observed, against its check",
             if observed { "with" } else { "without" }
         );
     }
@@ -3127,7 +3143,7 @@ mod tests {
         assert!(evaluation.occurrence_candidates().is_empty());
     }
 
-    /// A blocking candidate of a phase whose Findings carry occurrence
+    /// A blocking candidate of a check whose Findings carry occurrence
     /// Evidence, as Phase 0's do, must carry what it observed.
     #[test]
     #[should_panic(expected = "without what it observed")]
@@ -3135,7 +3151,7 @@ mod tests {
         missing(&mut Evaluation::default(), BOOTSTRAP);
     }
 
-    /// A blocking candidate of a phase whose Findings carry no occurrence
+    /// A blocking candidate of a check whose Findings carry no occurrence
     /// Evidence yet carries no observation.
     #[test]
     #[should_panic(expected = "with what it observed")]
