@@ -33,9 +33,9 @@
 //! rechecks are observed beside the admitted Policy that supplies the bound
 //! (D15:2249): the `artifactAdmission` ones where their checks under the
 //! capability are, and the `configurationInput` ones at the materialized
-//! root, the declarations, each declared Profile ID's key, or the selector
-//! under the policy's bound (D15:790, 812, 816). The longest string's carries
-//! no occurrence Evidence yet (plan 025 PR 5f-4d-2b).
+//! root, each string past the bound, the declarations, each declared Profile
+//! ID's key, or the selector under the policy's bound (D15:790, 812, 816,
+//! 1884). Every Finding of Phase 4 carries occurrence Evidence.
 
 use std::collections::BTreeMap;
 
@@ -887,10 +887,10 @@ fn recheck_at<'o>(
 /// declarations, each declared Profile ID and then a string selector, and the
 /// structural analysis. Whether all of them hold. Each is observed where its
 /// check under the capability was, beside the admitted policy: the root's
-/// totals and the analysis at the root, the declarations at the root's
-/// `profiles`, each Profile ID at its key, and the selector under the
-/// policy's bound beside the declarations (D15:790, 812, 816, 2249). The
-/// longest string carries no occurrence Evidence yet (plan 025 PR 5f-4d-2b).
+/// totals and the analysis at the root, each string past the bound at its
+/// token, the declarations at the root's `profiles`, each Profile ID at its
+/// key, and the selector under the policy's bound beside the declarations
+/// (D15:790, 812, 816, 1884, 2249).
 fn configuration_bounds(
     evaluation: &mut Evaluation,
     limits: Result<&ConfigurationInputLimits, &Causes>,
@@ -942,13 +942,36 @@ fn configuration_bounds(
         holds = and(holds, held);
     }
     // Each string value and object key is checked on its own, so the longest
-    // reports only the first-over witness.
-    let held = witnessed(
+    // reports only the first-over witness, and each string past the bound is
+    // observed at its token, found only when the longest is past it
+    // (D15:1884, 2203).
+    let longest = value.map(|limits| limits.max_single_string_bytes);
+    let past: Vec<(u64, Observation)> = match (observed, longest, counts) {
+        ((Some(policy), Some(observer)), Ok(limit), Ok(counts))
+            if counts.single_string_bytes > limit.get() =>
+        {
+            observer
+                .strings_past(limit.get())?
+                .into_iter()
+                .map(|(bytes, primary)| {
+                    (
+                        bytes,
+                        Observation {
+                            primary,
+                            related: vec![policy.clone()],
+                        },
+                    )
+                })
+                .collect()
+        }
+        _ => Vec::new(),
+    };
+    let held = witnessed_at(
         evaluation,
         recheck(PolicySubject::LongestString),
-        MAX_SINGLE_STRING_BYTES,
-        value.map(|limits| limits.max_single_string_bytes),
+        (MAX_SINGLE_STRING_BYTES, longest),
         counts.map(|counts| Tally::exactly(counts.single_string_bytes)),
+        &past,
     )?;
     holds = and(holds, held);
     let ids = measures.profile_ids.as_ref();
@@ -2703,6 +2726,34 @@ mod tests {
         );
         assert_eq!(primary["span"], token_span(&source, br#""storefront""#));
         assert_eq!((related, ordinal), (vec![policy], 0));
+    }
+
+    /// Each string past the policy's single-string bound is rechecked at its
+    /// token, beside the policy: here the declaration's semantic digests,
+    /// the only strings longer than 64 bytes (D15:790, 1884, 2203, 2249).
+    #[test]
+    fn each_string_past_the_policy_bound_is_rechecked_at_its_token() {
+        let (mut inputs, policy) = rechecking_input(|limits| {
+            limits.value.max_single_string_bytes = bound(64);
+        });
+        let digest = u64::try_from(format!("sha256:{}", "0".repeat(64)).len()).unwrap();
+        if let Ok(counts) = &mut inputs.measures.value {
+            counts.single_string_bytes = digest;
+        }
+        let at = recheck(PolicySubject::LongestString);
+        let (found, _) = rechecked_at(&inputs, |unit| *unit == at);
+        // Six present policy references and two Target Profile references.
+        assert_eq!(found.len(), 8);
+        for (unit, primary, related, ordinal) in found {
+            assert_eq!(unit, at);
+            let pointer = primary["value"]["exact-json-pointer"].as_str().unwrap();
+            assert!(
+                pointer.starts_with(&format!("/profiles/{SELECTED}/"))
+                    && pointer.ends_with("/semanticDigest"),
+                "{pointer}"
+            );
+            assert_eq!((related, ordinal), (vec![policy.clone()], 0));
+        }
     }
 
     /// A selector past the policy's bound is rechecked under it, its final

@@ -1380,25 +1380,21 @@ impl Evaluation {
     /// block.
     #[cfg(test)]
     fn observes(&self, unit: &Unit, observed: bool) {
-        // The phases whose Findings carry occurrence Evidence so far, and
-        // Phase 4's checks but the longest string's recheck; the others gain
-        // theirs check by check (plan 025 PRs 5f).
-        const OBSERVED: [Phase; 4] = [
+        // The phases whose Findings carry occurrence Evidence so far; the
+        // others gain theirs check by check (plan 025 PRs 5f).
+        const OBSERVED: [Phase; 5] = [
             Phase::ResolverBootstrapAdmission,
             Phase::EntryAdmission,
             Phase::StructuralAdmission,
             Phase::ProfileSelection,
+            Phase::ResourcePolicyAdmission,
         ];
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
-        let policy = match &unit.subject {
-            Subject::ResourcePolicy(subject) => !matches!(subject, PolicySubject::LongestString),
-            _ => false,
-        };
         assert_eq!(
             observed,
-            OBSERVED.contains(&unit.phase) || policy,
+            OBSERVED.contains(&unit.phase),
             "{unit:?} reports a blocking candidate {} what it observed, against its check",
             if observed { "with" } else { "without" }
         );

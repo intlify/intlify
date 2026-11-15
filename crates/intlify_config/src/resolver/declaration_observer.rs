@@ -4,7 +4,8 @@
 //! Where a check of the selected declaration looks: a value under the
 //! declaration, as Materialized Value Evidence at the value's token in the
 //! file Phase 1 read (D15:790, 802), and the configuration around it, the
-//! root, the declarations, a declared Profile ID's key, and the selector.
+//! root, the declarations, a declared Profile ID's key, every string past a
+//! bound, and the selector.
 //! The phases after profile selection observe their Findings through it.
 
 use crate::input_limits::Bound;
@@ -117,6 +118,63 @@ impl<'a> DeclarationObserver<'a> {
         )
     }
 
+    /// Every string value and object key in the configuration longer than
+    /// `limit` UTF-8 bytes, with its length, at its token: a key at its
+    /// member, at the key's span (D15:790, 1884, 2203).
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug of a string that has no Evidence.
+    pub(crate) fn strings_past(
+        &self,
+        limit: u64,
+    ) -> Result<Vec<(u64, EvidenceProjection)>, ObserverInvariant> {
+        let mut found = Vec::new();
+        self.walk(self.document.root(), &mut Vec::new(), limit, &mut found)?;
+        Ok(found)
+    }
+
+    /// The strings past `limit` at `node`, reached through `path`, into
+    /// `found`, in the document's order.
+    fn walk(
+        &self,
+        node: NodeId,
+        path: &mut Vec<Edge<'a>>,
+        limit: u64,
+        found: &mut Vec<(u64, EvidenceProjection)>,
+    ) -> Result<(), ObserverInvariant> {
+        let document: &'a MaterializedDocument = self.document;
+        let located = document.node(node);
+        match located.kind() {
+            NodeKind::String(text) => {
+                let bytes = utf8_bytes(text);
+                if bytes > limit {
+                    found.push((bytes, self.at(path, located.span())?));
+                }
+            }
+            NodeKind::Array(elements) => {
+                for (index, element) in (0..).zip(elements) {
+                    path.push(Edge::Index(index));
+                    self.walk(*element, path, limit, found)?;
+                    path.pop();
+                }
+            }
+            NodeKind::Object(members) => {
+                for (name, member) in members {
+                    path.push(Edge::Member(name));
+                    let bytes = utf8_bytes(name);
+                    if bytes > limit {
+                        found.push((bytes, self.at(path, member.key_span())?));
+                    }
+                    self.walk(member.value(), path, limit, found)?;
+                    path.pop();
+                }
+            }
+            NodeKind::Null | NodeKind::Boolean(_) | NodeKind::Number(_) => {}
+        }
+        Ok(())
+    }
+
     /// The selector `input`, projected under its final authority `authority`,
     /// beside the declarations when they are `available` (D15:812, 816; plan
     /// 025 interpretation #215). A selector past the bound names no
@@ -156,6 +214,11 @@ impl<'a> DeclarationObserver<'a> {
     }
 }
 
+/// The UTF-8 byte length of `text`.
+fn utf8_bytes(text: &str) -> u64 {
+    u64::try_from(text.len()).unwrap_or(u64::MAX)
+}
+
 /// The value of the member `name` of the object `node`.
 fn member(document: &MaterializedDocument, node: NodeId, name: &str) -> Option<NodeId> {
     match document.node(node).kind() {
@@ -170,7 +233,7 @@ mod tests {
 
     use serde_json::{json, Value};
 
-    use crate::fixtures::minimal_config;
+    use crate::fixtures::{complete_config, minimal_config};
     use crate::input_limits::Bound;
     use crate::materialize::{materialize_file, MaterializedDocument, NodeId};
     use crate::materialize_tests::limits;
@@ -296,6 +359,76 @@ mod tests {
                     json!({ "exact-json-pointer": "/profiles" })
                 );
             }
+        }
+    }
+
+    /// Every string value and object key of `value` longer than `limit`
+    /// bytes, as the pointer of its value or member and the string.
+    fn strings_of(value: &Value, pointer: &str, limit: usize, found: &mut Vec<(String, String)>) {
+        match value {
+            Value::String(text) if text.len() > limit => {
+                found.push((pointer.to_owned(), text.clone()));
+            }
+            Value::Array(elements) => {
+                for (index, element) in elements.iter().enumerate() {
+                    strings_of(element, &format!("{pointer}/{index}"), limit, found);
+                }
+            }
+            Value::Object(members) => {
+                for (name, member) in members {
+                    let at = format!("{pointer}/{}", name.replace('~', "~0").replace('/', "~1"));
+                    if name.len() > limit {
+                        found.push((at.clone(), name.clone()));
+                    }
+                    strings_of(member, &at, limit, found);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Every string value and object key past a bound is observed at its
+    /// token, a key at its member, and nothing within the bound is: each
+    /// once, at a span holding the string, and at its exact pointer unless a
+    /// member on its path is redacted (D15:776, 790, 1884, 2203).
+    #[test]
+    fn every_string_past_a_bound_is_observed_at_its_token() {
+        // The complete configuration has arrays of several strings and of
+        // objects, each element under its own index.
+        for (config, limit) in [minimal_config(), complete_config()]
+            .into_iter()
+            .flat_map(|config| [0, 8, 16, 1_000].map(|limit| (config.clone(), limit)))
+        {
+            let (bytes, document, profiles) = materialized(&config);
+            let fixture = FileFixture::new(&fixture_limits(10_000));
+            let file = fixture.file(Arc::clone(&bytes));
+            let observer = DeclarationObserver::new(&file, (&document, profiles), "app").unwrap();
+            let mut expected = Vec::new();
+            strings_of(&config, "", limit, &mut expected);
+            let mut texts = Vec::new();
+            for (length, evidence) in observer
+                .strings_past(u64::try_from(limit).unwrap())
+                .unwrap()
+            {
+                let view = view(&evidence);
+                let span = &view["span"];
+                let start: usize = span["start"].as_str().unwrap().parse().unwrap();
+                let end: usize = span["end"].as_str().unwrap().parse().unwrap();
+                // The span is the string's token in the file.
+                let text: String = serde_json::from_slice(&bytes[start..end]).unwrap();
+                assert_eq!(length, u64::try_from(text.len()).unwrap());
+                if let Some(pointer) = view["value"]["exact-json-pointer"].as_str() {
+                    assert!(
+                        expected.contains(&(pointer.to_owned(), text.clone())),
+                        "{pointer} {text}"
+                    );
+                }
+                texts.push(text);
+            }
+            let mut wanted: Vec<String> = expected.into_iter().map(|(_, text)| text).collect();
+            texts.sort();
+            wanted.sort();
+            assert_eq!(texts, wanted, "{limit}");
         }
     }
 
