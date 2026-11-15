@@ -124,11 +124,13 @@ jobs:
       - name: Check formatting
         run: vp fmt --check
 
-  # The tests build with opt-level 1. Many intlify_config benchmark tests each
-  # run every planned measurement case, and at opt-level 0 they took most of
-  # the Testing step. Debug assertions and overflow checks stay on. The
-  # variable is set for the whole job so that it also enters the cargo cache
-  # key and the optimized dependencies are cached.
+  # On ubuntu-latest the tests build with opt-level 1. Many intlify_config
+  # benchmark tests each run every planned measurement case, and at opt-level
+  # 0 they took most of the Testing step. On macos-latest and windows-latest,
+  # opt-level 1 made the workspace crates take 3 to 6 times longer to compile,
+  # more than the tests saved, so they stay at 0. Debug assertions and
+  # overflow checks stay on. The variable is set for the whole job so that it
+  # also enters the cargo cache key and the optimized dependencies are cached.
   test:
     runs-on: ${{ matrix.os }}
     name: Test (${{ matrix.os }})
@@ -136,7 +138,7 @@ jobs:
     if: needs.changes.outputs.docs_only != 'true'
     timeout-minutes: 45
     env:
-      CARGO_PROFILE_TEST_OPT_LEVEL: 1
+      CARGO_PROFILE_TEST_OPT_LEVEL: ${{ matrix.os == 'ubuntu-latest' && '1' || '0' }}
     strategy:
       fail-fast: false
       matrix:
