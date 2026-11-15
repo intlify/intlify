@@ -683,8 +683,9 @@ mod tests {
     fn without_a_confirmed_policy_nothing_is_admitted() {
         use crate::resolver::resource_policy::{unit as policy_unit, PolicySubject};
 
-        // What Phase 4 leaves when no submitted artifact is the policy.
-        let mut other = Evaluation::default();
+        // What Phase 4 leaves when no submitted artifact is the policy, made
+        // up without what its check observed.
+        let mut other = Evaluation::fabricated();
         let causes = other
             .check(
                 policy_unit(PolicySubject::ResourceLimits, Check::BootstrapCandidate),

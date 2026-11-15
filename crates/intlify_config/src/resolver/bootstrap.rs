@@ -7,7 +7,9 @@
 //! or the one Finding code and reason that blocks it. It creates no Profile
 //! Resolution Artifact Set and depends on no submission order.
 //!
-//! The decision accounts for nothing and records nothing. Phase 4 runs it as
+//! The decision accounts for nothing and records nothing. When it admits no
+//! candidate, it says what it compared the reference with, which Phase 4
+//! observes the Finding through (D15:2249). Phase 4 runs it as
 //! two checks, candidate selection and the chosen candidate's body admission,
 //! after the capability's `artifactAdmission` bounds, then compares the
 //! admitted policy with the capability and rechecks the earlier phases under
@@ -58,6 +60,30 @@ const fn issue(code: Code, reason: Reason) -> Blocking {
     }
 }
 
+/// Why candidate selection admitted no candidate: the blocking result, and
+/// what the decision compared the selected reference with.
+#[derive(Debug, Clone)]
+pub(crate) struct Rejected<'m> {
+    pub(crate) blocking: Blocking,
+    pub(crate) compared: Compared<'m>,
+}
+
+/// What candidate selection compared the selected reference with when it
+/// admitted no candidate (D15:2249).
+#[derive(Debug, Clone)]
+pub(crate) enum Compared<'m> {
+    /// Nothing submitted: the reference failed its own checks first.
+    Nothing,
+    /// The submitted collection as one location, the set the reference must
+    /// name a member of: no member shares even its kind or identity.
+    Collection,
+    /// The candidates of the closest tier, each a mismatched candidate.
+    Tier(Vec<&'m FormalMember>),
+    /// Every member of the selected group, each one of its conflicting or
+    /// duplicate occurrences.
+    Group(Vec<&'m FormalMember>),
+}
+
 /// 015's candidate selection for the selected `reference`, steps 1 to 3 and 9
 /// to 14 of its closed decision. The reference is checked before any candidate
 /// is classified; then only members that establish a tuple are grouped: the
@@ -66,13 +92,21 @@ const fn issue(code: Code, reason: Reason) -> Blocking {
 /// semantic digest. A member without a tuple is never guessed into either
 /// group. The sole exact candidate it chooses is measured by the
 /// `artifactBootstrap` bounds before its body admission, a check of its own
-/// (Decision 015-164).
+/// (Decision 015-164). Without one, it returns what it compared the reference
+/// with.
 pub(crate) fn select_candidate<'m>(
     reference: &ExactTuple,
     members: &'m [FormalMember],
-) -> Result<Envelope<'m>, Blocking> {
+) -> Result<Envelope<'m>, Rejected<'m>> {
     let not_admitted = |reason| issue(Code::ArtifactReferenceNotAdmitted, reason);
-    reference_checks(reference, ArtifactKind::ResourceLimitPolicy).map_err(not_admitted)?;
+    let group = |reason, group: &[&Envelope<'m>]| Rejected {
+        blocking: issue(Code::ArtifactCollectionNotAdmitted, reason),
+        compared: Compared::Group(group.iter().map(|envelope| envelope.member()).collect()),
+    };
+    reference_checks(reference, ArtifactKind::ResourceLimitPolicy).map_err(|reason| Rejected {
+        blocking: not_admitted(reason),
+        compared: Compared::Nothing,
+    })?;
     let envelopes: Vec<Envelope<'_>> = members.iter().filter_map(FormalMember::envelope).collect();
     let conflict_group: Vec<&Envelope<'_>> = envelopes
         .iter()
@@ -92,10 +126,7 @@ pub(crate) fn select_candidate<'m>(
             .iter()
             .any(|envelope| envelope.member().canonical_body() != body)
         {
-            return Err(issue(
-                Code::ArtifactCollectionNotAdmitted,
-                Reason::ConflictingContent,
-            ));
+            return Err(group(Reason::ConflictingContent, &conflict_group));
         }
     }
     let exact_group: Vec<&Envelope<'_>> = conflict_group
@@ -106,13 +137,23 @@ pub(crate) fn select_candidate<'m>(
     match exact_group.as_slice() {
         [] => {
             let tuples: Vec<&ExactTuple> = envelopes.iter().map(Envelope::tuple).collect();
-            Err(not_admitted(mismatch(reference, &tuples)))
+            let (reason, tier) = mismatch(reference, &tuples);
+            let compared = if tier.is_empty() {
+                Compared::Collection
+            } else {
+                Compared::Tier(
+                    tier.iter()
+                        .map(|&index| envelopes[index].member())
+                        .collect(),
+                )
+            };
+            Err(Rejected {
+                blocking: not_admitted(reason),
+                compared,
+            })
         }
         [candidate] => Ok((*candidate).clone()),
-        [_, _, ..] => Err(issue(
-            Code::ArtifactCollectionNotAdmitted,
-            Reason::DuplicateEnvelope,
-        )),
+        duplicates @ [_, _, ..] => Err(group(Reason::DuplicateEnvelope, duplicates)),
     }
 }
 
@@ -157,30 +198,44 @@ pub(crate) fn reference_checks(reference: &ExactTuple, role: ArtifactKind) -> Re
     Ok(())
 }
 
+/// A mismatch tier's reason, and whether a candidate is in the tier.
+type Tier<'t> = (Reason, &'t dyn Fn(&ExactTuple) -> bool);
+
 /// The closest tier some candidate occupies when none of `tuples` is the
-/// reference's. Each tier is tried only after every closer one is empty, so a
-/// candidate there also differs in what the closer tiers share: one sharing
-/// everything but the digest differs in the digest.
-pub(crate) fn mismatch(reference: &ExactTuple, tuples: &[&ExactTuple]) -> Reason {
-    let any = |predicate: &dyn Fn(&ExactTuple) -> bool| tuples.iter().any(|tuple| predicate(tuple));
+/// reference's, with the index of every candidate in it. Each tier is tried
+/// only after every closer one is empty, so a candidate there also differs in
+/// what the closer tiers share: one sharing everything but the digest differs
+/// in the digest. When no candidate is in any tier, the reference names
+/// nothing submitted.
+pub(crate) fn mismatch(reference: &ExactTuple, tuples: &[&ExactTuple]) -> (Reason, Vec<usize>) {
     let kind = |tuple: &ExactTuple| tuple.kind == reference.kind;
     let identity = |tuple: &ExactTuple| tuple.identity == reference.identity;
     let revision = |tuple: &ExactTuple| tuple.revision == reference.revision;
     let specification =
         |tuple: &ExactTuple| tuple.specification_revision == reference.specification_revision;
-    if any(&|tuple| kind(tuple) && identity(tuple) && revision(tuple) && specification(tuple)) {
-        Reason::DigestMismatch
-    } else if any(&|tuple| kind(tuple) && identity(tuple) && revision(tuple)) {
-        Reason::SpecificationRevisionMismatch
-    } else if any(&|tuple| kind(tuple) && identity(tuple)) {
-        Reason::RevisionMismatch
-    } else if any(&identity) {
-        Reason::KindMismatch
-    } else if any(&kind) {
-        Reason::IdentityMismatch
-    } else {
-        Reason::NotFound
-    }
+    // Each tier's candidates share with the reference what its name leaves
+    // out of the mismatch.
+    let but_digest = |tuple: &ExactTuple| {
+        kind(tuple) && identity(tuple) && revision(tuple) && specification(tuple)
+    };
+    let but_specification = |tuple: &ExactTuple| kind(tuple) && identity(tuple) && revision(tuple);
+    let but_revision = |tuple: &ExactTuple| kind(tuple) && identity(tuple);
+    let tiers: [Tier<'_>; 5] = [
+        (Reason::DigestMismatch, &but_digest),
+        (Reason::SpecificationRevisionMismatch, &but_specification),
+        (Reason::RevisionMismatch, &but_revision),
+        (Reason::KindMismatch, &identity),
+        (Reason::IdentityMismatch, &kind),
+    ];
+    tiers
+        .iter()
+        .find_map(|&(reason, tier)| {
+            let candidates: Vec<usize> = (0..tuples.len())
+                .filter(|&index| tier(tuples[index]))
+                .collect();
+            (!candidates.is_empty()).then_some((reason, candidates))
+        })
+        .unwrap_or((Reason::NotFound, Vec::new()))
 }
 
 #[cfg(test)]
@@ -276,6 +331,7 @@ mod tests {
         verification: &VerificationInput,
     ) -> Result<AdmittedResourcePolicy, Blocking> {
         select_candidate(reference, members)
+            .map_err(|rejected| rejected.blocking)
             .and_then(|candidate| admit_body(&candidate, verification))
     }
 
@@ -559,6 +615,81 @@ mod tests {
                 &pinning(&[&policy("pinned-limits", "1", 1)])
             ),
             Err(reference_issue(Reason::DigestMismatch))
+        );
+    }
+
+    /// What selection compared the reference with when it admits no
+    /// candidate, as the submitted values: nothing for the reference's own
+    /// checks, the collection when no member shares even its kind or identity,
+    /// the closest tier's candidates, or every member of the selected group
+    /// (D15:2249).
+    fn compared(reference: &ExactTuple, values: &[Value]) -> (&'static str, Vec<Value>) {
+        let members: Vec<FormalMember> = values
+            .iter()
+            .map(|value| FormalMember::new(value.clone()).unwrap())
+            .collect();
+        let values = |members: &[&FormalMember]| {
+            members
+                .iter()
+                .map(|member| member.value().clone())
+                .collect()
+        };
+        match select_candidate(reference, &members).unwrap_err().compared {
+            Compared::Nothing => ("nothing", Vec::new()),
+            Compared::Collection => ("collection", Vec::new()),
+            Compared::Tier(candidates) => ("tier", values(&candidates)),
+            Compared::Group(group) => ("group", values(&group)),
+        }
+    }
+
+    #[test]
+    fn a_rejected_selection_says_what_it_compared_the_reference_with() {
+        let chosen = policy("storefront-limits", "1", 10);
+        let reference = tuple_of(&chosen);
+        // The reference's own checks compare it with nothing submitted.
+        let trust = envelope_of(ArtifactKind::TrustPolicy, "trust", "1", json!({}));
+        assert_eq!(
+            compared(&tuple_of(&trust), std::slice::from_ref(&trust)),
+            ("nothing", Vec::new())
+        );
+        // Without a member of any tier, the collection as a whole.
+        let unrelated = envelope_of(ArtifactKind::GlossarySet, "glossary", "1", json!({}));
+        let untupled = edited(&chosen, "/integrityDigest", None);
+        for values in [vec![], vec![unrelated.clone(), untupled]] {
+            assert_eq!(compared(&reference, &values), ("collection", Vec::new()));
+        }
+        // Every candidate of the closest tier, and none of a farther one.
+        let revisions = [
+            policy("storefront-limits", "2", 10),
+            policy("storefront-limits", "3", 12),
+        ];
+        let farther = policy("other-limits", "1", 10);
+        assert_eq!(
+            compared(
+                &reference,
+                &[revisions[0].clone(), farther.clone(), revisions[1].clone()]
+            ),
+            ("tier", revisions.to_vec())
+        );
+        let digest = policy("storefront-limits", "1", 11);
+        assert_eq!(
+            compared(&reference, &[farther, digest.clone(), unrelated]),
+            ("tier", vec![digest.clone()])
+        );
+        // Every member of the conflict group, the exact candidate included.
+        let stale = tampered(&chosen);
+        let conflicting = [chosen.clone(), digest, stale];
+        assert_eq!(
+            compared(&reference, &conflicting),
+            ("group", conflicting.to_vec())
+        );
+        // Every member of the exact group, and no other member of the name.
+        assert_eq!(
+            compared(
+                &reference,
+                &[chosen.clone(), revisions[0].clone(), chosen.clone()]
+            ),
+            ("group", vec![chosen.clone(), chosen])
         );
     }
 

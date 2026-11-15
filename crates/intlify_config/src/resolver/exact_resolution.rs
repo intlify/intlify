@@ -225,7 +225,9 @@ fn resolve<'s>(
     reference_checks(reference, role).map_err(not_admitted)?;
     set.get(reference).ok_or_else(|| {
         let tuples: Vec<&ExactTuple> = set.iter().map(|(tuple, _)| tuple).collect();
-        not_admitted(mismatch(reference, &tuples))
+        // Phase 9's Findings carry no occurrence Evidence yet, so the tier's
+        // candidates go unobserved.
+        not_admitted(mismatch(reference, &tuples).0)
     })
 }
 

@@ -1381,8 +1381,9 @@ impl Evaluation {
     #[cfg(test)]
     fn observes(&self, unit: &Unit, observed: bool) {
         // The phases whose Findings carry occurrence Evidence so far, and
-        // Phase 4's checks under the capability; the others gain theirs check
-        // by check (plan 025 PRs 5f).
+        // Phase 4's checks under the capability and of the selected Resource
+        // Limit Policy; the others gain theirs check by check (plan 025 PRs
+        // 5f).
         const OBSERVED: [Phase; 4] = [
             Phase::ResolverBootstrapAdmission,
             Phase::EntryAdmission,
@@ -1392,16 +1393,13 @@ impl Evaluation {
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
-        let collection = match &unit.subject {
-            Subject::ResourcePolicy(PolicySubject::Capability(_)) => true,
-            Subject::ResourcePolicy(PolicySubject::ResourceLimits) => {
-                unit.check != Check::BootstrapCandidate
-            }
-            _ => false,
-        };
+        let policy = matches!(
+            unit.subject,
+            Subject::ResourcePolicy(PolicySubject::Capability(_) | PolicySubject::ResourceLimits)
+        );
         assert_eq!(
             observed,
-            OBSERVED.contains(&unit.phase) || collection,
+            OBSERVED.contains(&unit.phase) || policy,
             "{unit:?} reports a blocking candidate {} what it observed, against its check",
             if observed { "with" } else { "without" }
         );
