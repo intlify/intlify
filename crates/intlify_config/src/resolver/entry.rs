@@ -47,7 +47,7 @@ use super::evaluation::{
 };
 use super::evidence::{EvidenceInvariant, EvidenceProjection, Source};
 use super::evidence_component::{ComponentInvariant, ComponentPath};
-use super::evidence_path::Step;
+use super::evidence_path::{LocaleKeys, Step};
 use super::evidence_source::SourceSpan;
 use super::limits::{BoundId, Group};
 use super::origin::SafeOriginKind;
@@ -114,13 +114,16 @@ impl From<EvaluationInvariant> for EntryInvariant {
 }
 
 /// The classification of the members of an internal path from the
-/// configuration root (D15:776).
-pub(crate) type Classify = dyn for<'e> Fn(&[Edge<'e>]) -> Vec<Step<'e>>;
+/// configuration root, by what `specification-admission` bound to tell a
+/// locale key once it has, `None` in a record constructed before (D15:776).
+pub(crate) type Classify = dyn for<'e> Fn(&[Edge<'e>], Option<&dyn LocaleKeys>) -> Vec<Step<'e>>;
 
 /// The file Phase 1 reads, and what its Evidence names: the file's bytes, the
 /// source the entry admitted them under, and the classification of the
 /// members on a fact's internal path, which the admitted configuration schema
-/// and the capability's `policyComparable` bounds fix (D15:776, 780-786).
+/// and the capability's `policyComparable` bounds fix, and, in a record
+/// constructed once `specification-admission` bound the canonicalizer, that
+/// canonicalizer (D15:776, 780-786).
 pub(crate) struct EntryFile<'a> {
     pub(crate) bytes: Arc<[u8]>,
     pub(crate) source: Source<'a>,
@@ -144,7 +147,22 @@ impl EntryFile<'_> {
         edges: &[Edge<'_>],
         span: ByteSpan,
     ) -> Result<EvidenceProjection, EvidenceInvariant> {
-        let steps = (self.classify)(edges);
+        self.value_evidence_after(edges, span, None)
+    }
+
+    /// The same, in a record constructed once `specification-admission`
+    /// bound `locales`, which classify a locale key then (D15:776).
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug that leaves the value without Evidence.
+    pub(crate) fn value_evidence_after(
+        &self,
+        edges: &[Edge<'_>],
+        span: ByteSpan,
+        locales: Option<&dyn LocaleKeys>,
+    ) -> Result<EvidenceProjection, EvidenceInvariant> {
+        let steps = (self.classify)(edges, locales);
         let span = SourceSpan::admit(span.start_byte(), span.end_byte(), &self.bytes);
         EvidenceProjection::configuration_value(
             SafeOriginKind::ConfigurationFile,
@@ -180,7 +198,7 @@ impl EntryFile<'_> {
                 PathStep::Index(index) => Edge::Index(index),
             })
             .collect();
-        let classified = (self.classify)(&edges);
+        let classified = (self.classify)(&edges, None);
         let span = span
             .and_then(|span| SourceSpan::admit(span.start_byte(), span.end_byte(), &self.bytes));
         EvidenceProjection::entry_source(
@@ -463,7 +481,6 @@ pub(crate) mod fixtures {
     use crate::boundary::source::{file_source_revision, read_pair, ExactIdentity, SourceLimits};
     use crate::construction::resolver::committed;
     use crate::input_limits::Bound;
-    use crate::locale::fixtures::FixtureProvider;
     use crate::resolver::evidence::Source;
     use crate::resolver::evidence_path::KeyFacts;
     use crate::resolver::limits::ResolutionLimits;
@@ -498,10 +515,10 @@ pub(crate) mod fixtures {
             let schema = committed().configuration_schema();
             Self {
                 identity,
-                classify: Box::new(move |edges| {
-                    KeyFacts::<FixtureProvider> {
+                classify: Box::new(move |edges, locales| {
+                    KeyFacts {
                         comparable: &comparable,
-                        locales: None,
+                        locales,
                     }
                     .steps(schema, edges)
                 }),

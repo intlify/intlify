@@ -189,7 +189,8 @@ impl FixtureRunner {
             .profiles_value()
             .map(|profiles| DeclarationObserver::new(&file, profiles, selected.id().as_str()))
             .transpose()
-            .expect("the selected declaration is in the document");
+            .expect("the selected declaration is in the document")
+            .map(|observer| observer.with_locales(&self.provider));
         let mut evaluation = Evaluation::default();
         let result = resolve_locales(
             &mut evaluation,

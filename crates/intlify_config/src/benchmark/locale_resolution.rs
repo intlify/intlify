@@ -171,12 +171,14 @@ fn policies<P: Provider>(
         &DeclarationObserver<'_>,
     ),
 ) -> Result<Policies, LocaleInvariant> {
+    // The phases after Phase 5 observe through what it bound.
+    let observer = observer.with_locales(canonicalizer);
     let locales = resolve_locales(
         evaluation,
         Ok(policy),
         Ok(canonicalizer),
         fields,
-        Some(observer),
+        Some(&observer),
     )?;
     let negotiation = resolve_negotiation(evaluation, Ok(policy), &inputs.negotiation, &locales)?;
     let fallback = resolve_fallback(

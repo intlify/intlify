@@ -11,9 +11,9 @@
 //! Finding, observed at its own token (D15:790, 2387, 2410): a repeated
 //! locale at each of its spellings beside the others, and a spelling past the
 //! identifier bound beside the confirmed policy, which supplies the bound
-//! (D15:2249). So far the values are observed, the project's and each
-//! target's; the alias and fallback keys gain theirs later (plan 025 PR
-//! 5f-4f-4).
+//! (D15:2249). A key of `localeNegotiation.aliases` or `messageFallback` is
+//! observed at its key's token, and an alias's destination at its value's,
+//! each key classified by the canonicalizer Phase 5 bound (D15:776).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -118,7 +118,8 @@ impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
     }
 
     /// The spelling at `location`, at its token, when the declaration's file
-    /// is there and its field's spellings carry occurrence Evidence so far.
+    /// is there: a map's key at its rank in the unsigned byte order of the
+    /// map's keys, which is the model's map's order.
     fn at(&self, location: &Location) -> Result<Option<EvidenceProjection>, ObserverInvariant> {
         let Some(observer) = self.observer else {
             return Ok(None);
@@ -137,9 +138,15 @@ impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
             Location::TargetDefaultRequestedLocale(id) => observer
                 .value(&["targetProfiles", id.as_str(), "defaultRequestedLocale"])
                 .map(Some),
-            Location::NegotiationAliasKey(_)
-            | Location::NegotiationAliasValue(_)
-            | Location::MessageFallbackKey(_) => Ok(None),
+            Location::NegotiationAliasKey(rank) => observer
+                .ranked_key(&["localeNegotiation", "aliases"], *rank)
+                .map(Some),
+            Location::NegotiationAliasValue(rank) => observer
+                .ranked_value(&["localeNegotiation", "aliases"], *rank)
+                .map(Some),
+            Location::MessageFallbackKey(rank) => {
+                observer.ranked_key(&["messageFallback"], *rank).map(Some)
+            }
         }
     }
 
@@ -554,7 +561,7 @@ mod tests {
     use crate::input_limits::Bound;
     use crate::locale::fixtures::FixtureProvider;
     use crate::model::NonEmptyMap;
-    use crate::resolver::declaration_observer::fixtures::Observed;
+    use crate::resolver::declaration_observer::fixtures::{view, Observed};
     use crate::resolver::evaluation::Unit;
     use crate::resolver::specification::Slot;
 
@@ -1042,13 +1049,45 @@ mod tests {
     #[test]
     fn alias_destinations_sit_under_their_keys_and_fallback_keys_are_spelled_alone() {
         let canonicalizer = canonicalizer(64);
+        let confirmed = policy(64, 100, 100);
         let mut evaluation = Evaluation::default();
-        let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer), (None, None));
-        let aliases = BTreeMap::from([
-            ("EN".to_string(), "fr-FR".to_string()),
-            ("de".to_string(), "zz".to_string()),
-        ]);
-        let resolved = pass.aliases(Some(&aliases)).unwrap();
+        let fallback = json!({
+            "ja": ["EN", {"kind": "intent-source-locale"}, "de"],
+            "zz": ["en"]
+        });
+        let declared = Observed::declaration(&json!({
+            "localeNegotiation": {"aliases": {"EN": "fr-FR", "de": "zz"}},
+            "messageFallback": fallback,
+        }));
+        let (resolved, keys, occurrences, at) = declared.app(|observer| {
+            // Phase 7 observes once Phase 5 bound the canonicalizer.
+            let observer = observer.with_locales(&canonicalizer);
+            let mut pass = Pass::new(
+                &mut evaluation,
+                Ok(&canonicalizer),
+                (Some(&observer), Some(confirmed.evidence())),
+            );
+            let aliases = BTreeMap::from([
+                ("EN".to_string(), "fr-FR".to_string()),
+                ("de".to_string(), "zz".to_string()),
+            ]);
+            let resolved = pass.aliases(Some(&aliases)).unwrap();
+            let sequences: BTreeMap<String, NonEmptyVec<FallbackCandidate>> =
+                serde_json::from_value(fallback.clone()).unwrap();
+            let keys = pass.fallback_keys(Some(&sequences)).unwrap();
+            assert_eq!(pass.aliases(None).unwrap(), []);
+            assert_eq!(pass.fallback_keys(None).unwrap(), []);
+            let at = [
+                observer
+                    .ranked_key(&["localeNegotiation", "aliases"], 0)
+                    .unwrap(),
+                observer
+                    .ranked_value(&["localeNegotiation", "aliases"], 1)
+                    .unwrap(),
+                observer.ranked_key(&["messageFallback"], 1).unwrap(),
+            ];
+            (resolved, keys, pass.into_occurrences(), at)
+        });
         assert_eq!(
             resolved,
             [
@@ -1065,16 +1104,6 @@ mod tests {
         // A rejected destination keeps its spelling as its subject key.
         assert_eq!(resolved[1].value.key, content("zz"));
         assert!(resolved[1].value.locale.is_err());
-        let sequences: BTreeMap<String, NonEmptyVec<FallbackCandidate>> =
-            serde_json::from_value(serde_json::json!({
-                "ja": ["EN", {"kind": "intent-source-locale"}, "de"],
-                "zz": ["en"]
-            }))
-            .unwrap();
-        let keys = pass.fallback_keys(Some(&sequences)).unwrap();
-        assert_eq!(pass.aliases(None).unwrap(), []);
-        assert_eq!(pass.fallback_keys(None).unwrap(), []);
-        let occurrences = pass.into_occurrences();
         assert_eq!(keys.len(), 2);
         assert_eq!(keys[0], spelled("ja"));
         assert_eq!(keys[1].key, content("zz"));
@@ -1130,20 +1159,59 @@ mod tests {
             )))]
         );
         assert_eq!(evaluation.statuses().count(), 6);
+        // The corrected alias key is observed at its key's token, the
+        // rejected destination at its value's under its key, and the rejected
+        // fallback key at its key's (D15:790, 2410).
+        let [corrected, destination, fallback_key] = at;
+        assert_eq!(
+            evaluation
+                .occurrence_candidates()
+                .iter()
+                .map(|candidate| (candidate.finding.code(), candidate.primary.clone()))
+                .collect::<Vec<_>>(),
+            [
+                (Code::LocaleNonCanonical, corrected.clone()),
+                (Code::LocaleInvalid, destination),
+                (Code::LocaleInvalid, fallback_key.clone()),
+            ]
+        );
+        // A key the bound canonicalizer canonicalizes is non-secret, and one
+        // it rejects is redacted (D15:776).
+        assert_eq!(
+            view(&corrected)["value"],
+            json!({ "exact-json-pointer": "/profiles/app/localeNegotiation/aliases/EN" })
+        );
+        assert!(view(&fallback_key)["value"]
+            .get("exact-json-pointer")
+            .is_none());
     }
 
     #[test]
     fn colliding_keys_share_one_subject_and_phase_7_reports_no_collision() {
         let canonicalizer = canonicalizer(64);
+        let confirmed = policy(64, 100, 100);
         let mut evaluation = Evaluation::default();
-        let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer), (None, None));
-        let aliases = BTreeMap::from([
-            ("EN".to_string(), "fr".to_string()),
-            ("en".to_string(), "de".to_string()),
-        ]);
-        let resolved = pass.aliases(Some(&aliases)).unwrap();
+        let declared = Observed::declaration(&json!({
+            "localeNegotiation": {"aliases": {"EN": "fr", "en": "de"}}
+        }));
+        let (resolved, occurrences, corrected) = declared.app(|observer| {
+            let observer = observer.with_locales(&canonicalizer);
+            let mut pass = Pass::new(
+                &mut evaluation,
+                Ok(&canonicalizer),
+                (Some(&observer), Some(confirmed.evidence())),
+            );
+            let aliases = BTreeMap::from([
+                ("EN".to_string(), "fr".to_string()),
+                ("en".to_string(), "de".to_string()),
+            ]);
+            let resolved = pass.aliases(Some(&aliases)).unwrap();
+            let corrected = observer
+                .ranked_key(&["localeNegotiation", "aliases"], 0)
+                .unwrap();
+            (resolved, pass.into_occurrences(), corrected)
+        });
         assert_eq!(resolved.len(), 2);
-        let occurrences = pass.into_occurrences();
         assert_eq!(
             occurrences[0].subject,
             LocaleSubject::NegotiationAliasKey(key("en"))
@@ -1162,6 +1230,15 @@ mod tests {
                 canonical_unit(LocaleSubject::NegotiationAliasValue(key("en"), key("de"))),
                 canonical_unit(LocaleSubject::NegotiationAliasValue(key("en"), key("fr"))),
             ]
+        );
+        // The corrected key's notice is at its own key (D15:2410).
+        assert_eq!(
+            evaluation
+                .occurrence_candidates()
+                .iter()
+                .map(|candidate| candidate.primary.clone())
+                .collect::<Vec<_>>(),
+            [corrected]
         );
     }
 

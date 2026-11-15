@@ -56,16 +56,28 @@ use super::limits::ResolutionLimits;
 use super::origin::SafeOriginKind;
 use super::token::{RedactedToken, Specification};
 
+/// What `specification-admission` bound tells of a locale key: whether the
+/// Intlify conformance layer returns a canonical identifier for it (D15:776).
+pub(crate) trait LocaleKeys {
+    fn canonicalizes(&self, key: &str) -> bool;
+}
+
+impl<P: Provider> LocaleKeys for Canonicalizer<P> {
+    fn canonicalizes(&self, key: &str) -> bool {
+        self.canonicalize(key).is_ok()
+    }
+}
+
 /// The facts Decision 015-184 classifies a configuration key from: the
 /// capability's `policyComparable` bounds, and the canonicalizer once
 /// `specification-admission` has admitted the Locale Canonicalization Data
 /// Artifact, `None` before.
-pub(crate) struct KeyFacts<'a, P: Provider> {
+pub(crate) struct KeyFacts<'a> {
     pub(crate) comparable: &'a ResolutionLimits,
-    pub(crate) locales: Option<&'a Canonicalizer<P>>,
+    pub(crate) locales: Option<&'a dyn LocaleKeys>,
 }
 
-impl<P: Provider> KeyFacts<'_, P> {
+impl KeyFacts<'_> {
     /// The steps of `edges`, an internal path from the configuration root,
     /// each member classified at its place in `schema` (D15:776).
     pub(crate) fn steps<'e, Policy, Target>(
@@ -100,7 +112,7 @@ impl<P: Provider> KeyFacts<'_, P> {
             Some(Place::GroupId) => identifier(comparable.target_grouping.max_group_id_bytes),
             Some(Place::LocaleKey) => self
                 .locales
-                .is_some_and(|locales| locales.canonicalize(name).is_ok()),
+                .is_some_and(|locales| locales.canonicalizes(name)),
             Some(Place::Undefined) | None => false,
         }
     }
@@ -337,7 +349,6 @@ mod tests {
 
     use crate::construction::committed::CONFIGURATION_SCHEMA;
     use crate::input_limits::Bound;
-    use crate::locale::fixtures::FixtureProvider;
     use crate::model::CONFIGURATION_SCHEMA_VERSION;
     use crate::references::{PolicyReference, TargetProfileReference};
     use crate::resolver::limits::{fixture_limits, ResolutionLimits};
@@ -664,7 +675,7 @@ mod tests {
         limits
     }
 
-    fn before_data(comparable: &ResolutionLimits) -> KeyFacts<'_, FixtureProvider> {
+    fn before_data(comparable: &ResolutionLimits) -> KeyFacts<'_> {
         KeyFacts {
             comparable,
             locales: None,
