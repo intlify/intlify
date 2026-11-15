@@ -1381,9 +1381,9 @@ impl Evaluation {
     #[cfg(test)]
     fn observes(&self, unit: &Unit, observed: bool) {
         // The phases whose Findings carry occurrence Evidence so far, and
-        // Phase 4's checks under the capability and of the selected Resource
-        // Limit Policy; the others gain theirs check by check (plan 025 PRs
-        // 5f).
+        // Phase 4's checks under the capability, of the selected Resource
+        // Limit Policy, and of its `artifactAdmission` rechecks; the others
+        // gain theirs check by check (plan 025 PRs 5f).
         const OBSERVED: [Phase; 4] = [
             Phase::ResolverBootstrapAdmission,
             Phase::EntryAdmission,
@@ -1395,7 +1395,11 @@ impl Evaluation {
         }
         let policy = matches!(
             unit.subject,
-            Subject::ResourcePolicy(PolicySubject::Capability(_) | PolicySubject::ResourceLimits)
+            Subject::ResourcePolicy(
+                PolicySubject::Capability(_)
+                    | PolicySubject::ResourceLimits
+                    | PolicySubject::Recheck(_)
+            )
         );
         assert_eq!(
             observed,
