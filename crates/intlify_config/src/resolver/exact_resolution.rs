@@ -18,6 +18,13 @@
 //! (plan 022 #13). 015 derives them in profile projection (Phase 14) from the
 //! checked profile's references; until that phase exists they come from this
 //! resolution, and nothing projects them to a consumer.
+//!
+//! A reference that names nothing is observed at the reference in the
+//! declaration, beside what it was compared with (D15:2249): nothing when it
+//! failed its own checks, each artifact of the closest tier in the Set's
+//! order (D15:1734), or the collection as one location when no artifact
+//! shares even its kind or identity. Each artifact of the Set is admitted, so
+//! it is observed under its exact-reference identity (D15:834).
 
 use std::collections::BTreeMap;
 
@@ -25,14 +32,45 @@ use crate::artifacts::envelope::{ArtifactKind, ExactTuple};
 use crate::model::TargetId;
 use crate::references::{PolicyReference, TargetProfileReference};
 
-use super::artifact_resolution::{AdmittedArtifact, ArtifactSet};
+use super::artifact_resolution::{admitted, collection_root, AdmittedArtifact, ArtifactSet};
 use super::bootstrap::{mismatch, reference_checks};
+use super::declaration_observer::{DeclarationObserver, ObserverInvariant};
 use super::evaluation::{
-    and, both, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Phase,
-    Subject, Unit,
+    and, both, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Found,
+    Observation, Phase, Subject, Unit,
 };
+use super::evidence::EvidenceProjection;
+use super::evidence_component::ComponentInvariant;
 use super::locales::TargetLocales;
-use super::resource_policy::{DeclarationReferences, PolicySlot, ReferenceField};
+use super::resource_policy::{reference_path, DeclarationReferences, PolicySlot, ReferenceField};
+
+/// A resolver bug the exact resolution refuses.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ReferenceInvariant {
+    Evaluation(EvaluationInvariant),
+    /// An artifact of the Set, or the collection, has no component path.
+    Component(ComponentInvariant),
+    /// A reference of the selected declaration has no Evidence.
+    Observer(ObserverInvariant),
+}
+
+impl From<EvaluationInvariant> for ReferenceInvariant {
+    fn from(invariant: EvaluationInvariant) -> Self {
+        Self::Evaluation(invariant)
+    }
+}
+
+impl From<ComponentInvariant> for ReferenceInvariant {
+    fn from(invariant: ComponentInvariant) -> Self {
+        Self::Component(invariant)
+    }
+}
+
+impl From<ObserverInvariant> for ReferenceInvariant {
+    fn from(invariant: ObserverInvariant) -> Self {
+        Self::Observer(invariant)
+    }
+}
 
 /// The unit Phase 9 records for the reference at `field`.
 pub(crate) const fn unit(field: ReferenceField) -> Unit {
@@ -152,25 +190,101 @@ impl<'s> ReferenceResults<'s> {
 /// under the Set; a Target Profile reference also waits on its target's
 /// bounds, which `targets` holds as Phase 7 checked them. A field structural
 /// admission did not admit has no references to resolve, and its causes leave
-/// the resolution unavailable.
+/// the resolution unavailable. A reference that names nothing is observed
+/// through `observer`, the selected declaration's, when there is one.
+///
+/// # Errors
+///
+/// Returns the resolver bug of a unit recorded against its phase's rules, or
+/// of Evidence without a path.
 pub(crate) fn resolve_references<'s>(
     evaluation: &mut Evaluation,
     set: Result<&'s ArtifactSet<'s>, &Causes>,
     references: &DeclarationReferences<'_>,
-    targets: Result<&[TargetLocales], &Causes>,
-) -> Result<Admitted<ResolvedReferences<'s>>, EvaluationInvariant> {
-    Ok(resolve_fields(evaluation, set, references, targets)?.all())
+    declared: (
+        Result<&[TargetLocales], &Causes>,
+        Option<&DeclarationObserver<'_>>,
+    ),
+) -> Result<Admitted<ResolvedReferences<'s>>, ReferenceInvariant> {
+    Ok(resolve_fields(evaluation, set, references, declared)?.all())
+}
+
+/// What a reference that names nothing was compared with, as Evidence: each
+/// artifact of the Set, in the Set's order, and the collection.
+struct Compared {
+    artifacts: Vec<EvidenceProjection>,
+    collection: EvidenceProjection,
+}
+
+/// What one reference was compared with when it names nothing.
+enum Mismatch {
+    /// Nothing: the reference failed one of its own two checks.
+    Reference,
+    /// The artifacts of the closest tier, at their positions in the Set.
+    Tier(Vec<usize>),
+    /// The collection as one location: no artifact shares even the
+    /// reference's kind or identity.
+    Collection,
+}
+
+/// The candidate `blocking` of a reference that names nothing, observed at
+/// the reference, `at`, beside what `mismatch` compared it with, or not
+/// observed without the declaration's file (D15:1734, 2249).
+fn observed(
+    blocking: Blocking,
+    sight: Option<(&EvidenceProjection, &Compared)>,
+    mismatch: &Mismatch,
+) -> Found {
+    let Some((at, compared)) = sight else {
+        return Found::from(blocking);
+    };
+    let related = match mismatch {
+        Mismatch::Reference => Vec::new(),
+        Mismatch::Tier(candidates) => candidates
+            .iter()
+            .filter_map(|&index| compared.artifacts.get(index).cloned())
+            .collect(),
+        Mismatch::Collection => vec![compared.collection.clone()],
+    };
+    Found::observed(
+        blocking,
+        Observation {
+            primary: at.clone(),
+            related,
+        },
+    )
 }
 
 /// The same resolution, with each reference's result kept apart.
+///
+/// # Errors
+///
+/// Returns the resolver bug of a unit recorded against its phase's rules, or
+/// of Evidence without a path.
 pub(crate) fn resolve_fields<'s>(
     evaluation: &mut Evaluation,
     set: Result<&'s ArtifactSet<'s>, &Causes>,
     references: &DeclarationReferences<'_>,
-    targets: Result<&[TargetLocales], &Causes>,
-) -> Result<ReferenceResults<'s>, EvaluationInvariant> {
+    (targets, observer): (
+        Result<&[TargetLocales], &Causes>,
+        Option<&DeclarationObserver<'_>>,
+    ),
+) -> Result<ReferenceResults<'s>, ReferenceInvariant> {
     let (present, unavailable) =
         references.visible(PolicyReference::tuple, TargetProfileReference::tuple);
+    // What a reference that names nothing is compared with, made before any
+    // unit records it, and only with the declaration's file to observe the
+    // reference in.
+    let compared = match (observer, set) {
+        (Some(_), Ok(set)) => Some(Compared {
+            artifacts: set
+                .iter()
+                .map(|(tuple, _)| admitted(tuple))
+                .collect::<Result<_, _>>()?,
+            collection: collection_root()?,
+        }),
+        _ => None,
+    };
     let set = set.map_err(Causes::clone);
     let bounds: Admitted<BTreeMap<&TargetId, &Admitted<()>>> = targets
         .map(|targets| {
@@ -184,8 +298,13 @@ pub(crate) fn resolve_fields<'s>(
     for (field, reference) in present {
         let role = field.role_kind();
         let prerequisite = both(set.clone(), bounded(&bounds, &field)).map(|(set, ())| set);
-        let result = evaluation.check(unit(field.clone()), prerequisite, |set| {
+        let at = observer
+            .map(|observer| observer.value(&reference_path(&field)))
+            .transpose()?;
+        let sight = at.as_ref().zip(compared.as_ref());
+        let result = evaluation.check_found(unit(field.clone()), prerequisite, |set| {
             resolve(set, &reference, role)
+                .map_err(|(blocking, mismatch)| observed(blocking, sight, &mismatch))
         })?;
         found.insert(field, result);
     }
@@ -211,23 +330,28 @@ fn bounded(
 
 /// One reference's decision: its own two checks, then the Set's artifact with
 /// its exact tuple, or else the closest tier some artifact of the Set
-/// occupies.
+/// occupies, with what the reference was compared with.
 fn resolve<'s>(
     set: &'s ArtifactSet<'s>,
     reference: &ExactTuple,
     role: ArtifactKind,
-) -> Result<Named<'s>, Blocking> {
+) -> Result<Named<'s>, (Blocking, Mismatch)> {
     let not_admitted = |reason| Blocking {
         code: Code::ArtifactReferenceNotAdmitted,
         reason: Some(reason),
         details: None,
     };
-    reference_checks(reference, role).map_err(not_admitted)?;
+    reference_checks(reference, role)
+        .map_err(|reason| (not_admitted(reason), Mismatch::Reference))?;
     set.get(reference).ok_or_else(|| {
         let tuples: Vec<&ExactTuple> = set.iter().map(|(tuple, _)| tuple).collect();
-        // Phase 9's Findings carry no occurrence Evidence yet, so the tier's
-        // candidates go unobserved.
-        not_admitted(mismatch(reference, &tuples).0)
+        let (reason, candidates) = mismatch(reference, &tuples);
+        let compared = if candidates.is_empty() {
+            Mismatch::Collection
+        } else {
+            Mismatch::Tier(candidates)
+        };
+        (not_admitted(reason), compared)
     })
 }
 
@@ -242,7 +366,7 @@ mod tests {
     use crate::input_limits::Bound;
     use crate::model::{NonEmptyMap, Policies, TargetDeclaration};
     use crate::resolver::artifact_resolution::admit_collection;
-    use crate::resolver::declaration_observer::fixtures::Observed;
+    use crate::resolver::declaration_observer::fixtures::{view, Observed};
     use crate::resolver::evaluation::{IssueKey, Reason, Status};
     use crate::resolver::limits::{fixture_limits, ConfirmedPolicy, ResolutionLimits};
     use crate::resolver::locales::fixtures::{canonicalizer, stand_in, units};
@@ -345,6 +469,9 @@ mod tests {
         policies: Admitted<()>,
         targets: Admitted<()>,
         limits: ResolutionLimits,
+        /// Whether the resolution has the declaration's file to observe the
+        /// references in.
+        observe: bool,
     }
 
     impl Inputs {
@@ -360,7 +487,36 @@ mod tests {
                 policies: Ok(()),
                 targets: Ok(()),
                 limits: fixture_limits(1),
+                observe: true,
             }
+        }
+
+        /// The declaration the references are written in, as a file writes
+        /// it: `policies` and `targetProfiles`.
+        fn declaration(&self) -> Value {
+            let mut policies = Map::new();
+            let mut targets = Map::new();
+            for (field, reference) in &self.references {
+                match field {
+                    ReferenceField::Policy(slot) => {
+                        policies.insert(slot.name().into(), reference.clone());
+                    }
+                    ReferenceField::TargetProfile(id) => {
+                        targets.insert(
+                            id.as_str().into(),
+                            json!({"profile": reference, "requestedLocales": ["en"]}),
+                        );
+                    }
+                }
+            }
+            json!({ "policies": policies, "targetProfiles": targets })
+        }
+
+        /// The view of the Evidence of the reference at `field`, where the
+        /// declaration writes it.
+        fn at(&self, field: &ReferenceField) -> Value {
+            Observed::declaration(&self.declaration())
+                .app(|observer| view(&observer.value(&reference_path(field)).unwrap()))
         }
 
         fn reference(&mut self, field: &ReferenceField) -> &mut Value {
@@ -392,25 +548,11 @@ mod tests {
             &self,
             keep: impl FnOnce(Admitted<ResolvedReferences<'_>>) -> Admitted<T>,
         ) -> (Evaluation, Admitted<T>) {
-            let mut policies = Map::new();
-            let mut targets = Map::new();
-            for (field, reference) in &self.references {
-                match field {
-                    ReferenceField::Policy(slot) => {
-                        policies.insert(slot.name().into(), reference.clone());
-                    }
-                    ReferenceField::TargetProfile(id) => {
-                        targets.insert(
-                            id.as_str().into(),
-                            json!({"profile": reference, "requestedLocales": ["en"]}),
-                        );
-                    }
-                }
-            }
+            let declaration = self.declaration();
             let policies: Policies<PolicyReference> =
-                serde_json::from_value(Value::Object(policies)).unwrap();
+                serde_json::from_value(declaration["policies"].clone()).unwrap();
             let targets: NonEmptyMap<TargetId, TargetDeclaration<TargetProfileReference>> =
-                serde_json::from_value(Value::Object(targets)).unwrap();
+                serde_json::from_value(declaration["targetProfiles"].clone()).unwrap();
             let texts: Vec<String> = self.members.iter().map(Value::to_string).collect();
             let bytes: Vec<&[u8]> = texts.iter().map(String::as_bytes).collect();
             let collection = read_collection(Some(&bytes), &ROOM).unwrap();
@@ -426,7 +568,10 @@ mod tests {
                 coverage: Err(behind),
                 target_profiles: declared.clone(),
             };
-            let locales = Observed::declaration(&json!({ "targetProfiles": &targets }))
+            // The references are observed in the declaration they are read
+            // from.
+            let observed = Observed::declaration(&declaration);
+            let locales = observed
                 .app(|observer| {
                     resolve_locales(
                         &mut Evaluation::default(),
@@ -437,19 +582,28 @@ mod tests {
                     )
                 })
                 .unwrap();
-            let mut evaluation = Evaluation::default();
+            // Without the file, a failed reference carries no observation, so
+            // the test makes the result up.
+            let mut evaluation = if self.observe {
+                Evaluation::default()
+            } else {
+                Evaluation::fabricated()
+            };
             let set = admit_collection(&mut evaluation, Ok(&confirmed), &collection).unwrap();
             let references = DeclarationReferences {
                 policies: self.policies.clone().map(|()| &policies),
                 target_profiles: declared,
             };
-            let resolved = resolve_references(
-                &mut evaluation,
-                set.as_ref(),
-                &references,
-                locales.targets.as_deref(),
-            )
-            .unwrap();
+            let resolved = observed
+                .app(|observer| {
+                    resolve_references(
+                        &mut evaluation,
+                        set.as_ref(),
+                        &references,
+                        (locales.targets.as_deref(), self.observe.then_some(observer)),
+                    )
+                })
+                .unwrap();
             (evaluation, keep(resolved))
         }
 
@@ -504,6 +658,32 @@ mod tests {
                 Some((field, key.reason().unwrap()))
             })
             .collect()
+    }
+
+    /// Each reference Finding candidate: its field and reason, and the views
+    /// of its primary and related Evidence.
+    fn observed(evaluation: &Evaluation) -> Vec<(ReferenceField, Reason, Value, Vec<Value>)> {
+        evaluation
+            .occurrence_candidates()
+            .iter()
+            .filter_map(|candidate| {
+                let field = field_of(candidate.finding.unit())?;
+                let related = candidate.related.iter().map(view).collect();
+                let reason = candidate.finding.reason().unwrap();
+                Some((field, reason, view(&candidate.primary), related))
+            })
+            .collect()
+    }
+
+    /// The view of the Set's artifact `value`, under its exact-reference
+    /// identity.
+    fn artifact(value: &Value) -> Value {
+        view(&admitted(&tuple_of(value)).unwrap())
+    }
+
+    /// The view of the collection as one location.
+    fn collection() -> Value {
+        view(&collection_root().unwrap())
     }
 
     /// The reference units' statuses, in 015's order.
@@ -574,7 +754,11 @@ mod tests {
 
     #[test]
     fn a_failed_reference_takes_the_first_decision_that_applies() {
-        let cases: [(&str, Edit, Reason); 8] = [
+        // Each case's edit, its reason, and what the failed reference is
+        // observed beside: nothing after its own checks, the closest tier's
+        // artifacts, or the collection (D15:1734, 2249).
+        let trust = || artifact(&valid(ArtifactKind::TrustPolicy, "storefront-trust"));
+        let cases: [(&str, Edit, Reason, Vec<Value>); 8] = [
             // The two checks of the reference itself come first, the role's
             // kind before the specification revision.
             (
@@ -584,6 +768,7 @@ mod tests {
                     *inputs.reference(&policy(Trust)) = approval;
                 },
                 Reason::RoleKindMismatch,
+                Vec::new(),
             ),
             (
                 "an unsupported specification revision",
@@ -591,6 +776,7 @@ mod tests {
                     inputs.reference(&policy(Trust))["specificationRevision"] = json!("1");
                 },
                 Reason::SpecificationRevisionUnsupported,
+                Vec::new(),
             ),
             (
                 "both",
@@ -600,6 +786,7 @@ mod tests {
                     *inputs.reference(&policy(Trust)) = approval;
                 },
                 Reason::RoleKindMismatch,
+                Vec::new(),
             ),
             // Then the closest tier: everything but the digest, the revision,
             // the identity under another kind, and the kind.
@@ -610,6 +797,7 @@ mod tests {
                         json!(format!("sha256:{}", "1".repeat(64)));
                 },
                 Reason::DigestMismatch,
+                vec![trust()],
             ),
             (
                 "another revision",
@@ -621,6 +809,7 @@ mod tests {
                         .push(valid(ArtifactKind::ApprovalPolicy, "storefront-trust"));
                 },
                 Reason::RevisionMismatch,
+                vec![trust()],
             ),
             (
                 "the identity of another kind",
@@ -628,6 +817,10 @@ mod tests {
                     inputs.reference(&policy(Trust))["identity"] = json!("storefront-source");
                 },
                 Reason::KindMismatch,
+                vec![artifact(&valid(
+                    ArtifactKind::SourceAdmissionPolicy,
+                    "storefront-source",
+                ))],
             ),
             (
                 "another identity",
@@ -635,6 +828,7 @@ mod tests {
                     inputs.reference(&policy(Trust))["identity"] = json!("storefront-vault");
                 },
                 Reason::IdentityMismatch,
+                vec![trust()],
             ),
             (
                 "nothing related",
@@ -644,13 +838,19 @@ mod tests {
                     assert_eq!(inputs.members.len(), 8);
                 },
                 Reason::NotFound,
+                vec![collection()],
             ),
         ];
-        for (case, edit, reason) in cases {
+        for (case, edit, reason, related) in cases {
             let mut inputs = Inputs::new();
             edit(&mut inputs);
             let (evaluation, resolved) = inputs.run();
             assert_eq!(issues(&evaluation), [(policy(Trust), reason)], "{case}");
+            assert_eq!(
+                observed(&evaluation),
+                [(policy(Trust), reason, inputs.at(&policy(Trust)), related)],
+                "{case}"
+            );
             // The collection itself was admitted.
             assert_eq!(evaluation.issues().count(), 1, "{case}");
             let Err(causes) = resolved else {
@@ -719,6 +919,17 @@ mod tests {
             issues(&evaluation),
             [(target("web"), Reason::RevisionMismatch)]
         );
+        // Observed where its target writes it, beside the target's artifact.
+        let web = artifact(&valid(ArtifactKind::TargetProfile, "storefront-web"));
+        assert_eq!(
+            observed(&evaluation),
+            [(
+                target("web"),
+                Reason::RevisionMismatch,
+                inputs.at(&target("web")),
+                vec![web]
+            )]
+        );
         // Two targets may name one Target Profile, which is one artifact.
         let mut inputs = Inputs::new();
         let web = inputs.reference(&target("web")).clone();
@@ -735,6 +946,43 @@ mod tests {
                 .clone()
         };
         assert_eq!(named(&target("app")), named(&target("web")));
+    }
+
+    /// Several artifacts in the closest tier are each related, in the Set's
+    /// order, for the one reason; a farther tier's are not (D15:1734).
+    #[test]
+    fn every_artifact_of_the_closest_tier_is_related_in_the_sets_order() {
+        let mut inputs = Inputs::new();
+        let vault = valid(ArtifactKind::TrustPolicy, "storefront-vault");
+        inputs.members.push(vault.clone());
+        inputs.reference(&policy(Trust))["identity"] = json!("storefront-escrow");
+        let (evaluation, _) = inputs.run();
+        let trust = artifact(&valid(ArtifactKind::TrustPolicy, "storefront-trust"));
+        assert!(tuple_of(&valid(ArtifactKind::TrustPolicy, "storefront-trust")) < tuple_of(&vault));
+        assert_eq!(
+            observed(&evaluation),
+            [(
+                policy(Trust),
+                Reason::IdentityMismatch,
+                inputs.at(&policy(Trust)),
+                vec![trust, artifact(&vault)]
+            )]
+        );
+    }
+
+    /// Without the declaration's file a failed reference is reported, but
+    /// nothing observes it.
+    #[test]
+    fn without_the_declarations_file_a_failed_reference_is_not_observed() {
+        let mut inputs = Inputs::new();
+        inputs.observe = false;
+        inputs.reference(&policy(Trust))["revision"] = json!("2");
+        let (evaluation, _) = inputs.run();
+        assert_eq!(
+            issues(&evaluation),
+            [(policy(Trust), Reason::RevisionMismatch)]
+        );
+        assert_eq!(observed(&evaluation), []);
     }
 
     #[test]

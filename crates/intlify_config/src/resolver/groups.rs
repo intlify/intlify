@@ -453,7 +453,8 @@ mod tests {
             let unconfirmed = self.policy.clone().err();
             let policy = unconfirmed.as_ref().map_or(Ok(&confirmed), Err);
             let mut evaluation = Evaluation::default();
-            let locales = Observed::declaration(&self.app)
+            let observed = Observed::declaration(&self.app);
+            let locales = observed
                 .app(|observer| {
                     resolve_locales(
                         &mut evaluation,
@@ -472,16 +473,19 @@ mod tests {
             let bytes: Vec<&[u8]> = members.iter().map(String::as_bytes).collect();
             let collection = read_collection(Some(&bytes), &ROOM).unwrap();
             let set = admit_collection(&mut evaluation, Ok(&confirmed), &collection).unwrap();
-            let references = resolve_fields(
-                &mut evaluation,
-                set.as_ref(),
-                &DeclarationReferences {
-                    policies: Err(stand_in(Slot::ProjectProfile)),
-                    target_profiles: Ok(&declaration.target_profiles),
-                },
-                locales.targets.as_deref(),
-            )
-            .unwrap();
+            let references = observed
+                .app(|observer| {
+                    resolve_fields(
+                        &mut evaluation,
+                        set.as_ref(),
+                        &DeclarationReferences {
+                            policies: Err(stand_in(Slot::ProjectProfile)),
+                            target_profiles: Ok(&declaration.target_profiles),
+                        },
+                        (locales.targets.as_deref(), Some(observer)),
+                    )
+                })
+                .unwrap();
             let targets = resolve_targets(
                 &mut evaluation,
                 Ok(&declaration.target_profiles),

@@ -447,7 +447,8 @@ mod tests {
             let mut fields = LocaleFields::declared(&declaration);
             fields.target_profiles = declared.clone();
             let mut evaluation = Evaluation::default();
-            let locales = Observed::declaration(&self.app)
+            let observed = Observed::declaration(&self.app);
+            let locales = observed
                 .app(|observer| {
                     resolve_locales(
                         &mut evaluation,
@@ -463,16 +464,19 @@ mod tests {
             let collection = read_collection(Some(&bytes), &ROOM).unwrap();
             let set = admit_collection(&mut evaluation, Ok(&confirmed), &collection).unwrap();
             // The policies' references are no concern of Phase 11's.
-            let references = resolve_fields(
-                &mut evaluation,
-                set.as_ref(),
-                &DeclarationReferences {
-                    policies: Err(stand_in(Slot::ProjectProfile)),
-                    target_profiles: Ok(&declaration.target_profiles),
-                },
-                locales.targets.as_deref(),
-            )
-            .unwrap();
+            let references = observed
+                .app(|observer| {
+                    resolve_fields(
+                        &mut evaluation,
+                        set.as_ref(),
+                        &DeclarationReferences {
+                            policies: Err(stand_in(Slot::ProjectProfile)),
+                            target_profiles: Ok(&declaration.target_profiles),
+                        },
+                        (locales.targets.as_deref(), Some(observer)),
+                    )
+                })
+                .unwrap();
             let targets =
                 resolve_targets(&mut evaluation, declared, &locales, &references).unwrap();
             inspect(evaluation, targets)

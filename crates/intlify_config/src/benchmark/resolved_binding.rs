@@ -6,10 +6,11 @@
 //! Profile Artifact Bindings it makes, under a fixture-owned confirmed policy.
 //! The configuration is complete and selected, and before the interval
 //! Phase 7 runs through the finite fixture provider, for the target bounds a
-//! Target Profile reference waits on, and the collection is admitted into the
-//! Set. The interval then resolves each present reference and binds the
-//! distinct ones. Neither the result nor its observation is a Profile or a
-//! shared artifact.
+//! Target Profile reference waits on, the collection is admitted into the
+//! Set, and the selected declaration's observer is built. The interval then
+//! resolves each present reference, observing one that names nothing, and
+//! binds the distinct ones. Neither the result nor its observation is a
+//! Profile or a shared artifact.
 
 use std::sync::Arc;
 
@@ -19,10 +20,14 @@ use crate::artifacts::collection::FormalCollection;
 use crate::artifacts::envelope::ExactTuple;
 use crate::model::ProfileId;
 use crate::resolver::artifact_resolution::{admit_collection, ArtifactSet};
+use crate::resolver::declaration_observer::DeclarationObserver;
+use crate::resolver::entry::EntryFile;
 use crate::resolver::evaluation::{
-    Admitted, Causes, Check, Evaluation, EvaluationInvariant, IssueKey, Status, Subject, Unit,
+    Admitted, Causes, Check, Evaluation, IssueKey, Status, Subject, Unit,
 };
-use crate::resolver::exact_resolution::{resolve_references, ArtifactBindings, ResolvedReferences};
+use crate::resolver::exact_resolution::{
+    resolve_references, ArtifactBindings, ReferenceInvariant, ResolvedReferences,
+};
 use crate::resolver::limits::ConfirmedPolicy;
 use crate::resolver::locales::{resolve_locales, LocaleFields, TargetLocales};
 use crate::resolver::resource_policy::{DeclarationReferences, ReferenceField};
@@ -58,6 +63,15 @@ pub(super) struct BindingInputs<'a> {
 }
 
 impl PreparedBindings {
+    /// Where the selected declaration's checks observe it in `file`: the
+    /// phases after Phase 5 observe through what it bound.
+    pub(super) fn observer<'a>(
+        &'a self,
+        file: &'a EntryFile<'a>,
+    ) -> Option<DeclarationObserver<'a>> {
+        Some(observer(&self.analysis, file, &self.selected)?.with_locales(&*self.canonicalizer))
+    }
+
     /// The inputs, when the configuration is complete and Phase 7 and the
     /// collection admission run without a defect.
     pub(super) fn inputs(&self) -> Option<BindingInputs<'_>> {
@@ -66,9 +80,7 @@ impl PreparedBindings {
         }
         let declaration = self.config.profiles().get(&self.selected)?;
         let file = self.file.file();
-        // The phases after Phase 5 observe through what it bound.
-        let observer =
-            observer(&self.analysis, &file, &self.selected)?.with_locales(&*self.canonicalizer);
+        let observer = self.observer(&file)?;
         let mut preparation = Evaluation::default();
         let locales = resolve_locales(
             &mut preparation,
@@ -92,7 +104,9 @@ impl PreparedBindings {
     /// One untimed invocation, retained as a timed one is.
     pub(super) fn resolve(&self) -> Option<Resolved> {
         let inputs = self.inputs()?;
-        Some(Resolved::retain(construct(&inputs)))
+        let file = self.file.file();
+        let observer = self.observer(&file)?;
+        Some(Resolved::retain(construct((&inputs, &observer))))
     }
 }
 
@@ -100,18 +114,21 @@ impl PreparedBindings {
 /// with the bindings they make, both borrowing the Set.
 pub(super) struct Construction<'s> {
     evaluation: Evaluation,
-    result: Result<Admitted<(ResolvedReferences<'s>, ArtifactBindings<'s>)>, EvaluationInvariant>,
+    result: Result<Admitted<(ResolvedReferences<'s>, ArtifactBindings<'s>)>, ReferenceInvariant>,
 }
 
-/// Phase 9's exact resolution over a fresh evaluation, and then the bindings:
-/// what every timed invocation runs.
-pub(super) fn construct<'s>(inputs: &'s BindingInputs<'s>) -> Construction<'s> {
+/// Phase 9's exact resolution over a fresh evaluation, observed through the
+/// selected declaration's `observer`, and then the bindings: what every timed
+/// invocation runs.
+pub(super) fn construct<'s>(
+    (inputs, observer): (&'s BindingInputs<'s>, &DeclarationObserver<'_>),
+) -> Construction<'s> {
     let mut evaluation = Evaluation::default();
     let result = resolve_references(
         &mut evaluation,
         inputs.set.as_ref(),
         &inputs.references,
-        inputs.targets.as_deref(),
+        (inputs.targets.as_deref(), Some(observer)),
     )
     .map(|resolved| {
         resolved.map(|resolved| {
@@ -136,7 +153,7 @@ pub(super) struct Retained {
 /// bindings it made: the complete ordinary output, retained past the end read.
 pub(super) struct Resolved {
     pub(super) evaluation: Evaluation,
-    pub(super) result: Result<Admitted<Retained>, EvaluationInvariant>,
+    pub(super) result: Result<Admitted<Retained>, ReferenceInvariant>,
 }
 
 impl Resolved {
@@ -379,7 +396,8 @@ mod tests {
     use crate::input_limits::Bound;
     use crate::resolver::artifact_resolution::{unit as collection_unit, CollectionSubject};
     use crate::resolver::evaluation::{
-        Actual, Blocking, Code, Details, LimitExceeded, Notice, Phase, Reason, Shortfall,
+        Actual, Blocking, Code, Details, EvaluationInvariant, LimitExceeded, Notice, Phase, Reason,
+        Shortfall,
     };
     use crate::resolver::exact_resolution::unit as reference_unit;
     use crate::resolver::limits::{BoundId, Group};
@@ -459,7 +477,9 @@ mod tests {
     fn the_retained_resolution_is_the_one_the_interval_made() {
         let prepared = prepared(ResolvedBindingRecipe::EveryReference);
         let inputs = prepared.inputs().unwrap();
-        let construction = construct(&inputs);
+        let file = prepared.file.file();
+        let observer = prepared.observer(&file).unwrap();
+        let construction = construct((&inputs, &observer));
         let (references, bindings) = {
             let (resolution, bindings) = construction.result.as_ref().unwrap().as_ref().unwrap();
             (
@@ -504,7 +524,9 @@ mod tests {
         limits.target_grouping.max_target_profiles = Bound::new(1).unwrap();
         prepared.policy = ConfirmedPolicy::fixture_owned(limits);
         let inputs = prepared.inputs().unwrap();
-        let construction = construct(&inputs);
+        let file = prepared.file.file();
+        let observer = prepared.observer(&file).unwrap();
+        let construction = construct((&inputs, &observer));
         let map = locale_unit(LocaleSubject::TargetProfiles, Check::WithinBound);
         let mut waiting = Vec::new();
         for (recorded, status) in construction.evaluation.statuses() {
@@ -535,13 +557,44 @@ mod tests {
         );
     }
 
+    /// The interval observes a reference that names nothing through the
+    /// selected declaration's observer, as the resolver does: each mismatch
+    /// fails the trust reference, which is observed once.
+    #[test]
+    fn the_interval_observes_a_reference_that_names_nothing() {
+        for (recipe, reason) in [
+            (
+                ResolvedBindingRecipe::RoleKindMismatch,
+                Reason::RoleKindMismatch,
+            ),
+            (
+                ResolvedBindingRecipe::RevisionMismatch,
+                Reason::RevisionMismatch,
+            ),
+            (ResolvedBindingRecipe::NotFound, Reason::NotFound),
+        ] {
+            let resolved = resolved(recipe);
+            let observed: Vec<_> = resolved
+                .evaluation
+                .occurrence_candidates()
+                .iter()
+                .map(|candidate| (candidate.finding.unit().clone(), candidate.finding.reason()))
+                .collect();
+            assert_eq!(
+                observed,
+                [(reference_unit(trust()), Some(reason))],
+                "{recipe:?}"
+            );
+        }
+    }
+
     #[test]
     fn a_resolver_defect_fails_the_case() {
         let resolved = Resolved {
             evaluation: Evaluation::default(),
-            result: Err(EvaluationInvariant::UnitRecordedTwice(reference_unit(
-                trust(),
-            ))),
+            result: Err(ReferenceInvariant::Evaluation(
+                EvaluationInvariant::UnitRecordedTwice(reference_unit(trust())),
+            )),
         };
         assert_eq!(
             require_observable(&resolved).err(),
