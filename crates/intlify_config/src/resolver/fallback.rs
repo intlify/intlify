@@ -375,9 +375,12 @@ fn literal_at<P: Provider>(
         |attempt| attempt,
     )?;
     if let (true, Ok(canonical)) = (corrected, &locale) {
+        // Phase 8's notices carry no occurrence Evidence yet (plan 025 PRs
+        // 5f-4g).
         evaluation.notice(
             own(Check::CanonicalLocale),
             Notice::non_canonical(canonical.clone()),
+            None,
         )?;
     }
     let distinct = evaluation.check(
@@ -446,6 +449,7 @@ mod tests {
     use crate::fixtures::{minimal_config, FixtureTargetReference};
     use crate::input_limits::Bound;
     use crate::resolver::declaration_observer::fixtures::Observed;
+    use crate::resolver::declaration_observer::DeclarationObserver;
     use crate::resolver::evaluation::{Actual, LimitExceeded, Status};
     use crate::resolver::locales::fixtures::{
         canonical, canonicalizer, content, declaration, key, limits, notices, rejected, stand_in,
@@ -506,13 +510,15 @@ mod tests {
         uncounted: None,
     };
 
-    /// Phase 7 over `fields` under a policy with room for them, then Phase 8's
-    /// fallback under `policy` and `specification`, into one evaluation.
+    /// Phase 7 over `fields` under a policy with room for them, observed
+    /// through `observer` when there is one, then Phase 8's fallback under
+    /// `policy` and `specification`, into one evaluation.
     fn resolve_with(
         fields: &LocaleFields<'_, FixtureTargetReference>,
         policy: Result<&ConfirmedPolicy, &Causes>,
         specification: &Admitted<VersionedIdentity<Id>>,
         spelling: &Spelling<'_>,
+        observer: Option<&DeclarationObserver<'_>>,
     ) -> Resolved {
         let mut evaluation = Evaluation::default();
         let canonicalizer = canonicalizer(spelling.identifier_bytes);
@@ -521,7 +527,7 @@ mod tests {
             Ok(&self::policy(100, 100)),
             Ok(&canonicalizer),
             fields,
-            None,
+            observer,
         )
         .unwrap();
         if let Some(uncounted) = spelling.uncounted {
@@ -544,15 +550,20 @@ mod tests {
         policy: Result<&ConfirmedPolicy, &Causes>,
         specification: &Admitted<VersionedIdentity<Id>>,
     ) -> Resolved {
-        resolve_with(fields, policy, specification, &ROOM)
+        resolve_with(fields, policy, specification, &ROOM, None)
     }
 
+    /// Phases 7 and 8 over `declaration`, observed in it as a file writes it.
     fn resolve_under(declaration: &Declaration, sources: u64, candidates: u64) -> Resolved {
-        resolve_fields(
-            &LocaleFields::declared(declaration),
-            Ok(&policy(sources, candidates)),
-            &Ok(SPECIFICATION),
-        )
+        Observed::declaration(declaration).app(|observer| {
+            resolve_with(
+                &LocaleFields::declared(declaration),
+                Ok(&policy(sources, candidates)),
+                &Ok(SPECIFICATION),
+                &ROOM,
+                Some(observer),
+            )
+        })
     }
 
     fn resolve(declaration: &Declaration) -> Resolved {
@@ -1123,7 +1134,8 @@ mod tests {
                 &uncounted,
             ),
         ] {
-            let resolved = resolve_with(&fields, Ok(&confirmed), &Ok(SPECIFICATION), &spelling);
+            let resolved =
+                resolve_with(&fields, Ok(&confirmed), &Ok(SPECIFICATION), &spelling, None);
             for literal in [
                 &candidate_units(&key("ja"), 0)[..],
                 &candidate_units(&key("ja"), 2),
@@ -1162,6 +1174,7 @@ mod tests {
                 identifier_bytes: 4,
                 ..ROOM
             },
+            None,
         );
         let long = candidate_unit(key("ja"), 0, Check::CanonicalLocale);
         assert_eq!(

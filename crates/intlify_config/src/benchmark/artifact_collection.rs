@@ -533,6 +533,7 @@ mod tests {
                 .notice(
                     first.clone(),
                     Notice::made_up(Code::ArtifactCollectionNotAdmitted),
+                    None,
                 )
                 .unwrap();
             evaluation

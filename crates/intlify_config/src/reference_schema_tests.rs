@@ -507,14 +507,18 @@ fn formal_references_reach_the_same_locale_resolution_without_body_resolution() 
     )
     .unwrap();
     let mut evaluation = Evaluation::default();
-    let resolved = resolve_locales(
-        &mut evaluation,
-        Ok(&policy),
-        Ok(&provider),
-        &LocaleFields::declared(declaration),
-        None,
-    )
-    .unwrap();
+    let resolved =
+        crate::resolver::declaration_observer::fixtures::Observed::declaration(declaration)
+            .app(|observer| {
+                resolve_locales(
+                    &mut evaluation,
+                    Ok(&policy),
+                    Ok(&provider),
+                    &LocaleFields::declared(declaration),
+                    Some(observer),
+                )
+            })
+            .unwrap();
     assert_eq!(evaluation.issues().count(), 0);
     let project = resolved.project.unwrap();
     assert!(project.source_default().is_none());

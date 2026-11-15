@@ -1406,11 +1406,19 @@ pub(super) mod tests {
             })
             .collect();
         candidates.sort();
+        // Where a candidate was observed is presentation Evidence, which
+        // reordering a set moves (D15:2389): only what each one found stays.
+        let mut observed: Vec<&IssueKey> = evaluation
+            .occurrence_candidates()
+            .iter()
+            .map(|candidate| &candidate.finding)
+            .collect();
+        observed.sort();
         (
             statuses(evaluation),
             candidates,
             evaluation.findings(),
-            evaluation.occurrence_candidates(),
+            observed,
         )
     }
 
@@ -2103,7 +2111,37 @@ pub(super) mod tests {
             let duplicate = locales::unit(subject.clone(), Check::UniqueLocale);
             assert_eq!(
                 issues(&evaluation),
-                [(duplicate, Code::LocaleDuplicate, None)]
+                [(duplicate.clone(), Code::LocaleDuplicate, None)]
+            );
+            // Each spelling is a candidate at its own token beside the other
+            // (D15:2410), and the corrected one's notice is at its own token.
+            let pointer = |index: u64| {
+                json!({ "exact-json-pointer": format!("/profiles/web/requestedLocales/{index}") })
+            };
+            let located = |unit: &Unit| -> Vec<(Value, Vec<Value>)> {
+                observed_views(&evaluation, unit)
+                    .into_iter()
+                    .map(|(primary, related)| {
+                        (
+                            primary["value"].clone(),
+                            related
+                                .into_iter()
+                                .map(|related| related["value"].clone())
+                                .collect(),
+                        )
+                    })
+                    .collect()
+            };
+            assert_eq!(
+                located(&duplicate),
+                [
+                    (pointer(1), vec![pointer(3)]),
+                    (pointer(3), vec![pointer(1)])
+                ]
+            );
+            assert_eq!(
+                located(&locales::unit(subject.clone(), Check::CanonicalLocale)),
+                [(pointer(3), vec![])]
             );
             // Both spellings keep their place, and neither wins: the project's
             // locales wait on the duplicate.
@@ -2455,14 +2493,9 @@ pub(super) mod tests {
         });
     }
 
-    /// Past a bound the confirmed policy supplies, Phase 7 observes the
-    /// declaration's field in the file beside the policy Phase 4 admitted,
-    /// under the exact reference that keys it (D15:824, 834, 2249).
-    #[test]
-    fn a_locale_bound_is_observed_beside_the_admitted_policy() {
-        use intlify_shared_json::encoding::encode;
-
-        use crate::resolver::evidence_source::hex;
+    /// The views of what each occurrence candidate of `unit` observed, its
+    /// primary Evidence and its related Evidence, in the order recorded.
+    fn observed_views(evaluation: &Evaluation, unit: &Unit) -> Vec<(Value, Vec<Value>)> {
         use crate::resolver::evidence_token::EvidenceTokens;
         use crate::resolver::occurrence::redacted;
         use crate::resolver::token::Sha256;
@@ -2471,28 +2504,39 @@ pub(super) mod tests {
                 identity: "intlify-project-profile",
                 revision: "0",
             };
+        let candidates = evaluation.occurrence_candidates();
+        let tokens = EvidenceTokens::assign(PROFILE, redacted(candidates), &Sha256);
+        let view = |projection: &crate::resolver::evidence::EvidenceProjection| {
+            projection.retained(PROFILE, &tokens).unwrap().view()
+        };
+        candidates
+            .iter()
+            .filter(|candidate| candidate.finding.unit() == unit)
+            .map(|candidate| {
+                (
+                    view(&candidate.primary),
+                    candidate.related.iter().map(view).collect(),
+                )
+            })
+            .collect()
+    }
+
+    /// Past a bound the confirmed policy supplies, Phase 7 observes the
+    /// declaration's field in the file beside the policy Phase 4 admitted,
+    /// under the exact reference that keys it (D15:824, 834, 2249).
+    #[test]
+    fn a_locale_bound_is_observed_beside_the_admitted_policy() {
+        use intlify_shared_json::encoding::encode;
+
+        use crate::resolver::evidence_source::hex;
         let mut inputs = Inputs::complete();
         let mut limits = policy_limits();
         limits.target_grouping.max_target_profiles = bound(1);
         let policy = resource_limit_policy(&limits);
         inputs.select_policy(policy.clone());
         inputs.resolve(|evaluation, _| {
-            let candidates = evaluation.occurrence_candidates();
-            let tokens = EvidenceTokens::assign(PROFILE, redacted(candidates), &Sha256);
-            let view = |projection: &crate::resolver::evidence::EvidenceProjection| {
-                projection.retained(PROFILE, &tokens).unwrap().view()
-            };
             let map = locales::unit(LocaleSubject::TargetProfiles, Check::WithinBound);
-            let observed: Vec<(Value, Vec<Value>)> = candidates
-                .iter()
-                .filter(|candidate| *candidate.finding.unit() == map)
-                .map(|candidate| {
-                    (
-                        view(&candidate.primary),
-                        candidate.related.iter().map(view).collect(),
-                    )
-                })
-                .collect();
+            let observed = observed_views(&evaluation, &map);
             assert_eq!(observed.len(), 1);
             let (primary, related) = &observed[0];
             assert_eq!(primary["origin"], "configuration-file");

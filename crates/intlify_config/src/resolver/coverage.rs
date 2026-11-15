@@ -557,9 +557,12 @@ fn selected_locales<P: Provider>(
         let locale =
             evaluation.check(subject(Check::CanonicalLocale), attempt, |attempt| attempt)?;
         if let (true, Ok(canonical)) = (corrected, &locale) {
+            // Phase 8's notices carry no occurrence Evidence yet (plan 025
+            // PRs 5f-4g).
             evaluation.notice(
                 subject(Check::CanonicalLocale),
                 Notice::non_canonical(canonical.clone()),
+                None,
             )?;
         }
         let once = evaluation.check(subject(Check::UniqueLocale), locale.clone(), |_| {
@@ -903,15 +906,19 @@ mod tests {
         Resolved { evaluation, policy }
     }
 
+    /// Phases 7 and 8 over `declaration`, observed in it as a file writes it.
     fn resolve_under(
         declaration: &Declaration,
         bounds: Bounds,
         vocabulary: &SurfaceVocabulary,
     ) -> Resolved {
-        resolve_fields(
-            &LocaleFields::declared(declaration),
-            &setup(bounds, vocabulary),
-        )
+        Observed::declaration(declaration).app(|observer| {
+            resolve_observed(
+                &LocaleFields::declared(declaration),
+                &setup(bounds, vocabulary),
+                Some(observer),
+            )
+        })
     }
 
     fn resolve(declaration: &Declaration) -> Resolved {
@@ -1819,13 +1826,16 @@ mod tests {
         ];
         let missing = stand_in(Slot::IntentSurfaceClassVocabulary);
         let declaration = declared(json!({"rules": [selector]}));
-        let resolved = resolve_fields(
-            &LocaleFields::declared(&declaration),
-            &Setup {
-                vocabulary: Err(&missing),
-                ..setup(ROOM, &vocabulary())
-            },
-        );
+        let resolved = Observed::declaration(&declaration).app(|observer| {
+            resolve_observed(
+                &LocaleFields::declared(&declaration),
+                &Setup {
+                    vocabulary: Err(&missing),
+                    ..setup(ROOM, &vocabulary())
+                },
+                Some(observer),
+            )
+        });
         for check in [
             Check::CanonicalLocale,
             Check::UniqueLocale,
@@ -1907,13 +1917,16 @@ mod tests {
         // missing, while the locale item needs no vocabulary.
         let missing = stand_in(Slot::IntentSurfaceClassVocabulary);
         let declaration = declared(json!({"rules": [locale_only]}));
-        let resolved = resolve_fields(
-            &LocaleFields::declared(&declaration),
-            &Setup {
-                vocabulary: Err(&missing),
-                ..setup(ROOM, &vocabulary())
-            },
-        );
+        let resolved = Observed::declaration(&declaration).app(|observer| {
+            resolve_observed(
+                &LocaleFields::declared(&declaration),
+                &Setup {
+                    vocabulary: Err(&missing),
+                    ..setup(ROOM, &vocabulary())
+                },
+                Some(observer),
+            )
+        });
         let owner = rule(&locale_only);
         for check in [
             Check::CanonicalLocale,

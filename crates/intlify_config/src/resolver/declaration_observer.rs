@@ -2,10 +2,10 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Where a check of the selected declaration looks: a value under the
-//! declaration, or a member's key there, as Materialized Value Evidence at the
-//! token in the file Phase 1 read (D15:790, 802), and the configuration around
-//! it, the root, the declarations, a declared Profile ID's key, every string
-//! past a bound, and the selector.
+//! declaration, an array's element there, or a member's key there, as
+//! Materialized Value Evidence at the token in the file Phase 1 read (D15:790,
+//! 802), and the configuration around it, the root, the declarations, a
+//! declared Profile ID's key, every string past a bound, and the selector.
 //! The phases after profile selection observe their Findings through it.
 
 use crate::input_limits::Bound;
@@ -68,6 +68,28 @@ impl<'a> DeclarationObserver<'a> {
     pub(crate) fn value(&self, path: &[&str]) -> Result<EvidenceProjection, ObserverInvariant> {
         let node = self.node(path)?;
         self.at(&self.edges(path, None), self.document.node(node).span())
+    }
+
+    /// The element at `index` of the array at the member path `path` under
+    /// the declaration, at its token (D15:790).
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug of an element the document lacks, or that has
+    /// no Evidence.
+    pub(crate) fn element(
+        &self,
+        path: &[&str],
+        index: usize,
+    ) -> Result<EvidenceProjection, ObserverInvariant> {
+        let NodeKind::Array(elements) = self.document.node(self.node(path)?).kind() else {
+            return Err(ObserverInvariant::Missing);
+        };
+        let element = *elements.get(index).ok_or(ObserverInvariant::Missing)?;
+        let position = u64::try_from(index).map_err(|_| ObserverInvariant::Missing)?;
+        let mut edges = self.edges(path, None);
+        edges.push(Edge::Index(position));
+        self.at(&edges, self.document.node(element).span())
     }
 
     /// The key of the member `name` of the object at the member path `path`
@@ -458,6 +480,50 @@ mod tests {
         ] {
             assert_eq!(
                 observer.member_key(path, name).err(),
+                Some(ObserverInvariant::Missing)
+            );
+        }
+    }
+
+    /// An array's element under the declaration is observed at its token, at
+    /// the pointer of its index (D15:790).
+    #[test]
+    fn an_element_under_the_declaration_is_observed_at_its_token() {
+        let mut config = complete_config();
+        config["profiles"]["app"]["requestedLocales"] = json!(["ja", "en"]);
+        let (bytes, document, profiles) = materialized(&config);
+        let fixture = FileFixture::new(&fixture_limits(10_000));
+        let file = fixture.file(Arc::clone(&bytes));
+        let observer = DeclarationObserver::new(&file, (&document, profiles), "app").unwrap();
+        for (path, index, pointer) in [
+            (
+                &["requestedLocales"][..],
+                1,
+                "/profiles/app/requestedLocales/1",
+            ),
+            (
+                &["targetProfiles", "server", "requestedLocales"][..],
+                0,
+                "/profiles/app/targetProfiles/server/requestedLocales/0",
+            ),
+        ] {
+            let view = view(&observer.element(path, index).unwrap());
+            assert_eq!(view["kind"], "configuration-value", "{view}");
+            assert_eq!(view["value"], json!({ "exact-json-pointer": pointer }));
+            let start: usize = view["span"]["start"].as_str().unwrap().parse().unwrap();
+            let end: usize = view["span"]["end"].as_str().unwrap().parse().unwrap();
+            assert_eq!(
+                serde_json::from_slice::<String>(&bytes[start..end]).unwrap(),
+                "en"
+            );
+        }
+        for (path, index) in [
+            (&["requestedLocales"][..], 2),
+            (&["projectId"][..], 0),
+            (&["absent"][..], 0),
+        ] {
+            assert_eq!(
+                observer.element(path, index).err(),
                 Some(ObserverInvariant::Missing)
             );
         }
