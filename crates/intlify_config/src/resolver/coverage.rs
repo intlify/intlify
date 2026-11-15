@@ -40,6 +40,7 @@ use crate::locale::{CanonicalLocale, Canonicalizer, Provider, VersionedIdentity}
 use crate::model::{Coverage, CoverageMode, CoverageRule};
 use crate::structural::Edge;
 
+use super::decision_evidence::DecisionEvidence;
 use super::declaration_observer::{beside, DeclarationObserver, ObserverInvariant};
 use super::evaluation::{
     both, within, Actual, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant,
@@ -223,18 +224,6 @@ pub(crate) fn unit(subject: CoverageSubject, check: Check) -> Unit {
 pub(crate) enum Decision {
     Default,
     Rules(Vec<Domain>),
-}
-
-/// One Coverage Decision Evidence mapping, before the invocation's evidence
-/// tokens are assigned: a cell, the decision source its Coverage Decision
-/// Basis admitted, the project default or a matched rule domain, and the
-/// Evidence of that source (D15:1609, 2485).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct DecisionEvidence {
-    pub(crate) cell: (CanonicalLocale, Token),
-    /// The matched rule domain, or none for the project default.
-    pub(crate) source: Option<Domain>,
-    pub(crate) evidence: EvidenceProjection,
 }
 
 /// One cell's Coverage Decision Basis: its effective mode and how that was
@@ -2482,6 +2471,40 @@ mod tests {
         );
         assert!(unobserved.policy.is_ok());
         assert_eq!(decisions(&unobserved), []);
+    }
+
+    /// The recorded mappings become Coverage Decision Evidence records under
+    /// the invocation's tokens, each owned by the decision table: the declared
+    /// rule's Materialized Value Evidence, and the Coverage Specification
+    /// input for the omitted default (D15:1609, 2485).
+    #[test]
+    fn the_recorded_mappings_become_records_under_the_decision_table() {
+        use crate::resolver::decision_evidence::{records, redacted};
+        use crate::resolver::evidence_token::EvidenceTokens;
+        use crate::resolver::origin::EvidenceKind;
+        use crate::resolver::token::{Sha256, Specification};
+        const PROFILE: Specification<'static> = Specification {
+            identity: "intlify-project-profile",
+            revision: "0",
+        };
+        let declaration = declared(json!({
+            "rules": [{"requestedLocales": ["fr"], "mode": "fallback-allowed"}],
+        }));
+        let resolved = resolve(&declaration);
+        let candidates = resolved.evaluation.decision_evidence();
+        let tokens = EvidenceTokens::assign(PROFILE, redacted(candidates), &Sha256);
+        let records = records(candidates, PROFILE, &tokens).unwrap();
+        assert_eq!(records.len(), EVERY_LOCALE.len() * EVERY_SURFACE.len());
+        let table = unit(CoverageSubject::Table, Check::CompleteTable);
+        for record in &records {
+            let kind = if record.cell().0.as_str() == "fr" {
+                EvidenceKind::ConfigurationValue
+            } else {
+                EvidenceKind::SpecificationInput
+            };
+            assert_eq!(record.evidence().kind(), kind);
+            assert_eq!(record.owner(), &table);
+        }
     }
 
     #[test]
