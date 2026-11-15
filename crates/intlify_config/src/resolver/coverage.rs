@@ -26,8 +26,9 @@
 //! cells, the factor the declaration supplies (plan 025 decision #198). Each
 //! rule holding a selector is a raw parent of its own, so a selector item's
 //! Findings, and a locale item's notice, are observed at the items naming
-//! their subject in every such rule (D15:2190, 2387). The other checks'
-//! Findings carry no occurrence Evidence yet.
+//! their subject in every such rule (D15:2190, 2387). A domain several rules
+//! hold, and a cell whose maximally specific rules select two modes, are
+//! observed at each of those rules beside the others (D15:1609, 2387, 2410).
 
 use std::collections::BTreeMap;
 
@@ -234,9 +235,9 @@ pub(crate) struct Basis {
 /// by surface class.
 pub(crate) type Cells = BTreeMap<(CanonicalLocale, Token), Basis>;
 
-/// Each normalized domain with how many rule occurrences hold it and the mode
-/// of the first.
-type Domains = BTreeMap<Domain, (usize, CoverageMode)>;
+/// Each normalized domain with the positions of the rule occurrences holding
+/// it, in ascending order, and the mode of the first distinct rule.
+type Domains = BTreeMap<Domain, (Vec<usize>, CoverageMode)>;
 
 /// The checked coverage, 015's coverage semantic group: the admitted
 /// specification, the vocabulary its table was checked against, the
@@ -439,9 +440,13 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
     // every cell waits on the comparison bound. With no cell to wait on them,
     // the rules' own checks still decide whether the policy exists.
     let cells = match both(span.clone(), sized) {
-        Ok(((requested, vocabulary), ())) => {
-            decide(evaluation, &decidable, requested, vocabulary, &domains)?
-        }
+        Ok(((requested, vocabulary), ())) => decide(
+            evaluation,
+            (&decidable, &selectors),
+            requested,
+            vocabulary,
+            &domains,
+        )?,
         Err(causes) => Err(causes),
     };
     // The table owns every cell's Basis, so no Basis exists unless every cell
@@ -536,6 +541,30 @@ impl<P: Provider> Selectors<'_, P> {
             })
             .collect()
     }
+
+    /// The rules at `positions`, each at its token, or none without the
+    /// declaration's file (D15:790).
+    fn rules(
+        &self,
+        positions: &[usize],
+    ) -> Result<Vec<Option<EvidenceProjection>>, ObserverInvariant> {
+        let Some(observer) = self.observer else {
+            return Ok(Vec::new());
+        };
+        positions
+            .iter()
+            .map(|&position| {
+                let position = u64::try_from(position).map_err(|_| ObserverInvariant::Missing)?;
+                observer
+                    .nested(&[
+                        Edge::Member("coverage"),
+                        Edge::Member("rules"),
+                        Edge::Index(position),
+                    ])
+                    .map(Some)
+            })
+            .collect()
+    }
 }
 
 /// Each distinct rule's selector units and its unit normalizing them to a
@@ -583,22 +612,33 @@ fn normalize<P: Provider>(
         )?;
         match domain {
             Ok(domain) => {
-                domains.entry(domain).or_insert((0, rule.mode())).0 += raws.len();
+                let (holding, _) = domains.entry(domain).or_insert((Vec::new(), rule.mode()));
+                holding.extend(raws);
+                holding.sort_unstable();
             }
             Err(causes) => normalized = both(normalized, Err::<(), _>(causes)).map(|_| ()),
         }
     }
-    for (domain, &(occurrences, _)) in &domains {
+    for (domain, (holding, _)) in &domains {
         // Only a rule that normalized holds a domain, so what the domain waits
-        // on, those rules' units, has passed.
-        let unique = evaluation.check(
+        // on, those rules' units, has passed. Rules sharing it are found each
+        // at its own rule, beside the others (D15:2387, 2410).
+        let sharing = if holding.len() > 1 {
+            selectors.rules(holding)?
+        } else {
+            Vec::new()
+        };
+        let unique = evaluation.check_found(
             unit(CoverageSubject::Domain(domain.clone()), Check::UniqueDomain),
             Ok(()),
             |()| {
-                if occurrences == 1 {
+                if holding.len() == 1 {
                     Ok(())
                 } else {
-                    Err(issue(Code::CoverageRuleDuplicate, None))
+                    Err(Found::repeated(
+                        issue(Code::CoverageRuleDuplicate, None),
+                        &sharing,
+                    ))
                 }
             },
         )?;
@@ -871,24 +911,39 @@ fn selected_surfaces<P: Provider>(
 
 /// One unit per cell, locale first, each waiting on `decidable`: the default
 /// mode, once every rule normalized to a domain of its own and the comparison
-/// bound passed.
-fn decide(
+/// bound passed. A cell whose maximally specific rules select two modes is
+/// found at each of those rules, beside the others (D15:1609, 2410).
+fn decide<P: Provider>(
     evaluation: &mut Evaluation,
-    decidable: &Admitted<CoverageMode>,
+    (decidable, selectors): (&Admitted<CoverageMode>, &Selectors<'_, P>),
     requested: &LocaleSet,
     vocabulary: &SurfaceVocabulary,
     domains: &Domains,
-) -> Result<Admitted<Cells>, EvaluationInvariant> {
+) -> Result<Admitted<Cells>, LocaleInvariant> {
     let mut cells = Ok(BTreeMap::new());
     for locale in requested.as_slice() {
         for surface in vocabulary.members() {
-            let decided = evaluation.check(
+            let maximal = maximal(locale, surface, domains);
+            // Every domain is a rule's own once the cell is decidable.
+            let conflicting = if decidable.is_ok() && conflict(&maximal) {
+                let positions: Vec<usize> = maximal
+                    .iter()
+                    .flat_map(|(_, (holding, _))| holding.iter().copied())
+                    .collect();
+                selectors.rules(&positions)?
+            } else {
+                Vec::new()
+            };
+            let decided = evaluation.check_found(
                 unit(
                     CoverageSubject::Cell(locale.clone(), surface.clone()),
                     Check::EffectiveMode,
                 ),
                 decidable.clone(),
-                |default| basis(default, locale, surface, domains),
+                |default| {
+                    basis(default, &maximal)
+                        .map_err(|blocking| Found::repeated(blocking, &conflicting))
+                },
             )?;
             cells = both(cells, decided).map(|(mut cells, basis)| {
                 cells.insert((locale.clone(), surface.clone()), basis);
@@ -899,22 +954,18 @@ fn decide(
     Ok(cells)
 }
 
-/// One cell's decision from the rules matching it, keeping each that no
-/// narrower matching rule outranks. None kept is the default; kept rules of
-/// one mode decide it together; two modes conflict, whatever order the rules
-/// were authored in.
-fn basis(
-    default: CoverageMode,
+/// The rules matching one cell that no narrower matching rule outranks, each
+/// with its domain, in domain order.
+fn maximal<'d>(
     locale: &CanonicalLocale,
     surface: &Token,
-    domains: &Domains,
-) -> Result<Basis, Blocking> {
-    let matching: Vec<(&Domain, CoverageMode)> = domains
+    domains: &'d Domains,
+) -> Vec<(&'d Domain, &'d (Vec<usize>, CoverageMode))> {
+    let matching: Vec<_> = domains
         .iter()
         .filter(|(domain, _)| domain.contains(locale, surface))
-        .map(|(domain, &(_, mode))| (domain, mode))
         .collect();
-    let maximal: Vec<(&Domain, CoverageMode)> = matching
+    matching
         .iter()
         .filter(|(domain, _)| {
             !matching
@@ -922,25 +973,39 @@ fn basis(
                 .any(|(other, _)| other.narrower_than(domain))
         })
         .copied()
-        .collect();
-    let Some(&(_, mode)) = maximal.first() else {
+        .collect()
+}
+
+/// Whether the maximally specific rules select two modes.
+fn conflict(maximal: &[(&Domain, &(Vec<usize>, CoverageMode))]) -> bool {
+    maximal.windows(2).any(|pair| pair[0].1 .1 != pair[1].1 .1)
+}
+
+/// One cell's decision from its maximally specific rules. None is the
+/// default; rules of one mode decide it together; two modes conflict,
+/// whatever order the rules were authored in.
+fn basis(
+    default: CoverageMode,
+    maximal: &[(&Domain, &(Vec<usize>, CoverageMode))],
+) -> Result<Basis, Blocking> {
+    let Some(&(_, &(_, mode))) = maximal.first() else {
         return Ok(Basis {
             mode: default,
             decision: Decision::Default,
         });
     };
-    if maximal.iter().all(|&(_, other)| other == mode) {
+    if conflict(maximal) {
+        Err(issue(Code::CoverageRuleConflict, None))
+    } else {
         Ok(Basis {
             mode,
             decision: Decision::Rules(
                 maximal
-                    .into_iter()
-                    .map(|(domain, _)| domain.clone())
+                    .iter()
+                    .map(|(domain, _)| (*domain).clone())
                     .collect(),
             ),
         })
-    } else {
-        Err(issue(Code::CoverageRuleConflict, None))
     }
 }
 
@@ -1202,6 +1267,37 @@ mod tests {
     /// `declaration`, at its token.
     fn locale_item(declaration: &Declaration, rule: u64, position: u64) -> EvidenceProjection {
         selector_item(declaration, "requestedLocales", rule, position)
+    }
+
+    /// The rule at `rule` in `declaration`, at its token.
+    fn rule_at(declaration: &Declaration, rule: u64) -> EvidenceProjection {
+        use crate::structural::Edge::{Index, Member};
+        let canonicalizer = canonicalizer(64);
+        Observed::declaration(declaration).app(|observer| {
+            observer
+                .with_locales(&canonicalizer)
+                .nested(&[Member("coverage"), Member("rules"), Index(rule)])
+                .unwrap()
+        })
+    }
+
+    /// Each of two rules found at its token, beside the other, as Findings of
+    /// `unit`.
+    fn each_beside_the_other(
+        declaration: &Declaration,
+        unit: &Unit,
+        [first, second]: [u64; 2],
+    ) -> [(Unit, Observation); 2] {
+        let beside = |primary, related| {
+            (
+                unit.clone(),
+                Observation {
+                    primary: rule_at(declaration, primary),
+                    related: vec![rule_at(declaration, related)],
+                },
+            )
+        };
+        [beside(first, second), beside(second, first)]
     }
 
     /// The item at `position` of the selector `selector` of the rule at
@@ -1569,7 +1665,8 @@ mod tests {
         };
         assert_eq!(alone(&locale_only), alone(&named));
         // Together they are one domain held twice, whatever their modes.
-        let resolved = resolve(&declared(json!({"rules": [locale_only, named]})));
+        let declaration = declared(json!({"rules": [locale_only, named]}));
+        let resolved = resolve(&declaration);
         let duplicate = domain_unit(domain(&["fr", "ja"], &EVERY_SURFACE));
         assert_eq!(
             issues(&resolved.evaluation),
@@ -1578,6 +1675,12 @@ mod tests {
                 "project-profile-coverage-rule-duplicate",
                 None
             )]
+        );
+        // The second rule's content orders first, but the rules are found in
+        // their declared order.
+        assert_eq!(
+            observed(&resolved.evaluation),
+            each_beside_the_other(&declaration, &duplicate, [0, 1])
         );
         for cell in cell_units() {
             assert_eq!(
@@ -1592,7 +1695,8 @@ mod tests {
     #[test]
     fn identical_or_aliased_rules_are_duplicates_and_share_the_one_rule_unit() {
         let fr = json!({"requestedLocales": ["fr"], "mode": "fallback-allowed"});
-        let resolved = resolve(&declared(json!({"rules": [fr, fr]})));
+        let declaration = declared(json!({"rules": [fr, fr]}));
+        let resolved = resolve(&declaration);
         let owner = rule(&fr);
         assert_eq!(
             statuses(&resolved.evaluation)
@@ -1622,27 +1726,43 @@ mod tests {
                 .collect::<Vec<_>>(),
             [(rule_unit(&owner), Status::Evaluated)]
         );
+        let duplicate = domain_unit(domain(&["fr"], &EVERY_SURFACE));
         assert_eq!(
             issues(&resolved.evaluation),
             [(
-                domain_unit(domain(&["fr"], &EVERY_SURFACE)),
+                duplicate.clone(),
                 "project-profile-coverage-rule-duplicate",
                 None
             )]
         );
+        // Each rule holding the domain is found at its token, beside the
+        // other (D15:2387, 2410).
+        assert_eq!(
+            observed(&resolved.evaluation),
+            each_beside_the_other(&declaration, &duplicate, [0, 1])
+        );
         // An alias spelling names the same locale as its canonical form.
         let aliased = json!({"requestedLocales": ["EN"], "mode": "fallback-allowed"});
-        let resolved = resolve(&declared(json!({"rules": [
+        let declaration = declared(json!({"rules": [
             aliased,
             {"requestedLocales": ["en"], "mode": "fallback-allowed"}
-        ]})));
+        ]}));
+        let resolved = resolve(&declaration);
+        let duplicate = domain_unit(domain(&["en"], &EVERY_SURFACE));
         assert_eq!(
             issues(&resolved.evaluation),
             [(
-                domain_unit(domain(&["en"], &EVERY_SURFACE)),
+                duplicate.clone(),
                 "project-profile-coverage-rule-duplicate",
                 None
             )]
+        );
+        assert_eq!(
+            observed(&resolved.evaluation)
+                .into_iter()
+                .filter(|(unit, _)| unit == &duplicate)
+                .collect::<Vec<_>>(),
+            each_beside_the_other(&declaration, &duplicate, [0, 1])
         );
         assert_eq!(
             notices(&resolved.evaluation),
@@ -1894,7 +2014,8 @@ mod tests {
     fn incomparable_maximal_rules_of_two_modes_conflict_only_where_they_overlap() {
         let locale_only = json!({"requestedLocales": ["fr"], "mode": "fallback-allowed"});
         let surface_only = json!({"intentSurfaceClasses": ["checkout"], "mode": "direct-required"});
-        let resolved = resolve(&declared(json!({"rules": [locale_only, surface_only]})));
+        let declaration = declared(json!({"rules": [locale_only, surface_only]}));
+        let resolved = resolve(&declaration);
         let conflict = cell_unit("fr", "checkout");
         assert_eq!(
             issues(&resolved.evaluation),
@@ -1903,6 +2024,13 @@ mod tests {
                 "project-profile-coverage-rule-conflict",
                 None
             )]
+        );
+        // Each maximally specific rule is found at its token, beside the
+        // other, in domain order: the surface rule spans every locale
+        // (D15:1609, 2410).
+        assert_eq!(
+            observed(&resolved.evaluation),
+            each_beside_the_other(&declaration, &conflict, [1, 0])
         );
         assert!(cell_units()
             .iter()
@@ -2166,7 +2294,10 @@ mod tests {
         // Observed at the factor this bound adds to the cells, the rules,
         // beside the policy alone (plan 025 decision #198).
         assert_eq!(
-            observed(&over.evaluation),
+            observed(&over.evaluation)
+                .into_iter()
+                .filter(|(unit, _)| unit == &compared)
+                .collect::<Vec<_>>(),
             [(
                 compared.clone(),
                 beside_policy(&declaration, &["coverage", "rules"])
