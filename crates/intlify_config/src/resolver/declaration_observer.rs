@@ -116,6 +116,35 @@ impl<'a> DeclarationObserver<'a> {
         self.at(&edges, self.document.node(element).span())
     }
 
+    /// The value at the internal path `steps` under the declaration, through
+    /// members and array elements alike, at its token (D15:790).
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug of a value the document lacks, or that has no
+    /// Evidence.
+    pub(crate) fn nested(
+        &self,
+        steps: &[Edge<'_>],
+    ) -> Result<EvidenceProjection, ObserverInvariant> {
+        let mut node = self.declaration;
+        for step in steps {
+            node = match (step, self.document.node(node).kind()) {
+                (Edge::Member(name), NodeKind::Object(_)) => member(self.document, node, name),
+                (Edge::Index(index), NodeKind::Array(elements)) => usize::try_from(*index)
+                    .ok()
+                    .and_then(|index| elements.get(index).copied()),
+                _ => None,
+            }
+            .ok_or(ObserverInvariant::Missing)?;
+        }
+        let edges: Vec<Edge<'_>> = [Edge::Member("profiles"), Edge::Member(self.id)]
+            .into_iter()
+            .chain(steps.iter().copied())
+            .collect();
+        self.at(&edges, self.document.node(node).span())
+    }
+
     /// The key of the member `name` of the object at the member path `path`
     /// under the declaration, at the key's token, which is classified by facts
     /// fixed when the record is constructed, never by a later check (D15:776,
@@ -678,6 +707,59 @@ mod tests {
         ] {
             assert_eq!(
                 observer.element(path, index).err(),
+                Some(ObserverInvariant::Missing)
+            );
+        }
+    }
+
+    /// A value through members and elements alike, such as a coverage rule's
+    /// selector item, is observed at its token, and the same path through
+    /// members alone is the value's (D15:790).
+    #[test]
+    fn a_value_through_members_and_elements_is_observed_at_its_token() {
+        use crate::structural::Edge::{Index, Member};
+        let mut config = complete_config();
+        config["profiles"]["app"]["coverage"] = json!({"rules": [
+            {"requestedLocales": ["ja"], "mode": "fallback-allowed"},
+            {"requestedLocales": ["fr", "en"], "mode": "fallback-allowed"}
+        ]});
+        let (bytes, document, profiles) = materialized(&config);
+        let fixture = FileFixture::new(&fixture_limits(10_000));
+        let file = fixture.file(Arc::clone(&bytes));
+        let observer = DeclarationObserver::new(&file, (&document, profiles), "app").unwrap();
+        let item = [
+            Member("coverage"),
+            Member("rules"),
+            Index(1),
+            Member("requestedLocales"),
+            Index(1),
+        ];
+        let view = view(&observer.nested(&item).unwrap());
+        assert_eq!(
+            view["value"],
+            json!({ "exact-json-pointer": "/profiles/app/coverage/rules/1/requestedLocales/1" })
+        );
+        let start: usize = view["span"]["start"].as_str().unwrap().parse().unwrap();
+        let end: usize = view["span"]["end"].as_str().unwrap().parse().unwrap();
+        assert_eq!(
+            serde_json::from_slice::<String>(&bytes[start..end]).unwrap(),
+            "en"
+        );
+        assert_eq!(
+            observer.nested(&[Member("coverage"), Member("rules")]),
+            observer.value(&["coverage", "rules"])
+        );
+        for missing in [
+            &item[..2]
+                .iter()
+                .copied()
+                .chain([Index(2)])
+                .collect::<Vec<_>>()[..],
+            &[Member("coverage"), Index(0)],
+            &[Member("projectId"), Member("deeper")],
+        ] {
+            assert_eq!(
+                observer.nested(missing).err(),
                 Some(ObserverInvariant::Missing)
             );
         }
