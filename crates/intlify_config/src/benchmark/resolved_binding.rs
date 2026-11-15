@@ -28,7 +28,7 @@ use crate::resolver::locales::{resolve_locales, LocaleFields, TargetLocales};
 use crate::resolver::resource_policy::{DeclarationReferences, ReferenceField};
 
 use super::observation::{Frame, Observation};
-use super::operation::{Analysis, Config, OutputFailure};
+use super::operation::{observer, Analysis, Config, ConfigFile, OutputFailure};
 use super::quantity::Quantity;
 use super::{artifact_collection, locale};
 
@@ -37,6 +37,9 @@ use super::{artifact_collection, locale};
 /// through, and the collection past 015's pre-invocation boundary.
 pub(super) struct PreparedBindings {
     pub(super) analysis: Analysis,
+    /// The file the analysis materialized, which Phase 7's checks observe
+    /// the selected declaration in.
+    pub(super) file: ConfigFile,
     pub(super) config: Config,
     pub(super) selected: ProfileId,
     pub(super) policy: ConfirmedPolicy,
@@ -62,12 +65,15 @@ impl PreparedBindings {
             return None;
         }
         let declaration = self.config.profiles().get(&self.selected)?;
+        let file = self.file.file();
+        let observer = observer(&self.analysis, &file, &self.selected)?;
         let mut preparation = Evaluation::default();
         let locales = resolve_locales(
             &mut preparation,
             Ok(&self.policy),
             Ok(&*self.canonicalizer),
             &LocaleFields::declared(declaration),
+            Some(&observer),
         )
         .ok()?;
         let set = admit_collection(&mut preparation, Ok(&self.policy), &self.collection).ok()?;

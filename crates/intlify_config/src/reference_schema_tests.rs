@@ -512,6 +512,7 @@ fn formal_references_reach_the_same_locale_resolution_without_body_resolution() 
         Ok(&policy),
         Ok(&provider),
         &LocaleFields::declared(declaration),
+        None,
     )
     .unwrap();
     assert_eq!(evaluation.issues().count(), 0);

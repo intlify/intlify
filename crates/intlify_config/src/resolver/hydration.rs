@@ -581,6 +581,7 @@ mod tests {
     use crate::profile_fixtures::minimal_config;
     use crate::references::{PolicyReference, TargetProfileReference};
     use crate::resolver::artifact_resolution::admit_collection;
+    use crate::resolver::declaration_observer::fixtures::Observed;
     use crate::resolver::evaluation::{Actual, LimitExceeded, Status};
     use crate::resolver::exact_resolution::resolve_fields;
     use crate::resolver::groups::{self, resolve_groups, GroupSubject};
@@ -747,13 +748,17 @@ mod tests {
             let unconfirmed = self.policy.clone().err();
             let policy = unconfirmed.as_ref().map_or(Ok(&confirmed), Err);
             let mut evaluation = Evaluation::default();
-            let locales = resolve_locales(
-                &mut evaluation,
-                policy,
-                Ok(&canonicalizer(64)),
-                &LocaleFields::declared(&declaration),
-            )
-            .unwrap();
+            let locales = Observed::declaration(&declaration)
+                .app(|observer| {
+                    resolve_locales(
+                        &mut evaluation,
+                        policy,
+                        Ok(&canonicalizer(64)),
+                        &LocaleFields::declared(&declaration),
+                        Some(observer),
+                    )
+                })
+                .unwrap();
             let members: Vec<String> = declaration
                 .target_profiles
                 .iter()

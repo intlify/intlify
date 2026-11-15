@@ -341,6 +341,7 @@ impl From<LocaleInvariant> for ResolverInvariant {
         match invariant {
             LocaleInvariant::Evaluation(invariant) => Self::Evaluation(invariant),
             LocaleInvariant::Canonicalization(failure) => Self::Canonicalization(failure),
+            LocaleInvariant::Observer(invariant) => Self::Observer(invariant),
         }
     }
 }
@@ -407,7 +408,13 @@ where
         held(identity.as_ref()),
     )?;
     let locale_fields = fields.locale_fields();
-    let locales = resolve_locales(evaluation, confirmed, canonicalizer, &locale_fields)?;
+    let locales = resolve_locales(
+        evaluation,
+        confirmed,
+        canonicalizer,
+        &locale_fields,
+        configuration.observer.as_ref(),
+    )?;
     own(
         evaluation,
         SemanticGroup::ProjectLocales,
@@ -2444,6 +2451,66 @@ pub(super) mod tests {
             assert_eq!(
                 unestablished(&evaluation),
                 [SemanticGroup::Targets, SemanticGroup::DeploymentGroups]
+            );
+        });
+    }
+
+    /// Past a bound the confirmed policy supplies, Phase 7 observes the
+    /// declaration's field in the file beside the policy Phase 4 admitted,
+    /// under the exact reference that keys it (D15:824, 834, 2249).
+    #[test]
+    fn a_locale_bound_is_observed_beside_the_admitted_policy() {
+        use intlify_shared_json::encoding::encode;
+
+        use crate::resolver::evidence_source::hex;
+        use crate::resolver::evidence_token::EvidenceTokens;
+        use crate::resolver::occurrence::redacted;
+        use crate::resolver::token::Sha256;
+        const PROFILE: crate::resolver::token::Specification<'static> =
+            crate::resolver::token::Specification {
+                identity: "intlify-project-profile",
+                revision: "0",
+            };
+        let mut inputs = Inputs::complete();
+        let mut limits = policy_limits();
+        limits.target_grouping.max_target_profiles = bound(1);
+        let policy = resource_limit_policy(&limits);
+        inputs.select_policy(policy.clone());
+        inputs.resolve(|evaluation, _| {
+            let candidates = evaluation.occurrence_candidates();
+            let tokens = EvidenceTokens::assign(PROFILE, redacted(candidates), &Sha256);
+            let view = |projection: &crate::resolver::evidence::EvidenceProjection| {
+                projection.retained(PROFILE, &tokens).unwrap().view()
+            };
+            let map = locales::unit(LocaleSubject::TargetProfiles, Check::WithinBound);
+            let observed: Vec<(Value, Vec<Value>)> = candidates
+                .iter()
+                .filter(|candidate| *candidate.finding.unit() == map)
+                .map(|candidate| {
+                    (
+                        view(&candidate.primary),
+                        candidate.related.iter().map(view).collect(),
+                    )
+                })
+                .collect();
+            assert_eq!(observed.len(), 1);
+            let (primary, related) = &observed[0];
+            assert_eq!(primary["origin"], "configuration-file");
+            assert_eq!(
+                primary["value"],
+                json!({ "exact-json-pointer": "/profiles/web/targetProfiles" })
+            );
+            let reference = reference_value(&tuple_of(&policy));
+            assert_eq!(
+                related,
+                &[json!({
+                    "kind": "artifact-input",
+                    "origin": "profile-resolution-artifact-collection",
+                    "component": [
+                        { "fixed-role": "artifact-member" },
+                        { "safe-key": hex(&encode(&reference).unwrap()) },
+                    ],
+                })]
             );
         });
     }

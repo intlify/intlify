@@ -36,7 +36,7 @@ use crate::resolver::targets::{resolve_targets, ResolvedTargets};
 
 use super::locale_resolution::PolicyInputs;
 use super::observation::{Frame, Observation};
-use super::operation::{Analysis, Config, OutputFailure};
+use super::operation::{observer, Analysis, Config, ConfigFile, OutputFailure};
 use super::quantity::Quantity;
 use super::{artifact_collection, locale, locale_resolution, resolved_binding, target_group};
 
@@ -48,6 +48,9 @@ type Declaration = ProfileDeclaration<PolicyReference, TargetProfileReference>;
 /// Target Profiles declare their roles.
 pub(super) struct PreparedHydration {
     pub(super) analysis: Analysis,
+    /// The file the analysis materialized, which Phase 7's checks observe
+    /// the selected declaration in.
+    pub(super) file: ConfigFile,
     pub(super) config: Config,
     pub(super) selected: ProfileId,
     pub(super) policy: ConfirmedPolicy,
@@ -94,6 +97,8 @@ impl PreparedHydration {
         set: &'a Admitted<ArtifactSet<'a>>,
     ) -> Option<HydrationInputs<'a>> {
         let declaration = self.declaration()?;
+        let file = self.file.file();
+        let observer = observer(&self.analysis, &file, &self.selected)?;
         let mut preparation = Evaluation::default();
         let policy: Result<&ConfirmedPolicy, &Causes> = Ok(&self.policy);
         let locales = resolve_locales(
@@ -101,6 +106,7 @@ impl PreparedHydration {
             policy,
             Ok(&*self.canonicalizer),
             &LocaleFields::declared(declaration),
+            Some(&observer),
         )
         .ok()?;
         let negotiation = resolve_negotiation(

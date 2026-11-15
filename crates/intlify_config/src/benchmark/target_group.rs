@@ -32,7 +32,7 @@ use crate::resolver::resource_policy::DeclarationReferences;
 use crate::resolver::targets::{resolve_targets, ResolvedTargets, TargetSubject};
 
 use super::observation::{Frame, Observation};
-use super::operation::{Analysis, Config, OutputFailure};
+use super::operation::{observer, Analysis, Config, ConfigFile, OutputFailure};
 use super::quantity::Quantity;
 use super::{artifact_collection, locale, locale_resolution, resolved_binding};
 
@@ -43,6 +43,9 @@ type Declaration = ProfileDeclaration<PolicyReference, TargetProfileReference>;
 /// through, and the collection past 015's pre-invocation boundary.
 pub(super) struct PreparedTargets {
     pub(super) analysis: Analysis,
+    /// The file the analysis materialized, which Phase 7's checks observe
+    /// the selected declaration in.
+    pub(super) file: ConfigFile,
     pub(super) config: Config,
     pub(super) selected: ProfileId,
     pub(super) policy: ConfirmedPolicy,
@@ -87,12 +90,15 @@ impl PreparedTargets {
         set: &'a Admitted<ArtifactSet<'a>>,
     ) -> Option<TargetInputs<'a>> {
         let declaration = self.declaration()?;
+        let file = self.file.file();
+        let observer = observer(&self.analysis, &file, &self.selected)?;
         let mut preparation = Evaluation::default();
         let locales = resolve_locales(
             &mut preparation,
             Ok(&self.policy),
             Ok(&*self.canonicalizer),
             &LocaleFields::declared(declaration),
+            Some(&observer),
         )
         .ok()?;
         let references = resolve_fields(

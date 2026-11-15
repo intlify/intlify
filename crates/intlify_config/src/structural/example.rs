@@ -18,6 +18,8 @@ use crate::materialize::{
 };
 use crate::model::ProfileDeclaration;
 use crate::references::{PolicyReference, TargetProfileReference};
+use crate::resolver::declaration_observer::DeclarationObserver;
+use crate::resolver::entry::fixtures::FileFixture;
 use crate::resolver::evaluation::{Actual, Code, Evaluation, IssueKey, Subject};
 use crate::resolver::locales::{
     fixture_policy, resolve_locales, LocaleFields, LocaleInvariant, LocaleKey, Location,
@@ -415,12 +417,22 @@ pub fn resolve(source: &[u8], selector: Option<&str>) -> Result<Value, String> {
         .profiles()
         .get(selected.id())
         .ok_or("Selected example profile is missing")?;
+    // Phase 7 observes what it finds in the file, under the fixture owner's
+    // source identity; the example displays none of it.
+    let fixture = FileFixture::new(policy.limits());
+    let file = fixture.file(Arc::from(source));
+    let observer = analysis
+        .profiles_value()
+        .map(|profiles| DeclarationObserver::new(&file, profiles, id))
+        .transpose()
+        .map_err(|e| format!("Example observer invariant: {e:?}"))?;
     let mut evaluation = Evaluation::default();
     let resolved = match resolve_locales(
         &mut evaluation,
         Ok(&policy),
         Ok(&provider),
         &LocaleFields::declared(declaration),
+        observer.as_ref(),
     ) {
         Ok(resolved) => resolved,
         // The finite provider answers only for its own table. A spelling it

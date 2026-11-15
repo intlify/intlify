@@ -23,6 +23,7 @@ use crate::resolver::coverage::{
     resolve_coverage, CoveragePolicy, CoverageSubject, Decision, Domain, RuleContent, RuleMember,
     SurfaceKey,
 };
+use crate::resolver::declaration_observer::DeclarationObserver;
 use crate::resolver::evaluation::{
     Actual, Admitted, Causes, Check, Evaluation, IssueKey, LimitExceeded, Status, Subject, Unit,
 };
@@ -40,7 +41,7 @@ use crate::resolver::vocabulary::SurfaceVocabulary;
 use super::locale;
 use super::locale_icu4x::PreparedEngine;
 use super::observation::{Frame, Observation};
-use super::operation::{Analysis, Config, OutputFailure};
+use super::operation::{Analysis, Config, ConfigFile, OutputFailure};
 use super::quantity::Quantity;
 
 /// The canonicalizer Phases 7 and 8 run under: the finite provider's, or the
@@ -86,6 +87,9 @@ impl PolicyInputs {
 /// Phase 5 results, and canonicalizer Phases 7 and 8 run under.
 pub(super) struct PreparedLocales {
     pub(super) analysis: Analysis,
+    /// The file the analysis materialized, which Phase 7's checks observe
+    /// the selected declaration in.
+    pub(super) file: ConfigFile,
     pub(super) config: Config,
     pub(super) selected: ProfileId,
     pub(super) policy: ConfirmedPolicy,
@@ -139,15 +143,19 @@ pub(super) struct Resolved {
 }
 
 /// Phases 7 and 8 over a fresh evaluation: what preparation and every timed
-/// invocation run, through either provider.
+/// invocation run, through either provider, over the selected declaration's
+/// fields and where its checks observe them.
 pub(super) fn resolve<P: Provider>(
     policy: &ConfirmedPolicy,
     inputs: &PolicyInputs,
     canonicalizer: &Canonicalizer<P>,
-    fields: &LocaleFields<'_, TargetProfileReference>,
+    declared: (
+        &LocaleFields<'_, TargetProfileReference>,
+        &DeclarationObserver<'_>,
+    ),
 ) -> Resolved {
     let mut evaluation = Evaluation::default();
-    let result = policies(&mut evaluation, policy, inputs, canonicalizer, fields);
+    let result = policies(&mut evaluation, policy, inputs, canonicalizer, declared);
     Resolved { evaluation, result }
 }
 
@@ -158,9 +166,18 @@ fn policies<P: Provider>(
     policy: &ConfirmedPolicy,
     inputs: &PolicyInputs,
     canonicalizer: &Canonicalizer<P>,
-    fields: &LocaleFields<'_, TargetProfileReference>,
+    (fields, observer): (
+        &LocaleFields<'_, TargetProfileReference>,
+        &DeclarationObserver<'_>,
+    ),
 ) -> Result<Policies, LocaleInvariant> {
-    let locales = resolve_locales(evaluation, Ok(policy), Ok(canonicalizer), fields)?;
+    let locales = resolve_locales(
+        evaluation,
+        Ok(policy),
+        Ok(canonicalizer),
+        fields,
+        Some(observer),
+    )?;
     let negotiation = resolve_negotiation(evaluation, Ok(policy), &inputs.negotiation, &locales)?;
     let fallback = resolve_fallback(
         evaluation,
@@ -292,7 +309,9 @@ pub(super) fn require_observable(resolved: &Resolved) -> Result<&Policies, Outpu
             ProviderFailure::UnsupportedInput | ProviderFailure::Unavailable,
         ))) => Err(OutputFailure::LocaleProviderUnavailable),
         Err(LocaleInvariant::Canonicalization(_)) => Err(OutputFailure::LocaleProviderInvariant),
-        Err(LocaleInvariant::Evaluation(_)) => Err(OutputFailure::LocalePolicyResolutionInvariant),
+        Err(LocaleInvariant::Evaluation(_) | LocaleInvariant::Observer(_)) => {
+            Err(OutputFailure::LocalePolicyResolutionInvariant)
+        }
     }
 }
 
@@ -902,6 +921,7 @@ mod tests {
     use crate::input_limits::Bound;
     use crate::locale::ProviderFailure;
     use crate::resolver::coverage::unit as coverage_unit;
+    use crate::resolver::declaration_observer::fixtures::Observed;
     use crate::resolver::evaluation::EvaluationInvariant;
     use crate::resolver::fallback::unit as fallback_unit;
     use crate::resolver::locales::fixtures::{
@@ -1117,8 +1137,10 @@ mod tests {
     /// success: the map's, and each target's.
     #[test]
     fn the_target_bounds_results_frame() {
-        let declaration = declaration(&complete_config(), |_| {});
+        let config = complete_config();
+        let declaration = declaration(&config, |_| {});
         let fields = LocaleFields::declared(&declaration);
+        let observed = Observed::new(&config);
         // Two targets over a map bound of one.
         let mut limits = limits(64, 100, 100);
         limits.target_grouping.max_target_profiles = Bound::new(1).unwrap();
@@ -1126,8 +1148,17 @@ mod tests {
         let canonicalizer = canonicalizer(64);
         let shared = |edit: fn(&mut ResolvedLocales)| {
             let mut evaluation = Evaluation::default();
-            let mut locales =
-                resolve_locales(&mut evaluation, Ok(&policy), Ok(&canonicalizer), &fields).unwrap();
+            let mut locales = observed
+                .app(|observer| {
+                    resolve_locales(
+                        &mut evaluation,
+                        Ok(&policy),
+                        Ok(&canonicalizer),
+                        &fields,
+                        Some(observer),
+                    )
+                })
+                .unwrap();
             let blocked = locales.target_bound.clone().unwrap_err();
             edit(&mut locales);
             let resolved = Resolved {
