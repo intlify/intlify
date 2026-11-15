@@ -266,7 +266,7 @@ impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
             let locale = self
                 .evaluation
                 .check_found(unit.clone(), attempt, |attempt| {
-                    attempt.map_err(|blocking| each(blocking, found))
+                    attempt.map_err(|blocking| Found::each(blocking, found))
                 })?;
             if let Ok(canonical) = &locale {
                 for observed in corrected {
@@ -337,7 +337,7 @@ impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
                     if positions.len() == 1 {
                         Ok(())
                     } else {
-                        Err(duplicates(&observed))
+                        Err(Found::repeated(issue(Code::LocaleDuplicate), &observed))
                     }
                 },
             )?;
@@ -501,37 +501,6 @@ pub(crate) fn canonicalize<P: Provider>(
         }
         Err(failure) => Err(LocaleInvariant::Canonicalization(failure)),
     }
-}
-
-/// One candidate of `blocking` for each spelling, each with what it observed
-/// (D15:2387).
-fn each(blocking: Blocking, spellings: Vec<Option<Observation>>) -> Found {
-    spellings
-        .into_iter()
-        .map(|observed| Found::through(blocking, observed))
-        .reduce(Found::and)
-        .unwrap_or_else(|| Found::from(blocking))
-}
-
-/// One duplicate candidate for each spelling of a repeated locale, each at
-/// its own token beside the other spellings' (D15:2410).
-fn duplicates(spellings: &[Option<EvidenceProjection>]) -> Found {
-    let observed = spellings
-        .iter()
-        .enumerate()
-        .map(|(position, primary)| {
-            primary.clone().map(|primary| Observation {
-                primary,
-                related: spellings
-                    .iter()
-                    .enumerate()
-                    .filter(|&(other, _)| other != position)
-                    .filter_map(|(_, other)| other.clone())
-                    .collect(),
-            })
-        })
-        .collect();
-    each(issue(Code::LocaleDuplicate), observed)
 }
 
 /// The set of the spellings' canonical locales, once each has one; otherwise

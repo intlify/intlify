@@ -998,6 +998,38 @@ impl Found {
         self.0.extend(other.0);
         self
     }
+
+    /// One candidate of `blocking` for each raw occurrence that found it,
+    /// each with what it observed (D15:2387), or the one candidate when no
+    /// occurrence was observed.
+    pub(crate) fn each(blocking: Blocking, observed: Vec<Option<Observation>>) -> Self {
+        observed
+            .into_iter()
+            .map(|observation| Self::through(blocking, observation))
+            .reduce(Self::and)
+            .unwrap_or_else(|| Self::from(blocking))
+    }
+
+    /// One candidate of `blocking` for each occurrence of what repeats, each
+    /// at its own location beside the others' (D15:2410).
+    pub(crate) fn repeated(blocking: Blocking, at: &[Option<EvidenceProjection>]) -> Self {
+        let observed = at
+            .iter()
+            .enumerate()
+            .map(|(position, primary)| {
+                primary.clone().map(|primary| Observation {
+                    primary,
+                    related: at
+                        .iter()
+                        .enumerate()
+                        .filter(|&(other, _)| other != position)
+                        .filter_map(|(_, other)| other.clone())
+                        .collect(),
+                })
+            })
+            .collect();
+        Self::each(blocking, observed)
+    }
 }
 
 impl From<Blocking> for Found {
@@ -1400,9 +1432,12 @@ impl Evaluation {
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
+        // Phase 8's negotiation checks; those of the message fallback and
+        // coverage gain theirs later (plan 025 PRs 5f-4g).
+        let negotiation = matches!(unit.subject, Subject::Negotiation(_));
         assert_eq!(
             observed,
-            OBSERVED.contains(&unit.phase),
+            OBSERVED.contains(&unit.phase) || negotiation,
             "{unit:?} reports {what} {} what it observed, against its check",
             if observed { "with" } else { "without" }
         );
@@ -3242,6 +3277,39 @@ mod tests {
         );
     }
 
+    /// What repeats is one candidate at each of its occurrences, beside the
+    /// others' (D15:2387, 2410); one observed nowhere is a candidate all the
+    /// same, and no occurrence leaves the one candidate.
+    #[test]
+    fn a_repeated_value_is_a_candidate_at_each_occurrence_beside_the_others() {
+        use crate::resolver::evidence_component::ComponentPath;
+        let first = project_profile().primary;
+        let last = through(ComponentPath::data_root()).primary;
+        let Found(candidates) =
+            Found::repeated(MISSING, &[Some(first.clone()), None, Some(last.clone())]);
+        assert_eq!(
+            candidates,
+            [
+                (
+                    MISSING,
+                    Some(Observation {
+                        primary: first.clone(),
+                        related: vec![last.clone()],
+                    })
+                ),
+                (MISSING, None),
+                (
+                    MISSING,
+                    Some(Observation {
+                        primary: last,
+                        related: vec![first],
+                    })
+                ),
+            ]
+        );
+        assert_eq!(Found::each(MISSING, Vec::new()), Found::from(MISSING));
+    }
+
     /// D15:2381 within one evaluation: two candidates of one key with unequal
     /// details are a resolver bug, and then nothing of the unit is recorded.
     #[test]
@@ -3277,10 +3345,10 @@ mod tests {
     #[test]
     #[should_panic(expected = "with what it observed")]
     fn a_candidate_of_another_phase_with_an_observation_fails_the_test() {
-        use crate::resolver::negotiation::{unit, NegotiationSubject};
+        use crate::resolver::fallback::{unit, FallbackSubject};
         let data = through(crate::resolver::evidence_component::ComponentPath::data_root());
-        let aliases = unit(NegotiationSubject::Aliases, Check::WithinBound);
-        let _ = Evaluation::default().check_found(aliases, Ok(()), |()| {
+        let sources = unit(FallbackSubject::Sources, Check::WithinBound);
+        let _ = Evaluation::default().check_found(sources, Ok(()), |()| {
             Err::<(), _>(Found::observed(
                 Blocking::limit(exceeded(Actual::Exact(4))),
                 data,

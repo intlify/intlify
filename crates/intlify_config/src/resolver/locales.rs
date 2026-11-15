@@ -270,6 +270,8 @@ pub(crate) struct ResolvedLocales {
     /// identity.
     pub(crate) requested_default: Admitted<CanonicalLocale>,
     pub(crate) project: Admitted<ProjectLocales>,
+    /// Each alias, in the order the map holds its keys: an entry's position
+    /// is its key's rank among them.
     pub(crate) negotiation_aliases: Admitted<Vec<AliasLocales>>,
     /// Each `messageFallback` key, in the order the map holds them: Phase 8
     /// checks the sequence of each.

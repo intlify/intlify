@@ -21,11 +21,8 @@ use std::collections::BTreeMap;
 
 use crate::model::{FallbackCandidate, NonEmptyMap, TargetDeclaration, TargetId};
 
-use super::super::declaration_observer::{DeclarationObserver, ObserverInvariant};
-use super::super::evaluation::{
-    both, Actual, Admitted, Causes, Check, Evaluation, Found, Observation,
-};
-use super::super::evidence::EvidenceProjection;
+use super::super::declaration_observer::{beside, DeclarationObserver};
+use super::super::evaluation::{both, Actual, Admitted, Causes, Check, Evaluation, Found};
 use super::super::limits::{BoundId, ConfirmedPolicy, Group};
 use super::super::tally::{actual, measure, total, within, Tally};
 use super::{unit, LocaleFields, LocaleInvariant, LocaleSet, LocaleSubject};
@@ -111,24 +108,6 @@ fn field_tallies<'f, Target>(
             }))
         }),
     ]
-}
-
-/// What a bound's unit observes past the confirmed `policy`'s limit: where
-/// `at` looks in the declaration, beside the policy, which supplies the bound
-/// (D15:2249). Nothing is observed without the policy or the declaration's
-/// file.
-fn beside<'o>(
-    policy: Result<&ConfirmedPolicy, &Causes>,
-    observer: Option<&DeclarationObserver<'o>>,
-    at: impl FnOnce(&DeclarationObserver<'o>) -> Result<EvidenceProjection, ObserverInvariant>,
-) -> Result<Option<Observation>, ObserverInvariant> {
-    match (policy, observer) {
-        (Ok(policy), Some(observer)) => Ok(Some(Observation {
-            primary: at(observer)?,
-            related: vec![policy.evidence().clone()],
-        })),
-        _ => Ok(None),
-    }
 }
 
 /// The occurrence bound's unit: what the admitted fields prove against
@@ -282,7 +261,8 @@ mod tests {
     use crate::fixtures::{complete_config, minimal_config};
     use crate::input_limits::Bound;
     use crate::resolver::declaration_observer::fixtures::Observed;
-    use crate::resolver::evaluation::{Code, LimitExceeded, Unit};
+    use crate::resolver::evaluation::{Code, LimitExceeded, Observation, Unit};
+    use crate::resolver::evidence::EvidenceProjection;
     use crate::resolver::specification::Slot;
 
     /// What each occurrence candidate `evaluation` recorded observed, with
