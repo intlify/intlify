@@ -51,6 +51,7 @@ use super::delivery::{resolve_delivery, DeliveryPolicy};
 use super::dependency::{own, SemanticGroup, OPTIONAL_POLICIES, REQUIRED_POLICIES};
 use super::entry::EntryInvariant;
 use super::evaluation::{and, Admitted, Causes, Evaluation, EvaluationInvariant};
+use super::evidence_component::ComponentInvariant;
 use super::exact_resolution::{resolve_fields, ArtifactBindings, ResolvedReferences};
 use super::fallback::{resolve_fallback, MessageFallbackPolicy};
 use super::groups::{resolve_groups, ResolvedGroups};
@@ -264,6 +265,8 @@ pub(crate) enum ResolverInvariant {
     Structural(StructuralInvariant),
     /// Phase 3 found a defect of profile selection itself.
     ProfileSelection(ProfileSelectionInvariant),
+    /// A later phase's Evidence named a component without a path.
+    Component(ComponentInvariant),
 }
 
 impl From<ProfileSelectionInvariant> for ResolverInvariant {
@@ -304,6 +307,7 @@ impl From<PolicyInvariant> for ResolverInvariant {
         match invariant {
             PolicyInvariant::Evaluation(invariant) => Self::Evaluation(invariant),
             PolicyInvariant::Selection(invariant) => Self::Selection(invariant),
+            PolicyInvariant::Component(invariant) => Self::Component(invariant),
         }
     }
 }

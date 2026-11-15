@@ -15,6 +15,12 @@
 //! either side of the decision, so every unit follows the units it waits on.
 //! Recounting the diagnostics under the policy waits for 015 Implementation
 //! Phase 5.
+//!
+//! The checks of the collection under the capability observe their Findings
+//! at the collection's root, or at each member past one artifact's bound under
+//! a key that keeps only its JSON type, beside the capability's bound
+//! (D15:834, 836; plan 025 interpretation #200). The other checks carry no
+//! occurrence Evidence yet (plan 025 PRs 5f-4c, 5f-4d).
 
 use std::collections::BTreeMap;
 
@@ -31,14 +37,19 @@ use crate::structural::selection::{SelectionInvariant, SelectorInput, StringLeng
 
 use super::bootstrap::work::{self, WorkBound};
 use super::bootstrap::{admit_body, select_candidate, AdmittedResourcePolicy};
+use super::capability::CapabilityBound;
 use super::evaluation::{
-    and, both, Actual, Admitted, Blocking, Causes, Check, Evaluation, EvaluationInvariant, Phase,
-    Shortfall, Subject, Unit,
+    and, both, Actual, Admitted, Blocking, Causes, Check, Evaluation, EvaluationInvariant, Found,
+    Observation, Phase, Shortfall, Subject, Unit,
 };
+use super::evidence::EvidenceProjection;
+use super::evidence_component::{ComponentInvariant, ComponentPath, Key};
+use super::evidence_token::JsonType;
 use super::limits::{
     ArtifactAdmissionLimits, BoundId, ConfigurationInputLimits, ConfirmedPolicy, Group,
     ResolutionLimits,
 };
+use super::origin::SafeOriginKind;
 use super::tally::{actual, first_over, measure, total, within, Tally};
 
 const fn configuration_bound(name: &'static str) -> BoundId {
@@ -277,11 +288,19 @@ pub(crate) enum PolicyInvariant {
     /// The selector was observed under a bound below the final projection
     /// authority, which never exceeds the capability's: a resolver defect.
     Selection(SelectionInvariant),
+    /// A bound or a member the Evidence names has no component path.
+    Component(ComponentInvariant),
 }
 
 impl From<EvaluationInvariant> for PolicyInvariant {
     fn from(invariant: EvaluationInvariant) -> Self {
         Self::Evaluation(invariant)
+    }
+}
+
+impl From<ComponentInvariant> for PolicyInvariant {
+    fn from(invariant: ComponentInvariant) -> Self {
+        Self::Component(invariant)
     }
 }
 
@@ -313,26 +332,94 @@ impl Stage {
             Self::Policy => unit(PolicySubject::Recheck(subject), Check::WithinBound),
         }
     }
+
+    /// What this stage's unit of the collection's `bound` observes: under the
+    /// capability, the collection at its root, beside the capability's bound
+    /// (D15:834, 836). A recheck observes nothing yet (plan 025 PR 5f-4d).
+    fn at_collection(self, bound: BoundId) -> Result<Option<Observation>, ComponentInvariant> {
+        match self {
+            Self::Capability => Ok(Some(Observation {
+                primary: collection_root()?,
+                related: vec![capability_bound(CapabilityBound::PolicyComparable(bound))?],
+            })),
+            Self::Policy => Ok(None),
+        }
+    }
+
+    /// What this stage's unit of a member key observes past one artifact's
+    /// `bound`: under the capability, each member under the key, with its
+    /// canonical bytes, at the member no Set admitted, beside the
+    /// capability's bound (D15:834, 836; plan 025 interpretation #200). A
+    /// recheck observes nothing yet.
+    fn at_members(
+        self,
+        members: &[&FormalMember],
+        bound: BoundId,
+    ) -> Result<Vec<(u64, Observation)>, ComponentInvariant> {
+        match self {
+            Self::Capability => members
+                .iter()
+                .map(|member| {
+                    Ok((
+                        member.canonical_bytes(),
+                        Observation {
+                            primary: candidate(member)?,
+                            related: vec![capability_bound(CapabilityBound::PolicyComparable(
+                                bound,
+                            ))?],
+                        },
+                    ))
+                })
+                .collect(),
+            Self::Policy => Ok(Vec::new()),
+        }
+    }
+}
+
+/// Resolver-input Evidence of the submitted collection at its root (D15:834).
+fn collection_root() -> Result<EvidenceProjection, ComponentInvariant> {
+    ComponentPath::root(SafeOriginKind::ProfileResolutionArtifactCollection)
+        .map(EvidenceProjection::resolver_input)
+}
+
+/// Resolver-input Evidence of a collection member no Set admitted, under a
+/// key that keeps only its JSON type (D15:834; plan 025 interpretation #200).
+fn candidate(member: &FormalMember) -> Result<EvidenceProjection, ComponentInvariant> {
+    ComponentPath::artifact_member(Key::Unsafe(JsonType::of(member.value())))
+        .map(EvidenceProjection::resolver_input)
+}
+
+/// Resolver-input Evidence of the Implementation Capability's `bound`
+/// (D15:836).
+fn capability_bound(bound: CapabilityBound) -> Result<EvidenceProjection, ComponentInvariant> {
+    ComponentPath::capability(bound).map(EvidenceProjection::resolver_input)
+}
+
+/// The candidate `blocking`, with what it observed where its check's Findings
+/// carry occurrence Evidence.
+fn found(blocking: Blocking, observed: Option<Observation>) -> Found {
+    observed.map_or_else(
+        || Found::from(blocking),
+        |observation| Found::observed(blocking, observation),
+    )
 }
 
 /// The collection as the `artifactAdmission` bounds count it: every
-/// occurrence, and each member key with its largest canonical body. Members
-/// with one key share its unit, which holds exactly when that body does.
+/// occurrence, and each member key with its members. Members with one key
+/// share its unit, which holds exactly when its largest canonical body does.
 struct Submitted<'a> {
     members: &'a [FormalMember],
-    largest: BTreeMap<MemberKey, u64>,
+    keyed: BTreeMap<MemberKey, Vec<&'a FormalMember>>,
 }
 
 impl<'a> Submitted<'a> {
     fn of(collection: &'a FormalCollection) -> Self {
         let members = collection.members();
-        let mut largest: BTreeMap<MemberKey, u64> = BTreeMap::new();
+        let mut keyed: BTreeMap<MemberKey, Vec<&'a FormalMember>> = BTreeMap::new();
         for member in members {
-            let bytes = member.canonical_bytes();
-            let most = largest.entry(member.key()).or_insert(bytes);
-            *most = (*most).max(bytes);
+            keyed.entry(member.key()).or_default().push(member);
         }
-        Self { members, largest }
+        Self { members, keyed }
     }
 }
 
@@ -421,7 +508,7 @@ fn admit_and_compare(
     resource_limits: Result<&PolicyReference, &Causes>,
     references: &DeclarationReferences<'_>,
     verification: &VerificationInput,
-) -> Result<Admitted<AdmittedResourcePolicy>, EvaluationInvariant> {
+) -> Result<Admitted<AdmittedResourcePolicy>, PolicyInvariant> {
     let inspected = artifact_bounds(
         evaluation,
         Stage::Capability,
@@ -431,12 +518,22 @@ fn admit_and_compare(
         references,
     )?;
     let limits = &capability.bootstrap_only().artifact_bootstrap;
-    let scanned = evaluation.check(
+    // The scan reads the whole collection, not through the reference (D15:834,
+    // 836).
+    let scan = Observation {
+        primary: collection_root()?,
+        related: vec![capability_bound(CapabilityBound::BootstrapOnly(
+            WorkBound::MetadataScan.id(),
+        ))?],
+    };
+    let scanned = evaluation.check_found(
         unit(PolicySubject::ResourceLimits, Check::WithinMetadataScan),
         both(resource_limits.map_err(Causes::clone), inspected.collection),
         |(reference, ())| {
             let total = work::metadata_scan_units(submitted.members);
-            work::within(WorkBound::MetadataScan, limits, total).map(|()| reference)
+            work::within(WorkBound::MetadataScan, limits, total)
+                .map(|()| reference)
+                .map_err(|blocking| Found::observed(blocking, scan))
         },
     )?;
     let selected = evaluation.check(
@@ -472,14 +569,14 @@ fn admit_and_compare(
         measured,
         |candidate| admit_body(&candidate, verification),
     )?;
-    evaluation.check(
+    Ok(evaluation.check(
         unit(PolicySubject::ResourceLimits, Check::CompatiblePolicy),
         decided,
         |policy| match first_shortfall(policy.limits(), capability.policy_comparable()) {
             None => Ok(policy),
             Some(shortfall) => Err(Blocking::shortfall(shortfall)),
         },
-    )
+    )?)
 }
 
 /// One bound's unit, not evaluated while the bound's value or the count is
@@ -491,10 +588,24 @@ fn bounded(
     limit: Result<Bound, &Causes>,
     tally: Result<Tally, &Causes>,
 ) -> Result<Admitted<()>, EvaluationInvariant> {
-    evaluation.check(
+    bounded_at(evaluation, unit, (bound, limit), tally, None)
+}
+
+/// One bound's unit as [`bounded`], whose Finding is observed through
+/// `observed` where its check's Findings carry occurrence Evidence.
+fn bounded_at(
+    evaluation: &mut Evaluation,
+    unit: Unit,
+    (bound, limit): (BoundId, Result<Bound, &Causes>),
+    tally: Result<Tally, &Causes>,
+    observed: Option<Observation>,
+) -> Result<Admitted<()>, EvaluationInvariant> {
+    evaluation.check_found(
         unit,
         both(limit.map_err(Causes::clone), tally.map_err(Causes::clone)),
-        |(limit, tally)| within(bound, limit, actual(tally, limit)),
+        |(limit, tally)| {
+            within(bound, limit, actual(tally, limit)).map_err(|blocking| found(blocking, observed))
+        },
     )
 }
 
@@ -508,10 +619,33 @@ fn witnessed(
     limit: Result<Bound, &Causes>,
     tally: Result<Tally, &Causes>,
 ) -> Result<Admitted<()>, EvaluationInvariant> {
-    evaluation.check(
+    witnessed_at(evaluation, unit, (bound, limit), tally, &[])
+}
+
+/// One bound's unit as [`witnessed`], where `values` are the values the key
+/// stands for, each with its size and what it is observed through: one
+/// candidate for each value past the bound (D15:2203). Without them its
+/// Findings carry no occurrence Evidence yet.
+fn witnessed_at(
+    evaluation: &mut Evaluation,
+    unit: Unit,
+    (bound, limit): (BoundId, Result<Bound, &Causes>),
+    tally: Result<Tally, &Causes>,
+    values: &[(u64, Observation)],
+) -> Result<Admitted<()>, EvaluationInvariant> {
+    evaluation.check_found(
         unit,
         both(limit.map_err(Causes::clone), tally.map_err(Causes::clone)),
-        |(limit, tally)| within(bound, limit, first_over(tally, limit)),
+        |(limit, tally)| {
+            within(bound, limit, first_over(tally, limit)).map_err(|blocking| {
+                values
+                    .iter()
+                    .filter(|&&(size, _)| size > limit.get())
+                    .map(|(_, observation)| Found::observed(blocking, observation.clone()))
+                    .reduce(Found::and)
+                    .unwrap_or_else(|| Found::from(blocking))
+            })
+        },
     )
 }
 
@@ -662,7 +796,7 @@ fn artifact_bounds(
     submitted: &Submitted<'_>,
     resource_limits: Result<&PolicyReference, &Causes>,
     references: &DeclarationReferences<'_>,
-) -> Result<Inspected, EvaluationInvariant> {
+) -> Result<Inspected, PolicyInvariant> {
     let occurrences = occurrence_bounds(evaluation, stage, limits, submitted.members)?;
     let (visible, unavailable) = references.visible(
         PolicyReference::canonical_bytes,
@@ -706,7 +840,7 @@ fn occurrence_bounds(
     stage: Stage,
     limits: Result<&ArtifactAdmissionLimits, &Causes>,
     members: &[FormalMember],
-) -> Result<Admitted<()>, EvaluationInvariant> {
+) -> Result<Admitted<()>, PolicyInvariant> {
     let declared = |policy: bool| {
         members
             .iter()
@@ -736,12 +870,12 @@ fn occurrence_bounds(
             declared(false),
         ),
     ] {
-        let held = bounded(
+        let held = bounded_at(
             evaluation,
             stage.unit(subject),
-            bound,
-            limit,
+            (bound, limit),
             Ok(Tally::of(count)),
+            stage.at_collection(bound)?,
         )?;
         holds = and(holds, held);
     }
@@ -755,29 +889,40 @@ fn body_bounds(
     stage: Stage,
     limits: Result<&ArtifactAdmissionLimits, &Causes>,
     submitted: &Submitted<'_>,
-) -> Result<Admitted<()>, EvaluationInvariant> {
+) -> Result<Admitted<()>, PolicyInvariant> {
     let mut holds: Admitted<()> = Ok(());
-    for (key, &largest) in &submitted.largest {
-        let held = witnessed(
+    for (key, members) in &submitted.keyed {
+        let largest = members
+            .iter()
+            .map(|member| member.canonical_bytes())
+            .max()
+            .expect("a member key has a member");
+        let held = witnessed_at(
             evaluation,
             stage.unit(ArtifactSubject::Artifact(key.clone())),
-            MAX_SINGLE_ARTIFACT_CANONICAL_BYTES,
-            limits.map(|limits| limits.max_single_artifact_canonical_bytes),
+            (
+                MAX_SINGLE_ARTIFACT_CANONICAL_BYTES,
+                limits.map(|limits| limits.max_single_artifact_canonical_bytes),
+            ),
             Ok(Tally::exactly(largest)),
+            &stage.at_members(members, MAX_SINGLE_ARTIFACT_CANONICAL_BYTES)?,
         )?;
         holds = and(holds, held);
     }
-    let held = bounded(
+    let held = bounded_at(
         evaluation,
         stage.unit(ArtifactSubject::ArtifactBytes),
-        MAX_TOTAL_ARTIFACT_CANONICAL_BYTES,
-        limits.map(|limits| limits.max_total_artifact_canonical_bytes),
+        (
+            MAX_TOTAL_ARTIFACT_CANONICAL_BYTES,
+            limits.map(|limits| limits.max_total_artifact_canonical_bytes),
+        ),
         Ok(total(
             submitted
                 .members
                 .iter()
                 .map(|member| Tally::exactly(member.canonical_bytes())),
         )),
+        stage.at_collection(MAX_TOTAL_ARTIFACT_CANONICAL_BYTES)?,
     )?;
     Ok(and(holds, held))
 }
@@ -886,9 +1031,12 @@ mod tests {
     use crate::resolver::evaluation::{
         Actual, BootstrapLimitExceeded, Code, IssueKey, LimitExceeded, Reason, Status,
     };
+    use crate::resolver::evidence::Evidence;
+    use crate::resolver::evidence_token::EvidenceTokens;
     use crate::resolver::limits::{fixture_limits, SECTION};
     use crate::resolver::locales::fixtures::earlier;
-    use crate::resolver::token::logical_member;
+    use crate::resolver::occurrence::{occurrences, redacted};
+    use crate::resolver::token::{logical_member, Sha256, Specification};
     use crate::structural::selection::InvalidSelectorType;
 
     /// Limits no test reaches.
@@ -1673,6 +1821,209 @@ mod tests {
                 actual: Actual::AtLeast(largest),
             })
         );
+    }
+
+    const PROFILE: Specification<'static> = Specification {
+        identity: "intlify-project-profile",
+        revision: "0",
+    };
+
+    /// A Finding Occurrence of Phase 4: its unit, the views of its primary
+    /// and related Evidence, and its ordinal.
+    type Observed = (Unit, Value, Vec<Value>, u64);
+
+    /// Phase 4's Finding Occurrences in `evaluation`, in 015's order, each
+    /// checked against its Finding Registry row, and the tokens they took.
+    fn occurrences_of(evaluation: &Evaluation) -> (Vec<Observed>, EvidenceTokens) {
+        let candidates = evaluation.occurrence_candidates();
+        let tokens = EvidenceTokens::assign(PROFILE, redacted(candidates), &Sha256);
+        let found = occurrences(candidates, PROFILE, &tokens)
+            .unwrap()
+            .iter()
+            .filter(|occurrence| occurrence.owner().phase == Phase::ResourcePolicyAdmission)
+            .map(|occurrence| {
+                (
+                    occurrence.owner().clone(),
+                    occurrence.primary().view(),
+                    occurrence.related().iter().map(Evidence::view).collect(),
+                    occurrence.ordinal(),
+                )
+            })
+            .collect();
+        (found, tokens)
+    }
+
+    /// The view `projection` takes under `tokens`.
+    fn view(
+        projection: Result<EvidenceProjection, ComponentInvariant>,
+        tokens: &EvidenceTokens,
+    ) -> Value {
+        projection
+            .unwrap()
+            .retained(PROFILE, tokens)
+            .unwrap()
+            .view()
+    }
+
+    /// Each collection bound under the capability is observed at the
+    /// collection's root, beside the capability's bound (D15:834, 836).
+    #[test]
+    fn the_collection_bounds_under_the_capability_are_observed_at_its_root() {
+        type Edit = fn(&mut ArtifactAdmissionLimits);
+        let cases: [(ArtifactSubject, BoundId, Edit); 4] = [
+            (ArtifactSubject::Artifacts, MAX_ARTIFACTS, |limits| {
+                limits.max_artifacts = bound(1);
+            }),
+            (
+                ArtifactSubject::PolicyArtifacts,
+                MAX_POLICY_ARTIFACTS,
+                |limits| {
+                    limits.max_policy_artifacts = bound(1);
+                },
+            ),
+            (
+                ArtifactSubject::TargetProfileArtifacts,
+                MAX_TARGET_PROFILE_ARTIFACTS,
+                |limits| limits.max_target_profile_artifacts = bound(1),
+            ),
+            (
+                ArtifactSubject::ArtifactBytes,
+                MAX_TOTAL_ARTIFACT_CANONICAL_BYTES,
+                |limits| limits.max_total_artifact_canonical_bytes = bound(1),
+            ),
+        ];
+        for (subject, id, edit) in cases {
+            let mut inputs = Inputs::new();
+            inputs.members.push(envelope_of(
+                ArtifactKind::TargetProfile,
+                "storefront-app",
+                "1",
+                json!({}),
+            ));
+            inputs.capability = capability(edit);
+            let (evaluation, _) = inputs.run();
+            let (found, tokens) = occurrences_of(&evaluation);
+            let at = capability_unit(subject);
+            let root = view(collection_root(), &tokens);
+            let limit = view(
+                capability_bound(CapabilityBound::PolicyComparable(id)),
+                &tokens,
+            );
+            assert_eq!(
+                found
+                    .into_iter()
+                    .filter(|(unit, ..)| *unit == at)
+                    .collect::<Vec<_>>(),
+                [(at, root, vec![limit], 0)],
+                "{}",
+                id.name
+            );
+        }
+    }
+
+    /// Each member past one artifact's bound is observed at the member, under
+    /// a key that keeps only its JSON type, beside the capability's bound: two
+    /// bodies of one tuple are two occurrences of one Finding, told apart by
+    /// their ordinals (D15:183, 834, 838, 2203; plan 025 interpretation
+    /// #200).
+    #[test]
+    fn each_member_past_one_artifacts_bound_is_observed_at_the_member() {
+        let mut inputs = Inputs::new();
+        let mut tampered = chosen();
+        tampered["integrityDigest"] = json!(format!("sha256:{}", "0".repeat(64)));
+        inputs.members.push(tampered);
+        let largest = collection(&inputs.members)
+            .members()
+            .iter()
+            .map(FormalMember::canonical_bytes)
+            .max()
+            .unwrap();
+        inputs.capability = capability(|limits| {
+            limits.max_single_artifact_canonical_bytes = bound(largest - 1);
+        });
+        let (evaluation, _) = inputs.run();
+        let (found, tokens) = occurrences_of(&evaluation);
+        let tuple = logical_member(&MemberKey::Tuple(std::sync::Arc::new(tuple_of(&chosen()))));
+        let at = capability_unit(ArtifactSubject::Artifact(tuple));
+        let member = view(
+            ComponentPath::artifact_member(Key::Unsafe(JsonType::Object))
+                .map(EvidenceProjection::resolver_input),
+            &tokens,
+        );
+        let limit = view(
+            capability_bound(CapabilityBound::PolicyComparable(
+                MAX_SINGLE_ARTIFACT_CANONICAL_BYTES,
+            )),
+            &tokens,
+        );
+        assert_eq!(
+            found,
+            [
+                (at.clone(), member.clone(), vec![limit.clone()], 0),
+                (at, member, vec![limit], 1),
+            ]
+        );
+    }
+
+    /// The metadata scan reads the whole collection, not through the
+    /// reference, so it is observed at the collection's root, beside the
+    /// capability's bootstrap bound (D15:834, 836).
+    #[test]
+    fn the_metadata_scan_is_observed_at_the_collection_beside_its_bound() {
+        let total = bootstrap_totals()[0].2;
+        let mut over = Inputs::new();
+        over.capability = over
+            .capability
+            .clone()
+            .with_artifact_bootstrap(bootstrap_limits(WorkBound::MetadataScan, total - 1));
+        let (evaluation, _) = over.run();
+        let (found, tokens) = occurrences_of(&evaluation);
+        let limit = view(
+            capability_bound(CapabilityBound::BootstrapOnly(WorkBound::MetadataScan.id())),
+            &tokens,
+        );
+        assert_eq!(
+            found,
+            [(
+                bootstrap_unit(Check::WithinMetadataScan),
+                view(collection_root(), &tokens),
+                vec![limit],
+                0
+            )]
+        );
+    }
+
+    /// A key's values past the bound are its candidates, each through what
+    /// it is observed through, and its values within the bound are none
+    /// (D15:2203).
+    #[test]
+    fn only_the_values_past_the_bound_are_candidates() {
+        let through = |bound| Observation {
+            primary: collection_root().unwrap(),
+            related: vec![capability_bound(CapabilityBound::PolicyComparable(bound)).unwrap()],
+        };
+        let values = [
+            (5, through(MAX_ARTIFACTS)),
+            (9, through(MAX_POLICY_ARTIFACTS)),
+            (7, through(MAX_TARGET_PROFILE_ARTIFACTS)),
+        ];
+        let tuple = logical_member(&MemberKey::Tuple(std::sync::Arc::new(tuple_of(&chosen()))));
+        let mut evaluation = Evaluation::default();
+        let held = witnessed_at(
+            &mut evaluation,
+            capability_unit(ArtifactSubject::Artifact(tuple)),
+            (MAX_SINGLE_ARTIFACT_CANONICAL_BYTES, Ok(bound(6))),
+            Ok(Tally::exactly(9)),
+            &values,
+        )
+        .unwrap();
+        assert!(held.is_err());
+        let observed: Vec<&EvidenceProjection> = evaluation
+            .occurrence_candidates()
+            .iter()
+            .flat_map(|candidate| &candidate.related)
+            .collect();
+        assert_eq!(observed, [&values[1].1.related[0], &values[2].1.related[0]]);
     }
 
     fn reference_unit(field: ReferenceField) -> Unit {
