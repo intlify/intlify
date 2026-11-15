@@ -1433,7 +1433,8 @@ impl Evaluation {
             return;
         }
         // Phase 8's negotiation and message fallback checks, and coverage's
-        // counts; its other checks gain theirs later (plan 025 PRs 5f-4h).
+        // counts and locale items; its other checks gain theirs later (plan
+        // 025 PRs 5f-4h).
         let policies = matches!(
             unit.subject,
             Subject::Negotiation(_)
@@ -1442,6 +1443,7 @@ impl Evaluation {
                     CoverageSubject::Rules
                         | CoverageSubject::LocaleSelectors
                         | CoverageSubject::SurfaceSelectors
+                        | CoverageSubject::Locale(..)
                         | CoverageSubject::Cells
                         | CoverageSubject::Comparisons
                 )
@@ -2827,31 +2829,6 @@ mod tests {
         let _ = evaluation.notice(requested_en(), Notice::non_canonical(canonical("en")), None);
     }
 
-    /// A notice of a check whose Findings carry no occurrence Evidence yet,
-    /// as a coverage selector's locale's, carries no observation.
-    #[test]
-    #[should_panic(expected = "reports a notice with what it observed")]
-    fn a_notice_of_another_check_with_an_observation_fails_the_test() {
-        use crate::resolver::coverage::{unit, CoverageSubject, RuleContent};
-        let candidate = unit(
-            CoverageSubject::Locale(
-                RuleContent::projected(),
-                crate::resolver::locales::fixtures::key("ja"),
-            ),
-            Check::CanonicalLocale,
-        );
-        let mut evaluation = Evaluation::default();
-        evaluation
-            .check(candidate.clone(), Ok(()), Ok::<(), Blocking>)
-            .unwrap()
-            .unwrap();
-        let _ = evaluation.notice(
-            candidate,
-            Notice::non_canonical(canonical("en")),
-            Some(spelling()),
-        );
-    }
-
     /// A unit over a requested spelling without an identity: one candidate of
     /// the unit that every such spelling shares.
     fn rejected(raw: &str) -> Unit {
@@ -3359,22 +3336,23 @@ mod tests {
     #[test]
     #[should_panic(expected = "with what it observed")]
     fn a_candidate_of_another_phase_with_an_observation_fails_the_test() {
-        use crate::resolver::coverage::{unit, CoverageSubject, RuleContent};
+        use crate::resolver::coverage::{unit, CoverageSubject, RuleContent, SurfaceKey};
+        use crate::resolver::locales::Content;
         let data = through(crate::resolver::evidence_component::ComponentPath::data_root());
-        let locale = unit(
-            CoverageSubject::Locale(
+        let surface = unit(
+            CoverageSubject::SurfaceClass(
                 RuleContent::projected(),
-                crate::resolver::locales::fixtures::key("ja"),
+                SurfaceKey::Content(Content::new("nav")),
             ),
-            Check::CanonicalLocale,
+            Check::VocabularyMember,
         );
-        let invalid = Blocking {
-            code: Code::LocaleInvalid,
-            reason: None,
+        let unknown = Blocking {
+            code: Code::CoverageRuleInvalid,
+            reason: Some(Reason::SurfaceClassUnknown),
             details: None,
         };
-        let _ = Evaluation::default().check_found(locale, Ok(()), |()| {
-            Err::<(), _>(Found::observed(invalid, data))
+        let _ = Evaluation::default().check_found(surface, Ok(()), |()| {
+            Err::<(), _>(Found::observed(unknown, data))
         });
     }
 }

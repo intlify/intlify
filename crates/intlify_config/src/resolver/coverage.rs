@@ -23,8 +23,11 @@
 //! (D15:1901-1905, 2249): the rules for the rule and selector-item counts,
 //! the nearest location holding every item, and for the rule-to-cell
 //! comparisons, the factor that bound adds; the requested locales for the
-//! cells, the factor the declaration supplies (plan 025 decision #198). The
-//! other checks' Findings carry no occurrence Evidence yet.
+//! cells, the factor the declaration supplies (plan 025 decision #198). Each
+//! rule holding a selector is a raw parent of its own, so a locale item's
+//! Findings and notice are observed at the items spelling its subject in
+//! every such rule (D15:2190, 2387). The other checks' Findings carry no
+//! occurrence Evidence yet.
 
 use std::collections::BTreeMap;
 
@@ -33,12 +36,14 @@ use intlify_shared_json::token::Token;
 use crate::input_limits::Bound;
 use crate::locale::{CanonicalLocale, Canonicalizer, Provider, VersionedIdentity};
 use crate::model::{Coverage, CoverageMode, CoverageRule};
+use crate::structural::Edge;
 
-use super::declaration_observer::{beside, DeclarationObserver};
+use super::declaration_observer::{beside, DeclarationObserver, ObserverInvariant};
 use super::evaluation::{
     both, within, Actual, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant,
     Found, LimitExceeded, Notice, Observation, Phase, Reason, Subject, Unit,
 };
+use super::evidence::EvidenceProjection;
 use super::limits::{BoundId, ConfirmedPolicy, Group, LocaleResolutionLimits};
 use super::locales::{
     canonicalize, Content, LocaleInvariant, LocaleKey, LocaleSet, ResolvedLocales,
@@ -367,6 +372,8 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
         .map(|(vocabulary, _)| vocabulary),
         requested: requested.clone(),
         vocabulary: vocabulary.clone(),
+        observer,
+        policy: confirmed.ok().map(ConfirmedPolicy::evidence),
     };
     let (normalized, domains) = normalize(evaluation, &selectors, rules)?;
     let checked = both(
@@ -484,12 +491,50 @@ fn count(
 /// What the selector items of every rule wait on: the canonicalizer, once the
 /// rule, locale-item, and occurrence counts passed; the vocabulary, once the
 /// rule and surface-item counts passed; and the sets an omitted selector
-/// stands for.
+/// stands for. And where an item is observed: in the declaration's file
+/// when it is there, beside the confirmed policy's Evidence when there is
+/// one.
 struct Selectors<'a, P: Provider> {
     spelling: Admitted<&'a Canonicalizer<P>>,
     naming: Admitted<&'a SurfaceVocabulary>,
     requested: Admitted<&'a LocaleSet>,
     vocabulary: Admitted<&'a SurfaceVocabulary>,
+    observer: Option<&'a DeclarationObserver<'a>>,
+    policy: Option<&'a EvidenceProjection>,
+}
+
+impl<P: Provider> Selectors<'_, P> {
+    /// The items at `positions` of the selector `selector` of each rule at
+    /// `raws`, rule by rule, each at its token, or none without the
+    /// declaration's file: each raw rule is a parent of its own (D15:790,
+    /// 2190).
+    fn items(
+        &self,
+        raws: &[usize],
+        selector: &str,
+        positions: &[usize],
+    ) -> Result<Vec<Vec<EvidenceProjection>>, ObserverInvariant> {
+        let Some(observer) = self.observer else {
+            return Ok(Vec::new());
+        };
+        let index = |at: usize| u64::try_from(at).map_err(|_| ObserverInvariant::Missing);
+        raws.iter()
+            .map(|&rule| {
+                positions
+                    .iter()
+                    .map(|&position| {
+                        observer.nested(&[
+                            Edge::Member("coverage"),
+                            Edge::Member("rules"),
+                            Edge::Index(index(rule)?),
+                            Edge::Member(selector),
+                            Edge::Index(index(position)?),
+                        ])
+                    })
+                    .collect()
+            })
+            .collect()
+    }
 }
 
 /// Each distinct rule's selector units and its unit normalizing them to a
@@ -501,15 +546,20 @@ fn normalize<P: Provider>(
     selectors: &Selectors<'_, P>,
     rules: &[CoverageRule],
 ) -> Result<(Admitted<()>, Domains), LocaleInvariant> {
-    let mut contents: BTreeMap<RuleContent, (usize, &CoverageRule)> = BTreeMap::new();
-    for rule in rules {
-        contents.entry(RuleContent::of(rule)).or_insert((0, rule)).0 += 1;
+    // Each distinct rule with the positions of the rules holding it.
+    let mut contents: BTreeMap<RuleContent, (Vec<usize>, &CoverageRule)> = BTreeMap::new();
+    for (position, rule) in rules.iter().enumerate() {
+        contents
+            .entry(RuleContent::of(rule))
+            .or_insert((Vec::new(), rule))
+            .0
+            .push(position);
     }
     let mut normalized = Ok(());
     let mut domains = Domains::new();
-    for (content, (occurrences, rule)) in &contents {
+    for (content, (raws, rule)) in &contents {
         let locales = match rule.requested_locales() {
-            Some(items) => selected_locales(evaluation, selectors, content, items)?,
+            Some(items) => selected_locales(evaluation, selectors, (content, raws), items)?,
             None => selectors
                 .requested
                 .clone()
@@ -532,7 +582,7 @@ fn normalize<P: Provider>(
         )?;
         match domain {
             Ok(domain) => {
-                domains.entry(domain).or_insert((0, rule.mode())).0 += occurrences;
+                domains.entry(domain).or_insert((0, rule.mode())).0 += raws.len();
             }
             Err(causes) => normalized = both(normalized, Err::<(), _>(causes)).map(|_| ()),
         }
@@ -556,20 +606,22 @@ fn normalize<P: Provider>(
     Ok((normalized, domains))
 }
 
+/// The member a rule names its locale selector by.
+const REQUESTED_LOCALES: &str = "requestedLocales";
+
 /// One rule's locale selector: each item canonicalized, with one unit per
 /// subject as Phase 7 does, and each locale named once and requested. Returns
 /// the selector's canonical locales as a set once every unit passed.
 fn selected_locales<P: Provider>(
     evaluation: &mut Evaluation,
     selectors: &Selectors<'_, P>,
-    rule: &RuleContent,
+    (rule, raws): (&RuleContent, &[usize]),
     items: &[String],
 ) -> Result<Admitted<Vec<CanonicalLocale>>, LocaleInvariant> {
-    type Attempt = Admitted<Result<CanonicalLocale, Blocking>>;
-    // Each subject's result, whether an item differs from the canonical form,
-    // and how many items spell it.
-    let mut subjects: BTreeMap<LocaleKey, (Attempt, bool, usize)> = BTreeMap::new();
-    for raw in items {
+    // Each subject's result and the positions of the items that spell it,
+    // each with whether it differs from the canonical form.
+    let mut subjects: BTreeMap<LocaleKey, (Attempt, Vec<(usize, bool)>)> = BTreeMap::new();
+    for (position, raw) in items.iter().enumerate() {
         // An item's key can stand for several spellings, under a rule keyed
         // by its content: past the byte bound it reports only the first-over
         // witness (Decision 015-157).
@@ -584,52 +636,142 @@ fn selected_locales<P: Provider>(
             _ => (LocaleKey::Content(Content::new(raw)), false),
         };
         let attempt = attempt.map(|attempt| attempt.map(|(locale, _)| locale));
-        let subject = subjects.entry(key).or_insert((attempt, false, 0));
-        subject.1 |= corrected;
-        subject.2 += 1;
+        subjects
+            .entry(key)
+            .or_insert((attempt, Vec::new()))
+            .1
+            .push((position, corrected));
     }
     let mut selected = Ok(Vec::with_capacity(subjects.len()));
-    for (key, (attempt, corrected, spellings)) in subjects {
-        let subject = |check| unit(CoverageSubject::Locale(rule.clone(), key.clone()), check);
-        let locale =
-            evaluation.check(subject(Check::CanonicalLocale), attempt, |attempt| attempt)?;
-        if let (true, Ok(canonical)) = (corrected, &locale) {
-            // Coverage's notices carry no occurrence Evidence yet (plan 025
-            // PRs 5f-4h).
+    for (key, spelled) in subjects {
+        let locale = locale_units(evaluation, selectors, (rule, raws), &key, spelled)?;
+        selected = both(selected, locale).map(|(mut selected, locale)| {
+            selected.push(locale);
+            selected
+        });
+    }
+    Ok(selected)
+}
+
+/// A locale item's canonicalization, before its unit records it.
+type Attempt = Admitted<Result<CanonicalLocale, Blocking>>;
+
+/// The three units of one subject of a rule's locale selector. Each rule
+/// holding the selector is a raw parent of its own, so a unit's candidates
+/// are the items spelling its subject in every such rule, each at its token
+/// (D15:2190, 2387): one past the identifier bound beside the confirmed
+/// policy, which supplies the bound; a corrected one as its notice's
+/// occurrence; a repeated one beside the others repeating it in the same
+/// rule (D15:1567, 2410); and one outside the requested locales beside them,
+/// a set that counts as one location (D15:2249). Returns the subject's
+/// canonical locale once every unit passed.
+fn locale_units<P: Provider>(
+    evaluation: &mut Evaluation,
+    selectors: &Selectors<'_, P>,
+    (rule, raws): (&RuleContent, &[usize]),
+    key: &LocaleKey,
+    (attempt, spellings): (Attempt, Vec<(usize, bool)>),
+) -> Result<Admitted<CanonicalLocale>, LocaleInvariant> {
+    let subject = |check| unit(CoverageSubject::Locale(rule.clone(), key.clone()), check);
+    let positions: Vec<usize> = spellings.iter().map(|&(position, _)| position).collect();
+    let failed = match &attempt {
+        Ok(Err(blocking)) => {
+            let related = match (blocking.code, selectors.policy) {
+                (Code::ResourceLimitExceeded, Some(policy)) => vec![policy.clone()],
+                _ => Vec::new(),
+            };
+            observed(
+                selectors.items(raws, REQUESTED_LOCALES, &positions)?,
+                &related,
+            )
+        }
+        _ => Vec::new(),
+    };
+    let locale = evaluation.check_found(subject(Check::CanonicalLocale), attempt, |attempt| {
+        attempt.map_err(|blocking| Found::each(blocking, failed))
+    })?;
+    if let Ok(canonical) = &locale {
+        let corrected: Vec<usize> = spellings
+            .iter()
+            .filter(|&&(_, corrected)| corrected)
+            .map(|&(position, _)| position)
+            .collect();
+        let mut notices = observed(selectors.items(raws, REQUESTED_LOCALES, &corrected)?, &[]);
+        // Without the declaration's file, the subject's one notice.
+        if notices.is_empty() && !corrected.is_empty() {
+            notices.push(None);
+        }
+        for observation in notices {
             evaluation.notice(
                 subject(Check::CanonicalLocale),
                 Notice::non_canonical(canonical.clone()),
-                None,
+                observation,
             )?;
         }
-        let once = evaluation.check(subject(Check::UniqueLocale), locale.clone(), |_| {
-            if spellings == 1 {
+    }
+    // Each rule compares only its own items.
+    let repeated = if positions.len() > 1 {
+        selectors.items(raws, REQUESTED_LOCALES, &positions)?
+    } else {
+        Vec::new()
+    };
+    let once = evaluation.check_found(subject(Check::UniqueLocale), locale.clone(), |_| {
+        if positions.len() == 1 {
+            Ok(())
+        } else {
+            Err(each_rule(issue(Code::LocaleDuplicate, None), repeated))
+        }
+    })?;
+    let outside = match (selectors.observer, &locale, &selectors.requested) {
+        (Some(observer), Ok(locale), Ok(requested)) if !requested.contains(locale) => observed(
+            selectors.items(raws, REQUESTED_LOCALES, &positions)?,
+            &[observer.value(&[REQUESTED_LOCALES])?],
+        ),
+        _ => Vec::new(),
+    };
+    let member = evaluation.check_found(
+        subject(Check::RequestedMember),
+        both(locale.clone(), selectors.requested.clone()),
+        |(locale, requested)| {
+            if requested.contains(&locale) {
                 Ok(())
             } else {
-                Err(issue(Code::LocaleDuplicate, None))
+                Err(Found::each(
+                    issue(Code::CoverageRuleInvalid, Some(Reason::LocaleNotRequested)),
+                    outside,
+                ))
             }
-        })?;
-        let member = evaluation.check(
-            subject(Check::RequestedMember),
-            both(locale.clone(), selectors.requested.clone()),
-            |(locale, requested)| {
-                if requested.contains(&locale) {
-                    Ok(())
-                } else {
-                    Err(issue(
-                        Code::CoverageRuleInvalid,
-                        Some(Reason::LocaleNotRequested),
-                    ))
-                }
-            },
-        )?;
-        selected =
-            both(selected, both(locale, both(once, member))).map(|(mut selected, (locale, _))| {
-                selected.push(locale);
-                selected
-            });
-    }
-    Ok(selected)
+        },
+    )?;
+    Ok(both(locale, both(once, member)).map(|(locale, _)| locale))
+}
+
+/// What each item at `items` observed, beside `related`.
+fn observed(
+    items: Vec<Vec<EvidenceProjection>>,
+    related: &[EvidenceProjection],
+) -> Vec<Option<Observation>> {
+    items
+        .into_iter()
+        .flatten()
+        .map(|primary| {
+            Some(Observation {
+                primary,
+                related: related.to_vec(),
+            })
+        })
+        .collect()
+}
+
+/// One candidate of `blocking` for each of the rules' repeated items, each
+/// beside the other items repeating it in the same rule (D15:1567, 2410), or
+/// the one candidate without the declaration's file.
+fn each_rule(blocking: Blocking, rules: Vec<Vec<EvidenceProjection>>) -> Found {
+    rules
+        .into_iter()
+        .map(|items| Found::repeated(blocking, &items.into_iter().map(Some).collect::<Vec<_>>()))
+        .reduce(Found::and)
+        .unwrap_or_else(|| Found::from(blocking))
 }
 
 /// One rule's surface-class selector: each item a member of the admitted
@@ -1018,6 +1160,25 @@ mod tests {
             primary,
             related: vec![policy(ROOM).evidence().clone()],
         }
+    }
+
+    /// The item at `position` of the locale selector of the rule at `rule` in
+    /// `declaration`, at its token.
+    fn locale_item(declaration: &Declaration, rule: u64, position: u64) -> EvidenceProjection {
+        use crate::structural::Edge::{Index, Member};
+        let canonicalizer = canonicalizer(64);
+        Observed::declaration(declaration).app(|observer| {
+            observer
+                .with_locales(&canonicalizer)
+                .nested(&[
+                    Member("coverage"),
+                    Member("rules"),
+                    Index(rule),
+                    Member("requestedLocales"),
+                    Index(position),
+                ])
+                .unwrap()
+        })
     }
 
     /// The details of the resource issue `unit` found.
@@ -1450,7 +1611,8 @@ mod tests {
     fn a_locale_item_is_canonicalized_named_once_in_its_selector_and_requested() {
         let selector =
             json!({"requestedLocales": ["EN", "en", "de", "zz", "fr"], "mode": "fallback-allowed"});
-        let resolved = resolve(&declared(json!({"rules": [selector]})));
+        let declaration = declared(json!({"rules": [selector]}));
+        let resolved = resolve(&declaration);
         let owner = rule(&selector);
         let en = |check| locale_unit(&owner, key("en"), check);
         let de = |check| locale_unit(&owner, key("de"), check);
@@ -1474,6 +1636,30 @@ mod tests {
         ];
         assert_eq!(issues(&resolved.evaluation), found);
         assert_eq!(notices(&resolved.evaluation), [en(Check::CanonicalLocale)]);
+        // Each item is found at its token: `de` beside the requested
+        // locales, the corrected `EN` as its notice's occurrence, each `en`
+        // beside the other, and `zz` alone (D15:2249, 2410).
+        let item = |position| locale_item(&declaration, 0, position);
+        let requested = beside_policy(&declaration, &["requestedLocales"]).primary;
+        let at = |unit: Unit, primary, related: &[EvidenceProjection]| {
+            (
+                unit,
+                Observation {
+                    primary,
+                    related: related.to_vec(),
+                },
+            )
+        };
+        assert_eq!(
+            observed(&resolved.evaluation),
+            [
+                at(de(Check::RequestedMember), item(2), &[requested]),
+                at(en(Check::CanonicalLocale), item(0), &[]),
+                at(en(Check::UniqueLocale), item(0), &[item(1)]),
+                at(en(Check::UniqueLocale), item(1), &[item(0)]),
+                at(zz(Check::CanonicalLocale), item(3), &[]),
+            ]
+        );
         for check in [Check::UniqueLocale, Check::RequestedMember] {
             assert_eq!(
                 waits_on(&resolved.evaluation, &zz(check)),
@@ -1501,6 +1687,40 @@ mod tests {
             assert_eq!(waits_on(&resolved.evaluation, cell), Some(causes.clone()));
         }
         assert_eq!(units(&resolved.policy.unwrap_err()), causes);
+    }
+
+    /// Identical rules share their units but are each a raw parent of their
+    /// own: a locale repeated in their selector is found at each rule's
+    /// items, each beside the other items of its own rule (D15:1567, 2190,
+    /// 2387).
+    #[test]
+    fn identical_rules_are_each_a_parent_of_their_own_items() {
+        let repeated = json!({"requestedLocales": ["fr", "fr"], "mode": "fallback-allowed"});
+        let declaration = declared(json!({"rules": [repeated, repeated]}));
+        let resolved = resolve(&declaration);
+        let duplicate = locale_unit(&rule(&repeated), key("fr"), Check::UniqueLocale);
+        assert_eq!(
+            issues(&resolved.evaluation),
+            [(duplicate.clone(), "project-profile-locale-duplicate", None)]
+        );
+        let beside = |rule, position, other| {
+            (
+                duplicate.clone(),
+                Observation {
+                    primary: locale_item(&declaration, rule, position),
+                    related: vec![locale_item(&declaration, rule, other)],
+                },
+            )
+        };
+        assert_eq!(
+            observed(&resolved.evaluation),
+            [
+                beside(0, 0, 1),
+                beside(0, 1, 0),
+                beside(1, 0, 1),
+                beside(1, 1, 0)
+            ]
+        );
     }
 
     #[test]
@@ -1727,7 +1947,10 @@ mod tests {
             exactly(MAX_COVERAGE_SURFACE_SELECTOR_OCCURRENCES, 2, 3)
         );
         assert_eq!(
-            observed(&over.evaluation),
+            observed(&over.evaluation)
+                .into_iter()
+                .filter(|(unit, _)| unit == &surface_items)
+                .collect::<Vec<_>>(),
             [(
                 surface_items.clone(),
                 beside_policy(&declaration, &["coverage", "rules"])
@@ -2085,13 +2308,16 @@ mod tests {
             ),
             Some(vec![occurrences])
         );
-        let at = resolve_fields(
-            &fields,
-            &Setup {
-                occurrences: 7,
-                ..setup(ROOM, &vocabulary)
-            },
-        );
+        let at = Observed::declaration(&declaration).app(|observer| {
+            resolve_observed(
+                &fields,
+                &Setup {
+                    occurrences: 7,
+                    ..setup(ROOM, &vocabulary)
+                },
+                Some(observer),
+            )
+        });
         // At it, each item is canonicalized: `EN-us` is `en-US`, which the
         // project does not request.
         let corrected = |check| locale_unit(&owner, key("en-US"), check);
@@ -2104,16 +2330,42 @@ mod tests {
             )]
         );
         assert_eq!(notices(&at.evaluation), [corrected(Check::CanonicalLocale)]);
+        // The item is the notice's occurrence, and found outside the
+        // requested locales beside them (D15:2249, 2410).
+        let item = locale_item(&declaration, 0, 0);
+        let requested = beside_policy(&declaration, &["requestedLocales"]).primary;
+        assert_eq!(
+            observed(&at.evaluation),
+            [
+                (
+                    corrected(Check::CanonicalLocale),
+                    Observation {
+                        primary: item.clone(),
+                        related: Vec::new(),
+                    }
+                ),
+                (
+                    corrected(Check::RequestedMember),
+                    Observation {
+                        primary: item.clone(),
+                        related: vec![requested],
+                    }
+                ),
+            ]
+        );
         // Each item is measured in bytes before the provider sees it, and
         // under a rule keyed by its content reports only the first-over
         // witness.
-        let short = resolve_fields(
-            &fields,
-            &Setup {
-                identifier_bytes: 4,
-                ..setup(ROOM, &vocabulary)
-            },
-        );
+        let short = Observed::declaration(&declaration).app(|observer| {
+            resolve_observed(
+                &fields,
+                &Setup {
+                    identifier_bytes: 4,
+                    ..setup(ROOM, &vocabulary)
+                },
+                Some(observer),
+            )
+        });
         let long = locale_unit(&owner, content("EN-us"), Check::CanonicalLocale);
         assert_eq!(
             exceeded(&short.evaluation, &long),
@@ -2124,6 +2376,18 @@ mod tests {
                 },
                 4
             )
+        );
+        // Found at the item beside the confirmed policy, which supplies the
+        // bound.
+        assert_eq!(
+            observed(&short.evaluation),
+            [(
+                long.clone(),
+                Observation {
+                    primary: item,
+                    related: vec![policy(ROOM).evidence().clone()],
+                }
+            )]
         );
         assert_eq!(
             waits_on(
