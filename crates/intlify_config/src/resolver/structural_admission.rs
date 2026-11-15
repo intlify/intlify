@@ -43,10 +43,12 @@
 //! ([`profiles`]), checks a declared Profile ID once they admitted its key
 //! ([`profile_key`]), compares the selector with the declarations once the
 //! object holds one ([`nonempty_profiles`]), and selects a declaration once
-//! the checks under its key admitted it whole ([`declaration`]), the only
-//! one when its key is admitted ([`profile_keys`]), whatever else of the
-//! root they rejected (D15:2131, 2184, 2363). Profile projection needs a
-//! complete `IntlifyConfig`, the whole root ([`whole`]) (D15:2142, 2367).
+//! the checks admitted its boundary and its `resourceLimits` reference
+//! ([`selectable`]), the only one when its key is admitted
+//! ([`profile_keys`]), whatever else of it or of the root they rejected
+//! (D15:2131, 2184, 2363; plan 025 interpretation #218). Profile projection
+//! needs a complete `IntlifyConfig`, the whole root ([`whole`]) (D15:2142,
+//! 2367).
 
 use std::cell::OnceCell;
 use std::collections::BTreeMap;
@@ -222,14 +224,30 @@ impl Field {
     }
 }
 
-/// Whether structural admission admitted the declaration `id` whole, its key
-/// and every field under it, the checks that need them included: every unit
-/// under its key evaluated without a blocking result. Otherwise the causes:
-/// each such unit's blocking results, and the causes of each not evaluated
-/// (D15:2131, 2367).
-pub(crate) fn declaration(evaluation: &Evaluation, id: &str) -> Admitted<()> {
+/// Whether structural admission admitted what selecting the declaration `id`
+/// needs besides its key (D15:2131): the rest of its boundary, its value an
+/// object under the key (plan 025 interpretation #218), and its
+/// `resourceLimits` reference fragment, with the `policies` object present
+/// and typed to hold it. The key, which alone names the declaration's
+/// Profile ID, holds the selection back through that ID's check (D15:2184).
+/// Otherwise the causes: each such unit's blocking results, and the causes
+/// of each not evaluated. A missing required member, an undeclared member,
+/// or a failure elsewhere in the declaration suppresses only what reads it
+/// (D15:2367, 3341).
+pub(crate) fn selectable(evaluation: &Evaluation, id: &str) -> Admitted<()> {
     evaluation.admitted_within(|unit| match &unit.subject {
-        Subject::Structural(subject) => subject.declaration() == Some(id),
+        Subject::Structural(subject @ StructuralSubject::ProfileField(_, field))
+            if subject.declaration() == Some(id) =>
+        {
+            match &*field.path {
+                [] => unit.check == Check::FieldType,
+                [policies] => {
+                    &**policies == "policies"
+                        && matches!(unit.check, Check::RequiredField | Check::FieldType)
+                }
+                [policies, slot, ..] => &**policies == "policies" && &**slot == "resourceLimits",
+            }
+        }
         _ => false,
     })
 }
@@ -826,7 +844,7 @@ mod tests {
     use crate::structural::{AuthoringSchema, StructuralLimits};
 
     use super::{
-        admit_structure, declaration, selection, whole, EntryKey, Field, StructuralInvariant,
+        admit_structure, selectable, selection, whole, EntryKey, Field, StructuralInvariant,
         StructuralSubject, CAPABILITY, OWNER,
     };
 
@@ -1630,34 +1648,74 @@ mod tests {
             .collect()
     }
 
-    /// A declaration is admitted whole when every unit under its key was
-    /// evaluated without a Finding: a failure under another declaration or
-    /// at the root leaves it admitted, while the whole root waits on every
-    /// structural Finding; a unit not evaluated holds it back with its causes
-    /// (D15:2131, 2142, 2367).
+    /// A declaration is selectable once its boundary and its `resourceLimits`
+    /// fragment are admitted: a failure elsewhere in it, a missing required
+    /// member, or an undeclared member leaves it selectable, while the whole
+    /// root waits on every structural Finding; a unit not evaluated holds it
+    /// back with its causes (D15:2131, 2142, 2367, 3341; plan 025
+    /// interpretation #218).
     #[test]
-    fn a_declaration_is_admitted_whole_by_the_checks_under_its_key() {
+    fn a_declaration_is_selectable_once_its_boundary_and_resource_limits_are_admitted() {
         let mut value = minimal_config();
-        let mut other = value["profiles"]["app"].clone();
-        other["requestedLocales"] = json!("en");
-        value["profiles"]["other"] = other;
+        value["profiles"]["app"]["requestedLocales"] = json!("en");
+        value["profiles"]["app"]["extra"] = json!(true);
+        value["profiles"]["app"]
+            .as_object_mut()
+            .unwrap()
+            .remove("projectId");
         let (evaluation, _) = admitted(&value, 1_000_000);
-        let failed = level(
-            S::ProfileField(
-                EntryKey::identity("other"),
-                Field::of(&["requestedLocales"]),
-            ),
-            Check::FieldType,
-        );
-        assert_eq!(declaration(&evaluation, "app"), Ok(()));
+        assert_eq!(selectable(&evaluation, "app"), Ok(()));
+        assert_eq!(causes(whole(&evaluation)).len(), 3);
+        // Its value not an object, or its reference not admitted, is not.
+        let mut boundary = minimal_config();
+        boundary["profiles"]["other"] = json!(false);
+        let (evaluation, _) = admitted(&boundary, 1_000_000);
         assert_eq!(
-            causes(declaration(&evaluation, "other")),
-            [(failed.clone(), Code::FieldTypeInvalid)]
+            causes(selectable(&evaluation, "other")),
+            [(
+                level(
+                    S::ProfileField(EntryKey::identity("other"), Field::of(&[])),
+                    Check::FieldType
+                ),
+                Code::FieldTypeInvalid
+            )]
         );
+        assert_eq!(selectable(&evaluation, "app"), Ok(()));
+        let mut reference = minimal_config();
+        reference["profiles"]["app"]["policies"]["resourceLimits"] = json!(false);
+        let (evaluation, _) = admitted(&reference, 1_000_000);
         assert_eq!(
-            causes(whole(&evaluation)),
-            [(failed, Code::FieldTypeInvalid)]
+            causes(selectable(&evaluation, "app")),
+            [(
+                app(&["policies", "resourceLimits"], Check::FieldType),
+                Code::FieldTypeInvalid
+            )]
         );
+        let mut policies = minimal_config();
+        policies["profiles"]["app"]
+            .as_object_mut()
+            .unwrap()
+            .remove("policies");
+        let (evaluation, _) = admitted(&policies, 1_000_000);
+        assert_eq!(
+            causes(selectable(&evaluation, "app")),
+            [(
+                app(&["policies"], Check::RequiredField),
+                Code::RequiredFieldMissing
+            )]
+        );
+        policies["profiles"]["app"]["policies"] = json!(7);
+        let (evaluation, _) = admitted(&policies, 1_000_000);
+        assert_eq!(
+            causes(selectable(&evaluation, "app")),
+            [(app(&["policies"], Check::FieldType), Code::FieldTypeInvalid)]
+        );
+        // Another slot of `policies` does not hold the selection back.
+        let mut slot = minimal_config();
+        slot["profiles"]["app"]["policies"]["trust"] = json!(false);
+        slot["profiles"]["app"]["policies"]["extra"] = json!(true);
+        let (evaluation, _) = admitted(&slot, 1_000_000);
+        assert_eq!(selectable(&evaluation, "app"), Ok(()));
         // A unit the declaration needs, made to block, holds back every unit
         // under its key.
         let profiles = root(&["profiles"], Check::FieldType);
@@ -1668,7 +1726,7 @@ mod tests {
             Ok(()),
         );
         assert_eq!(
-            causes(declaration(&evaluation, "app"))
+            causes(selectable(&evaluation, "app"))
                 .into_iter()
                 .map(|(unit, _)| unit)
                 .collect::<Vec<_>>(),

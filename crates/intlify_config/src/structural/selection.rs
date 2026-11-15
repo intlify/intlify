@@ -344,9 +344,10 @@ impl<Policy: DeserializeOwned, Target> StructuralAnalysis<Policy, Target> {
             ));
         }
         let subject = member.value();
-        // A declaration boundary is the immediate object shape: type, required
-        // fields, and closedness. Descendant failures do not erase that boundary.
-        // Consult the existing evaluation rather than maintaining another field list.
+        // A declaration boundary is its value as an object under its admitted
+        // key, evaluated against the declaration's schema. A missing required
+        // member, an undeclared member, or a failure below suppresses only
+        // what reads it (D15:2131, 2367, 3341; plan 025 interpretation #218).
         let boundary_evaluated = evaluation.fragments.iter().any(|fragment| {
             fragment.subject == subject
                 && fragment.schema == self.binding.declaration_schema
@@ -355,13 +356,7 @@ impl<Policy: DeserializeOwned, Target> StructuralAnalysis<Policy, Target> {
                     FragmentState::Admitted | FragmentState::Invalid
                 )
         });
-        if !boundary_evaluated
-            || !matches!(self.doc.node(subject).kind(), NodeKind::Object(_))
-            || evaluation
-                .issues
-                .iter()
-                .any(|issue| issue.subject == subject)
-        {
+        if !boundary_evaluated || !matches!(self.doc.node(subject).kind(), NodeKind::Object(_)) {
             return Ok(Selection::Unavailable(
                 SelectionPrerequisite::DeclarationBoundary,
             ));
