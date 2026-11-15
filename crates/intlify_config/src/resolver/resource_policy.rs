@@ -30,7 +30,10 @@
 //! selection observes a reference that names nothing admissible at the
 //! reference, beside what it compared the reference with, and each occurrence
 //! of a selected group at the member, beside the reference (D15:2249). The
-//! rechecks carry no occurrence Evidence yet (plan 025 PR 5f-4d).
+//! `artifactAdmission` rechecks are observed where their checks under the
+//! capability are, beside the admitted Policy that supplies the bound
+//! (D15:2249); the `configurationInput` rechecks carry no occurrence Evidence
+//! yet (plan 025 PR 5f-4d-2).
 
 use std::collections::BTreeMap;
 
@@ -338,67 +341,76 @@ pub(crate) const fn unit(subject: PolicySubject, check: Check) -> Unit {
 }
 
 /// The `artifactAdmission` units of one stage: under the capability's value,
-/// before a policy is admitted, or as the admitted policy's recheck.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Stage {
+/// before a policy is admitted, or as the admitted policy's recheck, with the
+/// policy's Evidence once one is admitted.
+#[derive(Debug, Clone, Copy)]
+enum Stage<'p> {
     Capability,
-    Policy,
+    Policy(Option<&'p EvidenceProjection>),
 }
 
-impl Stage {
+impl Stage<'_> {
     fn unit(self, subject: ArtifactSubject) -> Unit {
         match self {
             Self::Capability => unit(PolicySubject::Capability(subject), Check::WithinCapability),
-            Self::Policy => unit(PolicySubject::Recheck(subject), Check::WithinBound),
+            Self::Policy(_) => unit(PolicySubject::Recheck(subject), Check::WithinBound),
         }
     }
 
-    /// What this stage's unit of the collection's `bound` observes: under the
-    /// capability, the collection at its root, beside the capability's bound
-    /// (D15:834, 836). A recheck observes nothing yet (plan 025 PR 5f-4d).
-    fn at_collection(self, bound: BoundId) -> Result<Option<Observation>, ComponentInvariant> {
+    /// What supplies this stage's `bound`, which a Finding past it relates
+    /// (D15:2249): the capability's bound, or the admitted policy. None
+    /// before a policy is admitted, when no recheck is evaluated.
+    fn beside(self, bound: BoundId) -> Result<Option<EvidenceProjection>, ComponentInvariant> {
         match self {
-            Self::Capability => Ok(Some(Observation {
-                primary: collection_root()?,
-                related: vec![capability_bound(CapabilityBound::PolicyComparable(bound))?],
-            })),
-            Self::Policy => Ok(None),
+            Self::Capability => {
+                capability_bound(CapabilityBound::PolicyComparable(bound)).map(Some)
+            }
+            Self::Policy(policy) => Ok(policy.cloned()),
         }
+    }
+
+    /// What this stage's unit of the collection's `bound` observes: the
+    /// collection at its root, beside what supplies the bound (D15:834, 836).
+    fn at_collection(self, bound: BoundId) -> Result<Option<Observation>, ComponentInvariant> {
+        self.beside(bound)?
+            .map(|limit| {
+                Ok(Observation {
+                    primary: collection_root()?,
+                    related: vec![limit],
+                })
+            })
+            .transpose()
     }
 
     /// What this stage's unit of a member key observes past one artifact's
-    /// `bound`: under the capability, each member under the key, with its
-    /// canonical bytes, at the member no Set admitted, beside the
-    /// capability's bound (D15:834, 836; plan 025 interpretation #200). A
-    /// recheck observes nothing yet.
+    /// `bound`: each member under the key, with its canonical bytes, at the
+    /// member no Set admitted, beside what supplies the bound (D15:834, 836;
+    /// plan 025 interpretation #200).
     fn at_members(
         self,
         members: &[&FormalMember],
         bound: BoundId,
     ) -> Result<Vec<(u64, Observation)>, ComponentInvariant> {
-        match self {
-            Self::Capability => members
-                .iter()
-                .map(|member| {
-                    Ok((
-                        member.canonical_bytes(),
-                        Observation {
-                            primary: candidate(member)?,
-                            related: vec![capability_bound(CapabilityBound::PolicyComparable(
-                                bound,
-                            ))?],
-                        },
-                    ))
-                })
-                .collect(),
-            Self::Policy => Ok(Vec::new()),
-        }
+        let Some(limit) = self.beside(bound)? else {
+            return Ok(Vec::new());
+        };
+        members
+            .iter()
+            .map(|member| {
+                Ok((
+                    member.canonical_bytes(),
+                    Observation {
+                        primary: candidate(member)?,
+                        related: vec![limit.clone()],
+                    },
+                ))
+            })
+            .collect()
     }
 
     /// What this stage's unit of a bound over the selected declaration's
-    /// references observes: under the capability, the value at `path` under
-    /// the declaration, beside the capability's bound (D15:790, 836). A
-    /// recheck observes nothing yet, and nothing is observed without the
+    /// references observes: the value at `path` under the declaration, beside
+    /// what supplies the bound (D15:790, 836). Nothing is observed without the
     /// declaration's file.
     fn at_declaration(
         self,
@@ -406,10 +418,10 @@ impl Stage {
         path: &[&str],
         bound: BoundId,
     ) -> Result<Option<Observation>, PolicyInvariant> {
-        match (self, observer) {
-            (Self::Capability, Some(observer)) => Ok(Some(Observation {
+        match (observer, self.beside(bound)?) {
+            (Some(observer), Some(limit)) => Ok(Some(Observation {
                 primary: observer.value(path)?,
-                related: vec![capability_bound(CapabilityBound::PolicyComparable(bound))?],
+                related: vec![limit],
             })),
             _ => Ok(None),
         }
@@ -529,6 +541,12 @@ pub(crate) fn admit_resource_policy(
         .length_fact(authority)
         .map_err(PolicyInvariant::Selection)?;
     let limits = compatible.as_ref().map(AdmittedResourcePolicy::limits);
+    // The admitted policy supplies every recheck's bound (D15:2249).
+    let policy = compatible
+        .as_ref()
+        .ok()
+        .map(|policy| admitted(policy.tuple()))
+        .transpose()?;
     let configured = configuration_bounds(
         evaluation,
         limits.map(|limits| &limits.configuration_input),
@@ -537,7 +555,7 @@ pub(crate) fn admit_resource_policy(
     )?;
     let inspected = artifact_bounds(
         evaluation,
-        Stage::Policy,
+        Stage::Policy(policy.as_ref()),
         limits.map(|limits| &limits.artifact_admission),
         &submitted,
         resource_limits,
@@ -965,7 +983,7 @@ fn configuration_bounds(
 /// proved only when what is visible already exceeds the bound.
 fn artifact_bounds(
     evaluation: &mut Evaluation,
-    stage: Stage,
+    stage: Stage<'_>,
     limits: Result<&ArtifactAdmissionLimits, &Causes>,
     submitted: &Submitted<'_>,
     resource_limits: Result<&PolicyReference, &Causes>,
@@ -1025,7 +1043,7 @@ fn artifact_bounds(
 /// as an artifact.
 fn occurrence_bounds(
     evaluation: &mut Evaluation,
-    stage: Stage,
+    stage: Stage<'_>,
     limits: Result<&ArtifactAdmissionLimits, &Causes>,
     members: &[FormalMember],
 ) -> Result<Admitted<()>, PolicyInvariant> {
@@ -1074,7 +1092,7 @@ fn occurrence_bounds(
 /// and then the canonical bytes of every occurrence. Whether they hold.
 fn body_bounds(
     evaluation: &mut Evaluation,
-    stage: Stage,
+    stage: Stage<'_>,
     limits: Result<&ArtifactAdmissionLimits, &Causes>,
     submitted: &Submitted<'_>,
 ) -> Result<Admitted<()>, PolicyInvariant> {
@@ -1121,7 +1139,7 @@ fn body_bounds(
 /// commit in canonical order whatever order they run in.
 fn each_reference(
     evaluation: &mut Evaluation,
-    stage: Stage,
+    stage: Stage<'_>,
     limits: Result<&ArtifactAdmissionLimits, &Causes>,
     (resource_limits, visible): (Result<&PolicyReference, &Causes>, &[(ReferenceField, u64)]),
     observer: Option<&DeclarationObserver<'_>>,
@@ -2495,6 +2513,173 @@ mod tests {
         }
     }
 
+    /// The view of the admitted `policy`, under the exact reference that keys
+    /// it: `C` of the reference a declaration writes (D15:824, 834).
+    fn policy_view(policy: &Value) -> Value {
+        let reference = reference_value(&tuple_of(policy));
+        json!({
+            "kind": "artifact-input",
+            "origin": "profile-resolution-artifact-collection",
+            "component": [
+                { "fixed-role": "artifact-member" },
+                { "safe-key": hex(&encode(&reference).unwrap()) },
+            ],
+        })
+    }
+
+    /// The default inputs selecting the ample policy whose `artifactAdmission`
+    /// bounds `edit` lowers within the roomy capability, and the view of the
+    /// policy, which supplies each recheck's bound.
+    fn rechecking(edit: impl FnOnce(&mut ArtifactAdmissionLimits)) -> (Inputs, Value) {
+        let mut limits = ample();
+        edit(&mut limits.artifact_admission);
+        let policy = chosen_under(&limits);
+        (Inputs::selecting(&policy), policy_view(&policy))
+    }
+
+    /// The occurrences of Phase 4's whole run over `inputs` at the units
+    /// `at` keeps, with the run's tokens.
+    fn rechecked_at(
+        inputs: &Inputs,
+        at: impl Fn(&Unit) -> bool,
+    ) -> (Vec<Observed>, EvidenceTokens) {
+        let (evaluation, _) = inputs.attempt();
+        let (found, tokens) = occurrences_of(&evaluation);
+        (
+            found.into_iter().filter(|(unit, ..)| at(unit)).collect(),
+            tokens,
+        )
+    }
+
+    /// The collection's rechecks past the admitted policy's bounds are
+    /// observed at its root, as under the capability, beside the policy that
+    /// supplies the bound (D15:834, 2249).
+    #[test]
+    fn the_collection_rechecks_are_observed_at_its_root_beside_the_policy() {
+        type Edit = fn(&mut ArtifactAdmissionLimits);
+        let cases: [(ArtifactSubject, Edit); 4] = [
+            (ArtifactSubject::Artifacts, |limits| {
+                limits.max_artifacts = bound(1);
+            }),
+            (ArtifactSubject::PolicyArtifacts, |limits| {
+                limits.max_policy_artifacts = bound(1);
+            }),
+            (ArtifactSubject::TargetProfileArtifacts, |limits| {
+                limits.max_target_profile_artifacts = bound(1);
+            }),
+            (ArtifactSubject::ArtifactBytes, |limits| {
+                limits.max_total_artifact_canonical_bytes = bound(1);
+            }),
+        ];
+        for (subject, edit) in cases {
+            let (mut inputs, policy) = rechecking(edit);
+            inputs.members.push(envelope_of(
+                ArtifactKind::TargetProfile,
+                "storefront-app",
+                "1",
+                json!({}),
+            ));
+            let at = artifact_recheck(subject.clone());
+            let (found, tokens) = rechecked_at(&inputs, |unit| *unit == at);
+            assert_eq!(
+                found,
+                [(at, view(collection_root(), &tokens), vec![policy], 0)],
+                "{subject:?}"
+            );
+        }
+    }
+
+    /// Each member past one artifact's bound under the admitted policy is
+    /// observed at the member, as under the capability, beside the policy
+    /// (D15:834, 2249; plan 025 interpretation #200).
+    #[test]
+    fn each_member_past_one_artifacts_recheck_is_observed_at_the_member() {
+        let (inputs, policy) = rechecking(|limits| {
+            limits.max_single_artifact_canonical_bytes = bound(1);
+        });
+        let (found, tokens) = rechecked_at(&inputs, |unit| {
+            matches!(
+                unit.subject,
+                Subject::ResourcePolicy(PolicySubject::Recheck(ArtifactSubject::Artifact(_)))
+            )
+        });
+        // Every member is past the bound. The two members without a tuple
+        // share one key, so their occurrences differ in their ordinals.
+        assert_eq!(found.len(), inputs.members.len());
+        let mut ordinals: std::collections::BTreeMap<Unit, Vec<u64>> =
+            std::collections::BTreeMap::new();
+        for (unit, primary, related, ordinal) in found {
+            assert_eq!(primary, chosen_view(&tokens));
+            assert_eq!(related, std::slice::from_ref(&policy));
+            ordinals.entry(unit).or_default().push(ordinal);
+        }
+        let mut keys: Vec<Vec<u64>> = ordinals.into_values().collect();
+        keys.sort();
+        assert_eq!(keys, [vec![0], vec![0], vec![0], vec![0, 1]]);
+    }
+
+    /// The declaration's reference count and bytes, and each reference, are
+    /// rechecked at the declaration and at each reference's value, as under
+    /// the capability, beside the admitted policy (D15:790, 1918, 1921, 1922,
+    /// 2249).
+    #[test]
+    fn the_declarations_reference_rechecks_are_observed_beside_the_policy() {
+        type Edit = fn(&mut ArtifactAdmissionLimits);
+        let declared: [(ArtifactSubject, Edit); 2] = [
+            (ArtifactSubject::References, |limits| {
+                limits.max_artifact_references = bound(1);
+            }),
+            (ArtifactSubject::ReferenceBytes, |limits| {
+                limits.max_total_reference_canonical_bytes = bound(1);
+            }),
+        ];
+        for (subject, edit) in declared {
+            let (inputs, policy) = rechecking(edit);
+            let at = artifact_recheck(subject.clone());
+            let (found, _) = rechecked_at(&inputs, |unit| *unit == at);
+            let [(unit, primary, related, ordinal)] = <[Observed; 1]>::try_from(found).unwrap();
+            assert_eq!(unit, at);
+            assert_eq!(
+                primary["value"],
+                json!({ "exact-json-pointer": format!("/profiles/{SELECTED}") }),
+                "{subject:?}"
+            );
+            assert_eq!((related, ordinal), (vec![policy], 0), "{subject:?}");
+        }
+        let (inputs, policy) = rechecking(|limits| {
+            limits.max_single_reference_canonical_bytes = bound(1);
+        });
+        let (found, _) = rechecked_at(&inputs, |unit| {
+            matches!(
+                unit.subject,
+                Subject::ResourcePolicy(PolicySubject::Recheck(ArtifactSubject::Reference(_)))
+            )
+        });
+        // Six present policy references and two Target Profile references,
+        // each at the pointer of its value.
+        assert_eq!(found.len(), 8);
+        for (unit, primary, related, ordinal) in found {
+            let Subject::ResourcePolicy(PolicySubject::Recheck(ArtifactSubject::Reference(field))) =
+                &unit.subject
+            else {
+                unreachable!()
+            };
+            let pointer = match field {
+                ReferenceField::Policy(slot) => {
+                    format!("/profiles/{SELECTED}/policies/{}", slot.name())
+                }
+                ReferenceField::TargetProfile(id) => {
+                    format!(
+                        "/profiles/{SELECTED}/targetProfiles/{}/profile",
+                        id.as_str()
+                    )
+                }
+            };
+            assert_eq!(primary["value"], json!({ "exact-json-pointer": pointer }));
+            assert_eq!((related, ordinal), (vec![policy.clone()], 0));
+        }
+    }
+
     /// The comparison is observed at the admitted Policy, under the exact
     /// reference that keys it, beside the selected reference and the
     /// capability's bound it needs more of first (D15:824, 834, 2249, 2355).
@@ -2515,20 +2700,9 @@ mod tests {
             })),
             &tokens,
         );
-        let reference = reference_value(&tuple_of(&chosen()));
         let [(unit, primary, related, ordinal)] = <[Observed; 1]>::try_from(found).unwrap();
         assert_eq!(unit, comparison());
-        assert_eq!(
-            primary,
-            json!({
-                "kind": "artifact-input",
-                "origin": "profile-resolution-artifact-collection",
-                "component": [
-                    { "fixed-role": "artifact-member" },
-                    { "safe-key": hex(&encode(&reference).unwrap()) },
-                ],
-            })
-        );
+        assert_eq!(primary, policy_view(&chosen()));
         assert_eq!(related.len(), 2);
         assert_selected_reference(&related[0]);
         assert_eq!(related[1], limit);
@@ -2921,7 +3095,7 @@ mod tests {
 
     /// The Policy recheck of an `artifactAdmission` bound.
     fn artifact_recheck(subject: ArtifactSubject) -> Unit {
-        Stage::Policy.unit(subject)
+        Stage::Policy(None).unit(subject)
     }
 
     fn keys(causes: &Causes) -> Vec<IssueKey> {
