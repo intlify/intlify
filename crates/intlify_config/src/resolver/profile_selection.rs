@@ -41,8 +41,9 @@
 //! admitted its boundary, its value an object under its key, and its
 //! `resourceLimits` reference fragment (D15:2131; plan 025 interpretation
 //! #218). The core's provisional selection then selects it; otherwise its
-//! causes hold every later phase back. A failure elsewhere in the
-//! declaration holds back only what reads that field.
+//! causes hold back each later check that reads the declaration or the Policy
+//! its reference selects (D15:2131). A failure elsewhere in the declaration
+//! holds back only what reads that field.
 
 use std::collections::BTreeMap;
 

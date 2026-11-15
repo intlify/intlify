@@ -1866,7 +1866,9 @@
         "structural.target-key.field-value",
         "structural.target.required-field",
         "structural.target.field-value",
-        "structural.target.known-field"
+        "structural.target.known-field",
+        "selection.profile-id.within-capability",
+        "selection.selector.declared"
       ],
       "possibleFindingCodes": [
         "project-profile-resource-limit-exceeded"
@@ -1987,7 +1989,9 @@
       "prerequisiteCheckIds": [
         "structural.profile.required-field",
         "structural.profile.field-value",
-        "structural.profile.known-field"
+        "structural.profile.known-field",
+        "selection.profile-id.within-capability",
+        "selection.selector.declared"
       ],
       "possibleFindingCodes": [
         "project-profile-resource-limit-exceeded"
@@ -2030,10 +2034,13 @@
       "prerequisiteCheckIds": [
         "structural.profile.required-field",
         "structural.profile.field-value",
+        "structural.profile.known-field",
         "structural.target-key.field-value",
         "structural.target.required-field",
         "structural.target.field-value",
-        "structural.target.known-field"
+        "structural.target.known-field",
+        "selection.profile-id.within-capability",
+        "selection.selector.declared"
       ],
       "possibleFindingCodes": [
         "project-profile-resource-limit-exceeded"
@@ -2080,7 +2087,9 @@
         "structural.target-key.field-value",
         "structural.target.required-field",
         "structural.target.field-value",
-        "structural.target.known-field"
+        "structural.target.known-field",
+        "selection.profile-id.within-capability",
+        "selection.selector.declared"
       ],
       "possibleFindingCodes": [
         "project-profile-resource-limit-exceeded"
@@ -2121,6 +2130,11 @@
       "subjectKindRank": "9",
       "checkRank": "0",
       "prerequisiteCheckIds": [
+        "structural.profile.required-field",
+        "structural.profile.field-value",
+        "structural.profile.known-field",
+        "selection.profile-id.within-capability",
+        "selection.selector.declared",
         "resource-policy.artifacts.within-capability",
         "resource-policy.policy-artifacts.within-capability",
         "resource-policy.target-profile-artifacts.within-capability",

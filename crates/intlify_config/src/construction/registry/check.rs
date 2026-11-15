@@ -61,9 +61,15 @@
 //! unless a check it lists already waits on them. The checks of the
 //! declaration's reference counts list those of `policies` and of the Target
 //! ID entries, which every check under the admitted Policy then waits on, and
-//! the group checks those of the Group ID entries. No row of a later phase
-//! lists a check of profile selection yet: without a selected declaration no
-//! later phase starts.
+//! the group checks those of the Group ID entries. Without a selection, each
+//! check that reads the declaration or the Policy its reference selects waits
+//! on what held the selection back (D15:2131): the reference counts and the
+//! Resource Limit Policy's metadata scan list the selected Profile ID's bound,
+//! the selector naming a declaration, and the structural checks of the
+//! boundary and the reference fragment, which no check of profile selection
+//! reports, and every later check reaches them through these. Phase 4's checks
+//! of the collection under the capability read neither and list none
+//! (D15:2132).
 //!
 //! A row's Finding codes are those its units may report, a notice included,
 //! in 015's table order: what the resolver's checks report, and for the kinds
@@ -147,7 +153,7 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:79fb4373298d1de83179b964b6df4369a784e8a8929202cc62256b8afcc68bb6";
+    "sha256:b292e136441a2390f05f04f3ad62e00b6c60185781820ecb5672813706e285c8";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
@@ -1174,8 +1180,13 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         | K::CapabilityArtifactBytes => &[NONE],
         // A count of the selected declaration's references reads the fields
         // that hold them, `policies` and the Target ID entries (D15:1918,
-        // 1921-1922).
-        K::CapabilityReferences | K::CapabilityReferenceBytes => &[&[
+        // 1921-1922), and waits on the selection: on its Profile ID and the
+        // selector naming it, and on the structural checks of its boundary
+        // and `resourceLimits` reference, which no check of profile selection
+        // reports (D15:2131).
+        K::CapabilityReferences
+        | K::CapabilityTargetProfileReference
+        | K::CapabilityReferenceBytes => &[&[
             "structural.profile.required-field",
             "structural.profile.field-value",
             "structural.profile.known-field",
@@ -1183,19 +1194,15 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
             "structural.target.required-field",
             "structural.target.field-value",
             "structural.target.known-field",
+            "selection.profile-id.within-capability",
+            "selection.selector.declared",
         ]],
         K::CapabilityPolicyReference => &[&[
             "structural.profile.required-field",
             "structural.profile.field-value",
             "structural.profile.known-field",
-        ]],
-        K::CapabilityTargetProfileReference => &[&[
-            "structural.profile.required-field",
-            "structural.profile.field-value",
-            "structural.target-key.field-value",
-            "structural.target.required-field",
-            "structural.target.field-value",
-            "structural.target.known-field",
+            "selection.profile-id.within-capability",
+            "selection.selector.declared",
         ]],
         K::ProfileSpecificationDependency => &[&["specification.project-profile.supported"]],
         // The selection's checks wait on the one before them: a `schemaVersion`
@@ -1271,11 +1278,17 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
             MATERIALIZABLE,
             MATERIALIZABLE,
         ],
-        // The scan waits on the collection's bounds; selection, on the scan and
-        // the reference's own bytes; and each later check, on the one before
-        // it (Decision 015-164).
+        // The scan waits on the selected `resourceLimits` reference and the
+        // collection's bounds; selection, on the scan and the reference's own
+        // bytes; and each later check, on the one before it (D15:2132;
+        // Decision 015-164).
         K::ResourceLimits => &[
             &[
+                "structural.profile.required-field",
+                "structural.profile.field-value",
+                "structural.profile.known-field",
+                "selection.profile-id.within-capability",
+                "selection.selector.declared",
                 "resource-policy.artifacts.within-capability",
                 "resource-policy.policy-artifacts.within-capability",
                 "resource-policy.target-profile-artifacts.within-capability",
