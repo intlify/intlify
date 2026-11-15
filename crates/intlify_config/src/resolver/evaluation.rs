@@ -1432,12 +1432,21 @@ impl Evaluation {
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
-        // Phase 8's negotiation checks; those of the message fallback and
-        // coverage gain theirs later (plan 025 PRs 5f-4g).
-        let negotiation = matches!(unit.subject, Subject::Negotiation(_));
+        // Phase 8's negotiation checks and the message fallback's checks of
+        // its keys and sequences; those of the candidates and coverage gain
+        // theirs later (plan 025 PRs 5f-4g, 5f-4h).
+        let policies = matches!(
+            unit.subject,
+            Subject::Negotiation(_)
+                | Subject::Fallback(
+                    FallbackSubject::Sources
+                        | FallbackSubject::Source(_)
+                        | FallbackSubject::Sequence(_)
+                )
+        );
         assert_eq!(
             observed,
-            OBSERVED.contains(&unit.phase) || negotiation,
+            OBSERVED.contains(&unit.phase) || policies,
             "{unit:?} reports {what} {} what it observed, against its check",
             if observed { "with" } else { "without" }
         );
@@ -3345,10 +3354,10 @@ mod tests {
     #[test]
     #[should_panic(expected = "with what it observed")]
     fn a_candidate_of_another_phase_with_an_observation_fails_the_test() {
-        use crate::resolver::fallback::{unit, FallbackSubject};
+        use crate::resolver::coverage::{unit, CoverageSubject};
         let data = through(crate::resolver::evidence_component::ComponentPath::data_root());
-        let sources = unit(FallbackSubject::Sources, Check::WithinBound);
-        let _ = Evaluation::default().check_found(sources, Ok(()), |()| {
+        let rules = unit(CoverageSubject::Rules, Check::WithinBound);
+        let _ = Evaluation::default().check_found(rules, Ok(()), |()| {
             Err::<(), _>(Found::observed(
                 Blocking::limit(exceeded(Actual::Exact(4))),
                 data,

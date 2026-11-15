@@ -194,6 +194,7 @@ fn policies<P: Provider>(
         Ok(canonicalizer),
         &locales,
         fields.message_fallback.clone(),
+        Some(&observer),
     )?;
     let coverage = resolve_coverage(
         evaluation,

@@ -448,6 +448,7 @@ where
         canonicalizer,
         &locales,
         locale_fields.message_fallback.clone(),
+        observer.as_ref(),
     )?;
     own(
         evaluation,
@@ -2636,6 +2637,48 @@ pub(super) mod tests {
                     (pointer("EN"), vec![pointer("en")]),
                     (pointer("en"), vec![pointer("EN")]),
                 ]
+            );
+        });
+    }
+
+    /// The message fallback observes through what Phase 5 bound as well: a
+    /// source outside the requested locales is found at its key, under its
+    /// non-secret name, beside them (D15:776, 2249).
+    #[test]
+    fn a_fallback_key_is_classified_by_the_canonicalizer_phase_5_bound() {
+        use crate::resolver::fallback::{self, FallbackSubject};
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["messageFallback"] = json!({"de": ["en"]});
+        inputs.resolve(|evaluation, _| {
+            let outside = fallback::unit(
+                FallbackSubject::Source(LocaleKey::Canonical(canonical("de"))),
+                Check::RequestedMember,
+            );
+            assert_eq!(
+                issues(&evaluation),
+                [(
+                    outside.clone(),
+                    Code::MessageFallbackSourceNotRequested,
+                    None
+                )]
+            );
+            let pointer =
+                |path: &str| json!({ "exact-json-pointer": format!("/profiles/web/{path}") });
+            assert_eq!(
+                observed_views(&evaluation, &outside)
+                    .into_iter()
+                    .map(|(primary, related)| (
+                        primary["value"].clone(),
+                        related
+                            .iter()
+                            .map(|view| view["value"].clone())
+                            .collect::<Vec<_>>()
+                    ))
+                    .collect::<Vec<_>>(),
+                [(
+                    pointer("messageFallback/de"),
+                    vec![pointer("requestedLocales")]
+                )]
             );
         });
     }
