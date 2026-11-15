@@ -782,13 +782,16 @@ mod tests {
                     )
                 })
                 .unwrap();
-            let targets = resolve_targets(
-                &mut evaluation,
-                Ok(&declaration.target_profiles),
-                &locales,
-                &references,
-            )
-            .unwrap();
+            let targets = observed
+                .app(|observer| {
+                    resolve_targets(
+                        &mut evaluation,
+                        Ok(&declaration.target_profiles),
+                        &locales,
+                        (&references, Some(observer)),
+                    )
+                })
+                .unwrap();
             let groups = resolve_groups(
                 &mut evaluation,
                 policy,

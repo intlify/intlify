@@ -72,7 +72,7 @@ use super::specification::{
     SupportedSpecifications,
 };
 use super::structural_admission::StructuralInvariant;
-use super::targets::{resolve_targets, ResolvedTargets};
+use super::targets::{resolve_targets, ResolvedTargets, TargetInvariant};
 use super::vocabulary::SurfaceVocabulary;
 
 type Analysis = StructuralAnalysis<PolicyReference, TargetProfileReference>;
@@ -318,6 +318,15 @@ impl From<EvaluationInvariant> for ResolverInvariant {
     }
 }
 
+impl From<TargetInvariant> for ResolverInvariant {
+    fn from(invariant: TargetInvariant) -> Self {
+        match invariant {
+            TargetInvariant::Evaluation(invariant) => Self::Evaluation(invariant),
+            TargetInvariant::Observer(invariant) => Self::Observer(invariant),
+        }
+    }
+}
+
 impl From<ReferenceInvariant> for ResolverInvariant {
     fn from(invariant: ReferenceInvariant) -> Self {
         match invariant {
@@ -524,7 +533,12 @@ where
         fields.delivery(),
     )?;
     own(evaluation, SemanticGroup::Delivery, held(delivery.as_ref()))?;
-    let targets = resolve_targets(evaluation, fields.target_profiles(), &locales, &results)?;
+    let targets = resolve_targets(
+        evaluation,
+        fields.target_profiles(),
+        &locales,
+        (&results, observer.as_ref()),
+    )?;
     own(
         evaluation,
         SemanticGroup::Targets,
