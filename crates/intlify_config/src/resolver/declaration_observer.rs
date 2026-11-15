@@ -2,10 +2,10 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Where a check of the selected declaration looks: a value under the
-//! declaration, as Materialized Value Evidence at the value's token in the
-//! file Phase 1 read (D15:790, 802), and the configuration around it, the
-//! root, the declarations, a declared Profile ID's key, every string past a
-//! bound, and the selector.
+//! declaration, or a member's key there, as Materialized Value Evidence at the
+//! token in the file Phase 1 read (D15:790, 802), and the configuration around
+//! it, the root, the declarations, a declared Profile ID's key, every string
+//! past a bound, and the selector.
 //! The phases after profile selection observe their Findings through it.
 
 use crate::input_limits::Bound;
@@ -66,15 +66,48 @@ impl<'a> DeclarationObserver<'a> {
     /// Returns the resolver bug of a value the document lacks, or that has no
     /// Evidence.
     pub(crate) fn value(&self, path: &[&str]) -> Result<EvidenceProjection, ObserverInvariant> {
+        let node = self.node(path)?;
+        self.at(&self.edges(path, None), self.document.node(node).span())
+    }
+
+    /// The key of the member `name` of the object at the member path `path`
+    /// under the declaration, at the key's token, which is classified by facts
+    /// fixed when the record is constructed, never by a later check (D15:776,
+    /// 790).
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug of a key the document lacks, or that has no
+    /// Evidence.
+    pub(crate) fn member_key(
+        &self,
+        path: &[&str],
+        name: &str,
+    ) -> Result<EvidenceProjection, ObserverInvariant> {
+        let NodeKind::Object(members) = self.document.node(self.node(path)?).kind() else {
+            return Err(ObserverInvariant::Missing);
+        };
+        let member = members.get(name).ok_or(ObserverInvariant::Missing)?;
+        self.at(&self.edges(path, Some(name)), member.key_span())
+    }
+
+    /// The node at the member path `path` under the declaration.
+    fn node(&self, path: &[&str]) -> Result<NodeId, ObserverInvariant> {
         let mut node = self.declaration;
         for name in path {
             node = member(self.document, node, name).ok_or(ObserverInvariant::Missing)?;
         }
-        let edges: Vec<Edge<'_>> = [Edge::Member("profiles"), Edge::Member(self.id)]
+        Ok(node)
+    }
+
+    /// The internal path from the root of the member path `path` under the
+    /// declaration, and then of its member `name` when there is one.
+    fn edges<'e>(&'e self, path: &[&'e str], name: Option<&'e str>) -> Vec<Edge<'e>> {
+        [Edge::Member("profiles"), Edge::Member(self.id)]
             .into_iter()
             .chain(path.iter().map(|name| Edge::Member(name)))
-            .collect();
-        self.at(&edges, self.document.node(node).span())
+            .chain(name.map(Edge::Member))
+            .collect()
     }
 
     /// The root value, at its token (D15:790).
@@ -227,14 +260,14 @@ fn member(document: &MaterializedDocument, node: NodeId, name: &str) -> Option<N
     }
 }
 
+/// What the tests of the phases after profile selection observe the
+/// declaration `app` of a configuration through.
 #[cfg(test)]
-mod tests {
+pub(crate) mod fixtures {
     use std::sync::Arc;
 
-    use serde_json::{json, Value};
+    use serde_json::Value;
 
-    use crate::fixtures::{complete_config, minimal_config};
-    use crate::input_limits::Bound;
     use crate::materialize::{materialize_file, MaterializedDocument, NodeId};
     use crate::materialize_tests::limits;
     use crate::resolver::entry::fixtures::FileFixture;
@@ -242,9 +275,8 @@ mod tests {
     use crate::resolver::evidence_token::EvidenceTokens;
     use crate::resolver::limits::fixture_limits;
     use crate::resolver::token::{Sha256, Specification};
-    use crate::structural::selection::SelectorInput;
 
-    use super::{member, DeclarationObserver, ObserverInvariant};
+    use super::{member, DeclarationObserver};
 
     const PROFILE: Specification<'static> = Specification {
         identity: "intlify-project-profile",
@@ -253,19 +285,70 @@ mod tests {
 
     /// The view of `projection`, under the tokens of its own redacted
     /// components.
-    fn view(projection: &EvidenceProjection) -> Value {
+    pub(crate) fn view(projection: &EvidenceProjection) -> Value {
         let tokens = EvidenceTokens::assign(PROFILE, projection.redacted(), &Sha256);
         projection.retained(PROFILE, &tokens).unwrap().view()
     }
 
     /// `config` as a file holds it, and the document it materializes with
     /// the root's `profiles` object.
-    fn materialized(config: &Value) -> (Arc<[u8]>, MaterializedDocument, NodeId) {
+    pub(crate) fn materialized(config: &Value) -> (Arc<[u8]>, MaterializedDocument, NodeId) {
         let bytes: Arc<[u8]> = Arc::from(serde_json::to_vec(config).unwrap());
         let document = materialize_file(Arc::clone(&bytes), limits()).unwrap();
         let profiles = member(&document, document.root(), "profiles").unwrap();
         (bytes, document, profiles)
     }
+
+    /// A configuration as a test file holds it, admitted under bounds that
+    /// classify every identifier key of a test non-secret.
+    pub(crate) struct Observed {
+        bytes: Arc<[u8]>,
+        document: MaterializedDocument,
+        profiles: NodeId,
+        fixture: FileFixture,
+    }
+
+    impl Observed {
+        /// A configuration whose one declaration, `app`, is `declaration` as
+        /// a file writes it.
+        pub(crate) fn declaration(declaration: &impl serde::Serialize) -> Self {
+            Self::new(&serde_json::json!({ "profiles": { "app": declaration } }))
+        }
+
+        pub(crate) fn new(config: &Value) -> Self {
+            let (bytes, document, profiles) = materialized(config);
+            Self {
+                bytes,
+                document,
+                profiles,
+                fixture: FileFixture::new(&fixture_limits(10_000)),
+            }
+        }
+
+        /// What `observe` makes of the observer of the declaration `app`.
+        pub(crate) fn app<R>(&self, observe: impl FnOnce(&DeclarationObserver<'_>) -> R) -> R {
+            let file = self.fixture.file(Arc::clone(&self.bytes));
+            let observer =
+                DeclarationObserver::new(&file, (&self.document, self.profiles), "app").unwrap();
+            observe(&observer)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use serde_json::{json, Value};
+
+    use crate::fixtures::{complete_config, minimal_config};
+    use crate::input_limits::Bound;
+    use crate::resolver::entry::fixtures::FileFixture;
+    use crate::resolver::limits::fixture_limits;
+    use crate::structural::selection::SelectorInput;
+
+    use super::fixtures::{materialized, view};
+    use super::{DeclarationObserver, ObserverInvariant};
 
     /// The view of the span `value` occupies in `source`, at its first
     /// occurrence.
@@ -331,6 +414,53 @@ mod tests {
             );
         }
         assert_eq!(observer.key("web").err(), Some(ObserverInvariant::Missing));
+    }
+
+    /// A member's key under the declaration is observed at its token, at the
+    /// pointer of its member (D15:776, 790).
+    #[test]
+    fn a_key_under_the_declaration_is_observed_at_its_token() {
+        // Both names occur elsewhere in the file too: `server` as a group
+        // member, `requestedLocales` in a coverage rule.
+        let config = complete_config();
+        let (bytes, document, profiles) = materialized(&config);
+        let fixture = FileFixture::new(&fixture_limits(10_000));
+        let file = fixture.file(Arc::clone(&bytes));
+        let observer = DeclarationObserver::new(&file, (&document, profiles), "app").unwrap();
+        for (path, name, pointer) in [
+            (
+                &["targetProfiles"][..],
+                "server",
+                "/profiles/app/targetProfiles/server",
+            ),
+            (
+                &[][..],
+                "requestedLocales",
+                "/profiles/app/requestedLocales",
+            ),
+        ] {
+            let view = view(&observer.member_key(path, name).unwrap());
+            assert_eq!(view["kind"], "configuration-value", "{view}");
+            assert_eq!(view["value"], json!({ "exact-json-pointer": pointer }));
+            let start: usize = view["span"]["start"].as_str().unwrap().parse().unwrap();
+            let end: usize = view["span"]["end"].as_str().unwrap().parse().unwrap();
+            // The key's token, which a colon follows.
+            assert_eq!(
+                serde_json::from_slice::<String>(&bytes[start..end]).unwrap(),
+                name
+            );
+            assert_eq!(bytes[end], b':');
+        }
+        for (path, name) in [
+            (&["targetProfiles"][..], "absent"),
+            (&["requestedLocales"][..], "en"),
+            (&["absent"][..], "server"),
+        ] {
+            assert_eq!(
+                observer.member_key(path, name).err(),
+                Some(ObserverInvariant::Missing)
+            );
+        }
     }
 
     /// The selector is projected under the authority it is given, beside the

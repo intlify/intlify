@@ -176,6 +176,10 @@ pub(crate) fn resolution_operation(value: &Value) -> Prepared {
     let bound = |value| Bound::new(value).unwrap();
     Prepared::LocalePolicyResolution(Box::new(locale_resolution::PreparedLocales {
         analysis,
+        file: super::ConfigFile::new(
+            Arc::from(serde_json::to_vec(value).unwrap()),
+            &crate::resolver::limits::fixture_limits(10_000),
+        ),
         config,
         selected: serde_json::from_value(json!("app")).unwrap(),
         policy: crate::resolver::locales::fixture_policy(bound(128), bound(128), bound(64)),

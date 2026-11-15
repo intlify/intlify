@@ -987,6 +987,12 @@ impl Found {
         Self(vec![(blocking, Some(observation))])
     }
 
+    /// The candidate `blocking`, found through `observation` when there is
+    /// one: a check observes nothing without the input it looks in.
+    pub(crate) fn through(blocking: Blocking, observation: Option<Observation>) -> Self {
+        Self(vec![(blocking, observation)])
+    }
+
     /// These candidates and those of `other`.
     pub(crate) fn and(mut self, other: Self) -> Self {
         self.0.extend(other.0);
@@ -1393,9 +1399,12 @@ impl Evaluation {
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
+        // Phase 7's bounds; its spellings gain theirs later (plan 025 PRs
+        // 5f-4f).
+        let locale = unit.phase == Phase::LocaleResolution && unit.check == Check::WithinBound;
         assert_eq!(
             observed,
-            OBSERVED.contains(&unit.phase),
+            OBSERVED.contains(&unit.phase) || locale,
             "{unit:?} reports a blocking candidate {} what it observed, against its check",
             if observed { "with" } else { "without" }
         );
@@ -2204,22 +2213,36 @@ mod tests {
 
     #[test]
     fn past_a_bound_a_unit_records_its_exact_total_or_the_smallest_witness() {
+        // The occurrence bound's Findings carry occurrence Evidence and a
+        // spelling's do not yet. Any Evidence serves: the test reads only the
+        // payloads.
+        let observed = || {
+            Some(through(
+                crate::resolver::evidence_component::ComponentPath::data_root(),
+            ))
+        };
         let mut evaluation = Evaluation::default();
-        for (unit, actual) in [
-            (occurrences(), Actual::Exact(4)),
-            (spelled(), Actual::AtLeast(4)),
+        for (unit, actual, observation) in [
+            (occurrences(), Actual::Exact(4), observed()),
+            (spelled(), Actual::AtLeast(4), None),
         ] {
             let found = evaluation
-                .check(unit, Ok(()), |()| {
-                    Err::<(), _>(Blocking::limit(exceeded(actual)))
+                .check_found(unit, Ok(()), |()| {
+                    Err::<(), _>(Found::through(
+                        Blocking::limit(exceeded(actual)),
+                        observation,
+                    ))
                 })
                 .unwrap();
             assert!(found.is_err());
         }
         let mut evaluation = Evaluation::default();
         let found = evaluation
-            .check(occurrences(), Ok(()), |()| {
-                Err::<(), _>(Blocking::limit(exceeded(Actual::AtLeast(4))))
+            .check_found(occurrences(), Ok(()), |()| {
+                Err::<(), _>(Found::through(
+                    Blocking::limit(exceeded(Actual::AtLeast(4))),
+                    observed(),
+                ))
             })
             .unwrap();
         assert!(found.is_err());
@@ -3155,9 +3178,9 @@ mod tests {
     #[should_panic(expected = "with what it observed")]
     fn a_candidate_of_another_phase_with_an_observation_fails_the_test() {
         let data = through(crate::resolver::evidence_component::ComponentPath::data_root());
-        let _ = Evaluation::default().check_found(occurrences(), Ok(()), |()| {
+        let _ = Evaluation::default().check_found(spelled(), Ok(()), |()| {
             Err::<(), _>(Found::observed(
-                Blocking::limit(exceeded(Actual::Exact(4))),
+                Blocking::limit(exceeded(Actual::AtLeast(4))),
                 data,
             ))
         });

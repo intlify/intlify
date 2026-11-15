@@ -14,6 +14,7 @@ use crate::input_limits::{Bound, ValueLimits};
 use crate::structural::StructuralLimits;
 
 use super::bootstrap::AdmittedResourcePolicy;
+use super::evidence::EvidenceProjection;
 use super::resource_policy::Rechecked;
 
 /// The member of a Resource Limit Policy's content that carries the section.
@@ -852,24 +853,53 @@ impl ResolutionLimits {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ConfirmedPolicy {
     limits: ResolutionLimits,
+    /// The admitted policy as Evidence names it, which supplies every bound
+    /// checked under it (D15:2249).
+    evidence: EvidenceProjection,
 }
 
 impl ConfirmedPolicy {
-    /// The admitted policy, once every recheck under it held.
-    pub(crate) fn confirmed(policy: &AdmittedResourcePolicy, _: Rechecked) -> Self {
+    /// The admitted policy, which Evidence names `evidence`, once every
+    /// recheck under it held.
+    pub(crate) fn confirmed(
+        policy: &AdmittedResourcePolicy,
+        evidence: EvidenceProjection,
+        _: Rechecked,
+    ) -> Self {
         Self {
             limits: policy.limits().clone(),
+            evidence,
         }
     }
 
-    /// A policy a fixture owner states outright, as Phase 4 would confirm it.
+    /// A policy a fixture owner states outright, as Phase 4 would confirm it,
+    /// under the fixture owner's own exact reference.
     #[cfg(any(test, feature = "benchmark", feature = "dev-example"))]
-    pub(crate) const fn fixture_owned(limits: ResolutionLimits) -> Self {
-        Self { limits }
+    pub(crate) fn fixture_owned(limits: ResolutionLimits) -> Self {
+        use super::evidence_component::{ComponentPath, Key};
+        // 017's five members, as a declaration writes them: never a product's
+        // policy.
+        let reference = serde_json::json!({
+            "kind": "resource-limit-policy",
+            "identity": "fixture-resource-limits",
+            "revision": "0",
+            "specificationRevision": "0",
+            "semanticDigest": format!("sha256:{}", "0".repeat(64)),
+        });
+        let evidence = ComponentPath::artifact_member(Key::Identity(reference))
+            .map(EvidenceProjection::resolver_input)
+            .expect("the fixture reference has canonical bytes");
+        Self { limits, evidence }
     }
 
     pub(crate) const fn limits(&self) -> &ResolutionLimits {
         &self.limits
+    }
+
+    /// The admitted policy's Evidence, which a check past one of its bounds
+    /// relates (D15:2249).
+    pub(crate) const fn evidence(&self) -> &EvidenceProjection {
+        &self.evidence
     }
 }
 

@@ -12,6 +12,8 @@ use crate::locale::Canonicalizer;
 use crate::materialize::{materialize_file, MaterializationError};
 use crate::model::ProfileId;
 use crate::references::{PolicyReference, TargetProfileReference};
+use crate::resolver::declaration_observer::DeclarationObserver;
+use crate::resolver::entry::fixtures::FileFixture;
 use crate::resolver::evaluation::Evaluation;
 use crate::resolver::limits::ConfirmedPolicy;
 use crate::resolver::locales::{
@@ -121,7 +123,7 @@ impl FixtureRunner {
 
     pub(super) fn run(&self, source: Arc<[u8]>, selector: Option<&str>) -> Run {
         let mut steps = vec![Step::Materialize];
-        let doc = match materialize_file(source, self.limits.input) {
+        let doc = match materialize_file(Arc::clone(&source), self.limits.input) {
             Ok(doc) => doc,
             Err(error) => {
                 return Run {
@@ -179,12 +181,22 @@ impl FixtureRunner {
             .profiles()
             .get(selected.id())
             .expect("exact selected declaration must exist in this complete root");
+        // Phase 7 observes what it finds in the file, admitted as entry
+        // admission would.
+        let fixture = FileFixture::new(self.policy.limits());
+        let file = fixture.file(source);
+        let observer = analysis
+            .profiles_value()
+            .map(|profiles| DeclarationObserver::new(&file, profiles, selected.id().as_str()))
+            .transpose()
+            .expect("the selected declaration is in the document");
         let mut evaluation = Evaluation::default();
         let result = resolve_locales(
             &mut evaluation,
             Ok(&self.policy),
             Ok(&self.provider),
             &LocaleFields::declared(declaration),
+            observer.as_ref(),
         );
         Run {
             steps,

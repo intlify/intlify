@@ -456,7 +456,7 @@ fn actual(violation: &LimitViolation) -> Actual {
     }
 }
 
-#[cfg(any(test, feature = "benchmark"))]
+#[cfg(any(test, feature = "benchmark", feature = "dev-example"))]
 pub(crate) mod fixtures {
     use std::sync::Arc;
 

@@ -11,8 +11,12 @@ use serde::{Deserialize, Serialize};
 use crate::construction::identity::ConstructionIdentity;
 use crate::input_limits::InputLimits;
 use crate::materialize::{materialize_file, MaterializationError, MaterializedDocument};
-use crate::model::IntlifyConfig;
+use crate::model::{IntlifyConfig, ProfileId};
 use crate::references::{PolicyReference, TargetProfileReference};
+use crate::resolver::declaration_observer::DeclarationObserver;
+use crate::resolver::entry::fixtures::FileFixture;
+use crate::resolver::entry::EntryFile;
+use crate::resolver::limits::ResolutionLimits;
 use crate::structural::selection::{
     InvalidSelectorType, Selection, SelectionFailure, SelectionInvariant, SelectionPrerequisite,
     SelectorInput,
@@ -36,6 +40,42 @@ use super::{
 pub(super) type Config = IntlifyConfig<PolicyReference, TargetProfileReference>;
 pub(super) type Analysis = StructuralAnalysis<PolicyReference, TargetProfileReference>;
 pub(super) type Schema = AuthoringSchema<PolicyReference, TargetProfileReference>;
+
+/// A case's configuration file, which the phases after profile selection
+/// observe the selected declaration in (D15:790), admitted as entry admission
+/// would under the fixture owner's source identity.
+pub(super) struct ConfigFile {
+    source: Arc<[u8]>,
+    fixture: FileFixture,
+}
+
+impl ConfigFile {
+    /// The file of `source`, the bytes the case's analysis materialized,
+    /// whose keys are classified under the capability bounds `comparable`.
+    pub(super) fn new(source: Arc<[u8]>, comparable: &ResolutionLimits) -> Self {
+        Self {
+            source,
+            fixture: FileFixture::new(comparable),
+        }
+    }
+
+    pub(super) fn file(&self) -> EntryFile<'_> {
+        self.fixture.file(Arc::clone(&self.source))
+    }
+}
+
+/// Where a check after profile selection observes the declaration `selected`
+/// of `analysis`: in `file`, as profile selection hands it on (D15:790), built
+/// before the interval. None when the configuration does not hold the
+/// declaration.
+pub(super) fn observer<'a>(
+    analysis: &'a Analysis,
+    file: &'a EntryFile<'a>,
+    selected: &'a ProfileId,
+) -> Option<DeclarationObserver<'a>> {
+    let profiles = analysis.profiles_value()?;
+    DeclarationObserver::new(file, profiles, selected.as_str()).ok()
+}
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
@@ -314,11 +354,19 @@ impl Prepared {
             }
             Self::LocalePolicyResolution(prepared) => {
                 let fields = prepared.fields().ok_or_else(I::unavailable)?;
+                let file = prepared.file.file();
+                let observer = observer(&prepared.analysis, &file, &prepared.selected)
+                    .ok_or_else(I::unavailable)?;
                 let measured = match &prepared.canonicalizer {
                     Canonicalizers::Finite(core) => instrument.interval(
-                        (&prepared.policy, &prepared.inputs, core.as_ref(), &fields),
-                        |(policy, inputs, canonicalizer, fields)| {
-                            locale_resolution::resolve(policy, inputs, canonicalizer, fields)
+                        (
+                            &prepared.policy,
+                            &prepared.inputs,
+                            core.as_ref(),
+                            (&fields, &observer),
+                        ),
+                        |(policy, inputs, canonicalizer, declared)| {
+                            locale_resolution::resolve(policy, inputs, canonicalizer, declared)
                         },
                     )?,
                     // A fresh engine is admitted and bound before the start
@@ -326,13 +374,18 @@ impl Prepared {
                     Canonicalizers::Icu4x(engine) => engine
                         .with_engine(|core| {
                             instrument.interval(
-                                (&prepared.policy, &prepared.inputs, core, &fields),
-                                |(policy, inputs, canonicalizer, fields)| {
+                                (
+                                    &prepared.policy,
+                                    &prepared.inputs,
+                                    core,
+                                    (&fields, &observer),
+                                ),
+                                |(policy, inputs, canonicalizer, declared)| {
                                     locale_resolution::resolve(
                                         policy,
                                         inputs,
                                         canonicalizer,
-                                        fields,
+                                        declared,
                                     )
                                 },
                             )
@@ -463,7 +516,11 @@ impl Prepared {
     pub(super) fn prerequisites_admitted(&self) -> bool {
         match self {
             Self::Authoring(analysis) => analysis.is_complete(),
-            Self::LocalePolicyResolution(prepared) => prepared.fields().is_some(),
+            Self::LocalePolicyResolution(prepared) => {
+                let file = prepared.file.file();
+                prepared.fields().is_some()
+                    && observer(&prepared.analysis, &file, &prepared.selected).is_some()
+            }
             Self::ResourcePolicy(prepared) => {
                 prepared.inputs().is_some() && prepared.observer(&prepared.file()).is_some()
             }

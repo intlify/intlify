@@ -268,6 +268,7 @@ mod tests {
             Ok(&self::policy(100)),
             Ok(&canonicalizer(64)),
             fields,
+            None,
         )
         .unwrap();
         let profile =

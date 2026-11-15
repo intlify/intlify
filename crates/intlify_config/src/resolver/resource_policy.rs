@@ -527,14 +527,22 @@ pub(crate) fn admit_resource_policy(
         declared,
         verification,
     )?;
+    // The admitted policy supplies every recheck's bound, and every bound a
+    // later phase checks under it (D15:2249).
+    let compatible = match compatible {
+        Ok(policy) => {
+            let evidence = admitted(policy.tuple())?;
+            Ok((policy, evidence))
+        }
+        Err(causes) => Err(causes),
+    };
     // An admitted, compatible policy is the projection authority whatever its
     // rechecks find; without one, the capability stays the authority.
     let authority = compatible
         .as_ref()
-        .map_or(
-            capability.policy_comparable(),
-            AdmittedResourcePolicy::limits,
-        )
+        .map_or(capability.policy_comparable(), |(policy, _)| {
+            policy.limits()
+        })
         .configuration_input
         .structural
         .max_profile_id_bytes;
@@ -542,22 +550,17 @@ pub(crate) fn admit_resource_policy(
         .selector
         .length_fact(authority)
         .map_err(PolicyInvariant::Selection)?;
-    let limits = compatible.as_ref().map(AdmittedResourcePolicy::limits);
-    // The admitted policy supplies every recheck's bound (D15:2249).
-    let policy = compatible
-        .as_ref()
-        .ok()
-        .map(|policy| admitted(policy.tuple()))
-        .transpose()?;
+    let limits = compatible.as_ref().map(|(policy, _)| policy.limits());
+    let policy = compatible.as_ref().ok().map(|(_, evidence)| evidence);
     let configured = configuration_bounds(
         evaluation,
         limits.map(|limits| &limits.configuration_input),
         (measures, selector_length),
-        (policy.as_ref(), declared.1),
+        (policy, declared.1),
     )?;
     let inspected = artifact_bounds(
         evaluation,
-        Stage::Policy(policy.as_ref()),
+        Stage::Policy(policy),
         limits.map(|limits| &limits.artifact_admission),
         &submitted,
         resource_limits,
@@ -566,8 +569,9 @@ pub(crate) fn admit_resource_policy(
     let rechecked = and(configured, inspected.every);
     Ok(PolicyOutcome {
         selector_length,
-        confirmed: both(compatible, rechecked)
-            .map(|(policy, ())| ConfirmedPolicy::confirmed(&policy, Rechecked(()))),
+        confirmed: both(compatible, rechecked).map(|((policy, evidence), ())| {
+            ConfirmedPolicy::confirmed(&policy, evidence, Rechecked(()))
+        }),
     })
 }
 

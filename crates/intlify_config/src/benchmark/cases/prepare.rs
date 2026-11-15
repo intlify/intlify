@@ -23,7 +23,9 @@ use crate::structural::StructuralLimits;
 
 use super::super::locale_icu4x::PreparedEngine;
 use super::super::observation::Observation;
-use super::super::operation::{Analysis, Config, Operation, Output, Prepared, Schema};
+use super::super::operation::{
+    observer, Analysis, Config, ConfigFile, Operation, Output, Prepared, Schema,
+};
 use super::super::work::LogicalWork;
 use super::policy_inputs::capacity;
 use super::{
@@ -557,7 +559,8 @@ fn prepare_resolution(declaration: &Declaration) -> Result<Candidate, Preparatio
         _ => return Err(PreparationFailure::UndeclaredCase),
     };
     let (input_limits, structural_limits) = fixture_capacity();
-    let doc = materialize_file(declaration.fixture.source(), input_limits)
+    let source = declaration.fixture.source();
+    let doc = materialize_file(Arc::clone(&source), input_limits)
         .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?;
     let analysis = configuration_schema()
         .analyze(Arc::new(doc), structural_limits)
@@ -629,6 +632,7 @@ fn prepare_resolution(declaration: &Declaration) -> Result<Candidate, Preparatio
     };
     let prepared = PreparedLocales {
         analysis,
+        file: ConfigFile::new(source, &capacity()),
         config,
         selected: selected.id().clone(),
         policy,
@@ -638,13 +642,17 @@ fn prepare_resolution(declaration: &Declaration) -> Result<Candidate, Preparatio
     let fields = prepared
         .fields()
         .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
+    let file = prepared.file.file();
+    let observer = observer(&prepared.analysis, &file, &prepared.selected)
+        .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
+    let declared = (&fields, &observer);
     // The reference output comes from the engine the case measures.
     let resolved = match &prepared.canonicalizer {
         Canonicalizers::Finite(core) => {
-            resolve(&prepared.policy, &prepared.inputs, core.as_ref(), &fields)
+            resolve(&prepared.policy, &prepared.inputs, core.as_ref(), declared)
         }
         Canonicalizers::Icu4x(engine) => engine
-            .with_engine(|core| resolve(&prepared.policy, &prepared.inputs, core, &fields))
+            .with_engine(|core| resolve(&prepared.policy, &prepared.inputs, core, declared))
             .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?,
     };
     let kind = match &resolved.result {
@@ -841,12 +849,14 @@ fn prepare_bindings(declaration: &Declaration) -> Result<Candidate, PreparationF
     let fixture = recipe.fixture();
     let SelectedConfig {
         analysis,
+        source,
         config,
         selected,
         ..
     } = select_config(&fixture.config, declaration.selector)?;
     let prepared = PreparedBindings {
         analysis,
+        file: ConfigFile::new(source, &capacity()),
         config,
         selected,
         policy,
@@ -942,12 +952,14 @@ fn prepare_targets(declaration: &Declaration) -> Result<Candidate, PreparationFa
     let fixture = recipe.fixture();
     let SelectedConfig {
         analysis,
+        source,
         config,
         selected,
         ..
     } = select_config(&fixture.config, declaration.selector)?;
     let prepared = PreparedTargets {
         analysis,
+        file: ConfigFile::new(source, &capacity()),
         config,
         selected,
         policy,
@@ -1053,12 +1065,14 @@ fn prepare_hydration(declaration: &Declaration) -> Result<Candidate, Preparation
     let fixture = recipe.fixture();
     let SelectedConfig {
         analysis,
+        source,
         config,
         selected,
         ..
     } = select_config(&fixture.config, declaration.selector)?;
     let prepared = PreparedHydration {
         analysis,
+        file: ConfigFile::new(source, &capacity()),
         config,
         selected,
         policy,

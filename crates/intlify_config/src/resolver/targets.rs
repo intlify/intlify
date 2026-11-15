@@ -306,6 +306,7 @@ mod tests {
     use crate::profile_fixtures::minimal_config;
     use crate::references::{PolicyReference, TargetProfileReference};
     use crate::resolver::artifact_resolution::admit_collection;
+    use crate::resolver::declaration_observer::fixtures::Observed;
     use crate::resolver::evaluation::{Actual, IssueKey, LimitExceeded, Status};
     use crate::resolver::exact_resolution::{self, resolve_fields};
     use crate::resolver::limits::{
@@ -446,8 +447,17 @@ mod tests {
             let mut fields = LocaleFields::declared(&declaration);
             fields.target_profiles = declared.clone();
             let mut evaluation = Evaluation::default();
-            let locales =
-                resolve_locales(&mut evaluation, policy, Ok(&canonicalizer(64)), &fields).unwrap();
+            let locales = Observed::declaration(&self.app)
+                .app(|observer| {
+                    resolve_locales(
+                        &mut evaluation,
+                        policy,
+                        Ok(&canonicalizer(64)),
+                        &fields,
+                        Some(observer),
+                    )
+                })
+                .unwrap();
             let texts: Vec<String> = self.members.iter().map(Value::to_string).collect();
             let bytes: Vec<&[u8]> = texts.iter().map(String::as_bytes).collect();
             let collection = read_collection(Some(&bytes), &ROOM).unwrap();

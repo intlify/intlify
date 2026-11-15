@@ -505,14 +505,6 @@ mod tests {
         }
     }
 
-    /// Records `unit` as finding the blocking result `found`.
-    fn blocked(evaluation: &mut Evaluation, unit: Unit, found: Blocking) {
-        evaluation
-            .check(unit, Ok(()), |()| Err::<(), _>(found))
-            .unwrap()
-            .unwrap_err();
-    }
-
     /// Records `unit` as finding `code` with `reason`, observed at a slot's
     /// Specification Input component or at the vocabulary's root when it is
     /// one of their checks, as Phase 5 observes them, and returns what waits
@@ -830,7 +822,7 @@ mod tests {
             Some(Reason::MissingRequiredSlot),
         )
         .unwrap_err();
-        blocked(
+        blocked_observed(
             &mut evaluation,
             requested_set(),
             Blocking::limit(LimitExceeded {

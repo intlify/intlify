@@ -26,6 +26,7 @@ use crate::model::{
     TargetDeclaration, TargetId,
 };
 
+use super::declaration_observer::{DeclarationObserver, ObserverInvariant};
 use super::evaluation::{
     both, Actual, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Phase,
     Subject, Unit,
@@ -285,6 +286,8 @@ pub(crate) enum LocaleInvariant {
     /// The provider failed in a way 015 never reports to an author: an
     /// adapter or resolver defect, not an invalid locale.
     Canonicalization(CanonicalizationFailure),
+    /// What a check looked at in the declaration has no Evidence.
+    Observer(ObserverInvariant),
 }
 
 impl From<EvaluationInvariant> for LocaleInvariant {
@@ -293,7 +296,15 @@ impl From<EvaluationInvariant> for LocaleInvariant {
     }
 }
 
-/// Phase 7 under the confirmed policy and the canonicalizer Phase 5 bound.
+impl From<ObserverInvariant> for LocaleInvariant {
+    fn from(invariant: ObserverInvariant) -> Self {
+        Self::Observer(invariant)
+    }
+}
+
+/// Phase 7 under the confirmed policy and the canonicalizer Phase 5 bound,
+/// over the selected declaration's `fields`, which a check past a bound
+/// observes through `observer` when the declaration's file is there.
 /// Every spelling is counted first; none is canonicalized unless the count is
 /// proved within `maxLocaleOccurrences`, so an over-bound declaration never has
 /// a valid prefix resolved.
@@ -302,8 +313,9 @@ pub(crate) fn resolve_locales<P: Provider, Target>(
     policy: Result<&ConfirmedPolicy, &Causes>,
     canonicalizer: Result<&Canonicalizer<P>, &Causes>,
     fields: &LocaleFields<'_, Target>,
+    observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<ResolvedLocales, LocaleInvariant> {
-    let (occurrence_total, bounded) = bound::occurrences(evaluation, policy, fields)?;
+    let (occurrence_total, bounded) = bound::occurrences(evaluation, policy, fields, observer)?;
     let mut pass = Pass::new(
         evaluation,
         both(canonicalizer.map_err(Causes::clone), bounded.clone())
@@ -313,7 +325,7 @@ pub(crate) fn resolve_locales<P: Provider, Target>(
         requested_set,
         requested_default,
         project,
-    } = project(&mut pass, policy, fields)?;
+    } = project(&mut pass, policy, fields, observer)?;
     let negotiation_aliases = match fields.locale_negotiation {
         Ok(negotiation) => Ok(pass.aliases(negotiation.and_then(|n| n.aliases.as_option()))?),
         Err(ref causes) => Err(causes.clone()),
@@ -324,7 +336,7 @@ pub(crate) fn resolve_locales<P: Provider, Target>(
     };
     let (target_bound, targets) = match fields.target_profiles {
         Ok(targets) => {
-            let bounds = bound::targets(pass.evaluation, policy, targets)?;
+            let bounds = bound::targets(pass.evaluation, policy, targets, observer)?;
             (bounds.map, Ok(pass.targets(targets, &bounds.targets)?))
         }
         Err(ref causes) => (Err(causes.clone()), Err(causes.clone())),
@@ -358,6 +370,7 @@ fn project<P: Provider, Target>(
     pass: &mut Pass<'_, '_, P>,
     policy: Result<&ConfirmedPolicy, &Causes>,
     fields: &LocaleFields<'_, Target>,
+    observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<ProjectResolution, LocaleInvariant> {
     let requested = match fields.requested_locales {
         Ok(requested) => Ok(pass.spell(
@@ -380,7 +393,7 @@ fn project<P: Provider, Target>(
         Err(causes) => Err(causes.clone()),
     };
     let requested_set = requested.and_then(|spelled| set(&spelled));
-    let size = bound::requested(pass.evaluation, policy, &requested_set)?;
+    let size = bound::requested(pass.evaluation, policy, &requested_set, observer)?;
     let default = match fields.default_requested_locale {
         Ok(raw) => Ok(pass.spell_one(
             Location::DefaultRequestedLocale,
@@ -682,24 +695,30 @@ mod tests {
     use super::*;
     use crate::fixtures::{complete_config, minimal_config};
     use crate::input_limits::Bound;
+    use crate::resolver::declaration_observer::fixtures::Observed;
     use crate::resolver::evaluation::{LimitExceeded, Status};
     use crate::resolver::limits::{BoundId, Group};
     use crate::resolver::specification::Slot;
 
     /// Phase 7 over `declaration` under the identifier, occurrence, and
-    /// requested-locale bounds given.
+    /// requested-locale bounds given, observed in the declaration as a file
+    /// writes it.
     fn resolve_under(
         declaration: &Declaration,
         (bytes, occurrences, requested): (u64, u64, u64),
     ) -> (Evaluation, ResolvedLocales) {
         let mut evaluation = Evaluation::default();
-        let resolved = resolve_locales(
-            &mut evaluation,
-            Ok(&policy(bytes, occurrences, requested)),
-            Ok(&canonicalizer(bytes)),
-            &LocaleFields::declared(declaration),
-        )
-        .unwrap();
+        let resolved = Observed::declaration(declaration)
+            .app(|observer| {
+                resolve_locales(
+                    &mut evaluation,
+                    Ok(&policy(bytes, occurrences, requested)),
+                    Ok(&canonicalizer(bytes)),
+                    &LocaleFields::declared(declaration),
+                    Some(observer),
+                )
+            })
+            .unwrap();
         (evaluation, resolved)
     }
 
@@ -1208,6 +1227,7 @@ mod tests {
             Ok(&policy(64, 100, 100)),
             Ok(&canonicalizer(64)),
             &fields,
+            None,
         )
         .unwrap();
         let every = requested
@@ -1260,7 +1280,7 @@ mod tests {
             ),
         ] {
             let mut evaluation = Evaluation::default();
-            let resolved = resolve_locales(&mut evaluation, policy, data, &fields).unwrap();
+            let resolved = resolve_locales(&mut evaluation, policy, data, &fields, None).unwrap();
             let spelled = unit(
                 LocaleSubject::RequestedLocale(content("en")),
                 Check::CanonicalLocale,
@@ -1376,9 +1396,23 @@ mod tests {
         let canonicalizer = canonicalizer(64);
         let policy = policy(64, 100, 100);
         let mut evaluation = Evaluation::default();
-        resolve_locales(&mut evaluation, Ok(&policy), Ok(&canonicalizer), &fields).unwrap();
+        resolve_locales(
+            &mut evaluation,
+            Ok(&policy),
+            Ok(&canonicalizer),
+            &fields,
+            None,
+        )
+        .unwrap();
         assert_eq!(
-            resolve_locales(&mut evaluation, Ok(&policy), Ok(&canonicalizer), &fields).err(),
+            resolve_locales(
+                &mut evaluation,
+                Ok(&policy),
+                Ok(&canonicalizer),
+                &fields,
+                None
+            )
+            .err(),
             Some(LocaleInvariant::Evaluation(
                 EvaluationInvariant::UnitRecordedTwice(occurrence_unit())
             ))

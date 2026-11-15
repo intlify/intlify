@@ -242,6 +242,7 @@ mod tests {
     use crate::input_limits::Bound;
     use crate::model::{NonEmptyMap, Policies, TargetDeclaration};
     use crate::resolver::artifact_resolution::admit_collection;
+    use crate::resolver::declaration_observer::fixtures::Observed;
     use crate::resolver::evaluation::{IssueKey, Reason, Status};
     use crate::resolver::limits::{fixture_limits, ConfirmedPolicy, ResolutionLimits};
     use crate::resolver::locales::fixtures::{canonicalizer, stand_in, units};
@@ -425,13 +426,17 @@ mod tests {
                 coverage: Err(behind),
                 target_profiles: declared.clone(),
             };
-            let locales = resolve_locales(
-                &mut Evaluation::default(),
-                Ok(&confirmed),
-                Ok(&canonicalizer(64)),
-                &fields,
-            )
-            .unwrap();
+            let locales = Observed::declaration(&json!({ "targetProfiles": &targets }))
+                .app(|observer| {
+                    resolve_locales(
+                        &mut Evaluation::default(),
+                        Ok(&confirmed),
+                        Ok(&canonicalizer(64)),
+                        &fields,
+                        Some(observer),
+                    )
+                })
+                .unwrap();
             let mut evaluation = Evaluation::default();
             let set = admit_collection(&mut evaluation, Ok(&confirmed), &collection).unwrap();
             let references = DeclarationReferences {

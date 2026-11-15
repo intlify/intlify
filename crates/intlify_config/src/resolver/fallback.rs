@@ -445,6 +445,7 @@ mod tests {
     use super::*;
     use crate::fixtures::{minimal_config, FixtureTargetReference};
     use crate::input_limits::Bound;
+    use crate::resolver::declaration_observer::fixtures::Observed;
     use crate::resolver::evaluation::{Actual, LimitExceeded, Status};
     use crate::resolver::locales::fixtures::{
         canonical, canonicalizer, content, declaration, key, limits, notices, rejected, stand_in,
@@ -520,6 +521,7 @@ mod tests {
             Ok(&self::policy(100, 100)),
             Ok(&canonicalizer),
             fields,
+            None,
         )
         .unwrap();
         if let Some(uncounted) = spelling.uncounted {
@@ -1092,15 +1094,19 @@ mod tests {
         let confirmed = policy(100, 100);
         let unbound = stand_in(Slot::LocaleCanonicalization);
         // Phase 7's occurrence bound, exceeded in another run.
-        let uncounted = resolve_locales(
-            &mut Evaluation::default(),
-            Ok(&locales::fixtures::policy(64, 1, 100)),
-            Ok(&canonicalizer(64)),
-            &fields,
-        )
-        .unwrap()
-        .occurrence_bound
-        .unwrap_err();
+        let uncounted = Observed::declaration(&declaration)
+            .app(|observer| {
+                resolve_locales(
+                    &mut Evaluation::default(),
+                    Ok(&locales::fixtures::policy(64, 1, 100)),
+                    Ok(&canonicalizer(64)),
+                    &fields,
+                    Some(observer),
+                )
+            })
+            .unwrap()
+            .occurrence_bound
+            .unwrap_err();
         for (spelling, causes) in [
             (
                 Spelling {
