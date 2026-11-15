@@ -15,12 +15,13 @@
 //! group's owner is a unit of Phase 2, which [`super::structural_admission`]
 //! records.
 //!
-//! Phase 3 records its units with its Findings later (plan 025 PR 5f-3), and
-//! the semantic phases start from the declaration Phase 3 provisionally
+//! The semantic phases start from the declaration Phase 3 provisionally
 //! selected once structural admission admitted it whole, whatever else of the
-//! root it rejected (D15:2367, 3434); they read its fields field by field
-//! later (plan 025 PRs 5f-4, 5f-5). Profile projection waits on the whole
-//! root (D15:2142). What the entry
+//! root it rejected (D15:2367, 3434), and read each of its fields on its own
+//! ([`super::declaration_fields`]), so that once Phase 3 selects a
+//! declaration admitted in part, a field structural admission did not admit
+//! suppresses only what reads it (plan 025 PRs 5f-4, 5f-5). Profile
+//! projection waits on the whole root (D15:2142). What the entry
 //! returns is crate-private semantic state, not a `LocalizationProjectProfile`,
 //! a checked or blocked outcome, or Resolution Evidence. The profile
 //! projection is 015's Implementation Phase 5.
@@ -40,6 +41,7 @@ use crate::structural::StructuralAnalysis;
 
 use super::artifact_resolution::{admit_collection, ArtifactSet};
 use super::coverage::{resolve_coverage, CoveragePolicy};
+use super::declaration_fields::DeclarationFields;
 use super::delivery::{resolve_delivery, DeliveryPolicy};
 use super::dependency::{own, SemanticGroup, OPTIONAL_POLICIES, REQUIRED_POLICIES};
 use super::entry::EntryInvariant;
@@ -49,7 +51,7 @@ use super::fallback::{resolve_fallback, MessageFallbackPolicy};
 use super::groups::{resolve_groups, ResolvedGroups};
 use super::hydration::{validate_hydration, ResolvedHydration};
 use super::identity::{resolve_project_identity, ProjectIdentity};
-use super::locales::{resolve_locales, LocaleFields, LocaleInvariant, ResolvedLocales};
+use super::locales::{resolve_locales, LocaleInvariant, ResolvedLocales};
 use super::negotiation::{resolve_negotiation, NegotiationProfile};
 use super::profile_selection::ProfileSelectionInvariant;
 use super::resource_policy::{
@@ -68,14 +70,14 @@ type Config = IntlifyConfig<PolicyReference, TargetProfileReference>;
 type Declaration = ProfileDeclaration<PolicyReference, TargetProfileReference>;
 
 /// One invocation's configuration past Phases 1 to 3, as the semantic phases
-/// read it: the declaration Phase 3 provisionally selected once structural
-/// admission admitted it whole, whatever else of the root it rejected
-/// (D15:2367, 3434), the `resourceLimits` reference it selected with, the
-/// selector, what Phase 4 rechecks of those phases' measures, and whether
-/// structural admission admitted the whole root, which profile projection
-/// needs (D15:2142).
+/// read it: the fields of the declaration Phase 3 provisionally selected once
+/// structural admission admitted it whole, whatever else of the root it
+/// rejected (D15:2367, 3434), each read on its own, the `resourceLimits`
+/// reference it selected with, the selector, what Phase 4 rechecks of those
+/// phases' measures, and whether structural admission admitted the whole
+/// root, which profile projection needs (D15:2142).
 pub(crate) struct SelectedConfiguration<'a> {
-    declaration: Declaration,
+    fields: DeclarationFields<PolicyReference, TargetProfileReference>,
     resource_limits: &'a PolicyReference,
     selector: &'a SelectorInput,
     value: ValueCounts,
@@ -90,14 +92,16 @@ pub(crate) struct SelectedConfiguration<'a> {
 
 impl<'a> SelectedConfiguration<'a> {
     /// The configuration of `analysis` once Phase 3 provisionally selected
-    /// one of its declarations, `selection`, with `selector`. `whole` is
-    /// whether structural admission admitted the whole root.
+    /// one of its declarations, `selection`, with `selector`, each field as
+    /// `evaluation` recorded structural admission's checks under it. `whole`
+    /// is whether structural admission admitted the whole root.
     ///
     /// # Errors
     ///
-    /// Returns the resolver bug of checks that admit a declaration the
-    /// analysis does not.
+    /// Returns the resolver bug of checks that admit a field the analysis
+    /// does not.
     pub(crate) fn new(
+        evaluation: &Evaluation,
         analysis: &Analysis,
         (selector, selection): (&'a SelectorInput, &'a ProvisionalSelection<PolicyReference>),
         whole: Admitted<()>,
@@ -105,16 +109,14 @@ impl<'a> SelectedConfiguration<'a> {
         let unreported = || ResolverInvariant::Structural(StructuralInvariant::UnreportedFailure);
         let admission =
             |invariant| ResolverInvariant::Structural(StructuralInvariant::Admission(invariant));
-        let declaration = analysis
-            .profile(selection.id().as_str())
-            .map_err(admission)?
-            .ok_or_else(unreported)?;
+        let fields = DeclarationFields::read(evaluation, analysis, selection.id().as_str())
+            .map_err(ResolverInvariant::Structural)?;
         let (declarations, profile_ids) = analysis
             .declarations()
             .map_err(admission)?
             .ok_or_else(unreported)?;
         Ok(Self {
-            declaration,
+            fields,
             resource_limits: selection.resource_limits(),
             selector,
             value: analysis.value_counts(),
@@ -126,10 +128,7 @@ impl<'a> SelectedConfiguration<'a> {
     }
 
     fn references(&self) -> DeclarationReferences<'_> {
-        DeclarationReferences {
-            policies: Ok(&self.declaration.policies),
-            target_profiles: Ok(&self.declaration.target_profiles),
-        }
+        self.fields.references()
     }
 
     fn measures(&self) -> ConfigurationMeasures<'_> {
@@ -290,7 +289,7 @@ where
     P::Identity: AsRef<str>,
     D: FormalData<Provider = P>,
 {
-    let declaration = &configuration.declaration;
+    let fields = &configuration.fields;
     let declared = configuration.references();
     let policy = admit_resource_policy(
         evaluation,
@@ -323,16 +322,16 @@ where
     let identity = resolve_project_identity(
         evaluation,
         confirmed,
-        Ok(declaration.project_id.clone()),
-        Ok(declaration.selection_scope.clone()),
+        fields.project_id(),
+        fields.selection_scope(),
     )?;
     own(
         evaluation,
         SemanticGroup::ProjectIdentity,
         held(identity.as_ref()),
     )?;
-    let fields = LocaleFields::declared(declaration);
-    let locales = resolve_locales(evaluation, confirmed, canonicalizer, &fields)?;
+    let locale_fields = fields.locale_fields();
+    let locales = resolve_locales(evaluation, confirmed, canonicalizer, &locale_fields)?;
     own(
         evaluation,
         SemanticGroup::ProjectLocales,
@@ -355,7 +354,7 @@ where
         &admitted.message_locale_fallback,
         canonicalizer,
         &locales,
-        fields.message_fallback.clone(),
+        locale_fields.message_fallback.clone(),
     )?;
     own(
         evaluation,
@@ -369,7 +368,7 @@ where
         admitted.vocabulary.as_ref(),
         canonicalizer,
         &locales,
-        fields.coverage.clone(),
+        locale_fields.coverage.clone(),
     )?;
     own(evaluation, SemanticGroup::Coverage, held(coverage.as_ref()))?;
     let set = &*set.insert(admit_collection(
@@ -407,15 +406,10 @@ where
         evaluation,
         &admitted.delivery_graph,
         &admitted.delivery_placement,
-        Ok(declaration.delivery.as_option()),
+        fields.delivery(),
     )?;
     own(evaluation, SemanticGroup::Delivery, held(delivery.as_ref()))?;
-    let targets = resolve_targets(
-        evaluation,
-        Ok(&declaration.target_profiles),
-        &locales,
-        &results,
-    )?;
+    let targets = resolve_targets(evaluation, fields.target_profiles(), &locales, &results)?;
     own(
         evaluation,
         SemanticGroup::Targets,
@@ -426,14 +420,14 @@ where
     let groups = resolve_groups(
         evaluation,
         confirmed,
-        Ok(&declaration.deployment_groups),
+        fields.deployment_groups(),
         targets.as_ref(),
     )?;
     // Every relation shares the negotiation profile; none compares it.
     let hydration = validate_hydration(
         evaluation,
         confirmed,
-        Ok(&declaration.deployment_groups),
+        fields.deployment_groups(),
         targets.as_ref(),
         groups.as_ref(),
         negotiation.as_ref().map(|_| ()).map_err(Causes::clone),
@@ -926,8 +920,13 @@ pub(super) mod tests {
             let Ok(Selection::Selected(selection)) = analysis.select(&selector) else {
                 panic!("{} is not selected", self.selected);
             };
-            let configuration =
-                SelectedConfiguration::new(&analysis, (&selector, &selection), Ok(())).unwrap();
+            let configuration = SelectedConfiguration::new(
+                &Evaluation::default(),
+                &analysis,
+                (&selector, &selection),
+                Ok(()),
+            )
+            .unwrap();
             self.invoked(|invocation| run(&configuration, invocation))
         }
 
@@ -1132,8 +1131,12 @@ pub(super) mod tests {
         let (Ok(analysis), Ok(selection)) = (structure, selection) else {
             return Ok(None);
         };
-        let configuration =
-            SelectedConfiguration::new(&analysis, (selector, &selection), whole(evaluation))?;
+        let configuration = SelectedConfiguration::new(
+            evaluation,
+            &analysis,
+            (selector, &selection),
+            whole(evaluation),
+        )?;
         resolve_profile(
             evaluation,
             &project_profile,
@@ -2473,8 +2476,14 @@ pub(super) mod tests {
         let Ok(Selection::Selected(selection)) = analysis.select(&selector) else {
             panic!("web is not selected");
         };
-        let configuration =
-            |analysis| SelectedConfiguration::new(analysis, (&selector, &selection), Ok(()));
+        let configuration = |analysis| {
+            SelectedConfiguration::new(
+                &Evaluation::default(),
+                analysis,
+                (&selector, &selection),
+                Ok(()),
+            )
+        };
         assert!(configuration(&analysis).is_ok());
         let mut partial = complete.config.clone();
         partial["profiles"]["web"]["projectId"] = json!("Store Front");
