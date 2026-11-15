@@ -1399,14 +1399,17 @@ impl Evaluation {
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
-        // Phase 7's bounds and requested locales; its other spellings gain
-        // theirs later (plan 025 PRs 5f-4f).
+        // Phase 7's checks but those of the alias and fallback keys, which
+        // gain theirs later (plan 025 PR 5f-4f-4).
         let locale = unit.phase == Phase::LocaleResolution
-            && (unit.check == Check::WithinBound
-                || matches!(
-                    unit.subject,
-                    Subject::Locale(LocaleSubject::RequestedLocale(_))
-                ));
+            && !matches!(
+                unit.subject,
+                Subject::Locale(
+                    LocaleSubject::NegotiationAliasKey(_)
+                        | LocaleSubject::NegotiationAliasValue(..)
+                        | LocaleSubject::MessageFallbackKey(_)
+                )
+            );
         assert_eq!(
             observed,
             OBSERVED.contains(&unit.phase) || locale,

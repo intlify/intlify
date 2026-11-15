@@ -11,8 +11,9 @@
 //! Finding, observed at its own token (D15:790, 2387, 2410): a repeated
 //! locale at each of its spellings beside the others, and a spelling past the
 //! identifier bound beside the confirmed policy, which supplies the bound
-//! (D15:2249). So far only the project's requested locales are observed;
-//! the other fields' spellings gain theirs later (plan 025 PRs 5f-4f).
+//! (D15:2249). So far the values are observed, the project's and each
+//! target's; the alias and fallback keys gain theirs later (plan 025 PR
+//! 5f-4f-4).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -126,7 +127,19 @@ impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
             Location::RequestedLocale(index) => {
                 observer.element(&["requestedLocales"], *index).map(Some)
             }
-            _ => Ok(None),
+            Location::DefaultSourceLocale => observer.value(&["defaultSourceLocale"]).map(Some),
+            Location::DefaultRequestedLocale => {
+                observer.value(&["defaultRequestedLocale"]).map(Some)
+            }
+            Location::TargetRequestedLocale(id, index) => observer
+                .element(&["targetProfiles", id.as_str(), "requestedLocales"], *index)
+                .map(Some),
+            Location::TargetDefaultRequestedLocale(id) => observer
+                .value(&["targetProfiles", id.as_str(), "defaultRequestedLocale"])
+                .map(Some),
+            Location::NegotiationAliasKey(_)
+            | Location::NegotiationAliasValue(_)
+            | Location::MessageFallbackKey(_) => Ok(None),
         }
     }
 
@@ -848,16 +861,23 @@ mod tests {
         // A single-valued field's path names its one spelling, whose exact
         // length it reports.
         let canonicalizer = canonicalizer(2);
+        let confirmed = policy(64, 100, 100);
         let mut evaluation = Evaluation::default();
-        {
-            let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer), (None, None));
-            pass.spell_one(
-                Location::DefaultSourceLocale,
-                Scope::DefaultSourceLocale,
-                "EN-us",
-            )
-            .unwrap();
-        }
+        let source =
+            Observed::declaration(&json!({ "defaultSourceLocale": "EN-us" })).app(|observer| {
+                let mut pass = Pass::new(
+                    &mut evaluation,
+                    Ok(&canonicalizer),
+                    (Some(observer), Some(confirmed.evidence())),
+                );
+                pass.spell_one(
+                    Location::DefaultSourceLocale,
+                    Scope::DefaultSourceLocale,
+                    "EN-us",
+                )
+                .unwrap();
+                observer.value(&["defaultSourceLocale"]).unwrap()
+            });
         assert_eq!(
             issues(&evaluation),
             [(
@@ -865,6 +885,16 @@ mod tests {
                 "project-profile-resource-limit-exceeded",
                 exceeded(2, Actual::Exact(5)),
             )]
+        );
+        // It is observed at the field's value, beside the policy (D15:790,
+        // 2249).
+        assert_eq!(
+            evaluation
+                .occurrence_candidates()
+                .iter()
+                .map(|candidate| (candidate.primary.clone(), candidate.related.clone()))
+                .collect::<Vec<_>>(),
+            [(source, vec![confirmed.evidence().clone()])]
         );
     }
 
@@ -1137,22 +1167,44 @@ mod tests {
 
     #[test]
     fn each_target_keeps_its_own_set_and_default() {
+        let declared = json!({
+            "server": {
+                "profile": {},
+                "requestedLocales": ["de"],
+                "defaultRequestedLocale": "EN"
+            },
+            "browser": {
+                "profile": {},
+                "requestedLocales": ["EN", "en", "de"],
+                "defaultRequestedLocale": "de"
+            }
+        });
         let targets: NonEmptyMap<TargetId, TargetDeclaration<serde_json::Value>> =
-            serde_json::from_value(serde_json::json!({
-                "server": {"profile": {}, "requestedLocales": ["de"]},
-                "browser": {
-                    "profile": {},
-                    "requestedLocales": ["EN", "en", "de"],
-                    "defaultRequestedLocale": "de"
-                }
-            }))
-            .unwrap();
+            serde_json::from_value(declared.clone()).unwrap();
         let canonicalizer = canonicalizer(64);
+        let confirmed = policy(64, 100, 100);
         let mut evaluation = Evaluation::default();
-        let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer), (None, None));
-        let admitted = targets.iter().map(|(id, _)| (id.clone(), Ok(()))).collect();
-        let resolved = pass.targets(&targets, &admitted).unwrap();
-        drop(pass);
+        let (resolved, browser, server) =
+            Observed::declaration(&json!({ "targetProfiles": declared })).app(|observer| {
+                let mut pass = Pass::new(
+                    &mut evaluation,
+                    Ok(&canonicalizer),
+                    (Some(observer), Some(confirmed.evidence())),
+                );
+                let admitted = targets.iter().map(|(id, _)| (id.clone(), Ok(()))).collect();
+                let resolved = pass.targets(&targets, &admitted).unwrap();
+                let browser: Vec<EvidenceProjection> = (0..3)
+                    .map(|index| {
+                        observer
+                            .element(&["targetProfiles", "browser", "requestedLocales"], index)
+                            .unwrap()
+                    })
+                    .collect();
+                let server = observer
+                    .value(&["targetProfiles", "server", "defaultRequestedLocale"])
+                    .unwrap();
+                (resolved, browser, server)
+            });
         let duplicate = unit(
             LocaleSubject::TargetRequestedLocale(target("browser"), key("en")),
             Check::UniqueLocale,
@@ -1180,7 +1232,7 @@ mod tests {
                     target("server"),
                     Ok(LocaleSet::new(vec![canonical("de")])),
                     Ok(()),
-                    Ok(None),
+                    Ok(Some(canonical("en"))),
                 ),
             ]
         );
@@ -1205,6 +1257,56 @@ mod tests {
                 )
             ),
             None
+        );
+        // A target's spellings are observed at their own tokens (D15:790,
+        // 2410): the browser's corrected `EN` and each spelling of `en`
+        // beside the other, then the server's corrected default.
+        let en = |check| {
+            unit(
+                LocaleSubject::TargetRequestedLocale(target("browser"), key("en")),
+                check,
+            )
+        };
+        assert_eq!(
+            evaluation
+                .occurrence_candidates()
+                .iter()
+                .map(|candidate| (
+                    candidate.finding.unit().clone(),
+                    candidate.finding.code(),
+                    candidate.primary.clone(),
+                    candidate.related.clone()
+                ))
+                .collect::<Vec<_>>(),
+            [
+                (
+                    en(Check::CanonicalLocale),
+                    Code::LocaleNonCanonical,
+                    browser[0].clone(),
+                    vec![]
+                ),
+                (
+                    en(Check::UniqueLocale),
+                    Code::LocaleDuplicate,
+                    browser[0].clone(),
+                    vec![browser[1].clone()]
+                ),
+                (
+                    en(Check::UniqueLocale),
+                    Code::LocaleDuplicate,
+                    browser[1].clone(),
+                    vec![browser[0].clone()]
+                ),
+                (
+                    unit(
+                        LocaleSubject::TargetDefaultRequestedLocale(target("server")),
+                        Check::CanonicalLocale
+                    ),
+                    Code::LocaleNonCanonical,
+                    server,
+                    vec![]
+                ),
+            ]
         );
     }
 

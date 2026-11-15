@@ -28,8 +28,8 @@ use crate::model::{
 
 use super::declaration_observer::{DeclarationObserver, ObserverInvariant};
 use super::evaluation::{
-    both, Actual, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Phase,
-    Subject, Unit,
+    both, Actual, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Found,
+    Observation, Phase, Subject, Unit,
 };
 use super::limits::ConfirmedPolicy;
 
@@ -408,7 +408,7 @@ fn project<P: Provider, Target>(
         Err(ref causes) => Err(causes.clone()),
     };
     let member = match &default {
-        Ok(spelled) => member(pass.evaluation, spelled, &requested_set)?,
+        Ok(spelled) => member(pass.evaluation, spelled, &requested_set, observer)?,
         Err(causes) => Err(causes.clone()),
     };
     let source = match fields.default_source_locale {
@@ -446,13 +446,23 @@ fn project<P: Provider, Target>(
 }
 
 /// The default's unit: its canonical locale must be one of the project's
-/// requested locales.
+/// requested locales. A default outside them is observed at its token,
+/// beside the requested locales, a set that counts as one location (D15:2249,
+/// 2416).
 fn member(
     evaluation: &mut Evaluation,
     default: &Spelled,
     requested: &Admitted<LocaleSet>,
-) -> Result<Admitted<()>, EvaluationInvariant> {
-    evaluation.check(
+    observer: Option<&DeclarationObserver<'_>>,
+) -> Result<Admitted<()>, LocaleInvariant> {
+    let observed = match (observer, &default.locale, requested) {
+        (Some(observer), Ok(locale), Ok(set)) if !set.contains(locale) => Some(Observation {
+            primary: observer.value(&["defaultRequestedLocale"])?,
+            related: vec![observer.value(&["requestedLocales"])?],
+        }),
+        _ => None,
+    };
+    Ok(evaluation.check_found(
         unit(
             LocaleSubject::DefaultRequestedLocale,
             Check::RequestedMember,
@@ -465,10 +475,13 @@ fn member(
             if requested.contains(&locale) {
                 Ok(())
             } else {
-                Err(issue(Code::DefaultRequestedLocaleNotInProject))
+                Err(Found::through(
+                    issue(Code::DefaultRequestedLocaleNotInProject),
+                    observed,
+                ))
             }
         },
-    )
+    )?)
 }
 
 const fn issue(code: Code) -> Blocking {
@@ -1096,6 +1109,46 @@ mod tests {
             None
         );
         assert_eq!(units(&resolved.project.unwrap_err()), [default]);
+    }
+
+    /// The default's spelling is observed at its token: corrected, with
+    /// nothing beside it, and outside the requested locales, beside them, a
+    /// set that counts as one location (D15:2249, 2410, 2416).
+    #[test]
+    fn a_default_outside_the_requested_locales_is_observed_beside_them() {
+        let declaration = declaration(&minimal_config(), |app| {
+            app["defaultRequestedLocale"] = json!("EN-us");
+        });
+        let (evaluation, _) = resolve(&declaration);
+        let spelling = unit(
+            LocaleSubject::DefaultRequestedLocale,
+            Check::CanonicalLocale,
+        );
+        let member = unit(
+            LocaleSubject::DefaultRequestedLocale,
+            Check::RequestedMember,
+        );
+        let (default, requested) = Observed::declaration(&declaration).app(|observer| {
+            (
+                observer.value(&["defaultRequestedLocale"]).unwrap(),
+                observer.value(&["requestedLocales"]).unwrap(),
+            )
+        });
+        assert_eq!(
+            evaluation
+                .occurrence_candidates()
+                .iter()
+                .map(|candidate| (
+                    candidate.finding.unit().clone(),
+                    candidate.primary.clone(),
+                    candidate.related.clone()
+                ))
+                .collect::<Vec<_>>(),
+            [
+                (spelling, default.clone(), vec![]),
+                (member, default, vec![requested])
+            ]
+        );
     }
 
     /// Phase 7 observes a requested spelling past the identifier bound at
