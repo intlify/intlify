@@ -1433,7 +1433,7 @@ impl Evaluation {
             return;
         }
         // Phase 8's negotiation and message fallback checks, and coverage's
-        // counts and locale items; its other checks gain theirs later (plan
+        // counts and selector items; its other checks gain theirs later (plan
         // 025 PRs 5f-4h).
         let policies = matches!(
             unit.subject,
@@ -1444,6 +1444,7 @@ impl Evaluation {
                         | CoverageSubject::LocaleSelectors
                         | CoverageSubject::SurfaceSelectors
                         | CoverageSubject::Locale(..)
+                        | CoverageSubject::SurfaceClass(..)
                         | CoverageSubject::Cells
                         | CoverageSubject::Comparisons
                 )
@@ -3336,23 +3337,19 @@ mod tests {
     #[test]
     #[should_panic(expected = "with what it observed")]
     fn a_candidate_of_another_phase_with_an_observation_fails_the_test() {
-        use crate::resolver::coverage::{unit, CoverageSubject, RuleContent, SurfaceKey};
-        use crate::resolver::locales::Content;
+        use crate::resolver::targets::{unit, TargetSubject};
         let data = through(crate::resolver::evidence_component::ComponentPath::data_root());
-        let surface = unit(
-            CoverageSubject::SurfaceClass(
-                RuleContent::projected(),
-                SurfaceKey::Content(Content::new("nav")),
-            ),
-            Check::VocabularyMember,
+        let target = unit(
+            TargetSubject::Target(crate::resolver::locales::fixtures::target("server")),
+            Check::ProjectSubset,
         );
-        let unknown = Blocking {
-            code: Code::CoverageRuleInvalid,
-            reason: Some(Reason::SurfaceClassUnknown),
+        let outside = Blocking {
+            code: Code::TargetLocalesNotSubset,
+            reason: None,
             details: None,
         };
-        let _ = Evaluation::default().check_found(surface, Ok(()), |()| {
-            Err::<(), _>(Found::observed(unknown, data))
+        let _ = Evaluation::default().check_found(target, Ok(()), |()| {
+            Err::<(), _>(Found::observed(outside, data))
         });
     }
 }

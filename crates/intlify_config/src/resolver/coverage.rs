@@ -24,10 +24,10 @@
 //! the nearest location holding every item, and for the rule-to-cell
 //! comparisons, the factor that bound adds; the requested locales for the
 //! cells, the factor the declaration supplies (plan 025 decision #198). Each
-//! rule holding a selector is a raw parent of its own, so a locale item's
-//! Findings and notice are observed at the items spelling its subject in
-//! every such rule (D15:2190, 2387). The other checks' Findings carry no
-//! occurrence Evidence yet.
+//! rule holding a selector is a raw parent of its own, so a selector item's
+//! Findings, and a locale item's notice, are observed at the items naming
+//! their subject in every such rule (D15:2190, 2387). The other checks'
+//! Findings carry no occurrence Evidence yet.
 
 use std::collections::BTreeMap;
 
@@ -44,6 +44,7 @@ use super::evaluation::{
     Found, LimitExceeded, Notice, Observation, Phase, Reason, Subject, Unit,
 };
 use super::evidence::EvidenceProjection;
+use super::evidence_component::ComponentPath;
 use super::limits::{BoundId, ConfirmedPolicy, Group, LocaleResolutionLimits};
 use super::locales::{
     canonicalize, Content, LocaleInvariant, LocaleKey, LocaleSet, ResolvedLocales,
@@ -566,7 +567,7 @@ fn normalize<P: Provider>(
                 .map(|requested| requested.as_slice().to_vec()),
         };
         let surfaces = match rule.intent_surface_classes() {
-            Some(items) => selected_surfaces(evaluation, &selectors.naming, content, items)?,
+            Some(items) => selected_surfaces(evaluation, selectors, (content, raws), items)?,
             None => selectors
                 .vocabulary
                 .clone()
@@ -774,19 +775,29 @@ fn each_rule(blocking: Blocking, rules: Vec<Vec<EvidenceProjection>>) -> Found {
         .unwrap_or_else(|| Found::from(blocking))
 }
 
+/// The member a rule names its surface-class selector by.
+const INTENT_SURFACE_CLASSES: &str = "intentSurfaceClasses";
+
 /// One rule's surface-class selector: each item a member of the admitted
 /// vocabulary and each member named once. A repeated item that names no
-/// member is unknown, not a duplicate. Returns the selector's surface classes
-/// as a set once every unit passed.
-fn selected_surfaces(
+/// member is unknown, not a duplicate. Each rule holding the selector is a
+/// raw parent of its own, so a unit's candidates are the items naming its
+/// subject in every such rule, each at its token (D15:2190, 2387): an
+/// unknown one beside the vocabulary's root, which it was compared with
+/// (D15:2249), and a repeated one beside the others repeating it in the same
+/// rule (D15:1567, 2410). Returns the selector's surface classes as a set
+/// once every unit passed.
+fn selected_surfaces<P: Provider>(
     evaluation: &mut Evaluation,
-    naming: &Admitted<&SurfaceVocabulary>,
-    rule: &RuleContent,
+    selectors: &Selectors<'_, P>,
+    (rule, raws): (&RuleContent, &[usize]),
     items: &[String],
-) -> Result<Admitted<Vec<Token>>, EvaluationInvariant> {
-    // Each subject with an item that spells it and how many items do.
-    let mut subjects: BTreeMap<SurfaceKey, (&str, usize)> = BTreeMap::new();
-    for raw in items {
+) -> Result<Admitted<Vec<Token>>, LocaleInvariant> {
+    let naming = &selectors.naming;
+    // Each subject with an item that spells it and the positions of the
+    // items that do.
+    let mut subjects: BTreeMap<SurfaceKey, (&str, Vec<usize>)> = BTreeMap::new();
+    for (position, raw) in items.iter().enumerate() {
         let key = match naming
             .as_ref()
             .ok()
@@ -795,36 +806,61 @@ fn selected_surfaces(
             Some(member) => SurfaceKey::Member(member.clone()),
             None => SurfaceKey::Content(Content::new(raw)),
         };
-        subjects.entry(key).or_insert((raw, 0)).1 += 1;
+        subjects
+            .entry(key)
+            .or_insert((raw, Vec::new()))
+            .1
+            .push(position);
     }
     let mut selected = Ok(Vec::with_capacity(subjects.len()));
-    for (key, (raw, spellings)) in subjects {
+    for (key, (raw, positions)) in subjects {
         let subject = |check| {
             unit(
                 CoverageSubject::SurfaceClass(rule.clone(), key.clone()),
                 check,
             )
         };
-        let member = evaluation.check(
+        let unknown = match naming {
+            Ok(vocabulary) if vocabulary.member(raw).is_none() => observed(
+                selectors.items(raws, INTENT_SURFACE_CLASSES, &positions)?,
+                &[EvidenceProjection::resolver_input(
+                    ComponentPath::vocabulary_root(),
+                )],
+            ),
+            _ => Vec::new(),
+        };
+        let member = evaluation.check_found(
             subject(Check::VocabularyMember),
             naming.clone(),
             |vocabulary| {
-                vocabulary.member(raw).cloned().ok_or(issue(
-                    Code::CoverageRuleInvalid,
-                    Some(Reason::SurfaceClassUnknown),
-                ))
+                vocabulary.member(raw).cloned().ok_or_else(|| {
+                    Found::each(
+                        issue(Code::CoverageRuleInvalid, Some(Reason::SurfaceClassUnknown)),
+                        unknown,
+                    )
+                })
             },
         )?;
-        let once = evaluation.check(subject(Check::UniqueSurfaceClass), member.clone(), |_| {
-            if spellings == 1 {
-                Ok(())
-            } else {
-                Err(issue(
-                    Code::CoverageRuleInvalid,
-                    Some(Reason::SurfaceClassDuplicate),
-                ))
-            }
-        })?;
+        // Each rule compares only its own items.
+        let repeated = if positions.len() > 1 {
+            selectors.items(raws, INTENT_SURFACE_CLASSES, &positions)?
+        } else {
+            Vec::new()
+        };
+        let once =
+            evaluation.check_found(subject(Check::UniqueSurfaceClass), member.clone(), |_| {
+                if positions.len() == 1 {
+                    Ok(())
+                } else {
+                    Err(each_rule(
+                        issue(
+                            Code::CoverageRuleInvalid,
+                            Some(Reason::SurfaceClassDuplicate),
+                        ),
+                        repeated,
+                    ))
+                }
+            })?;
         selected = both(selected, both(member, once)).map(|(mut selected, (member, ()))| {
             selected.push(member);
             selected
@@ -1165,6 +1201,17 @@ mod tests {
     /// The item at `position` of the locale selector of the rule at `rule` in
     /// `declaration`, at its token.
     fn locale_item(declaration: &Declaration, rule: u64, position: u64) -> EvidenceProjection {
+        selector_item(declaration, "requestedLocales", rule, position)
+    }
+
+    /// The item at `position` of the selector `selector` of the rule at
+    /// `rule` in `declaration`, at its token.
+    fn selector_item(
+        declaration: &Declaration,
+        selector: &str,
+        rule: u64,
+        position: u64,
+    ) -> EvidenceProjection {
         use crate::structural::Edge::{Index, Member};
         let canonicalizer = canonicalizer(64);
         Observed::declaration(declaration).app(|observer| {
@@ -1174,7 +1221,7 @@ mod tests {
                     Member("coverage"),
                     Member("rules"),
                     Index(rule),
-                    Member("requestedLocales"),
+                    Member(selector),
                     Index(position),
                 ])
                 .unwrap()
@@ -1723,10 +1770,58 @@ mod tests {
         );
     }
 
+    /// The same holds for surface items: in identical rules, a repeated
+    /// member is found at each rule's items beside the other of its own rule,
+    /// and an unknown item at each rule's item beside the vocabulary's root
+    /// (D15:1567, 2190, 2387).
+    #[test]
+    fn identical_rules_are_each_a_parent_of_their_own_surface_items() {
+        let selector =
+            json!({"intentSurfaceClasses": ["nav", "nav", "help"], "mode": "fallback-allowed"});
+        let declaration = declared(json!({"rules": [selector, selector]}));
+        let resolved = resolve(&declaration);
+        let owner = rule(&selector);
+        let duplicate = member_unit(&owner, "nav", Check::UniqueSurfaceClass);
+        let unknown = unknown_unit(&owner, "help", Check::VocabularyMember);
+        assert_eq!(
+            issues(&resolved.evaluation),
+            [
+                (
+                    duplicate.clone(),
+                    "project-profile-coverage-rule-invalid",
+                    Some("surface-class-duplicate")
+                ),
+                (
+                    unknown.clone(),
+                    "project-profile-coverage-rule-invalid",
+                    Some("surface-class-unknown")
+                ),
+            ]
+        );
+        let item =
+            |rule, position| selector_item(&declaration, "intentSurfaceClasses", rule, position);
+        let root = EvidenceProjection::resolver_input(ComponentPath::vocabulary_root());
+        let at = |unit: &Unit, primary, related: Vec<EvidenceProjection>| {
+            (unit.clone(), Observation { primary, related })
+        };
+        assert_eq!(
+            observed(&resolved.evaluation),
+            [
+                at(&duplicate, item(0, 0), vec![item(0, 1)]),
+                at(&duplicate, item(0, 1), vec![item(0, 0)]),
+                at(&duplicate, item(1, 0), vec![item(1, 1)]),
+                at(&duplicate, item(1, 1), vec![item(1, 0)]),
+                at(&unknown, item(0, 2), vec![root.clone()]),
+                at(&unknown, item(1, 2), vec![root]),
+            ]
+        );
+    }
+
     #[test]
     fn a_surface_item_is_a_vocabulary_member_named_once_in_its_selector() {
         let selector = json!({"intentSurfaceClasses": ["nav", "help", "nav", "Nav", "help"], "mode": "fallback-allowed"});
-        let resolved = resolve(&declared(json!({"rules": [selector]})));
+        let declaration = declared(json!({"rules": [selector]}));
+        let resolved = resolve(&declaration);
         let owner = rule(&selector);
         assert_eq!(
             issues(&resolved.evaluation),
@@ -1743,6 +1838,32 @@ mod tests {
                     "project-profile-coverage-rule-invalid",
                     Some("surface-class-unknown"),
                 ),
+            ]
+        );
+        // Each `nav` is found beside the other, and each item naming no
+        // member beside the vocabulary's root, which it was compared with
+        // (D15:1567, 2249, 2410).
+        let item = |position| selector_item(&declaration, "intentSurfaceClasses", 0, position);
+        let vocabulary_root = EvidenceProjection::resolver_input(ComponentPath::vocabulary_root());
+        let duplicate = member_unit(&owner, "nav", Check::UniqueSurfaceClass);
+        let unknown = unknown_unit(&owner, "Nav", Check::VocabularyMember);
+        let at = |unit: &Unit, primary, related: &[EvidenceProjection]| {
+            (
+                unit.clone(),
+                Observation {
+                    primary,
+                    related: related.to_vec(),
+                },
+            )
+        };
+        assert_eq!(
+            observed(&resolved.evaluation),
+            [
+                at(&duplicate, item(0), &[item(2)]),
+                at(&duplicate, item(2), &[item(0)]),
+                at(&unknown, item(3), std::slice::from_ref(&vocabulary_root)),
+                at(&unknown, item(1), std::slice::from_ref(&vocabulary_root)),
+                at(&unknown, item(4), std::slice::from_ref(&vocabulary_root)),
             ]
         );
         // A repeated item that names no member is unknown, never a duplicate.
@@ -1913,7 +2034,10 @@ mod tests {
         // Every item sits in a rule, so the rules are the nearest location
         // holding them all.
         assert_eq!(
-            observed(&over.evaluation),
+            observed(&over.evaluation)
+                .into_iter()
+                .filter(|(unit, _)| unit == &locale_items)
+                .collect::<Vec<_>>(),
             [(
                 locale_items.clone(),
                 beside_policy(&declaration, &["coverage", "rules"])
