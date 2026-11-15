@@ -17,15 +17,25 @@
 //! it through another source's sequence. Not the Linker's probing of
 //! definitions, which 020 owns, and not the canonicalization of the keys,
 //! which Phase 7 did.
+//!
+//! The mapping's and its keys' Findings are observed where their checks
+//! looked (D15:2249): past a bound, the mapping or a key's sequence, beside
+//! the confirmed policy, which supplies the bound; a source two keys name,
+//! at each key beside the others' (D15:2387, 2410); and a source outside the
+//! requested locales, at each key naming it, beside the requested locales, a
+//! set that counts as one location. A key is classified by the canonicalizer
+//! Phase 5 bound (D15:776). The candidates' Findings carry no occurrence
+//! Evidence yet.
 
 use std::collections::BTreeMap;
 
 use crate::locale::{CanonicalLocale, Canonicalizer, Provider, VersionedIdentity};
 use crate::model::{FallbackCandidate, NonEmptyVec};
 
+use super::declaration_observer::{beside, DeclarationObserver, ObserverInvariant};
 use super::evaluation::{
-    and, both, within, Admitted, Blocking, Causes, Check, Code, Evaluation, Notice, Phase, Reason,
-    Subject, Unit,
+    and, both, within, Admitted, Blocking, Causes, Check, Code, Evaluation, Found, Notice,
+    Observation, Phase, Reason, Subject, Unit,
 };
 use super::limits::{BoundId, ConfirmedPolicy, Group};
 use super::locales::{
@@ -113,28 +123,44 @@ impl<Id> MessageFallbackPolicy<Id> {
     }
 }
 
-/// A submitted key as Phase 7 spelled it, with its sequence as submitted.
+/// A submitted key as Phase 7 spelled it, with its name in the map and its
+/// sequence as submitted.
 struct Entry<'a> {
     key: &'a Spelled,
+    name: &'a str,
     candidates: &'a [FallbackCandidate],
 }
 
+/// Where the mapping sits under the declaration.
+const FALLBACK: &str = "messageFallback";
+
 /// Phase 8's fallback checks over the keys Phase 7 spelled from `fallback`
-/// and the sequences `fallback` holds, with the canonicalizer Phase 5 bound.
-/// Every unit waits on the mapping's bound; a sequence's units wait on its
-/// key holding alone with an identity, and its candidates on the sequence's
-/// bound. The policy exists only when every unit passed.
+/// and the sequences `fallback` holds, with the canonicalizer Phase 5 bound,
+/// observed through `observer` when the declaration's file is there; the
+/// caller hands it what Phase 5 bound. Every unit waits on the mapping's
+/// bound; a sequence's units wait on its key holding alone with an identity,
+/// and its candidates on the sequence's bound. The policy exists only when
+/// every unit passed.
 pub(crate) fn resolve_fallback<Id: Clone, P: Provider>(
     evaluation: &mut Evaluation,
-    policy: Result<&ConfirmedPolicy, &Causes>,
+    confirmed: Result<&ConfirmedPolicy, &Causes>,
     specification: &Admitted<VersionedIdentity<Id>>,
     canonicalizer: Result<&Canonicalizer<P>, &Causes>,
     locales: &ResolvedLocales,
     fallback: Admitted<Option<&BTreeMap<String, NonEmptyVec<FallbackCandidate>>>>,
+    observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<Admitted<MessageFallbackPolicy<Id>>, LocaleInvariant> {
-    let policy = policy.map_err(Causes::clone);
+    let policy = confirmed.map_err(Causes::clone);
     let keys = locales.fallback_keys.as_ref().map_err(Causes::clone);
-    let bounded = evaluation.check(
+    // The mapping is in the declaration once it holds a key, and an empty one
+    // is never past the bound.
+    let observed = match &keys {
+        Ok(keys) if !keys.is_empty() => {
+            beside(confirmed, observer, |observer| observer.value(&[FALLBACK]))?
+        }
+        _ => None,
+    };
+    let bounded = evaluation.check_found(
         unit(FallbackSubject::Sources, Check::WithinBound),
         both(both(policy.clone(), specification.clone()), keys.clone()),
         |((policy, _), keys)| {
@@ -143,6 +169,7 @@ pub(crate) fn resolve_fallback<Id: Clone, P: Provider>(
                 policy.limits().locale_resolution.max_fallback_sources,
                 keys.len(),
             )
+            .map_err(|blocking| Found::through(blocking, observed))
         },
     )?;
     let entries = entries(keys.map_or(&[][..], Vec::as_slice), fallback);
@@ -157,52 +184,8 @@ pub(crate) fn resolve_fallback<Id: Clone, P: Provider>(
     let mut checked = bounded.clone();
     let mut sequences = Ok(BTreeMap::new());
     for (key, sharing) in by_source(&entries) {
-        // Entries under one subject share their key's result.
-        let spelled = sharing[0].key;
-        let alone = evaluation.check(
-            unit(FallbackSubject::Source(key.clone()), Check::UniqueLocale),
-            both(bounded.clone(), spelled.locale.clone()),
-            |((), locale)| {
-                if sharing.len() == 1 {
-                    Ok(locale)
-                } else {
-                    Err(issue(Code::LocaleDuplicate, None))
-                }
-            },
-        )?;
-        let member = evaluation.check(
-            unit(FallbackSubject::Source(key.clone()), Check::RequestedMember),
-            both(
-                both(bounded.clone(), spelled.locale.clone()),
-                requested.clone(),
-            ),
-            |(((), locale), requested)| {
-                if requested.contains(&locale) {
-                    Ok(())
-                } else {
-                    Err(issue(Code::MessageFallbackSourceNotRequested, None))
-                }
-            },
-        )?;
-        // A key holding alone has one sequence, the one its bound measures.
-        // The key can stand for several sources, so past the bound the
-        // sequence reports only the first-over witness (Decision 015-157).
-        let sequence = evaluation.check(
-            unit(FallbackSubject::Sequence(key.clone()), Check::WithinBound),
-            both(alone.clone(), policy.clone()),
-            |(source, policy)| {
-                within(
-                    MAX_FALLBACK_CANDIDATES_PER_SOURCE,
-                    policy
-                        .limits()
-                        .locale_resolution
-                        .max_fallback_candidates_per_source,
-                    sharing[0].candidates.len(),
-                )
-                .map_err(Blocking::first_over)
-                .map(|()| source)
-            },
-        )?;
+        let (alone, member) = source(evaluation, (&bounded, &requested), key, &sharing, observer)?;
+        let sequence = bounded_sequence(evaluation, (confirmed, &alone), key, &sharing, observer)?;
         let (candidates, resolved) = candidates(evaluation, &spelling, key, &sequence, &sharing)?;
         checked = and(and(checked, and(alone.map(|_| ()), member)), candidates);
         sequences = both(sequences, both(sequence, resolved)).map(
@@ -220,15 +203,17 @@ pub(crate) fn resolve_fallback<Id: Clone, P: Provider>(
     ))
 }
 
-/// Each key Phase 7 spelled with its sequence as submitted, in the map's
-/// order: Phase 7 spelled the keys of this same map.
+/// Each key Phase 7 spelled with its name and its sequence as submitted, in
+/// the map's order: Phase 7 spelled the keys of this same map.
 fn entries<'a>(
     keys: &'a [Spelled],
     fallback: Admitted<Option<&'a BTreeMap<String, NonEmptyVec<FallbackCandidate>>>>,
 ) -> Vec<Entry<'a>> {
-    let sequences: Vec<&'a [FallbackCandidate]> =
+    let sequences: Vec<(&'a str, &'a [FallbackCandidate])> =
         fallback.ok().flatten().map_or_else(Vec::new, |map| {
-            map.values().map(NonEmptyVec::as_slice).collect()
+            map.iter()
+                .map(|(name, sequence)| (name.as_str(), sequence.as_slice()))
+                .collect()
         });
     assert_eq!(
         keys.len(),
@@ -237,7 +222,11 @@ fn entries<'a>(
     );
     keys.iter()
         .zip(sequences)
-        .map(|(key, candidates)| Entry { key, candidates })
+        .map(|(key, (name, candidates))| Entry {
+            key,
+            name,
+            candidates,
+        })
         .collect()
 }
 
@@ -248,6 +237,114 @@ fn by_source<'e, 'a>(entries: &'e [Entry<'a>]) -> BTreeMap<&'a LocaleKey, Vec<&'
         sources.entry(&entry.key.key).or_default().push(entry);
     }
     sources
+}
+
+/// The two units of one key's subject, which entries under it share: two keys
+/// naming one source are a duplicate, found at each key beside the others'
+/// (D15:2387, 2410), and a source outside the requested locales is found at
+/// each key naming it, beside them, a set that counts as one location
+/// (D15:2249). Returns the source when its key holds alone, and whether it
+/// is requested.
+fn source(
+    evaluation: &mut Evaluation,
+    (bounded, requested): (&Admitted<()>, &Admitted<&LocaleSet>),
+    key: &LocaleKey,
+    sharing: &[&Entry<'_>],
+    observer: Option<&DeclarationObserver<'_>>,
+) -> Result<(Admitted<CanonicalLocale>, Admitted<()>), LocaleInvariant> {
+    let spelled = sharing[0].key;
+    // Only a source two keys name is found, at each of them.
+    let named = match observer {
+        Some(observer) if sharing.len() > 1 => sharing
+            .iter()
+            .map(|entry| observer.member_key(&[FALLBACK], entry.name).map(Some))
+            .collect::<Result<Vec<_>, _>>()?,
+        _ => Vec::new(),
+    };
+    let alone = evaluation.check_found(
+        unit(FallbackSubject::Source(key.clone()), Check::UniqueLocale),
+        both(bounded.clone(), spelled.locale.clone()),
+        |((), locale)| {
+            if sharing.len() == 1 {
+                Ok(locale)
+            } else {
+                Err(Found::repeated(issue(Code::LocaleDuplicate, None), &named))
+            }
+        },
+    )?;
+    let outside = match (observer, &spelled.locale, requested) {
+        (Some(observer), Ok(locale), Ok(set)) if !set.contains(locale) => {
+            let locales = observer.value(&["requestedLocales"])?;
+            sharing
+                .iter()
+                .map(|entry| {
+                    Ok(Some(Observation {
+                        primary: observer.member_key(&[FALLBACK], entry.name)?,
+                        related: vec![locales.clone()],
+                    }))
+                })
+                .collect::<Result<Vec<_>, ObserverInvariant>>()?
+        }
+        _ => Vec::new(),
+    };
+    let member = evaluation.check_found(
+        unit(FallbackSubject::Source(key.clone()), Check::RequestedMember),
+        both(
+            both(bounded.clone(), spelled.locale.clone()),
+            requested.clone(),
+        ),
+        |(((), locale), requested)| {
+            if requested.contains(&locale) {
+                Ok(())
+            } else {
+                Err(Found::each(
+                    issue(Code::MessageFallbackSourceNotRequested, None),
+                    outside,
+                ))
+            }
+        },
+    )?;
+    Ok((alone, member))
+}
+
+/// A key's sequence under `maxFallbackCandidatesPerSource`, once the key
+/// holds alone: it then has one sequence, the one the bound measures, which
+/// past the bound is observed beside the confirmed policy that supplies the
+/// bound (D15:2249). The key can stand for several sources, so past the
+/// bound the sequence reports only the first-over witness (Decision
+/// 015-157).
+fn bounded_sequence(
+    evaluation: &mut Evaluation,
+    (confirmed, alone): (
+        Result<&ConfirmedPolicy, &Causes>,
+        &Admitted<CanonicalLocale>,
+    ),
+    key: &LocaleKey,
+    sharing: &[&Entry<'_>],
+    observer: Option<&DeclarationObserver<'_>>,
+) -> Result<Admitted<CanonicalLocale>, LocaleInvariant> {
+    let observed = match sharing {
+        [entry] => beside(confirmed, observer, |observer| {
+            observer.value(&[FALLBACK, entry.name])
+        })?,
+        _ => None,
+    };
+    Ok(evaluation.check_found(
+        unit(FallbackSubject::Sequence(key.clone()), Check::WithinBound),
+        both(alone.clone(), confirmed.map_err(Causes::clone)),
+        |(source, policy)| {
+            within(
+                MAX_FALLBACK_CANDIDATES_PER_SOURCE,
+                policy
+                    .limits()
+                    .locale_resolution
+                    .max_fallback_candidates_per_source,
+                sharing[0].candidates.len(),
+            )
+            .map_err(|blocking| Found::through(Blocking::first_over(blocking), observed))
+            .map(|()| source)
+        },
+    )?)
 }
 
 /// The units over one key's candidates, which wait on its sequence: each
@@ -451,6 +548,7 @@ mod tests {
     use crate::resolver::declaration_observer::fixtures::Observed;
     use crate::resolver::declaration_observer::DeclarationObserver;
     use crate::resolver::evaluation::{Actual, LimitExceeded, Status};
+    use crate::resolver::evidence::EvidenceProjection;
     use crate::resolver::locales::fixtures::{
         canonical, canonicalizer, content, declaration, key, limits, notices, rejected, stand_in,
         units, waits_on, Declaration,
@@ -522,12 +620,14 @@ mod tests {
     ) -> Resolved {
         let mut evaluation = Evaluation::default();
         let canonicalizer = canonicalizer(spelling.identifier_bytes);
+        // The phases after Phase 5 observe through what it bound.
+        let observer = observer.map(|observer| observer.with_locales(&canonicalizer));
         let mut locales = resolve_locales(
             &mut evaluation,
             Ok(&self::policy(100, 100)),
             Ok(&canonicalizer),
             fields,
-            observer,
+            observer.as_ref(),
         )
         .unwrap();
         if let Some(uncounted) = spelling.uncounted {
@@ -540,6 +640,7 @@ mod tests {
             spelling.unbound.map_or(Ok(&canonicalizer), Err),
             &locales,
             fields.message_fallback.clone(),
+            observer.as_ref(),
         )
         .unwrap();
         Resolved { evaluation, policy }
@@ -642,6 +743,33 @@ mod tests {
     fn candidate_units(source: &LocaleKey, position: usize) -> [Unit; 2] {
         [Check::CanonicalLocale, Check::DistinctFromSource]
             .map(|check| candidate_unit(source.clone(), position, check))
+    }
+
+    /// What each of Phase 8's occurrence candidates observed, with the unit
+    /// of its Finding.
+    fn observed(evaluation: &Evaluation) -> Vec<(Unit, Observation)> {
+        evaluation
+            .occurrence_candidates()
+            .iter()
+            .filter(|candidate| candidate.finding.unit().phase == Phase::LocalePolicyResolution)
+            .map(|candidate| {
+                (
+                    candidate.finding.unit().clone(),
+                    Observation {
+                        primary: candidate.primary.clone(),
+                        related: candidate.related.clone(),
+                    },
+                )
+            })
+            .collect()
+    }
+
+    /// What `look` finds in `declaration`, observed as the phases after
+    /// Phase 5 observe it.
+    fn at<R>(declaration: &Declaration, look: impl FnOnce(&DeclarationObserver<'_>) -> R) -> R {
+        let canonicalizer = canonicalizer(64);
+        Observed::declaration(declaration)
+            .app(|observer| look(&observer.with_locales(&canonicalizer)))
     }
 
     /// Each source's sequence as spelled, sources in their order.
@@ -758,7 +886,8 @@ mod tests {
 
     #[test]
     fn a_literal_may_name_any_locale_but_a_source_must_be_requested() {
-        let resolved = resolve(&declared(&["en"], json!({"fr": ["de"]})));
+        let declaration = declared(&["en"], json!({"fr": ["de"]}));
+        let resolved = resolve(&declaration);
         let outside = source_unit(key("fr"), Check::RequestedMember);
         assert_eq!(
             issues(&resolved.evaluation),
@@ -766,6 +895,24 @@ mod tests {
                 outside.clone(),
                 "project-profile-message-fallback-source-not-requested",
                 None
+            )]
+        );
+        // Found at the key, beside the requested locales, a set that counts
+        // as one location (D15:2249).
+        let (source, requested) = at(&declaration, |observer| {
+            (
+                observer.member_key(&[FALLBACK], "fr").unwrap(),
+                observer.value(&["requestedLocales"]).unwrap(),
+            )
+        });
+        assert_eq!(
+            observed(&resolved.evaluation),
+            [(
+                outside.clone(),
+                Observation {
+                    primary: source,
+                    related: vec![requested],
+                }
             )]
         );
         assert_eq!(
@@ -817,6 +964,52 @@ mod tests {
         );
     }
 
+    /// Keys naming one source outside the requested locales are each a
+    /// candidate of both of its units: at the key, beside the other key, and
+    /// at the key, beside the requested locales (D15:2387).
+    #[test]
+    fn keys_sharing_a_source_outside_the_requested_locales_are_each_a_candidate_of_both() {
+        let declaration = declared(&["en"], json!({"iw-IL": ["de"], "he-IL": ["de"]}));
+        let resolved = resolve(&declaration);
+        let [duplicate, outside] = source_units("he-IL");
+        assert_eq!(
+            issues(&resolved.evaluation),
+            [
+                (duplicate.clone(), "project-profile-locale-duplicate", None),
+                (
+                    outside.clone(),
+                    "project-profile-message-fallback-source-not-requested",
+                    None
+                ),
+            ]
+        );
+        // The map holds `he-IL` first.
+        let ([first, second], requested) = at(&declaration, |observer| {
+            (
+                ["he-IL", "iw-IL"].map(|name| observer.member_key(&[FALLBACK], name).unwrap()),
+                observer.value(&["requestedLocales"]).unwrap(),
+            )
+        });
+        let found = |unit: &Unit, primary: &EvidenceProjection, related: &EvidenceProjection| {
+            (
+                unit.clone(),
+                Observation {
+                    primary: primary.clone(),
+                    related: vec![related.clone()],
+                },
+            )
+        };
+        assert_eq!(
+            observed(&resolved.evaluation),
+            [
+                found(&duplicate, &first, &second),
+                found(&duplicate, &second, &first),
+                found(&outside, &first, &requested),
+                found(&outside, &second, &requested),
+            ]
+        );
+    }
+
     #[test]
     fn two_keys_naming_one_source_are_a_duplicate_whose_sequences_are_never_checked() {
         // The longer sequence is over its bound, and `de` sits in both, but
@@ -831,6 +1024,29 @@ mod tests {
         assert_eq!(
             issues(&resolved.evaluation),
             [(duplicate.clone(), "project-profile-locale-duplicate", None)]
+        );
+        // Each key is found at its token, beside the other's (D15:2387, 2410).
+        let [upper, lower] = at(&declaration, |observer| {
+            ["EN", "en"].map(|name| observer.member_key(&[FALLBACK], name).unwrap())
+        });
+        assert_eq!(
+            observed(&resolved.evaluation),
+            [
+                (
+                    duplicate.clone(),
+                    Observation {
+                        primary: upper.clone(),
+                        related: vec![lower.clone()],
+                    }
+                ),
+                (
+                    duplicate.clone(),
+                    Observation {
+                        primary: lower,
+                        related: vec![upper],
+                    }
+                ),
+            ]
         );
         // Position 0 holds `de` and `fr`, position 1 `de`, and position 2 only
         // the Intent source. No literal has an identity, so the two literals
@@ -1014,6 +1230,20 @@ mod tests {
                 None
             )]
         );
+        // Past it, the mapping is observed beside the confirmed policy, which
+        // supplies the bound (D15:2249).
+        assert_eq!(
+            observed(&resolved.evaluation),
+            [(
+                sources_unit(),
+                Observation {
+                    primary: at(&declaration, |observer| observer
+                        .value(&[FALLBACK])
+                        .unwrap()),
+                    related: vec![policy(1, 100).evidence().clone()],
+                }
+            )]
+        );
         let found = resolved.evaluation.issues().last().unwrap();
         assert_eq!(
             resolved.evaluation.limit(found),
@@ -1056,6 +1286,19 @@ mod tests {
                 sequence.clone(),
                 "project-profile-resource-limit-exceeded",
                 None
+            )]
+        );
+        // Past it, the sequence is observed beside the confirmed policy.
+        assert_eq!(
+            observed(&resolved.evaluation),
+            [(
+                sequence.clone(),
+                Observation {
+                    primary: at(&declaration, |observer| {
+                        observer.value(&[FALLBACK, "ja"]).unwrap()
+                    }),
+                    related: vec![policy(100, 2).evidence().clone()],
+                }
             )]
         );
         // The key can stand for several sources, so the sequence reports
