@@ -175,30 +175,6 @@ jobs:
           VITE_LOG: vite_task=trace
         run: vpr --no-cache -v test
 
-      - name: Run message benchmark smoke
-        if: runner.os == 'Linux'
-        run: vp run bench:messages:smoke
-
-      - name: Validate message benchmark result
-        if: runner.os == 'Linux'
-        run: vp run bench:messages:validate
-
-      - name: Validate minimum project-profile observation records
-        if: runner.os == 'Linux'
-        run: vp run bench:config:smoke
-
-      - name: Validate authoring semantics observation records
-        if: runner.os == 'Linux'
-        run: vp run bench:authoring:smoke
-
-      - name: Validate source discovery observation records
-        if: runner.os == 'Linux'
-        run: vp run bench:authoring-js:smoke
-
-      - name: Validate identity reconciliation observation records
-        if: runner.os == 'Linux'
-        run: vp run bench:authoring-identity:smoke
-
       - name: Validate authoring schemas and independent vectors
         if: runner.os == 'Linux'
         run: vp run schema:authoring:check && vp run vectors:authoring:check
@@ -250,6 +226,64 @@ jobs:
       - name: Validate the 015 profile view independent vectors
         if: runner.os == 'Linux'
         run: vp run vectors:profile-view:check
+
+  # The benchmark smokes build with the release and bench profiles, which
+  # share nothing with the test builds, so they run beside the Test jobs
+  # instead of after them. tools/messages-bench/rs is a workspace of its own
+  # with its own target directory, so the cargo cache lists it next to the
+  # root workspace.
+  bench-smoke:
+    runs-on: ubuntu-latest
+    name: Benchmark smoke
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
+    timeout-minutes: 30
+    steps:
+      - name: Checkout codes
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup Vite Plus
+        uses: voidzero-dev/setup-vp@9fd26ff49f9b5e6276c2b493da4454ad4527f7f4 # v1.20.0
+        with:
+          node-version: 24
+          cache: true
+          run-install: false
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: '1.98.1'
+
+      - name: Install dependencies
+        run: vp install --frozen-lockfile
+
+      - name: Setup cargo cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
+        with:
+          workspaces: |
+            . -> target
+            tools/messages-bench/rs -> target
+
+      - name: Run message benchmark smoke
+        run: vp run bench:messages:smoke
+
+      - name: Validate message benchmark result
+        run: vp run bench:messages:validate
+
+      - name: Validate minimum project-profile observation records
+        run: vp run bench:config:smoke
+
+      - name: Validate authoring semantics observation records
+        run: vp run bench:authoring:smoke
+
+      - name: Validate source discovery observation records
+        run: vp run bench:authoring-js:smoke
+
+      - name: Validate identity reconciliation observation records
+        run: vp run bench:authoring-identity:smoke
 
   cli-validation:
     runs-on: ${{ matrix.os }}
