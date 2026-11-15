@@ -200,10 +200,10 @@ fn policies<P: Provider>(
         evaluation,
         Ok(policy),
         &inputs.coverage,
-        Ok(&inputs.vocabulary),
-        Ok(canonicalizer),
+        (Ok(&inputs.vocabulary), Ok(canonicalizer)),
         &locales,
         fields.coverage.clone(),
+        Some(&observer),
     )?;
     Ok(Policies {
         locales,
