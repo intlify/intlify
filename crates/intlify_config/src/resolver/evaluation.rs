@@ -1380,10 +1380,9 @@ impl Evaluation {
     /// block.
     #[cfg(test)]
     fn observes(&self, unit: &Unit, observed: bool) {
-        use super::resource_policy::ArtifactSubject as A;
         // The phases whose Findings carry occurrence Evidence so far, and
-        // Phase 4's checks of the collection under the capability; the others
-        // gain theirs check by check (plan 025 PRs 5f).
+        // Phase 4's checks under the capability; the others gain theirs check
+        // by check (plan 025 PRs 5f).
         const OBSERVED: [Phase; 4] = [
             Phase::ResolverBootstrapAdmission,
             Phase::EntryAdmission,
@@ -1394,14 +1393,7 @@ impl Evaluation {
             return;
         }
         let collection = match &unit.subject {
-            Subject::ResourcePolicy(PolicySubject::Capability(subject)) => matches!(
-                subject,
-                A::Artifacts
-                    | A::PolicyArtifacts
-                    | A::TargetProfileArtifacts
-                    | A::Artifact(_)
-                    | A::ArtifactBytes
-            ),
+            Subject::ResourcePolicy(PolicySubject::Capability(_)) => true,
             Subject::ResourcePolicy(PolicySubject::ResourceLimits) => {
                 unit.check == Check::WithinMetadataScan
             }

@@ -115,7 +115,8 @@ pub(super) fn resolve(
         capability,
         collection,
         Ok(inputs.resource_limits),
-        &inputs.references,
+        // The measurements read no file, and reach no reference bound.
+        (&inputs.references, None),
         &inputs.measures,
         &inputs.verification,
     );

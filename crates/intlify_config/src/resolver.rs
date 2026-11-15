@@ -15,6 +15,7 @@ pub(crate) mod bootstrap;
 pub(crate) mod capability;
 pub(crate) mod coverage;
 pub(crate) mod declaration_fields;
+pub(crate) mod declaration_observer;
 pub(crate) mod delivery;
 pub(crate) mod dependency;
 pub(crate) mod entry;

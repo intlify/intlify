@@ -47,9 +47,10 @@ use crate::structural::{AdmissionInvariant, StructuralAnalysis};
 use super::artifact_resolution::{admit_collection, ArtifactSet};
 use super::coverage::{resolve_coverage, CoveragePolicy};
 use super::declaration_fields::DeclarationFields;
+use super::declaration_observer::{DeclarationObserver, ObserverInvariant};
 use super::delivery::{resolve_delivery, DeliveryPolicy};
 use super::dependency::{own, SemanticGroup, OPTIONAL_POLICIES, REQUIRED_POLICIES};
-use super::entry::EntryInvariant;
+use super::entry::{EntryFile, EntryInvariant};
 use super::evaluation::{and, Admitted, Causes, Evaluation, EvaluationInvariant};
 use super::evidence_component::ComponentInvariant;
 use super::exact_resolution::{resolve_fields, ArtifactBindings, ResolvedReferences};
@@ -79,13 +80,16 @@ type Declaration = ProfileDeclaration<PolicyReference, TargetProfileReference>;
 /// read it: the fields of the declaration Phase 3 provisionally selected once
 /// structural admission admitted its boundary and its `resourceLimits`
 /// reference, whatever else of it or of the root it rejected (D15:2131,
-/// 2367, 3434), each read on its own, and the `resourceLimits` reference it
-/// selected with, or, without a selection, the causes of its absence in
-/// their place (D15:2131); the selector; what Phase 4 rechecks of those
-/// phases' measures; and whether structural admission admitted the whole
-/// root, which profile projection needs (D15:2142).
+/// 2367, 3434), each read on its own, where a check of it looks (D15:790),
+/// and the `resourceLimits` reference it selected with, or, without a
+/// selection, the causes of its absence in their place (D15:2131); the
+/// selector; what Phase 4 rechecks of those phases' measures; and whether
+/// structural admission admitted the whole root, which profile projection
+/// needs (D15:2142).
 pub(crate) struct SelectedConfiguration<'a> {
     fields: DeclarationFields<PolicyReference, TargetProfileReference>,
+    /// Where a check of the selected declaration looks, when there is one.
+    observer: Option<DeclarationObserver<'a>>,
     resource_limits: Result<&'a PolicyReference, Causes>,
     selector: &'a SelectorInput,
     value: Admitted<ValueCounts>,
@@ -98,10 +102,11 @@ pub(crate) struct SelectedConfiguration<'a> {
 }
 
 impl<'a> SelectedConfiguration<'a> {
-    /// The configuration of `analysis` once Phase 3 provisionally selected
-    /// one of its declarations, `selection`, with `selector`, each field as
-    /// `evaluation` recorded structural admission's checks under it. `whole`
-    /// is whether structural admission admitted the whole root.
+    /// The configuration of `analysis`, which `file` holds, once Phase 3
+    /// provisionally selected one of its declarations, `selection`, with
+    /// `selector`, each field as `evaluation` recorded structural admission's
+    /// checks under it, observed in the file (D15:790). `whole` is whether
+    /// structural admission admitted the whole root.
     ///
     /// # Errors
     ///
@@ -109,7 +114,7 @@ impl<'a> SelectedConfiguration<'a> {
     /// does not.
     pub(crate) fn new(
         evaluation: &Evaluation,
-        analysis: &Analysis,
+        (analysis, file): (&'a Analysis, &'a EntryFile<'a>),
         (selector, selection): (&'a SelectorInput, &'a ProvisionalSelection<PolicyReference>),
         whole: Admitted<()>,
     ) -> Result<Self, ResolverInvariant> {
@@ -119,8 +124,12 @@ impl<'a> SelectedConfiguration<'a> {
             .declarations()
             .map_err(admission)?
             .ok_or_else(unreported)?;
+        let profiles = analysis.profiles_value().ok_or_else(unreported)?;
+        let observer = DeclarationObserver::new(file, profiles, selection.id().as_str())
+            .map_err(ResolverInvariant::Observer)?;
         Ok(Self {
             fields,
+            observer: Some(observer),
             resource_limits: Ok(selection.resource_limits()),
             selector,
             value: Ok(analysis.value_counts()),
@@ -155,6 +164,7 @@ impl<'a> SelectedConfiguration<'a> {
             .ok_or_else(|| causes.clone());
         Ok(Self {
             fields: DeclarationFields::unavailable(causes),
+            observer: None,
             resource_limits: Err(causes.clone()),
             selector,
             value: Err(causes.clone()),
@@ -267,6 +277,9 @@ pub(crate) enum ResolverInvariant {
     ProfileSelection(ProfileSelectionInvariant),
     /// A later phase's Evidence named a component without a path.
     Component(ComponentInvariant),
+    /// A later phase looked at a value of the selected declaration that has
+    /// no Evidence.
+    Observer(ObserverInvariant),
 }
 
 impl From<ProfileSelectionInvariant> for ResolverInvariant {
@@ -308,6 +321,7 @@ impl From<PolicyInvariant> for ResolverInvariant {
             PolicyInvariant::Evaluation(invariant) => Self::Evaluation(invariant),
             PolicyInvariant::Selection(invariant) => Self::Selection(invariant),
             PolicyInvariant::Component(invariant) => Self::Component(invariant),
+            PolicyInvariant::Observer(invariant) => Self::Observer(invariant),
         }
     }
 }
@@ -348,7 +362,7 @@ where
         invocation.capability,
         invocation.collection,
         configuration.resource_limits.as_ref().copied(),
-        &declared,
+        (&declared, configuration.observer.as_ref()),
         &configuration.measures(),
         invocation.verification,
     )?;
@@ -968,13 +982,16 @@ pub(super) mod tests {
         ) -> R {
             let analysis = analyze(&self.config, &self.capability);
             assert!(analysis.is_complete());
+            let (bytes, _) = entry_input(&self.config, &self.capability);
+            let fixture = FileFixture::new(&self.capability);
+            let file = fixture.file(bytes);
             let selector = self.selector();
             let Ok(Selection::Selected(selection)) = analysis.select(&selector) else {
                 panic!("{} is not selected", self.selected);
             };
             let configuration = SelectedConfiguration::new(
                 &Evaluation::default(),
-                &analysis,
+                (&analysis, &file),
                 (&selector, &selection),
                 Ok(()),
             )
@@ -1184,9 +1201,12 @@ pub(super) mod tests {
         )?;
         let root = whole(evaluation);
         let configuration = match (&structure, &selection) {
-            (Ok(analysis), Ok(selection)) => {
-                SelectedConfiguration::new(evaluation, analysis, (selector, selection), root)?
-            }
+            (Ok(analysis), Ok(selection)) => SelectedConfiguration::new(
+                evaluation,
+                (analysis, file),
+                (selector, selection),
+                root,
+            )?,
             (_, Err(causes)) => SelectedConfiguration::unselected(
                 structure.as_ref().ok(),
                 (selector, causes),
@@ -1607,6 +1627,42 @@ pub(super) mod tests {
                     assert_eq!(units, [missing], "{unit:?}");
                 }
             }
+        });
+    }
+
+    /// Phase 4 observes a bound over the selected declaration's references at
+    /// the declaration, in the file entry admitted (D15:790, 1918).
+    #[test]
+    fn a_reference_bound_is_observed_at_the_declaration_in_the_file() {
+        use crate::resolver::evidence_token::EvidenceTokens;
+        use crate::resolver::occurrence::redacted;
+        use crate::resolver::resource_policy::ArtifactSubject;
+        use crate::resolver::token::Sha256;
+        const PROFILE: crate::resolver::token::Specification<'static> =
+            crate::resolver::token::Specification {
+                identity: "intlify-project-profile",
+                revision: "0",
+            };
+        let mut inputs = Inputs::complete();
+        inputs.capability.artifact_admission.max_artifact_references = bound(1);
+        inputs.attempt(|evaluation, _| {
+            let candidates = evaluation.occurrence_candidates();
+            let tokens = EvidenceTokens::assign(PROFILE, redacted(candidates), &Sha256);
+            let references = resource_policy::unit(
+                PolicySubject::Capability(ArtifactSubject::References),
+                Check::WithinCapability,
+            );
+            let observed: Vec<Value> = candidates
+                .iter()
+                .filter(|candidate| *candidate.finding.unit() == references)
+                .map(|candidate| candidate.primary.retained(PROFILE, &tokens).unwrap().view())
+                .collect();
+            assert_eq!(observed.len(), 1);
+            assert_eq!(observed[0]["origin"], "configuration-file");
+            assert_eq!(
+                observed[0]["value"],
+                json!({ "exact-json-pointer": "/profiles/web" })
+            );
         });
     }
 
@@ -2666,20 +2722,23 @@ pub(super) mod tests {
         let Ok(Selection::Selected(selection)) = analysis.select(&selector) else {
             panic!("web is not selected");
         };
-        let configuration = |analysis| {
+        let fixture = FileFixture::new(&capability);
+        let configuration = |config: &Value, analysis| {
+            let file = fixture.file(entry_input(config, &capability).0);
             SelectedConfiguration::new(
                 &Evaluation::default(),
-                analysis,
+                (analysis, &file),
                 (&selector, &selection),
                 Ok(()),
             )
+            .map(|_| ())
         };
-        assert!(configuration(&analysis).is_ok());
+        assert!(configuration(&complete.config, &analysis).is_ok());
         let mut partial = complete.config.clone();
         partial["profiles"]["web"]["projectId"] = json!("Store Front");
-        let partial = analyze(&partial, &capability);
+        let analyzed = analyze(&partial, &capability);
         assert_eq!(
-            configuration(&partial).err(),
+            configuration(&partial, &analyzed).err(),
             Some(ResolverInvariant::Structural(
                 StructuralInvariant::UnreportedFailure
             ))
