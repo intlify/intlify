@@ -9,6 +9,8 @@
 //! names, as trusted setup would. Neither the result nor its observation is a
 //! Profile or a shared artifact.
 
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 
 use crate::artifacts::collection::FormalCollection;
@@ -17,6 +19,9 @@ use crate::boundary::capability::ImplementationCapability;
 use crate::boundary::verification::VerificationInput;
 use crate::model::ProfileId;
 use crate::references::PolicyReference;
+use crate::resolver::declaration_observer::DeclarationObserver;
+use crate::resolver::entry::fixtures::FileFixture;
+use crate::resolver::entry::EntryFile;
 use crate::resolver::evaluation::{
     Actual, Admitted, BootstrapLimitExceeded, Causes, Check, Evaluation, IssueKey, LimitExceeded,
     Shortfall, Status, Subject, Unit,
@@ -38,6 +43,11 @@ use super::quantity::Quantity;
 /// pre-invocation boundary.
 pub(super) struct PreparedPolicy {
     pub(super) analysis: Analysis,
+    /// The configuration's bytes, the file the analysis materialized, which
+    /// Phase 4's checks observe the selected declaration in, admitted under
+    /// `fixture`.
+    pub(super) source: Arc<[u8]>,
+    pub(super) fixture: FileFixture,
     pub(super) config: Config,
     pub(super) selected: ProfileId,
     pub(super) selector: SelectorInput,
@@ -65,6 +75,23 @@ fn pinning(reference: &PolicyReference) -> VerificationInput {
 }
 
 impl PreparedPolicy {
+    /// The configuration's file, admitted under `fixture` as entry admission
+    /// would.
+    pub(super) fn file(&self) -> EntryFile<'_> {
+        self.fixture.file(Arc::clone(&self.source))
+    }
+
+    /// Where Phase 4's checks observe the selected declaration: in `file`,
+    /// as profile selection hands it on (D15:790), built before the interval.
+    /// None when the configuration does not hold the declaration.
+    pub(super) fn observer<'a>(
+        &'a self,
+        file: &'a EntryFile<'a>,
+    ) -> Option<DeclarationObserver<'a>> {
+        let profiles = self.analysis.profiles_value()?;
+        DeclarationObserver::new(file, profiles, self.selected.as_str()).ok()
+    }
+
     /// The selected declaration's references and what the earlier phases
     /// measured, when the configuration is complete.
     pub(super) fn inputs(&self) -> Option<PolicyInputs<'_>> {
@@ -103,11 +130,13 @@ pub(super) struct Resolved {
 }
 
 /// Phase 4 over a fresh evaluation: what preparation and every timed
-/// invocation run.
+/// invocation run. Its checks observe the selected declaration through
+/// `observer`.
 pub(super) fn resolve(
     capability: &ImplementationCapability,
     collection: &FormalCollection,
     inputs: &PolicyInputs<'_>,
+    observer: &DeclarationObserver<'_>,
 ) -> Resolved {
     let mut evaluation = Evaluation::default();
     let result = admit_resource_policy(
@@ -115,8 +144,7 @@ pub(super) fn resolve(
         capability,
         collection,
         Ok(inputs.resource_limits),
-        // The measurements read no file, and reach no reference bound.
-        (&inputs.references, None),
+        (&inputs.references, Some(observer)),
         &inputs.measures,
         &inputs.verification,
     );

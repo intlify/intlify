@@ -346,10 +346,17 @@ impl Prepared {
             }
             Self::ResourcePolicy(prepared) => {
                 let inputs = prepared.inputs().ok_or_else(I::unavailable)?;
+                let file = prepared.file();
+                let observer = prepared.observer(&file).ok_or_else(I::unavailable)?;
                 let measured = instrument.interval(
-                    (&prepared.capability, &prepared.collection, &inputs),
-                    |(capability, collection, inputs)| {
-                        resource_policy::resolve(capability, collection, inputs)
+                    (
+                        &prepared.capability,
+                        &prepared.collection,
+                        &inputs,
+                        &observer,
+                    ),
+                    |(capability, collection, inputs, observer)| {
+                        resource_policy::resolve(capability, collection, inputs, observer)
                     },
                 )?;
                 Ok(Interval {
@@ -457,7 +464,9 @@ impl Prepared {
         match self {
             Self::Authoring(analysis) => analysis.is_complete(),
             Self::LocalePolicyResolution(prepared) => prepared.fields().is_some(),
-            Self::ResourcePolicy(prepared) => prepared.inputs().is_some(),
+            Self::ResourcePolicy(prepared) => {
+                prepared.inputs().is_some() && prepared.observer(&prepared.file()).is_some()
+            }
             Self::ResolvedBinding(prepared) => prepared.inputs().is_some(),
             Self::TargetAndGroup(prepared) => prepared
                 .set()

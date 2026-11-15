@@ -361,7 +361,9 @@ fn phase_4_confirms_every_collection_phase_9_checks() {
         };
         policy.collection = collection.collection.clone();
         let inputs = policy.inputs().unwrap();
-        let phase_4 = resolve(&policy.capability, &policy.collection, &inputs);
+        let file = policy.file();
+        let observer = policy.observer(&file).unwrap();
+        let phase_4 = resolve(&policy.capability, &policy.collection, &inputs, &observer);
         let confirmed = phase_4.result.unwrap().confirmed.unwrap();
         // The policy Phase 9 runs under is the one Phase 4 confirms.
         assert_eq!(

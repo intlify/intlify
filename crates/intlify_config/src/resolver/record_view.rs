@@ -531,9 +531,21 @@ mod tests {
             .unwrap()
     }
 
-    /// Records the structural `unit` as finding `code`, observed at the root
-    /// of a configuration file, as Phase 2 observes what it finds.
+    /// Records `unit` as finding `code`, observed at the root of a
+    /// configuration file, as Phase 2 observes what it finds.
     fn block_observed(evaluation: &mut Evaluation, unit: Unit, code: Code) {
+        let found = Blocking {
+            code,
+            reason: None,
+            details: None,
+        };
+        blocked_observed(evaluation, unit, found);
+    }
+
+    /// Records `unit` as finding the blocking result `found`, observed at the
+    /// root of a configuration file, as a check whose Findings carry
+    /// occurrence Evidence observes what it finds.
+    fn blocked_observed(evaluation: &mut Evaluation, unit: Unit, found: Blocking) {
         use crate::resolver::entry::fixtures::FileFixture;
         use crate::resolver::evaluation::{Found, Observation};
         use crate::resolver::evidence::EvidenceProjection;
@@ -548,18 +560,13 @@ mod tests {
             None,
         )
         .unwrap();
-        let blocking = Blocking {
-            code,
-            reason: None,
-            details: None,
-        };
         let observation = Observation {
             primary,
             related: Vec::new(),
         };
         evaluation
             .check_found(unit, Ok(()), |()| {
-                Err::<(), _>(Found::observed(blocking, observation))
+                Err::<(), _>(Found::observed(found, observation))
             })
             .unwrap()
             .unwrap_err();
@@ -890,7 +897,7 @@ mod tests {
     fn a_finding_has_details_exactly_when_its_code_has_members_and_a_suggestion_exactly_when_it_suggests(
     ) {
         let mut evaluation = Evaluation::default();
-        blocked(
+        blocked_observed(
             &mut evaluation,
             policy(PolicySubject::ResourceLimits, Check::WithinValidationWork),
             Blocking::bootstrap_limit(BootstrapLimitExceeded {
@@ -902,7 +909,7 @@ mod tests {
                 actual: Actual::Exact(9),
             }),
         );
-        blocked(
+        blocked_observed(
             &mut evaluation,
             policy(PolicySubject::ResourceLimits, Check::CompatiblePolicy),
             Blocking::shortfall(Shortfall {

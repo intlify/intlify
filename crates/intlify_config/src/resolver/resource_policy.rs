@@ -21,13 +21,19 @@
 //! past one artifact's bound under a key that keeps only its JSON type
 //! (D15:834, 836; plan 025 interpretation #200), and those of the selected
 //! declaration's references at the declaration, or at each reference's value,
-//! in the file Phase 1 read (D15:790, 1918, 1921-1922). The other checks carry
-//! no occurrence Evidence yet (plan 025 PRs 5f-4c-3, 5f-4d).
+//! in the file Phase 1 read (D15:790, 1918, 1921-1922). After selection, the
+//! work bounds and the body are observed at the chosen candidate, beside the
+//! selected reference and, for a work bound, the capability's bootstrap bound
+//! or, for the body, the pins where they do not authenticate the candidate;
+//! the comparison is observed at the admitted Policy, beside the reference and
+//! the capability's bound it needs more of (D15:2249, 2355). Candidate
+//! selection and the rechecks carry no occurrence Evidence yet (plan 025 PRs
+//! 5f-4c-3b, 5f-4d).
 
 use std::collections::BTreeMap;
 
 use crate::artifacts::collection::FormalCollection;
-use crate::artifacts::envelope::{ArtifactKind, Declaration, FormalMember, MemberKey};
+use crate::artifacts::envelope::{ArtifactKind, Declaration, ExactTuple, FormalMember, MemberKey};
 use crate::boundary::capability::ImplementationCapability;
 use crate::boundary::verification::VerificationInput;
 use crate::input_limits::{Bound, ValueCounts};
@@ -46,7 +52,7 @@ use super::evaluation::{
     Observation, Phase, Shortfall, Subject, Unit,
 };
 use super::evidence::EvidenceProjection;
-use super::evidence_component::{ComponentInvariant, ComponentPath, Key};
+use super::evidence_component::{ComponentInvariant, ComponentPath, Key, VerificationRole};
 use super::evidence_token::JsonType;
 use super::limits::{
     ArtifactAdmissionLimits, BoundId, ConfigurationInputLimits, ConfirmedPolicy, Group,
@@ -429,6 +435,14 @@ fn candidate(member: &FormalMember) -> Result<EvidenceProjection, ComponentInvar
         .map(EvidenceProjection::resolver_input)
 }
 
+/// Resolver-input Evidence of the admitted Resource Limit Policy, under the
+/// canonical exact-reference identity that keys an admitted envelope
+/// (D15:824, 834; plan 025 interpretation #200).
+fn admitted(tuple: &ExactTuple) -> Result<EvidenceProjection, ComponentInvariant> {
+    ComponentPath::artifact_member(Key::Identity(tuple.view()))
+        .map(EvidenceProjection::resolver_input)
+}
+
 /// Resolver-input Evidence of the Implementation Capability's `bound`
 /// (D15:836).
 fn capability_bound(bound: CapabilityBound) -> Result<EvidenceProjection, ComponentInvariant> {
@@ -581,16 +595,42 @@ fn admit_and_compare(
         both(scanned, inspected.own_bytes).map(|(reference, ())| reference),
         |reference| select_candidate(&reference.tuple(), submitted.members),
     )?;
-    let measured = [
+    // Every check after selection compares what it judges with the selected
+    // reference, through which it reaches the candidate, so nothing is
+    // observed without the declaration's file (D15:790, 2249).
+    let reference = match (declared.1, resource_limits) {
+        (Some(observer), Ok(_)) => {
+            Some(observer.value(&["policies", PolicySlot::ResourceLimits.name()])?)
+        }
+        _ => None,
+    };
+    // The chosen candidate, which no Set admitted yet (D15:834; plan 025
+    // interpretation #200).
+    let chosen = selected
+        .as_ref()
+        .ok()
+        .map(|envelope| candidate(envelope.member()))
+        .transpose()?;
+    // A check of the candidate observes it beside the selected reference and
+    // whatever else it compares the candidate with.
+    let beside = |others: Vec<EvidenceProjection>| {
+        Some(Observation {
+            primary: chosen.clone()?,
+            related: [reference.clone()?].into_iter().chain(others).collect(),
+        })
+    };
+    let mut measured = selected;
+    for (check, bound) in [
         (Check::WithinEnvelopeDepth, WorkBound::EnvelopeDepth),
         (Check::WithinDecodedAllocation, WorkBound::DecodedAllocation),
         (Check::WithinValidationWork, WorkBound::ValidationWork),
-    ]
-    .into_iter()
-    .try_fold(selected, |candidate, (check, bound)| {
-        evaluation.check(
+    ] {
+        let observed = beside(vec![capability_bound(CapabilityBound::BootstrapOnly(
+            bound.id(),
+        ))?]);
+        measured = evaluation.check_found(
             unit(PolicySubject::ResourceLimits, check),
-            candidate,
+            measured,
             |candidate| {
                 let total = match bound {
                     WorkBound::EnvelopeDepth => work::envelope_depth(candidate.member().value()),
@@ -600,21 +640,53 @@ fn admit_and_compare(
                     WorkBound::ValidationWork => work::validation_work_units(candidate.content()),
                     WorkBound::MetadataScan => unreachable!("the scan comes before selection"),
                 };
-                work::within(bound, limits, total).map(|()| candidate)
+                work::within(bound, limits, total)
+                    .map(|()| candidate)
+                    .map_err(|blocking| found(blocking, observed))
             },
-        )
-    })?;
-    let decided = evaluation.check(
+        )?;
+    }
+    // The pins are compared only where they do not authenticate the
+    // candidate (D15:2249).
+    let unpinned = beside(vec![EvidenceProjection::resolver_input(
+        ComponentPath::verification(VerificationRole::Pins),
+    )]);
+    let pinned = beside(Vec::new());
+    let decided = evaluation.check_found(
         unit(PolicySubject::ResourceLimits, Check::CandidateBody),
         measured,
-        |candidate| admit_body(&candidate, verification),
+        |candidate| {
+            let observed = if verification.authenticates(&candidate) {
+                pinned
+            } else {
+                unpinned
+            };
+            admit_body(&candidate, verification).map_err(|blocking| found(blocking, observed))
+        },
     )?;
-    Ok(evaluation.check(
+    // The admitted Policy needs more of the first bound in fixed declaration
+    // order the capability lacks (D15:2355). It is observed at the Policy,
+    // beside the selected reference and the capability's bound (D15:2249).
+    let shortfall = decided
+        .as_ref()
+        .ok()
+        .and_then(|policy| first_shortfall(policy.limits(), capability.policy_comparable()));
+    let compared = match (&decided, &reference, shortfall) {
+        (Ok(policy), Some(reference), Some(shortfall)) => Some(Observation {
+            primary: admitted(policy.tuple())?,
+            related: vec![
+                reference.clone(),
+                capability_bound(CapabilityBound::PolicyComparable(shortfall.bound))?,
+            ],
+        }),
+        _ => None,
+    };
+    Ok(evaluation.check_found(
         unit(PolicySubject::ResourceLimits, Check::CompatiblePolicy),
         decided,
-        |policy| match first_shortfall(policy.limits(), capability.policy_comparable()) {
+        |policy| match shortfall {
             None => Ok(policy),
-            Some(shortfall) => Err(Blocking::shortfall(shortfall)),
+            Some(shortfall) => Err(found(Blocking::shortfall(shortfall), compared)),
         },
     )?)
 }
@@ -1088,6 +1160,7 @@ fn first_shortfall(policy: &ResolutionLimits, available: &ResolutionLimits) -> O
 
 #[cfg(test)]
 mod tests {
+    use intlify_shared_json::encoding::encode;
     use serde_json::{json, Value};
 
     use std::collections::BTreeSet;
@@ -1104,6 +1177,7 @@ mod tests {
         Actual, BootstrapLimitExceeded, Code, IssueKey, LimitExceeded, Reason, Status,
     };
     use crate::resolver::evidence::Evidence;
+    use crate::resolver::evidence_source::hex;
     use crate::resolver::evidence_token::EvidenceTokens;
     use crate::resolver::limits::{fixture_limits, SECTION};
     use crate::resolver::locales::fixtures::earlier;
@@ -1417,6 +1491,15 @@ mod tests {
 
         /// Phase 4 up to the comparison.
         fn run(&self) -> (Evaluation, Admitted<AdmittedResourcePolicy>) {
+            self.run_pinning(&self.verification())
+        }
+
+        /// Phase 4 up to the comparison, under the Verification Input
+        /// `verification`.
+        fn run_pinning(
+            &self,
+            verification: &VerificationInput,
+        ) -> (Evaluation, Admitted<AdmittedResourcePolicy>) {
             let mut evaluation = Evaluation::default();
             let collection = collection(&self.members);
             let admitted = self
@@ -1427,7 +1510,7 @@ mod tests {
                         &Submitted::of(&collection),
                         self.resource_limits.as_ref(),
                         declared,
-                        &self.verification(),
+                        verification,
                     )
                 })
                 .unwrap();
@@ -2250,6 +2333,144 @@ mod tests {
             .flat_map(|candidate| &candidate.related)
             .collect();
         assert_eq!(observed, [&values[1].1.related[0], &values[2].1.related[0]]);
+    }
+
+    /// That `related` is the selected `resourceLimits` reference, at the
+    /// pointer of its path from the root, through which a check after
+    /// selection reaches the candidate (D15:790, 2249).
+    fn assert_selected_reference(related: &Value) {
+        assert_eq!(related["kind"], "configuration-value", "{related}");
+        assert_eq!(related["origin"], "configuration-file", "{related}");
+        assert_eq!(
+            related["value"],
+            json!({
+                "exact-json-pointer": format!("/profiles/{SELECTED}/policies/resourceLimits")
+            }),
+            "{related}"
+        );
+    }
+
+    /// The view under `tokens` of the chosen candidate, a collection member
+    /// no Set admitted, under a key that keeps only its JSON type.
+    fn chosen_view(tokens: &EvidenceTokens) -> Value {
+        view(
+            ComponentPath::artifact_member(Key::Unsafe(JsonType::Object))
+                .map(EvidenceProjection::resolver_input),
+            tokens,
+        )
+    }
+
+    /// Each work bound after selection is observed at the chosen candidate,
+    /// beside the selected reference and the capability's bootstrap bound
+    /// (D15:834, 836, 2249; plan 025 interpretation #200).
+    #[test]
+    fn each_work_bound_after_selection_is_observed_at_the_candidate() {
+        for (check, work_bound, total) in bootstrap_totals().into_iter().skip(1) {
+            let mut over = Inputs::new();
+            over.capability = over
+                .capability
+                .clone()
+                .with_artifact_bootstrap(bootstrap_limits(work_bound, total - 1));
+            let (evaluation, _) = over.run();
+            let (found, tokens) = occurrences_of(&evaluation);
+            let limit = view(
+                capability_bound(CapabilityBound::BootstrapOnly(work_bound.id())),
+                &tokens,
+            );
+            let [(unit, primary, related, ordinal)] = <[Observed; 1]>::try_from(found).unwrap();
+            assert_eq!(unit, bootstrap_unit(check));
+            assert_eq!(primary, chosen_view(&tokens), "{check:?}");
+            assert_eq!(related.len(), 2, "{check:?}");
+            assert_selected_reference(&related[0]);
+            assert_eq!(related[1], limit, "{check:?}");
+            assert_eq!(ordinal, 0, "{check:?}");
+        }
+    }
+
+    /// The body is observed at the chosen candidate beside the selected
+    /// reference, and beside the pins only where they do not authenticate
+    /// the candidate (D15:2249).
+    #[test]
+    fn the_body_is_observed_beside_the_pins_only_where_they_do_not_authenticate_the_candidate() {
+        // The pins authenticate a candidate whose integrity does not hold.
+        let mut tampered = Inputs::new();
+        tampered.members[0]["integrityDigest"] = json!(format!("sha256:{}", "0".repeat(64)));
+        let authenticating = tampered.verification();
+        // The pins name another policy than the intact candidate.
+        let intact = Inputs::new();
+        let elsewhere = VerificationInput::fixture_owned([tuple_of(&envelope_of(
+            ArtifactKind::ResourceLimitPolicy,
+            "pinned-limits",
+            "1",
+            json!({}),
+        ))]);
+        let pins = json!({
+            "kind": "verification-input",
+            "origin": "resource-limit-policy-verification",
+            "component": [{ "fixed-role": "pins" }],
+        });
+        for (inputs, verification, beside) in [
+            (&tampered, &authenticating, Vec::new()),
+            (&intact, &elsewhere, vec![pins]),
+        ] {
+            let (evaluation, admitted) = inputs.run_pinning(verification);
+            assert!(admitted.is_err());
+            let key = key_of(&evaluation, &bootstrap_unit(Check::CandidateBody));
+            assert_eq!(
+                (key.code(), key.reason()),
+                (
+                    Code::ResourcePolicyNotAdmitted,
+                    Some(Reason::BodyIntegrityInvalid)
+                )
+            );
+            let (found, tokens) = occurrences_of(&evaluation);
+            let [(unit, primary, related, ordinal)] = <[Observed; 1]>::try_from(found).unwrap();
+            assert_eq!(unit, bootstrap_unit(Check::CandidateBody));
+            assert_eq!(primary, chosen_view(&tokens));
+            assert_selected_reference(&related[0]);
+            assert_eq!(related[1..], beside[..]);
+            assert_eq!(ordinal, 0);
+        }
+    }
+
+    /// The comparison is observed at the admitted Policy, under the exact
+    /// reference that keys it, beside the selected reference and the
+    /// capability's bound it needs more of first (D15:824, 834, 2249, 2355).
+    #[test]
+    fn the_comparison_is_observed_at_the_admitted_policy() {
+        let mut short = policy_limits();
+        short.artifact_admission = fixture_limits(10_000).artifact_admission;
+        short.locale_resolution.max_requested_locales = bound(10);
+        short.configuration_input.value.max_depth = bound(1);
+        let mut lacking = Inputs::new();
+        lacking.capability = ImplementationCapability::fixture_owned(short);
+        let (evaluation, _) = lacking.run();
+        let (found, tokens) = occurrences_of(&evaluation);
+        let limit = view(
+            capability_bound(CapabilityBound::PolicyComparable(BoundId {
+                group: Group::ConfigurationInput,
+                name: "maxDepth",
+            })),
+            &tokens,
+        );
+        let reference = reference_value(&tuple_of(&chosen()));
+        let [(unit, primary, related, ordinal)] = <[Observed; 1]>::try_from(found).unwrap();
+        assert_eq!(unit, comparison());
+        assert_eq!(
+            primary,
+            json!({
+                "kind": "artifact-input",
+                "origin": "profile-resolution-artifact-collection",
+                "component": [
+                    { "fixed-role": "artifact-member" },
+                    { "safe-key": hex(&encode(&reference).unwrap()) },
+                ],
+            })
+        );
+        assert_eq!(related.len(), 2);
+        assert_selected_reference(&related[0]);
+        assert_eq!(related[1], limit);
+        assert_eq!(ordinal, 0);
     }
 
     fn reference_unit(field: ReferenceField) -> Unit {

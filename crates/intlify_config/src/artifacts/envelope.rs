@@ -18,7 +18,7 @@ use intlify_shared_json::encoding::{
     encode, hash, hash_with_excluded_member, Domain, EncodingFailure,
 };
 use intlify_shared_json::token::{valid_hex256, IntegrityDigest, Token};
-use serde_json::{Map, Value};
+use serde_json::{json, Map, Value};
 
 use super::content::{self, Content};
 use super::{closed, count, token, SemanticDigest};
@@ -153,6 +153,21 @@ pub(crate) struct ExactTuple {
     pub(crate) revision: Token,
     pub(crate) specification_revision: Token,
     pub(crate) semantic_digest: SemanticDigest,
+}
+
+impl ExactTuple {
+    /// 017's exact reference to the tuple, the five members a declaration
+    /// writes: the view of an admitted envelope's canonical exact-reference
+    /// identity (D15:824, 834).
+    pub(crate) fn view(&self) -> Value {
+        json!({
+            "kind": self.kind.spelling(),
+            "identity": self.identity.as_str(),
+            "revision": self.revision.as_str(),
+            "specificationRevision": self.specification_revision.as_str(),
+            "semanticDigest": self.semantic_digest.as_str(),
+        })
+    }
 }
 
 /// What names a collection member: the exact tuple it establishes, or,
@@ -1076,5 +1091,25 @@ mod tests {
                     .len()
             )
         );
+    }
+
+    /// A tuple's view is the reference a declaration writes for it: it reads
+    /// back as a reference to the same tuple.
+    #[test]
+    fn a_tuples_view_is_the_reference_a_declaration_writes() {
+        let tuple = tuple_of(approval()).unwrap();
+        let view = tuple.view();
+        assert_eq!(
+            view.as_object().unwrap().keys().collect::<Vec<_>>(),
+            [
+                "kind",
+                "identity",
+                "revision",
+                "specificationRevision",
+                "semanticDigest"
+            ]
+        );
+        let named: PolicyReference = serde_json::from_value(view).unwrap();
+        assert_eq!(named.tuple(), tuple);
     }
 }
