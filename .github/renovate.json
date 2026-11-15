@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "automerge": true,
+  "enabled": false,
   "extends": ["config:recommended", ":preserveSemverRanges", "helpers:pinGitHubActionDigests"],
   "labels": ["deps"],
   "major": {
