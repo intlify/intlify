@@ -27,8 +27,10 @@
 //! or, for the body, the pins where they do not authenticate the candidate;
 //! the comparison is observed at the admitted Policy, beside the reference and
 //! the capability's bound it needs more of (D15:2249, 2355). Candidate
-//! selection and the rechecks carry no occurrence Evidence yet (plan 025 PRs
-//! 5f-4c-3b, 5f-4d).
+//! selection observes a reference that names nothing admissible at the
+//! reference, beside what it compared the reference with, and each occurrence
+//! of a selected group at the member, beside the reference (D15:2249). The
+//! rechecks carry no occurrence Evidence yet (plan 025 PR 5f-4d).
 
 use std::collections::BTreeMap;
 
@@ -44,7 +46,7 @@ use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::selection::{SelectionInvariant, SelectorInput, StringLengthFact};
 
 use super::bootstrap::work::{self, WorkBound};
-use super::bootstrap::{admit_body, select_candidate, AdmittedResourcePolicy};
+use super::bootstrap::{admit_body, select_candidate, AdmittedResourcePolicy, Compared, Rejected};
 use super::capability::CapabilityBound;
 use super::declaration_observer::{DeclarationObserver, ObserverInvariant};
 use super::evaluation::{
@@ -590,20 +592,29 @@ fn admit_and_compare(
                 .map_err(|blocking| Found::observed(blocking, scan))
         },
     )?;
-    let selected = evaluation.check(
-        unit(PolicySubject::ResourceLimits, Check::BootstrapCandidate),
-        both(scanned, inspected.own_bytes).map(|(reference, ())| reference),
-        |reference| select_candidate(&reference.tuple(), submitted.members),
-    )?;
-    // Every check after selection compares what it judges with the selected
-    // reference, through which it reaches the candidate, so nothing is
-    // observed without the declaration's file (D15:790, 2249).
+    // Every check from candidate selection on compares what it judges with
+    // the selected reference, through which it reaches the candidates, so
+    // nothing is observed without the declaration's file (D15:790, 2249).
     let reference = match (declared.1, resource_limits) {
         (Some(observer), Ok(_)) => {
             Some(observer.value(&["policies", PolicySlot::ResourceLimits.name()])?)
         }
         _ => None,
     };
+    // A member that selection compares establishes a tuple, so it is an
+    // envelope, a JSON object, which no Set admitted (D15:834; plan 025
+    // interpretation #200).
+    let envelope = ComponentPath::artifact_member(Key::Unsafe(JsonType::Object))
+        .map(EvidenceProjection::resolver_input)?;
+    let root = collection_root()?;
+    let selected = evaluation.check_found(
+        unit(PolicySubject::ResourceLimits, Check::BootstrapCandidate),
+        both(scanned, inspected.own_bytes).map(|(reference, ())| reference),
+        |named| {
+            select_candidate(&named.tuple(), submitted.members)
+                .map_err(|rejected| rejection(rejected, reference.as_ref(), (&envelope, &root)))
+        },
+    )?;
     // The chosen candidate, which no Set admitted yet (D15:834; plan 025
     // interpretation #200).
     let chosen = selected
@@ -689,6 +700,57 @@ fn admit_and_compare(
             Some(shortfall) => Err(found(Blocking::shortfall(shortfall), compared)),
         },
     )?)
+}
+
+/// The candidates of a selection that admitted no candidate, each with what
+/// it observed (D15:2249). A reference that names nothing admissible is
+/// observed at the reference, beside what it was compared with: nothing when
+/// its own checks fail, the collection as one location when no member shares
+/// even its kind or identity, or each candidate of the closest tier. A
+/// selected group's conflicting or duplicate occurrences are each observed at
+/// the member, beside the reference. Every member is the same `envelope`
+/// Evidence, so a tier's candidates merge into one related record and a
+/// group's occurrences differ only in their ordinals (D15:834). Nothing is
+/// observed without the reference's value.
+fn rejection(
+    rejected: Rejected<'_>,
+    reference: Option<&EvidenceProjection>,
+    (envelope, root): (&EvidenceProjection, &EvidenceProjection),
+) -> Found {
+    let Rejected { blocking, compared } = rejected;
+    let Some(reference) = reference else {
+        return Found::from(blocking);
+    };
+    let at_reference = |related| {
+        Found::observed(
+            blocking,
+            Observation {
+                primary: reference.clone(),
+                related,
+            },
+        )
+    };
+    let at_member = || {
+        Found::observed(
+            blocking,
+            Observation {
+                primary: envelope.clone(),
+                related: vec![reference.clone()],
+            },
+        )
+    };
+    match compared {
+        Compared::Nothing => at_reference(Vec::new()),
+        Compared::Collection => at_reference(vec![root.clone()]),
+        Compared::Tier(candidates) => {
+            at_reference(candidates.iter().map(|_| envelope.clone()).collect())
+        }
+        // The first member, then each other one.
+        Compared::Group(members) => members
+            .iter()
+            .skip(1)
+            .fold(at_member(), |found, _| found.and(at_member())),
+    }
 }
 
 /// One bound's unit, not evaluated while the bound's value or the count is
@@ -2335,18 +2397,18 @@ mod tests {
         assert_eq!(observed, [&values[1].1.related[0], &values[2].1.related[0]]);
     }
 
-    /// That `related` is the selected `resourceLimits` reference, at the
-    /// pointer of its path from the root, through which a check after
-    /// selection reaches the candidate (D15:790, 2249).
-    fn assert_selected_reference(related: &Value) {
-        assert_eq!(related["kind"], "configuration-value", "{related}");
-        assert_eq!(related["origin"], "configuration-file", "{related}");
+    /// That `evidence` is the selected `resourceLimits` reference, at the
+    /// pointer of its path from the root, through which a check from candidate
+    /// selection on reaches the candidates (D15:790, 2249).
+    fn assert_selected_reference(evidence: &Value) {
+        assert_eq!(evidence["kind"], "configuration-value", "{evidence}");
+        assert_eq!(evidence["origin"], "configuration-file", "{evidence}");
         assert_eq!(
-            related["value"],
+            evidence["value"],
             json!({
                 "exact-json-pointer": format!("/profiles/{SELECTED}/policies/resourceLimits")
             }),
-            "{related}"
+            "{evidence}"
         );
     }
 
@@ -2471,6 +2533,90 @@ mod tests {
         assert_selected_reference(&related[0]);
         assert_eq!(related[1], limit);
         assert_eq!(ordinal, 0);
+    }
+
+    /// A reference that names nothing admissible is observed at the
+    /// reference, beside what selection compared it with: nothing when its
+    /// own checks fail, the collection as one location when no member shares
+    /// even its kind or identity, and otherwise the closest tier's candidates
+    /// (D15:834, 2249).
+    #[test]
+    fn a_reference_naming_nothing_admissible_is_observed_at_the_reference() {
+        // What a case relates to the reference, under the run's tokens.
+        type Related = fn(&EvidenceTokens) -> Vec<Value>;
+        // The Trust Policy's reference fails the role-kind check.
+        let mut wrong = Inputs::new();
+        wrong.resource_limits = Ok(reference_to(&wrong.members[1]));
+        // No submitted artifact shares the policy's kind and identity.
+        let mut missing = Inputs::new();
+        missing.members.remove(0);
+        // Only another revision of the policy is submitted.
+        let mut revised = Inputs::new();
+        revised.members[0] = envelope_of(
+            ArtifactKind::ResourceLimitPolicy,
+            "storefront-limits",
+            "2",
+            json!({ SECTION: policy_limits().section() }),
+        );
+        let cases: [(&Inputs, Reason, Related); 3] = [
+            (&wrong, Reason::RoleKindMismatch, |_| Vec::new()),
+            (&missing, Reason::NotFound, |tokens| {
+                vec![view(collection_root(), tokens)]
+            }),
+            (&revised, Reason::RevisionMismatch, |tokens| {
+                vec![chosen_view(tokens)]
+            }),
+        ];
+        for (inputs, reason, related) in cases {
+            let (evaluation, admitted) = inputs.run();
+            assert!(admitted.is_err());
+            let key = key_of(&evaluation, &decision());
+            assert_eq!(
+                (key.code(), key.reason()),
+                (Code::ArtifactReferenceNotAdmitted, Some(reason))
+            );
+            let (found, tokens) = occurrences_of(&evaluation);
+            let [(unit, primary, observed, ordinal)] = <[Observed; 1]>::try_from(found).unwrap();
+            assert_eq!(unit, decision(), "{reason:?}");
+            assert_selected_reference(&primary);
+            assert_eq!(observed, related(&tokens), "{reason:?}");
+            assert_eq!(ordinal, 0, "{reason:?}");
+        }
+    }
+
+    /// Each occurrence of a selected group that is not one candidate, a
+    /// duplicate or a conflicting body, is observed at the member beside the
+    /// reference: one redacted member, whose occurrences differ only in their
+    /// ordinals (D15:834, 2249).
+    #[test]
+    fn each_occurrence_of_a_rejected_group_is_observed_at_the_member() {
+        let mut repeated = Inputs::new();
+        repeated.members.push(chosen());
+        let mut conflicting = Inputs::new();
+        let mut tampered = chosen();
+        tampered["integrityDigest"] = json!(format!("sha256:{}", "0".repeat(64)));
+        conflicting.members.push(tampered);
+        for (inputs, reason) in [
+            (&repeated, Reason::DuplicateEnvelope),
+            (&conflicting, Reason::ConflictingContent),
+        ] {
+            let (evaluation, admitted) = inputs.run();
+            assert!(admitted.is_err());
+            let key = key_of(&evaluation, &decision());
+            assert_eq!(
+                (key.code(), key.reason()),
+                (Code::ArtifactCollectionNotAdmitted, Some(reason))
+            );
+            let (found, tokens) = occurrences_of(&evaluation);
+            assert_eq!(found.len(), 2, "{reason:?}");
+            for (expected, (unit, primary, related, ordinal)) in (0..).zip(found) {
+                assert_eq!(unit, decision(), "{reason:?}");
+                assert_eq!(primary, chosen_view(&tokens), "{reason:?}");
+                assert_eq!(related.len(), 1, "{reason:?}");
+                assert_selected_reference(&related[0]);
+                assert_eq!(ordinal, expected, "{reason:?}");
+            }
+        }
     }
 
     fn reference_unit(field: ReferenceField) -> Unit {

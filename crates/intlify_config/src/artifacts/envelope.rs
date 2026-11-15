@@ -377,7 +377,7 @@ impl<'a> Envelope<'a> {
         &self.tuple
     }
 
-    pub(crate) const fn member(&self) -> &FormalMember {
+    pub(crate) const fn member(&self) -> &'a FormalMember {
         self.member
     }
 
