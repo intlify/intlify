@@ -870,9 +870,9 @@ mod tests {
         assert_eq!(prepared.resolve().unwrap().result, Ok(Ok(retained)));
     }
 
-    /// The interval observes a target whose locale set or effective default
-    /// fails through the selected declaration's observer, as the resolver
-    /// does: one candidate at the failed target's check.
+    /// The interval observes a target whose locale set, effective default, or
+    /// directions fail through the selected declaration's observer, as the
+    /// resolver does: one candidate at the failed target's check.
     #[test]
     fn the_interval_observes_a_target_outside_its_locales() {
         for (recipe, id, check) in [
@@ -886,6 +886,11 @@ mod tests {
                 R::InheritedDefaultNotRequested,
                 "ssr",
                 Check::SupportedDefault,
+            ),
+            (
+                R::TargetLocaleDirectionMissing,
+                "ssr",
+                Check::DirectedLocales,
             ),
         ] {
             let resolved = resolved(recipe);
