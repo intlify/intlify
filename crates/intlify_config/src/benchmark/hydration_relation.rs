@@ -116,6 +116,7 @@ impl PreparedHydration {
             policy,
             &PolicyInputs::fixture_owned().negotiation,
             &locales,
+            Some(&observer),
         )
         .ok()?;
         let references = resolve_fields(

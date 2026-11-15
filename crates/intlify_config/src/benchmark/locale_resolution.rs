@@ -180,7 +180,13 @@ fn policies<P: Provider>(
         fields,
         Some(&observer),
     )?;
-    let negotiation = resolve_negotiation(evaluation, Ok(policy), &inputs.negotiation, &locales)?;
+    let negotiation = resolve_negotiation(
+        evaluation,
+        Ok(policy),
+        &inputs.negotiation,
+        &locales,
+        Some(&observer),
+    )?;
     let fallback = resolve_fallback(
         evaluation,
         Ok(policy),

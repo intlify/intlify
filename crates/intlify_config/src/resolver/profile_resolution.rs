@@ -434,6 +434,7 @@ where
         confirmed,
         &admitted.locale_negotiation,
         &locales,
+        observer.as_ref(),
     )?;
     own(
         evaluation,
@@ -2593,6 +2594,49 @@ pub(super) mod tests {
             let unsafe_key = observed_views(&evaluation, &key(rejected()));
             assert_eq!(unsafe_key.len(), 1);
             assert!(unsafe_key[0].0["value"].get("exact-json-pointer").is_none());
+        });
+    }
+
+    /// Phase 8 observes through what Phase 5 bound as well: a key two entries
+    /// name is found at each entry's key under its non-secret name, beside
+    /// the other's (D15:776, 2410).
+    #[test]
+    fn a_negotiation_key_is_classified_by_the_canonicalizer_phase_5_bound() {
+        use crate::resolver::negotiation::{self, NegotiationSubject};
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["localeNegotiation"] = json!({"aliases": {"EN": "ja", "en": "ja"}});
+        inputs.resolve(|evaluation, _| {
+            let duplicate = negotiation::unit(
+                NegotiationSubject::Key(LocaleKey::Canonical(canonical("en"))),
+                Check::UniqueLocale,
+            );
+            assert_eq!(
+                issues(&evaluation),
+                [(
+                    duplicate.clone(),
+                    Code::NegotiationAliasDuplicate,
+                    Some(Reason::SameDestination)
+                )]
+            );
+            let pointer = |name: &str| {
+                json!({ "exact-json-pointer": format!("/profiles/web/localeNegotiation/aliases/{name}") })
+            };
+            assert_eq!(
+                observed_views(&evaluation, &duplicate)
+                    .into_iter()
+                    .map(|(primary, related)| (
+                        primary["value"].clone(),
+                        related
+                            .iter()
+                            .map(|view| view["value"].clone())
+                            .collect::<Vec<_>>()
+                    ))
+                    .collect::<Vec<_>>(),
+                [
+                    (pointer("EN"), vec![pointer("en")]),
+                    (pointer("en"), vec![pointer("EN")]),
+                ]
+            );
         });
     }
 

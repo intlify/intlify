@@ -14,9 +14,10 @@ use crate::structural::selection::SelectorInput;
 use crate::structural::Edge;
 
 use super::entry::{EntryFile, SELECTOR_ORIGIN};
-use super::evaluation::Observation;
+use super::evaluation::{Causes, Observation};
 use super::evidence::{EvidenceInvariant, EvidenceProjection};
 use super::evidence_path::LocaleKeys;
+use super::limits::ConfirmedPolicy;
 
 /// The declaration profile selection selected, in the file Phase 1 read and
 /// the document it materialized, and what `specification-admission` bound to
@@ -341,6 +342,28 @@ impl<'a> DeclarationObserver<'a> {
         self.file
             .value_evidence_after(edges, span, self.locales)
             .map_err(ObserverInvariant::Evidence)
+    }
+}
+
+/// What a bound's unit observes past the confirmed `policy`'s limit: where
+/// `at` looks in the declaration, beside the policy, which supplies the bound
+/// (D15:2249). Nothing is observed without the policy or the declaration's
+/// file.
+///
+/// # Errors
+///
+/// Returns the resolver bug of a location the document lacks.
+pub(crate) fn beside<'o>(
+    policy: Result<&ConfirmedPolicy, &Causes>,
+    observer: Option<&DeclarationObserver<'o>>,
+    at: impl FnOnce(&DeclarationObserver<'o>) -> Result<EvidenceProjection, ObserverInvariant>,
+) -> Result<Option<Observation>, ObserverInvariant> {
+    match (policy, observer) {
+        (Ok(policy), Some(observer)) => Ok(Some(Observation {
+            primary: at(observer)?,
+            related: vec![policy.evidence().clone()],
+        })),
+        _ => Ok(None),
     }
 }
 
@@ -778,5 +801,39 @@ mod tests {
             observer.value(&["projectId", "deeper"]).err(),
             Some(ObserverInvariant::Missing)
         );
+    }
+
+    /// Past a bound, where the unit looks is observed beside the confirmed
+    /// policy, which supplies the bound; nothing without either.
+    #[test]
+    fn past_a_bound_the_declaration_is_observed_beside_the_policy() {
+        use crate::resolver::evaluation::Observation;
+        use crate::resolver::limits::ConfirmedPolicy;
+        use crate::resolver::specification::Slot;
+
+        let observed = super::fixtures::Observed::new(&minimal_config());
+        let policy = ConfirmedPolicy::fixture_owned(fixture_limits(10_000));
+        let unconfirmed = crate::resolver::locales::fixtures::stand_in(Slot::Coverage);
+        observed.app(|observer| {
+            let requested =
+                |observer: &DeclarationObserver<'_>| observer.value(&["requestedLocales"]);
+            assert_eq!(
+                super::beside(Ok(&policy), Some(observer), requested),
+                Ok(Some(Observation {
+                    primary: observer.value(&["requestedLocales"]).unwrap(),
+                    related: vec![policy.evidence().clone()],
+                }))
+            );
+            assert_eq!(
+                super::beside(Err(&unconfirmed), Some(observer), requested),
+                Ok(None)
+            );
+            assert_eq!(super::beside(Ok(&policy), None, requested), Ok(None));
+            assert_eq!(
+                super::beside(Ok(&policy), Some(observer), |observer| observer
+                    .value(&["absent"])),
+                Err(ObserverInvariant::Missing)
+            );
+        });
     }
 }
