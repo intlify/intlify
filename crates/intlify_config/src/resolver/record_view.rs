@@ -513,21 +513,35 @@ mod tests {
             .unwrap_err();
     }
 
-    /// Records `unit` as finding `code` with `reason`, and returns what waits
-    /// on its result.
+    /// Records `unit` as finding `code` with `reason`, observed at a slot's
+    /// Specification Input component when it is a slot's check, as Phase 5
+    /// observes it, and returns what waits on its result.
     fn block(
         evaluation: &mut Evaluation,
         unit: Unit,
         code: Code,
         reason: Option<Reason>,
     ) -> Admitted<()> {
+        use crate::resolver::evaluation::{Found, Observation};
+        use crate::resolver::evidence::EvidenceProjection;
+        use crate::resolver::evidence_component::ComponentPath;
         let found = Blocking {
             code,
             reason,
             details: None,
         };
+        let observed = match unit.subject {
+            Subject::Slot(slot) => Found::observed(
+                found,
+                Observation {
+                    primary: EvidenceProjection::resolver_input(ComponentPath::specification(slot)),
+                    related: Vec::new(),
+                },
+            ),
+            _ => Found::from(found),
+        };
         evaluation
-            .check(unit, Ok(()), |()| Err::<(), _>(found))
+            .check_found(unit, Ok(()), |()| Err::<(), _>(observed))
             .unwrap()
     }
 

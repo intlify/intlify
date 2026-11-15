@@ -143,6 +143,24 @@ impl ComponentPath {
         }
     }
 
+    /// The root of the Intent Surface-Class Vocabulary Artifact, where a check
+    /// of the whole artifact looks (D15:832).
+    pub(crate) const fn vocabulary_root() -> Self {
+        Self {
+            origin: SafeOriginKind::IntentSurfaceClassVocabulary,
+            segments: Vec::new(),
+        }
+    }
+
+    /// The root of the locale canonicalization data, the only path a 015
+    /// Finding names in it (D15:833).
+    pub(crate) const fn data_root() -> Self {
+        Self {
+            origin: SafeOriginKind::LocaleCanonicalizationData,
+            segments: Vec::new(),
+        }
+    }
+
     /// One member of the Intent Surface-Class Vocabulary Artifact (D15:832).
     ///
     /// # Errors
