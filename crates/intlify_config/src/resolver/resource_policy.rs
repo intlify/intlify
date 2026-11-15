@@ -50,6 +50,7 @@ use crate::model::{
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::selection::{SelectionInvariant, SelectorInput, StringLengthFact};
 
+use super::artifact_resolution::unadmitted;
 use super::bootstrap::work::{self, WorkBound};
 use super::bootstrap::{admit_body, select_candidate, AdmittedResourcePolicy, Compared, Rejected};
 use super::capability::CapabilityBound;
@@ -402,7 +403,7 @@ impl Stage<'_> {
                 Ok((
                     member.canonical_bytes(),
                     Observation {
-                        primary: candidate(member)?,
+                        primary: unadmitted(member)?,
                         related: vec![limit.clone()],
                     },
                 ))
@@ -441,13 +442,6 @@ fn reference_path(field: &ReferenceField) -> Vec<&str> {
 /// Resolver-input Evidence of the submitted collection at its root (D15:834).
 fn collection_root() -> Result<EvidenceProjection, ComponentInvariant> {
     ComponentPath::root(SafeOriginKind::ProfileResolutionArtifactCollection)
-        .map(EvidenceProjection::resolver_input)
-}
-
-/// Resolver-input Evidence of a collection member no Set admitted, under a
-/// key that keeps only its JSON type (D15:834; plan 025 interpretation #200).
-fn candidate(member: &FormalMember) -> Result<EvidenceProjection, ComponentInvariant> {
-    ComponentPath::artifact_member(Key::Unsafe(JsonType::of(member.value())))
         .map(EvidenceProjection::resolver_input)
 }
 
@@ -644,7 +638,7 @@ fn admit_and_compare(
     let chosen = selected
         .as_ref()
         .ok()
-        .map(|envelope| candidate(envelope.member()))
+        .map(|envelope| unadmitted(envelope.member()))
         .transpose()?;
     // A check of the candidate observes it beside the selected reference and
     // whatever else it compares the candidate with.

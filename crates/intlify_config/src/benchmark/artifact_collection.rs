@@ -14,10 +14,10 @@ use serde::{Deserialize, Serialize};
 use crate::artifacts::collection::FormalCollection;
 use crate::artifacts::envelope::{ExactTuple, MemberKey};
 use crate::resolver::artifact_resolution::{
-    admit_collection, ArtifactSet, CollectionSubject, ConflictKey,
+    admit_collection, ArtifactSet, CollectionInvariant, CollectionSubject, ConflictKey,
 };
 use crate::resolver::evaluation::{
-    Admitted, Causes, Check, Evaluation, EvaluationInvariant, IssueKey, Status, Subject, Unit,
+    Admitted, Causes, Check, Evaluation, IssueKey, Status, Subject, Unit,
 };
 use crate::resolver::limits::ConfirmedPolicy;
 
@@ -43,7 +43,7 @@ impl PreparedCollection {
 /// the collection's members.
 pub(super) struct Admission<'a> {
     evaluation: Evaluation,
-    result: Result<Admitted<ArtifactSet<'a>>, EvaluationInvariant>,
+    result: Result<Admitted<ArtifactSet<'a>>, CollectionInvariant>,
 }
 
 /// Phase 9's collection admission over a fresh evaluation: what every timed
@@ -70,7 +70,7 @@ pub(super) struct SetEntry {
 /// ordinary output, retained past the end read.
 pub(super) struct Resolved {
     pub(super) evaluation: Evaluation,
-    pub(super) result: Result<Admitted<Vec<SetEntry>>, EvaluationInvariant>,
+    pub(super) result: Result<Admitted<Vec<SetEntry>>, CollectionInvariant>,
 }
 
 impl Resolved {
@@ -356,7 +356,8 @@ mod tests {
     use crate::input_limits::Bound;
     use crate::resolver::artifact_resolution::unit as collection_unit;
     use crate::resolver::evaluation::{
-        Actual, Blocking, Code, Details, LimitExceeded, Notice, Phase, Reason, Shortfall,
+        Actual, Blocking, Code, Details, EvaluationInvariant, LimitExceeded, Notice, Phase, Reason,
+        Shortfall,
     };
     use crate::resolver::limits::{fixture_limits, BoundId, Group};
     use crate::resolver::locales::fixtures::stand_in;
@@ -450,10 +451,12 @@ mod tests {
     fn a_resolver_defect_fails_the_case() {
         let resolved = Resolved {
             evaluation: Evaluation::default(),
-            result: Err(EvaluationInvariant::UnitRecordedTwice(collection_unit(
-                CollectionSubject::Member(key_of(serde_json::json!({"schemaRevision": "0"}))),
-                Check::AdmissibleMember,
-            ))),
+            result: Err(CollectionInvariant::Evaluation(
+                EvaluationInvariant::UnitRecordedTwice(collection_unit(
+                    CollectionSubject::Member(key_of(serde_json::json!({"schemaRevision": "0"}))),
+                    Check::AdmissibleMember,
+                )),
+            )),
         };
         assert_eq!(
             require_observable(&resolved).err(),
@@ -703,8 +706,9 @@ mod tests {
             change(&mut changed);
             Ok(vec![changed])
         };
+        // A made-up result: a member with a tuple is never `kind-unsupported`.
         let blocked = {
-            let mut evaluation = Evaluation::default();
+            let mut evaluation = Evaluation::fabricated();
             evaluation
                 .check(
                     collection_unit(

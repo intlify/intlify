@@ -8,8 +8,17 @@
 //! or not a reference reaches it, and the collection's checks are not the
 //! bootstrap's, even where they share a code. Ordinary exact resolution of the
 //! declaration's references against the Set comes after it.
+//!
+//! The collection keeps every submitted occurrence for Finding Occurrence
+//! multiplicity (D15:1663), so a collection check's Finding is observed once
+//! for each occurrence that found it (D15:2387): a member key's checks see
+//! every occurrence of every body under the key, and a conflict group's check
+//! every occurrence of every body in the group. No Set admitted the member,
+//! so each is observed at a `redacted-key` that keeps only a JSON type, and
+//! the occurrences of one type are one presentation component, which the
+//! ordinals count (D15:834, 838, 2468; plan 025 interpretation #200).
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use intlify_shared_json::token::Token;
 
@@ -20,9 +29,12 @@ use crate::artifacts::envelope::{
 };
 
 use super::evaluation::{
-    and, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Phase, Reason,
-    Subject, Unit,
+    and, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Found,
+    Observation, Phase, Reason, Subject, Unit,
 };
+use super::evidence::EvidenceProjection;
+use super::evidence_component::{ComponentInvariant, ComponentPath, Key};
+use super::evidence_token::JsonType;
 use super::limits::ConfirmedPolicy;
 
 /// What one Phase 9 collection unit checks. Every member key comes before
@@ -104,6 +116,57 @@ struct Distinct<'a> {
     occurrences: usize,
 }
 
+/// A resolver bug collection admission refuses.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum CollectionInvariant {
+    Evaluation(EvaluationInvariant),
+    /// A member's Evidence named a component without a path.
+    Component(ComponentInvariant),
+}
+
+impl From<EvaluationInvariant> for CollectionInvariant {
+    fn from(invariant: EvaluationInvariant) -> Self {
+        Self::Evaluation(invariant)
+    }
+}
+
+impl From<ComponentInvariant> for CollectionInvariant {
+    fn from(invariant: ComponentInvariant) -> Self {
+        Self::Component(invariant)
+    }
+}
+
+/// Resolver-input Evidence of a collection member no Set admitted, under a
+/// `redacted-key` that keeps only the member's JSON type: for an envelope
+/// that establishes a tuple, its tuple view's, an object (D15:834, 2468; plan
+/// 025 interpretation #200).
+///
+/// # Errors
+///
+/// Returns the resolver bug of a component without a token.
+pub(crate) fn unadmitted(member: &FormalMember) -> Result<EvidenceProjection, ComponentInvariant> {
+    ComponentPath::artifact_member(Key::Unsafe(JsonType::of(member.value())))
+        .map(EvidenceProjection::resolver_input)
+}
+
+/// One candidate of `blocking` for each of `occurrences`, each at `member`
+/// (D15:2387).
+fn each_at(blocking: Blocking, member: &EvidenceProjection, occurrences: usize) -> Found {
+    let observed = Observation {
+        primary: member.clone(),
+        related: Vec::new(),
+    };
+    Found::each(blocking, vec![Some(observed); occurrences])
+}
+
+/// `found` and then `more`.
+fn joined(found: Option<Found>, more: Found) -> Found {
+    match found {
+        Some(found) => found.and(more),
+        None => more,
+    }
+}
+
 const fn not_admitted(reason: Reason) -> Blocking {
     Blocking {
         code: Code::ArtifactCollectionNotAdmitted,
@@ -134,11 +197,16 @@ fn admit_member<'a>(
 /// members, and, for a tuple, whether each was submitted only once. Each
 /// conflict group is checked for one body. The Set exists only when every
 /// unit holds, so it then has one body for each tuple.
+///
+/// # Errors
+///
+/// Returns the resolver bug of a unit recorded against its phase's rules, or
+/// of a member's Evidence without a component path.
 pub(crate) fn admit_collection<'a>(
     evaluation: &mut Evaluation,
     confirmed: Result<&ConfirmedPolicy, &Causes>,
     collection: &'a FormalCollection,
-) -> Result<Admitted<ArtifactSet<'a>>, EvaluationInvariant> {
+) -> Result<Admitted<ArtifactSet<'a>>, CollectionInvariant> {
     let mut keyed: BTreeMap<MemberKey, BTreeMap<&'a [u8], Distinct<'a>>> = BTreeMap::new();
     for member in collection.members() {
         let (key, envelope) = member.keyed();
@@ -154,39 +222,59 @@ pub(crate) fn admit_collection<'a>(
             .occurrences += 1;
     }
     let prerequisite = confirmed.map(|_| ()).map_err(Causes::clone);
+    // The members of a conflict group establish a tuple, so each is an
+    // envelope, a JSON object.
+    let envelope = ComponentPath::artifact_member(Key::Unsafe(JsonType::Object))
+        .map(EvidenceProjection::resolver_input)?;
     let mut holds: Admitted<()> = Ok(());
     let mut set = BTreeMap::new();
-    let mut groups: BTreeMap<ConflictKey, BTreeSet<&[u8]>> = BTreeMap::new();
+    let mut groups: BTreeMap<ConflictKey, BTreeMap<&[u8], usize>> = BTreeMap::new();
     for (key, bodies) in &keyed {
         let member = |check| unit(CollectionSubject::Member(key.clone()), check);
-        // Every body is checked, and the first that fails, in the bodies'
-        // order, is the unit's result.
-        let admitted = evaluation.check(
+        // Every body under one key has one JSON type: a body that
+        // establishes a tuple is an envelope, and a key without a tuple holds
+        // one body.
+        let Some(first) = bodies.values().next() else {
+            continue;
+        };
+        let at = unadmitted(first.member)?;
+        // Every body is checked, and each that fails is found once for each
+        // of its occurrences. Bodies under a tuple fail only as invalid
+        // envelopes, so they share one key (plan 025 interpretation #99).
+        let admitted = evaluation.check_found(
             member(Check::AdmissibleMember),
             prerequisite.clone(),
             |()| {
-                bodies
-                    .values()
-                    .map(|distinct| {
-                        admit_member(distinct.member, distinct.envelope.as_ref())
-                            .map(|content| (distinct.member, content))
-                    })
-                    .collect::<Result<Vec<_>, _>>()
+                let mut admitted = Vec::new();
+                let mut failed = None;
+                for distinct in bodies.values() {
+                    match admit_member(distinct.member, distinct.envelope.as_ref()) {
+                        Ok(content) => admitted.push((distinct.member, content)),
+                        Err(blocking) => {
+                            let found = each_at(blocking, &at, distinct.occurrences);
+                            failed = Some(joined(failed, found));
+                        }
+                    }
+                }
+                failed.map_or(Ok(admitted), Err)
             },
         )?;
         let MemberKey::Tuple(tuple) = key else {
             holds = and(holds, admitted.map(|_| ()));
             continue;
         };
-        let single = evaluation.check(
+        // Each occurrence of a body submitted more than once is a duplicate.
+        let single = evaluation.check_found(
             member(Check::SingleOccurrence),
             prerequisite.clone(),
             |()| {
-                if bodies.values().all(|distinct| distinct.occurrences == 1) {
-                    Ok(())
-                } else {
-                    Err(not_admitted(Reason::DuplicateEnvelope))
-                }
+                let duplicate = not_admitted(Reason::DuplicateEnvelope);
+                bodies
+                    .values()
+                    .filter(|distinct| distinct.occurrences > 1)
+                    .map(|distinct| each_at(duplicate, &at, distinct.occurrences))
+                    .reduce(Found::and)
+                    .map_or(Ok(()), Err)
             },
         )?;
         holds = and(holds, single);
@@ -203,13 +291,15 @@ pub(crate) fn admit_collection<'a>(
             Ok(_) => {}
             Err(causes) => holds = and(holds, Err(causes)),
         }
-        groups
-            .entry(ConflictKey::of(tuple))
-            .or_default()
-            .extend(bodies.keys());
+        groups.entry(ConflictKey::of(tuple)).or_default().extend(
+            bodies
+                .iter()
+                .map(|(&body, distinct)| (body, distinct.occurrences)),
+        );
     }
     for (group, bodies) in &groups {
-        let consistent = evaluation.check(
+        // Each occurrence of every body of a group with several conflicts.
+        let consistent = evaluation.check_found(
             unit(
                 CollectionSubject::Group(group.clone()),
                 Check::ConsistentContent,
@@ -219,7 +309,12 @@ pub(crate) fn admit_collection<'a>(
                 if bodies.len() == 1 {
                     Ok(())
                 } else {
-                    Err(not_admitted(Reason::ConflictingContent))
+                    let occurrences = bodies.values().sum();
+                    Err(each_at(
+                        not_admitted(Reason::ConflictingContent),
+                        &envelope,
+                        occurrences,
+                    ))
                 }
             },
         )?;
@@ -308,6 +403,44 @@ mod tests {
                 (subject, unit.check)
             })
             .collect()
+    }
+
+    /// What each collection Finding candidate was observed at, in the order
+    /// the units ran: the unit's subject and check, the reason, and the
+    /// primary Evidence. None has related Evidence.
+    fn observed(
+        evaluation: &Evaluation,
+    ) -> Vec<(CollectionSubject, Check, Reason, EvidenceProjection)> {
+        evaluation
+            .occurrence_candidates()
+            .iter()
+            .map(|candidate| {
+                assert!(candidate.related.is_empty());
+                let unit = candidate.finding.unit();
+                let Subject::ArtifactCollection(subject) = unit.subject.clone() else {
+                    panic!("only Phase 9 collection units")
+                };
+                let reason = candidate.finding.reason().unwrap();
+                (subject, unit.check, reason, candidate.primary.clone())
+            })
+            .collect()
+    }
+
+    /// A member no Set admitted, at a key that keeps only its JSON type.
+    fn at(value: &Value) -> EvidenceProjection {
+        EvidenceProjection::resolver_input(
+            ComponentPath::artifact_member(Key::Unsafe(JsonType::of(value))).unwrap(),
+        )
+    }
+
+    /// `n` candidates of `check` with `reason` over `subject`, each at a
+    /// member of `value`'s JSON type.
+    fn times(
+        n: usize,
+        (subject, check, reason): (&CollectionSubject, Check, Reason),
+        value: &Value,
+    ) -> Vec<(CollectionSubject, Check, Reason, EvidenceProjection)> {
+        vec![(subject.clone(), check, reason, at(value)); n]
     }
 
     use CollectionSubject::{Group, Member};
@@ -460,6 +593,16 @@ mod tests {
                 [(Member(key(&member)), Check::AdmissibleMember, reason)],
                 "{member}"
             );
+            // Observed once, at the member's JSON type.
+            assert_eq!(
+                observed(&evaluation),
+                times(
+                    1,
+                    (&Member(key(&member)), Check::AdmissibleMember, reason),
+                    &member
+                ),
+                "{member}"
+            );
             assert_eq!(set, None, "{member}");
             // Only a member with a tuple is checked for repetition and
             // belongs to a group.
@@ -489,11 +632,14 @@ mod tests {
                 Reason::DuplicateEnvelope
             )]
         );
+        // Each occurrence is a duplicate, at the envelope's JSON type.
+        let duplicate = (&named, Check::SingleOccurrence, Reason::DuplicateEnvelope);
+        assert_eq!(observed(&evaluation), times(2, duplicate, &approval));
         assert_eq!(set, None);
         // A repeated invalid body is still a duplicate envelope.
         let mut tampered = approval;
         tampered["integrityDigest"] = json!(format!("sha256:{}", "0".repeat(64)));
-        let (evaluation, _) = admit(&[tampered.clone(), tampered]);
+        let (evaluation, _) = admit(&[tampered.clone(), tampered.clone()]);
         assert_eq!(
             issues(&evaluation),
             [
@@ -502,8 +648,17 @@ mod tests {
                     Check::AdmissibleMember,
                     Reason::EnvelopeInvalid
                 ),
-                (named, Check::SingleOccurrence, Reason::DuplicateEnvelope),
+                (
+                    named.clone(),
+                    Check::SingleOccurrence,
+                    Reason::DuplicateEnvelope
+                ),
             ]
+        );
+        let invalid = (&named, Check::AdmissibleMember, Reason::EnvelopeInvalid);
+        assert_eq!(
+            observed(&evaluation),
+            [times(2, invalid, &tampered), times(2, duplicate, &tampered)].concat()
         );
         // A repeated member without a tuple is an invalid envelope, once.
         let lone = json!({"schemaRevision": "0"});
@@ -520,6 +675,13 @@ mod tests {
             statuses(&evaluation),
             [(Member(key(&lone)), Check::AdmissibleMember)]
         );
+        // Its one key holds the body twice, each occurrence observed.
+        let lone_invalid = (
+            &Member(key(&lone)),
+            Check::AdmissibleMember,
+            Reason::EnvelopeInvalid,
+        );
+        assert_eq!(observed(&evaluation), times(2, lone_invalid, &lone));
     }
 
     #[test]
@@ -541,6 +703,13 @@ mod tests {
                 Reason::ConflictingContent
             )]
         );
+        // Each member of the group is a conflicting occurrence.
+        let conflict = (
+            &Group(group(&first)),
+            Check::ConsistentContent,
+            Reason::ConflictingContent,
+        );
+        assert_eq!(observed(&evaluation), times(2, conflict, &first));
         assert_eq!(set, None);
         // The same tuple with another body: the digest pins the content, not
         // the integrity value, which here no longer holds. Both bodies are
@@ -563,6 +732,15 @@ mod tests {
                     Reason::ConflictingContent
                 ),
             ]
+        );
+        let invalid = (
+            &Member(key(&first)),
+            Check::AdmissibleMember,
+            Reason::EnvelopeInvalid,
+        );
+        assert_eq!(
+            observed(&evaluation),
+            [times(1, invalid, &first), times(2, conflict, &first)].concat()
         );
         // Another revision is another group, not a conflict.
         let next = envelope_of(
@@ -634,6 +812,34 @@ mod tests {
             tampered["integrityDigest"] = json!(format!("sha256:{}", digit.repeat(64)));
             assert_eq!(key(&tampered), key(&first));
             let (evaluation, set) = admit(&[first.clone(), tampered, first.clone()]);
+            // The invalid body once, the repeated one twice, and all three
+            // occurrences in the group.
+            assert_eq!(
+                observed(&evaluation),
+                [
+                    times(
+                        1,
+                        (&named, Check::AdmissibleMember, Reason::EnvelopeInvalid),
+                        &first
+                    ),
+                    times(
+                        2,
+                        (&named, Check::SingleOccurrence, Reason::DuplicateEnvelope),
+                        &first
+                    ),
+                    times(
+                        3,
+                        (
+                            &Group(group(&first)),
+                            Check::ConsistentContent,
+                            Reason::ConflictingContent
+                        ),
+                        &first
+                    ),
+                ]
+                .concat(),
+                "{digit}"
+            );
             assert_eq!(
                 statuses(&evaluation),
                 [
@@ -666,6 +872,32 @@ mod tests {
             );
             assert_eq!(set, None, "{digit}");
         }
+        // Two invalid bodies under one tuple: each fails the tuple's one
+        // unit, and each is observed, not only the first in the bodies'
+        // order.
+        let tampered = |digit: &str| {
+            let mut value = first.clone();
+            value["integrityDigest"] = json!(format!("sha256:{}", digit.repeat(64)));
+            value
+        };
+        let (evaluation, _) = admit(&[tampered("0"), tampered("f")]);
+        let conflict = (
+            &Group(group(&first)),
+            Check::ConsistentContent,
+            Reason::ConflictingContent,
+        );
+        assert_eq!(
+            observed(&evaluation),
+            [
+                times(
+                    2,
+                    (&named, Check::AdmissibleMember, Reason::EnvelopeInvalid),
+                    &first
+                ),
+                times(2, conflict, &first),
+            ]
+            .concat()
+        );
         // The two orders really differ: the valid body sorts between them.
         let body = |digit: &str| {
             let mut value = first.clone();

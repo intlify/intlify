@@ -1440,9 +1440,12 @@ impl Evaluation {
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
+        // Phase 9 observes its collection checks, not yet its references.
+        let observes = OBSERVED.contains(&unit.phase)
+            || matches!(unit.subject, Subject::ArtifactCollection(_));
         assert_eq!(
             observed,
-            OBSERVED.contains(&unit.phase),
+            observes,
             "{unit:?} reports {what} {} what it observed, against its check",
             if observed { "with" } else { "without" }
         );
