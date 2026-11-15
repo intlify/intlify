@@ -44,7 +44,7 @@ use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::selection::{ProvisionalSelection, SelectionInvariant, SelectorInput};
 use crate::structural::{AdmissionInvariant, StructuralAnalysis};
 
-use super::artifact_resolution::{admit_collection, ArtifactSet};
+use super::artifact_resolution::{admit_collection, ArtifactSet, CollectionInvariant};
 use super::coverage::{resolve_coverage, CoveragePolicy};
 use super::declaration_fields::DeclarationFields;
 use super::declaration_observer::{DeclarationObserver, ObserverInvariant};
@@ -313,6 +313,15 @@ impl From<EntryInvariant> for ResolverInvariant {
 impl From<EvaluationInvariant> for ResolverInvariant {
     fn from(invariant: EvaluationInvariant) -> Self {
         Self::Evaluation(invariant)
+    }
+}
+
+impl From<CollectionInvariant> for ResolverInvariant {
+    fn from(invariant: CollectionInvariant) -> Self {
+        match invariant {
+            CollectionInvariant::Evaluation(invariant) => Self::Evaluation(invariant),
+            CollectionInvariant::Component(invariant) => Self::Component(invariant),
+        }
     }
 }
 
