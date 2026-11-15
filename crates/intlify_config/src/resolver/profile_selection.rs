@@ -38,9 +38,11 @@
 //!
 //! The selection is the declaration the selector names, or the only one,
 //! once its Profile ID stays within the bound and structural admission
-//! admitted the declaration whole (plan 025 interpretation #205). The core's
-//! provisional selection then selects it; otherwise its causes hold every
-//! later phase back.
+//! admitted its boundary, its value an object under its key, and its
+//! `resourceLimits` reference fragment (D15:2131; plan 025 interpretation
+//! #218). The core's provisional selection then selects it; otherwise its
+//! causes hold every later phase back. A failure elsewhere in the
+//! declaration holds back only what reads that field.
 
 use std::collections::BTreeMap;
 
@@ -65,7 +67,7 @@ use super::evidence::{EvidenceInvariant, EvidenceProjection};
 use super::evidence_component::{ComponentInvariant, ComponentPath};
 use super::limits::{BoundId, Group};
 use super::structural_admission::{
-    declaration, nonempty_profiles, profile_key, profile_keys, profiles,
+    nonempty_profiles, profile_key, profile_keys, profiles, selectable,
 };
 use super::tally::{actual, within, Tally};
 
@@ -196,7 +198,7 @@ pub(crate) fn select_profile<Policy: DeserializeOwned, Target>(
             Ok(()) => return Err(ProfileSelectionInvariant::UnreportedFailure),
         },
     };
-    if let Err(causes) = both(within, declaration(evaluation, id.as_str())) {
+    if let Err(causes) = both(within, selectable(evaluation, id.as_str())) {
         return Ok(Err(causes));
     }
     // The checks decide, so a declaration they select and the core does not
@@ -989,21 +991,31 @@ mod tests {
     }
 
     /// A structural failure inside the selected declaration holds the
-    /// selection back, and one outside it does not (plan 025 interpretation
-    /// #205, D15:2367, 3434).
+    /// selection back only at the declaration's boundary or its
+    /// `resourceLimits` reference, and one elsewhere in it or outside it does
+    /// not (D15:2131, 2367, 3434; plan 025 interpretation #218).
     #[test]
-    fn only_a_declaration_admitted_whole_is_selected() {
+    fn only_a_declarations_boundary_and_reference_hold_the_selection_back() {
         let limits = bounds(2, 64);
         let input = SelectorInput::string("app", limits.max_profile_id_bytes);
         let mut config = declared(&["app", "web"]);
         config["profiles"]["web"]["projectId"] = json!(1);
+        config["profiles"]["app"]["projectId"] = json!(1);
+        config["profiles"]["app"]["extra"] = json!(true);
         let (_, selected) = selecting(&config, limits, &input);
         assert_eq!(selected, Ok("app".to_owned()));
-        config["profiles"]["app"]["projectId"] = json!(1);
-        let (_, selected) = selecting(&config, limits, &input);
-        assert!(held(selected)
-            .iter()
-            .all(|unit| unit.phase == Phase::StructuralAdmission));
+        for held_back in [json!(false), json!({"resourceLimits": false})] {
+            let mut config = config.clone();
+            if held_back.is_object() {
+                config["profiles"]["app"]["policies"]["resourceLimits"] = json!(false);
+            } else {
+                config["profiles"]["app"] = held_back;
+            }
+            let (_, selected) = selecting(&config, limits, &input);
+            assert!(held(selected)
+                .iter()
+                .all(|unit| unit.phase == Phase::StructuralAdmission));
+        }
     }
 
     /// A key the structural checks did not admit leaves the selection no

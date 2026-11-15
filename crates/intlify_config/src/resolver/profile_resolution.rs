@@ -16,12 +16,14 @@
 //! records.
 //!
 //! The semantic phases start from the declaration Phase 3 provisionally
-//! selected once structural admission admitted it whole, whatever else of the
-//! root it rejected (D15:2367, 3434), and read each of its fields on its own
-//! ([`super::declaration_fields`]), so that once Phase 3 selects a
-//! declaration admitted in part, a field structural admission did not admit
-//! suppresses only what reads it (plan 025 PRs 5f-4, 5f-5). Profile
-//! projection waits on the whole root (D15:2142). What the entry
+//! selected once structural admission admitted its boundary and its
+//! `resourceLimits` reference, whatever else of it or of the root it rejected
+//! (D15:2131, 2367, 3434; plan 025 interpretation #218), and read each of its
+//! fields on its own ([`super::declaration_fields`]): a field structural
+//! admission did not admit holds back only the checks that read it, with its
+//! Findings as their causes (D15:3340), for now the whole field even where
+//! the failure is in one of its entries (plan 025 interpretation #219).
+//! Profile projection waits on the whole root (D15:2142). What the entry
 //! returns is crate-private semantic state, not a `LocalizationProjectProfile`,
 //! a checked or blocked outcome, or Resolution Evidence. The profile
 //! projection is 015's Implementation Phase 5.
@@ -71,8 +73,9 @@ type Declaration = ProfileDeclaration<PolicyReference, TargetProfileReference>;
 
 /// One invocation's configuration past Phases 1 to 3, as the semantic phases
 /// read it: the fields of the declaration Phase 3 provisionally selected once
-/// structural admission admitted it whole, whatever else of the root it
-/// rejected (D15:2367, 3434), each read on its own, the `resourceLimits`
+/// structural admission admitted its boundary and its `resourceLimits`
+/// reference, whatever else of it or of the root it rejected (D15:2131,
+/// 2367, 3434), each read on its own, the `resourceLimits`
 /// reference it selected with, the selector, what Phase 4 rechecks of those
 /// phases' measures, and whether structural admission admitted the whole
 /// root, which profile projection needs (D15:2142).
@@ -1088,8 +1091,9 @@ pub(super) mod tests {
     /// `selector`'s declaration, and the semantic phases over the
     /// configuration. Without a value there is no Shared projection (D15:2369),
     /// and without a declaration Phase 3 selected, which needs structural
-    /// admission to admit it whole, no semantic phase starts yet (plan 025
-    /// interpretation #205): either way there is no semantic state.
+    /// admission to admit its boundary and its `resourceLimits` reference, no
+    /// semantic phase starts yet (plan 025 interpretation #218, PR 5f-4a-3):
+    /// either way there is no semantic state.
     fn invoke_entry<'s, P, D>(
         evaluation: &mut Evaluation,
         (file, limits): (&EntryFile<'_>, InputLimits),
@@ -1120,7 +1124,9 @@ pub(super) mod tests {
         // Phase 3 records its checks whatever Phase 2 admitted, with its
         // causes where it admitted nothing (D15:2131). The semantic phases
         // start from the declaration it selects once structural admission
-        // admitted it whole, whatever else of the root it rejected.
+        // admitted its boundary and its `resourceLimits` reference, whatever
+        // else of it or of the root it rejected (plan 025 interpretation
+        // #218).
         let selection = select_profile(
             evaluation,
             file,
@@ -1684,10 +1690,9 @@ pub(super) mod tests {
                 for unit in complete.keys().filter(|unit| !after.contains_key(unit)) {
                     // Without a value from entry admission there is no Shared
                     // projection, which no prerequisite names, and without a
-                    // selected declaration structural admission admitted
-                    // whole no semantic phase starts yet (plan 025
-                    // interpretation #205): the phases the invocation did not
-                    // reach wait on no prerequisite.
+                    // selected declaration no semantic phase starts yet (plan
+                    // 025 PR 5f-4a-3): the phases the invocation did not reach
+                    // wait on no prerequisite.
                     if reached.is_some_and(|reached| unit.phase > reached) {
                         continue;
                     }
@@ -2540,20 +2545,41 @@ pub(super) mod tests {
         }
     }
 
-    /// A structural failure inside the selected declaration starts no
-    /// semantic phase yet: they will read its admitted fields field by field
-    /// (plan 025 interpretation #205). Phase 3 still checks the declarations.
+    /// A structural failure inside the selected declaration holds back only
+    /// the checks that read its field, with its Finding as their cause, while
+    /// the semantic phases read the declaration's other fields (D15:2367,
+    /// 3340; plan 025 interpretation #218). Profile projection still waits on
+    /// the whole root (D15:2142).
     #[test]
-    fn a_failure_inside_the_selected_declaration_starts_no_semantic_phase() {
+    fn a_failure_inside_the_selected_declaration_holds_back_only_what_reads_it() {
         let mut inputs = Inputs::complete();
         inputs.declaration()["defaultSourceLocale"] = json!(1);
         inputs.attempt(|evaluation, state| {
-            assert!(state.unwrap().is_none());
+            let state = state.unwrap().unwrap();
             let structural = structural_issues(&evaluation);
             assert_eq!(structural.len(), 1, "{structural:?}");
-            assert!(evaluation
-                .statuses()
-                .all(|(unit, _)| unit.phase <= Phase::ProfileSelection));
+            assert!(state.structure.is_err() && state.identity.is_ok());
+            let held: Vec<(Unit, Status)> = statuses(&evaluation)
+                .into_iter()
+                .filter(|(unit, status)| {
+                    unit.phase > Phase::ProfileSelection
+                        && matches!(status, Status::NotEvaluated(_))
+                })
+                .collect();
+            assert!(held
+                .iter()
+                .any(|(unit, _)| unit.phase == Phase::LocaleResolution));
+            for (unit, status) in &held {
+                let Status::NotEvaluated(causes) = status else {
+                    unreachable!()
+                };
+                assert!(
+                    causes
+                        .keys()
+                        .all(|cause| cause.unit().phase == Phase::StructuralAdmission),
+                    "{unit:?} waits on {causes:?}"
+                );
+            }
         });
     }
 

@@ -53,10 +53,17 @@
 //! prerequisite until their units exist. No row of a Shared phase lists a check of entry
 //! admission: without a value from entry admission there is no Shared
 //! projection, whose absence the entry's Findings explain, and the phase's
-//! first unit requires no check (D15:2369, 2516). No row of a later phase lists
-//! a check of structural admission or profile selection yet: the resolver
-//! starts from the declaration profile selection selected once structural
-//! admission admitted it whole.
+//! first unit requires no check (D15:2369, 2516). Profile selection selects a
+//! declaration once structural admission admitted its boundary and its
+//! `resourceLimits` reference, and the later phases read its other fields one
+//! by one (D15:2131, 2367, 3340; plan 025 interpretation #218): a row of a
+//! later phase lists the structural checks of the fields its units read
+//! unless a check it lists already waits on them. The checks of the
+//! declaration's reference counts list those of `policies` and of the Target
+//! ID entries, which every check under the admitted Policy then waits on, and
+//! the group checks those of the Group ID entries. No row of a later phase
+//! lists a check of profile selection yet: without a selected declaration no
+//! later phase starts.
 //!
 //! A row's Finding codes are those its units may report, a notice included,
 //! in 015's table order: what the resolver's checks report, and for the kinds
@@ -140,7 +147,7 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:56606250b73d831f5cf51627d94d4847283910760b6a73d7c4cfc69f0217a602";
+    "sha256:79fb4373298d1de83179b964b6df4369a784e8a8929202cc62256b8afcc68bb6";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
@@ -1118,6 +1125,35 @@ const CONFIRMED_POLICY: &[&str] = &[
     "resource-policy.reference-bytes.within-bound",
 ];
 
+/// What a check over the selected declaration's groups under the admitted
+/// Resource Limit Policy waits on: the structural checks of the
+/// `deploymentGroups` entries it reads, then every Policy recheck, in row
+/// order.
+const GROUPS_UNDER_POLICY: &[&str] = &[
+    "structural.group-key.field-value",
+    "structural.group.required-field",
+    "structural.group.field-value",
+    "structural.group.known-field",
+    "resource-policy.root-nodes.within-bound",
+    "resource-policy.root-depth.within-bound",
+    "resource-policy.root-collection-entries.within-bound",
+    "resource-policy.root-string-bytes.within-bound",
+    "resource-policy.root-longest-string.within-bound",
+    "resource-policy.profiles.within-bound",
+    "resource-policy.profile-id.within-bound",
+    "resource-policy.selector.within-bound",
+    "resource-policy.structural-analysis.within-bound",
+    "resource-policy.artifacts.within-bound",
+    "resource-policy.policy-artifacts.within-bound",
+    "resource-policy.target-profile-artifacts.within-bound",
+    "resource-policy.references.within-bound",
+    "resource-policy.artifact.within-bound",
+    "resource-policy.artifact-bytes.within-bound",
+    "resource-policy.policy-reference.within-bound",
+    "resource-policy.target-profile-reference.within-bound",
+    "resource-policy.reference-bytes.within-bound",
+];
+
 /// Each kind's prerequisites, one list for each of its checks in the order
 /// of [`SubjectKind::checks`]: the checks its units wait on that none of the
 /// others listed already waits on, in row order. The resolver's tests make
@@ -1134,12 +1170,33 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         | K::CapabilityArtifacts
         | K::CapabilityPolicyArtifacts
         | K::CapabilityTargetProfileArtifacts
-        | K::CapabilityReferences
         | K::CapabilityArtifact
-        | K::CapabilityArtifactBytes
-        | K::CapabilityPolicyReference
-        | K::CapabilityTargetProfileReference
-        | K::CapabilityReferenceBytes => &[NONE],
+        | K::CapabilityArtifactBytes => &[NONE],
+        // A count of the selected declaration's references reads the fields
+        // that hold them, `policies` and the Target ID entries (D15:1918,
+        // 1921-1922).
+        K::CapabilityReferences | K::CapabilityReferenceBytes => &[&[
+            "structural.profile.required-field",
+            "structural.profile.field-value",
+            "structural.profile.known-field",
+            "structural.target-key.field-value",
+            "structural.target.required-field",
+            "structural.target.field-value",
+            "structural.target.known-field",
+        ]],
+        K::CapabilityPolicyReference => &[&[
+            "structural.profile.required-field",
+            "structural.profile.field-value",
+            "structural.profile.known-field",
+        ]],
+        K::CapabilityTargetProfileReference => &[&[
+            "structural.profile.required-field",
+            "structural.profile.field-value",
+            "structural.target-key.field-value",
+            "structural.target.required-field",
+            "structural.target.field-value",
+            "structural.target.known-field",
+        ]],
         K::ProfileSpecificationDependency => &[&["specification.project-profile.supported"]],
         // The selection's checks wait on the one before them: a `schemaVersion`
         // member of an object root, then its string (D15:2130, 2149). The
@@ -1247,12 +1304,16 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         | K::Artifacts
         | K::PolicyArtifacts
         | K::TargetProfileArtifacts
-        | K::References
         | K::Artifact
         | K::ArtifactBytes
-        | K::PolicyReference
-        | K::TargetProfileReference
-        | K::ReferenceBytes => &[&["resource-policy.resource-limits.compatible"]],
+        | K::PolicyReference => &[&["resource-policy.resource-limits.compatible"]],
+        K::References | K::TargetProfileReference | K::ReferenceBytes => &[&[
+            "structural.target-key.field-value",
+            "structural.target.required-field",
+            "structural.target.field-value",
+            "structural.target.known-field",
+            "resource-policy.resource-limits.compatible",
+        ]],
         K::LocaleCanonicalizationSlot
         | K::LocaleNegotiationSlot
         | K::MessageLocaleFallbackSlot
@@ -1263,10 +1324,8 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         | K::DeclarationField
         | K::LocaleOccurrences
         | K::TargetProfiles
-        | K::CollectionGroup
-        | K::Groups
-        | K::Memberships
-        | K::Relations => &[CONFIRMED_POLICY],
+        | K::CollectionGroup => &[CONFIRMED_POLICY],
+        K::Groups | K::Memberships | K::Relations => &[GROUPS_UNDER_POLICY],
         K::Vocabulary => &[
             CONFIRMED_POLICY,
             &[

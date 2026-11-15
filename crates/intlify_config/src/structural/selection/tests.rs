@@ -391,24 +391,30 @@ fn a_declarations_id_bytes_are_its_decoded_names() {
     );
 }
 
+/// The declaration boundary is its value as an object under its admitted
+/// key: an object missing its required members has a boundary but no
+/// `resourceLimits` reference, and an undeclared member leaves the boundary
+/// admitted (D15:2131, 3341; plan 025 interpretation #218).
 #[test]
 fn selected_declaration_boundary_and_resource_reference_are_independent_prerequisites() {
     let bound = limits().max_profile_id_bytes;
     let name = SelectorInput::string("app", bound);
-    for declaration in [json!(false), json!({})] {
-        let analysis =
-            analyze_fixture(&json!({"schemaVersion":"0", "profiles":{"app":declaration}}));
-        assert_eq!(
-            unavailable(analysis.select(&name).unwrap()),
-            SelectionPrerequisite::DeclarationBoundary
-        );
-    }
-    let mut unknown = minimal_config();
-    unknown["profiles"]["app"]["unknown-secret"] = json!(true);
+    let analysis = analyze_fixture(&json!({"schemaVersion":"0", "profiles":{"app":false}}));
     assert_eq!(
-        unavailable(analyze_fixture(&unknown).select(&name).unwrap()),
+        unavailable(analysis.select(&name).unwrap()),
         SelectionPrerequisite::DeclarationBoundary
     );
+    let analysis = analyze_fixture(&json!({"schemaVersion":"0", "profiles":{"app":{}}}));
+    assert_eq!(
+        unavailable(analysis.select(&name).unwrap()),
+        SelectionPrerequisite::ResourceLimitsReference
+    );
+    let mut unknown = minimal_config();
+    unknown["profiles"]["app"]["unknown-secret"] = json!(true);
+    assert!(matches!(
+        analyze_fixture(&unknown).select(&name).unwrap(),
+        Selection::Selected(_)
+    ));
     for resource in [json!(null), json!(false), json!({"$testPolicy":"unknown"})] {
         let mut value = minimal_config();
         value["profiles"]["app"]["policies"]["resourceLimits"] = resource;
