@@ -30,10 +30,12 @@
 //! selection observes a reference that names nothing admissible at the
 //! reference, beside what it compared the reference with, and each occurrence
 //! of a selected group at the member, beside the reference (D15:2249). The
-//! `artifactAdmission` rechecks are observed where their checks under the
-//! capability are, beside the admitted Policy that supplies the bound
-//! (D15:2249); the `configurationInput` rechecks carry no occurrence Evidence
-//! yet (plan 025 PR 5f-4d-2).
+//! rechecks are observed beside the admitted Policy that supplies the bound
+//! (D15:2249): the `artifactAdmission` ones where their checks under the
+//! capability are, and the `configurationInput` ones at the materialized
+//! root, the declarations, each declared Profile ID's key, or the selector
+//! under the policy's bound (D15:790, 812, 816). The longest string's carries
+//! no occurrence Evidence yet (plan 025 PR 5f-4d-2b).
 
 use std::collections::BTreeMap;
 
@@ -550,8 +552,8 @@ pub(crate) fn admit_resource_policy(
     let configured = configuration_bounds(
         evaluation,
         limits.map(|limits| &limits.configuration_input),
-        measures,
-        selector_length,
+        (measures, selector_length),
+        (policy.as_ref(), declared.1),
     )?;
     let inspected = artifact_bounds(
         evaluation,
@@ -860,17 +862,46 @@ fn measured(
     })
 }
 
+/// What a `configurationInput` recheck past the admitted `policy`'s bound
+/// observes: where `at` looks in the configuration, beside the policy, which
+/// supplies the bound (D15:2249). Nothing is observed without the policy or
+/// the declaration's file.
+fn recheck_at<'o>(
+    (policy, observer): (
+        Option<&EvidenceProjection>,
+        Option<&DeclarationObserver<'o>>,
+    ),
+    at: impl FnOnce(&DeclarationObserver<'o>) -> Result<EvidenceProjection, ObserverInvariant>,
+) -> Result<Option<Observation>, ObserverInvariant> {
+    match (policy, observer) {
+        (Some(policy), Some(observer)) => Ok(Some(Observation {
+            primary: at(observer)?,
+            related: vec![policy.clone()],
+        })),
+        _ => Ok(None),
+    }
+}
+
 /// The eight `configurationInput` bounds over what Phases 1 to 3 measured,
 /// under the policy's values: the root's five as Phase 1 summarizes them, the
 /// declarations, each declared Profile ID and then a string selector, and the
-/// structural analysis. Whether all of them hold.
+/// structural analysis. Whether all of them hold. Each is observed where its
+/// check under the capability was, beside the admitted policy: the root's
+/// totals and the analysis at the root, the declarations at the root's
+/// `profiles`, each Profile ID at its key, and the selector under the
+/// policy's bound beside the declarations (D15:790, 812, 816, 2249). The
+/// longest string carries no occurrence Evidence yet (plan 025 PR 5f-4d-2b).
 fn configuration_bounds(
     evaluation: &mut Evaluation,
     limits: Result<&ConfigurationInputLimits, &Causes>,
-    measures: &ConfigurationMeasures<'_>,
-    selector_length: Option<StringLengthFact>,
-) -> Result<Admitted<()>, EvaluationInvariant> {
+    (measures, selector_length): (&ConfigurationMeasures<'_>, Option<StringLengthFact>),
+    observed: (
+        Option<&EvidenceProjection>,
+        Option<&DeclarationObserver<'_>>,
+    ),
+) -> Result<Admitted<()>, PolicyInvariant> {
     let recheck = |subject| unit(subject, Check::WithinBound);
+    let at_root = recheck_at(observed, DeclarationObserver::root)?;
     let value = limits.map(|limits| &limits.value);
     let structural = limits.map(|limits| &limits.structural);
     let counts = measures.value.as_ref();
@@ -901,12 +932,12 @@ fn configuration_bounds(
             counts.map(|counts| counts.total_string_bytes),
         ),
     ] {
-        let held = bounded(
+        let held = bounded_at(
             evaluation,
             recheck(subject),
-            bound,
-            limit,
+            (bound, limit),
             count.map(Tally::exactly),
+            at_root.clone(),
         )?;
         holds = and(holds, held);
     }
@@ -921,33 +952,44 @@ fn configuration_bounds(
     )?;
     holds = and(holds, held);
     let ids = measures.profile_ids.as_ref();
-    let held = bounded(
+    let held = bounded_at(
         evaluation,
         recheck(PolicySubject::Profiles),
-        MAX_PROFILES,
-        structural.map(|limits| limits.max_profiles),
+        (MAX_PROFILES, structural.map(|limits| limits.max_profiles)),
         measures
             .declarations
             .as_ref()
             .map(|&declarations| Tally::exactly(declarations)),
+        recheck_at(observed, DeclarationObserver::declarations)?,
     )?;
     holds = and(holds, held);
     let id_limit = structural.map(|limits| limits.max_profile_id_bytes);
     if let Ok(ids) = ids {
         for id in *ids {
-            let held = bounded(
+            let held = bounded_at(
                 evaluation,
                 recheck(PolicySubject::ProfileId(id.clone())),
-                MAX_PROFILE_ID_BYTES,
-                id_limit,
+                (MAX_PROFILE_ID_BYTES, id_limit),
                 Ok(Tally::of(id.as_str().len())),
+                recheck_at(observed, |observer| observer.key(id.as_str()))?,
             )?;
             holds = and(holds, held);
         }
     }
     // An absent selector and a non-string type carry no ID bytes.
     if let Some(length) = selector_length {
-        let held = evaluation.check(
+        // Past the policy's bound, the selector is projected under it, the
+        // final authority (D15:816, 1889).
+        let selector = match (observed, id_limit) {
+            ((Some(policy), Some(observer)), Ok(limit)) => {
+                let mut observation =
+                    observer.selector(measures.selector, limit, measures.declarations.is_ok())?;
+                observation.related.push(policy.clone());
+                Some(observation)
+            }
+            _ => None,
+        };
+        let held = evaluation.check_found(
             recheck(PolicySubject::Selector),
             id_limit.map_err(Causes::clone),
             |limit| {
@@ -958,19 +1000,23 @@ fn configuration_bounds(
                     StringLengthFact::OverLimit => Actual::AtLeast(limit.get() + 1),
                 };
                 within(MAX_PROFILE_ID_BYTES, limit, actual)
+                    .map_err(|blocking| found(blocking, selector))
             },
         )?;
         holds = and(holds, held);
     }
-    let held = bounded(
+    let held = bounded_at(
         evaluation,
         recheck(PolicySubject::StructuralAnalysis),
-        MAX_STRUCTURAL_ANALYSIS_UNITS,
-        structural.map(|limits| limits.max_structural_analysis_units),
+        (
+            MAX_STRUCTURAL_ANALYSIS_UNITS,
+            structural.map(|limits| limits.max_structural_analysis_units),
+        ),
         measures
             .structural_units
             .as_ref()
             .map(|&units| Tally::exactly(units)),
+        at_root,
     )?;
     Ok(and(holds, held))
 }
@@ -1534,7 +1580,8 @@ mod tests {
         /// The configuration a file holds with these inputs' references in
         /// the selected declaration, [`SELECTED`], which a check of Phase 4
         /// looks at: the selected reference even where the rest of `policies`
-        /// was not admitted.
+        /// was not admitted. Every other declared Profile ID, whose key a
+        /// recheck looks at, declares nothing.
         fn config(&self) -> Value {
             let mut declaration = json!({});
             if let Ok(policies) = &self.policies {
@@ -1547,7 +1594,14 @@ mod tests {
             if let Ok(targets) = &self.targets {
                 declaration["targetProfiles"] = serde_json::to_value(targets).unwrap();
             }
-            json!({ "profiles": { SELECTED: declaration } })
+            let mut profiles = serde_json::Map::new();
+            profiles.insert(SELECTED.to_owned(), declaration);
+            for id in self.measures.profile_ids.iter().flatten() {
+                profiles
+                    .entry(id.as_str().to_owned())
+                    .or_insert_with(|| json!({}));
+            }
+            json!({ "profiles": profiles })
         }
 
         /// Runs `phase` with these inputs' references and where a check
@@ -2549,6 +2603,155 @@ mod tests {
             found.into_iter().filter(|(unit, ..)| at(unit)).collect(),
             tokens,
         )
+    }
+
+    /// The default inputs selecting the ample policy whose
+    /// `configurationInput` bounds `edit` lowers within the roomy capability,
+    /// and the view of the policy, which supplies each recheck's bound.
+    fn rechecking_input(edit: impl FnOnce(&mut ConfigurationInputLimits)) -> (Inputs, Value) {
+        let mut limits = ample();
+        edit(&mut limits.configuration_input);
+        let policy = chosen_under(&limits);
+        (Inputs::selecting(&policy), policy_view(&policy))
+    }
+
+    /// The view of the span `text` occupies in `source`, at its first
+    /// occurrence.
+    fn token_span(source: &[u8], text: &[u8]) -> Value {
+        let start = source
+            .windows(text.len())
+            .position(|window| window == text)
+            .unwrap();
+        json!({ "start": start.to_string(), "end": (start + text.len()).to_string() })
+    }
+
+    /// The root's totals and the structural analysis are rechecked at the
+    /// materialized root, beside the admitted policy (D15:790, 1880-1883,
+    /// 1887, 2249).
+    #[test]
+    fn the_roots_totals_and_the_analysis_are_rechecked_at_the_root() {
+        type Edit = fn(&mut ConfigurationInputLimits);
+        let cases: [(PolicySubject, Edit); 5] = [
+            (PolicySubject::Nodes, |limits| {
+                limits.value.max_nodes = bound(1);
+            }),
+            (PolicySubject::Depth, |limits| {
+                limits.value.max_depth = bound(1);
+            }),
+            (PolicySubject::CollectionEntries, |limits| {
+                limits.value.max_collection_entries = bound(1);
+            }),
+            (PolicySubject::StringBytes, |limits| {
+                limits.value.max_total_string_bytes = bound(1);
+            }),
+            (PolicySubject::StructuralAnalysis, |limits| {
+                limits.structural.max_structural_analysis_units = bound(1);
+            }),
+        ];
+        for (subject, edit) in cases {
+            let (inputs, policy) = rechecking_input(edit);
+            let at = recheck(subject.clone());
+            let (found, _) = rechecked_at(&inputs, |unit| *unit == at);
+            let [(unit, primary, related, ordinal)] = <[Observed; 1]>::try_from(found).unwrap();
+            assert_eq!(unit, at);
+            assert_eq!(primary["kind"], "configuration-value", "{subject:?}");
+            assert_eq!(
+                primary["value"],
+                json!({ "exact-json-pointer": "" }),
+                "{subject:?}"
+            );
+            assert_eq!((related, ordinal), (vec![policy], 0), "{subject:?}");
+        }
+    }
+
+    /// The declarations are rechecked at the root's `profiles`, and each
+    /// Profile ID past the policy's bound at its key's token, which keeps the
+    /// classification the capability's bound gives it (D15:776, 790, 1885,
+    /// 1886, 2249).
+    #[test]
+    fn the_declarations_and_each_long_profile_id_are_rechecked_at_their_tokens() {
+        let (inputs, policy) = rechecking_input(|limits| {
+            limits.structural.max_profiles = bound(1);
+        });
+        let at = recheck(PolicySubject::Profiles);
+        let (found, _) = rechecked_at(&inputs, |unit| *unit == at);
+        let [(_, primary, related, ordinal)] = <[Observed; 1]>::try_from(found).unwrap();
+        assert_eq!(
+            primary["value"],
+            json!({ "exact-json-pointer": "/profiles" })
+        );
+        assert_eq!((related, ordinal), (vec![policy], 0));
+        // "app" is within three bytes, and "storefront" is past them.
+        let (inputs, policy) = rechecking_input(|limits| {
+            limits.structural.max_profile_id_bytes = bound(3);
+        });
+        let (found, _) = rechecked_at(&inputs, |unit| {
+            matches!(
+                unit.subject,
+                Subject::ResourcePolicy(PolicySubject::ProfileId(_))
+            )
+        });
+        let source = serde_json::to_vec(&inputs.config()).unwrap();
+        let [(unit, primary, related, ordinal)] = <[Observed; 1]>::try_from(found).unwrap();
+        assert_eq!(
+            unit,
+            recheck(PolicySubject::ProfileId(profile("storefront")))
+        );
+        assert_eq!(
+            primary["value"],
+            json!({ "exact-json-pointer": "/profiles/storefront" })
+        );
+        assert_eq!(primary["span"], token_span(&source, br#""storefront""#));
+        assert_eq!((related, ordinal), (vec![policy], 0));
+    }
+
+    /// A selector past the policy's bound is rechecked under it, its final
+    /// projection authority, as over the limit, beside the declarations when
+    /// they are available and the policy (D15:812, 816, 1889, 2249; plan 025
+    /// interpretation #215).
+    #[test]
+    fn a_selector_past_the_policy_bound_is_rechecked_over_the_limit() {
+        let at = recheck(PolicySubject::Selector);
+        let (available, policy) = rechecking_input(|limits| {
+            limits.structural.max_profile_id_bytes = bound(2);
+        });
+        let mut unavailable = Inputs::selecting(&chosen_under(&{
+            let mut limits = ample();
+            limits.configuration_input.structural.max_profile_id_bytes = bound(2);
+            limits
+        }));
+        unavailable.measures.declarations = Err(earlier(Code::SpecificationInputIncomplete));
+        for (inputs, declarations) in [(&available, true), (&unavailable, false)] {
+            let (found, _) = rechecked_at(inputs, |unit| *unit == at);
+            let [(_, primary, related, ordinal)] = <[Observed; 1]>::try_from(found).unwrap();
+            assert_eq!(primary["kind"], "profile-selector");
+            assert_eq!(primary["origin"], "profile-selector-cli");
+            // A redacted selector's token stands for its type and length
+            // alone.
+            let mut kept = primary["selector"].clone();
+            assert!(kept["redacted-value"]
+                .as_object_mut()
+                .unwrap()
+                .remove("token")
+                .is_some());
+            assert_eq!(
+                kept,
+                json!({ "redacted-value": { "type": "string", "length": "over-limit" } })
+            );
+            let mut expected = Vec::new();
+            if declarations {
+                expected.push(json!({ "exact-json-pointer": "/profiles" }));
+            }
+            let values: Vec<Value> = related
+                .iter()
+                .filter(|view| view["kind"] == "configuration-value")
+                .map(|view| view["value"].clone())
+                .collect();
+            assert_eq!(values, expected, "{declarations}");
+            assert_eq!(related.last(), Some(&policy), "{declarations}");
+            assert_eq!(related.len(), expected.len() + 1, "{declarations}");
+            assert_eq!(ordinal, 0);
+        }
     }
 
     /// The collection's rechecks past the admitted policy's bounds are
