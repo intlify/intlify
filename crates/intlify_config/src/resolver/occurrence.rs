@@ -232,7 +232,8 @@ mod tests {
     use crate::input_limits::Bound;
     use crate::resolver::capability::CapabilityBound;
     use crate::resolver::evaluation::{
-        Blocking, Check, Code, Evaluation, IssueKey, Phase, Reason, Subject, Unit,
+        Blocking, Check, Code, Evaluation, Found, IssueKey, Observation, Phase, Reason, Subject,
+        Unit,
     };
     use crate::resolver::evidence::{Evidence, EvidenceProjection, Source};
     use crate::resolver::evidence_component::{ComponentPath, Key, VerificationRole};
@@ -296,6 +297,27 @@ mod tests {
             .unwrap()
             .key
             .clone()
+    }
+
+    /// Records `unit` as finding `code` with `reason` through `observation`,
+    /// as a check whose Findings carry occurrence Evidence does.
+    fn found_observed(
+        evaluation: &mut Evaluation,
+        unit: &Unit,
+        (code, reason): (Code, Option<Reason>),
+        observation: Observation,
+    ) {
+        let found = Blocking {
+            code,
+            reason,
+            details: None,
+        };
+        evaluation
+            .check_found(unit.clone(), Ok(()), |()| {
+                Err::<(), _>(Found::observed(found, observation))
+            })
+            .unwrap()
+            .unwrap_err();
     }
 
     fn exact(text: &str) -> ExactIdentity {
@@ -614,12 +636,6 @@ mod tests {
             Code::IntentSurfaceClassVocabularyNotAdmitted,
             Some(Reason::MemberInvalid),
         );
-        let body = found(
-            &mut evaluation,
-            &policy(PolicySubject::ResourceLimits, Check::CandidateBody),
-            Code::ResourcePolicyNotAdmitted,
-            Some(Reason::BodyIntegrityInvalid),
-        );
         let reference = value(
             O::ConfigurationFile,
             &[
@@ -634,9 +650,23 @@ mod tests {
         let candidate_member = input(ComponentPath::artifact_member(Key::Unsafe(
             JsonType::Object,
         )));
+        // An unauthenticated body is observed at the candidate, with the
+        // configuration reference and the pins as related Evidence.
+        found_observed(
+            &mut evaluation,
+            &policy(PolicySubject::ResourceLimits, Check::CandidateBody),
+            (
+                Code::ResourcePolicyNotAdmitted,
+                Some(Reason::BodyIntegrityInvalid),
+            ),
+            Observation {
+                primary: candidate_member,
+                related: vec![reference, pins],
+            },
+        );
         let candidates = [
             candidate(&invalid, invalid_member(), Vec::new()),
-            candidate(&body, candidate_member, vec![reference, pins]),
+            evaluation.occurrence_candidates()[0].clone(),
             candidate(&invalid, invalid_member(), Vec::new()),
         ];
         let tokens = tokens(&candidates);

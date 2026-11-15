@@ -456,18 +456,17 @@ fn actual(violation: &LimitViolation) -> Actual {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "benchmark"))]
 pub(crate) mod fixtures {
     use std::sync::Arc;
 
     use crate::boundary::source::{file_source_revision, read_pair, ExactIdentity, SourceLimits};
+    use crate::construction::resolver::committed;
     use crate::input_limits::Bound;
     use crate::locale::fixtures::FixtureProvider;
-    use crate::references::{PolicyReference, TargetProfileReference};
     use crate::resolver::evidence::Source;
     use crate::resolver::evidence_path::KeyFacts;
     use crate::resolver::limits::ResolutionLimits;
-    use crate::structural::AuthoringSchema;
 
     use super::{Classify, EntryFile};
 
@@ -495,8 +494,8 @@ pub(crate) mod fixtures {
                 .identity()
                 .clone();
             let comparable = comparable.clone();
-            let schema =
-                AuthoringSchema::<PolicyReference, TargetProfileReference>::for_model().unwrap();
+            // The configuration schema the committed construction admits.
+            let schema = committed().configuration_schema();
             Self {
                 identity,
                 classify: Box::new(move |edges| {
@@ -504,7 +503,7 @@ pub(crate) mod fixtures {
                         comparable: &comparable,
                         locales: None,
                     }
-                    .steps(&schema, edges)
+                    .steps(schema, edges)
                 }),
             }
         }

@@ -1395,7 +1395,7 @@ impl Evaluation {
         let collection = match &unit.subject {
             Subject::ResourcePolicy(PolicySubject::Capability(_)) => true,
             Subject::ResourcePolicy(PolicySubject::ResourceLimits) => {
-                unit.check == Check::WithinMetadataScan
+                unit.check != Check::BootstrapCandidate
             }
             _ => false,
         };

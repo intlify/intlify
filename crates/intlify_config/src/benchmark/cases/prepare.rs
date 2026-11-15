@@ -16,6 +16,7 @@ use crate::locale::fixtures::{fixture_pins, FixtureProvider};
 use crate::locale::Canonicalizer;
 use crate::materialize::materialize_file;
 use crate::model::ProfileId;
+use crate::resolver::entry::fixtures::FileFixture;
 use crate::resolver::limits::ConfirmedPolicy;
 use crate::structural::selection::{InvalidSelectorType, Selection, SelectorInput};
 use crate::structural::StructuralLimits;
@@ -727,6 +728,7 @@ fn prepare_policy(declaration: &Declaration) -> Result<Candidate, PreparationFai
     let fixture = recipe.fixture(&policy);
     let SelectedConfig {
         analysis,
+        source,
         config,
         selector,
         selected,
@@ -735,6 +737,8 @@ fn prepare_policy(declaration: &Declaration) -> Result<Candidate, PreparationFai
     let profile_ids = config.profiles().iter().map(|(id, _)| id.clone()).collect();
     let prepared = PreparedPolicy {
         analysis,
+        source,
+        fixture: FileFixture::new(&capability),
         config,
         selected,
         selector,
@@ -745,7 +749,16 @@ fn prepare_policy(declaration: &Declaration) -> Result<Candidate, PreparationFai
     let inputs = prepared
         .inputs()
         .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
-    let resolved = resolve(&prepared.capability, &prepared.collection, &inputs);
+    let file = prepared.file();
+    let observer = prepared
+        .observer(&file)
+        .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
+    let resolved = resolve(
+        &prepared.capability,
+        &prepared.collection,
+        &inputs,
+        &observer,
+    );
     let kind = match &resolved.result {
         Ok(outcome) if outcome.confirmed.is_ok() => ExpectedKind::ResourcePolicyConfirmed,
         Ok(_) => ExpectedKind::ResourcePolicyBlocked,
@@ -1088,6 +1101,8 @@ fn prepare_hydration(declaration: &Declaration) -> Result<Candidate, Preparation
 /// A complete configuration and the declaration its selector selects.
 struct SelectedConfig {
     analysis: Analysis,
+    /// The bytes the analysis materialized.
+    source: Arc<[u8]>,
     config: Config,
     selector: SelectorInput,
     selected: ProfileId,
@@ -1170,8 +1185,9 @@ fn prepare_construction(declaration: &Declaration) -> Result<Candidate, Preparat
 /// analyzed into a complete model, and selected with `selector`.
 fn select_config(config: &Value, selector: Selector) -> Result<SelectedConfig, PreparationFailure> {
     let (input_limits, structural_limits) = fixture_capacity();
-    let source = serde_json::to_vec(config).map_err(|_| PreparationFailure::CoreInvariant)?;
-    let doc = materialize_file(Arc::from(source), input_limits)
+    let source: Arc<[u8]> =
+        Arc::from(serde_json::to_vec(config).map_err(|_| PreparationFailure::CoreInvariant)?);
+    let doc = materialize_file(Arc::clone(&source), input_limits)
         .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?;
     let analysis = configuration_schema()
         .analyze(Arc::new(doc), structural_limits)
@@ -1192,6 +1208,7 @@ fn select_config(config: &Value, selector: Selector) -> Result<SelectedConfig, P
     let selected = selected.id().clone();
     Ok(SelectedConfig {
         analysis,
+        source,
         config,
         selector,
         selected,
