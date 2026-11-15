@@ -1420,7 +1420,7 @@ impl Evaluation {
     fn observes(&self, unit: &Unit, observed: bool, what: &str) {
         // The phases whose Findings carry occurrence Evidence so far; the
         // others gain theirs check by check (plan 025 PRs 5f).
-        const OBSERVED: [Phase; 7] = [
+        const OBSERVED: [Phase; 8] = [
             Phase::ResolverBootstrapAdmission,
             Phase::EntryAdmission,
             Phase::StructuralAdmission,
@@ -1428,30 +1428,14 @@ impl Evaluation {
             Phase::ResourcePolicyAdmission,
             Phase::SpecificationAdmission,
             Phase::LocaleResolution,
+            Phase::LocalePolicyResolution,
         ];
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
-        // Phase 8's negotiation and message fallback checks, and coverage's
-        // counts and selector items; its other checks gain theirs later (plan
-        // 025 PRs 5f-4h).
-        let policies = matches!(
-            unit.subject,
-            Subject::Negotiation(_)
-                | Subject::Fallback(_)
-                | Subject::Coverage(
-                    CoverageSubject::Rules
-                        | CoverageSubject::LocaleSelectors
-                        | CoverageSubject::SurfaceSelectors
-                        | CoverageSubject::Locale(..)
-                        | CoverageSubject::SurfaceClass(..)
-                        | CoverageSubject::Cells
-                        | CoverageSubject::Comparisons
-                )
-        );
         assert_eq!(
             observed,
-            OBSERVED.contains(&unit.phase) || policies,
+            OBSERVED.contains(&unit.phase),
             "{unit:?} reports {what} {} what it observed, against its check",
             if observed { "with" } else { "without" }
         );
