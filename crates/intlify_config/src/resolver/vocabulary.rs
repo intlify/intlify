@@ -14,10 +14,12 @@ use crate::artifacts::vocabulary::{BodyFailure, FormalVocabulary, IntactVocabula
 use crate::artifacts::SemanticDigest;
 
 use super::evaluation::{
-    both, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Phase, Reason,
-    Subject, Unit,
+    both, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Found,
+    Observation, Phase, Reason, Subject, Unit,
 };
-use super::specification::VocabularyAssertion;
+use super::evidence::EvidenceProjection;
+use super::evidence_component::ComponentPath;
+use super::specification::{Slot, VocabularyAssertion};
 
 /// The unit that reports what 017's reader found in the artifact itself.
 pub(crate) const INTACT: Unit = Unit {
@@ -148,18 +150,31 @@ pub(crate) fn admit_vocabulary<Id: AsRef<str>>(
             .admit()
             .map_err(|failure| not_admitted(body_reason(failure)))
     })?;
-    evaluation.check(
+    // A mismatch is observed at the artifact, beside the slot's assertion it
+    // was compared with (D15:832, 2249).
+    let mismatch = |reason| {
+        Found::observed(
+            not_admitted(reason),
+            Observation {
+                primary: EvidenceProjection::resolver_input(ComponentPath::vocabulary_root()),
+                related: vec![EvidenceProjection::resolver_input(
+                    ComponentPath::specification(Slot::IntentSurfaceClassVocabulary),
+                )],
+            },
+        )
+    };
+    evaluation.check_found(
         ASSERTED,
         both(intact, assertion.map_err(Causes::clone)),
         |(intact, assertion)| {
             if assertion.identity.as_ref() != intact.identity().as_str() {
-                return Err(not_admitted(Reason::IdentityMismatch));
+                return Err(mismatch(Reason::IdentityMismatch));
             }
             if assertion.revision.as_ref() != intact.revision().as_str() {
-                return Err(not_admitted(Reason::RevisionMismatch));
+                return Err(mismatch(Reason::RevisionMismatch));
             }
             if assertion.semantic_digest.as_ref() != intact.semantic_digest().as_str() {
-                return Err(not_admitted(Reason::DigestMismatch));
+                return Err(mismatch(Reason::DigestMismatch));
             }
             Ok(SurfaceVocabulary::admitted(intact))
         },

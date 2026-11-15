@@ -1392,9 +1392,12 @@ impl Evaluation {
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
+        // Phase 5's checks but the vocabulary's own (plan 025 PR 5f-4e-2).
+        let specification =
+            unit.phase == Phase::SpecificationAdmission && unit.check != Check::IntactArtifact;
         assert_eq!(
             observed,
-            OBSERVED.contains(&unit.phase),
+            OBSERVED.contains(&unit.phase) || specification,
             "{unit:?} reports a blocking candidate {} what it observed, against its check",
             if observed { "with" } else { "without" }
         );
@@ -1702,10 +1705,22 @@ mod tests {
         }
     }
 
-    /// The causes a missing slot leaves, as a later unit would receive them.
+    /// The causes a missing slot leaves, as a later unit would receive them,
+    /// observed where a slot's or the data's check looks.
     fn missing(evaluation: &mut Evaluation, unit: Unit) -> Causes {
+        use crate::resolver::evidence_component::ComponentPath;
+        let observed = match unit.subject {
+            Subject::Slot(slot) => Some(through(ComponentPath::specification(slot))),
+            Subject::CanonicalizationData => Some(through(ComponentPath::data_root())),
+            _ => None,
+        };
         evaluation
-            .check(unit, Ok(()), |()| Err::<(), _>(MISSING))
+            .check_found(unit, Ok(()), |()| {
+                Err::<(), _>(match observed {
+                    Some(observation) => Found::observed(MISSING, observation),
+                    None => Found::from(MISSING),
+                })
+            })
             .unwrap()
             .unwrap_err()
     }
@@ -3133,7 +3148,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "without what it observed")]
     fn a_candidate_of_an_observed_phase_without_an_observation_fails_the_test() {
-        missing(&mut Evaluation::default(), BOOTSTRAP);
+        let _ = Evaluation::default().check(BOOTSTRAP, Ok(()), |()| Err::<(), _>(MISSING));
     }
 
     /// A blocking candidate of a check whose Findings carry no occurrence
@@ -3141,11 +3156,12 @@ mod tests {
     #[test]
     #[should_panic(expected = "with what it observed")]
     fn a_candidate_of_another_phase_with_an_observation_fails_the_test() {
-        let coverage = through(
-            crate::resolver::evidence_component::ComponentPath::specification(Slot::Coverage),
-        );
-        let _ = Evaluation::default().check_found(slot(Slot::Coverage), Ok(()), |()| {
-            Err::<(), _>(Found::observed(MISSING, coverage))
+        let data = through(crate::resolver::evidence_component::ComponentPath::data_root());
+        let _ = Evaluation::default().check_found(occurrences(), Ok(()), |()| {
+            Err::<(), _>(Found::observed(
+                Blocking::limit(exceeded(Actual::Exact(4))),
+                data,
+            ))
         });
     }
 }

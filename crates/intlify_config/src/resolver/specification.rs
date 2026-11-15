@@ -208,16 +208,39 @@ fn admit_slot<Id: Clone + Eq>(
     }
 }
 
+/// What a slot's check observes: the slot's Specification Input component,
+/// whether its assertion is absent or names another specification (D15:718,
+/// 831).
+fn at_slot(slot: Slot) -> Observation {
+    Observation {
+        primary: EvidenceProjection::resolver_input(ComponentPath::specification(slot)),
+        related: Vec::new(),
+    }
+}
+
+/// Phase 5's check of `slot`'s assertion, observed at the slot.
+fn slot_check<T>(
+    evaluation: &mut Evaluation,
+    slot: Slot,
+    prerequisite: Admitted<()>,
+    evaluate: impl FnOnce() -> Result<T, Blocking>,
+) -> Result<Admitted<T>, EvaluationInvariant> {
+    evaluation.check_found(
+        unit(Phase::SpecificationAdmission, slot),
+        prerequisite,
+        |()| evaluate().map_err(|blocking| Found::observed(blocking, at_slot(slot))),
+    )
+}
+
 /// One slot whose supported value is a single specification identity.
 fn specification_slot<Id: Clone + Eq>(
     evaluation: &mut Evaluation,
-    unit: Unit,
-    code: Code,
+    (slot, code): (Slot, Code),
     prerequisite: Admitted<()>,
     asserted: Option<&VersionedIdentity<Id>>,
     supported: &VersionedIdentity<Id>,
 ) -> Result<Admitted<VersionedIdentity<Id>>, EvaluationInvariant> {
-    evaluation.check(unit, prerequisite, |()| {
+    slot_check(evaluation, slot, prerequisite, || {
         admit_slot(code, asserted, supported)
     })
 }
@@ -245,17 +268,7 @@ pub(crate) fn admit_project_profile<Id: Clone + Eq>(
                 input.project_profile.as_ref(),
                 &supported.project_profile.specification,
             )
-            .map_err(|blocking| {
-                Found::observed(
-                    blocking,
-                    Observation {
-                        primary: EvidenceProjection::resolver_input(ComponentPath::specification(
-                            slot,
-                        )),
-                        related: Vec::new(),
-                    },
-                )
-            })
+            .map_err(|blocking| Found::observed(blocking, at_slot(slot)))
         },
     )
 }
@@ -296,58 +309,67 @@ where
     D: FormalData,
     D::Provider: Provider<Identity = Id>,
 {
-    let [canonicalization, negotiation, fallback, coverage, asserted_vocabulary, graph, placement, ..] =
-        PHASE_5;
     let confirmed = || policy.map(|_| ()).map_err(Causes::clone);
-    let pins = evaluation.check(canonicalization, confirmed(), |()| {
-        let asserted = present(input.locale_canonicalization.as_ref())?;
-        match supported.locale_canonicalization.expected(asserted) {
-            Ok(pins) => Ok(pins.clone()),
-            Err(reason) => Err(not_admitted(Code::LocaleSpecificationNotAdmitted, reason)),
-        }
-    })?;
+    let pins = slot_check(
+        evaluation,
+        Slot::LocaleCanonicalization,
+        confirmed(),
+        || {
+            let asserted = present(input.locale_canonicalization.as_ref())?;
+            match supported.locale_canonicalization.expected(asserted) {
+                Ok(pins) => Ok(pins.clone()),
+                Err(reason) => Err(not_admitted(Code::LocaleSpecificationNotAdmitted, reason)),
+            }
+        },
+    )?;
     let locale_negotiation = specification_slot(
         evaluation,
-        negotiation,
-        Code::NegotiationSpecificationNotAdmitted,
+        (
+            Slot::LocaleNegotiation,
+            Code::NegotiationSpecificationNotAdmitted,
+        ),
         confirmed(),
         input.locale_negotiation.as_ref(),
         &supported.locale_negotiation,
     )?;
     let message_locale_fallback = specification_slot(
         evaluation,
-        fallback,
-        Code::MessageFallbackSpecificationNotAdmitted,
+        (
+            Slot::MessageLocaleFallback,
+            Code::MessageFallbackSpecificationNotAdmitted,
+        ),
         confirmed(),
         input.message_locale_fallback.as_ref(),
         &supported.message_locale_fallback,
     )?;
     let coverage = specification_slot(
         evaluation,
-        coverage,
-        Code::CoverageSpecificationNotAdmitted,
+        (Slot::Coverage, Code::CoverageSpecificationNotAdmitted),
         confirmed(),
         input.coverage.as_ref(),
         &supported.coverage,
     )?;
     // The slot has no fixed value, so it only has to be present: the
     // vocabulary artifact is admitted against what it asserts.
-    let intent_surface_class_vocabulary =
-        evaluation.check(asserted_vocabulary, confirmed(), |()| {
-            present(input.intent_surface_class_vocabulary.as_ref()).cloned()
-        })?;
+    let intent_surface_class_vocabulary = slot_check(
+        evaluation,
+        Slot::IntentSurfaceClassVocabulary,
+        confirmed(),
+        || present(input.intent_surface_class_vocabulary.as_ref()).cloned(),
+    )?;
     let delivery_graph = specification_slot(
         evaluation,
-        graph,
-        Code::DeliverySpecificationNotAdmitted,
+        (Slot::DeliveryGraph, Code::DeliverySpecificationNotAdmitted),
         confirmed(),
         input.delivery_graph.as_ref(),
         &supported.delivery_graph,
     )?;
     let delivery_placement = specification_slot(
         evaluation,
-        placement,
-        Code::DeliverySpecificationNotAdmitted,
+        (
+            Slot::DeliveryPlacement,
+            Code::DeliverySpecificationNotAdmitted,
+        ),
         confirmed(),
         input.delivery_placement.as_ref(),
         &supported.delivery_placement,
@@ -358,17 +380,28 @@ where
         intent_surface_class_vocabulary.as_ref(),
         vocabulary,
     )?;
-    let canonicalizer = evaluation.check(
+    let canonicalizer = evaluation.check_found(
         DATA,
         both(pins.clone(), policy.map_err(Causes::clone)),
         |(pins, policy): (SemanticPins<Id>, &ConfirmedPolicy)| {
             // The boundary admitted only the envelope: the rest of the data is
             // read here, and then it must be the data the admitted
-            // specification admits. Either failure is the data's.
-            let not_admitted = || Blocking {
-                code: Code::LocaleDataNotAdmitted,
-                reason: None,
-                details: None,
+            // specification admits. Either failure is the data's, observed at
+            // its root beside the slot it must match (D15:833, 2249).
+            let not_admitted = || {
+                Found::observed(
+                    Blocking {
+                        code: Code::LocaleDataNotAdmitted,
+                        reason: None,
+                        details: None,
+                    },
+                    Observation {
+                        primary: EvidenceProjection::resolver_input(ComponentPath::data_root()),
+                        related: vec![EvidenceProjection::resolver_input(
+                            ComponentPath::specification(Slot::LocaleCanonicalization),
+                        )],
+                    },
+                )
             };
             let provider = data.admit(data_limits).map_err(|_| not_admitted())?;
             Canonicalizer::bind(
@@ -503,7 +536,7 @@ pub(crate) const FIXTURE_PROFILE_DIGEST: &str =
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
+    use serde_json::{json, Value};
 
     use super::*;
     use crate::artifacts::vectors::vocabulary::{self as vectors, formal};
@@ -1209,5 +1242,130 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(evaluation.occurrence_candidates().is_empty());
+    }
+
+    /// Phase 5's occurrences in `evaluation`, each as its unit and the views
+    /// of its primary and related Evidence.
+    fn phase_5_occurrences(evaluation: &Evaluation) -> Vec<(Unit, Value, Vec<Value>)> {
+        use crate::resolver::evidence::Evidence;
+        use crate::resolver::evidence_token::EvidenceTokens;
+        use crate::resolver::occurrence::{occurrences, redacted};
+        use crate::resolver::token::{Sha256, Specification};
+        const PROFILE: Specification<'static> = Specification {
+            identity: "intlify-project-profile",
+            revision: "0",
+        };
+        let candidates = evaluation.occurrence_candidates();
+        let tokens = EvidenceTokens::assign(PROFILE, redacted(candidates), &Sha256);
+        occurrences(candidates, PROFILE, &tokens)
+            .unwrap()
+            .iter()
+            .filter(|occurrence| occurrence.owner().phase == Phase::SpecificationAdmission)
+            .map(|occurrence| {
+                (
+                    occurrence.owner().clone(),
+                    occurrence.primary().view(),
+                    occurrence.related().iter().map(Evidence::view).collect(),
+                )
+            })
+            .collect()
+    }
+
+    /// The view of `slot`'s Specification Input component (D15:831).
+    fn slot_view(slot: Slot) -> Value {
+        json!({
+            "kind": "specification-input",
+            "origin": "profile-resolution-specification-input",
+            "component": [{ "fixed-role": slot.name() }],
+        })
+    }
+
+    /// Each Phase 5 slot whose assertion is absent or names another
+    /// specification is observed at the slot's Specification Input
+    /// component, relating nothing; the vocabulary's slot only has to be
+    /// present (D15:718, 831).
+    #[test]
+    fn each_phase_5_slot_failure_is_observed_at_its_slot() {
+        for slot in [
+            Slot::LocaleCanonicalization,
+            Slot::LocaleNegotiation,
+            Slot::MessageLocaleFallback,
+            Slot::Coverage,
+            Slot::DeliveryGraph,
+            Slot::DeliveryPlacement,
+        ] {
+            for asserted in [None, Some(identity("another-specification", "0"))] {
+                let mut input = complete();
+                *assertion(&mut input, slot) = asserted.clone();
+                let admission = Admission::confirmed(&input);
+                assert_eq!(
+                    phase_5_occurrences(&admission.evaluation),
+                    [(
+                        unit(Phase::SpecificationAdmission, slot),
+                        slot_view(slot),
+                        Vec::new()
+                    )],
+                    "{slot:?} {asserted:?}"
+                );
+            }
+        }
+        let mut input = complete();
+        input.intent_surface_class_vocabulary = None;
+        let admission = Admission::confirmed(&input);
+        let slot = Slot::IntentSurfaceClassVocabulary;
+        assert_eq!(
+            phase_5_occurrences(&admission.evaluation),
+            [(
+                unit(Phase::SpecificationAdmission, slot),
+                slot_view(slot),
+                Vec::new()
+            )]
+        );
+    }
+
+    /// An intact vocabulary its slot does not assert is observed at the
+    /// artifact's root, beside the slot it was compared with (D15:832, 2249).
+    #[test]
+    fn a_vocabulary_its_slot_does_not_assert_is_observed_at_its_root() {
+        let mut input = complete();
+        input.intent_surface_class_vocabulary = Some(VocabularyAssertion {
+            identity: "another-vocabulary",
+            ..vocabulary()
+        });
+        let admission = Admission::confirmed(&input);
+        assert_eq!(
+            phase_5_occurrences(&admission.evaluation),
+            [(
+                ASSERTED,
+                json!({
+                    "kind": "artifact-input",
+                    "origin": "intent-surface-class-vocabulary",
+                    "component": [],
+                }),
+                vec![slot_view(Slot::IntentSurfaceClassVocabulary)]
+            )]
+        );
+    }
+
+    /// Data that is not the admitted specification's is observed at the
+    /// data's root, the only path 015 names in it, beside the slot it must
+    /// match (D15:833, 2249).
+    #[test]
+    fn data_not_admitted_is_observed_at_its_root_beside_its_slot() {
+        let mut stale = fixture_pins();
+        stale.dataset.semantic_digest = "sha256:another-dataset";
+        let admission = Admission::run(&supported_with(vec![stale]), &complete(), Ok(&policy()));
+        assert_eq!(
+            phase_5_occurrences(&admission.evaluation),
+            [(
+                DATA,
+                json!({
+                    "kind": "artifact-input",
+                    "origin": "locale-canonicalization-data",
+                    "component": [],
+                }),
+                vec![slot_view(Slot::LocaleCanonicalization)]
+            )]
+        );
     }
 }

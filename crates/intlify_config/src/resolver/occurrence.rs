@@ -290,23 +290,18 @@ mod tests {
             .check(unit.clone(), Ok(()), |()| Err::<(), _>(found))
             .unwrap()
             .unwrap_err();
-        evaluation
-            .findings()
-            .into_iter()
-            .find(|finding| finding.key.unit() == unit && finding.key.code() == code)
-            .unwrap()
-            .key
-            .clone()
+        key_of(evaluation, unit, code)
     }
 
     /// Records `unit` as finding `code` with `reason` through `observation`,
-    /// as a check whose Findings carry occurrence Evidence does.
+    /// as a check whose Findings carry occurrence Evidence does, and returns
+    /// the Finding's key.
     fn found_observed(
         evaluation: &mut Evaluation,
         unit: &Unit,
         (code, reason): (Code, Option<Reason>),
         observation: Observation,
-    ) {
+    ) -> IssueKey {
         let found = Blocking {
             code,
             reason,
@@ -318,6 +313,35 @@ mod tests {
             })
             .unwrap()
             .unwrap_err();
+        key_of(evaluation, unit, code)
+    }
+
+    /// The key of the Finding `code` `unit` reported.
+    fn key_of(evaluation: &Evaluation, unit: &Unit, code: Code) -> IssueKey {
+        evaluation
+            .findings()
+            .into_iter()
+            .find(|finding| finding.key.unit() == unit && finding.key.code() == code)
+            .unwrap()
+            .key
+            .clone()
+    }
+
+    /// Records the vocabulary's mismatch with its slot, observed at the
+    /// artifact beside the slot, and returns the Finding's key.
+    fn mismatched(evaluation: &mut Evaluation) -> IssueKey {
+        found_observed(
+            evaluation,
+            &vocabulary(Check::AssertedArtifact),
+            (
+                Code::IntentSurfaceClassVocabularyNotAdmitted,
+                Some(Reason::IdentityMismatch),
+            ),
+            Observation {
+                primary: vocabulary_root(),
+                related: vec![slot()],
+            },
+        )
     }
 
     fn exact(text: &str) -> ExactIdentity {
@@ -524,12 +548,7 @@ mod tests {
     #[test]
     fn the_key_leaves_related_evidence_out() {
         let mut evaluation = Evaluation::default();
-        let asserted = found(
-            &mut evaluation,
-            &vocabulary(Check::AssertedArtifact),
-            Code::IntentSurfaceClassVocabularyNotAdmitted,
-            Some(Reason::IdentityMismatch),
-        );
+        let asserted = mismatched(&mut evaluation);
         let with = built(&[candidate(&asserted, vocabulary_root(), vec![slot()])]);
         let without = built(&[candidate(&asserted, vocabulary_root(), Vec::new())]);
         assert_eq!(with[0].key(), without[0].key());
@@ -542,12 +561,7 @@ mod tests {
     #[test]
     fn an_occurrence_is_owned_by_its_findings_unit_and_refers_to_its_evidence() {
         let mut evaluation = Evaluation::default();
-        let asserted = found(
-            &mut evaluation,
-            &vocabulary(Check::AssertedArtifact),
-            Code::IntentSurfaceClassVocabularyNotAdmitted,
-            Some(Reason::IdentityMismatch),
-        );
+        let asserted = mismatched(&mut evaluation);
         let built = built(&[candidate(&asserted, vocabulary_root(), vec![slot()])]);
         let occurrence = &built[0];
         let unit = asserted.unit();
@@ -575,12 +589,7 @@ mod tests {
     #[test]
     fn occurrences_order_by_finding_primary_and_ordinal_and_present_their_view() {
         let mut evaluation = Evaluation::default();
-        let asserted = found(
-            &mut evaluation,
-            &vocabulary(Check::AssertedArtifact),
-            Code::IntentSurfaceClassVocabularyNotAdmitted,
-            Some(Reason::IdentityMismatch),
-        );
+        let asserted = mismatched(&mut evaluation);
         let invalid = found(
             &mut evaluation,
             &vocabulary(Check::IntactArtifact),
