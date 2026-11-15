@@ -85,7 +85,7 @@ fn refused(id: &str, artifact: &Value) -> Result<Value, String> {
     Ok(json!({
         "id": id,
         "artifact": artifact,
-        "reason": body_reason(failure).as_str(),
+        "reason": body_reason(&failure).as_str(),
     }))
 }
 
@@ -214,7 +214,7 @@ mod tests {
         for case in cases(&vectors, "refused") {
             let failure = reread(&case["artifact"]).admit().unwrap_err();
             assert_eq!(
-                body_reason(failure).as_str(),
+                body_reason(&failure).as_str(),
                 case["reason"],
                 "{}",
                 case["id"]

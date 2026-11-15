@@ -1382,22 +1382,20 @@ impl Evaluation {
     fn observes(&self, unit: &Unit, observed: bool) {
         // The phases whose Findings carry occurrence Evidence so far; the
         // others gain theirs check by check (plan 025 PRs 5f).
-        const OBSERVED: [Phase; 5] = [
+        const OBSERVED: [Phase; 6] = [
             Phase::ResolverBootstrapAdmission,
             Phase::EntryAdmission,
             Phase::StructuralAdmission,
             Phase::ProfileSelection,
             Phase::ResourcePolicyAdmission,
+            Phase::SpecificationAdmission,
         ];
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
-        // Phase 5's checks but the vocabulary's own (plan 025 PR 5f-4e-2).
-        let specification =
-            unit.phase == Phase::SpecificationAdmission && unit.check != Check::IntactArtifact;
         assert_eq!(
             observed,
-            OBSERVED.contains(&unit.phase) || specification,
+            OBSERVED.contains(&unit.phase),
             "{unit:?} reports a blocking candidate {} what it observed, against its check",
             if observed { "with" } else { "without" }
         );

@@ -284,17 +284,18 @@ fn strip(value: &mut Value) -> bool {
 
 /// Why a formally admitted artifact is not an intact vocabulary: 017 steps 3
 /// to 6, which 015 reports in this order.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum BodyFailure {
     /// The integrity digest is not the digest of the rest of the artifact.
     Integrity,
     /// A digest is beyond the shared encoding's capacity, so it cannot be
     /// computed, which is not the same as a digest that disagrees.
     Unframable,
-    /// A member is not an `IdentityToken`.
-    MemberInvalid,
-    /// A member occurs more than once, adjacent or not.
-    MemberDuplicate,
+    /// Members that are not `IdentityToken`s, by their index in the artifact.
+    MemberInvalid(Vec<usize>),
+    /// Every occurrence of each member that occurs more than once, adjacent
+    /// or not, in ascending order.
+    MemberDuplicate(Vec<Token>),
     /// The members are unique but not in ascending unsigned UTF-8 byte order.
     NonCanonicalOrder,
 }
@@ -340,16 +341,27 @@ impl FormalVocabulary {
         if integrity != artifact.integrity_digest {
             return Err(BodyFailure::Integrity);
         }
-        let members = artifact
-            .members
-            .iter()
-            .map(|member| Token::new(member))
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|_| BodyFailure::MemberInvalid)?;
+        let mut members = Vec::with_capacity(artifact.members.len());
+        let mut invalid = Vec::new();
+        for (index, member) in artifact.members.iter().enumerate() {
+            match Token::new(member) {
+                Ok(token) => members.push(token),
+                Err(_) => invalid.push(index),
+            }
+        }
+        if !invalid.is_empty() {
+            return Err(BodyFailure::MemberInvalid(invalid));
+        }
         let mut sorted = members.clone();
         sorted.sort_unstable();
-        if sorted.windows(2).any(|pair| pair[0] == pair[1]) {
-            return Err(BodyFailure::MemberDuplicate);
+        let repeated: Vec<Token> = sorted
+            .chunk_by(|left, right| left == right)
+            .filter(|run| run.len() > 1)
+            .flatten()
+            .cloned()
+            .collect();
+        if !repeated.is_empty() {
+            return Err(BodyFailure::MemberDuplicate(repeated));
         }
         if members != sorted {
             return Err(BodyFailure::NonCanonicalOrder);
@@ -766,13 +778,28 @@ mod tests {
         assert_eq!(admit(&stale), Err(BodyFailure::Integrity));
         // An invalid member before a repeated one, a repeated one before an
         // order, which a repeat that is not adjacent also breaks.
-        let cases: [(&[&str], BodyFailure); 5] = [
-            (&["nav", "Nav", "nav"], BodyFailure::MemberInvalid),
+        let token = |member: &str| Token::new(member).unwrap();
+        let cases: [(&[&str], BodyFailure); 6] = [
+            (&["nav", "Nav", "nav"], BodyFailure::MemberInvalid(vec![1])),
+            // Every invalid member, by its index.
             (
-                &["checkout", "nav", "checkout"],
-                BodyFailure::MemberDuplicate,
+                &["Nav", "checkout", "nav ", "nav"],
+                BodyFailure::MemberInvalid(vec![0, 2]),
             ),
-            (&["nav", "nav"], BodyFailure::MemberDuplicate),
+            // Every occurrence of each repeated member, in ascending order.
+            (
+                &["nav", "checkout", "nav", "checkout", "internal-tool"],
+                BodyFailure::MemberDuplicate(vec![
+                    token("checkout"),
+                    token("checkout"),
+                    token("nav"),
+                    token("nav"),
+                ]),
+            ),
+            (
+                &["nav", "nav"],
+                BodyFailure::MemberDuplicate(vec![token("nav"), token("nav")]),
+            ),
             (&["nav", "checkout"], BodyFailure::NonCanonicalOrder),
             (
                 &["internal-tool", "checkout", "nav"],

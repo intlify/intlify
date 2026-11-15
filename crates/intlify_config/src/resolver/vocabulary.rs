@@ -9,17 +9,19 @@
 //! an intact artifact with the slot's assertion.
 
 use intlify_shared_json::token::Token;
+use serde_json::Value;
 
 use crate::artifacts::vocabulary::{BodyFailure, FormalVocabulary, IntactVocabulary};
 use crate::artifacts::SemanticDigest;
 
 use super::evaluation::{
-    both, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Found,
-    Observation, Phase, Reason, Subject, Unit,
+    both, Admitted, Blocking, Causes, Check, Code, Evaluation, Found, Observation, Phase, Reason,
+    Subject, Unit,
 };
 use super::evidence::EvidenceProjection;
-use super::evidence_component::ComponentPath;
-use super::specification::{Slot, VocabularyAssertion};
+use super::evidence_component::{ComponentInvariant, ComponentPath, Key};
+use super::evidence_token::JsonType;
+use super::specification::{Slot, SpecificationInvariant, VocabularyAssertion};
 
 /// The unit that reports what 017's reader found in the artifact itself.
 pub(crate) const INTACT: Unit = Unit {
@@ -117,13 +119,61 @@ impl SurfaceVocabulary {
 /// 015's reason for each failure of 017's reader. A digest the shared encoding
 /// cannot compute leaves the integrity unverified, which 015 reports as the
 /// integrity's failure: it gives no other reason.
-pub(crate) const fn body_reason(failure: BodyFailure) -> Reason {
+pub(crate) const fn body_reason(failure: &BodyFailure) -> Reason {
     match failure {
         BodyFailure::Integrity | BodyFailure::Unframable => Reason::BodyIntegrityInvalid,
-        BodyFailure::MemberInvalid => Reason::MemberInvalid,
-        BodyFailure::MemberDuplicate => Reason::MemberDuplicate,
+        BodyFailure::MemberInvalid(_) => Reason::MemberInvalid,
+        BodyFailure::MemberDuplicate(_) => Reason::MemberDuplicate,
         BodyFailure::NonCanonicalOrder => Reason::NonCanonicalOrder,
     }
+}
+
+/// What 017's reader found, as the candidates of the artifact's own check
+/// (D15:832, 1569): each member that is not an `IdentityToken` at the member,
+/// a string under a key that keeps only its JSON type (plan 025
+/// interpretation #200); each occurrence of a repeated member at the member,
+/// under its canonical vocabulary identity; and a failure of the integrity or
+/// the order at the artifact's root.
+///
+/// # Errors
+///
+/// Returns the resolver bug of a member without a component path.
+fn intact_failure(failure: &BodyFailure) -> Result<Found, ComponentInvariant> {
+    let blocking = not_admitted(body_reason(failure));
+    let at = |primary| {
+        Found::observed(
+            blocking,
+            Observation {
+                primary,
+                related: Vec::new(),
+            },
+        )
+    };
+    let members = match failure {
+        BodyFailure::MemberInvalid(invalid) => {
+            let member = EvidenceProjection::resolver_input(ComponentPath::vocabulary_member(
+                Key::Unsafe(JsonType::String),
+            )?);
+            invalid.iter().map(|_| member.clone()).collect()
+        }
+        BodyFailure::MemberDuplicate(repeated) => repeated
+            .iter()
+            .map(|member| {
+                ComponentPath::vocabulary_member(Key::Identity(Value::from(member.as_str())))
+                    .map(EvidenceProjection::resolver_input)
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+        BodyFailure::Integrity | BodyFailure::Unframable | BodyFailure::NonCanonicalOrder => {
+            vec![EvidenceProjection::resolver_input(
+                ComponentPath::vocabulary_root(),
+            )]
+        }
+    };
+    Ok(members
+        .into_iter()
+        .map(at)
+        .reduce(Found::and)
+        .unwrap_or_else(|| Found::from(blocking)))
 }
 
 const fn not_admitted(reason: Reason) -> Blocking {
@@ -144,12 +194,17 @@ pub(crate) fn admit_vocabulary<Id: AsRef<str>>(
     policy: Admitted<()>,
     assertion: Result<&VocabularyAssertion<Id>, &Causes>,
     artifact: &FormalVocabulary,
-) -> Result<Admitted<SurfaceVocabulary>, EvaluationInvariant> {
-    let intact = evaluation.check(INTACT, policy, |()| {
-        artifact
-            .admit()
-            .map_err(|failure| not_admitted(body_reason(failure)))
-    })?;
+) -> Result<Admitted<SurfaceVocabulary>, SpecificationInvariant> {
+    // The reader runs under the policy, and what it found is observed before
+    // the check records it, which cannot return the resolver's own bugs.
+    let read = match policy {
+        Ok(()) => Ok(match artifact.admit() {
+            Ok(intact) => Ok(intact),
+            Err(failure) => Err(intact_failure(&failure)?),
+        }),
+        Err(causes) => Err(causes),
+    };
+    let intact = evaluation.check_found(INTACT, read, |read| read)?;
     // A mismatch is observed at the artifact, beside the slot's assertion it
     // was compared with (D15:832, 2249).
     let mismatch = |reason| {
@@ -163,7 +218,7 @@ pub(crate) fn admit_vocabulary<Id: AsRef<str>>(
             },
         )
     };
-    evaluation.check_found(
+    Ok(evaluation.check_found(
         ASSERTED,
         both(intact, assertion.map_err(Causes::clone)),
         |(intact, assertion)| {
@@ -178,7 +233,7 @@ pub(crate) fn admit_vocabulary<Id: AsRef<str>>(
             }
             Ok(SurfaceVocabulary::admitted(intact))
         },
-    )
+    )?)
 }
 
 #[cfg(test)]
@@ -275,13 +330,124 @@ mod tests {
         let reasons = [
             (BodyFailure::Integrity, "body-integrity-invalid"),
             (BodyFailure::Unframable, "body-integrity-invalid"),
-            (BodyFailure::MemberInvalid, "member-invalid"),
-            (BodyFailure::MemberDuplicate, "member-duplicate"),
+            (BodyFailure::MemberInvalid(vec![0]), "member-invalid"),
+            (BodyFailure::MemberDuplicate(Vec::new()), "member-duplicate"),
             (BodyFailure::NonCanonicalOrder, "non-canonical-order"),
         ];
         for (failure, reason) in reasons {
-            assert_eq!(body_reason(failure).as_str(), reason, "{failure:?}");
+            assert_eq!(body_reason(&failure).as_str(), reason, "{failure:?}");
         }
+    }
+
+    /// The intact check's occurrences over `artifact`, each as the
+    /// component of its primary Evidence and its ordinal, and the component
+    /// a string member no Set admitted takes under the same tokens.
+    fn intact_occurrences(
+        artifact: &FormalVocabulary,
+    ) -> (Vec<(serde_json::Value, u64)>, serde_json::Value) {
+        use crate::resolver::evidence_token::EvidenceTokens;
+        use crate::resolver::occurrence::{occurrences, redacted};
+        use crate::resolver::token::{Sha256, Specification};
+        const PROFILE: Specification<'static> = Specification {
+            identity: "intlify-project-profile",
+            revision: "0",
+        };
+        let mut evaluation = Evaluation::default();
+        admit(&mut evaluation, Ok(()), Ok(&ASSERTION), artifact).unwrap_err();
+        let string = EvidenceProjection::resolver_input(
+            ComponentPath::vocabulary_member(Key::Unsafe(JsonType::String)).unwrap(),
+        );
+        let candidates = evaluation.occurrence_candidates();
+        let tokens = EvidenceTokens::assign(
+            PROFILE,
+            redacted(candidates).chain(string.redacted()),
+            &Sha256,
+        );
+        let found = occurrences(candidates, PROFILE, &tokens)
+            .unwrap()
+            .iter()
+            .map(|occurrence| {
+                assert_eq!(occurrence.owner(), &INTACT);
+                assert!(occurrence.related().is_empty());
+                let view = occurrence.primary().view();
+                assert_eq!(view["kind"], "artifact-input", "{view}");
+                assert_eq!(view["origin"], "intent-surface-class-vocabulary", "{view}");
+                (view["component"].clone(), occurrence.ordinal())
+            })
+            .collect();
+        let string = string.retained(PROFILE, &tokens).unwrap().view()["component"].clone();
+        (found, string)
+    }
+
+    /// What the reader found is observed where it is: each invalid member at
+    /// the member, a string under a key that keeps only its JSON type; each
+    /// occurrence of a repeated member at the member, under its identity; and
+    /// a broken integrity or order at the artifact's root (D15:832, 1569; plan
+    /// 025 interpretation #200).
+    #[test]
+    fn what_the_reader_found_is_observed_where_it_is() {
+        use crate::resolver::evidence_source::hex;
+        use intlify_shared_json::encoding::encode;
+        use serde_json::json;
+        // Two invalid members are one redacted member, told apart by their
+        // ordinals.
+        let (invalid, string) = intact_occurrences(&sealed(&["Nav", "checkout", "nav "]));
+        assert_eq!(invalid, [(string.clone(), 0), (string.clone(), 1)]);
+        assert_eq!(string[0], json!({ "fixed-role": "vocabulary-member" }));
+        assert!(string[1].get("redacted-key").is_some(), "{string}");
+        // Every occurrence of each repeated member, and no other member.
+        let identity = |member: &str| {
+            json!([
+                { "fixed-role": "vocabulary-member" },
+                { "safe-key": hex(&encode(&json!(member)).unwrap()) },
+            ])
+        };
+        let (mut repeated, _) = intact_occurrences(&sealed(&[
+            "nav",
+            "checkout",
+            "nav",
+            "checkout",
+            "internal-tool",
+        ]));
+        repeated.sort_by(|left, right| {
+            left.0
+                .to_string()
+                .cmp(&right.0.to_string())
+                .then(left.1.cmp(&right.1))
+        });
+        let mut expected = vec![
+            (identity("checkout"), 0),
+            (identity("checkout"), 1),
+            (identity("nav"), 0),
+            (identity("nav"), 1),
+        ];
+        expected.sort_by(|left, right| {
+            left.0
+                .to_string()
+                .cmp(&right.0.to_string())
+                .then(left.1.cmp(&right.1))
+        });
+        assert_eq!(repeated, expected);
+        // The order and the integrity are the artifact's, at its root.
+        assert_eq!(
+            intact_occurrences(&sealed(&["nav", "checkout"])).0,
+            [(json!([]), 0)]
+        );
+        let mut stale = serde_json::to_value(
+            IntentSurfaceClassVocabularyArtifact::sealed(IDENTITY, REVISION, &["checkout"])
+                .unwrap(),
+        )
+        .unwrap();
+        stale["members"] = json!(["nav"]);
+        let limits = VocabularyLimits {
+            artifact_bytes: u64::MAX,
+            depth: u64::MAX,
+            members: u64::MAX,
+            member_bytes: u64::MAX,
+            total_member_bytes: u64::MAX,
+        };
+        let stale = read(Some(&serde_json::to_vec(&stale).unwrap()), &limits).unwrap();
+        assert_eq!(intact_occurrences(&stale).0, [(json!([]), 0)]);
     }
 
     #[test]

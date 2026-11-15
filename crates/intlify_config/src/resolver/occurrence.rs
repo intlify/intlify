@@ -327,6 +327,23 @@ mod tests {
             .clone()
     }
 
+    /// Records an invalid vocabulary member, observed at the member, and
+    /// returns the Finding's key.
+    fn invalidated(evaluation: &mut Evaluation) -> IssueKey {
+        found_observed(
+            evaluation,
+            &vocabulary(Check::IntactArtifact),
+            (
+                Code::IntentSurfaceClassVocabularyNotAdmitted,
+                Some(Reason::MemberInvalid),
+            ),
+            Observation {
+                primary: invalid_member(),
+                related: Vec::new(),
+            },
+        )
+    }
+
     /// Records the vocabulary's mismatch with its slot, observed at the
     /// artifact beside the slot, and returns the Finding's key.
     fn mismatched(evaluation: &mut Evaluation) -> IssueKey {
@@ -366,7 +383,7 @@ mod tests {
 
     fn invalid_member() -> EvidenceProjection {
         input(ComponentPath::vocabulary_member(Key::Unsafe(
-            JsonType::Object,
+            JsonType::String,
         )))
     }
 
@@ -475,12 +492,7 @@ mod tests {
     #[test]
     fn candidates_group_by_finding_and_primary_with_ordinals_for_their_multiplicity() {
         let mut evaluation = Evaluation::default();
-        let invalid = found(
-            &mut evaluation,
-            &vocabulary(Check::IntactArtifact),
-            Code::IntentSurfaceClassVocabularyNotAdmitted,
-            Some(Reason::MemberInvalid),
-        );
+        let invalid = invalidated(&mut evaluation);
         let candidates = [
             candidate(&invalid, invalid_member(), Vec::new()),
             candidate(&invalid, vocabulary_root(), Vec::new()),
@@ -590,12 +602,7 @@ mod tests {
     fn occurrences_order_by_finding_primary_and_ordinal_and_present_their_view() {
         let mut evaluation = Evaluation::default();
         let asserted = mismatched(&mut evaluation);
-        let invalid = found(
-            &mut evaluation,
-            &vocabulary(Check::IntactArtifact),
-            Code::IntentSurfaceClassVocabularyNotAdmitted,
-            Some(Reason::MemberInvalid),
-        );
+        let invalid = invalidated(&mut evaluation);
         let built = built(&[
             candidate(&asserted, vocabulary_root(), vec![slot()]),
             candidate(&invalid, invalid_member(), Vec::new()),
@@ -639,12 +646,7 @@ mod tests {
     #[test]
     fn tokens_are_assigned_once_for_all_candidates() {
         let mut evaluation = Evaluation::default();
-        let invalid = found(
-            &mut evaluation,
-            &vocabulary(Check::IntactArtifact),
-            Code::IntentSurfaceClassVocabularyNotAdmitted,
-            Some(Reason::MemberInvalid),
-        );
+        let invalid = invalidated(&mut evaluation);
         let reference = value(
             O::ConfigurationFile,
             &[
@@ -661,7 +663,7 @@ mod tests {
         )));
         // An unauthenticated body is observed at the candidate, with the
         // configuration reference and the pins as related Evidence.
-        found_observed(
+        let body = found_observed(
             &mut evaluation,
             &policy(PolicySubject::ResourceLimits, Check::CandidateBody),
             (
@@ -673,9 +675,15 @@ mod tests {
                 related: vec![reference, pins],
             },
         );
+        let recorded = evaluation
+            .occurrence_candidates()
+            .iter()
+            .find(|candidate| candidate.finding == body)
+            .unwrap()
+            .clone();
         let candidates = [
             candidate(&invalid, invalid_member(), Vec::new()),
-            evaluation.occurrence_candidates()[0].clone(),
+            recorded,
             candidate(&invalid, invalid_member(), Vec::new()),
         ];
         let tokens = tokens(&candidates);
@@ -794,12 +802,7 @@ mod tests {
     #[should_panic(expected = "does not allow")]
     fn an_occurrence_its_pair_does_not_allow_fails_the_test() {
         let mut evaluation = Evaluation::default();
-        let invalid = found(
-            &mut evaluation,
-            &vocabulary(Check::IntactArtifact),
-            Code::IntentSurfaceClassVocabularyNotAdmitted,
-            Some(Reason::MemberInvalid),
-        );
+        let invalid = invalidated(&mut evaluation);
         built(&[candidate(&invalid, slot(), Vec::new())]);
     }
 
