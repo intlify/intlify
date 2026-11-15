@@ -1432,18 +1432,9 @@ impl Evaluation {
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
-        // Phase 8's negotiation checks and the message fallback's checks of
-        // its keys and sequences; those of the candidates and coverage gain
-        // theirs later (plan 025 PRs 5f-4g, 5f-4h).
-        let policies = matches!(
-            unit.subject,
-            Subject::Negotiation(_)
-                | Subject::Fallback(
-                    FallbackSubject::Sources
-                        | FallbackSubject::Source(_)
-                        | FallbackSubject::Sequence(_)
-                )
-        );
+        // Phase 8's negotiation and message fallback checks; coverage's gain
+        // theirs later (plan 025 PRs 5f-4h).
+        let policies = matches!(unit.subject, Subject::Negotiation(_) | Subject::Fallback(_));
         assert_eq!(
             observed,
             OBSERVED.contains(&unit.phase) || policies,
@@ -2826,13 +2817,16 @@ mod tests {
     }
 
     /// A notice of a check whose Findings carry no occurrence Evidence yet,
-    /// as a fallback candidate's, carries no observation.
+    /// as a coverage selector's locale's, carries no observation.
     #[test]
     #[should_panic(expected = "reports a notice with what it observed")]
     fn a_notice_of_another_check_with_an_observation_fails_the_test() {
-        use crate::resolver::fallback::{unit, FallbackSubject};
+        use crate::resolver::coverage::{unit, CoverageSubject, RuleContent};
         let candidate = unit(
-            FallbackSubject::Candidate(crate::resolver::locales::fixtures::key("ja"), 0),
+            CoverageSubject::Locale(
+                RuleContent::projected(),
+                crate::resolver::locales::fixtures::key("ja"),
+            ),
             Check::CanonicalLocale,
         );
         let mut evaluation = Evaluation::default();
