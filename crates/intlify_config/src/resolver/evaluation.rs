@@ -1380,12 +1380,12 @@ impl Evaluation {
         );
     }
 
-    /// Asserts that a blocking candidate of `unit` carries what it observed
-    /// exactly when the unit's check is one whose Findings carry occurrence
-    /// Evidence so far. Unless a test made the result up or made the unit
-    /// block.
+    /// Asserts that a Finding candidate of `unit`, `what` it reports,
+    /// carries what it observed exactly when the unit's check is one whose
+    /// Findings carry occurrence Evidence so far. Unless a test made the
+    /// result up or made the unit block.
     #[cfg(test)]
-    fn observes(&self, unit: &Unit, observed: bool) {
+    fn observes(&self, unit: &Unit, observed: bool, what: &str) {
         // The phases whose Findings carry occurrence Evidence so far; the
         // others gain theirs check by check (plan 025 PRs 5f).
         const OBSERVED: [Phase; 6] = [
@@ -1399,13 +1399,18 @@ impl Evaluation {
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
-        // Phase 7's bounds; its spellings gain theirs later (plan 025 PRs
-        // 5f-4f).
-        let locale = unit.phase == Phase::LocaleResolution && unit.check == Check::WithinBound;
+        // Phase 7's bounds and requested locales; its other spellings gain
+        // theirs later (plan 025 PRs 5f-4f).
+        let locale = unit.phase == Phase::LocaleResolution
+            && (unit.check == Check::WithinBound
+                || matches!(
+                    unit.subject,
+                    Subject::Locale(LocaleSubject::RequestedLocale(_))
+                ));
         assert_eq!(
             observed,
             OBSERVED.contains(&unit.phase) || locale,
-            "{unit:?} reports a blocking candidate {} what it observed, against its check",
+            "{unit:?} reports {what} {} what it observed, against its check",
             if observed { "with" } else { "without" }
         );
     }
@@ -1520,7 +1525,7 @@ impl Evaluation {
                     None,
                     true,
                 );
-                self.observes(unit, observation.is_some());
+                self.observes(unit, observation.is_some(), "a blocking candidate");
             }
             #[cfg(not(test))]
             let _ = observation;
@@ -1549,29 +1554,39 @@ impl Evaluation {
     }
 
     /// Records the non-blocking result `notice` of a unit `check` evaluated,
-    /// under the unit over its logical subject. It is never a cause: nothing
-    /// waits on it. A candidate that suggests otherwise than another under
-    /// the same key is a resolver bug and is not recorded.
-    pub(crate) fn notice(&mut self, unit: Unit, notice: Notice) -> Result<(), EvaluationInvariant> {
+    /// under the unit over its logical subject, as one candidate of its
+    /// Finding, which becomes one Finding Occurrence candidate when it
+    /// carries what it observed (D15:2385, 2410). It is never a cause:
+    /// nothing waits on it. A candidate that suggests otherwise than another
+    /// under the same key is a resolver bug and is not recorded.
+    pub(crate) fn notice(
+        &mut self,
+        unit: Unit,
+        notice: Notice,
+        observation: Option<Observation>,
+    ) -> Result<(), EvaluationInvariant> {
         let logical = unit.logical();
         if self.statuses.get(&logical) != Some(&Status::Evaluated) {
             return Err(EvaluationInvariant::NoticeWithoutEvaluation(unit));
         }
         #[cfg(test)]
-        self.registered(
-            &logical,
-            notice.code,
-            None,
-            None,
-            notice.suggestion.as_ref(),
-            false,
-        );
+        {
+            self.registered(
+                &logical,
+                notice.code,
+                None,
+                None,
+                notice.suggestion.as_ref(),
+                false,
+            );
+            self.observes(&logical, observation.is_some(), "a notice");
+        }
         let key = IssueKey {
             unit: logical,
             code: notice.code,
             reason: None,
         };
-        match self.notices.entry(key) {
+        match self.notices.entry(key.clone()) {
             Entry::Vacant(entry) => {
                 entry.insert(notice.suggestion);
             }
@@ -1580,6 +1595,13 @@ impl Evaluation {
                     return Err(EvaluationInvariant::UnequalPayload(unit));
                 }
             }
+        }
+        if let Some(Observation { primary, related }) = observation {
+            self.occurrences.push(OccurrenceCandidate {
+                finding: key,
+                primary,
+                related,
+            });
         }
         Ok(())
     }
@@ -2053,7 +2075,7 @@ mod tests {
     fn a_test_evaluation_records_only_notices_the_units_row_lists() {
         let mut evaluation = Evaluation::default();
         let _ = evaluation.check(data(), Ok(()), |()| Ok::<(), Blocking>(()));
-        let _ = evaluation.notice(data(), Notice::non_canonical(canonical("en")));
+        let _ = evaluation.notice(data(), Notice::non_canonical(canonical("en")), None);
     }
 
     #[test]
@@ -2070,7 +2092,7 @@ mod tests {
             .unwrap()
             .unwrap();
         evaluation
-            .notice(data(), Notice::made_up(Code::LocaleNonCanonical))
+            .notice(data(), Notice::made_up(Code::LocaleNonCanonical), None)
             .unwrap();
         // A real evaluation a test goes on to fill.
         let mut evaluation = Evaluation::default();
@@ -2080,7 +2102,7 @@ mod tests {
             .unwrap();
         let mut evaluation = evaluation.fabricating();
         evaluation
-            .notice(data(), Notice::made_up(Code::LocaleNonCanonical))
+            .notice(data(), Notice::made_up(Code::LocaleNonCanonical), None)
             .unwrap();
         assert_eq!(evaluation.notices().count(), 1);
     }
@@ -2102,7 +2124,7 @@ mod tests {
     fn a_test_evaluation_records_a_blocking_code_only_as_a_blocking_result() {
         let mut evaluation = Evaluation::default();
         let _ = evaluation.check(data(), Ok(()), |()| Ok::<(), Blocking>(()));
-        let _ = evaluation.notice(data(), Notice::made_up(Code::LocaleDataNotAdmitted));
+        let _ = evaluation.notice(data(), Notice::made_up(Code::LocaleDataNotAdmitted), None);
     }
 
     #[test]
@@ -2123,7 +2145,7 @@ mod tests {
     fn a_test_evaluation_records_a_suggestion_exactly_of_the_kind_its_code_makes() {
         let mut evaluation = Evaluation::default();
         let _ = evaluation.check(spelled(), Ok(()), |()| Ok::<(), Blocking>(()));
-        let _ = evaluation.notice(spelled(), Notice::made_up(Code::LocaleNonCanonical));
+        let _ = evaluation.notice(spelled(), Notice::made_up(Code::LocaleNonCanonical), None);
     }
 
     /// The data's check reports a code without details.
@@ -2213,24 +2235,16 @@ mod tests {
 
     #[test]
     fn past_a_bound_a_unit_records_its_exact_total_or_the_smallest_witness() {
-        // The occurrence bound's Findings carry occurrence Evidence and a
-        // spelling's do not yet. Any Evidence serves: the test reads only the
-        // payloads.
-        let observed = || {
-            Some(through(
-                crate::resolver::evidence_component::ComponentPath::data_root(),
-            ))
-        };
         let mut evaluation = Evaluation::default();
-        for (unit, actual, observation) in [
-            (occurrences(), Actual::Exact(4), observed()),
-            (spelled(), Actual::AtLeast(4), None),
+        for (unit, actual) in [
+            (occurrences(), Actual::Exact(4)),
+            (spelled(), Actual::AtLeast(4)),
         ] {
             let found = evaluation
                 .check_found(unit, Ok(()), |()| {
-                    Err::<(), _>(Found::through(
+                    Err::<(), _>(Found::observed(
                         Blocking::limit(exceeded(actual)),
-                        observation,
+                        spelling(),
                     ))
                 })
                 .unwrap();
@@ -2239,13 +2253,19 @@ mod tests {
         let mut evaluation = Evaluation::default();
         let found = evaluation
             .check_found(occurrences(), Ok(()), |()| {
-                Err::<(), _>(Found::through(
+                Err::<(), _>(Found::observed(
                     Blocking::limit(exceeded(Actual::AtLeast(4))),
-                    observed(),
+                    spelling(),
                 ))
             })
             .unwrap();
         assert!(found.is_err());
+    }
+
+    /// What Phase 7's checks observed a spelling or a bound through. Any
+    /// Evidence serves: these tests read only what is recorded.
+    fn spelling() -> Observation {
+        through(crate::resolver::evidence_component::ComponentPath::data_root())
     }
 
     #[test]
@@ -2676,6 +2696,7 @@ mod tests {
             .notice(
                 slot(Slot::Coverage),
                 Notice::made_up(Code::LocaleNonCanonical),
+                None,
             )
             .unwrap();
         assert_eq!(
@@ -2694,7 +2715,8 @@ mod tests {
         assert_eq!(
             evaluation.notice(
                 slot(Slot::LocaleNegotiation),
-                Notice::made_up(Code::LocaleNonCanonical)
+                Notice::made_up(Code::LocaleNonCanonical),
+                None
             ),
             Err(EvaluationInvariant::NoticeWithoutEvaluation(slot(
                 Slot::LocaleNegotiation
@@ -2706,10 +2728,86 @@ mod tests {
             .unwrap()
             .unwrap_err();
         assert_eq!(
-            evaluation.notice(data(), Notice::made_up(Code::LocaleNonCanonical)),
+            evaluation.notice(data(), Notice::made_up(Code::LocaleNonCanonical), None),
             Err(EvaluationInvariant::NoticeWithoutEvaluation(data()))
         );
         assert_eq!(evaluation.notices().count(), 1);
+    }
+
+    /// The requested locale `en`'s canonical unit.
+    fn requested_en() -> Unit {
+        crate::resolver::locales::unit(
+            LocaleSubject::RequestedLocale(crate::resolver::locales::fixtures::key("en")),
+            Check::CanonicalLocale,
+        )
+    }
+
+    /// Each notice that carries what it observed is one Finding Occurrence
+    /// candidate of its Finding, and one that suggests otherwise records
+    /// nothing (D15:2385, 2410).
+    #[test]
+    fn a_notice_carries_what_it_observed_as_one_occurrence_candidate() {
+        let mut evaluation = Evaluation::default();
+        evaluation
+            .check(requested_en(), Ok(()), Ok::<(), Blocking>)
+            .unwrap()
+            .unwrap();
+        let suggest = |spelling| Notice::non_canonical(canonical(spelling));
+        for _ in 0..2 {
+            evaluation
+                .notice(requested_en(), suggest("en"), Some(spelling()))
+                .unwrap();
+        }
+        assert_eq!(evaluation.notices().count(), 1);
+        let observed = OccurrenceCandidate {
+            finding: evaluation.notices().next().unwrap().clone(),
+            primary: spelling().primary,
+            related: Vec::new(),
+        };
+        assert_eq!(
+            evaluation.occurrence_candidates(),
+            [observed.clone(), observed]
+        );
+        assert_eq!(
+            evaluation.notice(requested_en(), suggest("ja"), Some(spelling())),
+            Err(EvaluationInvariant::UnequalPayload(requested_en()))
+        );
+        assert_eq!(evaluation.occurrence_candidates().len(), 2);
+    }
+
+    /// A notice of a check whose Findings carry occurrence Evidence, as a
+    /// requested locale's do, must carry what it observed.
+    #[test]
+    #[should_panic(expected = "reports a notice without what it observed")]
+    fn a_notice_of_an_observed_check_without_an_observation_fails_the_test() {
+        let mut evaluation = Evaluation::default();
+        evaluation
+            .check(requested_en(), Ok(()), Ok::<(), Blocking>)
+            .unwrap()
+            .unwrap();
+        let _ = evaluation.notice(requested_en(), Notice::non_canonical(canonical("en")), None);
+    }
+
+    /// A notice of a check whose Findings carry no occurrence Evidence yet,
+    /// as a fallback candidate's, carries no observation.
+    #[test]
+    #[should_panic(expected = "reports a notice with what it observed")]
+    fn a_notice_of_another_check_with_an_observation_fails_the_test() {
+        use crate::resolver::fallback::{unit, FallbackSubject};
+        let candidate = unit(
+            FallbackSubject::Candidate(crate::resolver::locales::fixtures::key("ja"), 0),
+            Check::CanonicalLocale,
+        );
+        let mut evaluation = Evaluation::default();
+        evaluation
+            .check(candidate.clone(), Ok(()), Ok::<(), Blocking>)
+            .unwrap()
+            .unwrap();
+        let _ = evaluation.notice(
+            candidate,
+            Notice::non_canonical(canonical("en")),
+            Some(spelling()),
+        );
     }
 
     /// A unit over a requested spelling without an identity: one candidate of
@@ -2733,7 +2831,9 @@ mod tests {
         let mut evaluation = Evaluation::default();
         for raw in ["zz", "en-x-brand"] {
             let causes = evaluation
-                .check(rejected(raw), Ok(()), |()| Err::<(), _>(invalid))
+                .check_found(rejected(raw), Ok(()), |()| {
+                    Err::<(), _>(Found::observed(invalid, spelling()))
+                })
                 .unwrap()
                 .unwrap_err();
             // Whatever depends on a candidate waits on its logical unit.
@@ -2799,10 +2899,14 @@ mod tests {
                 .unwrap();
         }
         let suggest = |spelling| Notice::non_canonical(canonical(spelling));
-        evaluation.notice(rejected("zz"), suggest("en")).unwrap();
-        evaluation.notice(rejected("zy"), suggest("en")).unwrap();
+        evaluation
+            .notice(rejected("zz"), suggest("en"), None)
+            .unwrap();
+        evaluation
+            .notice(rejected("zy"), suggest("en"), None)
+            .unwrap();
         assert_eq!(
-            evaluation.notice(rejected("en-x-brand"), suggest("ja")),
+            evaluation.notice(rejected("en-x-brand"), suggest("ja"), None),
             Err(EvaluationInvariant::UnequalPayload(rejected("en-x-brand")))
         );
         let replacement = Suggestion::CanonicalLocaleReplacement(canonical("en"));
@@ -2852,7 +2956,9 @@ mod tests {
         let evaluations: Vec<Evaluation> = orders(candidates.len())
             .into_iter()
             .map(|order| {
-                let mut evaluation = Evaluation::default();
+                // Made-up results: what each candidate observed is kept in
+                // the order the units ran, which is no concern of the keys.
+                let mut evaluation = Evaluation::fabricated();
                 let causes = missing(&mut evaluation, slot(Slot::LocaleNegotiation));
                 for index in order {
                     let (raw, found) = candidates[index];
@@ -3023,6 +3129,7 @@ mod tests {
             .notice(
                 rejected("en-x-brand"),
                 Notice::non_canonical(canonical("en")),
+                Some(spelling()),
             )
             .unwrap();
         assert_eq!(
@@ -3177,10 +3284,12 @@ mod tests {
     #[test]
     #[should_panic(expected = "with what it observed")]
     fn a_candidate_of_another_phase_with_an_observation_fails_the_test() {
+        use crate::resolver::negotiation::{unit, NegotiationSubject};
         let data = through(crate::resolver::evidence_component::ComponentPath::data_root());
-        let _ = Evaluation::default().check_found(spelled(), Ok(()), |()| {
+        let aliases = unit(NegotiationSubject::Aliases, Check::WithinBound);
+        let _ = Evaluation::default().check_found(aliases, Ok(()), |()| {
             Err::<(), _>(Found::observed(
-                Blocking::limit(exceeded(Actual::AtLeast(4))),
+                Blocking::limit(exceeded(Actual::Exact(4))),
                 data,
             ))
         });

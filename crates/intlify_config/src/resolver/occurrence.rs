@@ -316,6 +316,21 @@ mod tests {
         key_of(evaluation, unit, code)
     }
 
+    /// Records the requested locale `en` named twice, observed at its first
+    /// spelling beside its second, as Phase 7 observes a duplicate, and
+    /// returns the Finding's key.
+    fn duplicated(evaluation: &mut Evaluation) -> IssueKey {
+        found_observed(
+            evaluation,
+            &unique("en"),
+            (Code::LocaleDuplicate, None),
+            Observation {
+                primary: requested(0),
+                related: vec![requested(2)],
+            },
+        )
+    }
+
     /// The key of the Finding `code` `unit` reported.
     fn key_of(evaluation: &Evaluation, unit: &Unit, code: Code) -> IssueKey {
         evaluation
@@ -527,7 +542,7 @@ mod tests {
     #[test]
     fn related_evidence_is_merged_once_in_order_without_the_primary() {
         let mut evaluation = Evaluation::default();
-        let duplicate = found(&mut evaluation, &unique("en"), Code::LocaleDuplicate, None);
+        let duplicate = duplicated(&mut evaluation);
         let candidates = [
             candidate(&duplicate, requested(0), vec![requested(2), requested(0)]),
             candidate(&duplicate, requested(0), vec![requested(1), requested(2)]),
@@ -720,7 +735,7 @@ mod tests {
     #[test]
     fn file_and_programmatic_failures_share_the_finding_key_but_not_the_occurrence_key() {
         let mut evaluation = Evaluation::default();
-        let duplicate = found(&mut evaluation, &unique("en"), Code::LocaleDuplicate, None);
+        let duplicate = duplicated(&mut evaluation);
         let steps = [
             Step::Safe("profiles"),
             Step::Safe("web"),
@@ -746,7 +761,7 @@ mod tests {
     #[test]
     fn related_records_take_tokens_with_the_primary_ones() {
         let mut evaluation = Evaluation::default();
-        let duplicate = found(&mut evaluation, &unique("en"), Code::LocaleDuplicate, None);
+        let duplicate = duplicated(&mut evaluation);
         let unmarked = marked_value(
             O::ConfigurationFile,
             false,
@@ -771,7 +786,7 @@ mod tests {
     #[test]
     fn tokens_that_leave_out_a_component_are_refused() {
         let mut evaluation = Evaluation::default();
-        let duplicate = found(&mut evaluation, &unique("en"), Code::LocaleDuplicate, None);
+        let duplicate = duplicated(&mut evaluation);
         let unmarked = marked_value(
             O::ConfigurationFile,
             false,

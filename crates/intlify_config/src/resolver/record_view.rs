@@ -505,10 +505,37 @@ mod tests {
         }
     }
 
+    /// The root of a configuration file, as Evidence observes it.
+    fn file_root() -> crate::resolver::evidence::EvidenceProjection {
+        use crate::resolver::entry::fixtures::FileFixture;
+        use crate::resolver::evidence::EvidenceProjection;
+        use crate::resolver::limits::fixture_limits;
+        use crate::resolver::origin::SafeOriginKind;
+        let fixture = FileFixture::new(&fixture_limits(100));
+        let file = fixture.file(std::sync::Arc::from(&b"{}"[..]));
+        EvidenceProjection::configuration_value(
+            SafeOriginKind::ConfigurationFile,
+            file.source,
+            &[],
+            None,
+        )
+        .unwrap()
+    }
+
+    /// What a check that observed the root of a configuration file saw,
+    /// relating nothing.
+    fn at_file_root() -> crate::resolver::evaluation::Observation {
+        crate::resolver::evaluation::Observation {
+            primary: file_root(),
+            related: Vec::new(),
+        }
+    }
+
     /// Records `unit` as finding `code` with `reason`, observed at a slot's
     /// Specification Input component or at the vocabulary's root when it is
-    /// one of their checks, as Phase 5 observes them, and returns what waits
-    /// on its result.
+    /// one of their checks, as Phase 5 observes them, or at a configuration
+    /// file's root when it is a requested locale's, as Phase 7 observes it in
+    /// the file, and returns what waits on its result.
     fn block(
         evaluation: &mut Evaluation,
         unit: Unit,
@@ -539,6 +566,7 @@ mod tests {
             Subject::Vocabulary => at(EvidenceProjection::resolver_input(
                 ComponentPath::vocabulary_root(),
             )),
+            Subject::Locale(LocaleSubject::RequestedLocale(_)) => at(file_root()),
             _ => Found::from(found),
         };
         evaluation
@@ -561,27 +589,10 @@ mod tests {
     /// root of a configuration file, as a check whose Findings carry
     /// occurrence Evidence observes what it finds.
     fn blocked_observed(evaluation: &mut Evaluation, unit: Unit, found: Blocking) {
-        use crate::resolver::entry::fixtures::FileFixture;
-        use crate::resolver::evaluation::{Found, Observation};
-        use crate::resolver::evidence::EvidenceProjection;
-        use crate::resolver::limits::fixture_limits;
-        use crate::resolver::origin::SafeOriginKind;
-        let fixture = FileFixture::new(&fixture_limits(100));
-        let file = fixture.file(std::sync::Arc::from(&b"{}"[..]));
-        let primary = EvidenceProjection::configuration_value(
-            SafeOriginKind::ConfigurationFile,
-            file.source,
-            &[],
-            None,
-        )
-        .unwrap();
-        let observation = Observation {
-            primary,
-            related: Vec::new(),
-        };
+        use crate::resolver::evaluation::Found;
         evaluation
             .check_found(unit, Ok(()), |()| {
-                Err::<(), _>(Found::observed(found, observation))
+                Err::<(), _>(Found::observed(found, at_file_root()))
             })
             .unwrap()
             .unwrap_err();
@@ -776,7 +787,11 @@ mod tests {
         let en = requested(key("en"), Check::CanonicalLocale);
         pass(&mut evaluation, en.clone());
         evaluation
-            .notice(en, Notice::non_canonical(canonical("en")))
+            .notice(
+                en,
+                Notice::non_canonical(canonical("en")),
+                Some(at_file_root()),
+            )
             .unwrap();
         let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
         let mut non_canonical = invalid_key();
@@ -834,7 +849,11 @@ mod tests {
         let us = requested(key("en-US"), Check::CanonicalLocale);
         pass(&mut evaluation, us.clone());
         evaluation
-            .notice(us, Notice::non_canonical(canonical("en-US")))
+            .notice(
+                us,
+                Notice::non_canonical(canonical("en-US")),
+                Some(at_file_root()),
+            )
             .unwrap();
         let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
         let mut missing = key_view(
@@ -1207,7 +1226,7 @@ mod tests {
         let en = requested(key("en"), Check::CanonicalLocale);
         pass(&mut evaluation, en.clone());
         evaluation
-            .notice(en, Notice::made_up(Code::LocaleNonCanonical))
+            .notice(en, Notice::made_up(Code::LocaleNonCanonical), None)
             .unwrap();
         let ja = requested(key("ja"), Check::CanonicalLocale);
         pass(&mut evaluation, ja.clone());
@@ -1218,6 +1237,7 @@ mod tests {
                     code: Code::LocaleDuplicate,
                     suggestion: Some(Suggestion::CanonicalLocaleReplacement(canonical("ja"))),
                 },
+                None,
             )
             .unwrap();
         let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);

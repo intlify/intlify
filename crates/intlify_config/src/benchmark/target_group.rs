@@ -924,6 +924,7 @@ mod tests {
                 .notice(
                     of_browser(Check::ProjectSubset),
                     Notice::made_up(Code::TargetLocalesNotSubset),
+                    None,
                 )
                 .unwrap();
             evaluation

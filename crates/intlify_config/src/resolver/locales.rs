@@ -34,7 +34,7 @@ use super::evaluation::{
 use super::limits::ConfirmedPolicy;
 
 pub(crate) use spelling::canonicalize;
-use spelling::{set, unique, Pass, Scope};
+use spelling::{set, Pass, Scope};
 
 mod bound;
 mod spelling;
@@ -320,6 +320,7 @@ pub(crate) fn resolve_locales<P: Provider, Target>(
         evaluation,
         both(canonicalizer.map_err(Causes::clone), bounded.clone())
             .map(|(canonicalizer, ())| canonicalizer),
+        (observer, policy.ok().map(ConfirmedPolicy::evidence)),
     );
     let ProjectResolution {
         requested_set,
@@ -367,7 +368,7 @@ struct ProjectResolution {
 /// its membership in that set, and the source default, with every independent
 /// check run.
 fn project<P: Provider, Target>(
-    pass: &mut Pass<'_, '_, P>,
+    pass: &mut Pass<'_, '_, '_, P>,
     policy: Result<&ConfirmedPolicy, &Causes>,
     fields: &LocaleFields<'_, Target>,
     observer: Option<&DeclarationObserver<'_>>,
@@ -389,7 +390,11 @@ fn project<P: Provider, Target>(
         Err(ref causes) => Err(causes.clone()),
     };
     let distinct = match &requested {
-        Ok(spelled) => unique(pass.evaluation, spelled, LocaleSubject::RequestedLocale)?,
+        Ok(spelled) => pass.unique(
+            spelled,
+            Location::RequestedLocale,
+            LocaleSubject::RequestedLocale,
+        )?,
         Err(causes) => Err(causes.clone()),
     };
     let requested_set = requested.and_then(|spelled| set(&spelled));
@@ -1091,6 +1096,27 @@ mod tests {
             None
         );
         assert_eq!(units(&resolved.project.unwrap_err()), [default]);
+    }
+
+    /// Phase 7 observes a requested spelling past the identifier bound at
+    /// its token, beside the confirmed policy it runs under (D15:790, 2249).
+    #[test]
+    fn a_spelling_past_the_identifier_bound_is_observed_beside_the_policy() {
+        let declaration = declaration(&minimal_config(), |app| {
+            app["requestedLocales"] = json!(["en", "EN-us"]);
+        });
+        let (evaluation, _) = resolve_under(&declaration, (4, 100, 100));
+        let observed: Vec<_> = evaluation
+            .occurrence_candidates()
+            .iter()
+            .map(|candidate| (candidate.primary.clone(), candidate.related.clone()))
+            .collect();
+        let spelling = Observed::declaration(&declaration)
+            .app(|observer| observer.element(&["requestedLocales"], 1).unwrap());
+        assert_eq!(
+            observed,
+            [(spelling, vec![policy(4, 100, 100).evidence().clone()])]
+        );
     }
 
     #[test]

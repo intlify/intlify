@@ -615,6 +615,7 @@ mod tests {
                 .notice(
                     reference_unit(trust()),
                     Notice::made_up(Code::ArtifactReferenceNotAdmitted),
+                    None,
                 )
                 .unwrap();
             evaluation

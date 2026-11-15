@@ -6,6 +6,13 @@
 //! take, and the duplicates in a set. Where a spelling sits decides its
 //! subject's kind and owner; its canonical identity, or its content when it
 //! has none, decides the rest.
+//!
+//! Each spelling a check finds, or corrects, is one candidate of the unit's
+//! Finding, observed at its own token (D15:790, 2387, 2410): a repeated
+//! locale at each of its spellings beside the others, and a spelling past the
+//! identifier bound beside the confirmed policy, which supplies the bound
+//! (D15:2249). So far only the project's requested locales are observed;
+//! the other fields' spellings gain theirs later (plan 025 PRs 5f-4f).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -15,10 +22,12 @@ use crate::locale::{
 };
 use crate::model::{FallbackCandidate, NonEmptyMap, NonEmptyVec, TargetDeclaration, TargetId};
 
+use super::super::declaration_observer::{DeclarationObserver, ObserverInvariant};
 use super::super::evaluation::{
-    both, Actual, Admitted, Blocking, Check, Code, Evaluation, EvaluationInvariant, LimitExceeded,
-    Notice,
+    both, Actual, Admitted, Blocking, Check, Code, Evaluation, Found, LimitExceeded, Notice,
+    Observation,
 };
+use super::super::evidence::EvidenceProjection;
 use super::bound::MAX_LOCALE_IDENTIFIER_BYTES;
 use super::{
     issue, unit, AliasLocales, Content, LocaleInvariant, LocaleKey, LocaleOccurrence, LocaleSet,
@@ -71,23 +80,71 @@ impl Scope {
 }
 
 /// The canonicalization of every spelling, which waits on the canonicalizer
-/// and on the occurrence bound.
-pub(super) struct Pass<'e, 'c, P: Provider> {
+/// and on the occurrence bound, and where it observes a spelling: in the
+/// declaration's file, when it is there, beside the confirmed policy's
+/// Evidence, when there is one.
+pub(super) struct Pass<'e, 'c, 'o, P: Provider> {
     pub(super) evaluation: &'e mut Evaluation,
     canonicalizer: Admitted<&'c Canonicalizer<P>>,
+    observer: Option<&'o DeclarationObserver<'o>>,
+    policy: Option<&'o EvidenceProjection>,
     occurrences: Vec<LocaleOccurrence>,
 }
 
-impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
+/// What one subject's spellings share, and what each of them observed.
+struct Group {
+    attempt: Admitted<Result<CanonicalLocale, Blocking>>,
+    /// Each spelling's correction and what it observed, in spelling order.
+    spellings: Vec<(bool, Option<Observation>)>,
+}
+
+impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
     pub(super) fn new(
         evaluation: &'e mut Evaluation,
         canonicalizer: Admitted<&'c Canonicalizer<P>>,
+        (observer, policy): (
+            Option<&'o DeclarationObserver<'o>>,
+            Option<&'o EvidenceProjection>,
+        ),
     ) -> Self {
         Self {
             evaluation,
             canonicalizer,
+            observer,
+            policy,
             occurrences: Vec::new(),
         }
+    }
+
+    /// The spelling at `location`, at its token, when the declaration's file
+    /// is there and its field's spellings carry occurrence Evidence so far.
+    fn at(&self, location: &Location) -> Result<Option<EvidenceProjection>, ObserverInvariant> {
+        let Some(observer) = self.observer else {
+            return Ok(None);
+        };
+        match location {
+            Location::RequestedLocale(index) => {
+                observer.element(&["requestedLocales"], *index).map(Some)
+            }
+            _ => Ok(None),
+        }
+    }
+
+    /// What the spelling at `location` observed when its check found
+    /// `blocking`: its token, beside the confirmed policy past the identifier
+    /// bound, which the policy supplies (D15:2249).
+    fn found_at(
+        &self,
+        location: &Location,
+        blocking: &Blocking,
+    ) -> Result<Option<Observation>, ObserverInvariant> {
+        let related = match (blocking.code, self.policy) {
+            (Code::ResourceLimitExceeded, Some(policy)) => vec![policy.clone()],
+            _ => Vec::new(),
+        };
+        Ok(self
+            .at(location)?
+            .map(|primary| Observation { primary, related }))
     }
 
     /// Every spelling the pass reached, in location order.
@@ -115,8 +172,7 @@ impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
         spellings: Vec<(Location, Scope, &str)>,
         after: &Admitted<()>,
     ) -> Result<Vec<Spelled>, LocaleInvariant> {
-        type Attempt = Admitted<Result<CanonicalLocale, Blocking>>;
-        let mut groups: BTreeMap<LocaleSubject, (Attempt, bool)> = BTreeMap::new();
+        let mut groups: BTreeMap<LocaleSubject, Group> = BTreeMap::new();
         let mut subjects = Vec::with_capacity(spellings.len());
         for (location, scope, raw) in spellings {
             // Past the byte bound, a subject several spellings can share
@@ -136,6 +192,17 @@ impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
                 Ok(Ok((locale, corrected))) => (LocaleKey::Canonical(locale.clone()), *corrected),
                 _ => (LocaleKey::Content(Content(Arc::from(raw))), false),
             };
+            // A spelling is observed only when its check finds it, or it is
+            // corrected.
+            let observed = match &attempt {
+                Ok(Err(blocking)) => self.found_at(&location, blocking)?,
+                // A corrected spelling's notice relates nothing.
+                Ok(Ok((_, true))) => self.at(&location)?.map(|primary| Observation {
+                    primary,
+                    related: Vec::new(),
+                }),
+                _ => None,
+            };
             let subject = scope.subject(key.clone());
             self.occurrences.push(LocaleOccurrence {
                 location,
@@ -144,18 +211,51 @@ impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
                 corrected,
             });
             let attempt = attempt.map(|attempt| attempt.map(|(locale, _)| locale));
-            groups.entry(subject.clone()).or_insert((attempt, false)).1 |= corrected;
+            groups
+                .entry(subject.clone())
+                .or_insert_with(|| Group {
+                    attempt,
+                    spellings: Vec::new(),
+                })
+                .spellings
+                .push((corrected, observed));
             subjects.push((subject, key));
         }
         let mut results = BTreeMap::new();
-        for (subject, (attempt, corrected)) in groups {
+        for (subject, Group { attempt, spellings }) in groups {
             let unit = unit(subject.clone(), Check::CanonicalLocale);
+            // The spellings of one subject share its result: each that a
+            // blocking result finds is one candidate of it (D15:2387), and
+            // each corrected one is a candidate of its notice.
+            let (found, corrected): (Vec<_>, Vec<_>) = match &attempt {
+                Ok(Err(_)) => (
+                    spellings
+                        .into_iter()
+                        .map(|(_, observed)| observed)
+                        .collect(),
+                    Vec::new(),
+                ),
+                _ => (
+                    Vec::new(),
+                    spellings
+                        .into_iter()
+                        .filter_map(|(corrected, observed)| corrected.then_some(observed))
+                        .collect(),
+                ),
+            };
             let locale = self
                 .evaluation
-                .check(unit.clone(), attempt, |attempt| attempt)?;
-            if let (true, Ok(canonical)) = (corrected, &locale) {
-                self.evaluation
-                    .notice(unit, Notice::non_canonical(canonical.clone()))?;
+                .check_found(unit.clone(), attempt, |attempt| {
+                    attempt.map_err(|blocking| each(blocking, found))
+                })?;
+            if let Ok(canonical) = &locale {
+                for observed in corrected {
+                    self.evaluation.notice(
+                        unit.clone(),
+                        Notice::non_canonical(canonical.clone()),
+                        observed,
+                    )?;
+                }
             }
             results.insert(subject, locale);
         }
@@ -178,6 +278,52 @@ impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
             .spell(vec![(location, scope, raw)])?
             .pop()
             .expect("one result per spelling"))
+    }
+
+    /// One unit per subject of a set's spellings, `spelled` at the locations
+    /// `at` gives their positions: two spellings naming one locale are a
+    /// duplicate, equal or aliases alike, each spelling one candidate. A
+    /// subject without a canonical locale leaves its unit not evaluated.
+    pub(super) fn unique(
+        &mut self,
+        spelled: &[Spelled],
+        at: impl Fn(usize) -> Location,
+        subject: impl Fn(LocaleKey) -> LocaleSubject,
+    ) -> Result<Admitted<()>, LocaleInvariant> {
+        let mut members: BTreeMap<&LocaleKey, (Vec<usize>, &Admitted<CanonicalLocale>)> =
+            BTreeMap::new();
+        for (position, spelling) in spelled.iter().enumerate() {
+            members
+                .entry(&spelling.key)
+                .or_insert_with(|| (Vec::new(), &spelling.locale))
+                .0
+                .push(position);
+        }
+        let mut all = Ok(());
+        for (key, (positions, locale)) in members {
+            // Only a repeated locale is found, at each of its spellings.
+            let observed = if positions.len() > 1 && locale.is_ok() {
+                positions
+                    .iter()
+                    .map(|&position| self.at(&at(position)))
+                    .collect::<Result<Vec<_>, _>>()?
+            } else {
+                Vec::new()
+            };
+            let checked = self.evaluation.check_found(
+                unit(subject(key.clone()), Check::UniqueLocale),
+                locale.clone(),
+                |_| {
+                    if positions.len() == 1 {
+                        Ok(())
+                    } else {
+                        Err(duplicates(&observed))
+                    }
+                },
+            )?;
+            all = both(all, checked).map(|((), ())| ());
+        }
+        Ok(all)
     }
 
     /// Alias keys, then each destination under its key's subject key.
@@ -279,9 +425,11 @@ impl<'e, 'c, P: Provider> Pass<'e, 'c, P> {
             )?;
             // A repeated member is an issue of its own; the set still holds
             // the canonical identities Phase 11 compares.
-            let distinct = unique(self.evaluation, &requested, |key| {
-                LocaleSubject::TargetRequestedLocale(id.clone(), key)
-            })?;
+            let distinct = self.unique(
+                &requested,
+                |index| Location::TargetRequestedLocale(id.clone(), index),
+                |key| LocaleSubject::TargetRequestedLocale(id.clone(), key),
+            )?;
             let default = match target.default_requested_locale.as_option() {
                 Some(raw) => self
                     .spell_after(
@@ -335,37 +483,35 @@ pub(crate) fn canonicalize<P: Provider>(
     }
 }
 
-/// One unit per subject of a set's spellings: two spellings naming one locale
-/// are a duplicate, equal or aliases alike. A subject without a canonical
-/// locale leaves its unit not evaluated.
-pub(super) fn unique(
-    evaluation: &mut Evaluation,
-    spelled: &[Spelled],
-    subject: impl Fn(LocaleKey) -> LocaleSubject,
-) -> Result<Admitted<()>, EvaluationInvariant> {
-    let mut members: BTreeMap<&LocaleKey, (usize, &Admitted<CanonicalLocale>)> = BTreeMap::new();
-    for spelling in spelled {
-        members
-            .entry(&spelling.key)
-            .or_insert((0, &spelling.locale))
-            .0 += 1;
-    }
-    let mut all = Ok(());
-    for (key, (spellings, locale)) in members {
-        let checked = evaluation.check(
-            unit(subject(key.clone()), Check::UniqueLocale),
-            locale.clone(),
-            |_| {
-                if spellings == 1 {
-                    Ok(())
-                } else {
-                    Err(issue(Code::LocaleDuplicate))
-                }
-            },
-        )?;
-        all = both(all, checked).map(|((), ())| ());
-    }
-    Ok(all)
+/// One candidate of `blocking` for each spelling, each with what it observed
+/// (D15:2387).
+fn each(blocking: Blocking, spellings: Vec<Option<Observation>>) -> Found {
+    spellings
+        .into_iter()
+        .map(|observed| Found::through(blocking, observed))
+        .reduce(Found::and)
+        .unwrap_or_else(|| Found::from(blocking))
+}
+
+/// One duplicate candidate for each spelling of a repeated locale, each at
+/// its own token beside the other spellings' (D15:2410).
+fn duplicates(spellings: &[Option<EvidenceProjection>]) -> Found {
+    let observed = spellings
+        .iter()
+        .enumerate()
+        .map(|(position, primary)| {
+            primary.clone().map(|primary| Observation {
+                primary,
+                related: spellings
+                    .iter()
+                    .enumerate()
+                    .filter(|&(other, _)| other != position)
+                    .filter_map(|(_, other)| other.clone())
+                    .collect(),
+            })
+        })
+        .collect();
+    each(issue(Code::LocaleDuplicate), observed)
 }
 
 /// The set of the spellings' canonical locales, once each has one; otherwise
@@ -385,14 +531,17 @@ pub(super) fn set(spelled: &[Spelled]) -> Admitted<LocaleSet> {
 mod tests {
     use std::collections::BTreeMap;
 
+    use serde_json::json;
+
     use super::super::fixtures::{
-        canonical, canonicalizer, content, issues, key, notices, rejected, spelled, stand_in,
-        target, units, waits_on,
+        canonical, canonicalizer, content, issues, key, notices, policy, rejected, spelled,
+        stand_in, target, units, waits_on,
     };
     use super::*;
     use crate::input_limits::Bound;
     use crate::locale::fixtures::FixtureProvider;
     use crate::model::NonEmptyMap;
+    use crate::resolver::declaration_observer::fixtures::Observed;
     use crate::resolver::evaluation::Unit;
     use crate::resolver::specification::Slot;
 
@@ -418,15 +567,92 @@ mod tests {
         canonical_unit(LocaleSubject::RequestedLocale(key))
     }
 
-    /// Spells `spellings` as project requested locales through `canonicalizer`.
+    /// What spelling requested locales leaves: the spellings, where each
+    /// sits, and whether no locale repeats, when that was checked.
+    type Spelling = (
+        Result<Vec<Spelled>, LocaleInvariant>,
+        Vec<LocaleOccurrence>,
+        Option<Admitted<()>>,
+    );
+
+    /// Spells `spellings` as project requested locales through `canonicalizer`,
+    /// observed in a declaration that requests them, beside a confirmed
+    /// policy, and, when `checked`, checks them for a locale named twice.
+    fn spelled_in(
+        evaluation: &mut Evaluation,
+        canonicalizer: Admitted<&Canonicalizer<FixtureProvider>>,
+        spellings: &[&'static str],
+        checked: bool,
+    ) -> Spelling {
+        let confirmed = policy(64, 100, 100);
+        Observed::declaration(&json!({ "requestedLocales": spellings })).app(|observer| {
+            let mut pass = Pass::new(
+                evaluation,
+                canonicalizer,
+                (Some(observer), Some(confirmed.evidence())),
+            );
+            let spelled = pass.spell(requested(spellings));
+            let distinct = match (&spelled, checked) {
+                (Ok(spelled), true) => Some(
+                    pass.unique(
+                        spelled,
+                        Location::RequestedLocale,
+                        LocaleSubject::RequestedLocale,
+                    )
+                    .unwrap(),
+                ),
+                _ => None,
+            };
+            (spelled, pass.into_occurrences(), distinct)
+        })
+    }
+
+    /// Spells `spellings` as [`spelled_in`] does, without the check for a
+    /// locale named twice.
     fn spell(
         evaluation: &mut Evaluation,
         canonicalizer: Admitted<&Canonicalizer<FixtureProvider>>,
         spellings: &[&'static str],
     ) -> (Result<Vec<Spelled>, LocaleInvariant>, Vec<LocaleOccurrence>) {
-        let mut pass = Pass::new(evaluation, canonicalizer);
-        let spelled = pass.spell(requested(spellings));
-        (spelled, pass.into_occurrences())
+        let (spelled, occurrences, _) = spelled_in(evaluation, canonicalizer, spellings, false);
+        (spelled, occurrences)
+    }
+
+    /// Each occurrence candidate `evaluation` recorded over the requested
+    /// `spellings`: the unit and code of its Finding, the position of the
+    /// spelling it observed, and the positions of the spellings it relates,
+    /// or `None` for the confirmed policy.
+    fn observed_spellings(
+        evaluation: &Evaluation,
+        spellings: &[&'static str],
+    ) -> Vec<(Unit, Code, usize, Vec<Option<usize>>)> {
+        let confirmed = policy(64, 100, 100);
+        Observed::declaration(&json!({ "requestedLocales": spellings })).app(|observer| {
+            let at: Vec<EvidenceProjection> = (0..spellings.len())
+                .map(|index| observer.element(&["requestedLocales"], index).unwrap())
+                .collect();
+            let position = |evidence: &EvidenceProjection| {
+                at.iter().position(|spelling| spelling == evidence).unwrap()
+            };
+            evaluation
+                .occurrence_candidates()
+                .iter()
+                .map(|candidate| {
+                    (
+                        candidate.finding.unit().clone(),
+                        candidate.finding.code(),
+                        position(&candidate.primary),
+                        candidate
+                            .related
+                            .iter()
+                            .map(|related| {
+                                (related != confirmed.evidence()).then(|| position(related))
+                            })
+                            .collect(),
+                    )
+                })
+                .collect()
+        })
     }
 
     fn keys(spelled: &[Spelled]) -> Vec<LocaleKey> {
@@ -475,6 +701,41 @@ mod tests {
                 (Location::RequestedLocale(2), false),
             ]
         );
+        // The notice is observed at the corrected spelling alone (D15:2410).
+        assert_eq!(
+            observed_spellings(&evaluation, &["EN", "de", "en"]),
+            [(
+                requested_unit(key("en")),
+                Code::LocaleNonCanonical,
+                0,
+                vec![]
+            )]
+        );
+    }
+
+    /// Each spelling that differs from its canonical form is one candidate of
+    /// the unit's notice, at its own token, equal ones too (D15:2387, 2410).
+    #[test]
+    fn each_corrected_spelling_is_a_candidate_of_the_notice() {
+        let canonicalizer = canonicalizer(64);
+        let mut evaluation = Evaluation::default();
+        let spellings = ["EN", "en", "EN"];
+        spell(&mut evaluation, Ok(&canonicalizer), &spellings)
+            .0
+            .unwrap();
+        assert_eq!(notices(&evaluation), [requested_unit(key("en"))]);
+        let notice = |position| {
+            (
+                requested_unit(key("en")),
+                Code::LocaleNonCanonical,
+                position,
+                vec![],
+            )
+        };
+        assert_eq!(
+            observed_spellings(&evaluation, &spellings),
+            [notice(0), notice(2)]
+        );
     }
 
     /// Each rejected spelling keeps its own key, but every one joins the one
@@ -509,6 +770,20 @@ mod tests {
         assert_eq!(spelled[0].locale, spelled[2].locale);
         assert_eq!(notices(&evaluation), []);
         assert!(occurrences.iter().all(|occurrence| !occurrence.corrected));
+        // Each spelling is one candidate at its own token, equal ones too,
+        // in the order of their subjects (D15:2387).
+        let invalid = |position| {
+            (
+                requested_unit(rejected()),
+                Code::LocaleInvalid,
+                position,
+                vec![],
+            )
+        };
+        assert_eq!(
+            observed_spellings(&evaluation, &["zz", "en-x-brand", "zz"]),
+            [invalid(1), invalid(0), invalid(2)]
+        );
     }
 
     #[test]
@@ -537,6 +812,29 @@ mod tests {
                 .0
                 .unwrap();
             assert_eq!(issues(&evaluation), found, "{limit}");
+            // Past the bound, the spelling is observed beside the confirmed
+            // policy, which supplies the bound (D15:2249); within it, the
+            // corrected spelling's notice relates nothing.
+            let observed = if found.is_empty() {
+                (
+                    requested_unit(key("en-US")),
+                    Code::LocaleNonCanonical,
+                    0,
+                    vec![],
+                )
+            } else {
+                (
+                    requested_unit(rejected()),
+                    Code::ResourceLimitExceeded,
+                    0,
+                    vec![None],
+                )
+            };
+            assert_eq!(
+                observed_spellings(&evaluation, &["EN-us"]),
+                [observed],
+                "{limit}"
+            );
         }
         // 17 bytes become 22, and the canonical spelling is checked too.
         for (limit, found) in [(22, vec![]), (21, vec![over(21)])] {
@@ -552,7 +850,7 @@ mod tests {
         let canonicalizer = canonicalizer(2);
         let mut evaluation = Evaluation::default();
         {
-            let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer));
+            let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer), (None, None));
             pass.spell_one(
                 Location::DefaultSourceLocale,
                 Scope::DefaultSourceLocale,
@@ -618,14 +916,43 @@ mod tests {
     fn a_locale_two_spellings_name_is_a_duplicate_whether_equal_or_aliases() {
         let canonicalizer = canonicalizer(64);
         let mut evaluation = Evaluation::default();
-        let spelled = spell(
-            &mut evaluation,
-            Ok(&canonicalizer),
-            &["en", "iw-IL", "EN", "de", "he-IL", "zz"],
-        )
-        .0
-        .unwrap();
-        let distinct = unique(&mut evaluation, &spelled, LocaleSubject::RequestedLocale).unwrap();
+        let spellings = ["en", "iw-IL", "EN", "de", "he-IL", "zz"];
+        let (_, _, distinct) = spelled_in(&mut evaluation, Ok(&canonicalizer), &spellings, true);
+        let distinct = distinct.unwrap();
+        // Each spelling of a repeated locale is one candidate at its own
+        // token, beside the others (D15:2410), after the corrections and the
+        // invalid spelling.
+        let unique_unit = |key| unit(LocaleSubject::RequestedLocale(key), Check::UniqueLocale);
+        let duplicate = |locale, position, other| {
+            (
+                unique_unit(key(locale)),
+                Code::LocaleDuplicate,
+                position,
+                vec![Some(other)],
+            )
+        };
+        assert_eq!(
+            observed_spellings(&evaluation, &spellings),
+            [
+                (
+                    requested_unit(key("en")),
+                    Code::LocaleNonCanonical,
+                    2,
+                    vec![]
+                ),
+                (
+                    requested_unit(key("he-IL")),
+                    Code::LocaleNonCanonical,
+                    1,
+                    vec![]
+                ),
+                (requested_unit(rejected()), Code::LocaleInvalid, 5, vec![]),
+                duplicate("en", 0, 2),
+                duplicate("en", 2, 0),
+                duplicate("he-IL", 1, 4),
+                duplicate("he-IL", 4, 1),
+            ]
+        );
         let unique_unit = |key| unit(LocaleSubject::RequestedLocale(key), Check::UniqueLocale);
         let duplicate = |key| (unique_unit(key), "project-profile-locale-duplicate", None);
         let found: Vec<_> = issues(&evaluation)
@@ -686,7 +1013,7 @@ mod tests {
     fn alias_destinations_sit_under_their_keys_and_fallback_keys_are_spelled_alone() {
         let canonicalizer = canonicalizer(64);
         let mut evaluation = Evaluation::default();
-        let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer));
+        let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer), (None, None));
         let aliases = BTreeMap::from([
             ("EN".to_string(), "fr-FR".to_string()),
             ("de".to_string(), "zz".to_string()),
@@ -779,7 +1106,7 @@ mod tests {
     fn colliding_keys_share_one_subject_and_phase_7_reports_no_collision() {
         let canonicalizer = canonicalizer(64);
         let mut evaluation = Evaluation::default();
-        let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer));
+        let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer), (None, None));
         let aliases = BTreeMap::from([
             ("EN".to_string(), "fr".to_string()),
             ("en".to_string(), "de".to_string()),
@@ -822,7 +1149,7 @@ mod tests {
             .unwrap();
         let canonicalizer = canonicalizer(64);
         let mut evaluation = Evaluation::default();
-        let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer));
+        let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer), (None, None));
         let admitted = targets.iter().map(|(id, _)| (id.clone(), Ok(()))).collect();
         let resolved = pass.targets(&targets, &admitted).unwrap();
         drop(pass);
@@ -901,7 +1228,7 @@ mod tests {
         ]);
         let canonicalizer = canonicalizer(64);
         let mut evaluation = Evaluation::default();
-        let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer));
+        let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer), (None, None));
         let resolved = pass.targets(&targets, &admitted).unwrap();
         drop(pass);
         // Each of the browser's spellings stands for itself and waits on its

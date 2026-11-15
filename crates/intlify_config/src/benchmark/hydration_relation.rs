@@ -911,6 +911,7 @@ mod tests {
                 .notice(
                     client_endpoint(Check::KnownEndpoint),
                     Notice::made_up(invalid),
+                    None,
                 )
                 .unwrap();
             evaluation

@@ -217,6 +217,8 @@ mod tests {
     use super::*;
     use crate::fixtures::minimal_config;
     use crate::input_limits::Bound;
+    use crate::resolver::declaration_observer::fixtures::Observed;
+    use crate::resolver::declaration_observer::DeclarationObserver;
     use crate::resolver::evaluation::{Actual, LimitExceeded, Status};
     use crate::resolver::locales::fixtures::{
         canonical, canonicalizer, content, declaration, key, limits, rejected, stand_in, target,
@@ -255,12 +257,14 @@ mod tests {
         profile: Admitted<NegotiationProfile<Id>>,
     }
 
-    /// Phase 7 over `fields` under a policy with room for them, then Phase 8's
-    /// negotiation under `policy` and `specification`, into one evaluation.
+    /// Phase 7 over `fields` under a policy with room for them, observed
+    /// through `observer` when there is one, then Phase 8's negotiation under
+    /// `policy` and `specification`, into one evaluation.
     fn resolve_fields(
         fields: &LocaleFields<'_, crate::fixtures::FixtureTargetReference>,
         policy: Result<&ConfirmedPolicy, &Causes>,
         specification: &Admitted<VersionedIdentity<Id>>,
+        observer: Option<&DeclarationObserver<'_>>,
     ) -> Resolved {
         let mut evaluation = Evaluation::default();
         let locales = resolve_locales(
@@ -268,7 +272,7 @@ mod tests {
             Ok(&self::policy(100)),
             Ok(&canonicalizer(64)),
             fields,
-            None,
+            observer,
         )
         .unwrap();
         let profile =
@@ -279,12 +283,16 @@ mod tests {
         }
     }
 
+    /// Phases 7 and 8 over `declaration`, observed in it as a file writes it.
     fn resolve_under(declaration: &Declaration, aliases: u64) -> Resolved {
-        resolve_fields(
-            &LocaleFields::declared(declaration),
-            Ok(&policy(aliases)),
-            &Ok(SPECIFICATION),
-        )
+        Observed::declaration(declaration).app(|observer| {
+            resolve_fields(
+                &LocaleFields::declared(declaration),
+                Ok(&policy(aliases)),
+                &Ok(SPECIFICATION),
+                Some(observer),
+            )
+        })
     }
 
     fn resolve(declaration: &Declaration) -> Resolved {
@@ -568,7 +576,7 @@ mod tests {
                 unsupported.clone().union(unconfirmed.clone()),
             ),
         ] {
-            let resolved = resolve_fields(&fields, policy, &specification);
+            let resolved = resolve_fields(&fields, policy, &specification, None);
             assert_eq!(issues(&resolved.evaluation), []);
             let recorded = statuses(&resolved.evaluation);
             assert_eq!(recorded.len(), 3);
@@ -581,7 +589,7 @@ mod tests {
         let mut fields = LocaleFields::declared(&declaration);
         let rejected = stand_in(Slot::DeliveryGraph);
         fields.locale_negotiation = Err(rejected.clone());
-        let resolved = resolve_fields(&fields, Ok(&confirmed), &Ok(SPECIFICATION));
+        let resolved = resolve_fields(&fields, Ok(&confirmed), &Ok(SPECIFICATION), None);
         assert_eq!(
             statuses(&resolved.evaluation),
             [(bound_unit(), Status::NotEvaluated(rejected.clone()))]
