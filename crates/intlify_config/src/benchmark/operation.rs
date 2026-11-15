@@ -432,11 +432,15 @@ impl Prepared {
                 })
             }
             Self::ResolvedBinding(prepared) => {
-                // The collection is admitted into the Set before the start
-                // mark; the resolution and the bindings borrow it, so they
-                // are copied out after the end mark.
+                // The collection is admitted into the Set, and the selected
+                // declaration's observer built, before the start mark; the
+                // resolution and the bindings borrow the Set, so they are
+                // copied out after the end mark.
                 let inputs = prepared.inputs().ok_or_else(I::unavailable)?;
-                let measured = instrument.interval(&inputs, resolved_binding::construct)?;
+                let file = prepared.file.file();
+                let observer = prepared.observer(&file).ok_or_else(I::unavailable)?;
+                let measured =
+                    instrument.interval((&inputs, &observer), resolved_binding::construct)?;
                 Ok(Interval {
                     quantity: measured.quantity,
                     output: Output::ResolvedBinding(resolved_binding::Resolved::retain(

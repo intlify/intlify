@@ -36,6 +36,7 @@ use super::evidence::EvidenceProjection;
 use super::evidence_component::{ComponentInvariant, ComponentPath, Key};
 use super::evidence_token::JsonType;
 use super::limits::ConfirmedPolicy;
+use super::origin::SafeOriginKind;
 
 /// What one Phase 9 collection unit checks. Every member key comes before
 /// the conflict groups.
@@ -146,6 +147,30 @@ impl From<ComponentInvariant> for CollectionInvariant {
 /// Returns the resolver bug of a component without a token.
 pub(crate) fn unadmitted(member: &FormalMember) -> Result<EvidenceProjection, ComponentInvariant> {
     ComponentPath::artifact_member(Key::Unsafe(JsonType::of(member.value())))
+        .map(EvidenceProjection::resolver_input)
+}
+
+/// Resolver-input Evidence of an admitted envelope, a member of the Set or
+/// the Resource Limit Policy bootstrap admitted, under the canonical
+/// exact-reference identity that keys it (D15:824, 834; plan 025
+/// interpretation #200).
+///
+/// # Errors
+///
+/// Returns the resolver bug of an identity view without canonical bytes.
+pub(crate) fn admitted(tuple: &ExactTuple) -> Result<EvidenceProjection, ComponentInvariant> {
+    ComponentPath::artifact_member(Key::Identity(tuple.view()))
+        .map(EvidenceProjection::resolver_input)
+}
+
+/// Resolver-input Evidence of the submitted collection at its root: the one
+/// location of every member together (D15:834).
+///
+/// # Errors
+///
+/// Returns the resolver bug of a root the origin does not permit.
+pub(crate) fn collection_root() -> Result<EvidenceProjection, ComponentInvariant> {
+    ComponentPath::root(SafeOriginKind::ProfileResolutionArtifactCollection)
         .map(EvidenceProjection::resolver_input)
 }
 

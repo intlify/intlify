@@ -53,7 +53,9 @@ use super::dependency::{own, SemanticGroup, OPTIONAL_POLICIES, REQUIRED_POLICIES
 use super::entry::{EntryFile, EntryInvariant};
 use super::evaluation::{and, Admitted, Causes, Evaluation, EvaluationInvariant};
 use super::evidence_component::ComponentInvariant;
-use super::exact_resolution::{resolve_fields, ArtifactBindings, ResolvedReferences};
+use super::exact_resolution::{
+    resolve_fields, ArtifactBindings, ReferenceInvariant, ResolvedReferences,
+};
 use super::fallback::{resolve_fallback, MessageFallbackPolicy};
 use super::groups::{resolve_groups, ResolvedGroups};
 use super::hydration::{validate_hydration, ResolvedHydration};
@@ -316,6 +318,16 @@ impl From<EvaluationInvariant> for ResolverInvariant {
     }
 }
 
+impl From<ReferenceInvariant> for ResolverInvariant {
+    fn from(invariant: ReferenceInvariant) -> Self {
+        match invariant {
+            ReferenceInvariant::Evaluation(invariant) => Self::Evaluation(invariant),
+            ReferenceInvariant::Component(invariant) => Self::Component(invariant),
+            ReferenceInvariant::Observer(invariant) => Self::Observer(invariant),
+        }
+    }
+}
+
 impl From<CollectionInvariant> for ResolverInvariant {
     fn from(invariant: CollectionInvariant) -> Self {
         match invariant {
@@ -485,7 +497,7 @@ where
         evaluation,
         set.as_ref(),
         &declared,
-        locales.targets.as_deref(),
+        (locales.targets.as_deref(), observer.as_ref()),
     )?;
     // Both policy groups are the confirmed declaration's, and the required
     // one also holds the confirmed policy's bounds.

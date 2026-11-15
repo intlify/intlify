@@ -1427,7 +1427,7 @@ impl Evaluation {
     fn observes(&self, unit: &Unit, observed: bool, what: &str) {
         // The phases whose Findings carry occurrence Evidence so far; the
         // others gain theirs check by check (plan 025 PRs 5f).
-        const OBSERVED: [Phase; 8] = [
+        const OBSERVED: [Phase; 9] = [
             Phase::ResolverBootstrapAdmission,
             Phase::EntryAdmission,
             Phase::StructuralAdmission,
@@ -1436,16 +1436,14 @@ impl Evaluation {
             Phase::SpecificationAdmission,
             Phase::LocaleResolution,
             Phase::LocalePolicyResolution,
+            Phase::ArtifactReferenceResolution,
         ];
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
-        // Phase 9 observes its collection checks, not yet its references.
-        let observes = OBSERVED.contains(&unit.phase)
-            || matches!(unit.subject, Subject::ArtifactCollection(_));
         assert_eq!(
             observed,
-            observes,
+            OBSERVED.contains(&unit.phase),
             "{unit:?} reports {what} {} what it observed, against its check",
             if observed { "with" } else { "without" }
         );

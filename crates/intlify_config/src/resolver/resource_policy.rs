@@ -40,7 +40,7 @@
 use std::collections::BTreeMap;
 
 use crate::artifacts::collection::FormalCollection;
-use crate::artifacts::envelope::{ArtifactKind, Declaration, ExactTuple, FormalMember, MemberKey};
+use crate::artifacts::envelope::{ArtifactKind, Declaration, FormalMember, MemberKey};
 use crate::boundary::capability::ImplementationCapability;
 use crate::boundary::verification::VerificationInput;
 use crate::input_limits::{Bound, ValueCounts};
@@ -50,7 +50,7 @@ use crate::model::{
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::selection::{SelectionInvariant, SelectorInput, StringLengthFact};
 
-use super::artifact_resolution::unadmitted;
+use super::artifact_resolution::{admitted, collection_root, unadmitted};
 use super::bootstrap::work::{self, WorkBound};
 use super::bootstrap::{admit_body, select_candidate, AdmittedResourcePolicy, Compared, Rejected};
 use super::capability::CapabilityBound;
@@ -66,7 +66,6 @@ use super::limits::{
     ArtifactAdmissionLimits, BoundId, ConfigurationInputLimits, ConfirmedPolicy, Group,
     ResolutionLimits,
 };
-use super::origin::SafeOriginKind;
 use super::tally::{actual, first_over, measure, total, within, Tally};
 
 const fn configuration_bound(name: &'static str) -> BoundId {
@@ -432,25 +431,11 @@ impl Stage<'_> {
 }
 
 /// The path of a reference field's value under the declaration.
-fn reference_path(field: &ReferenceField) -> Vec<&str> {
+pub(super) fn reference_path(field: &ReferenceField) -> Vec<&str> {
     match field {
         ReferenceField::Policy(slot) => vec!["policies", slot.name()],
         ReferenceField::TargetProfile(id) => vec!["targetProfiles", id.as_str(), "profile"],
     }
-}
-
-/// Resolver-input Evidence of the submitted collection at its root (D15:834).
-fn collection_root() -> Result<EvidenceProjection, ComponentInvariant> {
-    ComponentPath::root(SafeOriginKind::ProfileResolutionArtifactCollection)
-        .map(EvidenceProjection::resolver_input)
-}
-
-/// Resolver-input Evidence of the admitted Resource Limit Policy, under the
-/// canonical exact-reference identity that keys an admitted envelope
-/// (D15:824, 834; plan 025 interpretation #200).
-fn admitted(tuple: &ExactTuple) -> Result<EvidenceProjection, ComponentInvariant> {
-    ComponentPath::artifact_member(Key::Identity(tuple.view()))
-        .map(EvidenceProjection::resolver_input)
 }
 
 /// Resolver-input Evidence of the Implementation Capability's `bound`
