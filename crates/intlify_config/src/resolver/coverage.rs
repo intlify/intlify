@@ -557,8 +557,8 @@ fn selected_locales<P: Provider>(
         let locale =
             evaluation.check(subject(Check::CanonicalLocale), attempt, |attempt| attempt)?;
         if let (true, Ok(canonical)) = (corrected, &locale) {
-            // Phase 8's notices carry no occurrence Evidence yet (plan 025
-            // PRs 5f-4g).
+            // Coverage's notices carry no occurrence Evidence yet (plan 025
+            // PRs 5f-4h).
             evaluation.notice(
                 subject(Check::CanonicalLocale),
                 Notice::non_canonical(canonical.clone()),

@@ -18,14 +18,17 @@
 //! definitions, which 020 owns, and not the canonicalization of the keys,
 //! which Phase 7 did.
 //!
-//! The mapping's and its keys' Findings are observed where their checks
-//! looked (D15:2249): past a bound, the mapping or a key's sequence, beside
-//! the confirmed policy, which supplies the bound; a source two keys name,
-//! at each key beside the others' (D15:2387, 2410); and a source outside the
-//! requested locales, at each key naming it, beside the requested locales, a
-//! set that counts as one location. A key is classified by the canonicalizer
-//! Phase 5 bound (D15:776). The candidates' Findings carry no occurrence
-//! Evidence yet.
+//! Each Finding is observed where its check looked (D15:2249): past a bound,
+//! the mapping or a key's sequence, beside the confirmed policy, which
+//! supplies the bound; a source two keys name, at each key beside the
+//! others' (D15:2387, 2410); a source outside the requested locales, at each
+//! key naming it, beside the requested locales, a set that counts as one
+//! location; and a candidate at its own token: a literal that fails or
+//! corrects its spelling alone, or beside the confirmed policy past the
+//! identifier bound, one naming its own source beside the key, and a
+//! repeated literal or Intent source-locale candidate beside the others
+//! that repeat it. A key is classified by the canonicalizer Phase 5 bound
+//! (D15:776).
 
 use std::collections::BTreeMap;
 
@@ -37,6 +40,7 @@ use super::evaluation::{
     and, both, within, Admitted, Blocking, Causes, Check, Code, Evaluation, Found, Notice,
     Observation, Phase, Reason, Subject, Unit,
 };
+use super::evidence::EvidenceProjection;
 use super::limits::{BoundId, ConfirmedPolicy, Group};
 use super::locales::{
     canonicalize, Content, LocaleInvariant, LocaleKey, LocaleSet, ResolvedLocales, Spelled,
@@ -186,7 +190,16 @@ pub(crate) fn resolve_fallback<Id: Clone, P: Provider>(
     for (key, sharing) in by_source(&entries) {
         let (alone, member) = source(evaluation, (&bounded, &requested), key, &sharing, observer)?;
         let sequence = bounded_sequence(evaluation, (confirmed, &alone), key, &sharing, observer)?;
-        let (candidates, resolved) = candidates(evaluation, &spelling, key, &sequence, &sharing)?;
+        let sight = Sight {
+            observer,
+            policy: confirmed.ok().map(ConfirmedPolicy::evidence),
+            entry: match sharing.as_slice() {
+                [entry] => Some(*entry),
+                _ => None,
+            },
+        };
+        let (candidates, resolved) =
+            candidates(evaluation, (&spelling, &sight), key, &sequence, &sharing)?;
         checked = and(and(checked, and(alone.map(|_| ()), member)), candidates);
         sequences = both(sequences, both(sequence, resolved)).map(
             |(mut sequences, (source, candidates))| {
@@ -347,6 +360,52 @@ fn bounded_sequence(
     )?)
 }
 
+/// Where a key's candidates are observed: the one sequence of a key holding
+/// alone, the only key whose candidates' units are evaluated, in the
+/// declaration's file when it is there, beside the confirmed policy's
+/// Evidence when there is one.
+struct Sight<'s> {
+    observer: Option<&'s DeclarationObserver<'s>>,
+    policy: Option<&'s EvidenceProjection>,
+    entry: Option<&'s Entry<'s>>,
+}
+
+impl Sight<'_> {
+    /// The candidate at `position`, at its token (D15:790).
+    fn candidate(&self, position: usize) -> Result<Option<EvidenceProjection>, ObserverInvariant> {
+        match (self.observer, self.entry) {
+            (Some(observer), Some(entry)) => observer
+                .element(&[FALLBACK, entry.name], position)
+                .map(Some),
+            _ => Ok(None),
+        }
+    }
+
+    /// The key the sequence falls back from, at its token.
+    fn source(&self) -> Result<Option<EvidenceProjection>, ObserverInvariant> {
+        match (self.observer, self.entry) {
+            (Some(observer), Some(entry)) => observer.member_key(&[FALLBACK], entry.name).map(Some),
+            _ => Ok(None),
+        }
+    }
+
+    /// The candidates at `positions` when they repeat one candidate, each at
+    /// its token.
+    fn repeating(
+        &self,
+        positions: &[usize],
+    ) -> Result<Vec<Option<EvidenceProjection>>, ObserverInvariant> {
+        if positions.len() > 1 {
+            positions
+                .iter()
+                .map(|&position| self.candidate(position))
+                .collect()
+        } else {
+            Ok(Vec::new())
+        }
+    }
+}
+
 /// The units over one key's candidates, which wait on its sequence: each
 /// literal canonicalized at its position and never its source, and each
 /// literal identity and the Intent source-locale candidate never repeated. A
@@ -355,7 +414,7 @@ fn bounded_sequence(
 /// every unit passed and the sequence as checked candidates.
 fn candidates<P: Provider>(
     evaluation: &mut Evaluation,
-    spelling: &Admitted<&Canonicalizer<P>>,
+    (spelling, sight): (&Admitted<&Canonicalizer<P>>, &Sight<'_>),
     key: &LocaleKey,
     sequence: &Admitted<CanonicalLocale>,
     sharing: &[&Entry<'_>],
@@ -363,53 +422,63 @@ fn candidates<P: Provider>(
     let canonicalizing =
         both(spelling.clone(), sequence.clone()).map(|(canonicalizer, _)| canonicalizer);
     let after = sequence.clone().map(|_| ());
-    // The literals at each position, and the Intent source-locale candidates.
+    // The literals at each position, and the Intent source-locale candidates'
+    // positions.
     let mut positions: BTreeMap<usize, Vec<&str>> = BTreeMap::new();
-    let mut intents = 0;
+    let mut intents = Vec::new();
     for entry in sharing {
         for (position, candidate) in entry.candidates.iter().enumerate() {
             match candidate {
                 FallbackCandidate::Locale(raw) => positions.entry(position).or_default().push(raw),
-                FallbackCandidate::IntentSource(_) => intents += 1,
+                FallbackCandidate::IntentSource(_) => intents.push(position),
             }
         }
     }
     let mut checked = after.clone();
     let mut found = BTreeMap::new();
-    // Each literal's subject key, what its repeat check waits on, and how
-    // many candidates hold it: the one sequence's, whenever the check runs.
-    let mut literals: BTreeMap<LocaleKey, (Admitted<()>, usize)> = BTreeMap::new();
+    // Each literal's subject key, what its repeat check waits on, and the
+    // positions of the candidates holding it: the one sequence's, whenever
+    // the check runs.
+    let mut literals: BTreeMap<LocaleKey, (Admitted<()>, Vec<usize>)> = BTreeMap::new();
     for (position, raws) in positions {
         let subject = FallbackSubject::Candidate(key.clone(), position);
-        let at = literal_at(evaluation, &canonicalizing, &subject, &raws, sequence)?;
+        let at = literal_at(
+            evaluation,
+            &canonicalizing,
+            (&subject, position),
+            &raws,
+            (sequence, sight),
+        )?;
         let identified = at.locale.clone().map(|_| ());
         for identity in at.identities {
-            let (waits, holding) = literals.entry(identity).or_insert((Ok(()), 0));
+            let (waits, holding) = literals.entry(identity).or_insert((Ok(()), Vec::new()));
             *waits = and(waits.clone(), identified.clone());
-            *holding += 1;
+            holding.push(position);
         }
         checked = and(checked, at.checked);
         found.insert(position, at.locale);
     }
     for (identity, (waits, holding)) in literals {
-        let once = evaluation.check(
+        let repeating = sight.repeating(&holding)?;
+        let once = evaluation.check_found(
             unit(
                 FallbackSubject::Literal(key.clone(), identity),
                 Check::UniqueCandidate,
             ),
             and(after.clone(), waits),
-            |()| repeated(holding, Reason::LiteralDuplicate),
+            |()| repeated(&repeating, holding.len(), Reason::LiteralDuplicate),
         )?;
         checked = and(checked, once);
     }
-    if intents > 0 {
-        let once = evaluation.check(
+    if !intents.is_empty() {
+        let repeating = sight.repeating(&intents)?;
+        let once = evaluation.check_found(
             unit(
                 FallbackSubject::IntentSource(key.clone()),
                 Check::UniqueCandidate,
             ),
             after,
-            |()| repeated(intents, Reason::IntentSourceDuplicate),
+            |()| repeated(&repeating, intents.len(), Reason::IntentSourceDuplicate),
         )?;
         checked = and(checked, once);
     }
@@ -435,13 +504,15 @@ struct LiteralAt {
 /// The two units at one position: the literal canonicalized, its canonical
 /// form suggested when it is spelled otherwise, then compared with its
 /// source. They are evaluated only under a key holding alone, which has one
-/// literal at the position.
+/// literal at the position, and observe it at its token: past the
+/// identifier bound beside the confirmed policy, which supplies the bound,
+/// and naming its own source beside the key (D15:2249, 2410).
 fn literal_at<P: Provider>(
     evaluation: &mut Evaluation,
     canonicalizing: &Admitted<&Canonicalizer<P>>,
-    subject: &FallbackSubject,
+    (subject, position): (&FallbackSubject, usize),
     raws: &[&str],
-    sequence: &Admitted<CanonicalLocale>,
+    (sequence, sight): (&Admitted<CanonicalLocale>, &Sight<'_>),
 ) -> Result<LiteralAt, LocaleInvariant> {
     let attempt = match canonicalizing {
         Ok(canonicalizer) => {
@@ -466,26 +537,54 @@ fn literal_at<P: Provider>(
         ),
     };
     let own = |check| unit(subject.clone(), check);
-    let locale = evaluation.check(
+    let failed = match &attempt {
+        Ok(Err(blocking)) => sight.candidate(position)?.map(|primary| Observation {
+            primary,
+            related: match (blocking.code, sight.policy) {
+                (Code::ResourceLimitExceeded, Some(policy)) => vec![policy.clone()],
+                _ => Vec::new(),
+            },
+        }),
+        _ => None,
+    };
+    let locale = evaluation.check_found(
         own(Check::CanonicalLocale),
         attempt.map(|attempt| attempt.map(|(locale, _)| locale)),
-        |attempt| attempt,
+        |attempt| attempt.map_err(|blocking| Found::through(blocking, failed)),
     )?;
     if let (true, Ok(canonical)) = (corrected, &locale) {
-        // Phase 8's notices carry no occurrence Evidence yet (plan 025 PRs
-        // 5f-4g).
+        // The corrected candidate is the notice's occurrence (D15:2410).
+        let corrected = sight.candidate(position)?.map(|primary| Observation {
+            primary,
+            related: Vec::new(),
+        });
         evaluation.notice(
             own(Check::CanonicalLocale),
             Notice::non_canonical(canonical.clone()),
-            None,
+            corrected,
         )?;
     }
-    let distinct = evaluation.check(
+    let naming = match (&locale, sequence) {
+        (Ok(literal), Ok(source)) if literal == source => {
+            match (sight.candidate(position)?, sight.source()?) {
+                (Some(primary), Some(source)) => Some(Observation {
+                    primary,
+                    related: vec![source],
+                }),
+                _ => None,
+            }
+        }
+        _ => None,
+    };
+    let distinct = evaluation.check_found(
         own(Check::DistinctFromSource),
         both(locale.clone(), sequence.clone()),
         |(literal, source)| {
             if literal == source {
-                Err(sequence_invalid(Reason::LiteralSelfReference))
+                Err(Found::through(
+                    sequence_invalid(Reason::LiteralSelfReference),
+                    naming,
+                ))
             } else {
                 Ok(())
             }
@@ -498,10 +597,15 @@ fn literal_at<P: Provider>(
     })
 }
 
-/// A candidate's issue when one sequence holds it more than once.
-fn repeated(holding: usize, reason: Reason) -> Result<(), Blocking> {
+/// A candidate's issue when one sequence holds it more than once, found at
+/// each candidate holding it beside the others (D15:2387, 2410).
+fn repeated(
+    repeating: &[Option<EvidenceProjection>],
+    holding: usize,
+    reason: Reason,
+) -> Result<(), Found> {
     if holding > 1 {
-        Err(sequence_invalid(reason))
+        Err(Found::repeated(sequence_invalid(reason), repeating))
     } else {
         Ok(())
     }
@@ -772,6 +876,36 @@ mod tests {
             .app(|observer| look(&observer.with_locales(&canonicalizer)))
     }
 
+    /// The candidate at `position` in the sequence of `source` in
+    /// `declaration`, at its token.
+    fn element(declaration: &Declaration, source: &str, position: usize) -> EvidenceProjection {
+        at(declaration, |observer| {
+            observer.element(&[FALLBACK, source], position).unwrap()
+        })
+    }
+
+    /// The key `source` in `declaration`, at its token.
+    fn at_key(declaration: &Declaration, source: &str) -> EvidenceProjection {
+        at(declaration, |observer| {
+            observer.member_key(&[FALLBACK], source).unwrap()
+        })
+    }
+
+    /// An occurrence candidate of `unit`, at `primary` beside `related`.
+    fn occurrence(
+        unit: Unit,
+        primary: &EvidenceProjection,
+        related: &[&EvidenceProjection],
+    ) -> (Unit, Observation) {
+        (
+            unit,
+            Observation {
+                primary: primary.clone(),
+                related: related.iter().map(|&related| related.clone()).collect(),
+            },
+        )
+    }
+
     /// Each source's sequence as spelled, sources in their order.
     fn sequences(policy: &MessageFallbackPolicy<Id>) -> Vec<(&str, Vec<&str>)> {
         policy
@@ -930,10 +1064,8 @@ mod tests {
 
     #[test]
     fn each_literal_is_canonicalized_at_its_position_and_a_differing_spelling_corrected() {
-        let resolved = resolve(&declared(
-            &["ja"],
-            json!({"ja": ["EN", intent(), "de", "EN-us"]}),
-        ));
+        let declaration = declared(&["ja"], json!({"ja": ["EN", intent(), "de", "EN-us"]}));
+        let resolved = resolve(&declaration);
         assert_eq!(issues(&resolved.evaluation), []);
         // The Intent source at position 1 spells no locale, so the position
         // has no unit; the repeat checks name each literal by its identity.
@@ -957,6 +1089,15 @@ mod tests {
         assert_eq!(
             notices(&resolved.evaluation),
             [0, 3].map(|position| candidate_unit(key("ja"), position, Check::CanonicalLocale))
+        );
+        // Each corrected candidate is its notice's occurrence (D15:2410).
+        assert_eq!(
+            observed(&resolved.evaluation),
+            [0, 3].map(|position| occurrence(
+                candidate_unit(key("ja"), position, Check::CanonicalLocale),
+                &element(&declaration, "ja", position),
+                &[]
+            ))
         );
         assert_eq!(
             sequences(&resolved.policy.unwrap()),
@@ -1139,10 +1280,11 @@ mod tests {
 
     #[test]
     fn each_sequence_defect_is_an_issue_with_its_own_reason() {
-        let resolved = resolve(&declared(
+        let declaration = declared(
             &["ja", "en"],
             json!({"ja": ["ja", "en", "EN", intent(), intent()]}),
-        ));
+        );
+        let resolved = resolve(&declaration);
         let invalid = "project-profile-message-fallback-sequence-invalid";
         assert_eq!(
             issues(&resolved.evaluation),
@@ -1176,6 +1318,29 @@ mod tests {
             notices(&resolved.evaluation),
             [candidate_unit(key("ja"), 2, Check::CanonicalLocale)]
         );
+        // The self-reference beside the key, and each repeated candidate
+        // beside the other (D15:2387, 2410).
+        let at = |position| element(&declaration, "ja", position);
+        let source = at_key(&declaration, "ja");
+        assert_eq!(
+            observed(&resolved.evaluation),
+            [
+                occurrence(
+                    candidate_unit(key("ja"), 0, Check::DistinctFromSource),
+                    &at(0),
+                    &[&source]
+                ),
+                occurrence(
+                    candidate_unit(key("ja"), 2, Check::CanonicalLocale),
+                    &at(2),
+                    &[]
+                ),
+                occurrence(literal_unit(key("ja"), key("en")), &at(1), &[&at(2)]),
+                occurrence(literal_unit(key("ja"), key("en")), &at(2), &[&at(1)]),
+                occurrence(intent_unit(key("ja")), &at(3), &[&at(4)]),
+                occurrence(intent_unit(key("ja")), &at(4), &[&at(3)]),
+            ]
+        );
         assert_eq!(units(&resolved.policy.unwrap_err()).len(), 3);
     }
 
@@ -1183,7 +1348,8 @@ mod tests {
     fn each_position_naming_its_source_is_its_own_self_reference() {
         // Two spellings of the source: a self-reference at each position,
         // and one repeat of the literal they share.
-        let resolved = resolve(&declared(&["en"], json!({"en": ["en", "EN"]})));
+        let declaration = declared(&["en"], json!({"en": ["en", "EN"]}));
+        let resolved = resolve(&declaration);
         let invalid = "project-profile-message-fallback-sequence-invalid";
         assert_eq!(
             issues(&resolved.evaluation),
@@ -1203,6 +1369,24 @@ mod tests {
                     invalid,
                     Some("literal-duplicate")
                 ),
+            ]
+        );
+        // Each position is found at its token beside the key it names.
+        let at = |position| element(&declaration, "en", position);
+        let source = at_key(&declaration, "en");
+        let distinct = |position| candidate_unit(key("en"), position, Check::DistinctFromSource);
+        assert_eq!(
+            observed(&resolved.evaluation),
+            [
+                occurrence(distinct(0), &at(0), &[&source]),
+                occurrence(
+                    candidate_unit(key("en"), 1, Check::CanonicalLocale),
+                    &at(1),
+                    &[]
+                ),
+                occurrence(distinct(1), &at(1), &[&source]),
+                occurrence(literal_unit(key("en"), key("en")), &at(0), &[&at(1)]),
+                occurrence(literal_unit(key("en"), key("en")), &at(1), &[&at(0)]),
             ]
         );
     }
@@ -1276,6 +1460,22 @@ mod tests {
                 "project-profile-message-fallback-sequence-invalid",
                 Some("literal-duplicate")
             )]
+        );
+        let candidate = |position| element(&declaration, "ja", position);
+        assert_eq!(
+            observed(&resolved.evaluation),
+            [
+                occurrence(
+                    literal_unit(key("ja"), key("en")),
+                    &candidate(0),
+                    &[&candidate(2)]
+                ),
+                occurrence(
+                    literal_unit(key("ja"), key("en")),
+                    &candidate(2),
+                    &[&candidate(0)]
+                ),
+            ]
         );
 
         let resolved = resolve_under(&declaration, 100, 2);
@@ -1409,16 +1609,18 @@ mod tests {
         // Each literal is measured in bytes before the provider reads it,
         // and under a key that can stand for several sources reports only
         // the first-over witness.
-        let short = resolve_with(
-            &fields,
-            Ok(&confirmed),
-            &Ok(SPECIFICATION),
-            &Spelling {
-                identifier_bytes: 4,
-                ..ROOM
-            },
-            None,
-        );
+        let short = Observed::declaration(&declaration).app(|observer| {
+            resolve_with(
+                &fields,
+                Ok(&confirmed),
+                &Ok(SPECIFICATION),
+                &Spelling {
+                    identifier_bytes: 4,
+                    ..ROOM
+                },
+                Some(observer),
+            )
+        });
         let long = candidate_unit(key("ja"), 0, Check::CanonicalLocale);
         assert_eq!(
             issues(&short.evaluation),
@@ -1439,6 +1641,16 @@ mod tests {
                 limit: Bound::new(4).unwrap(),
                 actual: Actual::AtLeast(5),
             })
+        );
+        // Found at its token beside the confirmed policy, which supplies the
+        // bound (D15:2249).
+        assert_eq!(
+            observed(&short.evaluation),
+            [occurrence(
+                long.clone(),
+                &element(&declaration, "ja", 0),
+                &[confirmed.evidence()]
+            )]
         );
         assert_eq!(
             waits_on(
