@@ -1432,9 +1432,20 @@ impl Evaluation {
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
-        // Phase 8's negotiation and message fallback checks; coverage's gain
-        // theirs later (plan 025 PRs 5f-4h).
-        let policies = matches!(unit.subject, Subject::Negotiation(_) | Subject::Fallback(_));
+        // Phase 8's negotiation and message fallback checks, and coverage's
+        // counts; its other checks gain theirs later (plan 025 PRs 5f-4h).
+        let policies = matches!(
+            unit.subject,
+            Subject::Negotiation(_)
+                | Subject::Fallback(_)
+                | Subject::Coverage(
+                    CoverageSubject::Rules
+                        | CoverageSubject::LocaleSelectors
+                        | CoverageSubject::SurfaceSelectors
+                        | CoverageSubject::Cells
+                        | CoverageSubject::Comparisons
+                )
+        );
         assert_eq!(
             observed,
             OBSERVED.contains(&unit.phase) || policies,
@@ -3348,14 +3359,22 @@ mod tests {
     #[test]
     #[should_panic(expected = "with what it observed")]
     fn a_candidate_of_another_phase_with_an_observation_fails_the_test() {
-        use crate::resolver::coverage::{unit, CoverageSubject};
+        use crate::resolver::coverage::{unit, CoverageSubject, RuleContent};
         let data = through(crate::resolver::evidence_component::ComponentPath::data_root());
-        let rules = unit(CoverageSubject::Rules, Check::WithinBound);
-        let _ = Evaluation::default().check_found(rules, Ok(()), |()| {
-            Err::<(), _>(Found::observed(
-                Blocking::limit(exceeded(Actual::Exact(4))),
-                data,
-            ))
+        let locale = unit(
+            CoverageSubject::Locale(
+                RuleContent::projected(),
+                crate::resolver::locales::fixtures::key("ja"),
+            ),
+            Check::CanonicalLocale,
+        );
+        let invalid = Blocking {
+            code: Code::LocaleInvalid,
+            reason: None,
+            details: None,
+        };
+        let _ = Evaluation::default().check_found(locale, Ok(()), |()| {
+            Err::<(), _>(Found::observed(invalid, data))
         });
     }
 }

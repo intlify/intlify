@@ -459,10 +459,10 @@ where
         evaluation,
         confirmed,
         &admitted.coverage,
-        admitted.vocabulary.as_ref(),
-        canonicalizer,
+        (admitted.vocabulary.as_ref(), canonicalizer),
         &locales,
         locale_fields.coverage.clone(),
+        observer.as_ref(),
     )?;
     own(evaluation, SemanticGroup::Coverage, held(coverage.as_ref()))?;
     let set = &*set.insert(admit_collection(
@@ -2566,6 +2566,37 @@ pub(super) mod tests {
                         { "safe-key": hex(&encode(&reference).unwrap()) },
                     ],
                 })]
+            );
+        });
+    }
+
+    /// Coverage observes through the same observer: past the rule count's
+    /// bound, the rules are observed beside the policy Phase 4 admitted,
+    /// which supplies the bound (D15:1901, 2249).
+    #[test]
+    fn a_coverage_count_is_observed_beside_the_admitted_policy() {
+        use crate::resolver::coverage::{self, CoverageSubject};
+        let mut inputs = Inputs::complete();
+        let mut limits = policy_limits();
+        // The complete declaration submits two rules.
+        limits.locale_resolution.max_coverage_rules = bound(1);
+        inputs.select_policy(resource_limit_policy(&limits));
+        inputs.resolve(|evaluation, _| {
+            let rules = coverage::unit(CoverageSubject::Rules, Check::WithinBound);
+            assert_eq!(
+                issues(&evaluation),
+                [(rules.clone(), Code::ResourceLimitExceeded, None)]
+            );
+            let observed = observed_views(&evaluation, &rules);
+            assert_eq!(observed.len(), 1);
+            let (primary, related) = &observed[0];
+            assert_eq!(
+                primary["value"],
+                json!({ "exact-json-pointer": "/profiles/web/coverage/rules" })
+            );
+            assert_eq!(
+                related.iter().map(|view| &view["kind"]).collect::<Vec<_>>(),
+                [&json!("artifact-input")]
             );
         });
     }

@@ -17,6 +17,14 @@
 //! raw content until a Subject content projection replaces it. Not Coverage
 //! Decision Evidence, which maps a Basis to its sources through Evidence 015
 //! Phase 5 owns, and not the vocabulary's admission.
+//!
+//! A count past its bound is observed where its table's Scope sits in the
+//! declaration, beside the confirmed policy, which supplies the bound
+//! (D15:1901-1905, 2249): the rules for the rule and selector-item counts,
+//! the nearest location holding every item, and for the rule-to-cell
+//! comparisons, the factor that bound adds; the requested locales for the
+//! cells, the factor the declaration supplies (plan 025 decision #198). The
+//! other checks' Findings carry no occurrence Evidence yet.
 
 use std::collections::BTreeMap;
 
@@ -26,9 +34,10 @@ use crate::input_limits::Bound;
 use crate::locale::{CanonicalLocale, Canonicalizer, Provider, VersionedIdentity};
 use crate::model::{Coverage, CoverageMode, CoverageRule};
 
+use super::declaration_observer::{beside, DeclarationObserver};
 use super::evaluation::{
     both, within, Actual, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant,
-    LimitExceeded, Notice, Phase, Reason, Subject, Unit,
+    Found, LimitExceeded, Notice, Observation, Phase, Reason, Subject, Unit,
 };
 use super::limits::{BoundId, ConfirmedPolicy, Group, LocaleResolutionLimits};
 use super::locales::{
@@ -271,19 +280,24 @@ impl<Id> CoveragePolicy<Id> {
 }
 
 /// Phase 8's coverage checks over the declaration's `coverage` field, what
-/// Phase 7 resolved, and the vocabulary and canonicalizer Phase 5 admitted.
-/// Every unit waits on the specification, through a count or through the
-/// cells' bound; the policy exists only when every unit passed.
+/// Phase 7 resolved, and the vocabulary and canonicalizer Phase 5 admitted,
+/// observed through `observer` when the declaration's file is there; the
+/// caller hands it what Phase 5 bound. Every unit waits on the
+/// specification, through a count or through the cells' bound; the policy
+/// exists only when every unit passed.
 pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
     evaluation: &mut Evaluation,
-    policy: Result<&ConfirmedPolicy, &Causes>,
+    confirmed: Result<&ConfirmedPolicy, &Causes>,
     specification: &Admitted<VersionedIdentity<Id>>,
-    vocabulary: Result<&SurfaceVocabulary, &Causes>,
-    canonicalizer: Result<&Canonicalizer<P>, &Causes>,
+    (vocabulary, canonicalizer): (
+        Result<&SurfaceVocabulary, &Causes>,
+        Result<&Canonicalizer<P>, &Causes>,
+    ),
     locales: &ResolvedLocales,
     coverage: Admitted<Option<&Coverage>>,
+    observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<Admitted<CoveragePolicy<Id>>, LocaleInvariant> {
-    let policy = policy.map_err(Causes::clone);
+    let policy = confirmed.map_err(Causes::clone);
     let vocabulary = vocabulary.map_err(Causes::clone);
     let requested = locales.requested_set.as_ref().map_err(Causes::clone);
     let rules = coverage
@@ -298,9 +312,18 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
         coverage.clone(),
     )
     .map(|((policy, _), _)| policy);
+    // The rules are in the declaration once one is submitted, and no count
+    // over none is past its bound.
+    let at_rules = if rules.is_empty() {
+        None
+    } else {
+        beside(confirmed, observer, |observer| {
+            observer.value(&["coverage", "rules"])
+        })?
+    };
     let rules_bounded = count(
         evaluation,
-        &declared,
+        (&declared, at_rules.clone()),
         CoverageSubject::Rules,
         MAX_COVERAGE_RULES,
         |limits| limits.max_coverage_rules,
@@ -308,7 +331,7 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
     )?;
     let locale_items_bounded = count(
         evaluation,
-        &declared,
+        (&declared, at_rules.clone()),
         CoverageSubject::LocaleSelectors,
         MAX_COVERAGE_LOCALE_SELECTOR_OCCURRENCES,
         |limits| limits.max_coverage_locale_selector_occurrences,
@@ -319,7 +342,7 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
     )?;
     let surface_items_bounded = count(
         evaluation,
-        &declared,
+        (&declared, at_rules.clone()),
         CoverageSubject::SurfaceSelectors,
         MAX_COVERAGE_SURFACE_SELECTOR_OCCURRENCES,
         |limits| limits.max_coverage_surface_selector_occurrences,
@@ -354,8 +377,16 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
         normalized,
     )
     .map(|_| ());
+    // The cells span the requested locales, the factor the declaration
+    // supplies, observed beside the policy alone (plan 025 decision #198).
+    let at_requested = match &requested {
+        Ok(_) => beside(confirmed, observer, |observer| {
+            observer.value(&["requestedLocales"])
+        })?,
+        Err(_) => None,
+    };
     let span = both(requested, vocabulary);
-    let sized = evaluation.check(
+    let sized = evaluation.check_found(
         unit(CoverageSubject::Cells, Check::WithinBound),
         both(both(policy, specification.clone()), span.clone()),
         |((policy, _), (requested, vocabulary))| {
@@ -367,9 +398,10 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
                     .max_coverage_decision_cells,
                 &[requested.as_slice().len(), vocabulary.members().len()],
             )
+            .map_err(|blocking| Found::through(blocking, at_requested))
         },
     )?;
-    let compared = evaluation.check(
+    let compared = evaluation.check_found(
         unit(CoverageSubject::Comparisons, Check::WithinBound),
         both(declared, span.clone()),
         |(policy, (requested, vocabulary))| {
@@ -385,6 +417,7 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
                     vocabulary.members().len(),
                 ],
             )
+            .map_err(|blocking| Found::through(blocking, at_rules))
         },
     )?;
     let default = coverage.map(|coverage| {
@@ -428,19 +461,23 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
     ))
 }
 
-/// A count's unit: every submitted item counts, within its bound.
+/// A count's unit: every submitted item counts, within its bound, and past
+/// it what the count observed is found.
 fn count(
     evaluation: &mut Evaluation,
-    declared: &Admitted<&ConfirmedPolicy>,
+    (declared, observed): (&Admitted<&ConfirmedPolicy>, Option<Observation>),
     subject: CoverageSubject,
     bound: BoundId,
     limit: fn(&LocaleResolutionLimits) -> Bound,
     total: usize,
 ) -> Result<Admitted<()>, EvaluationInvariant> {
-    evaluation.check(
+    evaluation.check_found(
         unit(subject, Check::WithinBound),
         declared.clone(),
-        |policy| within(bound, limit(&policy.limits().locale_resolution), total),
+        |policy| {
+            within(bound, limit(&policy.limits().locale_resolution), total)
+                .map_err(|blocking| Found::through(blocking, observed))
+        },
     )
 }
 
@@ -881,6 +918,8 @@ mod tests {
     ) -> Resolved {
         let mut evaluation = Evaluation::default();
         let canonicalizer = canonicalizer(setup.identifier_bytes);
+        // The phases after Phase 5 observe through what it bound.
+        let observer = observer.map(|observer| observer.with_locales(&canonicalizer));
         let locales = resolve_locales(
             &mut evaluation,
             Ok(&locales::fixtures::policy(
@@ -890,17 +929,17 @@ mod tests {
             )),
             Ok(&canonicalizer),
             fields,
-            observer,
+            observer.as_ref(),
         )
         .unwrap();
         let policy = resolve_coverage(
             &mut evaluation,
             setup.policy.as_ref(),
             &setup.specification,
-            setup.vocabulary,
-            Ok(&canonicalizer),
+            (setup.vocabulary, Ok(&canonicalizer)),
             &locales,
             fields.coverage.clone(),
+            observer.as_ref(),
         )
         .unwrap();
         Resolved { evaluation, policy }
@@ -947,6 +986,38 @@ mod tests {
                 )
             })
             .collect()
+    }
+
+    /// What each of Phase 8's occurrence candidates observed, with the unit
+    /// of its Finding.
+    fn observed(evaluation: &Evaluation) -> Vec<(Unit, Observation)> {
+        evaluation
+            .occurrence_candidates()
+            .iter()
+            .filter(|candidate| candidate.finding.unit().phase == Phase::LocalePolicyResolution)
+            .map(|candidate| {
+                (
+                    candidate.finding.unit().clone(),
+                    Observation {
+                        primary: candidate.primary.clone(),
+                        related: candidate.related.clone(),
+                    },
+                )
+            })
+            .collect()
+    }
+
+    /// The value at `path` in `declaration`, observed as the phases after
+    /// Phase 5 observe it, beside the confirmed policy, which supplies a
+    /// bound.
+    fn beside_policy(declaration: &Declaration, path: &[&str]) -> Observation {
+        let canonicalizer = canonicalizer(64);
+        let primary = Observed::declaration(declaration)
+            .app(|observer| observer.with_locales(&canonicalizer).value(path).unwrap());
+        Observation {
+            primary,
+            related: vec![policy(ROOM).evidence().clone()],
+        }
     }
 
     /// The details of the resource issue `unit` found.
@@ -1542,6 +1613,15 @@ mod tests {
             exceeded(&over.evaluation, &rules),
             exactly(MAX_COVERAGE_RULES, 2, 3)
         );
+        // Past it, the rules are observed beside the confirmed policy, which
+        // supplies the bound (D15:1901, 2249).
+        assert_eq!(
+            observed(&over.evaluation),
+            [(
+                rules.clone(),
+                beside_policy(&declaration, &["coverage", "rules"])
+            )]
+        );
         // Nothing past the count is checked: no item, no domain, and no cell.
         assert_eq!(
             waits_on(
@@ -1610,6 +1690,15 @@ mod tests {
             exceeded(&over.evaluation, &locale_items),
             exactly(MAX_COVERAGE_LOCALE_SELECTOR_OCCURRENCES, 2, 3)
         );
+        // Every item sits in a rule, so the rules are the nearest location
+        // holding them all.
+        assert_eq!(
+            observed(&over.evaluation),
+            [(
+                locale_items.clone(),
+                beside_policy(&declaration, &["coverage", "rules"])
+            )]
+        );
         assert_eq!(
             waits_on(
                 &over.evaluation,
@@ -1638,6 +1727,13 @@ mod tests {
             exactly(MAX_COVERAGE_SURFACE_SELECTOR_OCCURRENCES, 2, 3)
         );
         assert_eq!(
+            observed(&over.evaluation),
+            [(
+                surface_items.clone(),
+                beside_policy(&declaration, &["coverage", "rules"])
+            )]
+        );
+        assert_eq!(
             waits_on(
                 &over.evaluation,
                 &unknown_unit(&rule(&surfaces), "nav", Check::VocabularyMember)
@@ -1664,6 +1760,15 @@ mod tests {
         assert_eq!(
             exceeded(&over.evaluation, &cells),
             exactly(MAX_COVERAGE_DECISION_CELLS, 8, 9)
+        );
+        // Observed at the factor the declaration supplies, beside the policy
+        // alone (plan 025 decision #198).
+        assert_eq!(
+            observed(&over.evaluation),
+            [(
+                cells.clone(),
+                beside_policy(&declaration, &["requestedLocales"])
+            )]
         );
         assert!(!statuses(&over.evaluation)
             .iter()
@@ -1710,6 +1815,15 @@ mod tests {
         assert_eq!(
             exceeded(&over.evaluation, &compared),
             exactly(MAX_COVERAGE_RULE_CELL_COMPARISONS, 26, 27)
+        );
+        // Observed at the factor this bound adds to the cells, the rules,
+        // beside the policy alone (plan 025 decision #198).
+        assert_eq!(
+            observed(&over.evaluation),
+            [(
+                compared.clone(),
+                beside_policy(&declaration, &["coverage", "rules"])
+            )]
         );
         // The cells are still named, and wait on it.
         for cell in cell_units() {
