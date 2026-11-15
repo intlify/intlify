@@ -34,7 +34,8 @@ use crate::locale::CanonicalLocale;
 
 use super::artifact_resolution::CollectionSubject;
 use super::capability::BootstrapBoundId;
-use super::coverage::{CoverageSubject, DecisionEvidence};
+use super::coverage::CoverageSubject;
+use super::decision_evidence::DecisionEvidence;
 use super::dependency::SemanticGroup;
 use super::evidence::EvidenceProjection;
 use super::fallback::FallbackSubject;

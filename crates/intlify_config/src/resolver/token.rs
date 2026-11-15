@@ -632,8 +632,8 @@ fn conflict(group: &ConflictKey) -> Value {
     })
 }
 
-/// A normalized rule domain, `{ locales, surfaceClasses }`.
-fn rule_domain(domain: &Domain) -> Value {
+/// A normalized rule domain, `{ locales, surfaceClasses }` (D15:2487).
+pub(super) fn rule_domain(domain: &Domain) -> Value {
     json!({
         "locales": domain.locales().iter().map(CanonicalLocale::as_str).collect::<Vec<_>>(),
         "surfaceClasses": domain.surfaces().iter().map(Token::as_str).collect::<Vec<_>>(),

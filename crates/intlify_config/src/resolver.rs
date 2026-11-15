@@ -14,6 +14,7 @@ pub(crate) mod artifact_resolution;
 pub(crate) mod bootstrap;
 pub(crate) mod capability;
 pub(crate) mod coverage;
+pub(crate) mod decision_evidence;
 pub(crate) mod declaration_fields;
 pub(crate) mod declaration_observer;
 pub(crate) mod delivery;
