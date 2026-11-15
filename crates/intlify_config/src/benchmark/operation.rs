@@ -449,12 +449,16 @@ impl Prepared {
                 })
             }
             Self::TargetAndGroup(prepared) => {
-                // Phase 7, the collection admission, and Phase 9 run before
-                // the start mark; the targets borrow the Set, so they are
-                // copied out after the end mark.
+                // Phase 7, the collection admission, and Phase 9 run, and the
+                // selected declaration's observer is built, before the start
+                // mark; the targets borrow the Set, so they are copied out
+                // after the end mark.
                 let set = prepared.set().ok_or_else(I::unavailable)?;
                 let inputs = prepared.inputs(&set).ok_or_else(I::unavailable)?;
-                let measured = instrument.interval(&inputs, target_group::construct)?;
+                let file = prepared.file.file();
+                let observer = prepared.observer(&file).ok_or_else(I::unavailable)?;
+                let measured =
+                    instrument.interval((&inputs, &observer), target_group::construct)?;
                 Ok(Interval {
                     quantity: measured.quantity,
                     output: Output::TargetAndGroup(target_group::Resolved::retain(measured.output)),

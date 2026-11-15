@@ -1441,9 +1441,14 @@ impl Evaluation {
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
+        // Phase 11 observes its subset and default checks, not yet its
+        // directions.
+        let observes = OBSERVED.contains(&unit.phase)
+            || (unit.phase == Phase::TargetResolution
+                && matches!(unit.check, Check::ProjectSubset | Check::SupportedDefault));
         assert_eq!(
             observed,
-            OBSERVED.contains(&unit.phase),
+            observes,
             "{unit:?} reports {what} {} what it observed, against its check",
             if observed { "with" } else { "without" }
         );
@@ -3385,19 +3390,21 @@ mod tests {
     #[test]
     #[should_panic(expected = "with what it observed")]
     fn a_candidate_of_another_phase_with_an_observation_fails_the_test() {
-        use crate::resolver::targets::{unit, TargetSubject};
+        use crate::resolver::hydration::{unit, HydrationSubject};
+        use crate::resolver::locales::fixtures::target;
         let data = through(crate::resolver::evidence_component::ComponentPath::data_root());
-        let target = unit(
-            TargetSubject::Target(crate::resolver::locales::fixtures::target("server")),
-            Check::ProjectSubset,
+        let group = serde_json::from_value(serde_json::json!("web")).unwrap();
+        let relation = unit(
+            HydrationSubject::Relation(group, target("server"), target("server")),
+            Check::DistinctEndpoints,
         );
-        let outside = Blocking {
-            code: Code::TargetLocalesNotSubset,
-            reason: None,
+        let equal = Blocking {
+            code: Code::HydrationRelationInvalid,
+            reason: Some(Reason::EqualEndpoint),
             details: None,
         };
-        let _ = Evaluation::default().check_found(target, Ok(()), |()| {
-            Err::<(), _>(Found::observed(outside, data))
+        let _ = Evaluation::default().check_found(relation, Ok(()), |()| {
+            Err::<(), _>(Found::observed(equal, data))
         });
     }
 }

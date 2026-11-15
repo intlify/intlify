@@ -6,9 +6,10 @@
 //! effective default, and Target Profile, each group's members, and whether
 //! the groups partition the targets. Phase 7 runs through the finite fixture
 //! provider, and the collection admission and Phase 9's exact resolution run
-//! after it, all before the interval and on an evaluation of their own; the
-//! interval runs Phase 11 and then Phase 12 over a fresh one. Neither the
-//! result nor its observation is a Profile or a shared artifact.
+//! after it, all before the interval and on an evaluation of their own, and
+//! the selected declaration's observer is built; the interval runs Phase 11,
+//! observing through it, and then Phase 12 over a fresh evaluation. Neither
+//! the result nor its observation is a Profile or a shared artifact.
 
 use std::sync::Arc;
 
@@ -20,16 +21,18 @@ use crate::locale::CanonicalLocale;
 use crate::model::{ProfileDeclaration, ProfileId, TargetId};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::resolver::artifact_resolution::{admit_collection, ArtifactSet};
+use crate::resolver::declaration_observer::DeclarationObserver;
+use crate::resolver::entry::EntryFile;
 use crate::resolver::evaluation::{
-    both, Actual, Admitted, Causes, Check, Evaluation, EvaluationInvariant, IssueKey,
-    LimitExceeded, Status, Subject, Unit,
+    both, Actual, Admitted, Causes, Check, Evaluation, IssueKey, LimitExceeded, Status, Subject,
+    Unit,
 };
 use crate::resolver::exact_resolution::{resolve_fields, ReferenceResults};
 use crate::resolver::groups::{resolve_groups, GroupSubject, ResolvedGroups};
 use crate::resolver::limits::ConfirmedPolicy;
 use crate::resolver::locales::{resolve_locales, LocaleFields, ResolvedLocales};
 use crate::resolver::resource_policy::DeclarationReferences;
-use crate::resolver::targets::{resolve_targets, ResolvedTargets, TargetSubject};
+use crate::resolver::targets::{resolve_targets, ResolvedTargets, TargetInvariant, TargetSubject};
 
 use super::observation::{Frame, Observation};
 use super::operation::{observer, Analysis, Config, ConfigFile, OutputFailure};
@@ -83,6 +86,15 @@ impl PreparedTargets {
         .ok()
     }
 
+    /// Where the selected declaration's checks observe it in `file`: the
+    /// phases after Phase 5 observe through what it bound.
+    pub(super) fn observer<'a>(
+        &'a self,
+        file: &'a EntryFile<'a>,
+    ) -> Option<DeclarationObserver<'a>> {
+        Some(observer(&self.analysis, file, &self.selected)?.with_locales(&*self.canonicalizer))
+    }
+
     /// The interval's inputs over `set`, when the configuration is complete
     /// and Phases 7 and 9 run without a defect.
     pub(super) fn inputs<'a>(
@@ -91,9 +103,7 @@ impl PreparedTargets {
     ) -> Option<TargetInputs<'a>> {
         let declaration = self.declaration()?;
         let file = self.file.file();
-        // The phases after Phase 5 observe through what it bound.
-        let observer =
-            observer(&self.analysis, &file, &self.selected)?.with_locales(&*self.canonicalizer);
+        let observer = self.observer(&file)?;
         let mut preparation = Evaluation::default();
         let locales = resolve_locales(
             &mut preparation,
@@ -125,7 +135,9 @@ impl PreparedTargets {
     pub(super) fn resolve(&self) -> Option<Resolved> {
         let set = self.set()?;
         let inputs = self.inputs(&set)?;
-        Some(Resolved::retain(construct(&inputs)))
+        let file = self.file.file();
+        let observer = self.observer(&file)?;
+        Some(Resolved::retain(construct((&inputs, &observer))))
     }
 }
 
@@ -133,26 +145,29 @@ impl PreparedTargets {
 /// borrow the Set, with Phase 12's groups.
 pub(super) struct Construction<'s> {
     evaluation: Evaluation,
-    result: Result<(Admitted<ResolvedTargets<'s>>, Admitted<ResolvedGroups>), EvaluationInvariant>,
+    result: Result<(Admitted<ResolvedTargets<'s>>, Admitted<ResolvedGroups>), TargetInvariant>,
 }
 
 /// Phase 11 and then Phase 12 over a fresh evaluation: what every timed
-/// invocation runs.
-pub(super) fn construct<'s>(inputs: &'s TargetInputs<'s>) -> Construction<'s> {
+/// invocation runs, observing through the selected declaration's `observer`.
+pub(super) fn construct<'s>(
+    (inputs, observer): (&'s TargetInputs<'s>, &DeclarationObserver<'_>),
+) -> Construction<'s> {
     let mut evaluation = Evaluation::default();
-    let result = phases(&mut evaluation, inputs);
+    let result = phases(&mut evaluation, inputs, observer);
     Construction { evaluation, result }
 }
 
 fn phases<'s>(
     evaluation: &mut Evaluation,
     inputs: &'s TargetInputs<'s>,
-) -> Result<(Admitted<ResolvedTargets<'s>>, Admitted<ResolvedGroups>), EvaluationInvariant> {
+    observer: &DeclarationObserver<'_>,
+) -> Result<(Admitted<ResolvedTargets<'s>>, Admitted<ResolvedGroups>), TargetInvariant> {
     let targets = resolve_targets(
         evaluation,
         Ok(&inputs.declaration.target_profiles),
         &inputs.locales,
-        &inputs.references,
+        (&inputs.references, Some(observer)),
     )?;
     let groups = resolve_groups(
         evaluation,
@@ -195,7 +210,7 @@ pub(super) struct Retained {
 /// established: the complete ordinary output, retained past the end read.
 pub(super) struct Resolved {
     pub(super) evaluation: Evaluation,
-    pub(super) result: Result<Admitted<Retained>, EvaluationInvariant>,
+    pub(super) result: Result<Admitted<Retained>, TargetInvariant>,
 }
 
 fn texts<'a>(values: impl Iterator<Item = &'a str>) -> Vec<String> {
@@ -653,7 +668,9 @@ mod tests {
     use crate::input_limits::Bound;
     use crate::model::DeploymentGroupId;
     use crate::resolver::artifact_resolution::{unit as collection_unit, CollectionSubject};
-    use crate::resolver::evaluation::{Blocking, Code, Details, Notice, Phase, Reason, Shortfall};
+    use crate::resolver::evaluation::{
+        Blocking, Code, Details, EvaluationInvariant, Notice, Phase, Reason, Shortfall,
+    };
     use crate::resolver::exact_resolution::unit as reference_unit;
     use crate::resolver::groups::unit as group_unit;
     use crate::resolver::limits::{BoundId, Group};
@@ -769,7 +786,9 @@ mod tests {
         let prepared = prepared(R::Storefront);
         let set = prepared.set().unwrap();
         let inputs = prepared.inputs(&set).unwrap();
-        let construction = construct(&inputs);
+        let file = prepared.file.file();
+        let observer = prepared.observer(&file).unwrap();
+        let construction = construct((&inputs, &observer));
         let (targets, groups) = {
             let (Ok(targets), Ok(groups)) = construction.result.as_ref().unwrap() else {
                 unreachable!()
@@ -851,14 +870,49 @@ mod tests {
         assert_eq!(prepared.resolve().unwrap().result, Ok(Ok(retained)));
     }
 
+    /// The interval observes a target whose locale set or effective default
+    /// fails through the selected declaration's observer, as the resolver
+    /// does: one candidate at the failed target's check.
+    #[test]
+    fn the_interval_observes_a_target_outside_its_locales() {
+        for (recipe, id, check) in [
+            (R::LocalesNotSubset, "ssr", Check::ProjectSubset),
+            (
+                R::ExplicitDefaultNotRequested,
+                "browser",
+                Check::SupportedDefault,
+            ),
+            (
+                R::InheritedDefaultNotRequested,
+                "ssr",
+                Check::SupportedDefault,
+            ),
+        ] {
+            let resolved = resolved(recipe);
+            let observed: Vec<_> = resolved
+                .evaluation
+                .occurrence_candidates()
+                .iter()
+                .map(|candidate| candidate.finding.unit().clone())
+                .collect();
+            assert_eq!(
+                observed,
+                [target_unit(TargetSubject::Target(target(id)), check)],
+                "{recipe:?}"
+            );
+        }
+    }
+
     #[test]
     fn a_resolver_defect_fails_the_case() {
         let resolved = Resolved {
             evaluation: Evaluation::default(),
-            result: Err(EvaluationInvariant::UnitRecordedTwice(target_unit(
-                TargetSubject::Target(target("web")),
-                Check::ProjectSubset,
-            ))),
+            result: Err(TargetInvariant::Evaluation(
+                EvaluationInvariant::UnitRecordedTwice(target_unit(
+                    TargetSubject::Target(target("web")),
+                    Check::ProjectSubset,
+                )),
+            )),
         };
         assert_eq!(
             require_observable(&resolved).err(),

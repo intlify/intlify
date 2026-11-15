@@ -319,7 +319,9 @@ mod tests {
 
     #[test]
     fn an_owner_is_evaluated_exactly_when_its_group_is_established() {
-        let mut evaluation = Evaluation::default();
+        // The test makes the target's result up, without what its check
+        // observes.
+        let mut evaluation = Evaluation::fabricated();
         // A target whose locales are not the project's leaves the targets
         // group unestablished.
         let id = serde_json::from_value(json!("browser")).unwrap();

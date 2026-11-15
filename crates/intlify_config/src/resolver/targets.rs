@@ -17,6 +17,11 @@
 //! which Phase 9 did and this phase only joins; and not the groups (Phase 12)
 //! or the hydration relations (Phase 13). A subject is a Target ID, a semantic
 //! identity the declaration's map admitted.
+//!
+//! A target whose locale set is not a subset of the project's is observed at
+//! its locale set beside the project's, and one whose effective default is
+//! outside its set at that default where it is written, its own override or
+//! the project's default, beside its set (D15:2416).
 
 use std::collections::BTreeMap;
 
@@ -25,13 +30,34 @@ use crate::locale::CanonicalLocale;
 use crate::model::{NonEmptyMap, TargetDeclaration, TargetId};
 
 use super::artifact_resolution::AdmittedArtifact;
+use super::declaration_observer::{DeclarationObserver, ObserverInvariant};
 use super::evaluation::{
-    and, both, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Phase,
-    Reason, Subject, Unit,
+    and, both, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Found,
+    Observation, Phase, Reason, Subject, Unit,
 };
 use super::exact_resolution::{Named, ReferenceResults};
 use super::locales::{LocaleSet, ResolvedLocales, TargetLocales};
 use super::resource_policy::ReferenceField;
+
+/// A resolver bug Phase 11 refuses.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum TargetInvariant {
+    Evaluation(EvaluationInvariant),
+    /// What a check looked at in the declaration has no Evidence.
+    Observer(ObserverInvariant),
+}
+
+impl From<EvaluationInvariant> for TargetInvariant {
+    fn from(invariant: EvaluationInvariant) -> Self {
+        Self::Evaluation(invariant)
+    }
+}
+
+impl From<ObserverInvariant> for TargetInvariant {
+    fn from(invariant: ObserverInvariant) -> Self {
+        Self::Observer(invariant)
+    }
+}
 
 /// What one Phase 11 unit checks.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -112,17 +138,23 @@ impl<'s> ResolvedTargets<'s> {
 }
 
 /// Phase 11 over the declared targets, the locales and target bounds Phase 7
-/// resolved, and the references Phase 9 resolved. Each check of a target
-/// waits on its Target ID's bounds. The subset, the effective default, and
-/// the directions are checked independently of each other; only the
+/// resolved, and the references Phase 9 resolved, observed through
+/// `observer`, the selected declaration's, when there is one. Each check of a
+/// target waits on its Target ID's bounds. The subset, the effective default,
+/// and the directions are checked independently of each other; only the
 /// directions wait on the Target Profile, and the resolved target needs every
 /// one.
+///
+/// # Errors
+///
+/// Returns the resolver bug of a unit recorded against its phase's rules, or
+/// of a declared value without Evidence.
 pub(crate) fn resolve_targets<'s, Target>(
     evaluation: &mut Evaluation,
     declared: Admitted<&NonEmptyMap<TargetId, TargetDeclaration<Target>>>,
     locales: &ResolvedLocales,
-    references: &ReferenceResults<'s>,
-) -> Result<Admitted<ResolvedTargets<'s>>, EvaluationInvariant> {
+    (references, observer): (&ReferenceResults<'s>, Option<&DeclarationObserver<'_>>),
+) -> Result<Admitted<ResolvedTargets<'s>>, TargetInvariant> {
     let declared = match declared {
         Ok(declared) => declared,
         Err(causes) => return Ok(Err(causes)),
@@ -141,7 +173,7 @@ pub(crate) fn resolve_targets<'s, Target>(
         });
         facts.insert(
             id.clone(),
-            Checks { id }.resolve(evaluation, own, locales, references)?,
+            Checks { id, observer }.resolve(evaluation, own, locales, references)?,
         );
     }
     Ok(Ok(ResolvedTargets {
@@ -150,14 +182,20 @@ pub(crate) fn resolve_targets<'s, Target>(
     }))
 }
 
-/// One target's checks.
-struct Checks<'a> {
+/// One target's checks, and where they observe the declaration.
+struct Checks<'a, 'o> {
     id: &'a TargetId,
+    observer: Option<&'a DeclarationObserver<'o>>,
 }
 
-impl Checks<'_> {
+impl Checks<'_, '_> {
     fn unit(&self, check: Check) -> Unit {
         unit(TargetSubject::Target(self.id.clone()), check)
+    }
+
+    /// The path of the target's `field` in the declaration.
+    fn path<'f>(&'f self, field: &'f str) -> [&'f str; 3] {
+        ["targetProfiles", self.id.as_str(), field]
     }
 
     /// The subset, the effective default, and the directions, then the target
@@ -169,15 +207,25 @@ impl Checks<'_> {
         own: Admitted<&TargetLocales>,
         locales: &ResolvedLocales,
         references: &ReferenceResults<'s>,
-    ) -> Result<TargetFacts<'s>, EvaluationInvariant> {
+    ) -> Result<TargetFacts<'s>, TargetInvariant> {
         let admitted = own.clone().and_then(|own| own.admitted.clone());
         let requested = own.clone().and_then(|own| own.requested.clone());
-        let subset = evaluation.check(
+        let subset_input = both(
+            both(admitted.clone(), requested.clone()),
+            locales.requested_set.clone(),
+        );
+        // What each check observes, made before its unit records it, and only
+        // once its input is admitted, which the declaration then holds.
+        let beside_project = match (self.observer, &subset_input) {
+            (Some(observer), Ok(_)) => Some(Observation {
+                primary: observer.value(&self.path("requestedLocales"))?,
+                related: vec![observer.value(&["requestedLocales"])?],
+            }),
+            _ => None,
+        };
+        let subset = evaluation.check_found(
             self.unit(Check::ProjectSubset),
-            both(
-                both(admitted.clone(), requested.clone()),
-                locales.requested_set.clone(),
-            ),
+            subset_input,
             |(((), requested), project)| {
                 if requested
                     .as_slice()
@@ -186,21 +234,38 @@ impl Checks<'_> {
                 {
                     Ok(())
                 } else {
-                    Err(issue(Code::TargetLocalesNotSubset, None))
+                    let outside = issue(Code::TargetLocalesNotSubset, None);
+                    Err(Found::through(outside, beside_project))
                 }
             },
         )?;
-        let default = evaluation.check(
+        let default_input = both(
+            both(admitted.clone(), requested.clone()),
+            effective_default(own.clone(), locales),
+        );
+        let beside_set = match (self.observer, &default_input) {
+            (Some(observer), Ok((_, (_, reason)))) => {
+                let written = if *reason == Reason::ExplicitOverride {
+                    observer.value(&self.path("defaultRequestedLocale"))?
+                } else {
+                    observer.value(&["defaultRequestedLocale"])?
+                };
+                Some(Observation {
+                    primary: written,
+                    related: vec![observer.value(&self.path("requestedLocales"))?],
+                })
+            }
+            _ => None,
+        };
+        let default = evaluation.check_found(
             self.unit(Check::SupportedDefault),
-            both(
-                both(admitted.clone(), requested.clone()),
-                effective_default(own.clone(), locales),
-            ),
+            default_input,
             |(((), requested), (locale, reason))| {
                 if requested.contains(&locale) {
                     Ok(locale)
                 } else {
-                    Err(issue(Code::TargetDefaultLocaleNotSupported, Some(reason)))
+                    let unsupported = issue(Code::TargetDefaultLocaleNotSupported, Some(reason));
+                    Err(Found::through(unsupported, beside_set))
                 }
             },
         )?;
@@ -306,7 +371,7 @@ mod tests {
     use crate::profile_fixtures::minimal_config;
     use crate::references::{PolicyReference, TargetProfileReference};
     use crate::resolver::artifact_resolution::admit_collection;
-    use crate::resolver::declaration_observer::fixtures::Observed;
+    use crate::resolver::declaration_observer::fixtures::{view, Observed};
     use crate::resolver::evaluation::{Actual, IssueKey, LimitExceeded, Status};
     use crate::resolver::exact_resolution::{self, resolve_fields};
     use crate::resolver::limits::{
@@ -477,10 +542,43 @@ mod tests {
                     )
                 })
                 .unwrap();
-            let targets =
-                resolve_targets(&mut evaluation, declared, &locales, &references).unwrap();
+            let targets = observed
+                .app(|observer| {
+                    resolve_targets(
+                        &mut evaluation,
+                        declared,
+                        &locales,
+                        (&references, Some(observer)),
+                    )
+                })
+                .unwrap();
             inspect(evaluation, targets)
         }
+    }
+
+    impl Inputs {
+        /// The view of the Evidence of the value at `path` in the declaration.
+        fn at(&self, path: &[&str]) -> Value {
+            Observed::declaration(&self.app).app(|observer| view(&observer.value(path).unwrap()))
+        }
+    }
+
+    /// Each Phase 11 Finding candidate: its unit, and the views of its
+    /// primary and related Evidence.
+    fn observed(evaluation: &Evaluation) -> Vec<(Unit, Value, Vec<Value>)> {
+        evaluation
+            .occurrence_candidates()
+            .iter()
+            .filter(|candidate| candidate.finding.unit().phase == Phase::TargetResolution)
+            .map(|candidate| {
+                let related = candidate.related.iter().map(view).collect();
+                (
+                    candidate.finding.unit().clone(),
+                    view(&candidate.primary),
+                    related,
+                )
+            })
+            .collect()
     }
 
     fn bound(value: u64) -> Bound {
@@ -713,6 +811,16 @@ mod tests {
                 issues(&evaluation),
                 [(subset.clone(), Code::TargetLocalesNotSubset, None)]
             );
+            // Observed at the browser's locale set, beside the project's
+            // (D15:2416).
+            assert_eq!(
+                observed(&evaluation),
+                [(
+                    subset.clone(),
+                    inputs.at(&["targetProfiles", "browser", "requestedLocales"]),
+                    vec![inputs.at(&["requestedLocales"])]
+                )]
+            );
             // The browser's default and directions are still checked, against
             // its own locales.
             for check in [Check::SupportedDefault, Check::DirectedLocales] {
@@ -752,6 +860,25 @@ mod tests {
                         target_unit("server", Check::SupportedDefault),
                         Code::TargetDefaultLocaleNotSupported,
                         Some(Reason::InheritedProjectDefault)
+                    ),
+                ]
+            );
+            // Each at the default where it is written, the browser's own
+            // override or the project's default the server inherits, beside
+            // the target's locale set (D15:2416).
+            let set = |id| inputs.at(&["targetProfiles", id, "requestedLocales"]);
+            assert_eq!(
+                observed(&evaluation),
+                [
+                    (
+                        target_unit("browser", Check::SupportedDefault),
+                        inputs.at(&["targetProfiles", "browser", "defaultRequestedLocale"]),
+                        vec![set("browser")]
+                    ),
+                    (
+                        target_unit("server", Check::SupportedDefault),
+                        inputs.at(&["defaultRequestedLocale"]),
+                        vec![set("server")]
                     ),
                 ]
             );

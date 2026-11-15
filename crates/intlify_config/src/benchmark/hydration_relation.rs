@@ -133,7 +133,7 @@ impl PreparedHydration {
             &mut preparation,
             Ok(&declaration.target_profiles),
             &locales,
-            &references,
+            (&references, Some(&observer)),
         )
         .ok()?;
         let groups = resolve_groups(
@@ -844,6 +844,25 @@ mod tests {
         );
         assert!(retained.negotiation.is_ok());
         assert_eq!(prepared.resolve().unwrap().result, Ok(Ok(retained)));
+    }
+
+    /// The preparation runs Phase 11 through the selected declaration's
+    /// observer, as the resolver does: the server whose locales reach outside
+    /// the project is observed there, and the case still prepares, its
+    /// server's locales unavailable to Phase 13.
+    #[test]
+    fn the_preparation_observes_phase_11_as_the_resolver_does() {
+        let prepared = prepared(R::EndpointLocalesUnresolved);
+        let set = prepared.set().unwrap();
+        let inputs = prepared.inputs(&set).unwrap();
+        assert!(inputs
+            .targets
+            .as_ref()
+            .unwrap()
+            .get(&target("ssr"))
+            .unwrap()
+            .resolved
+            .is_err());
     }
 
     #[test]
