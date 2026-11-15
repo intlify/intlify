@@ -514,8 +514,9 @@ mod tests {
     }
 
     /// Records `unit` as finding `code` with `reason`, observed at a slot's
-    /// Specification Input component when it is a slot's check, as Phase 5
-    /// observes it, and returns what waits on its result.
+    /// Specification Input component or at the vocabulary's root when it is
+    /// one of their checks, as Phase 5 observes them, and returns what waits
+    /// on its result.
     fn block(
         evaluation: &mut Evaluation,
         unit: Unit,
@@ -530,14 +531,22 @@ mod tests {
             reason,
             details: None,
         };
-        let observed = match unit.subject {
-            Subject::Slot(slot) => Found::observed(
+        let at = |primary| {
+            Found::observed(
                 found,
                 Observation {
-                    primary: EvidenceProjection::resolver_input(ComponentPath::specification(slot)),
+                    primary,
                     related: Vec::new(),
                 },
-            ),
+            )
+        };
+        let observed = match unit.subject {
+            Subject::Slot(slot) => at(EvidenceProjection::resolver_input(
+                ComponentPath::specification(slot),
+            )),
+            Subject::Vocabulary => at(EvidenceProjection::resolver_input(
+                ComponentPath::vocabulary_root(),
+            )),
             _ => Found::from(found),
         };
         evaluation

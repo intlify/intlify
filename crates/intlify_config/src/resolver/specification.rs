@@ -23,7 +23,7 @@ use super::evaluation::{
     Observation, Phase, Reason, Subject, Unit,
 };
 use super::evidence::EvidenceProjection;
-use super::evidence_component::ComponentPath;
+use super::evidence_component::{ComponentInvariant, ComponentPath};
 use super::limits::ConfirmedPolicy;
 use super::vocabulary::{admit_vocabulary, SurfaceVocabulary, ASSERTED, INTACT};
 
@@ -208,6 +208,26 @@ fn admit_slot<Id: Clone + Eq>(
     }
 }
 
+/// A resolver bug Phase 5 finds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum SpecificationInvariant {
+    Evaluation(EvaluationInvariant),
+    /// What a check looked at has no component path.
+    Component(ComponentInvariant),
+}
+
+impl From<EvaluationInvariant> for SpecificationInvariant {
+    fn from(invariant: EvaluationInvariant) -> Self {
+        Self::Evaluation(invariant)
+    }
+}
+
+impl From<ComponentInvariant> for SpecificationInvariant {
+    fn from(invariant: ComponentInvariant) -> Self {
+        Self::Component(invariant)
+    }
+}
+
 /// What a slot's check observes: the slot's Specification Input component,
 /// whether its assertion is absent or names another specification (D15:718,
 /// 831).
@@ -303,7 +323,7 @@ pub(crate) fn admit_specifications<Id, D>(
     vocabulary: &FormalVocabulary,
     data: D,
     data_limits: &LocaleDataLimits,
-) -> Result<AdmittedSpecifications<Id, D::Provider>, EvaluationInvariant>
+) -> Result<AdmittedSpecifications<Id, D::Provider>, SpecificationInvariant>
 where
     Id: Clone + Eq + AsRef<str>,
     D: FormalData,

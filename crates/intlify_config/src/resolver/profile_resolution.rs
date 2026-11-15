@@ -66,7 +66,8 @@ use super::resource_policy::{
     PolicyOutcome,
 };
 use super::specification::{
-    admit_specifications, SpecificationInput, SpecificationSet, SupportedSpecifications,
+    admit_specifications, SpecificationInput, SpecificationInvariant, SpecificationSet,
+    SupportedSpecifications,
 };
 use super::structural_admission::StructuralInvariant;
 use super::targets::{resolve_targets, ResolvedTargets};
@@ -312,6 +313,15 @@ impl From<EntryInvariant> for ResolverInvariant {
 impl From<EvaluationInvariant> for ResolverInvariant {
     fn from(invariant: EvaluationInvariant) -> Self {
         Self::Evaluation(invariant)
+    }
+}
+
+impl From<SpecificationInvariant> for ResolverInvariant {
+    fn from(invariant: SpecificationInvariant) -> Self {
+        match invariant {
+            SpecificationInvariant::Evaluation(invariant) => Self::Evaluation(invariant),
+            SpecificationInvariant::Component(invariant) => Self::Component(invariant),
+        }
     }
 }
 
