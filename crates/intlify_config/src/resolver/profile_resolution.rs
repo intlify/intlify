@@ -23,7 +23,10 @@
 //! admission did not admit holds back only the checks that read it, with its
 //! Findings as their causes (D15:3340), for now the whole field even where
 //! the failure is in one of its entries (plan 025 interpretation #219).
-//! Profile projection waits on the whole root (D15:2142). What the entry
+//! Without a selection, each check that reads the declaration, or the Policy
+//! its reference selects, is not evaluated with what held the selection back,
+//! while Phase 4 still checks the collection under the capability (D15:2131,
+//! 2132). Profile projection waits on the whole root (D15:2142). What the entry
 //! returns is crate-private semantic state, not a `LocalizationProjectProfile`,
 //! a checked or blocked outcome, or Resolution Evidence. The profile
 //! projection is 015's Implementation Phase 5.
@@ -39,7 +42,7 @@ use crate::locale::{
 use crate::model::{IntlifyConfig, ProfileDeclaration, ProfileId};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::selection::{ProvisionalSelection, SelectionInvariant, SelectorInput};
-use crate::structural::StructuralAnalysis;
+use crate::structural::{AdmissionInvariant, StructuralAnalysis};
 
 use super::artifact_resolution::{admit_collection, ArtifactSet};
 use super::coverage::{resolve_coverage, CoveragePolicy};
@@ -75,20 +78,20 @@ type Declaration = ProfileDeclaration<PolicyReference, TargetProfileReference>;
 /// read it: the fields of the declaration Phase 3 provisionally selected once
 /// structural admission admitted its boundary and its `resourceLimits`
 /// reference, whatever else of it or of the root it rejected (D15:2131,
-/// 2367, 3434), each read on its own, the `resourceLimits`
-/// reference it selected with, the selector, what Phase 4 rechecks of those
-/// phases' measures, and whether structural admission admitted the whole
+/// 2367, 3434), each read on its own, and the `resourceLimits` reference it
+/// selected with, or, without a selection, the causes of its absence in
+/// their place (D15:2131); the selector; what Phase 4 rechecks of those
+/// phases' measures; and whether structural admission admitted the whole
 /// root, which profile projection needs (D15:2142).
 pub(crate) struct SelectedConfiguration<'a> {
     fields: DeclarationFields<PolicyReference, TargetProfileReference>,
-    resource_limits: &'a PolicyReference,
+    resource_limits: Result<&'a PolicyReference, Causes>,
     selector: &'a SelectorInput,
-    value: ValueCounts,
-    /// How many declarations the root's `profiles` object holds.
-    declarations: u64,
-    /// Every declared Profile ID, in their unsigned byte order.
-    profile_ids: Vec<ProfileId>,
-    structural_units: u64,
+    value: Admitted<ValueCounts>,
+    /// How many declarations the root's `profiles` object holds, and every
+    /// declared Profile ID, in their unsigned byte order.
+    declarations: Admitted<(u64, Vec<ProfileId>)>,
+    structural_units: Admitted<u64>,
     /// Whether structural admission admitted the whole root, or the causes.
     whole: Admitted<()>,
 }
@@ -109,23 +112,53 @@ impl<'a> SelectedConfiguration<'a> {
         (selector, selection): (&'a SelectorInput, &'a ProvisionalSelection<PolicyReference>),
         whole: Admitted<()>,
     ) -> Result<Self, ResolverInvariant> {
-        let unreported = || ResolverInvariant::Structural(StructuralInvariant::UnreportedFailure);
-        let admission =
-            |invariant| ResolverInvariant::Structural(StructuralInvariant::Admission(invariant));
         let fields = DeclarationFields::read(evaluation, analysis, selection.id().as_str())
             .map_err(ResolverInvariant::Structural)?;
-        let (declarations, profile_ids) = analysis
+        let declarations = analysis
             .declarations()
             .map_err(admission)?
             .ok_or_else(unreported)?;
         Ok(Self {
             fields,
-            resource_limits: selection.resource_limits(),
+            resource_limits: Ok(selection.resource_limits()),
             selector,
-            value: analysis.value_counts(),
+            value: Ok(analysis.value_counts()),
+            declarations: Ok(declarations),
+            structural_units: Ok(analysis.structural_units().ok_or_else(unreported)?),
+            whole,
+        })
+    }
+
+    /// The configuration once Phase 3 selected no declaration, with
+    /// `selector`, for `causes`, why it selected none: each field of the
+    /// declaration and the `resourceLimits` reference are unavailable with
+    /// them, so that each check that reads one is not evaluated with them
+    /// (D15:2131). Without a Policy no recheck runs, each waiting on the same
+    /// causes, so the measures are unavailable with them, but for the
+    /// declarations `analysis` holds once its `profiles` member is an object:
+    /// each declared Profile ID still names its recheck (D15:1171, 2184).
+    ///
+    /// # Errors
+    ///
+    /// Returns the defect of a key with the syntax that is no Profile ID.
+    pub(crate) fn unselected(
+        analysis: Option<&Analysis>,
+        (selector, causes): (&'a SelectorInput, &Causes),
+        whole: Admitted<()>,
+    ) -> Result<Self, ResolverInvariant> {
+        let declarations = analysis
+            .map(Analysis::declarations)
+            .transpose()
+            .map_err(admission)?
+            .flatten()
+            .ok_or_else(|| causes.clone());
+        Ok(Self {
+            fields: DeclarationFields::unavailable(causes),
+            resource_limits: Err(causes.clone()),
+            selector,
+            value: Err(causes.clone()),
             declarations,
-            profile_ids,
-            structural_units: analysis.structural_units().ok_or_else(unreported)?,
+            structural_units: Err(causes.clone()),
             whole,
         })
     }
@@ -135,14 +168,26 @@ impl<'a> SelectedConfiguration<'a> {
     }
 
     fn measures(&self) -> ConfigurationMeasures<'_> {
+        let declarations = self.declarations.as_ref().map_err(Causes::clone);
         ConfigurationMeasures {
-            value: Ok(self.value),
-            declarations: Ok(self.declarations),
-            profile_ids: Ok(&self.profile_ids),
+            value: self.value.clone(),
+            declarations: declarations.clone().map(|(count, _)| *count),
+            profile_ids: declarations.map(|(_, ids)| ids.as_slice()),
             selector: self.selector,
-            structural_units: Ok(self.structural_units),
+            structural_units: self.structural_units.clone(),
         }
     }
+}
+
+/// The resolver bug of checks that admitted what structural admission's
+/// analysis lacks.
+fn unreported() -> ResolverInvariant {
+    ResolverInvariant::Structural(StructuralInvariant::UnreportedFailure)
+}
+
+/// The resolver bug of an analysis whose model does not hold what it read.
+fn admission(invariant: AdmissionInvariant) -> ResolverInvariant {
+    ResolverInvariant::Structural(StructuralInvariant::Admission(invariant))
 }
 
 /// One invocation's inputs besides the configuration, as resolver
@@ -298,7 +343,7 @@ where
         evaluation,
         invocation.capability,
         invocation.collection,
-        Ok(configuration.resource_limits),
+        configuration.resource_limits.as_ref().copied(),
         &declared,
         &configuration.measures(),
         invocation.verification,
@@ -1089,11 +1134,9 @@ pub(super) mod tests {
     /// over `file` under `limits`, Phase 2 over the value Phase 1 admits with
     /// the model's configuration schema under `structural`, Phase 3 selecting
     /// `selector`'s declaration, and the semantic phases over the
-    /// configuration. Without a value there is no Shared projection (D15:2369),
-    /// and without a declaration Phase 3 selected, which needs structural
-    /// admission to admit its boundary and its `resourceLimits` reference, no
-    /// semantic phase starts yet (plan 025 interpretation #218, PR 5f-4a-3):
-    /// either way there is no semantic state.
+    /// configuration, or, without a declaration Phase 3 selected, over the
+    /// causes of its absence (D15:2131). Without a value there is no Shared
+    /// projection and so no semantic state (D15:2369).
     fn invoke_entry<'s, P, D>(
         evaluation: &mut Evaluation,
         (file, limits): (&EntryFile<'_>, InputLimits),
@@ -1123,10 +1166,11 @@ pub(super) mod tests {
         )?;
         // Phase 3 records its checks whatever Phase 2 admitted, with its
         // causes where it admitted nothing (D15:2131). The semantic phases
-        // start from the declaration it selects once structural admission
-        // admitted its boundary and its `resourceLimits` reference, whatever
-        // else of it or of the root it rejected (plan 025 interpretation
-        // #218).
+        // read the declaration it selects once structural admission admitted
+        // its boundary and its `resourceLimits` reference, whatever else of it
+        // or of the root it rejected (plan 025 interpretation #218), and
+        // without one each check that reads the declaration waits on the
+        // causes (D15:2131).
         let selection = select_profile(
             evaluation,
             file,
@@ -1134,15 +1178,20 @@ pub(super) mod tests {
             selector,
             structural,
         )?;
-        let (Ok(analysis), Ok(selection)) = (structure, selection) else {
-            return Ok(None);
+        let root = whole(evaluation);
+        let configuration = match (&structure, &selection) {
+            (Ok(analysis), Ok(selection)) => {
+                SelectedConfiguration::new(evaluation, analysis, (selector, selection), root)?
+            }
+            (_, Err(causes)) => SelectedConfiguration::unselected(
+                structure.as_ref().ok(),
+                (selector, causes),
+                root,
+            )?,
+            (Err(_), Ok(_)) => {
+                return Err(ProfileSelectionInvariant::UnreportedFailure.into());
+            }
         };
-        let configuration = SelectedConfiguration::new(
-            evaluation,
-            &analysis,
-            (selector, &selection),
-            whole(evaluation),
-        )?;
         resolve_profile(
             evaluation,
             &project_profile,
@@ -1425,38 +1474,39 @@ pub(super) mod tests {
 
     /// When the schema selection selects no schema, Phase 2 records its
     /// owner, the selection's checks, the analysis's measure waiting on the
-    /// failed check, and the `profileSpecification` group's owner; Phase 3
-    /// its count of the declarations and the selector's checks that compare
-    /// it with them, waiting on the same check, and no Profile ID; and no
-    /// semantic phase starts (D15:2130, 2131).
+    /// failed check, and the `profileSpecification` group's owner, and Phase
+    /// 3 its count of the declarations and the selector's checks that compare
+    /// it with them, waiting on the same check, and no Profile ID. Every later
+    /// phase records its checks waiting on the same check, but Phase 4's
+    /// checks of the collection under the capability, which read no
+    /// declaration (D15:2130, 2131, 2132, 2151).
     #[test]
-    fn a_configuration_without_a_selected_schema_starts_no_semantic_phase() {
+    fn without_a_selected_schema_each_later_check_waits_on_the_version() {
         let mut inputs = Inputs::complete();
         inputs.config["schemaVersion"] = json!("1");
         inputs.attempt(|evaluation, state| {
-            assert!(matches!(state, Ok(None)));
+            let state = state.unwrap().expect("entry admits the file");
+            assert!(state.structure.is_err() && state.policy.confirmed.is_err());
             let phases: BTreeSet<Phase> =
                 evaluation.statuses().map(|(unit, _)| unit.phase).collect();
-            assert_eq!(
-                phases,
-                BTreeSet::from([
-                    Phase::ResolverBootstrapAdmission,
-                    Phase::EntryAdmission,
-                    Phase::StructuralAdmission,
-                    Phase::ProfileSelection,
-                ])
-            );
+            let mut ran = BTreeSet::from(PHASES);
+            ran.extend([
+                Phase::EntryAdmission,
+                Phase::StructuralAdmission,
+                Phase::ProfileSelection,
+            ]);
+            assert_eq!(phases, ran);
+            let version = selection(Check::SupportedSchemaVersion);
             assert_eq!(
                 issues(&evaluation),
-                [(
-                    selection(Check::SupportedSchemaVersion),
-                    Code::SchemaVersionUnsupported,
-                    None
-                )]
+                [(version.clone(), Code::SchemaVersionUnsupported, None)]
             );
             let waiting: Vec<&Unit> = evaluation
                 .statuses()
-                .filter(|(_, status)| matches!(status, Status::NotEvaluated(_)))
+                .filter(|(unit, status)| {
+                    unit.phase <= Phase::ProfileSelection
+                        && matches!(status, Status::NotEvaluated(_))
+                })
                 .map(|(unit, _)| unit)
                 .collect();
             assert_eq!(
@@ -1468,14 +1518,126 @@ pub(super) mod tests {
                     &selector(Check::DeclaredSelector),
                 ]
             );
-            for unit in waiting {
-                let Some(Status::NotEvaluated(causes)) = evaluation.status(unit) else {
-                    panic!("{unit:?} waits");
-                };
-                let units: Vec<&Unit> = causes.keys().map(IssueKey::unit).collect();
-                assert_eq!(units, [&selection(Check::SupportedSchemaVersion)]);
+            assert_eq!(
+                evaluated_after_selection(&evaluation),
+                BTreeSet::from(COLLECTION_UNDER_CAPABILITY)
+            );
+            // Without an analysis no Profile ID names a recheck.
+            assert_eq!(rechecked_ids(&evaluation), []);
+            for (unit, status) in evaluation.statuses() {
+                if let Status::NotEvaluated(causes) = status {
+                    let units: Vec<&Unit> = causes.keys().map(IssueKey::unit).collect();
+                    assert_eq!(units, [&version], "{unit:?}");
+                }
             }
         });
+    }
+
+    /// Without a selected declaration each later check that reads it, or the
+    /// Policy its reference selects, waits on what held the selection back,
+    /// and Phase 4 still checks the collection under the capability: here the
+    /// selector names no declaration, while structural admission admitted the
+    /// whole root (D15:2131, 2132).
+    #[test]
+    fn without_a_selection_each_later_check_waits_on_its_causes() {
+        let mut inputs = Inputs::complete();
+        inputs.selected = "absent";
+        inputs.attempt(|evaluation, state| {
+            let state = state.unwrap().expect("entry admits the file");
+            assert!(state.structure.is_ok() && state.policy.confirmed.is_err());
+            let declared = selector(Check::DeclaredSelector);
+            assert_eq!(
+                issues(&evaluation),
+                [(declared.clone(), Code::SelectorUnknown, None)]
+            );
+            assert_eq!(
+                evaluated_after_selection(&evaluation),
+                BTreeSet::from(COLLECTION_UNDER_CAPABILITY)
+            );
+            // Each Profile ID structural admission admitted still names its
+            // recheck under the Policy, which waits (D15:1171).
+            assert_eq!(
+                rechecked_ids(&evaluation),
+                [PolicySubject::ProfileId(
+                    serde_json::from_value(json!("web")).unwrap()
+                )]
+            );
+            let waiting = evaluation
+                .statuses()
+                .filter(|(unit, _)| unit.phase > Phase::ProfileSelection)
+                .filter_map(|(unit, status)| match status {
+                    Status::NotEvaluated(causes) => Some((unit, causes)),
+                    Status::Evaluated => None,
+                });
+            for (unit, causes) in waiting {
+                let units: Vec<&Unit> = causes.keys().map(IssueKey::unit).collect();
+                assert_eq!(units, [&declared], "{unit:?}");
+            }
+        });
+    }
+
+    /// Without a `profiles` object no declaration is counted or selected:
+    /// each later check waits on its Finding, and no Profile ID names a
+    /// recheck (D15:2131, 2184).
+    #[test]
+    fn without_a_profiles_object_each_later_check_waits_on_its_finding() {
+        let mut inputs = Inputs::complete();
+        inputs.config.as_object_mut().unwrap().remove("profiles");
+        inputs.attempt(|evaluation, state| {
+            let state = state.unwrap().expect("entry admits the file");
+            assert!(state.structure.is_err() && state.policy.confirmed.is_err());
+            let found = issues(&evaluation);
+            let [(missing, Code::RequiredFieldMissing, None)] = found.as_slice() else {
+                panic!("{found:?}");
+            };
+            assert_eq!(
+                evaluated_after_selection(&evaluation),
+                BTreeSet::from(COLLECTION_UNDER_CAPABILITY)
+            );
+            assert_eq!(rechecked_ids(&evaluation), []);
+            for (unit, status) in evaluation.statuses() {
+                if let (true, Status::NotEvaluated(causes)) =
+                    (unit.phase > Phase::ProfileSelection, status)
+                {
+                    let units: Vec<&Unit> = causes.keys().map(IssueKey::unit).collect();
+                    assert_eq!(units, [missing], "{unit:?}");
+                }
+            }
+        });
+    }
+
+    /// The rows of Phase 4's checks of the collection under the capability,
+    /// which read no declaration (D15:2132).
+    const COLLECTION_UNDER_CAPABILITY: [&str; 5] = [
+        "resource-policy.artifacts.within-capability",
+        "resource-policy.policy-artifacts.within-capability",
+        "resource-policy.target-profile-artifacts.within-capability",
+        "resource-policy.artifact.within-capability",
+        "resource-policy.artifact-bytes.within-capability",
+    ];
+
+    /// The subjects of Phase 4's rechecks of the declared Profile IDs.
+    fn rechecked_ids(evaluation: &Evaluation) -> Vec<PolicySubject> {
+        evaluation
+            .statuses()
+            .filter_map(|(unit, _)| match &unit.subject {
+                Subject::ResourcePolicy(subject @ PolicySubject::ProfileId(_)) => {
+                    Some(subject.clone())
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// The rows of the units after Phase 3 that were evaluated.
+    fn evaluated_after_selection(evaluation: &Evaluation) -> BTreeSet<&'static str> {
+        evaluation
+            .statuses()
+            .filter(|(unit, status)| {
+                unit.phase > Phase::ProfileSelection && **status == Status::Evaluated
+            })
+            .map(|(unit, _)| row_of(unit))
+            .collect()
     }
 
     #[test]
@@ -1689,10 +1851,8 @@ pub(super) mod tests {
                 }
                 for unit in complete.keys().filter(|unit| !after.contains_key(unit)) {
                     // Without a value from entry admission there is no Shared
-                    // projection, which no prerequisite names, and without a
-                    // selected declaration no semantic phase starts yet (plan
-                    // 025 PR 5f-4a-3): the phases the invocation did not reach
-                    // wait on no prerequisite.
+                    // projection, which no prerequisite names: the phases the
+                    // invocation did not reach wait on no prerequisite.
                     if reached.is_some_and(|reached| unit.phase > reached) {
                         continue;
                     }
@@ -1833,6 +1993,27 @@ pub(super) mod tests {
                 state.policy.selector_length,
                 Some(StringLengthFact::OverLimit)
             );
+        });
+    }
+
+    /// Phase 4 rechecks the exact measures: a Policy whose bounds are what
+    /// Phases 1 and 2 measured admits each of them (D15:2132).
+    #[test]
+    fn phase_4_rechecks_the_exact_measures() {
+        let mut inputs = Inputs::complete();
+        let mut limits = policy_limits();
+        // Selecting another Policy changes only the reference's digest, of
+        // the same length, so no measure.
+        inputs.select_policy(resource_limit_policy(&limits));
+        let analysis = analyze(&inputs.config, &inputs.capability);
+        let input = &mut limits.configuration_input;
+        input.value.max_nodes = bound(analysis.value_counts().nodes);
+        input.structural.max_structural_analysis_units =
+            bound(analysis.structural_units().unwrap());
+        inputs.select_policy(resource_limit_policy(&limits));
+        inputs.resolve(|evaluation, state| {
+            assert_eq!(issues(&evaluation), []);
+            assert!(state.policy.confirmed.is_ok());
         });
     }
 

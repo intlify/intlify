@@ -119,6 +119,28 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
     }
 }
 
+impl<Policy, Target> DeclarationFields<Policy, Target> {
+    /// The fields of no declaration: each unavailable with `causes`, why
+    /// profile selection selected none, so that each check that reads one is
+    /// not evaluated with them (D15:2131).
+    pub(crate) fn unavailable(causes: &Causes) -> Self {
+        Self {
+            project_id: Err(causes.clone()),
+            selection_scope: Err(causes.clone()),
+            requested_locales: Err(causes.clone()),
+            default_requested_locale: Err(causes.clone()),
+            default_source_locale: Err(causes.clone()),
+            locale_negotiation: Err(causes.clone()),
+            message_fallback: Err(causes.clone()),
+            coverage: Err(causes.clone()),
+            policies: Err(causes.clone()),
+            target_profiles: Err(causes.clone()),
+            deployment_groups: Err(causes.clone()),
+            delivery: Err(causes.clone()),
+        }
+    }
+}
+
 impl DeclarationFields<PolicyReference, TargetProfileReference> {
     /// The fields that hold artifact references, which Phases 4 and 9 read.
     pub(crate) fn references(&self) -> DeclarationReferences<'_> {
@@ -426,5 +448,30 @@ mod tests {
             analysis.profile_member::<Value>("app", "extra").err(),
             Some(crate::structural::AdmissionInvariant::ModelLayout)
         );
+    }
+
+    /// Without a selected declaration every field is unavailable with the
+    /// causes profile selection gives.
+    #[test]
+    fn no_selected_declaration_leaves_every_field_with_the_selections_causes() {
+        let mut config = minimal_config();
+        config["profiles"]["app"]["projectId"] = json!(1);
+        let causes = read(&config).project_id.unwrap_err();
+        let fields = Fields::unavailable(&causes);
+        let unavailable = [
+            fields.project_id.as_ref().err(),
+            fields.selection_scope.as_ref().err(),
+            fields.requested_locales.as_ref().err(),
+            fields.default_requested_locale.as_ref().err(),
+            fields.default_source_locale.as_ref().err(),
+            fields.locale_negotiation.as_ref().err(),
+            fields.message_fallback.as_ref().err(),
+            fields.coverage.as_ref().err(),
+            fields.policies.as_ref().err(),
+            fields.target_profiles.as_ref().err(),
+            fields.deployment_groups.as_ref().err(),
+            fields.delivery.as_ref().err(),
+        ];
+        assert!(unavailable.iter().all(|field| *field == Some(&causes)));
     }
 }
