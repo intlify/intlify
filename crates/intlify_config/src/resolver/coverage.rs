@@ -14,9 +14,10 @@
 //! every cell is decided, which owns every Basis. All of it is under the
 //! admitted Coverage Specification, and the order rules or items were authored
 //! in never decides anything. A rule and its items are named by the rule's
-//! raw content until a Subject content projection replaces it. Not Coverage
-//! Decision Evidence, which maps a Basis to its sources through Evidence 015
-//! Phase 5 owns, and not the vocabulary's admission.
+//! raw content until a Subject content projection replaces it. Once the table
+//! is established, it also owns the Coverage Decision Evidence mapping each
+//! Basis to the Evidence of its decision sources, observed in the
+//! declaration's file (D15:1609, 1611). Not the vocabulary's admission.
 //!
 //! A count past its bound is observed where its table's Scope sits in the
 //! declaration, beside the confirmed policy, which supplies the bound
@@ -50,6 +51,7 @@ use super::limits::{BoundId, ConfirmedPolicy, Group, LocaleResolutionLimits};
 use super::locales::{
     canonicalize, Content, LocaleInvariant, LocaleKey, LocaleSet, ResolvedLocales,
 };
+use super::specification::Slot;
 use super::vocabulary::SurfaceVocabulary;
 
 const fn coverage_bound(name: &'static str) -> BoundId {
@@ -223,6 +225,18 @@ pub(crate) enum Decision {
     Rules(Vec<Domain>),
 }
 
+/// One Coverage Decision Evidence mapping, before the invocation's evidence
+/// tokens are assigned: a cell, the decision source its Coverage Decision
+/// Basis admitted, the project default or a matched rule domain, and the
+/// Evidence of that source (D15:1609, 2485).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DecisionEvidence {
+    pub(crate) cell: (CanonicalLocale, Token),
+    /// The matched rule domain, or none for the project default.
+    pub(crate) source: Option<Domain>,
+    pub(crate) evidence: EvidenceProjection,
+}
+
 /// One cell's Coverage Decision Basis: its effective mode and how that was
 /// decided. It names no source, so equivalent declarations share it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -314,6 +328,12 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
         .flatten()
         .and_then(|coverage| coverage.rules.as_option())
         .map_or(&[][..], Vec::as_slice);
+    let default_declared = coverage
+        .as_ref()
+        .ok()
+        .copied()
+        .flatten()
+        .is_some_and(|coverage| coverage.default_mode.as_option().is_some());
     let declared = both(
         both(policy.clone(), specification.clone()),
         coverage.clone(),
@@ -450,12 +470,13 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
         Err(causes) => Err(causes),
     };
     // The table owns every cell's Basis, so no Basis exists unless every cell
-    // is decided.
-    let table = evaluation.check(
-        unit(CoverageSubject::Table, Check::CompleteTable),
-        cells,
-        Ok,
-    )?;
+    // is decided, and its Coverage Decision Evidence.
+    let owner = unit(CoverageSubject::Table, Check::CompleteTable);
+    let table = evaluation.check(owner.clone(), cells, Ok)?;
+    if let (Ok(cells), Some(observer)) = (&table, observer) {
+        let decisions = decision_evidence(cells, &domains, (observer, default_declared))?;
+        evaluation.decided(&owner, decisions)?;
+    }
     // The default mode exists whenever the declared coverage does, which the
     // rule counts wait on too, and the span whenever the table does, so
     // neither adds a cause of its own.
@@ -553,16 +574,7 @@ impl<P: Provider> Selectors<'_, P> {
         };
         positions
             .iter()
-            .map(|&position| {
-                let position = u64::try_from(position).map_err(|_| ObserverInvariant::Missing)?;
-                observer
-                    .nested(&[
-                        Edge::Member("coverage"),
-                        Edge::Member("rules"),
-                        Edge::Index(position),
-                    ])
-                    .map(Some)
-            })
+            .map(|&position| rule_token(observer, position).map(Some))
             .collect()
     }
 }
@@ -1007,6 +1019,61 @@ fn basis(
             ),
         })
     }
+}
+
+/// The Coverage Decision Evidence of an established table, observed in the
+/// declaration's file: one mapping for each `default` Basis, to the declared
+/// project default or, when it is omitted, to the Coverage Specification
+/// input, and one for each matched domain of a `rule` Basis, to the one rule
+/// holding it, in cell order and then domain order (D15:1609, 1611). A rule
+/// deciding several cells is mapped once for each.
+fn decision_evidence(
+    cells: &Cells,
+    domains: &Domains,
+    (observer, declared): (&DeclarationObserver<'_>, bool),
+) -> Result<Vec<DecisionEvidence>, ObserverInvariant> {
+    let default = if declared {
+        observer.value(&["coverage", "defaultMode"])?
+    } else {
+        EvidenceProjection::resolver_input(ComponentPath::specification(Slot::Coverage))
+    };
+    let mut decisions = Vec::new();
+    for ((locale, surface), basis) in cells {
+        let cell = (locale.clone(), surface.clone());
+        match &basis.decision {
+            Decision::Default => decisions.push(DecisionEvidence {
+                cell,
+                source: None,
+                evidence: default.clone(),
+            }),
+            Decision::Rules(matched) => {
+                for domain in matched {
+                    // An established table rejected every duplicate domain,
+                    // so one rule holds each matched domain (D15:1611).
+                    let (holding, _) = &domains[domain];
+                    decisions.push(DecisionEvidence {
+                        cell: cell.clone(),
+                        source: Some(domain.clone()),
+                        evidence: rule_token(observer, holding[0])?,
+                    });
+                }
+            }
+        }
+    }
+    Ok(decisions)
+}
+
+/// The rule at `position`, at its token (D15:790).
+fn rule_token(
+    observer: &DeclarationObserver<'_>,
+    position: usize,
+) -> Result<EvidenceProjection, ObserverInvariant> {
+    let position = u64::try_from(position).map_err(|_| ObserverInvariant::Missing)?;
+    observer.nested(&[
+        Edge::Member("coverage"),
+        Edge::Member("rules"),
+        Edge::Index(position),
+    ])
 }
 
 /// Whether the product of `factors` stays within `limit`. The product uses
@@ -2310,6 +2377,111 @@ mod tests {
                 Some(vec![duplicate.clone(), compared.clone()])
             );
         }
+    }
+
+    /// The Coverage Decision Evidence `resolved` recorded, as each mapping's
+    /// cell, its matched domain or none for the default, and its Evidence.
+    fn decisions(resolved: &Resolved) -> Vec<(&str, &str, Option<Domain>, EvidenceProjection)> {
+        resolved
+            .evaluation
+            .decision_evidence()
+            .iter()
+            .map(|decision| {
+                (
+                    decision.cell.0.as_str(),
+                    decision.cell.1.as_str(),
+                    decision.source.clone(),
+                    decision.evidence.clone(),
+                )
+            })
+            .collect()
+    }
+
+    /// An established table maps each `default` Basis to the Coverage
+    /// Specification input when the default is omitted, or to the declared
+    /// default, and each matched domain of a `rule` Basis to the rule holding
+    /// it, cell by cell, a rule deciding several cells once for each
+    /// (D15:1609, 1611).
+    #[test]
+    fn an_established_table_maps_each_basis_to_its_decision_sources() {
+        let fr = json!({"requestedLocales": ["fr"], "mode": "fallback-allowed"});
+        let specification =
+            EvidenceProjection::resolver_input(ComponentPath::specification(Slot::Coverage));
+        for (coverage, default) in [
+            (json!({"rules": [fr]}), None),
+            (
+                json!({"defaultMode": "fallback-allowed", "rules": [fr]}),
+                Some(&["coverage", "defaultMode"][..]),
+            ),
+        ] {
+            let declaration = declared(coverage);
+            let resolved = resolve(&declaration);
+            let default = default.map_or_else(
+                || specification.clone(),
+                |path| beside_policy(&declaration, path).primary,
+            );
+            let rule = rule_at(&declaration, 0);
+            let mut expected = Vec::new();
+            for locale in EVERY_LOCALE {
+                for surface in EVERY_SURFACE {
+                    expected.push(if locale == "fr" {
+                        (
+                            locale,
+                            surface,
+                            Some(domain(&["fr"], &EVERY_SURFACE)),
+                            rule.clone(),
+                        )
+                    } else {
+                        (locale, surface, None, default.clone())
+                    });
+                }
+            }
+            assert_eq!(decisions(&resolved), expected);
+        }
+    }
+
+    /// A cell two rules of one mode decide maps to each, in domain order; a
+    /// table that is not established keeps none, nor does an evaluation
+    /// without the declaration's file (D15:1609, 1611).
+    #[test]
+    fn each_matched_domain_is_mapped_and_an_unestablished_table_keeps_none() {
+        let locale_only = json!({"requestedLocales": ["fr"], "mode": "fallback-allowed"});
+        let same_mode = json!({"intentSurfaceClasses": ["checkout"], "mode": "fallback-allowed"});
+        let declaration = declared(json!({"rules": [locale_only, same_mode]}));
+        let resolved = resolve(&declaration);
+        let both: Vec<_> = decisions(&resolved)
+            .into_iter()
+            .filter(|(locale, surface, ..)| (*locale, *surface) == ("fr", "checkout"))
+            .collect();
+        assert_eq!(
+            both,
+            [
+                (
+                    "fr",
+                    "checkout",
+                    Some(domain(&EVERY_LOCALE, &["checkout"])),
+                    rule_at(&declaration, 1)
+                ),
+                (
+                    "fr",
+                    "checkout",
+                    Some(domain(&["fr"], &EVERY_SURFACE)),
+                    rule_at(&declaration, 0)
+                ),
+            ]
+        );
+        // The rules conflict once their modes differ: no table, no mapping.
+        let other_mode = json!({"intentSurfaceClasses": ["checkout"], "mode": "direct-required"});
+        let conflicting = resolve(&declared(json!({"rules": [locale_only, other_mode]})));
+        assert!(conflicting.policy.is_err());
+        assert_eq!(decisions(&conflicting), []);
+        // Without the declaration's file, nothing is observed.
+        let unobserved = resolve_fields(
+            &LocaleFields::declared(&declaration),
+            &setup(ROOM, &vocabulary()),
+        );
+        assert!(unobserved.policy.is_ok());
+        assert_eq!(decisions(&unobserved), []);
     }
 
     #[test]
