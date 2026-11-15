@@ -91,7 +91,9 @@ impl PreparedTargets {
     ) -> Option<TargetInputs<'a>> {
         let declaration = self.declaration()?;
         let file = self.file.file();
-        let observer = observer(&self.analysis, &file, &self.selected)?;
+        // The phases after Phase 5 observe through what it bound.
+        let observer =
+            observer(&self.analysis, &file, &self.selected)?.with_locales(&*self.canonicalizer);
         let mut preparation = Evaluation::default();
         let locales = resolve_locales(
             &mut preparation,

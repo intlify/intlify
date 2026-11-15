@@ -393,6 +393,15 @@ where
         SemanticGroup::LocaleCanonicalization,
         held(canonicalizer),
     )?;
+    // A record constructed since classifies a locale key by the canonicalizer
+    // Phase 5 bound (D15:776).
+    let observer = configuration
+        .observer
+        .as_ref()
+        .map(|observer| match canonicalizer {
+            Ok(canonicalizer) => observer.with_locales(canonicalizer),
+            Err(_) => *observer,
+        });
     let canonicalization = canonicalizer
         .map(|canonicalizer| canonicalizer.binding().pins.clone())
         .map_err(Causes::clone);
@@ -413,7 +422,7 @@ where
         confirmed,
         canonicalizer,
         &locale_fields,
-        configuration.observer.as_ref(),
+        observer.as_ref(),
     )?;
     own(
         evaluation,
@@ -2556,6 +2565,34 @@ pub(super) mod tests {
                     ],
                 })]
             );
+        });
+    }
+
+    /// The phases after Phase 5 classify a locale key by the canonicalizer it
+    /// bound: Phase 7 observes a corrected alias key under its non-secret
+    /// name and a rejected one redacted (D15:776).
+    #[test]
+    fn an_alias_key_is_classified_by_the_canonicalizer_phase_5_bound() {
+        use crate::resolver::locales::fixtures::rejected;
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["localeNegotiation"] = json!({"aliases": {"EN": "ja", "zz": "en"}});
+        inputs.resolve(|evaluation, _| {
+            let key = |key| {
+                locales::unit(
+                    LocaleSubject::NegotiationAliasKey(key),
+                    Check::CanonicalLocale,
+                )
+            };
+            let corrected =
+                observed_views(&evaluation, &key(LocaleKey::Canonical(canonical("en"))));
+            assert_eq!(corrected.len(), 1);
+            assert_eq!(
+                corrected[0].0["value"],
+                json!({ "exact-json-pointer": "/profiles/web/localeNegotiation/aliases/EN" })
+            );
+            let unsafe_key = observed_views(&evaluation, &key(rejected()));
+            assert_eq!(unsafe_key.len(), 1);
+            assert!(unsafe_key[0].0["value"].get("exact-json-pointer").is_none());
         });
     }
 

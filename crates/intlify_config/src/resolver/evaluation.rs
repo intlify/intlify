@@ -1388,31 +1388,21 @@ impl Evaluation {
     fn observes(&self, unit: &Unit, observed: bool, what: &str) {
         // The phases whose Findings carry occurrence Evidence so far; the
         // others gain theirs check by check (plan 025 PRs 5f).
-        const OBSERVED: [Phase; 6] = [
+        const OBSERVED: [Phase; 7] = [
             Phase::ResolverBootstrapAdmission,
             Phase::EntryAdmission,
             Phase::StructuralAdmission,
             Phase::ProfileSelection,
             Phase::ResourcePolicyAdmission,
             Phase::SpecificationAdmission,
+            Phase::LocaleResolution,
         ];
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
-        // Phase 7's checks but those of the alias and fallback keys, which
-        // gain theirs later (plan 025 PR 5f-4f-4).
-        let locale = unit.phase == Phase::LocaleResolution
-            && !matches!(
-                unit.subject,
-                Subject::Locale(
-                    LocaleSubject::NegotiationAliasKey(_)
-                        | LocaleSubject::NegotiationAliasValue(..)
-                        | LocaleSubject::MessageFallbackKey(_)
-                )
-            );
         assert_eq!(
             observed,
-            OBSERVED.contains(&unit.phase) || locale,
+            OBSERVED.contains(&unit.phase),
             "{unit:?} reports {what} {} what it observed, against its check",
             if observed { "with" } else { "without" }
         );

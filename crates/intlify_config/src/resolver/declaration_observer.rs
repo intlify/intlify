@@ -16,15 +16,19 @@ use crate::structural::Edge;
 use super::entry::{EntryFile, SELECTOR_ORIGIN};
 use super::evaluation::Observation;
 use super::evidence::{EvidenceInvariant, EvidenceProjection};
+use super::evidence_path::LocaleKeys;
 
 /// The declaration profile selection selected, in the file Phase 1 read and
-/// the document it materialized.
+/// the document it materialized, and what `specification-admission` bound to
+/// classify a locale key in a record constructed since, when it has (D15:776).
+#[derive(Clone, Copy)]
 pub(crate) struct DeclarationObserver<'a> {
     file: &'a EntryFile<'a>,
     document: &'a MaterializedDocument,
     profiles: NodeId,
     id: &'a str,
     declaration: NodeId,
+    locales: Option<&'a dyn LocaleKeys>,
 }
 
 /// A resolver bug the observer finds.
@@ -55,7 +59,26 @@ impl<'a> DeclarationObserver<'a> {
             profiles,
             id,
             declaration,
+            locales: None,
         })
+    }
+
+    /// The observer of the records constructed once `specification-admission`
+    /// bound `locales`, which then classify a key of `localeNegotiation.aliases`
+    /// or `messageFallback` by whether it returns a canonical identifier
+    /// (D15:776).
+    pub(crate) fn with_locales<'b>(&self, locales: &'b dyn LocaleKeys) -> DeclarationObserver<'b>
+    where
+        'a: 'b,
+    {
+        DeclarationObserver {
+            file: self.file,
+            document: self.document,
+            profiles: self.profiles,
+            id: self.id,
+            declaration: self.declaration,
+            locales: Some(locales),
+        }
     }
 
     /// The value at the member path `path` under the declaration, at its
@@ -111,6 +134,58 @@ impl<'a> DeclarationObserver<'a> {
         };
         let member = members.get(name).ok_or(ObserverInvariant::Missing)?;
         self.at(&self.edges(path, Some(name)), member.key_span())
+    }
+
+    /// The key of the member at `rank`, in the unsigned byte order of member
+    /// names, of the object at the member path `path` under the declaration,
+    /// at the key's token (D15:776, 790).
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug of a member the document lacks, or that has
+    /// no Evidence.
+    pub(crate) fn ranked_key(
+        &self,
+        path: &[&str],
+        rank: usize,
+    ) -> Result<EvidenceProjection, ObserverInvariant> {
+        let (name, member) = self.ranked(path, rank)?;
+        self.at(&self.edges(path, Some(name)), member.key_span())
+    }
+
+    /// The value of that member, at its token (D15:790).
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug of a member the document lacks, or that has
+    /// no Evidence.
+    pub(crate) fn ranked_value(
+        &self,
+        path: &[&str],
+        rank: usize,
+    ) -> Result<EvidenceProjection, ObserverInvariant> {
+        let (name, member) = self.ranked(path, rank)?;
+        self.at(
+            &self.edges(path, Some(name)),
+            self.document.node(member.value()).span(),
+        )
+    }
+
+    /// The member at `rank` of the object at `path`, and its name.
+    fn ranked(
+        &self,
+        path: &[&str],
+        rank: usize,
+    ) -> Result<(&'a str, &'a ObjectMember), ObserverInvariant> {
+        let document: &'a MaterializedDocument = self.document;
+        let NodeKind::Object(members) = document.node(self.node(path)?).kind() else {
+            return Err(ObserverInvariant::Missing);
+        };
+        members
+            .iter()
+            .nth(rank)
+            .map(|(name, member)| (name.as_str(), member))
+            .ok_or(ObserverInvariant::Missing)
     }
 
     /// The node at the member path `path` under the declaration.
@@ -264,7 +339,7 @@ impl<'a> DeclarationObserver<'a> {
         span: ByteSpan,
     ) -> Result<EvidenceProjection, ObserverInvariant> {
         self.file
-            .value_evidence(edges, span)
+            .value_evidence_after(edges, span, self.locales)
             .map_err(ObserverInvariant::Evidence)
     }
 }
@@ -370,7 +445,7 @@ mod tests {
     use crate::structural::selection::SelectorInput;
 
     use super::fixtures::{materialized, view};
-    use super::{DeclarationObserver, ObserverInvariant};
+    use super::{DeclarationObserver, EvidenceProjection, ObserverInvariant};
 
     /// The view of the span `value` occupies in `source`, at its first
     /// occurrence.
@@ -483,6 +558,62 @@ mod tests {
                 Some(ObserverInvariant::Missing)
             );
         }
+    }
+
+    /// A key of `localeNegotiation.aliases` or `messageFallback`, at its rank
+    /// among the map's keys, is non-secret in a record constructed once
+    /// `specification-admission` bound a canonicalizer that returns a canonical
+    /// identifier for it, and redacted otherwise, and before (D15:776).
+    #[test]
+    fn a_locale_key_is_classified_by_the_bound_canonicalizer() {
+        let mut config = complete_config();
+        config["profiles"]["app"]["messageFallback"]["zz"] = json!(["en"]);
+        let (bytes, document, profiles) = materialized(&config);
+        let fixture = FileFixture::new(&fixture_limits(10_000));
+        let file = fixture.file(Arc::clone(&bytes));
+        let before = DeclarationObserver::new(&file, (&document, profiles), "app").unwrap();
+        let canonicalizer = crate::resolver::locales::fixtures::canonicalizer(64);
+        let after = before.with_locales(&canonicalizer);
+        let pointer = |projection: EvidenceProjection| view(&projection)["value"].clone();
+        let exact = |at: &str| json!({ "exact-json-pointer": at });
+        // `ja` and then `zz`, in byte order.
+        assert_eq!(
+            pointer(after.ranked_key(&["messageFallback"], 0).unwrap()),
+            exact("/profiles/app/messageFallback/ja")
+        );
+        for unsafe_key in [
+            before.ranked_key(&["messageFallback"], 0).unwrap(),
+            after.ranked_key(&["messageFallback"], 1).unwrap(),
+        ] {
+            assert!(pointer(unsafe_key).get("exact-json-pointer").is_none());
+        }
+        // A destination sits under its key, and its value's token is its own.
+        let destination = after
+            .ranked_value(&["localeNegotiation", "aliases"], 0)
+            .unwrap();
+        let destination = view(&destination);
+        assert_eq!(
+            destination["value"],
+            exact("/profiles/app/localeNegotiation/aliases/fr")
+        );
+        let start: usize = destination["span"]["start"]
+            .as_str()
+            .unwrap()
+            .parse()
+            .unwrap();
+        let end: usize = destination["span"]["end"]
+            .as_str()
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert_eq!(
+            serde_json::from_slice::<String>(&bytes[start..end]).unwrap(),
+            "fr-FR"
+        );
+        assert_eq!(
+            after.ranked_key(&["messageFallback"], 2).err(),
+            Some(ObserverInvariant::Missing)
+        );
     }
 
     /// An array's element under the declaration is observed at its token, at

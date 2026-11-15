@@ -425,7 +425,8 @@ pub fn resolve(source: &[u8], selector: Option<&str>) -> Result<Value, String> {
         .profiles_value()
         .map(|profiles| DeclarationObserver::new(&file, profiles, id))
         .transpose()
-        .map_err(|e| format!("Example observer invariant: {e:?}"))?;
+        .map_err(|e| format!("Example observer invariant: {e:?}"))?
+        .map(|observer| observer.with_locales(&provider));
     let mut evaluation = Evaluation::default();
     let resolved = match resolve_locales(
         &mut evaluation,

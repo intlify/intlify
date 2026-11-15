@@ -303,8 +303,10 @@ impl From<ObserverInvariant> for LocaleInvariant {
 }
 
 /// Phase 7 under the confirmed policy and the canonicalizer Phase 5 bound,
-/// over the selected declaration's `fields`, which a check past a bound
-/// observes through `observer` when the declaration's file is there.
+/// over the selected declaration's `fields`, which its checks observe through
+/// `observer` when the declaration's file is there. The caller hands the
+/// observer what Phase 5 bound, so a locale key is classified as a record
+/// constructed since is (D15:776).
 /// Every spelling is counted first; none is canonicalized unless the count is
 /// proved within `maxLocaleOccurrences`, so an over-bound declaration never has
 /// a valid prefix resolved.
@@ -726,14 +728,16 @@ mod tests {
         (bytes, occurrences, requested): (u64, u64, u64),
     ) -> (Evaluation, ResolvedLocales) {
         let mut evaluation = Evaluation::default();
+        let canonicalizer = canonicalizer(bytes);
         let resolved = Observed::declaration(declaration)
             .app(|observer| {
+                // Phase 7 observes once Phase 5 bound the canonicalizer.
                 resolve_locales(
                     &mut evaluation,
                     Ok(&policy(bytes, occurrences, requested)),
-                    Ok(&canonicalizer(bytes)),
+                    Ok(&canonicalizer),
                     &LocaleFields::declared(declaration),
-                    Some(observer),
+                    Some(&observer.with_locales(&canonicalizer)),
                 )
             })
             .unwrap();
@@ -1109,6 +1113,45 @@ mod tests {
             None
         );
         assert_eq!(units(&resolved.project.unwrap_err()), [default]);
+    }
+
+    /// Phase 7 observes through what its observer was handed, which
+    /// classifies an alias key by whether the canonicalizer returns a
+    /// canonical identifier: a corrected key is non-secret and a rejected one
+    /// is redacted (D15:776).
+    #[test]
+    fn an_alias_key_is_classified_by_what_the_observer_was_handed() {
+        use crate::resolver::declaration_observer::fixtures::view;
+        let declaration = declaration(&minimal_config(), |app| {
+            app["localeNegotiation"] = json!({"aliases": {"EN": "en", "zz": "en"}});
+        });
+        let (evaluation, _) = resolve(&declaration);
+        let keys: Vec<(Code, serde_json::Value)> = evaluation
+            .occurrence_candidates()
+            .iter()
+            .filter(|candidate| {
+                matches!(
+                    candidate.finding.unit().subject,
+                    Subject::Locale(LocaleSubject::NegotiationAliasKey(_))
+                )
+            })
+            .map(|candidate| {
+                (
+                    candidate.finding.code(),
+                    view(&candidate.primary)["value"].clone(),
+                )
+            })
+            .collect();
+        assert_eq!(keys.len(), 2);
+        assert_eq!(
+            keys[0],
+            (
+                Code::LocaleNonCanonical,
+                json!({ "exact-json-pointer": "/profiles/app/localeNegotiation/aliases/EN" })
+            )
+        );
+        assert_eq!(keys[1].0, Code::LocaleInvalid);
+        assert!(keys[1].1.get("exact-json-pointer").is_none());
     }
 
     /// The default's spelling is observed at its token: corrected, with
