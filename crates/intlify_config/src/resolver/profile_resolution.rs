@@ -57,7 +57,7 @@ use super::exact_resolution::{
     resolve_fields, ArtifactBindings, ReferenceInvariant, ResolvedReferences,
 };
 use super::fallback::{resolve_fallback, MessageFallbackPolicy};
-use super::groups::{resolve_groups, ResolvedGroups};
+use super::groups::{resolve_groups, GroupInvariant, ResolvedGroups};
 use super::hydration::{validate_hydration, ResolvedHydration};
 use super::identity::{resolve_project_identity, ProjectIdentity};
 use super::locales::{resolve_locales, LocaleInvariant, ResolvedLocales};
@@ -318,6 +318,15 @@ impl From<EvaluationInvariant> for ResolverInvariant {
     }
 }
 
+impl From<GroupInvariant> for ResolverInvariant {
+    fn from(invariant: GroupInvariant) -> Self {
+        match invariant {
+            GroupInvariant::Evaluation(invariant) => Self::Evaluation(invariant),
+            GroupInvariant::Observer(invariant) => Self::Observer(invariant),
+        }
+    }
+}
+
 impl From<TargetInvariant> for ResolverInvariant {
     fn from(invariant: TargetInvariant) -> Self {
         match invariant {
@@ -551,7 +560,7 @@ where
         evaluation,
         confirmed,
         fields.deployment_groups(),
-        targets.as_ref(),
+        (targets.as_ref(), observer.as_ref()),
     )?;
     // Every relation shares the negotiation profile; none compares it.
     let hydration = validate_hydration(
@@ -2629,6 +2638,38 @@ pub(super) mod tests {
             assert_eq!(
                 primary["value"],
                 json!({ "exact-json-pointer": "/profiles/web/coverage/rules" })
+            );
+            assert_eq!(
+                related.iter().map(|view| &view["kind"]).collect::<Vec<_>>(),
+                [&json!("artifact-input")]
+            );
+        });
+    }
+
+    /// Phase 12 observes through the same observer: past the member count's
+    /// bound, a group's members are observed beside the policy Phase 4
+    /// admitted, which supplies the bound (D15:2249).
+    #[test]
+    fn a_group_count_is_observed_beside_the_admitted_policy() {
+        use crate::resolver::groups::{self, GroupSubject};
+        let mut inputs = Inputs::complete();
+        let mut limits = policy_limits();
+        // The complete declaration's group names two members.
+        limits.target_grouping.max_members_per_group = bound(1);
+        inputs.select_policy(resource_limit_policy(&limits));
+        inputs.resolve(|evaluation, _| {
+            let web = serde_json::from_value(json!("web")).unwrap();
+            let members = groups::unit(GroupSubject::Members(web), Check::WithinBound);
+            assert_eq!(
+                issues(&evaluation),
+                [(members.clone(), Code::ResourceLimitExceeded, None)]
+            );
+            let observed = observed_views(&evaluation, &members);
+            assert_eq!(observed.len(), 1);
+            let (primary, related) = &observed[0];
+            assert_eq!(
+                primary["value"],
+                json!({ "exact-json-pointer": "/profiles/web/deploymentGroups/web/members" })
             );
             assert_eq!(
                 related.iter().map(|view| &view["kind"]).collect::<Vec<_>>(),
