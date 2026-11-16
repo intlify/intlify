@@ -31,8 +31,9 @@ use crate::resolver::exact_resolution::{resolve_fields, ReferenceResults};
 use crate::resolver::groups::{resolve_groups, GroupSubject, ResolvedGroups};
 use crate::resolver::limits::ConfirmedPolicy;
 use crate::resolver::locales::{resolve_locales, LocaleFields, ResolvedLocales};
+use crate::resolver::profile_resolution::ResolverInvariant;
 use crate::resolver::resource_policy::DeclarationReferences;
-use crate::resolver::targets::{resolve_targets, ResolvedTargets, TargetInvariant, TargetSubject};
+use crate::resolver::targets::{resolve_targets, ResolvedTargets, TargetSubject};
 
 use super::observation::{Frame, Observation};
 use super::operation::{observer, Analysis, Config, ConfigFile, OutputFailure};
@@ -145,7 +146,7 @@ impl PreparedTargets {
 /// borrow the Set, with Phase 12's groups.
 pub(super) struct Construction<'s> {
     evaluation: Evaluation,
-    result: Result<(Admitted<ResolvedTargets<'s>>, Admitted<ResolvedGroups>), TargetInvariant>,
+    result: Result<(Admitted<ResolvedTargets<'s>>, Admitted<ResolvedGroups>), ResolverInvariant>,
 }
 
 /// Phase 11 and then Phase 12 over a fresh evaluation: what every timed
@@ -162,7 +163,7 @@ fn phases<'s>(
     evaluation: &mut Evaluation,
     inputs: &'s TargetInputs<'s>,
     observer: &DeclarationObserver<'_>,
-) -> Result<(Admitted<ResolvedTargets<'s>>, Admitted<ResolvedGroups>), TargetInvariant> {
+) -> Result<(Admitted<ResolvedTargets<'s>>, Admitted<ResolvedGroups>), ResolverInvariant> {
     let targets = resolve_targets(
         evaluation,
         Ok(&inputs.declaration.target_profiles),
@@ -173,7 +174,7 @@ fn phases<'s>(
         evaluation,
         Ok(inputs.policy),
         Ok(&inputs.declaration.deployment_groups),
-        targets.as_ref(),
+        (targets.as_ref(), Some(observer)),
     )?;
     Ok((targets, groups))
 }
@@ -210,7 +211,7 @@ pub(super) struct Retained {
 /// established: the complete ordinary output, retained past the end read.
 pub(super) struct Resolved {
     pub(super) evaluation: Evaluation,
-    pub(super) result: Result<Admitted<Retained>, TargetInvariant>,
+    pub(super) result: Result<Admitted<Retained>, ResolverInvariant>,
 }
 
 fn texts<'a>(values: impl Iterator<Item = &'a str>) -> Vec<String> {
@@ -908,11 +909,36 @@ mod tests {
         }
     }
 
+    /// The interval observes a group past its bound through the selected
+    /// declaration's observer, as the resolver does: under one member per
+    /// group, `web` is past it.
+    #[test]
+    fn the_interval_observes_a_group_past_its_bound() {
+        let mut prepared = prepared(R::Storefront);
+        let mut limits = prepared.policy.limits().clone();
+        limits.target_grouping.max_members_per_group = Bound::new(1).unwrap();
+        prepared.policy = ConfirmedPolicy::fixture_owned(limits);
+        let resolved = prepared.resolve().unwrap();
+        let observed: Vec<_> = resolved
+            .evaluation
+            .occurrence_candidates()
+            .iter()
+            .map(|candidate| candidate.finding.unit().clone())
+            .collect();
+        assert_eq!(
+            observed,
+            [group_unit(
+                GroupSubject::Members(group("web")),
+                Check::WithinBound
+            )]
+        );
+    }
+
     #[test]
     fn a_resolver_defect_fails_the_case() {
         let resolved = Resolved {
             evaluation: Evaluation::default(),
-            result: Err(TargetInvariant::Evaluation(
+            result: Err(ResolverInvariant::Evaluation(
                 EvaluationInvariant::UnitRecordedTwice(target_unit(
                     TargetSubject::Target(target("web")),
                     Check::ProjectSubset,

@@ -792,13 +792,16 @@ mod tests {
                     )
                 })
                 .unwrap();
-            let groups = resolve_groups(
-                &mut evaluation,
-                policy,
-                Ok(&declaration.deployment_groups),
-                targets.as_ref(),
-            )
-            .unwrap();
+            let groups = observed
+                .app(|observer| {
+                    resolve_groups(
+                        &mut evaluation,
+                        policy,
+                        Ok(&declaration.deployment_groups),
+                        (targets.as_ref(), Some(observer)),
+                    )
+                })
+                .unwrap();
             let declared = self
                 .declared
                 .clone()

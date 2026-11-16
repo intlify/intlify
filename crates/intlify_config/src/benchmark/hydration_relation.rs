@@ -140,7 +140,7 @@ impl PreparedHydration {
             &mut preparation,
             policy,
             Ok(&declaration.deployment_groups),
-            targets.as_ref(),
+            (targets.as_ref(), Some(&observer)),
         )
         .ok()?;
         Some(HydrationInputs {
@@ -863,6 +863,21 @@ mod tests {
             .unwrap()
             .resolved
             .is_err());
+    }
+
+    /// The preparation runs Phase 12 through the selected declaration's
+    /// observer, as the resolver does: under one member per group, a group
+    /// past it is observed there, and the case still prepares, without a
+    /// partition for Phase 13.
+    #[test]
+    fn the_preparation_observes_phase_12_as_the_resolver_does() {
+        let mut prepared = prepared(R::Storefront);
+        let mut limits = prepared.policy.limits().clone();
+        limits.target_grouping.max_members_per_group = Bound::new(1).unwrap();
+        prepared.policy = ConfirmedPolicy::fixture_owned(limits);
+        let set = prepared.set().unwrap();
+        let inputs = prepared.inputs(&set).unwrap();
+        assert!(inputs.groups.as_ref().unwrap().partition().is_err());
     }
 
     #[test]

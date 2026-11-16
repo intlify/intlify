@@ -1442,9 +1442,12 @@ impl Evaluation {
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
+        // Phase 12 observes its bounds, not yet its members and assignments.
+        let observes = OBSERVED.contains(&unit.phase)
+            || (unit.phase == Phase::GroupResolution && unit.check == Check::WithinBound);
         assert_eq!(
             observed,
-            OBSERVED.contains(&unit.phase),
+            observes,
             "{unit:?} reports {what} {} what it observed, against its check",
             if observed { "with" } else { "without" }
         );

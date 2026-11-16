@@ -16,14 +16,21 @@
 //! A subject is a Group ID, a member's Target ID within its group, or a
 //! declared Target ID; a group's members and the groups are sets, so their
 //! authoring order is no part of any.
+//!
+//! A count past its bound is observed where the count is, beside the
+//! confirmed policy, which supplies the bound (D15:2249): the Group ID map
+//! for the groups and the memberships, a Group ID's key for its bytes, a
+//! group's `members` for their count, and each occurrence of a member for its
+//! bytes (D15:2387).
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::model::{DeploymentGroup, DeploymentGroupId, NonEmptyMap, TargetId};
 
+use super::declaration_observer::{beside, DeclarationObserver, ObserverInvariant};
 use super::evaluation::{
     and, both, within, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant,
-    Phase, Subject, Unit,
+    Found, Observation, Phase, Subject, Unit,
 };
 use super::limits::{BoundId, ConfirmedPolicy, Group};
 use super::targets::ResolvedTargets;
@@ -52,6 +59,26 @@ const MAX_TARGET_ID_BYTES: BoundId = BoundId {
     group: Group::TargetGrouping,
     name: "maxTargetIdBytes",
 };
+
+/// A resolver bug Phase 12 refuses.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum GroupInvariant {
+    Evaluation(EvaluationInvariant),
+    /// What a check looked at in the declaration has no Evidence.
+    Observer(ObserverInvariant),
+}
+
+impl From<EvaluationInvariant> for GroupInvariant {
+    fn from(invariant: EvaluationInvariant) -> Self {
+        Self::Evaluation(invariant)
+    }
+}
+
+impl From<ObserverInvariant> for GroupInvariant {
+    fn from(invariant: ObserverInvariant) -> Self {
+        Self::Observer(invariant)
+    }
+}
 
 /// What one Phase 12 unit checks. Kinds are declared so that each unit's
 /// prerequisites order before it: the two bounds over every group, each
@@ -134,15 +161,32 @@ impl ResolvedGroups {
 /// member's other checks wait on its bytes, and whether it names a Target ID
 /// also on the set of declared Target IDs Phase 11 admitted. A Target ID's
 /// place waits on its own admission and on every group's bounds, never on
-/// another group's members.
+/// another group's members. The checks observe through `observer`, the
+/// selected declaration's, when there is one.
+///
+/// # Errors
+///
+/// Returns the resolver bug of a unit recorded against its phase's rules, or
+/// of a declared value without Evidence.
 pub(crate) fn resolve_groups(
     evaluation: &mut Evaluation,
     policy: Result<&ConfirmedPolicy, &Causes>,
     declared: Admitted<&NonEmptyMap<DeploymentGroupId, DeploymentGroup>>,
-    targets: Result<&ResolvedTargets<'_>, &Causes>,
-) -> Result<Admitted<ResolvedGroups>, EvaluationInvariant> {
+    (targets, observer): (
+        Result<&ResolvedTargets<'_>, &Causes>,
+        Option<&DeclarationObserver<'_>>,
+    ),
+) -> Result<Admitted<ResolvedGroups>, GroupInvariant> {
+    // The map is there to observe only once structural admission admitted
+    // it.
+    let at_map = match &declared {
+        Ok(_) => beside(policy, observer, |observer| {
+            observer.value(&["deploymentGroups"])
+        })?,
+        Err(_) => None,
+    };
     let policy = policy.map_err(Causes::clone);
-    let bounded = evaluation.check(
+    let bounded = evaluation.check_found(
         unit(GroupSubject::Groups, Check::WithinBound),
         both(policy.clone(), declared.clone()),
         |(policy, declared)| {
@@ -151,9 +195,10 @@ pub(crate) fn resolve_groups(
                 policy.limits().target_grouping.max_deployment_groups,
                 declared.len(),
             )
+            .map_err(|blocking| Found::through(blocking, at_map.clone()))
         },
     )?;
-    let memberships = evaluation.check(
+    let memberships = evaluation.check_found(
         unit(GroupSubject::Memberships, Check::WithinBound),
         both(policy.clone(), declared.clone()),
         |(policy, declared)| {
@@ -165,6 +210,7 @@ pub(crate) fn resolve_groups(
                     .map(|group| group.members.as_slice().len())
                     .sum(),
             )
+            .map_err(|blocking| Found::through(blocking, at_map.clone()))
         },
     )?;
     let declared = match declared {
@@ -180,7 +226,7 @@ pub(crate) fn resolve_groups(
     let mut named = BTreeMap::new();
     let mut every_group = memberships.clone();
     for (id, group) in declared.iter() {
-        let (identified, own) = own_bounds(evaluation, &policy, &bounded, id, group)?;
+        let (identified, own) = own_bounds(evaluation, (&policy, observer), &bounded, (id, group))?;
         bounds.insert(id.clone(), identified);
         named.insert(
             id.clone(),
@@ -189,7 +235,10 @@ pub(crate) fn resolve_groups(
         );
         every_group = and(every_group, own.clone());
         let gate = both(policy.clone(), and(own, memberships.clone())).map(|(policy, ())| policy);
-        groups.insert(id.clone(), members(evaluation, &gate, &known, id, group)?);
+        groups.insert(
+            id.clone(),
+            members(evaluation, (&gate, observer), &known, (id, group))?,
+        );
     }
     let assignments = match targets {
         Ok(targets) => assignments(evaluation, &every_group, declared, targets)?,
@@ -215,13 +264,22 @@ pub(crate) fn resolve_groups(
 /// on them too.
 fn own_bounds(
     evaluation: &mut Evaluation,
-    policy: &Admitted<&ConfirmedPolicy>,
+    (policy, observer): (
+        &Admitted<&ConfirmedPolicy>,
+        Option<&DeclarationObserver<'_>>,
+    ),
     bounded: &Admitted<()>,
-    id: &DeploymentGroupId,
-    group: &DeploymentGroup,
-) -> Result<(Admitted<()>, Admitted<()>), EvaluationInvariant> {
+    (id, group): (&DeploymentGroupId, &DeploymentGroup),
+) -> Result<(Admitted<()>, Admitted<()>), GroupInvariant> {
+    let confirmed = policy.as_ref().map(|policy| *policy);
+    let at_key = beside(confirmed, observer, |observer| {
+        observer.member_key(&["deploymentGroups"], id.as_str())
+    })?;
+    let at_members = beside(confirmed, observer, |observer| {
+        observer.value(&["deploymentGroups", id.as_str(), "members"])
+    })?;
     let prerequisite = both(policy.clone(), bounded.clone());
-    let bytes = evaluation.check(
+    let bytes = evaluation.check_found(
         unit(GroupSubject::Group(id.clone()), Check::WithinBound),
         prerequisite.clone(),
         |(policy, ())| {
@@ -230,9 +288,10 @@ fn own_bounds(
                 policy.limits().target_grouping.max_group_id_bytes,
                 id.as_str().len(),
             )
+            .map_err(|blocking| Found::through(blocking, at_key))
         },
     )?;
-    let occurrences = evaluation.check(
+    let occurrences = evaluation.check_found(
         unit(GroupSubject::Members(id.clone()), Check::WithinBound),
         both(prerequisite, bytes.clone()),
         |((policy, ()), ())| {
@@ -241,6 +300,7 @@ fn own_bounds(
                 policy.limits().target_grouping.max_members_per_group,
                 group.members.as_slice().len(),
             )
+            .map_err(|blocking| Found::through(blocking, at_members))
         },
     )?;
     Ok((bytes, occurrences))
@@ -252,19 +312,33 @@ fn own_bounds(
 /// only when every member holds.
 fn members(
     evaluation: &mut Evaluation,
-    gate: &Admitted<&ConfirmedPolicy>,
+    (gate, observer): (
+        &Admitted<&ConfirmedPolicy>,
+        Option<&DeclarationObserver<'_>>,
+    ),
     known: &Admitted<&ResolvedTargets<'_>>,
-    id: &DeploymentGroupId,
-    group: &DeploymentGroup,
-) -> Result<Admitted<BTreeSet<TargetId>>, EvaluationInvariant> {
-    let mut occurrences: BTreeMap<&TargetId, usize> = BTreeMap::new();
-    for member in group.members.as_slice() {
-        *occurrences.entry(member).or_default() += 1;
+    (id, group): (&DeploymentGroupId, &DeploymentGroup),
+) -> Result<Admitted<BTreeSet<TargetId>>, GroupInvariant> {
+    // Each member's occurrences, by their positions in the group's members.
+    let mut occurrences: BTreeMap<&TargetId, Vec<usize>> = BTreeMap::new();
+    for (index, member) in group.members.as_slice().iter().enumerate() {
+        occurrences.entry(member).or_default().push(index);
     }
+    let confirmed = gate.as_ref().map(|policy| *policy);
     let mut holds = Ok(());
-    for (&member, &count) in &occurrences {
+    for (&member, positions) in &occurrences {
         let subject = || GroupSubject::Member(id.clone(), member.clone());
-        let bytes = evaluation.check(
+        // Past the bound, each occurrence is observed at its token, beside
+        // the policy (D15:2387).
+        let past = positions
+            .iter()
+            .map(|&index| {
+                beside(confirmed, observer, |observer| {
+                    observer.element(&["deploymentGroups", id.as_str(), "members"], index)
+                })
+            })
+            .collect::<Result<Vec<Option<Observation>>, _>>()?;
+        let bytes = evaluation.check_found(
             unit(subject(), Check::WithinBound),
             gate.clone(),
             |policy| {
@@ -273,8 +347,10 @@ fn members(
                     policy.limits().target_grouping.max_target_id_bytes,
                     member.as_str().len(),
                 )
+                .map_err(|blocking| Found::each(blocking, past))
             },
         )?;
+        let count = positions.len();
         let declared = evaluation.check(
             unit(subject(), Check::KnownMember),
             both(bytes.clone(), known.clone()),
@@ -350,10 +426,11 @@ mod tests {
     use crate::profile_fixtures::minimal_config;
     use crate::references::{PolicyReference, TargetProfileReference};
     use crate::resolver::artifact_resolution::admit_collection;
-    use crate::resolver::declaration_observer::fixtures::Observed;
+    use crate::resolver::declaration_observer::fixtures::{view, Observed};
     use crate::resolver::evaluation::{Actual, LimitExceeded, Status};
+    use crate::resolver::evidence::EvidenceProjection;
     use crate::resolver::exact_resolution::resolve_fields;
-    use crate::resolver::limits::{fixture_limits, ResolutionLimits};
+    use crate::resolver::limits::{fixture_limits, ConfirmedPolicy, ResolutionLimits};
     use crate::resolver::locales::fixtures::{canonicalizer, stand_in, target, waits_on};
     use crate::resolver::locales::{self, resolve_locales, LocaleFields, LocaleSubject};
     use crate::resolver::resource_policy::DeclarationReferences;
@@ -500,10 +577,51 @@ mod tests {
                 .declared
                 .clone()
                 .map(|()| &declaration.deployment_groups);
-            let groups =
-                resolve_groups(&mut evaluation, policy, declared, targets.as_ref()).unwrap();
+            let groups = observed
+                .app(|observer| {
+                    resolve_groups(
+                        &mut evaluation,
+                        policy,
+                        declared,
+                        (targets.as_ref(), Some(observer)),
+                    )
+                })
+                .unwrap();
             inspect(evaluation, groups)
         }
+    }
+
+    impl Inputs {
+        /// The view of the Evidence `at` makes in the declaration.
+        fn at(
+            &self,
+            at: impl FnOnce(&DeclarationObserver<'_>) -> Result<EvidenceProjection, ObserverInvariant>,
+        ) -> Value {
+            Observed::declaration(&self.app).app(|observer| view(&at(observer).unwrap()))
+        }
+    }
+
+    /// The view of the confirmed policy, which supplies every bound.
+    fn policy() -> Value {
+        view(ConfirmedPolicy::fixture_owned(fixture_limits(1)).evidence())
+    }
+
+    /// Each Phase 12 Finding candidate: its unit, and the views of its
+    /// primary and related Evidence.
+    fn observed(evaluation: &Evaluation) -> Vec<(Unit, Value, Vec<Value>)> {
+        evaluation
+            .occurrence_candidates()
+            .iter()
+            .filter(|candidate| candidate.finding.unit().phase == Phase::GroupResolution)
+            .map(|candidate| {
+                let related = candidate.related.iter().map(view).collect();
+                (
+                    candidate.finding.unit().clone(),
+                    view(&candidate.primary),
+                    related,
+                )
+            })
+            .collect()
     }
 
     fn bound(value: u64) -> Bound {
@@ -710,6 +828,15 @@ mod tests {
                     issues(&evaluation),
                     [(map.clone(), Code::ResourceLimitExceeded)]
                 );
+                // Observed at the Group ID map, beside the policy.
+                assert_eq!(
+                    observed(&evaluation),
+                    [(
+                        map.clone(),
+                        inputs.at(|observer| observer.value(&["deploymentGroups"])),
+                        vec![policy()]
+                    )]
+                );
                 let key = evaluation.issues().next().unwrap().clone();
                 assert_eq!(
                     evaluation.limit(&key),
@@ -750,6 +877,16 @@ mod tests {
                     return;
                 }
                 assert_eq!(found, std::slice::from_ref(&total));
+                // Observed at the Group ID map, which holds every
+                // membership, beside the policy.
+                assert_eq!(
+                    observed(&evaluation),
+                    [(
+                        total.clone(),
+                        inputs.at(|observer| observer.value(&["deploymentGroups"])),
+                        vec![policy()]
+                    )]
+                );
                 let key = evaluation.issues().next().unwrap().clone();
                 assert_eq!(
                     evaluation.limit(&key),
@@ -809,6 +946,16 @@ mod tests {
                     issues(&evaluation),
                     [(own.clone(), Code::ResourceLimitExceeded)]
                 );
+                // Observed at the Group ID's key or at the group's members,
+                // beside the policy.
+                let at = match &subject {
+                    GroupSubject::Group(_) => {
+                        inputs.at(|observer| observer.member_key(&["deploymentGroups"], "jobs"))
+                    }
+                    _ => inputs
+                        .at(|observer| observer.value(&["deploymentGroups", "web", "members"])),
+                };
+                assert_eq!(observed(&evaluation), [(own.clone(), at, vec![policy()])]);
                 let (blocked, other) = match subject {
                     GroupSubject::Group(_) => ("jobs", "web"),
                     _ => ("web", "jobs"),
@@ -894,6 +1041,18 @@ mod tests {
                     return;
                 }
                 assert_eq!(found, [(bytes.clone(), Code::ResourceLimitExceeded)]);
+                // Each of the two occurrences, at its token, beside the
+                // policy (D15:2387).
+                let each = |index| {
+                    (
+                        bytes.clone(),
+                        inputs.at(|observer| {
+                            observer.element(&["deploymentGroups", "web", "members"], index)
+                        }),
+                        vec![policy()],
+                    )
+                };
+                assert_eq!(observed(&evaluation), [each(0), each(2)]);
                 let key = evaluation
                     .issues()
                     .find(|key| key.unit() == &bytes)
