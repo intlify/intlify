@@ -934,6 +934,34 @@ mod tests {
         );
     }
 
+    /// The interval observes a member or a target out of place through the
+    /// selected declaration's observer, as the resolver does: one candidate
+    /// for each occurrence that found it, or for a target no group names.
+    #[test]
+    fn the_interval_observes_a_member_or_a_target_out_of_place() {
+        let member =
+            |id: &str, check| group_unit(GroupSubject::Member(group("web"), target(id)), check);
+        let place = |id: &str| group_unit(GroupSubject::Assignment(target(id)), Check::SingleGroup);
+        for (recipe, expected) in [
+            (R::MemberUnknown, vec![member("tablet", Check::KnownMember)]),
+            (
+                R::MemberDuplicate,
+                vec![member("browser", Check::UniqueMember); 2],
+            ),
+            (R::TargetUnassigned, vec![place("ssr")]),
+            (R::TargetInTwoGroups, vec![place("browser"); 2]),
+        ] {
+            let resolved = resolved(recipe);
+            let observed: Vec<_> = resolved
+                .evaluation
+                .occurrence_candidates()
+                .iter()
+                .map(|candidate| candidate.finding.unit().clone())
+                .collect();
+            assert_eq!(observed, expected, "{recipe:?}");
+        }
+    }
+
     #[test]
     fn a_resolver_defect_fails_the_case() {
         let resolved = Resolved {

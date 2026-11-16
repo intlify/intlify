@@ -22,6 +22,14 @@
 //! for the groups and the memberships, a Group ID's key for its bytes, a
 //! group's `members` for their count, and each occurrence of a member for its
 //! bytes (D15:2387).
+//!
+//! A member that names no declared Target ID is observed at each of its
+//! occurrences beside the declared Target IDs, the set it must belong to, and
+//! a repeated member at each occurrence beside the others (D15:2249). A
+//! declared Target ID that no group names is observed at its key beside the
+//! groups, the set it must belong to; one that several groups name, at each
+//! of its occurrences beside those in the other groups, the conflicting
+//! group/member evidence (D15:2438).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -32,6 +40,7 @@ use super::evaluation::{
     and, both, within, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant,
     Found, Observation, Phase, Subject, Unit,
 };
+use super::evidence::EvidenceProjection;
 use super::limits::{BoundId, ConfirmedPolicy, Group};
 use super::targets::ResolvedTargets;
 
@@ -221,6 +230,12 @@ pub(crate) fn resolve_groups(
     let known = targets
         .clone()
         .and_then(|targets| targets.bounded().clone().map(|()| targets));
+    // The declared Target IDs are there to observe only once Phase 11
+    // admitted them.
+    let at_targets = match (observer, &known) {
+        (Some(observer), Ok(_)) => Some(observer.value(&["targetProfiles"])?),
+        _ => None,
+    };
     let mut groups = BTreeMap::new();
     let mut bounds = BTreeMap::new();
     let mut named = BTreeMap::new();
@@ -237,11 +252,16 @@ pub(crate) fn resolve_groups(
         let gate = both(policy.clone(), and(own, memberships.clone())).map(|(policy, ())| policy);
         groups.insert(
             id.clone(),
-            members(evaluation, (&gate, observer), &known, (id, group))?,
+            members(
+                evaluation,
+                (&gate, observer),
+                (&known, at_targets.as_ref()),
+                (id, group),
+            )?,
         );
     }
     let assignments = match targets {
-        Ok(targets) => assignments(evaluation, &every_group, declared, targets)?,
+        Ok(targets) => assignments(evaluation, (&every_group, observer), declared, targets)?,
         Err(causes) => Err(causes),
     };
     let mut partition = assignments;
@@ -309,14 +329,17 @@ fn own_bounds(
 /// The group's members by the Target ID each spells. Each must be within
 /// `maxTargetIdBytes`, name a declared Target ID, and occur once; repeated
 /// occurrences are one subject, all spelling the same bytes. The set exists
-/// only when every member holds.
+/// only when every member holds. A check that fails observes each occurrence
+/// of the member (D15:2387): past the bound beside the policy, naming no
+/// Target ID beside the declared Target IDs at `at_targets`, and repeated
+/// beside the other occurrences.
 fn members(
     evaluation: &mut Evaluation,
     (gate, observer): (
         &Admitted<&ConfirmedPolicy>,
         Option<&DeclarationObserver<'_>>,
     ),
-    known: &Admitted<&ResolvedTargets<'_>>,
+    (known, at_targets): (&Admitted<&ResolvedTargets<'_>>, Option<&EvidenceProjection>),
     (id, group): (&DeploymentGroupId, &DeploymentGroup),
 ) -> Result<Admitted<BTreeSet<TargetId>>, GroupInvariant> {
     // Each member's occurrences, by their positions in the group's members.
@@ -324,20 +347,21 @@ fn members(
     for (index, member) in group.members.as_slice().iter().enumerate() {
         occurrences.entry(member).or_default().push(index);
     }
-    let confirmed = gate.as_ref().map(|policy| *policy);
     let mut holds = Ok(());
     for (&member, positions) in &occurrences {
         let subject = || GroupSubject::Member(id.clone(), member.clone());
-        // Past the bound, each occurrence is observed at its token, beside
-        // the policy (D15:2387).
-        let past = positions
+        // Each occurrence at its token, when there is a declaration to
+        // observe.
+        let at = positions
             .iter()
             .map(|&index| {
-                beside(confirmed, observer, |observer| {
-                    observer.element(&["deploymentGroups", id.as_str(), "members"], index)
-                })
+                observer
+                    .map(|observer| {
+                        observer.element(&["deploymentGroups", id.as_str(), "members"], index)
+                    })
+                    .transpose()
             })
-            .collect::<Result<Vec<Option<Observation>>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
         let bytes = evaluation.check_found(
             unit(subject(), Check::WithinBound),
             gate.clone(),
@@ -347,26 +371,28 @@ fn members(
                     policy.limits().target_grouping.max_target_id_bytes,
                     member.as_str().len(),
                 )
-                .map_err(|blocking| Found::each(blocking, past))
+                .map_err(|blocking| {
+                    Found::each(blocking, each_beside(&at, Some(policy.evidence())))
+                })
             },
         )?;
-        let count = positions.len();
-        let declared = evaluation.check(
+        let declared = evaluation.check_found(
             unit(subject(), Check::KnownMember),
             both(bytes.clone(), known.clone()),
             |((), targets)| {
                 if targets.get(member).is_some() {
                     Ok(())
                 } else {
-                    Err(issue(Code::GroupMemberUnknown))
+                    let unknown = issue(Code::GroupMemberUnknown);
+                    Err(Found::each(unknown, each_beside(&at, at_targets)))
                 }
             },
         )?;
-        let once = evaluation.check(unit(subject(), Check::UniqueMember), bytes, |()| {
-            if count == 1 {
+        let once = evaluation.check_found(unit(subject(), Check::UniqueMember), bytes, |()| {
+            if at.len() == 1 {
                 Ok(())
             } else {
-                Err(issue(Code::GroupMemberDuplicate))
+                Err(Found::repeated(issue(Code::GroupMemberDuplicate), &at))
             }
         })?;
         holds = and(holds, and(declared, once));
@@ -374,35 +400,122 @@ fn members(
     Ok(holds.map(|()| occurrences.into_keys().cloned().collect()))
 }
 
+/// One observation for each occurrence at `at`, beside `related`, where both
+/// were observed.
+fn each_beside(
+    at: &[Option<EvidenceProjection>],
+    related: Option<&EvidenceProjection>,
+) -> Vec<Option<Observation>> {
+    at.iter()
+        .map(|primary| {
+            Some(Observation {
+                primary: primary.clone()?,
+                related: vec![related?.clone()],
+            })
+        })
+        .collect()
+}
+
 /// Each declared Target ID's place: in exactly one group, counting a group
-/// once however often it names the target.
+/// once however often it names the target. A target out of place is
+/// observed through `observer`, when there is one.
 fn assignments(
     evaluation: &mut Evaluation,
-    every_group: &Admitted<()>,
+    (every_group, observer): (&Admitted<()>, Option<&DeclarationObserver<'_>>),
     declared: &NonEmptyMap<DeploymentGroupId, DeploymentGroup>,
     targets: &ResolvedTargets<'_>,
-) -> Result<Admitted<()>, EvaluationInvariant> {
-    let mut containing: BTreeMap<&TargetId, usize> = BTreeMap::new();
-    for group in declared.values() {
-        let distinct: BTreeSet<&TargetId> = group.members.as_slice().iter().collect();
-        for member in distinct {
-            *containing.entry(member).or_default() += 1;
+) -> Result<Admitted<()>, GroupInvariant> {
+    // Every occurrence of each Target ID among the groups, by its group and
+    // position. A group's occurrences are adjacent, so each run is a group.
+    let mut occurrences: BTreeMap<&TargetId, Vec<(&DeploymentGroupId, usize)>> = BTreeMap::new();
+    for (id, group) in declared.iter() {
+        for (index, member) in group.members.as_slice().iter().enumerate() {
+            occurrences.entry(member).or_default().push((id, index));
         }
     }
     let mut holds = Ok(());
     for (target, facts) in targets.iter() {
-        let placed = evaluation.check(
+        let found = occurrences.get(target).map_or(&[][..], Vec::as_slice);
+        let groups = found.chunk_by(|(one, _), (other, _)| one == other).count();
+        // Where a target out of place is observed: the declaration has its
+        // key and every occurrence, whatever the check waits on. Relating each
+        // occurrence to the other groups' grows with their square, so it
+        // waits until the check runs.
+        let (key, at) = match groups {
+            0 => (unassigned(observer, target)?, Vec::new()),
+            1 => (None, Vec::new()),
+            _ => (None, located(observer, found)?),
+        };
+        let placed = evaluation.check_found(
             unit(GroupSubject::Assignment(target.clone()), Check::SingleGroup),
             both(facts.admitted.clone(), every_group.clone()),
-            |((), ())| match containing.get(target).copied().unwrap_or(0) {
+            |((), ())| match groups {
                 1 => Ok(()),
-                0 => Err(issue(Code::TargetUnassigned)),
-                _ => Err(issue(Code::TargetAssignedToMultipleGroups)),
+                0 => Err(Found::each(issue(Code::TargetUnassigned), vec![key])),
+                _ => Err(Found::each(
+                    issue(Code::TargetAssignedToMultipleGroups),
+                    beside_other_groups(&at),
+                )),
             },
         )?;
         holds = and(holds, placed);
     }
     Ok(holds)
+}
+
+/// A declared Target ID that no group names, at its key beside the groups,
+/// the set it must belong to (D15:2249).
+fn unassigned(
+    observer: Option<&DeclarationObserver<'_>>,
+    target: &TargetId,
+) -> Result<Option<Observation>, ObserverInvariant> {
+    observer
+        .map(|observer| {
+            Ok(Observation {
+                primary: observer.member_key(&["targetProfiles"], target.as_str())?,
+                related: vec![observer.value(&["deploymentGroups"])?],
+            })
+        })
+        .transpose()
+}
+
+/// Where each occurrence `found` of a Target ID is, by its group, when it
+/// is observed.
+fn located<'g>(
+    observer: Option<&DeclarationObserver<'_>>,
+    found: &[(&'g DeploymentGroupId, usize)],
+) -> Result<Vec<(&'g DeploymentGroupId, Option<EvidenceProjection>)>, ObserverInvariant> {
+    found
+        .iter()
+        .map(|&(id, index)| {
+            observer
+                .map(|observer| {
+                    observer.element(&["deploymentGroups", id.as_str(), "members"], index)
+                })
+                .transpose()
+                .map(|at| (id, at))
+        })
+        .collect()
+}
+
+/// Each occurrence at `at` of a Target ID that several groups name, beside
+/// its occurrences in the other groups (D15:2387, 2438). An occurrence in the
+/// same group is no other group the check counts.
+fn beside_other_groups(
+    at: &[(&DeploymentGroupId, Option<EvidenceProjection>)],
+) -> Vec<Option<Observation>> {
+    at.iter()
+        .map(|(id, primary)| {
+            Some(Observation {
+                primary: primary.clone()?,
+                related: at
+                    .iter()
+                    .filter(|(other, _)| other != id)
+                    .filter_map(|(_, related)| related.clone())
+                    .collect(),
+            })
+        })
+        .collect()
 }
 
 const fn issue(code: Code) -> Blocking {
@@ -753,6 +866,17 @@ mod tests {
                 issues(&evaluation),
                 [(unknown.clone(), Code::GroupMemberUnknown)]
             );
+            // Observed at its occurrence, beside the declared Target IDs.
+            assert_eq!(
+                observed(&evaluation),
+                [(
+                    unknown.clone(),
+                    inputs.at(|observer| {
+                        observer.element(&["deploymentGroups", "web", "members"], 2)
+                    }),
+                    vec![inputs.at(|observer| observer.value(&["targetProfiles"]))]
+                )]
+            );
             let groups = groups.unwrap();
             // Only `web` lacks its members; `jobs` and every target's place
             // were checked.
@@ -773,16 +897,58 @@ mod tests {
     }
 
     #[test]
+    fn a_member_naming_no_target_twice_is_observed_at_each_occurrence() {
+        let mut inputs = Inputs::new();
+        *inputs.members("web") = json!(["phone", "browser", "server", "phone"]);
+        inputs.resolve(|evaluation, _| {
+            let unknown = member("web", "phone", Check::KnownMember);
+            let duplicate = member("web", "phone", Check::UniqueMember);
+            assert_eq!(
+                issues(&evaluation),
+                [
+                    (unknown.clone(), Code::GroupMemberUnknown),
+                    (duplicate.clone(), Code::GroupMemberDuplicate),
+                ]
+            );
+            let at = |index| {
+                inputs
+                    .at(|observer| observer.element(&["deploymentGroups", "web", "members"], index))
+            };
+            let targets = inputs.at(|observer| observer.value(&["targetProfiles"]));
+            // One candidate for each occurrence of either result (D15:2387).
+            assert_eq!(
+                observed(&evaluation),
+                [
+                    (unknown.clone(), at(0), vec![targets.clone()]),
+                    (unknown, at(3), vec![targets]),
+                    (duplicate.clone(), at(0), vec![at(3)]),
+                    (duplicate, at(3), vec![at(0)]),
+                ]
+            );
+        });
+    }
+
+    #[test]
     fn a_member_named_twice_in_its_group_is_one_duplicate() {
         let mut inputs = Inputs::new();
         *inputs.members("web") = json!(["browser", "server", "browser"]);
         inputs.resolve(|evaluation, groups| {
+            let duplicate = member("web", "browser", Check::UniqueMember);
             assert_eq!(
                 issues(&evaluation),
-                [(
-                    member("web", "browser", Check::UniqueMember),
-                    Code::GroupMemberDuplicate
-                )]
+                [(duplicate.clone(), Code::GroupMemberDuplicate)]
+            );
+            // Each occurrence, beside the other.
+            let at = |index| {
+                inputs
+                    .at(|observer| observer.element(&["deploymentGroups", "web", "members"], index))
+            };
+            assert_eq!(
+                observed(&evaluation),
+                [
+                    (duplicate.clone(), at(0), vec![at(2)]),
+                    (duplicate, at(2), vec![at(0)]),
+                ]
             );
             // The repeat is not a second group: `browser` is still placed once.
             assert_eq!(waits_on(&evaluation, &assignment("browser")), None);
@@ -804,12 +970,68 @@ mod tests {
                     (assignment("worker"), Code::TargetUnassigned),
                 ]
             );
+            let at = |id: &str, index| {
+                inputs.at(|observer| observer.element(&["deploymentGroups", id, "members"], index))
+            };
+            assert_eq!(
+                observed(&evaluation),
+                [
+                    // Each occurrence, beside the other group's.
+                    (assignment("server"), at("jobs", 0), vec![at("web", 1)]),
+                    (assignment("server"), at("web", 1), vec![at("jobs", 0)]),
+                    // The target's key, beside the groups it must be in.
+                    (
+                        assignment("worker"),
+                        inputs.at(|observer| observer.member_key(&["targetProfiles"], "worker")),
+                        vec![inputs.at(|observer| observer.value(&["deploymentGroups"]))]
+                    ),
+                ]
+            );
             let groups = groups.unwrap();
             // Each group's own members hold; only the partition does not.
             for id in ["jobs", "web"] {
                 assert!(groups.get(&group(id)).unwrap().is_ok(), "{id}");
             }
             assert!(groups.partition().is_err());
+        });
+    }
+
+    #[test]
+    fn a_target_two_groups_name_is_observed_at_each_occurrence_beside_the_other_group() {
+        // `server` twice in `web` and once in `jobs`: the groups conflict, and
+        // `web` repeats it as well.
+        let mut inputs = Inputs::new();
+        *inputs.members("web") = json!(["browser", "server", "server"]);
+        *inputs.members("jobs") = json!(["worker", "server"]);
+        inputs.resolve(|evaluation, _| {
+            let duplicate = member("web", "server", Check::UniqueMember);
+            let server = assignment("server");
+            assert_eq!(
+                issues(&evaluation),
+                [
+                    (duplicate.clone(), Code::GroupMemberDuplicate),
+                    (server.clone(), Code::TargetAssignedToMultipleGroups),
+                ]
+            );
+            let at = |id: &str, index| {
+                inputs.at(|observer| observer.element(&["deploymentGroups", id, "members"], index))
+            };
+            assert_eq!(
+                observed(&evaluation),
+                [
+                    (duplicate.clone(), at("web", 1), vec![at("web", 2)]),
+                    (duplicate, at("web", 2), vec![at("web", 1)]),
+                    // The group counts once: an occurrence in the same group
+                    // is no conflicting one.
+                    (
+                        server.clone(),
+                        at("jobs", 1),
+                        vec![at("web", 1), at("web", 2)]
+                    ),
+                    (server.clone(), at("web", 1), vec![at("jobs", 1)]),
+                    (server, at("web", 2), vec![at("jobs", 1)]),
+                ]
+            );
         });
     }
 
