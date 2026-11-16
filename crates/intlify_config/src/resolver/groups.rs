@@ -438,21 +438,23 @@ fn assignments(
         let found = occurrences.get(target).map_or(&[][..], Vec::as_slice);
         let groups = found.chunk_by(|(one, _), (other, _)| one == other).count();
         // Where a target out of place is observed: the declaration has its
-        // key and every occurrence, whatever the check waits on.
-        let observed = match groups {
-            0 => vec![unassigned(observer, target)?],
-            1 => Vec::new(),
-            _ => in_several(observer, found)?,
+        // key and every occurrence, whatever the check waits on. Relating each
+        // occurrence to the other groups' grows with their square, so it
+        // waits until the check runs.
+        let (key, at) = match groups {
+            0 => (unassigned(observer, target)?, Vec::new()),
+            1 => (None, Vec::new()),
+            _ => (None, located(observer, found)?),
         };
         let placed = evaluation.check_found(
             unit(GroupSubject::Assignment(target.clone()), Check::SingleGroup),
             both(facts.admitted.clone(), every_group.clone()),
             |((), ())| match groups {
                 1 => Ok(()),
-                0 => Err(Found::each(issue(Code::TargetUnassigned), observed)),
+                0 => Err(Found::each(issue(Code::TargetUnassigned), vec![key])),
                 _ => Err(Found::each(
                     issue(Code::TargetAssignedToMultipleGroups),
-                    observed,
+                    beside_other_groups(&at),
                 )),
             },
         )?;
@@ -477,14 +479,13 @@ fn unassigned(
         .transpose()
 }
 
-/// Each occurrence `found` of a Target ID that several groups name, beside
-/// its occurrences in the other groups (D15:2387, 2438). An occurrence in the
-/// same group is no other group the check counts.
-fn in_several(
+/// Where each occurrence `found` of a Target ID is, by its group, when it
+/// is observed.
+fn located<'g>(
     observer: Option<&DeclarationObserver<'_>>,
-    found: &[(&DeploymentGroupId, usize)],
-) -> Result<Vec<Option<Observation>>, ObserverInvariant> {
-    let at = found
+    found: &[(&'g DeploymentGroupId, usize)],
+) -> Result<Vec<(&'g DeploymentGroupId, Option<EvidenceProjection>)>, ObserverInvariant> {
+    found
         .iter()
         .map(|&(id, index)| {
             observer
@@ -494,9 +495,16 @@ fn in_several(
                 .transpose()
                 .map(|at| (id, at))
         })
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(at
-        .iter()
+        .collect()
+}
+
+/// Each occurrence at `at` of a Target ID that several groups name, beside
+/// its occurrences in the other groups (D15:2387, 2438). An occurrence in the
+/// same group is no other group the check counts.
+fn beside_other_groups(
+    at: &[(&DeploymentGroupId, Option<EvidenceProjection>)],
+) -> Vec<Option<Observation>> {
+    at.iter()
         .map(|(id, primary)| {
             Some(Observation {
                 primary: primary.clone()?,
@@ -507,7 +515,7 @@ fn in_several(
                     .collect(),
             })
         })
-        .collect())
+        .collect()
 }
 
 const fn issue(code: Code) -> Blocking {
