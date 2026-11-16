@@ -2678,6 +2678,33 @@ pub(super) mod tests {
         });
     }
 
+    /// Without its Target ID map, a declaration's groups are still checked,
+    /// but whether a member names a declared Target ID waits on the map, and
+    /// Phase 12 observes nothing the declaration lacks.
+    #[test]
+    fn a_group_beside_no_target_map_leaves_its_members_unknown() {
+        use crate::resolver::groups::{self, GroupSubject};
+        let mut inputs = Inputs::complete();
+        inputs
+            .declaration()
+            .as_object_mut()
+            .unwrap()
+            .remove("targetProfiles");
+        inputs.resolve(|evaluation, _| {
+            for id in ["browser", "server"] {
+                let member = GroupSubject::Member(
+                    serde_json::from_value(json!("web")).unwrap(),
+                    serde_json::from_value(json!(id)).unwrap(),
+                );
+                let known = groups::unit(member, Check::KnownMember);
+                assert!(
+                    matches!(evaluation.status(&known), Some(Status::NotEvaluated(_))),
+                    "{id}"
+                );
+            }
+        });
+    }
+
     /// The phases after Phase 5 classify a locale key by the canonicalizer it
     /// bound: Phase 7 observes a corrected alias key under its non-secret
     /// name and a rejected one redacted (D15:776).
