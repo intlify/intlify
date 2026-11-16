@@ -322,6 +322,7 @@ impl From<TargetInvariant> for ResolverInvariant {
     fn from(invariant: TargetInvariant) -> Self {
         match invariant {
             TargetInvariant::Evaluation(invariant) => Self::Evaluation(invariant),
+            TargetInvariant::Component(invariant) => Self::Component(invariant),
             TargetInvariant::Observer(invariant) => Self::Observer(invariant),
         }
     }

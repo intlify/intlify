@@ -21,7 +21,10 @@
 //! A target whose locale set is not a subset of the project's is observed at
 //! its locale set beside the project's, and one whose effective default is
 //! outside its set at that default where it is written, its own override or
-//! the project's default, beside its set (D15:2416).
+//! the project's default, beside its set (D15:2416). A requested locale its
+//! Target Profile has no direction for is observed at each item that names
+//! it, a repeat included, beside the Target Profile, a member of the Set
+//! (D15:834, 1405, 2387).
 
 use std::collections::BTreeMap;
 
@@ -29,22 +32,32 @@ use crate::artifacts::content::Content;
 use crate::locale::CanonicalLocale;
 use crate::model::{NonEmptyMap, TargetDeclaration, TargetId};
 
-use super::artifact_resolution::AdmittedArtifact;
+use super::artifact_resolution::{self, AdmittedArtifact};
 use super::declaration_observer::{DeclarationObserver, ObserverInvariant};
 use super::evaluation::{
     and, both, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Found,
     Observation, Phase, Reason, Subject, Unit,
 };
+use super::evidence::EvidenceProjection;
+use super::evidence_component::ComponentInvariant;
 use super::exact_resolution::{Named, ReferenceResults};
-use super::locales::{LocaleSet, ResolvedLocales, TargetLocales};
+use super::locales::{LocaleKey, LocaleSet, Location, ResolvedLocales, TargetLocales};
 use super::resource_policy::ReferenceField;
 
 /// A resolver bug Phase 11 refuses.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum TargetInvariant {
     Evaluation(EvaluationInvariant),
+    /// The Target Profile a check compared has no component path.
+    Component(ComponentInvariant),
     /// What a check looked at in the declaration has no Evidence.
     Observer(ObserverInvariant),
+}
+
+impl From<ComponentInvariant> for TargetInvariant {
+    fn from(invariant: ComponentInvariant) -> Self {
+        Self::Component(invariant)
+    }
 }
 
 impl From<EvaluationInvariant> for TargetInvariant {
@@ -193,6 +206,24 @@ impl Checks<'_, '_> {
         unit(TargetSubject::Target(self.id.clone()), check)
     }
 
+    /// Each item of the target's requested locales Phase 7 canonicalized, by
+    /// its position and its canonical locale, in the declaration's order, a
+    /// repeat included.
+    fn items<'l>(&self, locales: &'l ResolvedLocales) -> Vec<(usize, &'l CanonicalLocale)> {
+        locales
+            .occurrences
+            .iter()
+            .filter_map(|occurrence| match (&occurrence.location, &occurrence.key) {
+                (Location::TargetRequestedLocale(id, index), LocaleKey::Canonical(locale))
+                    if id == self.id =>
+                {
+                    Some((*index, locale))
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
     /// The path of the target's `field` in the declaration.
     fn path<'f>(&'f self, field: &'f str) -> [&'f str; 3] {
         ["targetProfiles", self.id.as_str(), field]
@@ -270,14 +301,34 @@ impl Checks<'_, '_> {
             },
         )?;
         let profile = profile(references, self.id);
-        let directed = evaluation.check(
+        let directed_input = both(both(admitted.clone(), requested.clone()), profile.clone());
+        let sight = match (self.observer, &directed_input) {
+            (Some(observer), Ok((_, (tuple, _)))) => Some(Directions {
+                items: self
+                    .items(locales)
+                    .into_iter()
+                    .map(|(index, locale)| {
+                        Ok((
+                            locale.clone(),
+                            observer.element(&self.path("requestedLocales"), index)?,
+                        ))
+                    })
+                    .collect::<Result<_, ObserverInvariant>>()?,
+                profile: artifact_resolution::admitted(tuple)?,
+            }),
+            _ => None,
+        };
+        let directed = evaluation.check_found(
             self.unit(Check::DirectedLocales),
-            both(both(admitted.clone(), requested.clone()), profile.clone()),
+            directed_input,
             |(((), requested), (_, artifact))| {
-                if directs(artifact, &requested) {
+                let missing = undirected(artifact, &requested);
+                if missing.is_empty() {
                     Ok(())
                 } else {
-                    Err(issue(Code::TargetLocaleDirectionMissing, None))
+                    let blocking = issue(Code::TargetLocaleDirectionMissing, None);
+                    let observed = sight.map_or_else(Vec::new, |sight| sight.at(&missing));
+                    Err(Found::each(blocking, observed))
                 }
             },
         )?;
@@ -320,20 +371,52 @@ fn effective_default(
     })
 }
 
-/// Whether the Target Profile has a direction for each of `requested`: an
-/// entry whose locale is the canonical spelling, byte for byte. An entry for
-/// another locale is unused, and an artifact that is no Target Profile has
-/// none.
-fn directs(artifact: &AdmittedArtifact<'_>, requested: &LocaleSet) -> bool {
-    let Content::TargetProfile(profile) = &artifact.content else {
-        return false;
-    };
-    requested.as_slice().iter().all(|locale| {
-        profile
-            .directions
+/// What the directions check observes, made before its unit records it:
+/// each item of the target's locales, by its canonical locale, at its token,
+/// and the Target Profile the check compared them with.
+struct Directions {
+    items: Vec<(CanonicalLocale, EvidenceProjection)>,
+    profile: EvidenceProjection,
+}
+
+impl Directions {
+    /// One observation for each item that names one of `missing`, a repeat
+    /// included, beside the Target Profile (D15:2387).
+    fn at(&self, missing: &[&CanonicalLocale]) -> Vec<Option<Observation>> {
+        self.items
             .iter()
-            .any(|direction| direction.locale == locale.as_str())
-    })
+            .filter(|(locale, _)| missing.contains(&locale))
+            .map(|(_, at)| {
+                Some(Observation {
+                    primary: at.clone(),
+                    related: vec![self.profile.clone()],
+                })
+            })
+            .collect()
+    }
+}
+
+/// The requested locales the Target Profile has no direction for: those
+/// without an entry whose locale is the canonical spelling, byte for byte. An
+/// entry for another locale is unused, and an artifact that is no Target
+/// Profile has none.
+fn undirected<'l>(
+    artifact: &AdmittedArtifact<'_>,
+    requested: &'l LocaleSet,
+) -> Vec<&'l CanonicalLocale> {
+    let Content::TargetProfile(profile) = &artifact.content else {
+        return requested.as_slice().iter().collect();
+    };
+    requested
+        .as_slice()
+        .iter()
+        .filter(|locale| {
+            !profile
+                .directions
+                .iter()
+                .any(|direction| direction.locale == locale.as_str())
+        })
+        .collect()
 }
 
 /// The Set's Target Profile the target's reference names, or why it names
@@ -477,7 +560,9 @@ mod tests {
 
         /// Submits, in place of the Target Profile the target `id` names, one
         /// with `directions`, and names it.
-        fn direct(&mut self, id: &str, directions: Value) {
+        /// Gives the target `id` a Target Profile with these `directions`,
+        /// and returns it.
+        fn direct(&mut self, id: &str, directions: Value) -> Value {
             let mut content = sample(ArtifactKind::TargetProfile);
             content["locale"]["directions"] = directions;
             let member = envelope_of(
@@ -493,6 +578,7 @@ mod tests {
                 }
             }
             self.target(id)["profile"] = reference_value(&tuple_of(&member));
+            member
         }
 
         /// Phase 7, Phase 9's exact resolution of the targets' references,
@@ -561,6 +647,19 @@ mod tests {
         fn at(&self, path: &[&str]) -> Value {
             Observed::declaration(&self.app).app(|observer| view(&observer.value(path).unwrap()))
         }
+
+        /// The view of the Evidence of the element at `index` of the array at
+        /// `path` in the declaration.
+        fn element(&self, path: &[&str], index: usize) -> Value {
+            Observed::declaration(&self.app)
+                .app(|observer| view(&observer.element(path, index).unwrap()))
+        }
+    }
+
+    /// The view of the Set's artifact `member`, under its exact-reference
+    /// identity.
+    fn artifact(member: &Value) -> Value {
+        view(&artifact_resolution::admitted(&tuple_of(member)).unwrap())
     }
 
     /// Each Phase 11 Finding candidate: its unit, and the views of its
@@ -717,7 +816,7 @@ mod tests {
         let mut inputs = Inputs::new();
         // `JA` is no canonical spelling, so it directs nothing, and `fr` is
         // no locale the browser requests.
-        inputs.direct(
+        let profile = inputs.direct(
             "browser",
             json!([
                 {"locale": "JA", "direction": "LTR"},
@@ -732,6 +831,16 @@ mod tests {
                     target_unit("browser", Check::DirectedLocales),
                     Code::TargetLocaleDirectionMissing,
                     None
+                )]
+            );
+            // Observed at the item that names `ja`, beside the browser's
+            // Target Profile (D15:1405).
+            assert_eq!(
+                observed(&evaluation),
+                [(
+                    target_unit("browser", Check::DirectedLocales),
+                    inputs.element(&["targetProfiles", "browser", "requestedLocales"], 0),
+                    vec![artifact(&profile)]
                 )]
             );
             assert!(statuses(&evaluation)
@@ -770,6 +879,28 @@ mod tests {
         });
     }
 
+    /// Each item that names a locale without a direction is observed, a
+    /// repeat included, beside the Target Profile (D15:1405, 2387).
+    #[test]
+    fn each_item_naming_an_undirected_locale_is_observed() {
+        let mut inputs = Inputs::new();
+        // The server names `en` twice, and its Target Profile directs only
+        // `ja`, which the server does not request.
+        inputs.target("server")["requestedLocales"] = json!(["en", "EN"]);
+        let profile = inputs.direct("server", json!([{"locale": "ja", "direction": "LTR"}]));
+        inputs.resolve(|evaluation, _| {
+            let set = ["targetProfiles", "server", "requestedLocales"];
+            let each = |index| {
+                (
+                    target_unit("server", Check::DirectedLocales),
+                    inputs.element(&set, index),
+                    vec![artifact(&profile)],
+                )
+            };
+            assert_eq!(observed(&evaluation), [each(0), each(1)]);
+        });
+    }
+
     /// Only an entry spelled as the canonical locale directs it, and an
     /// artifact that is no Target Profile directs nothing.
     #[test]
@@ -795,10 +926,12 @@ mod tests {
             content: member.envelope().unwrap().admit().unwrap(),
         };
         let (profile, trust) = (admitted(&profile), admitted(&trust));
-        assert!(directs(&profile, &set(&["en"])));
-        assert!(directs(&profile, &set(&["de", "en", "fr-FR", "ja"])));
-        assert!(!directs(&profile, &set(&["en", "fr"])));
-        assert!(!directs(&trust, &set(&["en"])));
+        let (en, fr) = (canonical("en"), canonical("fr"));
+        assert!(undirected(&profile, &set(&["en"])).is_empty());
+        assert!(undirected(&profile, &set(&["de", "en", "fr-FR", "ja"])).is_empty());
+        // Only the locale without its entry is missing.
+        assert_eq!(undirected(&profile, &set(&["en", "fr"])), [&fr]);
+        assert_eq!(undirected(&trust, &set(&["en"])), [&en]);
     }
 
     #[test]
