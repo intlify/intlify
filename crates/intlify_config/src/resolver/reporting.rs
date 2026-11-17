@@ -16,8 +16,10 @@
 //! its Shared Findings and status and the Coverage Decision Basis it owns
 //! (D15:1607-1609, 2207). The unit owns every record of its slices, and units
 //! report in canonical unit order, so the earliest unit that refers to an
-//! Evidence owns its index record (D15:1972, 2205). The dependency records
-//! come later (plan 025 decision #221).
+//! Evidence owns its index record (D15:1972, 2205). The owner of an
+//! established group's semantic dependency reports it into its Shared slice
+//! (D15:2516); the materialized and entry dependency records come later (plan
+//! 025 decision #221).
 //!
 //! A slice has two stages (D15:2209). Its candidates are what the candidate
 //! stage counts before any ordinal or record exists: each Finding candidate,
@@ -53,6 +55,7 @@ use super::coverage::{self, Basis, CoverageSubject, Decision};
 use super::decision_evidence::{
     self, CoverageDecisionEvidence, DecisionEvidence, DecisionInvariant,
 };
+use super::dependency::{self, SemanticGroup};
 use super::evaluation::{
     Causes, Check, Details, Evaluation, ExhaustedBound, Finding, IssueKey, Phase, Reason, Status,
     Unit,
@@ -130,6 +133,8 @@ pub(crate) enum Record<'e> {
     /// key.
     UnavailabilityCause(&'e IssueKey),
     DecisionBasis(&'e (CanonicalLocale, Token), &'e Basis),
+    /// The semantic dependency of an established group (D15:2510, 2516).
+    SemanticDependency(SemanticGroup),
 }
 
 /// A retained record, of its record kind, with `C` of its accounting view
@@ -418,6 +423,18 @@ impl<'e, 's> Reporting<'e, 's> {
                         )?);
                     }
                 }
+                // The owner of a group's semantic dependency is evaluated
+                // exactly when the group is established (D15:2516).
+                if let Some(group) = dependency::owned(unit) {
+                    if let Some(Status::Evaluated) = self.evaluation.status(unit) {
+                        records.push(self.retained(
+                            unit,
+                            RecordKind::SemanticDependency,
+                            Record::SemanticDependency(group),
+                            group.view(),
+                        )?);
+                    }
+                }
             }
         }
         Ok(records)
@@ -637,6 +654,7 @@ mod tests {
 
     use crate::construction::registry::check::RecordKind;
     use crate::materialize_tests::limits;
+    use crate::resolver::dependency::{self, SemanticGroup};
     use crate::resolver::entry::admit_entry;
     use crate::resolver::entry::fixtures::FileFixture;
     use crate::resolver::evaluation::{Blocking, Check, Code, Evaluation, Phase, Status, Unit};
@@ -751,9 +769,15 @@ mod tests {
                     ReportingDomain::Shared => RecordKind::SharedEvaluationStatus,
                 };
                 let basis = if slice.unit == &table { cells } else { 0 };
+                let semantic = usize::from(dependency::owned(slice.unit).is_some());
                 assert_eq!(
                     kinds(slice),
-                    [vec![status], vec![RecordKind::CoverageDecisionBasis; basis]].concat(),
+                    [
+                        vec![status],
+                        vec![RecordKind::CoverageDecisionBasis; basis],
+                        vec![RecordKind::SemanticDependency; semantic],
+                    ]
+                    .concat(),
                     "{:?}",
                     slice.unit
                 );
@@ -1014,6 +1038,71 @@ mod tests {
                 u64::try_from(causes.keys().count()).unwrap()
             );
             assert!(owned.candidates.causes > 0);
+        });
+    }
+
+    /// Every group, in the canonical order of its owner's unit, which is the
+    /// order its slice reports in (D15:2211).
+    fn by_owner() -> Vec<SemanticGroup> {
+        let mut groups = SemanticGroup::ALL.to_vec();
+        groups.sort_by_key(|group| dependency::unit(*group));
+        groups
+    }
+
+    /// The groups whose semantic dependencies `slices` report, each by its
+    /// owner, with the view and the accounting bytes of its record.
+    fn semantic(slices: &[Slice<'_>], views: &RecordViews<'_>) -> Vec<SemanticGroup> {
+        let mut groups = Vec::new();
+        for slice in slices {
+            for retained in &slice.records {
+                if let Record::SemanticDependency(group) = retained.record {
+                    assert_eq!(slice.unit, &dependency::unit(group));
+                    assert_eq!(slice.domain, ReportingDomain::Shared);
+                    assert_eq!(retained.kind, RecordKind::SemanticDependency);
+                    let accounting = views
+                        .accounting(slice.unit, retained.kind, group.view())
+                        .unwrap();
+                    assert_eq!(retained.bytes, encoded_length(&accounting).unwrap());
+                    groups.push(group);
+                }
+            }
+        }
+        groups
+    }
+
+    /// A complete invocation establishes every group, so each group's owner
+    /// reports its semantic dependency into its Shared slice, after its
+    /// status (D15:2510, 2516, 2518).
+    #[test]
+    fn each_established_group_reports_its_semantic_dependency() {
+        Inputs::complete().resolve(|evaluation, _| {
+            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
+            let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
+            let slices = reporting.slices().unwrap();
+            assert_eq!(semantic(&slices, &views), by_owner());
+        });
+    }
+
+    /// A group that is not established has no semantic dependency, while the
+    /// groups established beside it keep theirs (D15:1173, 2516).
+    #[test]
+    fn a_group_that_is_not_established_has_no_semantic_dependency() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["coverage"]["rules"] =
+            json!([{"intentSurfaceClasses": ["unknown"], "mode": "fallback-allowed"}]);
+        inputs.resolve(|evaluation, _| {
+            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
+            let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
+            let slices = reporting.slices().unwrap();
+            let established: Vec<SemanticGroup> = by_owner()
+                .into_iter()
+                .filter(|group| {
+                    evaluation.status(&dependency::unit(*group)) == Some(&Status::Evaluated)
+                })
+                .collect();
+            assert!(!established.contains(&SemanticGroup::Coverage));
+            assert!(established.contains(&SemanticGroup::ProjectLocales));
+            assert_eq!(semantic(&slices, &views), established);
         });
     }
 }

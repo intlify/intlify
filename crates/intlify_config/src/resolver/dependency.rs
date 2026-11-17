@@ -12,9 +12,16 @@
 //! themselves: Resolution Evidence builds them, each under its owner. The
 //! materialized and entry dependencies name the closed input slots 015 lists
 //! (D15:2507), [`MaterializedSlot`] and [`EntrySlot`].
+//!
+//! A semantic dependency's `inputs` are fixed per group: the slots the group's
+//! values are taken from and the slots 015's dependency paragraphs name as its
+//! semantic inputs, never a slot that only decides whether the group is
+//! established, which a materialized dependency records (D15:2516; plan 025
+//! decisions #241 and #242).
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 use super::evaluation::{
     Admitted, Blocking, Check, Evaluation, EvaluationInvariant, Subject, Unit,
@@ -75,6 +82,45 @@ impl SemanticGroup {
             Self::DeploymentGroups => "deploymentGroups",
             Self::Delivery => "delivery",
         }
+    }
+
+    /// The input slots the group is derived from, in the vocabulary's order:
+    /// none for `profileSpecification`, whose values come from construction,
+    /// and for every other group the slots its values are taken from and the
+    /// slots 015 names as its semantic inputs (D15:2516, 2541-2573).
+    pub(crate) const fn inputs(self) -> &'static [MaterializedSlot] {
+        use MaterializedSlot::{
+            ArtifactCollection as Collection, ConfigurationValue as Value,
+            IntentSurfaceClassVocabulary as Vocabulary, LocaleCanonicalizationData as Data,
+            SpecificationInput as Specification,
+        };
+        match self {
+            Self::ProfileSpecification => &[],
+            Self::ProjectIdentity => &[Value],
+            Self::LocaleCanonicalization => &[Specification, Data],
+            Self::ProjectLocales
+            | Self::LocaleNegotiation
+            | Self::MessageFallback
+            | Self::Targets
+            | Self::DeploymentGroups => &[Specification, Data, Collection, Value],
+            Self::Coverage => &[Specification, Vocabulary, Data, Collection, Value],
+            Self::RequiredPolicies | Self::OptionalPolicies => &[Collection, Value],
+            Self::Delivery => &[Specification, Value],
+        }
+    }
+
+    /// The view of the group's semantic dependency, `{ group, inputs }`
+    /// (D15:2510).
+    pub(crate) fn view(self) -> Value {
+        json!({ "group": self.id(), "inputs": self.inputs() })
+    }
+}
+
+/// The group whose semantic dependency `unit` owns, if it owns one.
+pub(crate) fn owned(unit: &Unit) -> Option<SemanticGroup> {
+    match unit.subject {
+        Subject::SemanticDependency(group) if *unit == self::unit(group) => Some(group),
+        _ => None,
     }
 }
 
@@ -356,5 +402,87 @@ mod tests {
                 SemanticGroup::Delivery
             )))
         );
+    }
+
+    /// Each group's semantic dependency names the slots 015 derives it from,
+    /// in the vocabulary's order, and never a slot that only gates it (plan
+    /// 025 decisions #241 and #242).
+    #[test]
+    fn each_group_names_its_fixed_inputs() {
+        let views = SemanticGroup::ALL.map(SemanticGroup::view);
+        let common = [
+            "specification-input",
+            "locale-canonicalization-data",
+            "artifact-collection",
+            "configuration-value",
+        ];
+        assert_eq!(
+            views,
+            [
+                json!({ "group": "profileSpecification", "inputs": [] }),
+                json!({ "group": "projectIdentity", "inputs": ["configuration-value"] }),
+                json!({
+                    "group": "localeCanonicalization",
+                    "inputs": ["specification-input", "locale-canonicalization-data"],
+                }),
+                json!({ "group": "projectLocales", "inputs": common }),
+                json!({ "group": "localeNegotiation", "inputs": common }),
+                json!({ "group": "messageFallback", "inputs": common }),
+                json!({
+                    "group": "coverage",
+                    "inputs": [
+                        "specification-input",
+                        "intent-surface-class-vocabulary",
+                        "locale-canonicalization-data",
+                        "artifact-collection",
+                        "configuration-value",
+                    ],
+                }),
+                json!({
+                    "group": "requiredPolicies",
+                    "inputs": ["artifact-collection", "configuration-value"],
+                }),
+                json!({
+                    "group": "optionalPolicies",
+                    "inputs": ["artifact-collection", "configuration-value"],
+                }),
+                json!({ "group": "targets", "inputs": common }),
+                json!({ "group": "deploymentGroups", "inputs": common }),
+                json!({
+                    "group": "delivery",
+                    "inputs": ["specification-input", "configuration-value"],
+                }),
+            ]
+        );
+        for group in SemanticGroup::ALL {
+            let inputs = group.inputs();
+            assert!(inputs.windows(2).all(|pair| pair[0] < pair[1]), "{group:?}");
+            for gate in [
+                MaterializedSlot::VerificationInput,
+                MaterializedSlot::ImplementationCapability,
+                MaterializedSlot::ProfileSelector,
+            ] {
+                assert!(!inputs.contains(&gate), "{group:?}");
+            }
+        }
+    }
+
+    /// Only a group's owner owns its semantic dependency.
+    #[test]
+    fn only_a_groups_owner_owns_its_semantic_dependency() {
+        for group in SemanticGroup::ALL {
+            assert_eq!(owned(&unit(group)), Some(group));
+            let other = Unit {
+                check: Check::EstablishedSlots,
+                ..unit(group)
+            };
+            assert_eq!(owned(&other), None);
+        }
+        let materialized = Unit {
+            phase: Phase::StructuralAdmission,
+            subject: Subject::MaterializedDependencies,
+            check: Check::EstablishedSlots,
+        };
+        assert_eq!(owned(&materialized), None);
     }
 }
