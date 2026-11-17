@@ -557,9 +557,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Subject::Target(_)
         | Subject::Group(_)
         | Subject::Hydration(_)
-        | Subject::SemanticDependency(_) => {
-            return Err(OutputFailure::LocalePolicyResolutionInvariant)
-        }
+        | Subject::SemanticDependency(_)
+        | Subject::DiagnosticDomain => return Err(OutputFailure::LocalePolicyResolutionInvariant),
     }
     frame.uint(match unit.check {
         Check::WithinBound => 0,

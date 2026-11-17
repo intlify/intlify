@@ -44,6 +44,7 @@ pub(crate) mod profile_selection;
 pub(crate) mod profile_view;
 pub(crate) mod record_view;
 pub(crate) mod reporting;
+pub(crate) mod reporting_plan;
 pub(crate) mod resource_policy;
 pub(crate) mod specification;
 pub(crate) mod structural_admission;

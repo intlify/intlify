@@ -181,6 +181,11 @@ pub(crate) enum Subject {
     /// One semantic group of the profile view, whose unit owns the group's
     /// semantic dependency record: each group is a singleton kind.
     SemanticDependency(SemanticGroup),
+    /// The diagnostic domain, a singleton: the subject of the terminal
+    /// reporting-limit Finding of an exhausted domain, whose reason names the
+    /// domain. No unit is recorded over it (D15:2359, 2408; plan 025
+    /// decision #227).
+    DiagnosticDomain,
 }
 
 /// The check a unit runs, declared in rank order within a subject kind.
@@ -1091,6 +1096,10 @@ pub(crate) enum Details {
     Limit(LimitExceeded),
     Shortfall(Shortfall),
     BootstrapLimit(BootstrapLimitExceeded),
+    /// The bound of a diagnostic domain that a reporting slice exceeded,
+    /// which the domain's terminal reporting-limit Finding names
+    /// (D15:2359, 2408).
+    Exhausted(BoundId),
 }
 
 /// Whether `count` submitted items stay within `limit`, or the issue 015
@@ -1153,6 +1162,21 @@ pub(crate) struct IssueKey {
 }
 
 impl IssueKey {
+    /// The key of the terminal reporting-limit Finding of the diagnostic
+    /// domain `reason` names: the one fixed check over the singleton
+    /// diagnostic domain in `reporting-finalization` (D15:2359, 2408).
+    pub(crate) const fn terminal(reason: Reason) -> Self {
+        Self {
+            unit: Unit {
+                phase: Phase::ReportingFinalization,
+                subject: Subject::DiagnosticDomain,
+                check: Check::CompleteReporting,
+            },
+            code: Code::ReportingLimitExceeded,
+            reason: Some(reason),
+        }
+    }
+
     pub(crate) const fn unit(&self) -> &Unit {
         &self.unit
     }
@@ -1401,6 +1425,9 @@ impl Evaluation {
                 measured && members.contains(&DetailsMember::Actual)
             }
             Some(Details::Shortfall(_)) => members.contains(&DetailsMember::Available),
+            Some(Details::Exhausted(_)) => {
+                members.contains(&DetailsMember::Bound) && !members.contains(&DetailsMember::Actual)
+            }
             Some(Details::BootstrapLimit(exceeded)) => {
                 let limit = exceeded.limit.get();
                 let measured = match exceeded.actual {

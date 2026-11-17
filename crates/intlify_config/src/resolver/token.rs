@@ -130,6 +130,7 @@ pub(crate) fn logical(subject: &Subject) -> Subject {
         | Subject::Group(_)
         | Subject::Hydration(_)
         | Subject::SemanticDependency(_)
+        | Subject::DiagnosticDomain
         | Subject::ArtifactCollection(CollectionSubject::Group(_)) => subject.clone(),
         Subject::Structural(structural) => Subject::Structural(structural.logical()),
         Subject::ResourcePolicy(policy) => Subject::ResourcePolicy(match policy {
@@ -426,7 +427,8 @@ fn own(subject: &Subject) -> (Own<'_>, Option<Subject>) {
         | Subject::StructuralCapability
         | Subject::Vocabulary
         | Subject::CanonicalizationData
-        | Subject::SemanticDependency(_) => alone(Own::Singleton),
+        | Subject::SemanticDependency(_)
+        | Subject::DiagnosticDomain => alone(Own::Singleton),
         Subject::Structural(structural) => structural_own(structural),
         Subject::Selection(selection) => alone(match selection {
             SelectionSubject::Profiles | SelectionSubject::Selector => Own::Singleton,
@@ -1339,6 +1341,7 @@ mod tests {
                 Subject::Hydration(HydrationSubject::Roles(group("site"), target("web"))),
                 parent(site, web),
             ),
+            (Subject::DiagnosticDomain, json!("diagnostic-domain")),
         ];
         for (subject, expected) in cases {
             assert_eq!(projected(&subject), expected, "{subject:?}");
