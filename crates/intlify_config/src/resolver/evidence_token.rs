@@ -354,6 +354,11 @@ impl EvidenceTokens {
     pub(crate) const fn comparisons(&self) -> u64 {
         self.comparisons
     }
+
+    /// The token records built, one per distinct record.
+    pub(crate) fn records(&self) -> u64 {
+        crate::artifacts::count(self.tokens.len())
+    }
 }
 
 #[cfg(test)]
@@ -694,5 +699,18 @@ mod tests {
         for (value, tag) in typed {
             assert_eq!(JsonType::of(&value).id(), tag, "{value}");
         }
+    }
+
+    /// Components with one record build one token record (plan 025
+    /// interpretation #239).
+    #[test]
+    fn components_with_one_record_build_one_token_record() {
+        let cases = every_kind();
+        let components: Vec<_> = cases.iter().map(|(component, _)| component).collect();
+        let doubled = components.iter().chain(&components).copied();
+        assert_eq!(
+            EvidenceTokens::assign(PROFILE, doubled, &Sha256).records(),
+            7
+        );
     }
 }

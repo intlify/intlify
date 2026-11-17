@@ -1,27 +1,57 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Design 015's `evidenceMetadata` bounds that the resolver applies itself,
-//! in the order of the capability's table (D15:1834-1839, 1851; Decision
-//! 015-197), and path admission under the first two: every Logical input
-//! path, Portable Value Locator, and Resolver Input Component Path that a
-//! Finding Occurrence or Coverage Decision Evidence candidate's Evidence needs
-//! is measured before token generation, each token written without a
-//! collision ordinal (D15:724; plan 025 interpretations #234 and #238).
+//! Design 015's `evidenceMetadata` bounds that the resolver applies itself:
+//! the two path bounds, under which every Logical input path, Portable Value
+//! Locator, and Resolver Input Component Path that a Finding Occurrence or
+//! Coverage Decision Evidence candidate's Evidence needs is admitted, and the
+//! four counts of the resolver's own Evidence metadata work, which no adapter
+//! applies (D15:724, 1834-1839, 1851; Decision 015-197).
 //!
-//! A Logical input path past either path bound is absent, as path absence is
-//! (D15:776). A value locator or component path past one leaves its Evidence
-//! invalid (D15:842), and the Finding Registry fixes each check's evidence
-//! kinds, so no other form replaces it: the Entry domain, the only one whose
-//! records carry Evidence, is exhausted instead (plan 025 decisions #232,
-//! #236, and #247). Where several paths exceed a bound, the one named is the
-//! first in the table's order.
+//! Both come once, after the last evaluation phase and before token generation
+//! and any reporting slice (plan 025 decision #230), in two scopes: the
+//! complete invocation, and its Shared scope, the candidates and subjects of
+//! the units that report into the Shared domain, which the construction
+//! context and Materialized Resolution Input Set alone determine. A Logical
+//! input path past either path bound is absent, as path absence is (D15:776).
+//! A value locator or component path past one leaves its Evidence invalid
+//! (D15:842), and the Finding Registry fixes each check's evidence kinds, so
+//! no other form replaces it: the Entry domain, the only one whose records
+//! carry Evidence, is exhausted instead (plan 025 decisions #232 and #236). So
+//! it is when only a count of the complete invocation exceeds its bound, while
+//! the Shared domain reports as it would within every bound, so that paired
+//! entries keep equal Shared projections (D15:2659, 3228; plan 025 decision
+//! #247). A count of the Shared scope past its bound exhausts every domain
+//! (#229). Each domain's terminal Finding names the first bound in the table's
+//! order that its scope exceeds, which is also the order the work is checked
+//! in: the path bounds, then subject occurrences, token inputs, collision
+//! comparisons, and metadata work units, so no token of a scope is generated
+//! past its token inputs' bound.
+//!
+//! A subject occurrence is a raw candidate the evaluation recorded, before
+//! its logical subject is deduplicated. A token input is the subject of a
+//! recorded unit, one for each unit, or a redacted component of an admitted
+//! candidate's Evidence. A collision comparison is one pair of a colliding set
+//! of subject or evidence token records. A metadata work unit is one source
+//! identity, locator, Logical input path or value locator, selector, or
+//! component path that an admitted candidate's Evidence carries, or one token
+//! record (plan 025 interpretation #239). The diagnostic domain's subject
+//! token, which only the reserved terminal records name, is outside the
+//! counts (plan 025 interpretation #237).
+
+use std::iter::once;
 
 use crate::input_limits::Bound;
 
 use super::capability::{BootstrapBoundId, BootstrapGroup, EvidenceMetadataLimits};
+use super::decision_evidence::{self, DecisionEvidence};
+use super::evaluation::{Evaluation, Unit};
 use super::evidence_path::PathSize;
-use super::tally::Tally;
+use super::evidence_token::EvidenceTokens;
+use super::occurrence::{self, OccurrenceCandidate};
+use super::reporting::ReportingDomain;
+use super::tally::{total, Tally};
+use super::token::{Digest, Specification, Tokens};
 
 /// One `evidenceMetadata` bound the resolver applies itself, in the order of
 /// 015's table, which `Ord` follows (D15:1834-1839).
@@ -114,6 +144,197 @@ pub(crate) fn all<T>(
     values
 }
 
+/// The Evidence candidates of an invocation as path admission leaves them,
+/// with the tokens of their invocation.
+#[derive(Debug)]
+pub(crate) struct Admitted {
+    /// The Finding Occurrence candidates, in the evaluation's order.
+    pub(crate) occurrences: Vec<OccurrenceCandidate>,
+    /// The Coverage Decision Evidence candidates, in the evaluation's order.
+    pub(crate) decisions: Vec<DecisionEvidence>,
+    /// The token of the subject of every unit the evaluation recorded.
+    pub(crate) subjects: Tokens,
+    /// The token of every redacted component of the admitted Evidence.
+    pub(crate) evidence: EvidenceTokens,
+}
+
+/// The first bound in the table's order that each domain's scope exceeds,
+/// if one does (plan 025 decision #247).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct Exceeded {
+    pub(crate) entry: Option<MetadataBound>,
+    pub(crate) shared: Option<MetadataBound>,
+}
+
+impl Exceeded {
+    /// The bound `domain`'s scope exceeds, if one does.
+    pub(crate) const fn of(self, domain: ReportingDomain) -> Option<MetadataBound> {
+        match domain {
+            ReportingDomain::Entry => self.entry,
+            ReportingDomain::Shared => self.shared,
+        }
+    }
+}
+
+/// What the resolver's own Evidence metadata work leaves to report.
+#[derive(Debug)]
+pub(crate) enum Admission {
+    /// Every path and count is within its bound.
+    Admitted(Admitted),
+    /// The complete invocation exceeds `entry`, the first bound in the
+    /// table's order it exceeds, while the Shared scope exceeds none: only
+    /// the Entry domain is exhausted, and the Shared domain reports with
+    /// `shared`, the tokens of its units' subjects.
+    EntryExhausted {
+        entry: MetadataBound,
+        shared: Tokens,
+    },
+    /// The Shared scope exceeds `shared`, so every domain is exhausted, the
+    /// Entry domain at `entry`, the first bound the complete invocation
+    /// exceeds.
+    Exhausted {
+        entry: MetadataBound,
+        shared: MetadataBound,
+    },
+}
+
+impl Admission {
+    /// The bound each domain's scope exceeds.
+    pub(crate) const fn exceeded(&self) -> Exceeded {
+        match self {
+            Self::Admitted(_) => Exceeded {
+                entry: None,
+                shared: None,
+            },
+            Self::EntryExhausted { entry, .. } => Exceeded {
+                entry: Some(*entry),
+                shared: None,
+            },
+            Self::Exhausted { entry, shared } => Exceeded {
+                entry: Some(*entry),
+                shared: Some(*shared),
+            },
+        }
+    }
+}
+
+/// Admits the Evidence of `evaluation`'s candidates under the path bounds of
+/// `limits`, and checks the Evidence metadata work of the complete invocation
+/// and of its Shared scope against the four counts, assigning under `digest`
+/// a scope's tokens only once its token inputs are within their bound. The
+/// subjects of the units that report into the Shared domain have colliding
+/// sets of their own, so the Shared scope's tokens are the invocation's
+/// (D15:1851, 2194; plan 025 decisions #171 and #247).
+pub(crate) fn admit(
+    evaluation: &Evaluation,
+    specification: Specification<'_>,
+    limits: &EvidenceMetadataLimits,
+    digest: &impl Digest,
+) -> Admission {
+    let shared = |unit: &Unit| ReportingDomain::of(unit.phase) == ReportingDomain::Shared;
+    let (shared_units, entry_units): (Vec<&Unit>, Vec<&Unit>) = evaluation
+        .statuses()
+        .map(|(unit, _)| unit)
+        .partition(|unit| shared(unit));
+    let shared_inputs = MetadataBound::SubjectOccurrences
+        .holds(
+            limits,
+            Tally::of(
+                evaluation
+                    .candidates()
+                    .filter(|(unit, _)| shared(unit))
+                    .count(),
+            ),
+        )
+        .and_then(|()| MetadataBound::TokenInputs.holds(limits, Tally::of(shared_units.len())));
+    let invocation_inputs = both(
+        all(evaluation
+            .occurrence_candidates()
+            .iter()
+            .map(|candidate| candidate.admitted(limits))),
+        all(evaluation
+            .decision_evidence()
+            .iter()
+            .map(|candidate| candidate.admitted(limits))),
+    )
+    .and_then(|(occurrences, decisions)| {
+        MetadataBound::SubjectOccurrences
+            .holds(limits, Tally::of(evaluation.candidates().count()))?;
+        let components = occurrence::redacted(&occurrences)
+            .chain(decision_evidence::redacted(&decisions))
+            .count();
+        MetadataBound::TokenInputs.holds(
+            limits,
+            Tally::of(shared_units.len())
+                .plus(Tally::of(entry_units.len()))
+                .plus(Tally::of(components)),
+        )?;
+        Ok((occurrences, decisions))
+    });
+    // The complete invocation holds the Shared scope, so past a bound of the
+    // Shared scope it exceeds one no later in the table's order.
+    let shared_tokens = match shared_inputs {
+        Ok(()) => Tokens::assign(
+            specification,
+            shared_units.iter().map(|unit| &unit.subject),
+            digest,
+        ),
+        Err(shared) => {
+            return Admission::Exhausted {
+                entry: invocation_inputs.err().unwrap_or(shared),
+                shared,
+            }
+        }
+    };
+    let shared_counted = MetadataBound::CollisionComparisons
+        .holds(limits, Tally::exactly(shared_tokens.comparisons()))
+        .and_then(|()| {
+            MetadataBound::MetadataWorkUnits.holds(limits, Tally::exactly(shared_tokens.records()))
+        });
+    let invocation = invocation_inputs.and_then(|(occurrences, decisions)| {
+        let subjects = shared_tokens.clone().merge(Tokens::assign(
+            specification,
+            entry_units.iter().map(|unit| &unit.subject),
+            digest,
+        ));
+        let evidence = EvidenceTokens::assign(
+            specification,
+            occurrence::redacted(&occurrences).chain(decision_evidence::redacted(&decisions)),
+            digest,
+        );
+        MetadataBound::CollisionComparisons.holds(
+            limits,
+            Tally::exactly(subjects.comparisons()).plus(Tally::exactly(evidence.comparisons())),
+        )?;
+        let projections = occurrences
+            .iter()
+            .flat_map(|candidate| once(&candidate.primary).chain(&candidate.related))
+            .chain(decisions.iter().map(|candidate| &candidate.evidence))
+            .map(|projection| Tally::exactly(projection.work()));
+        MetadataBound::MetadataWorkUnits.holds(
+            limits,
+            total(projections.chain([subjects.records(), evidence.records()].map(Tally::exactly))),
+        )?;
+        Ok(Admitted {
+            occurrences,
+            decisions,
+            subjects,
+            evidence,
+        })
+    });
+    match (shared_counted, invocation) {
+        (Err(shared), invocation) => Admission::Exhausted {
+            entry: invocation.err().unwrap_or(shared),
+            shared,
+        },
+        (Ok(()), Err(entry)) => Admission::EntryExhausted {
+            entry,
+            shared: shared_tokens,
+        },
+        (Ok(()), Ok(admitted)) => Admission::Admitted(admitted),
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod fixtures {
     use crate::input_limits::Bound;
@@ -160,15 +381,31 @@ mod tests {
 
     use serde_json::json;
 
+    use crate::artifacts::count;
+    use crate::boundary::source::{file_source_revision, read_pair, SourceLimits};
     use crate::input_limits::Bound;
     use crate::resolver::capability::{BootstrapGroup, BootstrapLimits, EvidenceMetadataLimits};
-    use crate::resolver::evaluation::Evaluation;
-    use crate::resolver::evidence::EvidenceProjection;
-    use crate::resolver::evidence_path::PathSize;
+    use crate::resolver::evaluation::{
+        Blocking, Check, Code, Evaluation, Found, Observation, Phase, Subject, Unit,
+    };
+    use crate::resolver::evidence::{EvidenceProjection, Source};
+    use crate::resolver::evidence_path::{PathSize, Step};
+    use crate::resolver::evidence_token::EvidenceTokens;
+    use crate::resolver::locales::fixtures::key;
+    use crate::resolver::locales::LocaleSubject;
+    use crate::resolver::origin::SafeOriginKind as O;
     use crate::resolver::profile_resolution::tests::Inputs;
+    use crate::resolver::token::{Digest, Sha256, Specification, Tokens};
+    use crate::resolver::{decision_evidence, occurrence};
 
     use super::fixtures::{unbounded, with};
-    use super::{all, both, path_holds, MetadataBound};
+    use super::{admit, all, both, path_holds, Exceeded, MetadataBound};
+    use crate::resolver::reporting::ReportingDomain;
+
+    const PROFILE: Specification<'static> = Specification {
+        identity: "intlify-project-profile",
+        revision: "0",
+    };
 
     const ALL: [MetadataBound; 6] = [
         MetadataBound::LogicalPathSegments,
@@ -178,6 +415,15 @@ mod tests {
         MetadataBound::CollisionComparisons,
         MetadataBound::MetadataWorkUnits,
     ];
+
+    /// A digest under which every record collides.
+    struct Constant;
+
+    impl Digest for Constant {
+        fn digest(&self, _: &[u8]) -> [u8; 32] {
+            [7; 32]
+        }
+    }
 
     /// `complete`'s profile, whose two targets each request a locale outside
     /// the project's that their Target Profiles have no direction for, and
@@ -331,6 +577,19 @@ mod tests {
             assert!(largest >= 2, "{bound:?}");
             assert_eq!(admitted(evaluation, &with(bound, largest)), Ok(candidates));
             assert_eq!(admitted(evaluation, &with(bound, largest - 1)), Err(bound));
+            assert_eq!(
+                admit(evaluation, PROFILE, &with(bound, largest), &Sha256).exceeded(),
+                Exceeded::default()
+            );
+            // Only the Entry domain's records carry Evidence (plan 025
+            // decision #247).
+            assert_eq!(
+                admit(evaluation, PROFILE, &with(bound, largest - 1), &Sha256).exceeded(),
+                Exceeded {
+                    entry: Some(bound),
+                    shared: None,
+                }
+            );
         }
         let tight = EvidenceMetadataLimits {
             max_logical_path_segments: Bound::new(segments - 1).unwrap(),
@@ -359,5 +618,270 @@ mod tests {
             assert!(!evaluation.decision_evidence().is_empty());
             required_paths_pass_at_their_largest_size_and_name_it_one_below(&evaluation);
         });
+    }
+
+    /// What each count of `evaluation` is under `digest`, as 015's table
+    /// counts it, with nothing past a path bound.
+    fn counts(evaluation: &Evaluation, digest: &impl Digest) -> [(MetadataBound, u64); 4] {
+        let subjects = Tokens::assign(
+            PROFILE,
+            evaluation.statuses().map(|(unit, _)| &unit.subject),
+            digest,
+        );
+        let components: Vec<_> = occurrence::redacted(evaluation.occurrence_candidates())
+            .chain(decision_evidence::redacted(evaluation.decision_evidence()))
+            .collect();
+        let inputs = evaluation.statuses().count() + components.len();
+        let evidence = EvidenceTokens::assign(PROFILE, components, digest);
+        let projected: u64 = projections(evaluation)
+            .into_iter()
+            .map(EvidenceProjection::work)
+            .sum();
+        [
+            (
+                MetadataBound::SubjectOccurrences,
+                count(evaluation.candidates().count()),
+            ),
+            (MetadataBound::TokenInputs, count(inputs)),
+            (
+                MetadataBound::CollisionComparisons,
+                subjects.comparisons() + evidence.comparisons(),
+            ),
+            (
+                MetadataBound::MetadataWorkUnits,
+                projected + subjects.records() + evidence.records(),
+            ),
+        ]
+    }
+
+    /// What each count of `evaluation`'s Shared scope is under `digest`: the
+    /// candidates and subjects of the units that report into the Shared
+    /// domain, and the comparisons and records of their tokens.
+    fn shared_counts(evaluation: &Evaluation, digest: &impl Digest) -> [(MetadataBound, u64); 4] {
+        let shared = |unit: &Unit| ReportingDomain::of(unit.phase) == ReportingDomain::Shared;
+        let subjects: Vec<&Subject> = evaluation
+            .statuses()
+            .filter(|(unit, _)| shared(unit))
+            .map(|(unit, _)| &unit.subject)
+            .collect();
+        let tokens = Tokens::assign(PROFILE, subjects.iter().copied(), digest);
+        [
+            (
+                MetadataBound::SubjectOccurrences,
+                count(
+                    evaluation
+                        .candidates()
+                        .filter(|(unit, _)| shared(unit))
+                        .count(),
+                ),
+            ),
+            (MetadataBound::TokenInputs, count(subjects.len())),
+            (MetadataBound::CollisionComparisons, tokens.comparisons()),
+            (MetadataBound::MetadataWorkUnits, tokens.records()),
+        ]
+    }
+
+    /// Each count passes at exactly what the complete invocation counts, and
+    /// one below exhausts the Entry domain, naming the bound. Down to what
+    /// the Shared scope counts only the Entry domain is exhausted, and one
+    /// below that every domain is, both naming the bound, the counts checked
+    /// after admission and in the table's order, under a digest that makes
+    /// every record of a kind collide so the comparisons count too
+    /// (D15:1836-1839, 1851; plan 025 decision #247, interpretation #239).
+    fn each_count_passes_exactly_and_names_itself_one_over(evaluation: &Evaluation) {
+        assert_eq!(
+            admit(evaluation, PROFILE, &unbounded(), &Sha256).exceeded(),
+            Exceeded::default()
+        );
+        let exceeded =
+            |bound, limit| admit(evaluation, PROFILE, &with(bound, limit), &Constant).exceeded();
+        let scopes: Vec<(MetadataBound, u64, u64)> = counts(evaluation, &Constant)
+            .into_iter()
+            .zip(shared_counts(evaluation, &Constant))
+            .map(|((bound, count), (_, shared))| (bound, count, shared))
+            .collect();
+        for &(bound, count, shared) in &scopes {
+            assert!(
+                count >= 2 && shared <= count,
+                "{bound:?} counts {count}, {shared}"
+            );
+            assert_eq!(exceeded(bound, count), Exceeded::default(), "{bound:?}");
+            let entry = Some(bound);
+            assert_eq!(
+                exceeded(bound, count - 1),
+                Exceeded {
+                    entry,
+                    shared: (shared == count).then_some(bound),
+                },
+                "{bound:?}"
+            );
+            if (1..count).contains(&shared) {
+                assert_eq!(
+                    exceeded(bound, shared),
+                    Exceeded {
+                        entry,
+                        shared: None,
+                    },
+                    "{bound:?}"
+                );
+            }
+            if shared >= 2 {
+                assert_eq!(
+                    exceeded(bound, shared - 1),
+                    Exceeded {
+                        entry,
+                        shared: entry,
+                    },
+                    "{bound:?}"
+                );
+            }
+        }
+        // Some count exhausts only the Entry domain, and some every domain.
+        assert!(scopes
+            .iter()
+            .any(|(_, count, shared)| (1..*count).contains(shared)));
+        assert!(scopes.iter().any(|(_, _, shared)| *shared >= 2));
+    }
+
+    /// Each domain names the first bound in the table's order that its own
+    /// scope exceeds: past a value locator's path bound and a Shared-scope
+    /// count, the Entry domain names the path bound and the Shared domain the
+    /// count, whether the Shared scope exceeds its inputs or the work its
+    /// tokens take (D15:1851; plan 025 decision #247).
+    #[test]
+    fn each_domain_names_the_first_bound_its_scope_exceeds() {
+        failing().resolve(|evaluation, _| {
+            let one = Bound::new(1).unwrap();
+            for (shared, limits) in [
+                (
+                    MetadataBound::SubjectOccurrences,
+                    EvidenceMetadataLimits {
+                        max_logical_path_segments: one,
+                        max_subject_occurrences: one,
+                        ..unbounded()
+                    },
+                ),
+                (
+                    MetadataBound::MetadataWorkUnits,
+                    EvidenceMetadataLimits {
+                        max_logical_path_segments: one,
+                        max_metadata_work_units: one,
+                        ..unbounded()
+                    },
+                ),
+            ] {
+                assert_eq!(
+                    admit(&evaluation, PROFILE, &limits, &Sha256).exceeded(),
+                    Exceeded {
+                        entry: Some(MetadataBound::LogicalPathSegments),
+                        shared: Some(shared),
+                    }
+                );
+            }
+        });
+    }
+
+    /// A complete invocation counts the Coverage Decision Evidence of its
+    /// decision table.
+    #[test]
+    fn each_count_of_a_complete_invocation_passes_exactly_and_names_itself_one_over() {
+        Inputs::complete().resolve(|evaluation, _| {
+            assert!(evaluation.occurrence_candidates().is_empty());
+            assert!(!evaluation.decision_evidence().is_empty());
+            each_count_passes_exactly_and_names_itself_one_over(&evaluation);
+        });
+    }
+
+    /// A failing invocation counts the Evidence of its Findings' occurrences.
+    #[test]
+    fn each_count_of_a_failing_invocation_passes_exactly_and_names_itself_one_over() {
+        failing().resolve(|evaluation, _| {
+            assert!(!evaluation.occurrence_candidates().is_empty());
+            each_count_passes_exactly_and_names_itself_one_over(&evaluation);
+        });
+    }
+
+    /// Materialized Value Evidence of `steps` in a file whose owner marked
+    /// its source identity when `marked`.
+    fn located(marked: bool, steps: &[Step<'_>]) -> EvidenceProjection {
+        let largest = Bound::new(u64::MAX - 1).unwrap();
+        let limits = SourceLimits {
+            identity_bytes: largest,
+            revision_bytes: largest,
+        };
+        let pair = read_pair(
+            Some("intlify-file-source.v0:storefront/intlify.config.json"),
+            Some(&file_source_revision(b"")),
+            b"",
+            limits,
+        )
+        .unwrap();
+        let source = Source {
+            identity: pair.identity(),
+            marked,
+            locator: None,
+        };
+        EvidenceProjection::configuration_value(O::ConfigurationFile, source, steps, None).unwrap()
+    }
+
+    /// The requested locales `en` and `ja` each found twice, observed at a
+    /// value of a file whose owner did not mark its source identity beside an
+    /// unsafe member of one whose owner did: Evidence whose components are a
+    /// source identity and a member, of two records.
+    fn redacting() -> Evaluation {
+        let mut evaluation = Evaluation::default();
+        for locale in ["en", "ja"] {
+            let unit = Unit {
+                phase: Phase::LocaleResolution,
+                subject: Subject::Locale(LocaleSubject::RequestedLocale(key(locale))),
+                check: Check::UniqueLocale,
+            };
+            let found = Blocking {
+                code: Code::LocaleDuplicate,
+                reason: None,
+                details: None,
+            };
+            let observation = Observation {
+                primary: located(
+                    false,
+                    &[
+                        Step::Safe("profiles"),
+                        Step::Safe("web"),
+                        Step::Safe("requestedLocales"),
+                        Step::Index(0),
+                    ],
+                ),
+                related: vec![located(
+                    true,
+                    &[
+                        Step::Safe("profiles"),
+                        Step::Unsafe,
+                        Step::Safe("requestedLocales"),
+                        Step::Index(1),
+                    ],
+                )],
+            };
+            evaluation
+                .check_found(unit, Ok(()), |()| {
+                    Err::<(), _>(Found::observed(found, observation))
+                })
+                .unwrap()
+                .unwrap_err();
+        }
+        evaluation
+    }
+
+    /// Evidence that redacts a source identity and a member counts each
+    /// component as a token input and each record as work, and the one pair
+    /// of records when they collide (D15:1837-1839; plan 025 interpretation
+    /// #239).
+    #[test]
+    fn each_count_of_redacted_evidence_passes_exactly_and_names_itself_one_over() {
+        let evaluation = redacting();
+        let components: Vec<_> = occurrence::redacted(evaluation.occurrence_candidates()).collect();
+        assert_eq!(components.len(), 4);
+        let evidence = EvidenceTokens::assign(PROFILE, components, &Constant);
+        assert_eq!((evidence.records(), evidence.comparisons()), (2, 1));
+        each_count_passes_exactly_and_names_itself_one_over(&evaluation);
     }
 }
