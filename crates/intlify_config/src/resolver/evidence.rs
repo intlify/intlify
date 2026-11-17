@@ -31,9 +31,11 @@ use crate::input_limits::Bound;
 use crate::model::ProfileId;
 use crate::structural::selection::SelectorInput;
 
+use super::capability::EvidenceMetadataLimits;
 use super::evidence_component::{ComponentPath, ResolverInputComponentPath};
+use super::evidence_metadata::{path_holds, MetadataBound};
 use super::evidence_path::{
-    InputPath, LogicalInputPath, PortableValueLocator, Step, ValueLocation,
+    InputPath, LogicalInputPath, PathSize, PortableValueLocator, Step, ValueLocation,
 };
 use super::evidence_selector::{SelectorEvidence, SelectorEvidenceInvariant, SelectorProjection};
 use super::evidence_source::{PortableSourceIdentity, SourceIdentity, SourceSpan};
@@ -175,6 +177,49 @@ impl EvidenceProjection {
             origin: path.origin(),
             parts: Parts::ResolverInput(path),
         }
+    }
+
+    /// The size of the path the record cannot do without, its value locator
+    /// or component path, if it has one (D15:842).
+    pub(crate) fn required_path(&self) -> Option<PathSize> {
+        match &self.parts {
+            Parts::Configuration {
+                location: Location::Value(value),
+                ..
+            } => Some(value.size()),
+            Parts::ResolverInput(path) => Some(path.size()),
+            Parts::Configuration { .. } | Parts::Selector(_) => None,
+        }
+    }
+
+    /// The record as path admission leaves it under `limits`, before token
+    /// generation: a Logical input path past either path bound is absent, as
+    /// path absence is (D15:724, 776, 1851).
+    ///
+    /// # Errors
+    ///
+    /// Returns the first path bound, in the table's order, that the record's
+    /// value locator or component path exceeds, which leaves the record
+    /// invalid with no other form to replace it (D15:842; plan 025 decisions
+    /// #232 and #236).
+    pub(crate) fn admitted(&self, limits: &EvidenceMetadataLimits) -> Result<Self, MetadataBound> {
+        if let Some(size) = self.required_path() {
+            path_holds(limits, size)?;
+        }
+        let mut admitted = self.clone();
+        if let Parts::Configuration {
+            location: Location::Entry(path),
+            ..
+        } = &mut admitted.parts
+        {
+            if path
+                .as_ref()
+                .is_some_and(|path| path_holds(limits, path.size()).is_err())
+            {
+                *path = None;
+            }
+        }
+        Ok(admitted)
     }
 
     /// Every component of the record that a token replaces.
@@ -334,7 +379,12 @@ mod tests {
     use crate::boundary::source::{file_source_revision, read_pair, ExactIdentity, SourceLimits};
     use crate::input_limits::Bound;
     use crate::model::ProfileId;
+    use intlify_shared_json::encoding::encoded_length;
+
+    use crate::resolver::capability::EvidenceMetadataLimits;
     use crate::resolver::evidence_component::{ComponentPath, VerificationRole};
+    use crate::resolver::evidence_metadata::fixtures::unbounded;
+    use crate::resolver::evidence_metadata::MetadataBound;
     use crate::resolver::evidence_path::Step;
     use crate::resolver::evidence_source::SourceSpan;
     use crate::resolver::evidence_token::{EvidenceTokenInvariant, EvidenceTokens, TokenKind};
@@ -690,5 +740,82 @@ mod tests {
         ]);
         pair.sort();
         assert_eq!(pair[0].view()["origin"], json!("configuration-file"));
+    }
+
+    /// The limits that admit a path of `segments` segments and `bytes`
+    /// canonical bytes, and no more.
+    fn paths(segments: u64, bytes: u64) -> EvidenceMetadataLimits {
+        EvidenceMetadataLimits {
+            max_logical_path_segments: Bound::new(segments).unwrap(),
+            max_logical_path_canonical_bytes: Bound::new(bytes).unwrap(),
+            ..unbounded()
+        }
+    }
+
+    /// At both path bounds a record is admitted unchanged. One past either,
+    /// its Logical input path is absent, as path absence is, while a value
+    /// locator or component path leaves the record invalid, naming the
+    /// segments before the bytes (D15:776, 842, 1851; plan 025 decisions #232
+    /// and #236).
+    #[test]
+    fn path_admission_drops_a_logical_input_path_and_refuses_a_required_one() {
+        let identity = exact(FILE);
+        let source = Source {
+            identity: &identity,
+            marked: false,
+            locator: None,
+        };
+        let steps = [Step::Safe("profiles"), Step::Unsafe, Step::Index(0)];
+        let entry =
+            EvidenceProjection::entry_source(O::ConfigurationFile, source, Some(&steps), None)
+                .unwrap();
+        let absent =
+            EvidenceProjection::entry_source(O::ConfigurationFile, source, None, None).unwrap();
+        let value =
+            EvidenceProjection::configuration_value(O::ConfigurationFile, source, &steps, None)
+                .unwrap();
+        let bound = MetadataBound::TokenInputs.id();
+        let input = EvidenceProjection::resolver_input(
+            ComponentPath::capability(crate::resolver::capability::CapabilityBound::BootstrapOnly(
+                bound,
+            ))
+            .unwrap(),
+        );
+        let retained = retain(&[entry.clone(), value.clone(), input.clone()]);
+        let bytes = |record: &Evidence, key: &str| encoded_length(&record.view()[key]).unwrap();
+        let cases = [
+            (&entry, bytes(&retained[0], "path")),
+            (&value, bytes(&retained[1], "value")),
+            (&input, bytes(&retained[2], "component")),
+        ];
+        for (record, bytes) in cases {
+            assert_eq!(record.admitted(&paths(3, bytes)).as_ref(), Ok(record));
+        }
+        assert_eq!(entry.admitted(&paths(2, u64::MAX - 1)), Ok(absent.clone()));
+        assert_eq!(entry.admitted(&paths(3, cases[0].1 - 1)), Ok(absent));
+        for (record, bytes) in &cases[1..] {
+            assert_eq!(
+                record.admitted(&paths(2, *bytes)),
+                Err(MetadataBound::LogicalPathSegments)
+            );
+            assert_eq!(
+                record.admitted(&paths(3, bytes - 1)),
+                Err(MetadataBound::LogicalPathCanonicalBytes)
+            );
+            assert_eq!(
+                record.admitted(&paths(2, bytes - 1)),
+                Err(MetadataBound::LogicalPathSegments)
+            );
+        }
+        let declared: Vec<ProfileId> = vec![serde_json::from_value(json!("app")).unwrap()];
+        let selector = EvidenceProjection::selector(
+            O::ProfileSelectorCli,
+            &SelectorInput::string("app", Bound::new(64).unwrap()),
+            Bound::new(64).unwrap(),
+            &declared,
+        )
+        .unwrap();
+        assert_eq!(selector.admitted(&paths(1, 1)), Ok(selector.clone()));
+        assert_eq!(selector.required_path(), None);
     }
 }

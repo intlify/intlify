@@ -42,8 +42,10 @@ use serde_json::{Map, Value};
 
 use crate::construction::registry::check::RecordKind;
 
+use super::capability::EvidenceMetadataLimits;
 use super::evaluation::{Code, IssueKey, Unit};
 use super::evidence::{Evidence, EvidenceProjection};
+use super::evidence_metadata::{all, both, MetadataBound};
 use super::evidence_token::{EvidenceTokens, Redacted};
 use super::record_view::{RecordViews, ViewInvariant};
 use super::token::Specification;
@@ -55,6 +57,30 @@ pub(crate) struct OccurrenceCandidate {
     pub(crate) finding: IssueKey,
     pub(crate) primary: EvidenceProjection,
     pub(crate) related: Vec<EvidenceProjection>,
+}
+
+impl OccurrenceCandidate {
+    /// The candidate with its Evidence as path admission leaves it under
+    /// `limits` (D15:776, 1851).
+    ///
+    /// # Errors
+    ///
+    /// Returns the first path bound, in the table's order, that a value
+    /// locator or component path of its Evidence exceeds.
+    pub(crate) fn admitted(&self, limits: &EvidenceMetadataLimits) -> Result<Self, MetadataBound> {
+        let (primary, related) = both(
+            self.primary.admitted(limits),
+            all(self
+                .related
+                .iter()
+                .map(|projection| projection.admitted(limits))),
+        )?;
+        Ok(Self {
+            finding: self.finding.clone(),
+            primary,
+            related,
+        })
+    }
 }
 
 /// A resolver bug the occurrences refuse.
@@ -237,6 +263,8 @@ mod tests {
     };
     use crate::resolver::evidence::{Evidence, EvidenceProjection, Source};
     use crate::resolver::evidence_component::{ComponentPath, Key, VerificationRole};
+    use crate::resolver::evidence_metadata::fixtures::with;
+    use crate::resolver::evidence_metadata::MetadataBound;
     use crate::resolver::evidence_path::Step;
     use crate::resolver::evidence_token::{EvidenceTokens, JsonType};
     use crate::resolver::locales::fixtures::key;
@@ -944,5 +972,50 @@ mod tests {
             &[&capability("policyComparable.configurationInput.maxDepth")]
         )
         .is_some());
+    }
+
+    /// Entry Source Evidence of the whole entry through
+    /// `configuration-file`, at `path` when one was established.
+    fn at(path: Option<&[Step<'_>]>) -> EvidenceProjection {
+        let identity = exact(FILE);
+        EvidenceProjection::entry_source(
+            O::ConfigurationFile,
+            Source {
+                identity: &identity,
+                marked: true,
+                locator: None,
+            },
+            path,
+            None,
+        )
+        .unwrap()
+    }
+
+    /// Path admission reaches the primary and every related Evidence: a
+    /// Logical input path past a bound is absent wherever it is, and a value
+    /// locator past one among the related refuses the candidate (D15:776,
+    /// 1851; plan 025 decisions #232 and #236).
+    #[test]
+    fn path_admission_reaches_the_primary_and_every_related_evidence() {
+        let mut evaluation = Evaluation::default();
+        let duplicate = duplicated(&mut evaluation);
+        let steps = [Step::Safe("profiles"), Step::Safe("web")];
+        let tight = with(MetadataBound::LogicalPathSegments, 1);
+        let paths = candidate(
+            &duplicate,
+            at(Some(&steps)),
+            vec![at(None), at(Some(&steps))],
+        );
+        assert_eq!(
+            paths.admitted(&tight),
+            Ok(candidate(&duplicate, at(None), vec![at(None), at(None)]))
+        );
+        let located = candidate(&duplicate, entry(O::ConfigurationFile), vec![requested(0)]);
+        let four = with(MetadataBound::LogicalPathSegments, 4);
+        assert_eq!(located.admitted(&four), Ok(located.clone()));
+        assert_eq!(
+            located.admitted(&tight),
+            Err(MetadataBound::LogicalPathSegments)
+        );
     }
 }
