@@ -19,14 +19,15 @@ use crate::artifacts::collection::FormalCollection;
 use crate::model::{ProfileDeclaration, ProfileId, TargetId};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::resolver::artifact_resolution::{admit_collection, ArtifactSet};
+use crate::resolver::declaration_observer::DeclarationObserver;
+use crate::resolver::entry::EntryFile;
 use crate::resolver::evaluation::{
-    Actual, Admitted, Causes, Check, Evaluation, EvaluationInvariant, IssueKey, LimitExceeded,
-    Status, Subject, Unit,
+    Actual, Admitted, Causes, Check, Evaluation, IssueKey, LimitExceeded, Status, Subject, Unit,
 };
 use crate::resolver::exact_resolution::resolve_fields;
 use crate::resolver::groups::{resolve_groups, ResolvedGroups};
 use crate::resolver::hydration::{
-    validate_hydration, EndpointField, HydrationSubject, ResolvedHydration,
+    validate_hydration, EndpointField, HydrationInvariant, HydrationSubject, ResolvedHydration,
 };
 use crate::resolver::limits::ConfirmedPolicy;
 use crate::resolver::locales::{resolve_locales, LocaleFields};
@@ -90,6 +91,15 @@ impl PreparedHydration {
         .ok()
     }
 
+    /// Where the selected declaration's checks observe it in `file`: the
+    /// phases after Phase 5 observe through what it bound.
+    pub(super) fn observer<'a>(
+        &'a self,
+        file: &'a EntryFile<'a>,
+    ) -> Option<DeclarationObserver<'a>> {
+        Some(observer(&self.analysis, file, &self.selected)?.with_locales(&*self.canonicalizer))
+    }
+
     /// The interval's inputs over `set`, when the configuration is complete
     /// and every earlier phase runs without a defect.
     pub(super) fn inputs<'a>(
@@ -98,9 +108,7 @@ impl PreparedHydration {
     ) -> Option<HydrationInputs<'a>> {
         let declaration = self.declaration()?;
         let file = self.file.file();
-        // The phases after Phase 5 observe through what it bound.
-        let observer =
-            observer(&self.analysis, &file, &self.selected)?.with_locales(&*self.canonicalizer);
+        let observer = self.observer(&file)?;
         let mut preparation = Evaluation::default();
         let policy: Result<&ConfirmedPolicy, &Causes> = Ok(&self.policy);
         let locales = resolve_locales(
@@ -156,7 +164,9 @@ impl PreparedHydration {
     pub(super) fn resolve(&self) -> Option<Resolved> {
         let set = self.set()?;
         let inputs = self.inputs(&set)?;
-        Some(Resolved::retain(construct(&inputs)))
+        let file = self.file.file();
+        let observer = self.observer(&file)?;
+        Some(Resolved::retain(construct((&inputs, &observer))))
     }
 }
 
@@ -164,18 +174,21 @@ impl PreparedHydration {
 /// with the shared negotiation profile.
 pub(super) struct Construction {
     evaluation: Evaluation,
-    result: Result<Admitted<ResolvedHydration>, EvaluationInvariant>,
+    result: Result<Admitted<ResolvedHydration>, HydrationInvariant>,
 }
 
-/// Phase 13 over a fresh evaluation: what every timed invocation runs.
-pub(super) fn construct(inputs: &HydrationInputs<'_>) -> Construction {
+/// Phase 13 over a fresh evaluation: what every timed invocation runs,
+/// observing through the selected declaration's `observer`.
+pub(super) fn construct(
+    (inputs, observer): (&HydrationInputs<'_>, &DeclarationObserver<'_>),
+) -> Construction {
     let mut evaluation = Evaluation::default();
     let result = validate_hydration(
         &mut evaluation,
         Ok(inputs.policy),
         Ok(&inputs.declaration.deployment_groups),
         inputs.targets.as_ref(),
-        inputs.groups.as_ref(),
+        (inputs.groups.as_ref(), Some(observer)),
         inputs.negotiation.clone(),
     );
     Construction { evaluation, result }
@@ -200,7 +213,7 @@ pub(super) struct Retained {
 /// complete ordinary output.
 pub(super) struct Resolved {
     pub(super) evaluation: Evaluation,
-    pub(super) result: Result<Admitted<Retained>, EvaluationInvariant>,
+    pub(super) result: Result<Admitted<Retained>, HydrationInvariant>,
 }
 
 impl Resolved {
@@ -605,7 +618,9 @@ mod tests {
     use crate::input_limits::Bound;
     use crate::model::DeploymentGroupId;
     use crate::resolver::artifact_resolution::{unit as collection_unit, CollectionSubject};
-    use crate::resolver::evaluation::{Blocking, Code, Details, Notice, Phase, Reason, Shortfall};
+    use crate::resolver::evaluation::{
+        Blocking, Code, Details, EvaluationInvariant, Notice, Phase, Reason, Shortfall,
+    };
     use crate::resolver::exact_resolution::unit as reference_unit;
     use crate::resolver::hydration::unit as hydration_unit;
     use crate::resolver::limits::{BoundId, Group};
@@ -798,7 +813,9 @@ mod tests {
         let prepared = prepared(R::FanOutFanIn);
         let set = prepared.set().unwrap();
         let inputs = prepared.inputs(&set).unwrap();
-        let construction = construct(&inputs);
+        let file = prepared.file.file();
+        let observer = prepared.observer(&file).unwrap();
+        let construction = construct((&inputs, &observer));
         let made = {
             let Ok(Ok(hydration)) = &construction.result else {
                 unreachable!()
@@ -880,13 +897,63 @@ mod tests {
         assert!(inputs.groups.as_ref().unwrap().partition().is_err());
     }
 
+    /// The interval observes an endpoint that fails through the selected
+    /// declaration's observer, as the resolver does: one candidate for each
+    /// failed check of the endpoint's occurrence.
+    #[test]
+    fn the_interval_observes_an_endpoint_that_fails() {
+        let endpoint = |client: &str, field, check| {
+            hydration_unit(
+                HydrationSubject::Endpoint(group("web"), target("ssr"), target(client), field),
+                check,
+            )
+        };
+        let client = EndpointField::Client;
+        for (recipe, expected) in [
+            (
+                R::UnknownEndpoint,
+                vec![
+                    endpoint("phone", client, Check::KnownEndpoint),
+                    endpoint("phone", client, Check::SameGroupEndpoint),
+                ],
+            ),
+            (
+                R::CrossGroup,
+                vec![
+                    endpoint("worker", client, Check::SameGroupEndpoint),
+                    endpoint("worker", client, Check::EndpointRole),
+                ],
+            ),
+            (
+                R::ServerCapabilityMissing,
+                vec![endpoint(
+                    "browser",
+                    EndpointField::Server,
+                    Check::EndpointRole,
+                )],
+            ),
+            (
+                R::ClientCapabilityMissing,
+                vec![endpoint("browser", client, Check::EndpointRole)],
+            ),
+        ] {
+            let observed: Vec<_> = resolved(recipe)
+                .evaluation
+                .occurrence_candidates()
+                .iter()
+                .map(|candidate| candidate.finding.unit().clone())
+                .collect();
+            assert_eq!(observed, expected, "{recipe:?}");
+        }
+    }
+
     #[test]
     fn a_resolver_defect_fails_the_case() {
         let resolved = Resolved {
             evaluation: Evaluation::default(),
-            result: Err(EvaluationInvariant::UnitRecordedTwice(storefront(
-                Check::WithinBound,
-            ))),
+            result: Err(HydrationInvariant::Evaluation(
+                EvaluationInvariant::UnitRecordedTwice(storefront(Check::WithinBound)),
+            )),
         };
         assert_eq!(
             require_observable(&resolved).err(),

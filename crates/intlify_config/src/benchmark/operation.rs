@@ -465,11 +465,15 @@ impl Prepared {
                 })
             }
             Self::Hydration(prepared) => {
-                // Every earlier phase runs before the start mark; Phase 13's
-                // result owns its values.
+                // Every earlier phase runs, and the selected declaration's
+                // observer is built, before the start mark; Phase 13's result
+                // owns its values.
                 let set = prepared.set().ok_or_else(I::unavailable)?;
                 let inputs = prepared.inputs(&set).ok_or_else(I::unavailable)?;
-                let measured = instrument.interval(&inputs, hydration_relation::construct)?;
+                let file = prepared.file.file();
+                let observer = prepared.observer(&file).ok_or_else(I::unavailable)?;
+                let measured =
+                    instrument.interval((&inputs, &observer), hydration_relation::construct)?;
                 Ok(Interval {
                     quantity: measured.quantity,
                     output: Output::Hydration(hydration_relation::Resolved::retain(
