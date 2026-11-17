@@ -396,6 +396,22 @@ pub(crate) fn beside<'o>(
     }
 }
 
+/// One observation for each occurrence at `at`, beside `related`, where both
+/// were observed (D15:2387).
+pub(crate) fn each_beside(
+    at: &[Option<EvidenceProjection>],
+    related: Option<&EvidenceProjection>,
+) -> Vec<Option<Observation>> {
+    at.iter()
+        .map(|primary| {
+            Some(Observation {
+                primary: primary.clone()?,
+                related: vec![related?.clone()],
+            })
+        })
+        .collect()
+}
+
 /// The UTF-8 byte length of `text`.
 fn utf8_bytes(text: &str) -> u64 {
     u64::try_from(text.len()).unwrap_or(u64::MAX)

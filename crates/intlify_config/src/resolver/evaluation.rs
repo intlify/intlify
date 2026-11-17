@@ -1443,9 +1443,20 @@ impl Evaluation {
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
+        // Phase 13 observes its bound and its endpoints, not yet its
+        // relations and roles.
+        let observes = OBSERVED.contains(&unit.phase)
+            || (unit.phase == Phase::HydrationValidation
+                && matches!(
+                    unit.check,
+                    Check::WithinBound
+                        | Check::KnownEndpoint
+                        | Check::SameGroupEndpoint
+                        | Check::EndpointRole
+                ));
         assert_eq!(
             observed,
-            OBSERVED.contains(&unit.phase),
+            observes,
             "{unit:?} reports {what} {} what it observed, against its check",
             if observed { "with" } else { "without" }
         );

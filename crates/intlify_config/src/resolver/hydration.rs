@@ -25,20 +25,61 @@
 //! every relation shares, never compared between endpoints. Not the render
 //! equivalence of the two outputs (026, 030), the selection of a group (020),
 //! or the Release both outputs join (025).
+//!
+//! A count past its bound is observed where the count is, beside the
+//! confirmed policy, which supplies the bound (D15:2249): the Group ID map
+//! for every group's relations, and each occurrence of an endpoint for its
+//! bytes (D15:2387). An endpoint is observed at each of its occurrences: one
+//! that names no declared Target ID beside the declared Target IDs, one that
+//! names no member of its group beside the group's members, each the set it
+//! must belong to, and one whose Target Profile lacks its field's role beside
+//! that Target Profile.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::artifacts::content::{Content, HydrationRoles, TargetProfile};
 use crate::model::{DeploymentGroup, DeploymentGroupId, HydrationRelation, NonEmptyMap, TargetId};
+use crate::structural::Edge;
 
-use super::artifact_resolution::AdmittedArtifact;
+use super::artifact_resolution::{self, AdmittedArtifact};
+use super::declaration_observer::{beside, each_beside, DeclarationObserver, ObserverInvariant};
 use super::evaluation::{
     and, both, within, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant,
-    Phase, Reason, Subject, Unit,
+    Found, Phase, Reason, Subject, Unit,
 };
+use super::evidence::EvidenceProjection;
+use super::evidence_component::ComponentInvariant;
 use super::groups::ResolvedGroups;
 use super::limits::{BoundId, ConfirmedPolicy, Group};
 use super::targets::{ResolvedTargets, TargetFacts};
+
+/// A resolver bug Phase 13 refuses.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum HydrationInvariant {
+    Evaluation(EvaluationInvariant),
+    /// The Target Profile a check compared has no component path.
+    Component(ComponentInvariant),
+    /// What a check looked at in the declaration has no Evidence.
+    Observer(ObserverInvariant),
+}
+
+impl From<ComponentInvariant> for HydrationInvariant {
+    fn from(invariant: ComponentInvariant) -> Self {
+        Self::Component(invariant)
+    }
+}
+
+impl From<EvaluationInvariant> for HydrationInvariant {
+    fn from(invariant: EvaluationInvariant) -> Self {
+        Self::Evaluation(invariant)
+    }
+}
+
+impl From<ObserverInvariant> for HydrationInvariant {
+    fn from(invariant: ObserverInvariant) -> Self {
+        Self::Observer(invariant)
+    }
+}
 
 const MAX_HYDRATION_RELATIONS: BoundId = BoundId {
     group: Group::TargetGrouping,
@@ -102,6 +143,16 @@ pub(crate) enum EndpointField {
     Server,
 }
 
+impl EndpointField {
+    /// The relation's member that names the endpoint.
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Client => "client",
+            Self::Server => "server",
+        }
+    }
+}
+
 /// The unit Phase 13 records for `check` over `subject`.
 pub(crate) fn unit(subject: HydrationSubject, check: Check) -> Unit {
     Unit {
@@ -157,17 +208,35 @@ impl ResolvedHydration {
 /// bounds. Each endpoint's checks wait on that endpoint alone, and each check
 /// of a relation on just the facts it compares (D15:2365): a relation between
 /// equal endpoints, or with an endpoint outside its group, still compares
-/// their locales and Target Profiles.
+/// their locales and Target Profiles. The checks observe through `observer`,
+/// the selected declaration's, when there is one.
+///
+/// # Errors
+///
+/// Returns the resolver bug of a unit recorded against its phase's rules, of
+/// a declared value without Evidence, or of a Target Profile without a
+/// component path.
 pub(crate) fn validate_hydration(
     evaluation: &mut Evaluation,
     policy: Result<&ConfirmedPolicy, &Causes>,
     declared: Admitted<&NonEmptyMap<DeploymentGroupId, DeploymentGroup>>,
     targets: Result<&ResolvedTargets<'_>, &Causes>,
-    groups: Result<&ResolvedGroups, &Causes>,
+    (groups, observer): (
+        Result<&ResolvedGroups, &Causes>,
+        Option<&DeclarationObserver<'_>>,
+    ),
     negotiation: Admitted<()>,
-) -> Result<Admitted<ResolvedHydration>, EvaluationInvariant> {
+) -> Result<Admitted<ResolvedHydration>, HydrationInvariant> {
+    // The map is there to observe only once structural admission admitted
+    // it.
+    let at_map = match &declared {
+        Ok(_) => beside(policy, observer, |observer| {
+            observer.value(&["deploymentGroups"])
+        })?,
+        Err(_) => None,
+    };
     let policy = policy.map_err(Causes::clone);
-    let bounded = evaluation.check(
+    let bounded = evaluation.check_found(
         unit(HydrationSubject::Relations, Check::WithinBound),
         both(policy.clone(), declared.clone()),
         |(policy, declared)| {
@@ -179,17 +248,26 @@ pub(crate) fn validate_hydration(
                     .map(|group| relations_of(group).len())
                     .sum(),
             )
+            .map_err(|blocking| Found::through(blocking, at_map))
         },
     )?;
     let declared = match declared {
         Ok(declared) => declared,
         Err(causes) => return Ok(Err(causes)),
     };
+    // The declared Target IDs are there to observe only once Phase 11
+    // resolved them.
+    let at_targets = match (observer, &targets) {
+        (Some(observer), Ok(_)) => Some(observer.value(&["targetProfiles"])?),
+        _ => None,
+    };
     let shared = Shared {
         policy: &policy,
         bounded: &bounded,
         targets: targets.map_err(Causes::clone),
         groups: groups.map_err(Causes::clone),
+        observer,
+        at_targets: at_targets.as_ref(),
     };
     let mut relations = BTreeMap::new();
     for (id, group) in declared.iter() {
@@ -209,12 +287,15 @@ fn relations_of(group: &DeploymentGroup) -> &[HydrationRelation] {
         .map_or(&[], Vec::as_slice)
 }
 
-/// What every relation's checks share.
+/// What every relation's checks share: what they wait on, the declaration's
+/// observer, and the declared Target IDs once there to observe.
 struct Shared<'a, 'p, 't, 's> {
     policy: &'a Admitted<&'p ConfirmedPolicy>,
     bounded: &'a Admitted<()>,
     targets: Admitted<&'t ResolvedTargets<'s>>,
     groups: Admitted<&'t ResolvedGroups>,
+    observer: Option<&'a DeclarationObserver<'a>>,
+    at_targets: Option<&'a EvidenceProjection>,
 }
 
 impl<'p, 't, 's> Shared<'_, 'p, 't, 's> {
@@ -225,19 +306,27 @@ impl<'p, 't, 's> Shared<'_, 'p, 't, 's> {
         evaluation: &mut Evaluation,
         id: &DeploymentGroupId,
         group: &DeploymentGroup,
-    ) -> Result<Admitted<Relations>, EvaluationInvariant> {
-        let mut occurrences: BTreeMap<(&TargetId, &TargetId), usize> = BTreeMap::new();
-        for relation in relations_of(group) {
-            *occurrences
+    ) -> Result<Admitted<Relations>, HydrationInvariant> {
+        // Each pair's occurrences, by their positions in the group's
+        // relations.
+        let mut occurrences: BTreeMap<(&TargetId, &TargetId), Vec<usize>> = BTreeMap::new();
+        for (index, relation) in relations_of(group).iter().enumerate() {
+            occurrences
                 .entry((&relation.server, &relation.client))
-                .or_default() += 1;
+                .or_default()
+                .push(index);
         }
-        let gate = self.gate(id);
+        let gate = self.gate(id)?;
         let mut holds = Ok(());
         let mut taken: BTreeMap<&TargetId, Taken> = BTreeMap::new();
-        for (&(server, client), &count) in &occurrences {
-            let relation = Relation { id, server, client };
-            let checked = relation.check(evaluation, self, &gate, count)?;
+        for (&(server, client), positions) in &occurrences {
+            let relation = Relation {
+                id,
+                server,
+                client,
+                positions,
+            };
+            let checked = relation.check(evaluation, self, &gate)?;
             // An equal-endpoint relation is its own failure and takes neither
             // role.
             if server != client {
@@ -261,8 +350,9 @@ impl<'p, 't, 's> Shared<'_, 'p, 't, 's> {
 
     /// What every endpoint of one group reads: the policy once the relations'
     /// bound and the group's own bounds hold, the Target IDs the group's
-    /// members name, and the declared Target IDs.
-    fn gate(&self, id: &DeploymentGroupId) -> Gate<'p, 't, 's> {
+    /// members name, and the declared Target IDs; and where the group's
+    /// members are, which the declaration has whenever the group is checked.
+    fn gate(&self, id: &DeploymentGroupId) -> Result<Gate<'p, 't, 's>, ObserverInvariant> {
         let bounds = self.groups.clone().and_then(|groups| {
             groups
                 .bounds(id)
@@ -276,7 +366,11 @@ impl<'p, 't, 's> Shared<'_, 'p, 't, 's> {
                 .as_ref()
                 .map_err(Causes::clone)
         });
-        Gate {
+        let at_members = self
+            .observer
+            .map(|observer| observer.value(&["deploymentGroups", id.as_str(), "members"]))
+            .transpose()?;
+        Ok(Gate {
             policy: both(both(self.policy.clone(), self.bounded.clone()), bounds)
                 .map(|((policy, ()), ())| policy),
             named,
@@ -284,7 +378,8 @@ impl<'p, 't, 's> Shared<'_, 'p, 't, 's> {
                 .targets
                 .clone()
                 .and_then(|targets| targets.bounded().clone().map(|()| targets)),
-        }
+            at_members,
+        })
     }
 
     /// What Phase 11 established of a declared endpoint.
@@ -301,6 +396,9 @@ struct Gate<'p, 't, 's> {
     policy: Admitted<&'p ConfirmedPolicy>,
     named: Admitted<&'t BTreeSet<TargetId>>,
     known: Admitted<&'t ResolvedTargets<'s>>,
+    /// The group's members, the set an endpoint must belong to, when there
+    /// is a declaration to observe.
+    at_members: Option<EvidenceProjection>,
 }
 
 /// The roles one Target ID takes among its group's relations between
@@ -350,11 +448,13 @@ fn single_roles(
     Ok(holds)
 }
 
-/// One relation's checks.
+/// One relation's checks, over the positions of its occurrences in the
+/// group's relations.
 struct Relation<'a> {
     id: &'a DeploymentGroupId,
     server: &'a TargetId,
     client: &'a TargetId,
+    positions: &'a [usize],
 }
 
 /// What one relation's checks leave its group: each endpoint's bytes, which
@@ -397,19 +497,43 @@ impl Relation<'_> {
     /// then whether it names a declared Target ID, and whether the group's
     /// members name it, each after its bytes alone; and whether its Target
     /// Profile takes the role its field names, after what Phase 11 found of
-    /// it.
+    /// it. A check that fails observes each occurrence of the endpoint
+    /// (D15:2387): past the bound beside the policy, naming no declared
+    /// Target ID beside the declared Target IDs, naming no member beside the
+    /// group's members, and without its role beside its Target Profile.
     fn endpoint<'t, 's>(
         &self,
         evaluation: &mut Evaluation,
         shared: &Shared<'_, '_, 't, 's>,
         gate: &Gate<'_, 't, 's>,
         field: EndpointField,
-    ) -> Result<Endpoint<'t, 's>, EvaluationInvariant> {
+    ) -> Result<Endpoint<'t, 's>, HydrationInvariant> {
         let endpoint = match field {
             EndpointField::Client => self.client,
             EndpointField::Server => self.server,
         };
-        let bytes = evaluation.check(
+        // Each occurrence of the endpoint at its token, when there is a
+        // declaration to observe.
+        let at = self
+            .positions
+            .iter()
+            .map(|&index| {
+                shared
+                    .observer
+                    .map(|observer| {
+                        let index = u64::try_from(index).map_err(|_| ObserverInvariant::Missing)?;
+                        observer.nested(&[
+                            Edge::Member("deploymentGroups"),
+                            Edge::Member(self.id.as_str()),
+                            Edge::Member("hydrationRelations"),
+                            Edge::Index(index),
+                            Edge::Member(field.name()),
+                        ])
+                    })
+                    .transpose()
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let bytes = evaluation.check_found(
             self.endpoint_unit(field, Check::WithinBound),
             gate.policy.clone(),
             |policy| {
@@ -418,41 +542,61 @@ impl Relation<'_> {
                     policy.limits().target_grouping.max_target_id_bytes,
                     endpoint.as_str().len(),
                 )
+                .map_err(|blocking| {
+                    Found::each(blocking, each_beside(&at, Some(policy.evidence())))
+                })
             },
         )?;
-        let declared = evaluation.check(
+        let declared = evaluation.check_found(
             self.endpoint_unit(field, Check::KnownEndpoint),
             both(bytes.clone(), gate.known.clone()),
             |((), targets)| {
                 if targets.get(endpoint).is_some() {
                     Ok(())
                 } else {
-                    Err(invalid(Reason::UnknownEndpoint))
+                    let unknown = invalid(Reason::UnknownEndpoint);
+                    Err(Found::each(unknown, each_beside(&at, shared.at_targets)))
                 }
             },
         )?;
-        let member = evaluation.check(
+        let member = evaluation.check_found(
             self.endpoint_unit(field, Check::SameGroupEndpoint),
             both(bytes.clone(), gate.named.clone()),
             |((), named)| {
                 if named.contains(endpoint) {
                     Ok(())
                 } else {
-                    Err(invalid(Reason::CrossGroup))
+                    let outside = invalid(Reason::CrossGroup);
+                    Err(Found::each(
+                        outside,
+                        each_beside(&at, gate.at_members.as_ref()),
+                    ))
                 }
             },
         )?;
         let facts = declared.clone().and_then(|()| shared.facts(endpoint));
-        let role = evaluation.check(
+        let named = facts.clone().and_then(|facts| facts.profile.clone());
+        // The Target Profile the role is read from, once Phase 9 resolved it.
+        let at_profile = match &named {
+            Ok((tuple, _)) => Some(artifact_resolution::admitted(tuple)?),
+            Err(_) => None,
+        };
+        let role = evaluation.check_found(
             self.endpoint_unit(field, Check::EndpointRole),
-            facts.clone().and_then(|facts| facts.profile.clone()),
+            named,
             |(_, profile)| {
                 let taken = roles(profile);
+                let missing = |reason| {
+                    Err(Found::each(
+                        invalid(reason),
+                        each_beside(&at, at_profile.as_ref()),
+                    ))
+                };
                 match field {
                     EndpointField::Client if taken.browser_hydration_client => Ok(()),
-                    EndpointField::Client => Err(invalid(Reason::ClientCapabilityMissing)),
+                    EndpointField::Client => missing(Reason::ClientCapabilityMissing),
                     EndpointField::Server if taken.ssr_renderer => Ok(()),
-                    EndpointField::Server => Err(invalid(Reason::ServerCapabilityMissing)),
+                    EndpointField::Server => missing(Reason::ServerCapabilityMissing),
                 }
             },
         )?;
@@ -473,8 +617,7 @@ impl Relation<'_> {
         evaluation: &mut Evaluation,
         shared: &Shared<'_, '_, '_, '_>,
         gate: &Gate<'_, '_, '_>,
-        count: usize,
-    ) -> Result<Checked, EvaluationInvariant> {
+    ) -> Result<Checked, HydrationInvariant> {
         let client = self.endpoint(evaluation, shared, gate, EndpointField::Client)?;
         let server = self.endpoint(evaluation, shared, gate, EndpointField::Server)?;
         let bytes = and(server.bytes.clone(), client.bytes.clone());
@@ -487,7 +630,7 @@ impl Relation<'_> {
                 }
             })?;
         let once = evaluation.check(self.unit(Check::UniqueRelation), bytes, |()| {
-            if count == 1 {
+            if self.positions.len() == 1 {
                 Ok(())
             } else {
                 Err(invalid(Reason::DuplicateRelation))
@@ -581,7 +724,7 @@ mod tests {
     use crate::profile_fixtures::minimal_config;
     use crate::references::{PolicyReference, TargetProfileReference};
     use crate::resolver::artifact_resolution::admit_collection;
-    use crate::resolver::declaration_observer::fixtures::Observed;
+    use crate::resolver::declaration_observer::fixtures::{view, Observed};
     use crate::resolver::evaluation::{Actual, LimitExceeded, Status};
     use crate::resolver::exact_resolution::resolve_fields;
     use crate::resolver::groups::{self, resolve_groups, GroupSubject};
@@ -734,16 +877,21 @@ mod tests {
 
         /// Phases 7, 9, 11, 12, and 13 into one evaluation; `inspect` reads it
         /// and what Phase 13 returned.
-        fn resolve<R>(
-            &self,
-            inspect: impl FnOnce(Evaluation, Admitted<ResolvedHydration>) -> R,
-        ) -> R {
-            // Each reference names its Target Profile as the roles now declare it.
+        /// The declaration, each reference naming its Target Profile as the
+        /// roles now declare it.
+        fn declaration(&self) -> Declaration {
             let mut app = self.app.clone();
             for (id, entry) in app["targetProfiles"].as_object_mut().unwrap() {
                 entry["profile"] = reference_value(&tuple_of(&self.roles.profile_of(id)));
             }
-            let declaration: Declaration = serde_json::from_value(app).unwrap();
+            serde_json::from_value(app).unwrap()
+        }
+
+        fn resolve<R>(
+            &self,
+            inspect: impl FnOnce(Evaluation, Admitted<ResolvedHydration>) -> R,
+        ) -> R {
+            let declaration = self.declaration();
             let confirmed = ConfirmedPolicy::fixture_owned(self.limits.clone());
             let unconfirmed = self.policy.clone().err();
             let policy = unconfirmed.as_ref().map_or(Ok(&confirmed), Err);
@@ -806,17 +954,71 @@ mod tests {
                 .declared
                 .clone()
                 .map(|()| &declaration.deployment_groups);
-            let hydration = validate_hydration(
-                &mut evaluation,
-                policy,
-                declared,
-                targets.as_ref(),
-                groups.as_ref(),
-                self.negotiation.clone(),
-            )
-            .unwrap();
+            let hydration = observed
+                .app(|observer| {
+                    validate_hydration(
+                        &mut evaluation,
+                        policy,
+                        declared,
+                        targets.as_ref(),
+                        (groups.as_ref(), Some(observer)),
+                        self.negotiation.clone(),
+                    )
+                })
+                .unwrap();
             inspect(evaluation, hydration)
         }
+
+        /// The view of the Evidence `at` makes in the declaration.
+        fn at(
+            &self,
+            at: impl FnOnce(&DeclarationObserver<'_>) -> Result<EvidenceProjection, ObserverInvariant>,
+        ) -> Value {
+            Observed::declaration(&self.declaration()).app(|observer| view(&at(observer).unwrap()))
+        }
+
+        /// The view of the endpoint `field` names in the relation at `index`
+        /// of `group_id`.
+        fn endpoint_at(&self, group_id: &str, index: u64, field: &str) -> Value {
+            self.at(|observer| {
+                observer.nested(&[
+                    Edge::Member("deploymentGroups"),
+                    Edge::Member(group_id),
+                    Edge::Member("hydrationRelations"),
+                    Edge::Index(index),
+                    Edge::Member(field),
+                ])
+            })
+        }
+
+        /// The view of the Target Profile the target `id` names, as the
+        /// roles now declare it.
+        fn profile(&self, id: &str) -> Value {
+            view(&artifact_resolution::admitted(&tuple_of(&self.roles.profile_of(id))).unwrap())
+        }
+    }
+
+    /// The view of the confirmed policy, which supplies every bound.
+    fn policy() -> Value {
+        view(ConfirmedPolicy::fixture_owned(fixture_limits(1)).evidence())
+    }
+
+    /// Each Phase 13 Finding candidate: its unit, and the views of its
+    /// primary and related Evidence.
+    fn observed(evaluation: &Evaluation) -> Vec<(Unit, Value, Vec<Value>)> {
+        evaluation
+            .occurrence_candidates()
+            .iter()
+            .filter(|candidate| candidate.finding.unit().phase == Phase::HydrationValidation)
+            .map(|candidate| {
+                let related = candidate.related.iter().map(view).collect();
+                (
+                    candidate.finding.unit().clone(),
+                    view(&candidate.primary),
+                    related,
+                )
+            })
+            .collect()
     }
 
     fn bound(value: u64) -> Bound {
@@ -1091,6 +1293,36 @@ mod tests {
                     ),
                 ]
             );
+            // Each endpoint at its occurrence: beside the declared Target IDs,
+            // the group's members, or the Target Profile it compared.
+            let targets = inputs.at(|observer| observer.value(&["targetProfiles"]));
+            let members =
+                inputs.at(|observer| observer.value(&["deploymentGroups", "web", "members"]));
+            let (at_phone, at_worker) = (
+                inputs.endpoint_at("web", 0, "client"),
+                inputs.endpoint_at("web", 1, "client"),
+            );
+            assert_eq!(
+                observed(&evaluation),
+                [
+                    (phone(Check::KnownEndpoint), at_phone.clone(), vec![targets]),
+                    (
+                        phone(Check::SameGroupEndpoint),
+                        at_phone,
+                        vec![members.clone()]
+                    ),
+                    (
+                        worker(Check::SameGroupEndpoint),
+                        at_worker.clone(),
+                        vec![members]
+                    ),
+                    (
+                        worker(Check::EndpointRole),
+                        at_worker,
+                        vec![inputs.profile("worker")]
+                    ),
+                ]
+            );
             // Only what needs `phone`'s facts waits on it, and the endpoints
             // outside the group are still compared.
             let unknown = vec![phone(Check::KnownEndpoint)];
@@ -1111,6 +1343,37 @@ mod tests {
                 );
             }
             assert!(hydration.unwrap().complete().is_err());
+        });
+    }
+
+    #[test]
+    fn a_repeated_relation_observes_each_occurrence_of_its_endpoint() {
+        // `ssr -> phone` twice: one subject, so one result for each failed
+        // check, observed at both occurrences (D15:2387).
+        let mut inputs = Inputs::new();
+        inputs.relate(
+            "web",
+            &[("ssr", "phone"), ("ssr", "browser"), ("ssr", "phone")],
+        );
+        inputs.resolve(|evaluation, _| {
+            let phone = |check| on_endpoint("web", "ssr", "phone", EndpointField::Client, check);
+            let targets = inputs.at(|observer| observer.value(&["targetProfiles"]));
+            let members =
+                inputs.at(|observer| observer.value(&["deploymentGroups", "web", "members"]));
+            let at = |index| inputs.endpoint_at("web", index, "client");
+            assert_eq!(
+                observed(&evaluation),
+                [
+                    (phone(Check::KnownEndpoint), at(0), vec![targets.clone()]),
+                    (phone(Check::KnownEndpoint), at(2), vec![targets]),
+                    (
+                        phone(Check::SameGroupEndpoint),
+                        at(0),
+                        vec![members.clone()]
+                    ),
+                    (phone(Check::SameGroupEndpoint), at(2), vec![members]),
+                ]
+            );
         });
     }
 
@@ -1181,6 +1444,22 @@ mod tests {
         inputs.roles = Roles::default();
         inputs.resolve(|evaluation, _| {
             assert_eq!(issues(&evaluation), both_roles_missing());
+            // Each endpoint at its occurrence, beside the Target Profile its
+            // role is read from.
+            let missing = |field, name, id| {
+                (
+                    on_endpoint("web", "ssr", "browser", field, Check::EndpointRole),
+                    inputs.endpoint_at("web", 0, name),
+                    vec![inputs.profile(id)],
+                )
+            };
+            assert_eq!(
+                observed(&evaluation),
+                [
+                    missing(EndpointField::Client, "client", "browser"),
+                    missing(EndpointField::Server, "server", "ssr"),
+                ]
+            );
             // Compatibility compares the two Target Profiles whatever roles
             // they declare.
             assert_eq!(
@@ -1351,6 +1630,15 @@ mod tests {
                     return;
                 }
                 assert_eq!(found, [bound_unit()]);
+                // Observed at the Group ID map, beside the policy.
+                assert_eq!(
+                    observed(&evaluation),
+                    [(
+                        bound_unit(),
+                        inputs.at(|observer| observer.value(&["deploymentGroups"])),
+                        vec![policy()]
+                    )]
+                );
                 let key = evaluation.issues().next().unwrap().clone();
                 assert_eq!(
                     evaluation.limit(&key),
@@ -1410,6 +1698,20 @@ mod tests {
                 if over.is_empty() {
                     return;
                 }
+                // Each endpoint over the bound at its occurrence, beside the
+                // policy.
+                let at: Vec<_> = over
+                    .iter()
+                    .map(|(unit, _)| {
+                        let field = if *unit == client { "client" } else { "server" };
+                        (
+                            unit.clone(),
+                            inputs.endpoint_at("web", 0, field),
+                            vec![policy()],
+                        )
+                    })
+                    .collect();
+                assert_eq!(observed(&evaluation), at, "{limit}");
                 // The relation's checks wait on every endpoint over the
                 // bound, and each Target ID's roles on its own endpoint.
                 for check in [Check::DistinctEndpoints, Check::UniqueRelation] {

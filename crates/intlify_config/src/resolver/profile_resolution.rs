@@ -58,7 +58,7 @@ use super::exact_resolution::{
 };
 use super::fallback::{resolve_fallback, MessageFallbackPolicy};
 use super::groups::{resolve_groups, GroupInvariant, ResolvedGroups};
-use super::hydration::{validate_hydration, ResolvedHydration};
+use super::hydration::{validate_hydration, HydrationInvariant, ResolvedHydration};
 use super::identity::{resolve_project_identity, ProjectIdentity};
 use super::locales::{resolve_locales, LocaleInvariant, ResolvedLocales};
 use super::negotiation::{resolve_negotiation, NegotiationProfile};
@@ -327,6 +327,16 @@ impl From<GroupInvariant> for ResolverInvariant {
     }
 }
 
+impl From<HydrationInvariant> for ResolverInvariant {
+    fn from(invariant: HydrationInvariant) -> Self {
+        match invariant {
+            HydrationInvariant::Evaluation(invariant) => Self::Evaluation(invariant),
+            HydrationInvariant::Component(invariant) => Self::Component(invariant),
+            HydrationInvariant::Observer(invariant) => Self::Observer(invariant),
+        }
+    }
+}
+
 impl From<TargetInvariant> for ResolverInvariant {
     fn from(invariant: TargetInvariant) -> Self {
         match invariant {
@@ -568,7 +578,7 @@ where
         confirmed,
         fields.deployment_groups(),
         targets.as_ref(),
-        groups.as_ref(),
+        (groups.as_ref(), observer.as_ref()),
         negotiation.as_ref().map(|_| ()).map_err(Causes::clone),
     )?;
     // The groups' members and partition, and their checked relations; the
@@ -2700,6 +2710,72 @@ pub(super) mod tests {
                 assert!(
                     matches!(evaluation.status(&known), Some(Status::NotEvaluated(_))),
                     "{id}"
+                );
+            }
+        });
+    }
+
+    /// Phase 13 observes through the same observer: a relation's client that
+    /// names no declared Target ID is observed at its field, beside the
+    /// declared Target IDs (D15:2249).
+    #[test]
+    fn an_unknown_endpoint_is_observed_beside_the_declared_targets() {
+        use crate::resolver::hydration::{self, EndpointField, HydrationSubject};
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["deploymentGroups"]["web"]["hydrationRelations"] =
+            json!([{"server": "server", "client": "phone"}]);
+        inputs.resolve(|evaluation, _| {
+            let endpoint = HydrationSubject::Endpoint(
+                serde_json::from_value(json!("web")).unwrap(),
+                serde_json::from_value(json!("server")).unwrap(),
+                serde_json::from_value(json!("phone")).unwrap(),
+                EndpointField::Client,
+            );
+            let known = hydration::unit(endpoint, Check::KnownEndpoint);
+            let observed = observed_views(&evaluation, &known);
+            assert_eq!(observed.len(), 1);
+            let (primary, related) = &observed[0];
+            assert_eq!(
+                primary["value"],
+                json!({
+                    "exact-json-pointer":
+                        "/profiles/web/deploymentGroups/web/hydrationRelations/0/client"
+                })
+            );
+            assert_eq!(
+                related
+                    .iter()
+                    .map(|view| &view["value"])
+                    .collect::<Vec<_>>(),
+                [&json!({ "exact-json-pointer": "/profiles/web/targetProfiles" })]
+            );
+        });
+    }
+
+    /// Without its Target ID map, whether a relation's endpoint names a
+    /// declared Target ID waits on the map, and Phase 13 observes nothing the
+    /// declaration lacks.
+    #[test]
+    fn a_relation_beside_no_target_map_leaves_its_endpoints_unknown() {
+        use crate::resolver::hydration::{self, EndpointField, HydrationSubject};
+        let mut inputs = Inputs::complete();
+        inputs
+            .declaration()
+            .as_object_mut()
+            .unwrap()
+            .remove("targetProfiles");
+        inputs.resolve(|evaluation, _| {
+            for field in [EndpointField::Client, EndpointField::Server] {
+                let endpoint = HydrationSubject::Endpoint(
+                    serde_json::from_value(json!("web")).unwrap(),
+                    serde_json::from_value(json!("server")).unwrap(),
+                    serde_json::from_value(json!("browser")).unwrap(),
+                    field,
+                );
+                let known = hydration::unit(endpoint, Check::KnownEndpoint);
+                assert!(
+                    matches!(evaluation.status(&known), Some(Status::NotEvaluated(_))),
+                    "{field:?}"
                 );
             }
         });

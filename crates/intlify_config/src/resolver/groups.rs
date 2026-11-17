@@ -35,7 +35,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::model::{DeploymentGroup, DeploymentGroupId, NonEmptyMap, TargetId};
 
-use super::declaration_observer::{beside, DeclarationObserver, ObserverInvariant};
+use super::declaration_observer::{beside, each_beside, DeclarationObserver, ObserverInvariant};
 use super::evaluation::{
     and, both, within, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant,
     Found, Observation, Phase, Subject, Unit,
@@ -398,22 +398,6 @@ fn members(
         holds = and(holds, and(declared, once));
     }
     Ok(holds.map(|()| occurrences.into_keys().cloned().collect()))
-}
-
-/// One observation for each occurrence at `at`, beside `related`, where both
-/// were observed.
-fn each_beside(
-    at: &[Option<EvidenceProjection>],
-    related: Option<&EvidenceProjection>,
-) -> Vec<Option<Observation>> {
-    at.iter()
-        .map(|primary| {
-            Some(Observation {
-                primary: primary.clone()?,
-                related: vec![related?.clone()],
-            })
-        })
-        .collect()
 }
 
 /// Each declared Target ID's place: in exactly one group, counting a group
