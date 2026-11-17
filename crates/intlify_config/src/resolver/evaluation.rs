@@ -1096,10 +1096,19 @@ pub(crate) enum Details {
     Limit(LimitExceeded),
     Shortfall(Shortfall),
     BootstrapLimit(BootstrapLimitExceeded),
-    /// The bound of a diagnostic domain that a reporting slice exceeded,
-    /// which the domain's terminal reporting-limit Finding names
-    /// (D15:2359, 2408).
-    Exhausted(BoundId),
+    /// The bound that exhausted a diagnostic domain, which the domain's
+    /// terminal reporting-limit Finding names (D15:2359, 2408).
+    Exhausted(ExhaustedBound),
+}
+
+/// The bound that exhausted a diagnostic domain: a bound of the domain that a
+/// reporting slice exceeded, or an `evidenceMetadata` bound of the capability
+/// that the resolver's own Evidence metadata work exceeded before any slice
+/// was planned (D15:1851, 2359).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ExhaustedBound {
+    Domain(BoundId),
+    Capability(BootstrapBoundId),
 }
 
 /// Whether `count` submitted items stay within `limit`, or the issue 015

@@ -30,6 +30,14 @@
 //! interpretation #223). Its records are what the record stage builds: each
 //! retained record with `C` of its accounting view (D15:2518). The bounds of
 //! each stage come with their own stage.
+//!
+//! Before any slice, the Evidence of every candidate passes path admission,
+//! and the resolver's own Evidence metadata work is checked against the
+//! capability's `evidenceMetadata` bounds, over the complete invocation and
+//! over its Shared scope (D15:1851). A domain whose scope exceeds one of them
+//! plans no slice, and only the subject tokens of the Shared scope, when it
+//! fits, and those the reserved terminal records name are assigned (plan 025
+//! decisions #229, #236, and #247, interpretation #237).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -40,17 +48,22 @@ use serde_json::{json, Value};
 use crate::construction::registry::check::RecordKind;
 use crate::locale::CanonicalLocale;
 
+use super::capability::EvidenceMetadataLimits;
 use super::coverage::{self, Basis, CoverageSubject, Decision};
-use super::decision_evidence::{self, CoverageDecisionEvidence, DecisionInvariant};
+use super::decision_evidence::{
+    self, CoverageDecisionEvidence, DecisionEvidence, DecisionInvariant,
+};
 use super::evaluation::{
-    Causes, Check, Details, Evaluation, Finding, IssueKey, Phase, Reason, Status, Unit,
+    Causes, Check, Details, Evaluation, ExhaustedBound, Finding, IssueKey, Phase, Reason, Status,
+    Unit,
 };
 use super::evidence::Evidence;
+use super::evidence_metadata::{self, Admission, Exceeded, MetadataBound};
 use super::evidence_token::EvidenceTokens;
-use super::limits::BoundId;
 use super::occurrence::{self, FindingOccurrence, OccurrenceCandidate, OccurrenceInvariant};
 use super::record_view::{RecordViews, ViewInvariant};
-use super::token::{rule_domain, Digest, Specification};
+use super::subject::SubjectKind;
+use super::token::{rule_domain, Digest, Specification, Tokens};
 
 /// One of 015's two diagnostic domains (D15:1940).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -176,42 +189,53 @@ pub(crate) struct Reporting<'e, 's> {
     unavailable: Option<&'e Causes>,
     /// The statuses of each unit's raw candidates (D15:2203).
     statuses: BTreeMap<Unit, Vec<&'e Status>>,
-    /// The occurrence candidates of each unit's Findings, in the order the
-    /// units found them.
-    occurrences: BTreeMap<&'e Unit, Vec<&'e OccurrenceCandidate>>,
+    /// How many occurrence candidates each unit that found something has: a
+    /// unit that found something reports into the Entry domain (D15:2207).
+    found: BTreeMap<&'e Unit, u64>,
+    /// The occurrence candidates of each unit's Findings as path admission
+    /// left them, in the order the units found them; none when the
+    /// resolver's own Evidence metadata work exceeded a bound of the Entry
+    /// domain's scope.
+    occurrences: BTreeMap<&'e Unit, Vec<OccurrenceCandidate>>,
+    /// The Coverage Decision Evidence candidates as path admission left them.
+    decisions: Vec<DecisionEvidence>,
     /// Each unit's Findings, in Finding order.
     findings: BTreeMap<&'e Unit, Vec<Finding<'e>>>,
+    /// The `evidenceMetadata` bound each domain's scope exceeds, if one does
+    /// (D15:1851).
+    exceeded: Exceeded,
 }
 
 impl<'e, 's> Reporting<'e, 's> {
     /// The reporting of `evaluation`, whose Shared projection `unavailable`
-    /// names the causes of when it is absent. `digest` assigns the subject
-    /// tokens of every unit it recorded and the evidence tokens of every
-    /// Evidence its records may carry, together, before any slice is planned
-    /// (D15:2194).
+    /// names the causes of when it is absent. Path admission and the
+    /// resolver's own Evidence metadata work come first, under the
+    /// capability's `limits`, and only within them does `digest` assign the
+    /// subject tokens of every unit it recorded and the evidence tokens of
+    /// every Evidence its records may carry, together, before any slice is
+    /// planned (D15:1851, 2194). When only the complete invocation exceeds a
+    /// bound, `digest` assigns the subject tokens of the units that report
+    /// into the Shared domain, which reports as within every bound (plan 025
+    /// decision #247). The reserved terminal records of a domain whose scope
+    /// exceeds a bound name the subject token of its first unit, whose subject
+    /// kind's colliding sets are its own, so `digest` assigns the tokens of
+    /// that kind's subjects alone (plan 025 interpretation #237).
     pub(crate) fn new(
         evaluation: &'e Evaluation,
         specification: Specification<'s>,
         unavailable: Option<&'e Causes>,
+        limits: &EvidenceMetadataLimits,
         digest: &impl Digest,
     ) -> Self {
-        let tokens = EvidenceTokens::assign(
-            specification,
-            occurrence::redacted(evaluation.occurrence_candidates())
-                .chain(decision_evidence::redacted(evaluation.decision_evidence())),
-            digest,
-        );
         let mut statuses: BTreeMap<Unit, Vec<&Status>> = BTreeMap::new();
         for (raw, status) in evaluation.candidates() {
             statuses.entry(raw.logical()).or_default().push(status);
         }
-        let mut occurrences: BTreeMap<&Unit, Vec<&OccurrenceCandidate>> = BTreeMap::new();
+        let mut found: BTreeMap<&Unit, u64> = BTreeMap::new();
         for candidate in evaluation.occurrence_candidates() {
-            occurrences
-                .entry(candidate.finding.unit())
-                .or_default()
-                .push(candidate);
+            *found.entry(candidate.finding.unit()).or_default() += 1;
         }
+        let mut occurrences: BTreeMap<&Unit, Vec<OccurrenceCandidate>> = BTreeMap::new();
         let mut findings: BTreeMap<&Unit, Vec<Finding<'_>>> = BTreeMap::new();
         for finding in evaluation.findings() {
             findings
@@ -219,16 +243,77 @@ impl<'e, 's> Reporting<'e, 's> {
                 .or_default()
                 .push(finding);
         }
+        let admission = evidence_metadata::admit(evaluation, specification, limits, digest);
+        let exceeded = admission.exceeded();
+        let no_evidence = || EvidenceTokens::assign(specification, std::iter::empty(), digest);
+        // The reserved terminal records of an exhausted domain name the
+        // subject token of its first unit, whose subject kind's colliding sets
+        // are its own, so the tokens of that kind's subjects alone are the
+        // invocation's (plan 025 interpretation #237).
+        let reserved = |domains: &[ReportingDomain]| {
+            let kinds: BTreeSet<SubjectKind> = domains
+                .iter()
+                .filter_map(|domain| first(evaluation, &found, *domain))
+                .map(|unit| unit.subject.kind())
+                .collect();
+            let subjects = evaluation
+                .statuses()
+                .map(|(unit, _)| &unit.subject)
+                .filter(|subject| kinds.contains(&subject.kind()));
+            Tokens::assign(specification, subjects, digest)
+        };
+        let (subjects, tokens, decisions) = match admission {
+            Admission::Admitted(admitted) => {
+                let raw = evaluation.occurrence_candidates();
+                for (raw, candidate) in raw.iter().zip(admitted.occurrences) {
+                    occurrences
+                        .entry(raw.finding.unit())
+                        .or_default()
+                        .push(candidate);
+                }
+                (admitted.subjects, admitted.evidence, admitted.decisions)
+            }
+            Admission::EntryExhausted { shared, .. } => (
+                shared.merge(reserved(&[ReportingDomain::Entry])),
+                no_evidence(),
+                Vec::new(),
+            ),
+            Admission::Exhausted { .. } => (
+                reserved(&[ReportingDomain::Entry, ReportingDomain::Shared]),
+                no_evidence(),
+                Vec::new(),
+            ),
+        };
         Self {
             evaluation,
             specification,
-            views: RecordViews::assign(specification, evaluation, digest),
+            views: RecordViews::new(specification, subjects, digest),
             tokens,
             unavailable,
             statuses,
+            found,
             occurrences,
+            decisions,
             findings,
+            exceeded,
         }
+    }
+
+    /// The `evidenceMetadata` bound `domain`'s scope exceeds, if one does:
+    /// then the domain plans no ordinary slice (D15:1851; plan 025 decisions
+    /// #229 and #247).
+    pub(crate) const fn exceeded(&self, domain: ReportingDomain) -> Option<MetadataBound> {
+        self.exceeded.of(domain)
+    }
+
+    /// The first unit, in canonical unit order, that reports into `domain`.
+    pub(crate) fn first(&self, domain: ReportingDomain) -> Option<&'e Unit> {
+        first(self.evaluation, &self.found, domain)
+    }
+
+    /// Whether `unit` reports into `domain`.
+    fn reports_into(&self, unit: &Unit, domain: ReportingDomain) -> bool {
+        reports_into(self.evaluation, &self.found, unit, domain)
     }
 
     /// Every unit the evaluation recorded, in canonical unit order: the
@@ -238,10 +323,7 @@ impl<'e, 's> Reporting<'e, 's> {
     }
 
     /// What the candidate stage of `unit`'s slice in `domain` counts, or
-    /// `None` when the unit has no slice there: a unit reports into the
-    /// domain of its own Findings and status, and into the Entry domain
-    /// whenever it found something or owns Coverage Decision Evidence
-    /// (D15:2207).
+    /// `None` when the unit does not report into the domain.
     ///
     /// # Errors
     ///
@@ -251,14 +333,15 @@ impl<'e, 's> Reporting<'e, 's> {
         unit: &Unit,
         domain: ReportingDomain,
     ) -> Result<Option<Candidates>, ReportingInvariant> {
-        let found = self.occurrences.get(unit).map_or(&[][..], Vec::as_slice);
-        let own = ReportingDomain::of(unit.phase) == domain;
-        let decides = *unit == table() && !self.evaluation.decision_evidence().is_empty();
-        if !own && (domain == ReportingDomain::Shared || found.is_empty() && !decides) {
+        if !self.reports_into(unit, domain) {
             return Ok(None);
         }
+        let found = self.occurrences.get(unit).map_or(&[][..], Vec::as_slice);
+        // Every raw occurrence candidate, whether or not its Evidence was
+        // admitted, so the Shared domain counts the same Finding candidates
+        // when only the Entry domain is exhausted (plan 025 decision #247).
         let mut candidates = Candidates {
-            findings: count(found.len()),
+            findings: self.found.get(unit).copied().unwrap_or(0),
             ..Candidates::default()
         };
         // A unit is not evaluated only when its prerequisites exclude every
@@ -383,7 +466,7 @@ impl<'e, 's> Reporting<'e, 's> {
         &self,
         domain: ReportingDomain,
         cursor: &Unit,
-        bound: BoundId,
+        bound: ExhaustedBound,
     ) -> Result<(Value, Value), ReportingInvariant> {
         let key = IssueKey::terminal(domain.reason());
         let details = Details::Exhausted(bound);
@@ -407,14 +490,10 @@ impl<'e, 's> Reporting<'e, 's> {
         indexed: &BTreeSet<Evidence>,
         records: &mut Vec<Retained<'e>>,
     ) -> Result<(), ReportingInvariant> {
-        let found = self.occurrences.get(unit).into_iter().flatten().copied();
+        let found = self.occurrences.get(unit).into_iter().flatten();
         let occurrences = occurrence::occurrences(found, self.specification, &self.tokens)?;
         let decisions = if *unit == table() {
-            decision_evidence::records(
-                self.evaluation.decision_evidence(),
-                self.specification,
-                &self.tokens,
-            )?
+            decision_evidence::records(&self.decisions, self.specification, &self.tokens)?
         } else {
             Vec::new()
         };
@@ -487,6 +566,34 @@ impl<'e, 's> Reporting<'e, 's> {
     }
 }
 
+/// The first unit of `evaluation`, in canonical unit order, that reports
+/// into `domain`, `found` counting the occurrence candidates of each unit
+/// that found something.
+fn first<'e>(
+    evaluation: &'e Evaluation,
+    found: &BTreeMap<&Unit, u64>,
+    domain: ReportingDomain,
+) -> Option<&'e Unit> {
+    evaluation
+        .statuses()
+        .map(|(unit, _)| unit)
+        .find(|unit| reports_into(evaluation, found, unit, domain))
+}
+
+/// Whether `unit` reports into `domain`: a unit reports into the domain of
+/// its own Findings and status, and into the Entry domain whenever it found
+/// something or owns Coverage Decision Evidence (D15:2207).
+fn reports_into(
+    evaluation: &Evaluation,
+    found: &BTreeMap<&Unit, u64>,
+    unit: &Unit,
+    domain: ReportingDomain,
+) -> bool {
+    let decides = *unit == table() && !evaluation.decision_evidence().is_empty();
+    ReportingDomain::of(unit.phase) == domain
+        || (domain == ReportingDomain::Entry && (found.contains_key(unit) || decides))
+}
+
 /// The decision table's unit, which owns every Coverage Decision Basis and
 /// Evidence record (D15:1609).
 fn table() -> Unit {
@@ -534,6 +641,7 @@ mod tests {
     use crate::resolver::entry::fixtures::FileFixture;
     use crate::resolver::evaluation::{Blocking, Check, Code, Evaluation, Phase, Status, Unit};
     use crate::resolver::evidence::Evidence;
+    use crate::resolver::evidence_metadata::fixtures::unbounded;
     use crate::resolver::limits::fixture_limits;
     use crate::resolver::profile_resolution::tests::Inputs;
     use crate::resolver::record_view::RecordViews;
@@ -594,7 +702,7 @@ mod tests {
     fn a_complete_invocation_reports_each_status_into_its_own_domain() {
         Inputs::complete().resolve(|evaluation, _| {
             assert!(evaluation.findings().is_empty());
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &Sha256);
+            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
             let slices = reporting.slices().unwrap();
             let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
             let table = table();
@@ -692,7 +800,7 @@ mod tests {
                 json!(["ja", "en", "fr"]);
         }
         inputs.resolve(|evaluation, _| {
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &Sha256);
+            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
             let slices = reporting.slices().unwrap();
             let subsets: Vec<&Slice<'_>> = slices
                 .iter()
@@ -774,7 +882,7 @@ mod tests {
         let Ok(Err(causes)) = admit_entry(&mut evaluation, &file, limits()) else {
             panic!("the file is not strict JSON");
         };
-        let reporting = Reporting::new(&evaluation, PROFILE, Some(&causes), &Sha256);
+        let reporting = Reporting::new(&evaluation, PROFILE, Some(&causes), &unbounded(), &Sha256);
         let slices = reporting.slices().unwrap();
         assert!(slices
             .iter()
@@ -847,7 +955,7 @@ mod tests {
             panic!("every value waits");
         };
         assert_eq!(causes.keys().count(), 1);
-        let reporting = Reporting::new(&waiting, PROFILE, None, &Sha256);
+        let reporting = Reporting::new(&waiting, PROFILE, None, &unbounded(), &Sha256);
         let counted = |reporting: &Reporting<'_, '_>| {
             reporting
                 .candidates(&unit, ReportingDomain::Shared)
@@ -867,7 +975,13 @@ mod tests {
             .unwrap_err();
         assert_eq!(evaluated.status(&unit), Some(&Status::Evaluated));
         assert_eq!(
-            counted(&Reporting::new(&evaluated, PROFILE, None, &Sha256)),
+            counted(&Reporting::new(
+                &evaluated,
+                PROFILE,
+                None,
+                &unbounded(),
+                &Sha256
+            )),
             0
         );
     }
@@ -882,7 +996,7 @@ mod tests {
         inputs.declaration()["coverage"]["rules"] =
             json!([{"intentSurfaceClasses": ["unknown"], "mode": "fallback-allowed"}]);
         inputs.resolve(|evaluation, _| {
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &Sha256);
+            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
             let slices = reporting.slices().unwrap();
             let table = table();
             let owned: Vec<&Slice<'_>> =

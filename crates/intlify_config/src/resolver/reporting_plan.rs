@@ -32,6 +32,15 @@
 //! a domain with no slice at or after the admitting unit recounts once it has
 //! planned them all (plan 025 interpretation #228).
 //!
+//! When the resolver's own Evidence metadata work exceeded an
+//! `evidenceMetadata` bound of a domain's scope, that domain plans no slice:
+//! it is exhausted at the first unit that reports into it, and its terminal
+//! Finding names that bound by its capability path. A bound of the Shared
+//! scope exhausts both domains; one that only the complete invocation exceeds
+//! exhausts only the Entry domain, and the Shared domain plans its slices as
+//! it would within every bound (D15:1851; plan 025 decisions #229, #231, and
+//! #247).
+//!
 //! Counts are checked: a count past `u64` is past every bound. The terminal
 //! Finding and state occupy the domain's reserved slots, not its ordinary
 //! bounds (D15:1972).
@@ -41,7 +50,7 @@ use std::collections::BTreeSet;
 use crate::artifacts::count;
 use crate::input_limits::Bound;
 
-use super::evaluation::{Check, Status, Unit};
+use super::evaluation::{Check, ExhaustedBound, Status, Unit};
 use super::evidence::Evidence;
 use super::limits::{
     BoundId, DiagnosticsLimits, EntryDiagnosticsLimits, Group, SharedDiagnosticsLimits,
@@ -66,7 +75,7 @@ pub(crate) struct Committed<'e> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Exhausted<'e> {
     pub(crate) cursor: &'e Unit,
-    pub(crate) bound: BoundId,
+    pub(crate) bound: ExhaustedBound,
 }
 
 /// What both domains report.
@@ -90,19 +99,42 @@ pub(crate) fn report<'e>(
     policy: Option<&DiagnosticsLimits>,
 ) -> Result<Reported<'e>, ReportingInvariant> {
     Ok(Reported {
-        entry: commit(
+        entry: plan(
             reporting,
             ReportingDomain::Entry,
             Bounds::Entry(&capability.entry),
             policy.map(|policy| Bounds::Entry(&policy.entry)),
         )?,
-        shared: commit(
+        shared: plan(
             reporting,
             ReportingDomain::Shared,
             Bounds::Shared(&capability.shared),
             policy.map(|policy| Bounds::Shared(&policy.shared)),
         )?,
     })
+}
+
+/// The slices of `domain`: none when the resolver's own Evidence metadata
+/// work exceeded a bound of the domain's scope, the domain then exhausted at
+/// the first unit that reports into it, its terminal Finding naming that
+/// bound, if any unit does (D15:1851, 2408; plan 025 decisions #229 and
+/// #247); otherwise those `commit` plans.
+fn plan<'e>(
+    reporting: &Reporting<'e, '_>,
+    domain: ReportingDomain,
+    capability: Bounds<'_>,
+    policy: Option<Bounds<'_>>,
+) -> Result<Committed<'e>, ReportingInvariant> {
+    match reporting.exceeded(domain) {
+        Some(bound) => Ok(Committed {
+            slices: Vec::new(),
+            exhausted: reporting.first(domain).map(|cursor| Exhausted {
+                cursor,
+                bound: ExhaustedBound::Capability(bound.id()),
+            }),
+        }),
+        None => commit(reporting, domain, capability, policy),
+    }
 }
 
 /// The slices of `domain`, planned in canonical unit order under `capability`
@@ -169,7 +201,10 @@ fn settle<'e>(
     }
     Committed {
         slices,
-        exhausted: refused.map(|(cursor, bound)| Exhausted { cursor, bound }),
+        exhausted: refused.map(|(cursor, bound)| Exhausted {
+            cursor,
+            bound: ExhaustedBound::Domain(bound),
+        }),
     }
 }
 
@@ -180,7 +215,10 @@ fn cut(mut slices: Vec<Slice<'_>>, index: usize, bound: BoundId) -> Committed<'_
     slices.truncate(index);
     Committed {
         slices,
-        exhausted: Some(Exhausted { cursor, bound }),
+        exhausted: Some(Exhausted {
+            cursor,
+            bound: ExhaustedBound::Domain(bound),
+        }),
     }
 }
 
@@ -454,12 +492,20 @@ mod tests {
 
     use serde_json::json;
 
+    use crate::artifacts::count;
     use crate::input_limits::Bound;
     use crate::materialize_tests::limits;
     use crate::resolver::entry::admit_entry;
     use crate::resolver::entry::fixtures::FileFixture;
-    use crate::resolver::evaluation::{Causes, Check, Evaluation, IssueKey, Reason, Status, Unit};
+    use crate::resolver::evaluation::{
+        Causes, Check, Evaluation, ExhaustedBound, IssueKey, Reason, Status, Unit,
+    };
+    use intlify_shared_json::encoding::encoded_length;
+
+    use crate::resolver::capability::EvidenceMetadataLimits;
     use crate::resolver::evidence::Evidence;
+    use crate::resolver::evidence_metadata::fixtures::{unbounded, with};
+    use crate::resolver::evidence_metadata::MetadataBound;
     use crate::resolver::limits::{
         fixture_limits, BoundId, DiagnosticsLimits, Group, ResolutionLimits,
     };
@@ -467,7 +513,7 @@ mod tests {
     use crate::resolver::record_view::RecordViews;
     use crate::resolver::reporting::{Record, Reporting, ReportingDomain, Slice};
     use crate::resolver::resource_policy::{self, PolicySubject};
-    use crate::resolver::token::{Sha256, Specification};
+    use crate::resolver::token::{Sha256, Specification, Tokens};
 
     use super::{report, Committed, Exhausted, Reported};
 
@@ -641,7 +687,7 @@ mod tests {
                     slices: all[..refused].to_vec(),
                     exhausted: Some(Exhausted {
                         cursor: all[refused].unit,
-                        bound,
+                        bound: ExhaustedBound::Domain(bound),
                     }),
                 },
                 "{}",
@@ -684,14 +730,14 @@ mod tests {
     #[test]
     fn each_entry_bound_passes_exactly_and_refuses_one_over() {
         let (evaluation, causes) = entered();
-        let reporting = Reporting::new(&evaluation, PROFILE, Some(&causes), &Sha256);
+        let reporting = Reporting::new(&evaluation, PROFILE, Some(&causes), &unbounded(), &Sha256);
         exactly_and_one_over(&reporting, ReportingDomain::Entry);
     }
 
     #[test]
     fn each_shared_bound_passes_exactly_and_refuses_one_over() {
         failing().resolve(|evaluation, _| {
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &Sha256);
+            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
             exactly_and_one_over(&reporting, ReportingDomain::Shared);
         });
     }
@@ -703,7 +749,7 @@ mod tests {
     #[test]
     fn unbounded_domains_commit_every_slice_and_index_each_evidence_once() {
         failing().resolve(|evaluation, _| {
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &Sha256);
+            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
             let reported = report(&reporting, &limits_with(None), None).unwrap();
             let slices = reporting.slices().unwrap();
             for domain in [ReportingDomain::Entry, ReportingDomain::Shared] {
@@ -754,7 +800,7 @@ mod tests {
     #[test]
     fn a_refused_slice_names_the_first_bound_of_the_stage_that_refused_it() {
         let (evaluation, causes) = entered();
-        let reporting = Reporting::new(&evaluation, PROFILE, Some(&causes), &Sha256);
+        let reporting = Reporting::new(&evaluation, PROFILE, Some(&causes), &unbounded(), &Sha256);
         let all = report(&reporting, &limits_with(None), None)
             .unwrap()
             .entry
@@ -785,7 +831,7 @@ mod tests {
             refused(&limits),
             Some(Exhausted {
                 cursor: all[second].unit,
-                bound: bound("maxFindings")
+                bound: ExhaustedBound::Domain(bound("maxFindings"))
             })
         );
         limits.entry.max_total_evidence_bytes =
@@ -794,7 +840,7 @@ mod tests {
             refused(&limits),
             Some(Exhausted {
                 cursor: all[second].unit,
-                bound: bound("maxTotalEvidenceBytes")
+                bound: ExhaustedBound::Domain(bound("maxTotalEvidenceBytes"))
             })
         );
         limits.entry.max_finding_occurrences = Bound::new(before("maxFindingOccurrences")).unwrap();
@@ -802,7 +848,7 @@ mod tests {
             refused(&limits),
             Some(Exhausted {
                 cursor: all[second].unit,
-                bound: bound("maxFindingOccurrences")
+                bound: ExhaustedBound::Domain(bound("maxFindingOccurrences"))
             })
         );
     }
@@ -815,7 +861,7 @@ mod tests {
     #[test]
     fn an_exhausted_domain_reports_its_terminal_finding_and_state() {
         failing().resolve(|evaluation, _| {
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &Sha256);
+            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
             let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
             let records = |domain| BoundId {
                 group: match domain {
@@ -867,6 +913,214 @@ mod tests {
         });
     }
 
+    /// Past a bound of the Shared scope, no slice is planned: each domain is
+    /// exhausted at the first unit that reports into it, its terminal Finding
+    /// naming the bound by its capability path and its terminal state the
+    /// cursor that a complete assignment of the subject tokens gives (D15:1851,
+    /// 2359, 2408; plan 025 decisions #229, #231, and #247, interpretation
+    /// #237).
+    #[test]
+    fn past_a_shared_scope_bound_every_domain_is_exhausted_at_its_first_unit() {
+        failing().resolve(|evaluation, _| {
+            let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
+            let units: Vec<&Unit> = evaluation.statuses().map(|(unit, _)| unit).collect();
+            for bound in [
+                MetadataBound::SubjectOccurrences,
+                MetadataBound::TokenInputs,
+                MetadataBound::MetadataWorkUnits,
+            ] {
+                let limits = with(bound, 1);
+                let reporting = Reporting::new(&evaluation, PROFILE, None, &limits, &Sha256);
+                let reported = report(&reporting, &limits_with(None), None).unwrap();
+                let exhausted = ExhaustedBound::Capability(bound.id());
+                for domain in [ReportingDomain::Entry, ReportingDomain::Shared] {
+                    assert_eq!(reporting.exceeded(domain), Some(bound), "{bound:?}");
+                    let cursor = units
+                        .iter()
+                        .copied()
+                        .find(|unit| ReportingDomain::of(unit.phase) == domain)
+                        .unwrap();
+                    assert_eq!(
+                        of(&reported, domain),
+                        &Committed {
+                            slices: Vec::new(),
+                            exhausted: Some(Exhausted {
+                                cursor,
+                                bound: exhausted,
+                            }),
+                        },
+                        "{bound:?}"
+                    );
+                    let (finding, state) = reporting.terminal(domain, cursor, exhausted).unwrap();
+                    assert_eq!(
+                        finding["details"],
+                        json!({
+                            "reason": domain.id(),
+                            "bound": format!("bootstrapOnly.evidenceMetadata.{}", bound.id().name),
+                        })
+                    );
+                    assert_eq!(state["nextUnitCursor"], views.unit(cursor).unwrap());
+                }
+                // Only the subject tokens the terminal records name are
+                // assigned, so a unit of another subject kind has no view
+                // (plan 025 interpretation #237).
+                let kinds: Vec<_> = [ReportingDomain::Entry, ReportingDomain::Shared]
+                    .into_iter()
+                    .map(|domain| reporting.first(domain).unwrap().subject.kind())
+                    .collect();
+                let other = units
+                    .iter()
+                    .copied()
+                    .find(|unit| !kinds.contains(&unit.subject.kind()))
+                    .unwrap();
+                assert!(reporting
+                    .terminal(ReportingDomain::Shared, other, exhausted)
+                    .is_err());
+            }
+        });
+    }
+
+    /// The counts of the units that report into the Shared domain: their
+    /// candidates, their subjects, and their tokens' comparisons and records.
+    fn shared_scope(evaluation: &Evaluation) -> [(MetadataBound, u64); 4] {
+        let shared = |unit: &Unit| ReportingDomain::of(unit.phase) == ReportingDomain::Shared;
+        let subjects: Vec<_> = evaluation
+            .statuses()
+            .filter(|(unit, _)| shared(unit))
+            .map(|(unit, _)| &unit.subject)
+            .collect();
+        let tokens = Tokens::assign(PROFILE, subjects.iter().copied(), &Sha256);
+        [
+            (
+                MetadataBound::SubjectOccurrences,
+                count(
+                    evaluation
+                        .candidates()
+                        .filter(|(unit, _)| shared(unit))
+                        .count(),
+                ),
+            ),
+            (MetadataBound::TokenInputs, count(subjects.len())),
+            (MetadataBound::CollisionComparisons, tokens.comparisons()),
+            (MetadataBound::MetadataWorkUnits, tokens.records()),
+        ]
+    }
+
+    /// Past a bound that only the complete invocation exceeds, a count down
+    /// to what the Shared scope counts or a value locator past a path bound,
+    /// only the Entry domain is exhausted, at its first unit and naming the
+    /// bound, while the Shared domain commits exactly what it would within
+    /// every bound, so that paired entries keep equal Shared projections
+    /// (D15:1851, 2659, 3228; plan 025 decision #247). Under this digest no
+    /// record collides, so the comparisons are not counted here.
+    #[test]
+    fn past_only_an_invocation_bound_only_the_entry_domain_is_exhausted() {
+        failing().resolve(|evaluation, _| {
+            let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
+            let within = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
+            let within = report(&within, &limits_with(None), None).unwrap().shared;
+            assert!(!within.slices.is_empty());
+            let mut bounds = vec![(MetadataBound::LogicalPathSegments, 1)];
+            bounds.extend(
+                shared_scope(&evaluation)
+                    .into_iter()
+                    .filter(|(bound, _)| *bound != MetadataBound::CollisionComparisons),
+            );
+            for (bound, limit) in bounds {
+                let limits = with(bound, limit);
+                let reporting = Reporting::new(&evaluation, PROFILE, None, &limits, &Sha256);
+                assert_eq!(
+                    reporting.exceeded(ReportingDomain::Entry),
+                    Some(bound),
+                    "{bound:?}"
+                );
+                assert_eq!(
+                    reporting.exceeded(ReportingDomain::Shared),
+                    None,
+                    "{bound:?}"
+                );
+                let reported = report(&reporting, &limits_with(None), None).unwrap();
+                let cursor = reporting.first(ReportingDomain::Entry).unwrap();
+                let exhausted = ExhaustedBound::Capability(bound.id());
+                assert_eq!(
+                    reported.entry,
+                    Committed {
+                        slices: Vec::new(),
+                        exhausted: Some(Exhausted {
+                            cursor,
+                            bound: exhausted,
+                        }),
+                    },
+                    "{bound:?}"
+                );
+                let (_, state) = reporting
+                    .terminal(ReportingDomain::Entry, cursor, exhausted)
+                    .unwrap();
+                assert_eq!(state["nextUnitCursor"], views.unit(cursor).unwrap());
+                assert_eq!(reported.shared, within, "{bound:?}");
+            }
+        });
+    }
+
+    /// With no unit that reports into the Shared domain, a count past its
+    /// bound exhausts only the Entry domain, and the Shared domain has
+    /// nothing to commit (D15:1851, 2408).
+    #[test]
+    fn without_a_shared_unit_a_count_past_its_bound_exhausts_only_the_entry_domain() {
+        let (evaluation, causes) = entered();
+        let limits = with(MetadataBound::SubjectOccurrences, 1);
+        let reporting = Reporting::new(&evaluation, PROFILE, Some(&causes), &limits, &Sha256);
+        let reported = report(&reporting, &limits_with(None), None).unwrap();
+        let first = evaluation.statuses().next().unwrap().0;
+        assert_eq!(reported.entry.exhausted.map(|at| at.cursor), Some(first));
+        assert_eq!(
+            reported.shared,
+            Committed {
+                slices: Vec::new(),
+                exhausted: None,
+            }
+        );
+    }
+
+    /// A Logical input path past a path bound is absent from every record
+    /// that would carry it, and reporting goes on (D15:776; plan 025
+    /// interpretation #234).
+    #[test]
+    fn a_logical_input_path_past_a_path_bound_is_absent_and_reporting_goes_on() {
+        let (evaluation, causes) = entered();
+        let paths = |limits: &EvidenceMetadataLimits| -> Vec<serde_json::Value> {
+            let reporting = Reporting::new(&evaluation, PROFILE, Some(&causes), limits, &Sha256);
+            assert_eq!(reporting.exceeded(ReportingDomain::Entry), None);
+            report(&reporting, &limits_with(None), None)
+                .unwrap()
+                .entry
+                .slices
+                .iter()
+                .flat_map(|slice| &slice.records)
+                .filter_map(|retained| match &retained.record {
+                    Record::Evidence(evidence) => evidence.view().get("path").cloned(),
+                    _ => None,
+                })
+                .collect()
+        };
+        let kept = paths(&unbounded());
+        assert!(!kept.is_empty());
+        let largest = kept
+            .iter()
+            .map(|path| encoded_length(path).unwrap())
+            .max()
+            .unwrap();
+        let tight = EvidenceMetadataLimits {
+            max_logical_path_canonical_bytes: Bound::new(largest - 1).unwrap(),
+            ..unbounded()
+        };
+        let left = paths(&tight);
+        assert!(left.len() < kept.len());
+        assert!(left
+            .iter()
+            .all(|path| encoded_length(path).unwrap() < largest));
+    }
+
     /// Once admitted, the Policy recounts from zero the slices committed
     /// before it, and refuses a slice the capability let through, the domain
     /// keeping the slices before it while the other domain goes on. Exactly
@@ -876,7 +1130,7 @@ mod tests {
     #[test]
     fn the_admitted_policy_recounts_what_was_committed_before_it() {
         failing().resolve(|evaluation, _| {
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &Sha256);
+            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
             let generous = limits_of(&[]);
             let unbounded = report(&reporting, &generous, None).unwrap();
             let all = &unbounded.shared.slices;
@@ -894,7 +1148,7 @@ mod tests {
                     slices: all[..before - 1].to_vec(),
                     exhausted: Some(Exhausted {
                         cursor: all[before - 1].unit,
-                        bound: shared("maxRecords"),
+                        bound: ExhaustedBound::Domain(shared("maxRecords")),
                     }),
                 }
             );
@@ -914,7 +1168,7 @@ mod tests {
                     slices: all[..last].to_vec(),
                     exhausted: Some(Exhausted {
                         cursor: all[last].unit,
-                        bound: shared("maxRecords"),
+                        bound: ExhaustedBound::Domain(shared("maxRecords")),
                     }),
                 }
             );
@@ -928,7 +1182,7 @@ mod tests {
     #[test]
     fn the_admitting_units_own_slice_is_planned_under_the_policy() {
         failing().resolve(|evaluation, _| {
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &Sha256);
+            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
             let unbounded = report(&reporting, &limits_of(&[]), None).unwrap();
             let all = &unbounded.shared.slices;
             let at = all
@@ -947,7 +1201,7 @@ mod tests {
                 refused(None).exhausted,
                 Some(Exhausted {
                     cursor: all[at].unit,
-                    bound: shared("maxRecords"),
+                    bound: ExhaustedBound::Domain(shared("maxRecords")),
                 })
             );
             assert_eq!(
@@ -956,7 +1210,7 @@ mod tests {
                     slices: all[..at].to_vec(),
                     exhausted: Some(Exhausted {
                         cursor: all[at].unit,
-                        bound: shared("maxEvaluationStatusEntries"),
+                        bound: ExhaustedBound::Domain(shared("maxEvaluationStatusEntries")),
                     }),
                 }
             );
@@ -971,7 +1225,7 @@ mod tests {
     #[test]
     fn a_domain_exhausted_before_the_admission_ends_no_later_after_the_recount() {
         failing().resolve(|evaluation, _| {
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &Sha256);
+            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
             let unbounded = report(&reporting, &limits_of(&[]), None).unwrap();
             let all = &unbounded.shared.slices;
             let before = all
@@ -992,7 +1246,7 @@ mod tests {
                     slices: all[..refused].to_vec(),
                     exhausted: Some(Exhausted {
                         cursor: all[refused].unit,
-                        bound: shared("maxRecords"),
+                        bound: ExhaustedBound::Domain(shared("maxRecords")),
                     }),
                 }
             );
@@ -1005,7 +1259,7 @@ mod tests {
                     slices: all[..refused - 1].to_vec(),
                     exhausted: Some(Exhausted {
                         cursor: all[refused - 1].unit,
-                        bound: shared("maxRecords"),
+                        bound: ExhaustedBound::Domain(shared("maxRecords")),
                     }),
                 }
             );
@@ -1018,7 +1272,7 @@ mod tests {
     #[test]
     fn a_domain_with_no_slice_after_the_admission_recounts_at_its_end() {
         let (evaluation, causes) = entered();
-        let reporting = Reporting::new(&evaluation, PROFILE, Some(&causes), &Sha256);
+        let reporting = Reporting::new(&evaluation, PROFILE, Some(&causes), &unbounded(), &Sha256);
         let generous = limits_of(&[]);
         let all = report(&reporting, &generous, None).unwrap().entry.slices;
         assert!(all.iter().all(|slice| *slice.unit < admission()));
@@ -1031,7 +1285,7 @@ mod tests {
                 slices: all[..last].to_vec(),
                 exhausted: Some(Exhausted {
                     cursor: all[last].unit,
-                    bound: entry("maxRecords"),
+                    bound: ExhaustedBound::Domain(entry("maxRecords")),
                 }),
             }
         );
