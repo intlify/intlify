@@ -63,8 +63,8 @@ use super::evidence::EvidenceProjection;
 use super::evidence_component::{ComponentInvariant, ComponentPath, Key, VerificationRole};
 use super::evidence_token::JsonType;
 use super::limits::{
-    ArtifactAdmissionLimits, BoundId, ConfigurationInputLimits, ConfirmedPolicy, Group,
-    ResolutionLimits,
+    ArtifactAdmissionLimits, BoundId, ConfigurationInputLimits, ConfirmedPolicy, DiagnosticsLimits,
+    Group, ResolutionLimits,
 };
 use super::tally::{actual, first_over, measure, total, within, Tally};
 
@@ -293,6 +293,11 @@ pub(crate) struct PolicyOutcome {
     /// The selector's String Length Fact under the final projection
     /// authority, or none for an absent or non-string selector.
     pub(crate) selector_length: Option<StringLengthFact>,
+    /// The diagnostic bounds of the admitted policy once it is compatible with
+    /// the capability, which then take over ordinary reporting from the
+    /// capability's whatever its rechecks find (D15:2132, 2391), or none
+    /// without such a policy.
+    pub(crate) diagnostics: Option<DiagnosticsLimits>,
     /// The confirmed policy, which also confirms the provisional selection,
     /// or why there is none.
     pub(crate) confirmed: Admitted<ConfirmedPolicy>,
@@ -547,6 +552,7 @@ pub(crate) fn admit_resource_policy(
     let rechecked = and(configured, inspected.every);
     Ok(PolicyOutcome {
         selector_length,
+        diagnostics: limits.ok().map(|limits| limits.diagnostics),
         confirmed: both(compatible, rechecked).map(|((policy, evidence), ())| {
             ConfirmedPolicy::confirmed(&policy, evidence, Rechecked(()))
         }),
@@ -3559,6 +3565,8 @@ mod tests {
                 std::slice::from_ref(&incompatible)
             );
         }
+        // A policy the capability cannot run takes over no reporting.
+        assert_eq!(outcome.diagnostics, None);
         assert_eq!(keys(&outcome.confirmed.unwrap_err()), [incompatible]);
         // Without an admitted policy at all, the capability is the authority
         // too.
@@ -3730,7 +3738,9 @@ mod tests {
                 keys(&fields)
             );
         }
-        // The policy is admitted and compatible, but not confirmed.
+        // The policy is admitted and compatible, but not confirmed: its
+        // diagnostic bounds take over reporting all the same.
+        assert_eq!(outcome.diagnostics, Some(ample().diagnostics));
         let every = root
             .clone()
             .union(declarations)
