@@ -586,8 +586,7 @@ mod tests {
     }
 
     /// Records `unit` as finding the blocking result `found`, observed at the
-    /// root of a configuration file, as a check whose Findings carry
-    /// occurrence Evidence observes what it finds.
+    /// root of a configuration file, as a check observes what it finds.
     fn blocked_observed(evaluation: &mut Evaluation, unit: Unit, found: Blocking) {
         use crate::resolver::evaluation::Found;
         evaluation

@@ -111,6 +111,10 @@ pub(crate) struct TargetFacts<'s> {
     pub(crate) requested: Admitted<LocaleSet>,
     /// Its effective default, once found one of its requested locales.
     pub(crate) effective_default: Admitted<CanonicalLocale>,
+    /// Where its effective default comes from, once there is one: its own
+    /// override or the project's default, where a later check that compares
+    /// the default observes it.
+    pub(crate) default_origin: Option<Reason>,
     /// The Set's Target Profile its reference names.
     pub(crate) profile: Admitted<Named<'s>>,
     /// The target, once every fact above and its repeats check held.
@@ -270,10 +274,9 @@ impl Checks<'_, '_> {
                 }
             },
         )?;
-        let default_input = both(
-            both(admitted.clone(), requested.clone()),
-            effective_default(own.clone(), locales),
-        );
+        let origin = effective_default(own.clone(), locales);
+        let default_origin = origin.as_ref().ok().map(|&(_, reason)| reason);
+        let default_input = both(both(admitted.clone(), requested.clone()), origin);
         let beside_set = match (self.observer, &default_input) {
             (Some(observer), Ok((_, (_, reason)))) => {
                 let written = if *reason == Reason::ExplicitOverride {
@@ -349,6 +352,7 @@ impl Checks<'_, '_> {
             admitted,
             requested,
             effective_default: default,
+            default_origin,
             profile,
             resolved,
         })

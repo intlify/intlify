@@ -402,11 +402,21 @@ pub(crate) fn each_beside(
     at: &[Option<EvidenceProjection>],
     related: Option<&EvidenceProjection>,
 ) -> Vec<Option<Observation>> {
+    each_beside_all(at, related.map(std::slice::from_ref))
+}
+
+/// One observation for each occurrence at `at`, beside every location in
+/// `related`, where all were observed (D15:2387). A check that compares no
+/// other location relates none.
+pub(crate) fn each_beside_all(
+    at: &[Option<EvidenceProjection>],
+    related: Option<&[EvidenceProjection]>,
+) -> Vec<Option<Observation>> {
     at.iter()
         .map(|primary| {
             Some(Observation {
                 primary: primary.clone()?,
-                related: vec![related?.clone()],
+                related: related?.to_vec(),
             })
         })
         .collect()
