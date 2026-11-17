@@ -159,8 +159,8 @@ pub(crate) fn redacted(candidates: &[OccurrenceCandidate]) -> impl Iterator<Item
 ///
 /// Returns the resolver bug of a candidate of the terminal reporting
 /// Finding, or of a component `tokens` leaves out.
-pub(crate) fn occurrences(
-    candidates: &[OccurrenceCandidate],
+pub(crate) fn occurrences<'a>(
+    candidates: impl IntoIterator<Item = &'a OccurrenceCandidate>,
     specification: Specification<'_>,
     tokens: &EvidenceTokens,
 ) -> Result<Vec<FindingOccurrence>, OccurrenceInvariant> {

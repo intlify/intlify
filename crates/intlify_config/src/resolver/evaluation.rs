@@ -33,7 +33,7 @@ use crate::locale::CanonicalLocale;
 
 use super::artifact_resolution::CollectionSubject;
 use super::capability::BootstrapBoundId;
-use super::coverage::CoverageSubject;
+use super::coverage::{Cells, CoverageSubject};
 use super::decision_evidence::DecisionEvidence;
 use super::dependency::SemanticGroup;
 use super::evidence::EvidenceProjection;
@@ -1256,7 +1256,7 @@ pub(crate) enum EvaluationInvariant {
     /// never settles unequal payloads by keeping one (D15:2381).
     UnequalPayload(Unit),
     /// A resolver bug: only the decision table, once established, owns
-    /// Coverage Decision Evidence (D15:1609).
+    /// Coverage Decision Basis and Evidence (D15:1609).
     DecisionsWithoutTable(Unit),
 }
 
@@ -1277,6 +1277,9 @@ pub(crate) struct Evaluation {
     /// The Finding Occurrence candidate of every blocking candidate that
     /// carried what it observed, in the order the units ran.
     occurrences: Vec<OccurrenceCandidate>,
+    /// The Coverage Decision Basis of the established decision table, in
+    /// cell order.
+    basis: Cells,
     /// The Coverage Decision Evidence of the established decision table, in
     /// cell order and then matched-domain order.
     decisions: Vec<DecisionEvidence>,
@@ -1692,9 +1695,10 @@ impl Evaluation {
         &self.occurrences
     }
 
-    /// Records the Coverage Decision Evidence of the decision table `table`,
-    /// which owns it, once the table was established: a table that was not
-    /// evaluated keeps none (D15:1609).
+    /// Records each cell's Coverage Decision Basis `basis` and the Coverage
+    /// Decision Evidence `decisions` of the decision table `table`, which
+    /// owns them, once the table was established: a table that was not
+    /// evaluated keeps neither (D15:1609; plan 025 decision #225).
     ///
     /// # Errors
     ///
@@ -1702,6 +1706,7 @@ impl Evaluation {
     pub(crate) fn decided(
         &mut self,
         table: &Unit,
+        basis: Cells,
         decisions: Vec<DecisionEvidence>,
     ) -> Result<(), EvaluationInvariant> {
         let logical = table.logical();
@@ -1710,8 +1715,14 @@ impl Evaluation {
         {
             return Err(EvaluationInvariant::DecisionsWithoutTable(table.clone()));
         }
+        self.basis.extend(basis);
         self.decisions.extend(decisions);
         Ok(())
+    }
+
+    /// The Coverage Decision Basis recorded, in cell order (D15:1607).
+    pub(crate) const fn decision_basis(&self) -> &Cells {
+        &self.basis
     }
 
     /// The Coverage Decision Evidence recorded, in cell order and then
@@ -3302,22 +3313,29 @@ mod tests {
         assert_eq!(Found::each(MISSING, Vec::new()), Found::from(MISSING));
     }
 
-    /// Only the decision table owns Coverage Decision Evidence, and only once
-    /// it was established: before it is evaluated or when it waits, and for
-    /// any other unit, recording it is a resolver bug (D15:1609).
+    /// Only the decision table owns Coverage Decision Basis and Evidence, and
+    /// only once it was established: before it is evaluated or when it
+    /// waits, and for any other unit, recording them is a resolver bug
+    /// (D15:1609).
     #[test]
-    fn only_the_established_table_owns_decision_evidence() {
+    fn only_the_established_table_owns_decision_records() {
         use crate::resolver::coverage::{unit, CoverageSubject};
         let table = unit(CoverageSubject::Table, Check::CompleteTable);
         let without = |unit: &Unit| Err(EvaluationInvariant::DecisionsWithoutTable(unit.clone()));
         let mut evaluation = Evaluation::default();
-        assert_eq!(evaluation.decided(&table, Vec::new()), without(&table));
+        assert_eq!(
+            evaluation.decided(&table, Cells::new(), Vec::new()),
+            without(&table)
+        );
         let waits = crate::resolver::locales::fixtures::stand_in(Slot::Coverage);
         evaluation
             .check(table.clone(), Err::<(), _>(waits), Ok::<(), Blocking>)
             .unwrap()
             .unwrap_err();
-        assert_eq!(evaluation.decided(&table, Vec::new()), without(&table));
+        assert_eq!(
+            evaluation.decided(&table, Cells::new(), Vec::new()),
+            without(&table)
+        );
         let mut evaluation = Evaluation::default();
         let cells = unit(CoverageSubject::Cells, Check::WithinBound);
         for owner in [&cells, &table] {
@@ -3326,8 +3344,11 @@ mod tests {
                 .unwrap()
                 .unwrap();
         }
-        assert_eq!(evaluation.decided(&cells, Vec::new()), without(&cells));
-        assert_eq!(evaluation.decided(&table, Vec::new()), Ok(()));
+        assert_eq!(
+            evaluation.decided(&cells, Cells::new(), Vec::new()),
+            without(&cells)
+        );
+        assert_eq!(evaluation.decided(&table, Cells::new(), Vec::new()), Ok(()));
     }
 
     /// D15:2381 within one evaluation: two candidates of one key with unequal
