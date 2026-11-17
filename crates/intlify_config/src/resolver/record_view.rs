@@ -74,13 +74,19 @@ pub(crate) struct RecordViews<'a> {
 
 impl<'a> RecordViews<'a> {
     /// Assigns, under `digest`, the token of the subject of every unit
-    /// `evaluation` recorded.
+    /// `evaluation` recorded, and of the diagnostic domain, which the
+    /// terminal reporting-limit Finding of an exhausted domain names while no
+    /// unit is recorded over it (D15:2359; plan 025 decision #227).
     pub(crate) fn assign(
         specification: Specification<'a>,
         evaluation: &Evaluation,
         digest: &impl Digest,
     ) -> Self {
-        let subjects = evaluation.statuses().map(|(unit, _)| &unit.subject);
+        let domain = Subject::DiagnosticDomain;
+        let subjects = evaluation
+            .statuses()
+            .map(|(unit, _)| &unit.subject)
+            .chain([&domain]);
         Self {
             specification,
             tokens: Tokens::assign(specification, subjects, digest),
@@ -126,6 +132,27 @@ impl<'a> RecordViews<'a> {
             view.insert("reason".to_owned(), json!(reason.as_str()));
         }
         Ok(Value::Object(view))
+    }
+
+    /// The view of the terminal state of the diagnostic domain `domain`, whose
+    /// terminal Finding is `cause` and whose omitted slices start at
+    /// `cursor`'s: `{ domain, nextUnitCursor, cause }` (D15:2408, 2489).
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug that leaves `cursor` or `cause` without a
+    /// view.
+    pub(crate) fn terminal_state(
+        &self,
+        domain: &str,
+        cursor: &Unit,
+        cause: &IssueKey,
+    ) -> Result<Value, ViewInvariant> {
+        Ok(json!({
+            "domain": domain,
+            "nextUnitCursor": self.unit(cursor)?,
+            "cause": self.finding_key(cause)?,
+        }))
     }
 
     /// The view of the Shared-unavailability cause that names the blocking
@@ -315,6 +342,7 @@ fn member_value(finding: &Finding<'_>, member: DetailsMember) -> Option<Value> {
         }
         (M::Bound, Some(Details::Limit(exceeded))) => exceeded.bound.name.to_owned(),
         (M::Bound, Some(Details::Shortfall(shortfall))) => shortfall.bound.name.to_owned(),
+        (M::Bound, Some(Details::Exhausted(bound))) => bound.name.to_owned(),
         // A capability bound's path names its namespace and group.
         (M::Bound, Some(Details::BootstrapLimit(exceeded))) => {
             let bound = CapabilityBound::BootstrapOnly(exceeded.bound);
@@ -373,7 +401,7 @@ fn measured(details: Option<&Details>) -> Option<(Bound, Actual)> {
     match details? {
         Details::Limit(exceeded) => Some((exceeded.limit, exceeded.actual)),
         Details::BootstrapLimit(exceeded) => Some((exceeded.limit, exceeded.actual)),
-        Details::Shortfall(_) => None,
+        Details::Shortfall(_) | Details::Exhausted(_) => None,
     }
 }
 

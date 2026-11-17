@@ -927,6 +927,7 @@ impl Subject {
                 SemanticGroup::DeploymentGroups => SubjectKind::DeploymentGroupsDependency,
                 SemanticGroup::Delivery => SubjectKind::DeliveryDependency,
             },
+            Self::DiagnosticDomain => SubjectKind::DiagnosticDomain,
         }
     }
 }
@@ -962,7 +963,8 @@ impl Ord for Subject {
                 | (Self::Vocabulary, Self::Vocabulary)
                 | (Self::CanonicalizationData, Self::CanonicalizationData)
                 | (Self::DeliveryPlacement, Self::DeliveryPlacement)
-                | (Self::SemanticDependency(_), Self::SemanticDependency(_)) => Ordering::Equal,
+                | (Self::SemanticDependency(_), Self::SemanticDependency(_))
+                | (Self::DiagnosticDomain, Self::DiagnosticDomain) => Ordering::Equal,
                 _ => unreachable!("subjects of one kind share one variant"),
             })
     }
@@ -991,8 +993,8 @@ mod tests {
     use crate::resolver::structural_admission::{EntryKey, Field};
 
     /// One subject of every kind but the normalized coverage domain, which
-    /// only coverage can build, and the kinds declared only, which have no
-    /// subject yet, in the order of [`SubjectKind::ALL`].
+    /// only coverage can build, and the kinds declared only, whose units no
+    /// evaluation records, in the order of [`SubjectKind::ALL`].
     fn samples() -> Vec<Subject> {
         let group: DeploymentGroupId = serde_json::from_value(json!("web")).unwrap();
         let rule: CoverageRule =

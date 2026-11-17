@@ -42,9 +42,12 @@ use crate::locale::CanonicalLocale;
 
 use super::coverage::{self, Basis, CoverageSubject, Decision};
 use super::decision_evidence::{self, CoverageDecisionEvidence, DecisionInvariant};
-use super::evaluation::{Causes, Check, Evaluation, Finding, IssueKey, Phase, Status, Unit};
+use super::evaluation::{
+    Causes, Check, Details, Evaluation, Finding, IssueKey, Phase, Reason, Status, Unit,
+};
 use super::evidence::Evidence;
 use super::evidence_token::EvidenceTokens;
+use super::limits::BoundId;
 use super::occurrence::{self, FindingOccurrence, OccurrenceCandidate, OccurrenceInvariant};
 use super::record_view::{RecordViews, ViewInvariant};
 use super::token::{rule_domain, Digest, Specification};
@@ -64,6 +67,24 @@ impl ReportingDomain {
         match phase {
             Phase::ResolverBootstrapAdmission | Phase::EntryAdmission => Self::Entry,
             _ => Self::Shared,
+        }
+    }
+
+    /// The domain's ID, as its terminal state names it (D15:2489).
+    pub(crate) const fn id(self) -> &'static str {
+        match self {
+            Self::Entry => "entry",
+            Self::Shared => "shared",
+        }
+    }
+
+    /// The stable reason of the domain's terminal reporting-limit Finding,
+    /// which equals the domain, so the two domains' Findings have two keys
+    /// (D15:2408).
+    pub(crate) const fn reason(self) -> Reason {
+        match self {
+            Self::Entry => Reason::Entry,
+            Self::Shared => Reason::Shared,
         }
     }
 }
@@ -348,6 +369,31 @@ impl<'e, 's> Reporting<'e, 's> {
             }
         }
         Ok(slices)
+    }
+
+    /// The views of `domain`'s terminal reporting-limit Finding, which names
+    /// `bound`, and of its terminal state, whose omitted slices start at
+    /// `cursor`'s. Both occupy the domain's reserved slots, so they are not
+    /// records of any slice (D15:1972, 2359, 2408, 2489).
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug that leaves either without its view.
+    pub(crate) fn terminal(
+        &self,
+        domain: ReportingDomain,
+        cursor: &Unit,
+        bound: BoundId,
+    ) -> Result<(Value, Value), ReportingInvariant> {
+        let key = IssueKey::terminal(domain.reason());
+        let details = Details::Exhausted(bound);
+        let finding = self.views.finding(&Finding {
+            key: &key,
+            details: Some(&details),
+            suggestion: None,
+        })?;
+        let state = self.views.terminal_state(domain.id(), cursor, &key)?;
+        Ok((finding, state))
     }
 
     /// The Entry records `unit` owns besides its own Findings and status:

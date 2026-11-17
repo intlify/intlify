@@ -25,6 +25,12 @@ impl Tally {
         Self(Some(count))
     }
 
+    /// Whether the count is past `limit`: a count past `u64` is past every
+    /// bound.
+    pub(crate) fn exceeds(self, limit: Bound) -> bool {
+        self.0.is_none_or(|count| count > limit.get())
+    }
+
     pub(crate) fn plus(self, other: Self) -> Self {
         Self(
             self.0
@@ -111,6 +117,16 @@ mod tests {
         );
         assert_eq!(actual(Tally(Some(9)), bound(7)), Actual::Exact(9));
         assert_eq!(actual(Tally(None), bound(7)), Actual::AtLeast(8));
+    }
+
+    /// A count exceeds a bound past its value, never at it, and a count past
+    /// `u64` exceeds every bound.
+    #[test]
+    fn a_count_exceeds_a_bound_only_past_it() {
+        assert!(!Tally(Some(5)).exceeds(bound(5)));
+        assert!(Tally(Some(6)).exceeds(bound(5)));
+        assert!(!Tally(Some(0)).exceeds(bound(1)));
+        assert!(Tally(None).exceeds(bound(u64::MAX - 1)));
     }
 
     #[test]

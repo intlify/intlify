@@ -370,7 +370,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Subject::DeliveryPlacement
         | Subject::Target(_)
         | Subject::Group(_)
-        | Subject::SemanticDependency(_) => return defect(),
+        | Subject::SemanticDependency(_)
+        | Subject::DiagnosticDomain => return defect(),
     }
     frame.uint(match unit.check {
         Check::WithinBound => 0,
@@ -499,7 +500,8 @@ fn causes(frame: &mut Frame, causes: &Causes) -> Result<(), OutputFailure> {
             | Subject::Fallback(_)
             | Subject::Coverage(_)
             | Subject::DeliveryPlacement
-            | Subject::SemanticDependency(_) => return defect(),
+            | Subject::SemanticDependency(_)
+            | Subject::DiagnosticDomain => return defect(),
         };
         framed.map_err(|_| OutputFailure::HydrationRelationValidationInvariant)?;
     }
