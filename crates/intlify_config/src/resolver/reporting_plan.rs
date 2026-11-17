@@ -20,19 +20,28 @@
 //! in the domain's declaration order, that the refused slice exceeds at the
 //! stage that refused it (D15:2408; plan 025 interpretation #226).
 //!
+//! Until a Resource Limit Policy is admitted, the capability's
+//! `policyComparable` values are the sole authority. Phase 4 admits the Policy
+//! once it is compatible with the capability, whatever its rechecks find, and
+//! each domain then recounts the slices it committed before, from zero and in
+//! canonical unit order, under the Policy's values, and goes on from the
+//! recounted counts under them (D15:2132, 2391). The admitting unit's own
+//! slice is planned after its check admitted the Policy, so under it. A domain
+//! the capability exhausted before the admission keeps its terminal cursor and
+//! bound unless the recount of what it committed refuses an earlier slice, and
+//! a domain with no slice at or after the admitting unit recounts once it has
+//! planned them all (plan 025 interpretation #228).
+//!
 //! Counts are checked: a count past `u64` is past every bound. The terminal
 //! Finding and state occupy the domain's reserved slots, not its ordinary
-//! bounds (D15:1972). The bounds here are one authority's, the
-//! capability's `policyComparable` values before a Resource Limit Policy is
-//! admitted (D15:2391); the Policy's, with a recount of what was committed
-//! before, come with plan 025 PR 5g-3.
+//! bounds (D15:1972).
 
 use std::collections::BTreeSet;
 
 use crate::artifacts::count;
 use crate::input_limits::Bound;
 
-use super::evaluation::{Status, Unit};
+use super::evaluation::{Check, Status, Unit};
 use super::evidence::Evidence;
 use super::limits::{
     BoundId, DiagnosticsLimits, EntryDiagnosticsLimits, Group, SharedDiagnosticsLimits,
@@ -40,6 +49,7 @@ use super::limits::{
 use super::reporting::{
     Candidates, Record, Reporting, ReportingDomain, ReportingInvariant, Retained, Slice,
 };
+use super::resource_policy::{self, PolicySubject};
 use super::tally::{total, Tally};
 
 /// What one domain reports: the slices it committed, in canonical unit
@@ -66,37 +76,46 @@ pub(crate) struct Reported<'e> {
     pub(crate) shared: Committed<'e>,
 }
 
-/// Plans and commits the slices of `reporting` under `limits`, each domain
-/// on its own in canonical unit order.
+/// Plans and commits the slices of `reporting`, each domain on its own in
+/// canonical unit order, under `capability`'s limits until Phase 4 admits a
+/// Resource Limit Policy, whose limits `policy` gives, and under the Policy's
+/// from then on.
 ///
 /// # Errors
 ///
 /// Returns the resolver bug that leaves a slice without its records.
 pub(crate) fn report<'e>(
     reporting: &Reporting<'e, '_>,
-    limits: &DiagnosticsLimits,
+    capability: &DiagnosticsLimits,
+    policy: Option<&DiagnosticsLimits>,
 ) -> Result<Reported<'e>, ReportingInvariant> {
     Ok(Reported {
         entry: commit(
             reporting,
             ReportingDomain::Entry,
-            Bounds::Entry(&limits.entry),
+            Bounds::Entry(&capability.entry),
+            policy.map(|policy| Bounds::Entry(&policy.entry)),
         )?,
         shared: commit(
             reporting,
             ReportingDomain::Shared,
-            Bounds::Shared(&limits.shared),
+            Bounds::Shared(&capability.shared),
+            policy.map(|policy| Bounds::Shared(&policy.shared)),
         )?,
     })
 }
 
-/// The slices of `domain`, planned in canonical unit order until one exceeds
-/// a bound of `bounds`.
+/// The slices of `domain`, planned in canonical unit order under `capability`
+/// and, from the unit that admits it, under `policy`, until one exceeds a
+/// bound.
 fn commit<'e>(
     reporting: &Reporting<'e, '_>,
     domain: ReportingDomain,
-    bounds: Bounds<'_>,
+    capability: Bounds<'_>,
+    mut policy: Option<Bounds<'_>>,
 ) -> Result<Committed<'e>, ReportingInvariant> {
+    let admission = resource_policy::unit(PolicySubject::ResourceLimits, Check::CompatiblePolicy);
+    let mut bounds = capability;
     let mut counted = Counters::default();
     let mut indexed: BTreeSet<Evidence> = BTreeSet::new();
     let mut slices = Vec::new();
@@ -104,24 +123,23 @@ fn commit<'e>(
         let Some(candidates) = reporting.candidates(unit, domain)? else {
             continue;
         };
-        let staged = counted.with_candidates(&candidates);
-        if let Some(bound) = bounds.candidate_stage(&staged, &candidates) {
-            let exhausted = Some(Exhausted {
-                cursor: unit,
-                bound,
-            });
-            return Ok(Committed { slices, exhausted });
+        if *unit >= admission {
+            if let Some(admitted) = policy.take() {
+                if let Some((index, bound)) = recount(&slices, admitted) {
+                    return Ok(cut(slices, index, bound));
+                }
+                bounds = admitted;
+            }
         }
+        let staged = match bounds.candidates(counted, &candidates) {
+            Ok(staged) => staged,
+            Err(bound) => return Ok(settle(slices, Some((unit, bound)), policy)),
+        };
         let records = reporting.records(unit, domain, &indexed)?;
-        let staged = staged.with_records(&records);
-        if let Some(bound) = bounds.record_stage(&staged, &records) {
-            let exhausted = Some(Exhausted {
-                cursor: unit,
-                bound,
-            });
-            return Ok(Committed { slices, exhausted });
-        }
-        counted = staged;
+        counted = match bounds.records(staged, &records) {
+            Ok(staged) => staged,
+            Err(bound) => return Ok(settle(slices, Some((unit, bound)), policy)),
+        };
         for retained in &records {
             if let Record::Evidence(evidence) = &retained.record {
                 indexed.insert(evidence.clone());
@@ -134,10 +152,53 @@ fn commit<'e>(
             records,
         });
     }
-    Ok(Committed {
+    Ok(settle(slices, None, policy))
+}
+
+/// What a domain committed under the capability alone, `slices`, and the slice
+/// it refused, if any: once the Policy the domain never reached the admitting
+/// unit of, `pending`, recounts them, the first slice it refuses ends the
+/// domain instead (D15:2391).
+fn settle<'e>(
+    slices: Vec<Slice<'e>>,
+    refused: Option<(&'e Unit, BoundId)>,
+    pending: Option<Bounds<'_>>,
+) -> Committed<'e> {
+    if let Some((index, bound)) = pending.and_then(|policy| recount(&slices, policy)) {
+        return cut(slices, index, bound);
+    }
+    Committed {
         slices,
-        exhausted: None,
-    })
+        exhausted: refused.map(|(cursor, bound)| Exhausted { cursor, bound }),
+    }
+}
+
+/// The slices before `index` of `slices`, the domain ending at the unit of the
+/// slice at `index`, which exceeds `bound`.
+fn cut(mut slices: Vec<Slice<'_>>, index: usize, bound: BoundId) -> Committed<'_> {
+    let cursor = slices[index].unit;
+    slices.truncate(index);
+    Committed {
+        slices,
+        exhausted: Some(Exhausted { cursor, bound }),
+    }
+}
+
+/// The first of `slices` that `bounds` refuse, by its index and the bound it
+/// exceeds, when the slices are counted again from zero in their order. What
+/// a slice counts does not depend on the bounds, so a domain whose slices all
+/// pass goes on from the counts it already has.
+fn recount(slices: &[Slice<'_>], bounds: Bounds<'_>) -> Option<(usize, BoundId)> {
+    slices
+        .iter()
+        .enumerate()
+        .try_fold(Counters::default(), |counted, (index, slice)| {
+            bounds
+                .candidates(counted, &slice.candidates)
+                .and_then(|staged| bounds.records(staged, &slice.records))
+                .map_err(|bound| (index, bound))
+        })
+        .err()
 }
 
 /// What a domain has counted so far for each bound that counts across its
@@ -226,6 +287,21 @@ enum Bounds<'l> {
 }
 
 impl Bounds<'_> {
+    /// `counted` once a slice's candidate stage counted `candidates`, or the
+    /// first bound it exceeds.
+    fn candidates(self, counted: Counters, candidates: &Candidates) -> Result<Counters, BoundId> {
+        let staged = counted.with_candidates(candidates);
+        self.candidate_stage(&staged, candidates)
+            .map_or(Ok(staged), Err)
+    }
+
+    /// `staged` once a slice's record stage counted `records`, or the first
+    /// bound they exceed.
+    fn records(self, staged: Counters, records: &[Retained<'_>]) -> Result<Counters, BoundId> {
+        let staged = staged.with_records(records);
+        self.record_stage(&staged, records).map_or(Ok(staged), Err)
+    }
+
     /// The first bound, in declaration order, that the candidate stage of a
     /// slice whose candidates are `candidates` exceeds once `staged` counts
     /// them: each candidate occurrence, each single item, and what comes
@@ -382,7 +458,7 @@ mod tests {
     use crate::materialize_tests::limits;
     use crate::resolver::entry::admit_entry;
     use crate::resolver::entry::fixtures::FileFixture;
-    use crate::resolver::evaluation::{Causes, Evaluation, IssueKey, Reason, Status};
+    use crate::resolver::evaluation::{Causes, Check, Evaluation, IssueKey, Reason, Status, Unit};
     use crate::resolver::evidence::Evidence;
     use crate::resolver::limits::{
         fixture_limits, BoundId, DiagnosticsLimits, Group, ResolutionLimits,
@@ -390,6 +466,7 @@ mod tests {
     use crate::resolver::profile_resolution::tests::Inputs;
     use crate::resolver::record_view::RecordViews;
     use crate::resolver::reporting::{Record, Reporting, ReportingDomain, Slice};
+    use crate::resolver::resource_policy::{self, PolicySubject};
     use crate::resolver::token::{Sha256, Specification};
 
     use super::{report, Committed, Exhausted, Reported};
@@ -408,13 +485,45 @@ mod tests {
 
     /// Every diagnostic bound at its largest value, but `bound` at `limit`.
     fn limits_with(bound: Option<(BoundId, u64)>) -> DiagnosticsLimits {
+        limits_of(bound.as_slice())
+    }
+
+    /// Every diagnostic bound at its largest value, but each of `tight` at
+    /// its limit.
+    fn limits_of(tight: &[(BoundId, u64)]) -> DiagnosticsLimits {
         let largest = Bound::new(u64::MAX - 1).unwrap();
-        ResolutionLimits::from_bounds(|id| match bound {
-            Some((tight, limit)) if tight == id => Bound::new(limit),
-            _ => Some(largest),
+        ResolutionLimits::from_bounds(|id| {
+            tight
+                .iter()
+                .find(|(bound, _)| *bound == id)
+                .map_or(Some(largest), |&(_, limit)| Bound::new(limit))
         })
         .unwrap()
         .diagnostics
+    }
+
+    fn entry(name: &'static str) -> BoundId {
+        BoundId {
+            group: Group::DiagnosticsEntry,
+            name,
+        }
+    }
+
+    fn shared(name: &'static str) -> BoundId {
+        BoundId {
+            group: Group::DiagnosticsShared,
+            name,
+        }
+    }
+
+    /// The unit whose check admits the Resource Limit Policy.
+    fn admission() -> Unit {
+        resource_policy::unit(PolicySubject::ResourceLimits, Check::CompatiblePolicy)
+    }
+
+    /// What `slices` count together for `bound`.
+    fn summed(bound: &str, slices: &[Slice<'_>]) -> u64 {
+        slices.iter().map(|slice| measure(bound, slice)).sum()
     }
 
     /// The bounds of `group`, in their declaration order.
@@ -494,7 +603,7 @@ mod tests {
             ReportingDomain::Entry => Group::DiagnosticsEntry,
             ReportingDomain::Shared => Group::DiagnosticsShared,
         };
-        let unbounded = report(reporting, &limits_with(None)).unwrap();
+        let unbounded = report(reporting, &limits_with(None), None).unwrap();
         let other = match domain {
             ReportingDomain::Entry => ReportingDomain::Shared,
             ReportingDomain::Shared => ReportingDomain::Entry,
@@ -523,9 +632,9 @@ mod tests {
                 (total, measures.iter().rposition(|&m| m > 0).unwrap())
             };
             assert!(exact >= 2, "{} counts {exact}", bound.name);
-            let at = report(reporting, &limits_with(Some((bound, exact)))).unwrap();
+            let at = report(reporting, &limits_with(Some((bound, exact))), None).unwrap();
             assert_eq!(of(&at, domain), of(&unbounded, domain), "{}", bound.name);
-            let over = report(reporting, &limits_with(Some((bound, exact - 1)))).unwrap();
+            let over = report(reporting, &limits_with(Some((bound, exact - 1))), None).unwrap();
             assert_eq!(
                 of(&over, domain),
                 &Committed {
@@ -595,7 +704,7 @@ mod tests {
     fn unbounded_domains_commit_every_slice_and_index_each_evidence_once() {
         failing().resolve(|evaluation, _| {
             let reporting = Reporting::new(&evaluation, PROFILE, None, &Sha256);
-            let reported = report(&reporting, &limits_with(None)).unwrap();
+            let reported = report(&reporting, &limits_with(None), None).unwrap();
             let slices = reporting.slices().unwrap();
             for domain in [ReportingDomain::Entry, ReportingDomain::Shared] {
                 let committed = of(&reported, domain);
@@ -646,7 +755,10 @@ mod tests {
     fn a_refused_slice_names_the_first_bound_of_the_stage_that_refused_it() {
         let (evaluation, causes) = entered();
         let reporting = Reporting::new(&evaluation, PROFILE, Some(&causes), &Sha256);
-        let all = report(&reporting, &limits_with(None)).unwrap().entry.slices;
+        let all = report(&reporting, &limits_with(None), None)
+            .unwrap()
+            .entry
+            .slices;
         let found: Vec<usize> = all
             .iter()
             .enumerate()
@@ -667,7 +779,7 @@ mod tests {
             name,
         };
         let refused =
-            |limits: &DiagnosticsLimits| report(&reporting, limits).unwrap().entry.exhausted;
+            |limits: &DiagnosticsLimits| report(&reporting, limits, None).unwrap().entry.exhausted;
         let mut limits = limits_with(Some((bound("maxFindings"), 1)));
         assert_eq!(
             refused(&limits),
@@ -715,7 +827,7 @@ mod tests {
             let mut keys = Vec::new();
             for domain in [ReportingDomain::Entry, ReportingDomain::Shared] {
                 let reported =
-                    report(&reporting, &limits_with(Some((records(domain), 1)))).unwrap();
+                    report(&reporting, &limits_with(Some((records(domain), 1))), None).unwrap();
                 let exhausted = of(&reported, domain).exhausted.unwrap();
                 let (finding, state) = reporting
                     .terminal(domain, exhausted.cursor, exhausted.bound)
@@ -753,5 +865,175 @@ mod tests {
             assert_ne!(keys[0], keys[1]);
             assert!(keys[0] < keys[1], "the Entry Finding comes first");
         });
+    }
+
+    /// Once admitted, the Policy recounts from zero the slices committed
+    /// before it, and refuses a slice the capability let through, the domain
+    /// keeping the slices before it while the other domain goes on. Exactly
+    /// what they count passes, and the Policy then goes on from the recounted
+    /// counts: one less than the domain's total refuses its last slice, past
+    /// the admission (D15:2132, 2391).
+    #[test]
+    fn the_admitted_policy_recounts_what_was_committed_before_it() {
+        failing().resolve(|evaluation, _| {
+            let reporting = Reporting::new(&evaluation, PROFILE, None, &Sha256);
+            let generous = limits_of(&[]);
+            let unbounded = report(&reporting, &generous, None).unwrap();
+            let all = &unbounded.shared.slices;
+            let before = all
+                .iter()
+                .position(|slice| *slice.unit >= admission())
+                .unwrap();
+            let records = summed("maxRecords", &all[..before]);
+            assert!(records >= 2);
+            let policy = limits_of(&[(shared("maxRecords"), records - 1)]);
+            let reported = report(&reporting, &generous, Some(&policy)).unwrap();
+            assert_eq!(
+                reported.shared,
+                Committed {
+                    slices: all[..before - 1].to_vec(),
+                    exhausted: Some(Exhausted {
+                        cursor: all[before - 1].unit,
+                        bound: shared("maxRecords"),
+                    }),
+                }
+            );
+            assert_eq!(reported.entry, unbounded.entry);
+            let total = summed("maxRecords", all);
+            let exact = limits_of(&[(shared("maxRecords"), total)]);
+            assert_eq!(
+                report(&reporting, &generous, Some(&exact)).unwrap().shared,
+                unbounded.shared
+            );
+            let last = all.len() - 1;
+            assert!(*all[last].unit > admission());
+            let over = limits_of(&[(shared("maxRecords"), total - 1)]);
+            assert_eq!(
+                report(&reporting, &generous, Some(&over)).unwrap().shared,
+                Committed {
+                    slices: all[..last].to_vec(),
+                    exhausted: Some(Exhausted {
+                        cursor: all[last].unit,
+                        bound: shared("maxRecords"),
+                    }),
+                }
+            );
+        });
+    }
+
+    /// The admitting unit's own slice is planned after its check admitted the
+    /// Policy, so under it: when the capability would refuse the slice for
+    /// one bound and the Policy for one declared before it, the terminal
+    /// Finding names the Policy's (plan 025 interpretation #228).
+    #[test]
+    fn the_admitting_units_own_slice_is_planned_under_the_policy() {
+        failing().resolve(|evaluation, _| {
+            let reporting = Reporting::new(&evaluation, PROFILE, None, &Sha256);
+            let unbounded = report(&reporting, &limits_of(&[]), None).unwrap();
+            let all = &unbounded.shared.slices;
+            let at = all
+                .iter()
+                .position(|slice| *slice.unit == admission())
+                .unwrap();
+            let records = summed("maxRecords", &all[..at]);
+            let statuses = summed("maxEvaluationStatusEntries", &all[..at]);
+            let capability = limits_of(&[(shared("maxRecords"), records)]);
+            let policy = limits_of(&[
+                (shared("maxRecords"), records),
+                (shared("maxEvaluationStatusEntries"), statuses),
+            ]);
+            let refused = |policy| report(&reporting, &capability, policy).unwrap().shared;
+            assert_eq!(
+                refused(None).exhausted,
+                Some(Exhausted {
+                    cursor: all[at].unit,
+                    bound: shared("maxRecords"),
+                })
+            );
+            assert_eq!(
+                refused(Some(&policy)),
+                Committed {
+                    slices: all[..at].to_vec(),
+                    exhausted: Some(Exhausted {
+                        cursor: all[at].unit,
+                        bound: shared("maxEvaluationStatusEntries"),
+                    }),
+                }
+            );
+        });
+    }
+
+    /// A domain the capability exhausted before the admission keeps its
+    /// terminal cursor and bound when the Policy's recount of what it
+    /// committed passes, even when the Policy would have refused the slice
+    /// for another bound, and ends earlier where the recount refuses
+    /// (D15:2391; plan 025 interpretation #228).
+    #[test]
+    fn a_domain_exhausted_before_the_admission_ends_no_later_after_the_recount() {
+        failing().resolve(|evaluation, _| {
+            let reporting = Reporting::new(&evaluation, PROFILE, None, &Sha256);
+            let unbounded = report(&reporting, &limits_of(&[]), None).unwrap();
+            let all = &unbounded.shared.slices;
+            let before = all
+                .iter()
+                .position(|slice| *slice.unit >= admission())
+                .unwrap();
+            let refused = before - 1;
+            assert!(refused >= 2);
+            let records = summed("maxRecords", &all[..refused]);
+            let statuses = summed("maxEvaluationStatusEntries", &all[..refused]);
+            let capability = limits_of(&[(shared("maxRecords"), records)]);
+            let passing = limits_of(&[(shared("maxEvaluationStatusEntries"), statuses)]);
+            assert_eq!(
+                report(&reporting, &capability, Some(&passing))
+                    .unwrap()
+                    .shared,
+                Committed {
+                    slices: all[..refused].to_vec(),
+                    exhausted: Some(Exhausted {
+                        cursor: all[refused].unit,
+                        bound: shared("maxRecords"),
+                    }),
+                }
+            );
+            let refusing = limits_of(&[(shared("maxRecords"), records - 1)]);
+            assert_eq!(
+                report(&reporting, &capability, Some(&refusing))
+                    .unwrap()
+                    .shared,
+                Committed {
+                    slices: all[..refused - 1].to_vec(),
+                    exhausted: Some(Exhausted {
+                        cursor: all[refused - 1].unit,
+                        bound: shared("maxRecords"),
+                    }),
+                }
+            );
+        });
+    }
+
+    /// A domain with no slice at or after the admitting unit recounts under
+    /// the Policy once it has planned every slice (plan 025 interpretation
+    /// #228).
+    #[test]
+    fn a_domain_with_no_slice_after_the_admission_recounts_at_its_end() {
+        let (evaluation, causes) = entered();
+        let reporting = Reporting::new(&evaluation, PROFILE, Some(&causes), &Sha256);
+        let generous = limits_of(&[]);
+        let all = report(&reporting, &generous, None).unwrap().entry.slices;
+        assert!(all.iter().all(|slice| *slice.unit < admission()));
+        let total = summed("maxRecords", &all);
+        let policy = limits_of(&[(entry("maxRecords"), total - 1)]);
+        let last = all.len() - 1;
+        assert_eq!(
+            report(&reporting, &generous, Some(&policy)).unwrap().entry,
+            Committed {
+                slices: all[..last].to_vec(),
+                exhausted: Some(Exhausted {
+                    cursor: all[last].unit,
+                    bound: entry("maxRecords"),
+                }),
+            }
+        );
     }
 }
