@@ -2781,6 +2781,33 @@ pub(super) mod tests {
         });
     }
 
+    /// Without the project's default, an endpoint that inherits it has no
+    /// effective default: whether a relation's endpoints share one waits on
+    /// it, and Phase 13 observes nothing the declaration lacks.
+    #[test]
+    fn a_relation_beside_no_project_default_leaves_its_default_unchecked() {
+        use crate::resolver::hydration::{self, HydrationSubject};
+        let mut inputs = Inputs::complete();
+        inputs
+            .declaration()
+            .as_object_mut()
+            .unwrap()
+            .remove("defaultRequestedLocale");
+        inputs.resolve(|evaluation, _| {
+            // `server` inherits the default; `browser` declares its own.
+            let relation = HydrationSubject::Relation(
+                serde_json::from_value(json!("web")).unwrap(),
+                serde_json::from_value(json!("server")).unwrap(),
+                serde_json::from_value(json!("browser")).unwrap(),
+            );
+            let default = hydration::unit(relation, Check::SameEffectiveDefault);
+            assert!(matches!(
+                evaluation.status(&default),
+                Some(Status::NotEvaluated(_))
+            ));
+        });
+    }
+
     /// The phases after Phase 5 classify a locale key by the canonicalizer it
     /// bound: Phase 7 observes a corrected alias key under its non-secret
     /// name and a rejected one redacted (D15:776).

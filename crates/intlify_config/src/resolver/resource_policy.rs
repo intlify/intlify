@@ -444,8 +444,7 @@ fn capability_bound(bound: CapabilityBound) -> Result<EvidenceProjection, Compon
     ComponentPath::capability(bound).map(EvidenceProjection::resolver_input)
 }
 
-/// The candidate `blocking`, with what it observed where its check's Findings
-/// carry occurrence Evidence.
+/// The candidate `blocking`, with what it observed when there is one.
 fn found(blocking: Blocking, observed: Option<Observation>) -> Found {
     observed.map_or_else(
         || Found::from(blocking),
@@ -757,19 +756,8 @@ fn rejection(
 }
 
 /// One bound's unit, not evaluated while the bound's value or the count is
-/// unavailable.
-fn bounded(
-    evaluation: &mut Evaluation,
-    unit: Unit,
-    bound: BoundId,
-    limit: Result<Bound, &Causes>,
-    tally: Result<Tally, &Causes>,
-) -> Result<Admitted<()>, EvaluationInvariant> {
-    bounded_at(evaluation, unit, (bound, limit), tally, None)
-}
-
-/// One bound's unit as [`bounded`], whose Finding is observed through
-/// `observed` where its check's Findings carry occurrence Evidence.
+/// unavailable, whose Finding is observed through `observed` when there is
+/// one.
 fn bounded_at(
     evaluation: &mut Evaluation,
     unit: Unit,
@@ -789,20 +777,9 @@ fn bounded_at(
 /// One bound's unit whose key stands for several values that are checked
 /// independently, of which `tally` is the largest: past the bound it reports
 /// only the first-over witness, the same for every value the key stands for.
-fn witnessed(
-    evaluation: &mut Evaluation,
-    unit: Unit,
-    bound: BoundId,
-    limit: Result<Bound, &Causes>,
-    tally: Result<Tally, &Causes>,
-) -> Result<Admitted<()>, EvaluationInvariant> {
-    witnessed_at(evaluation, unit, (bound, limit), tally, &[])
-}
-
-/// One bound's unit as [`witnessed`], where `values` are the values the key
-/// stands for, each with its size and what it is observed through: one
-/// candidate for each value past the bound (D15:2203). Without them its
-/// Findings carry no occurrence Evidence yet.
+/// `values` are the values the key stands for, each with its size and what
+/// it is observed through: one candidate for each value past the bound
+/// (D15:2203).
 fn witnessed_at(
     evaluation: &mut Evaluation,
     unit: Unit,
@@ -828,7 +805,7 @@ fn witnessed_at(
 
 /// One bound's unit over a count part of which may be unavailable: proved
 /// only once what is visible exceeds the bound. Its Finding is observed
-/// through `observed` where its check's Findings carry occurrence Evidence.
+/// through `observed` when there is one.
 fn measured(
     evaluation: &mut Evaluation,
     unit: Unit,

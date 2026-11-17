@@ -15,10 +15,9 @@
 //!
 //! One evaluation of a unit may find several blocking candidates: Findings
 //! with different codes or reasons, and occurrences of one Finding that a
-//! singleton subject checks independently (D15:2203, 2213-2221). For a check
-//! whose Findings carry occurrence Evidence, each candidate also carries what
-//! it observed its value through, which becomes one Finding Occurrence
-//! candidate (D15:2385).
+//! singleton subject checks independently (D15:2203, 2213-2221). Each
+//! candidate also carries what it observed its value through, which becomes
+//! one Finding Occurrence candidate (D15:2385).
 
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -978,7 +977,7 @@ pub(crate) struct Observation {
 }
 
 /// The blocking candidates one evaluation of a unit found, each with what it
-/// observed when its check's Findings carry occurrence Evidence. Never empty.
+/// observed when it had the input it looks in. Never empty.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Found(Vec<(Blocking, Option<Observation>)>);
 
@@ -1034,8 +1033,8 @@ impl Found {
 }
 
 impl From<Blocking> for Found {
-    /// The candidate `blocking`, of a check whose Findings carry no occurrence
-    /// Evidence yet.
+    /// The candidate `blocking`, observed through nothing: what a check finds
+    /// without the input it looks in.
     fn from(blocking: Blocking) -> Self {
         Self(vec![(blocking, None)])
     }
@@ -1420,46 +1419,15 @@ impl Evaluation {
     }
 
     /// Asserts that a Finding candidate of `unit`, `what` it reports,
-    /// carries what it observed exactly when the unit's check is one whose
-    /// Findings carry occurrence Evidence so far. Unless a test made the
-    /// result up or made the unit block.
+    /// carries what it observed, as every candidate does but the terminal
+    /// reporting limit's (D15:2387), which no unit records. Unless a test
+    /// made the result up or made the unit block.
     #[cfg(test)]
     fn observes(&self, unit: &Unit, observed: bool, what: &str) {
-        // The phases whose Findings carry occurrence Evidence so far; the
-        // others gain theirs check by check (plan 025 PRs 5f).
-        const OBSERVED: [Phase; 11] = [
-            Phase::ResolverBootstrapAdmission,
-            Phase::EntryAdmission,
-            Phase::StructuralAdmission,
-            Phase::ProfileSelection,
-            Phase::ResourcePolicyAdmission,
-            Phase::SpecificationAdmission,
-            Phase::LocaleResolution,
-            Phase::LocalePolicyResolution,
-            Phase::ArtifactReferenceResolution,
-            Phase::TargetResolution,
-            Phase::GroupResolution,
-        ];
         if self.fabricated || self.blocked.as_ref().map(Unit::logical).as_ref() == Some(unit) {
             return;
         }
-        // Phase 13 observes its bound and its endpoints, not yet its
-        // relations and roles.
-        let observes = OBSERVED.contains(&unit.phase)
-            || (unit.phase == Phase::HydrationValidation
-                && matches!(
-                    unit.check,
-                    Check::WithinBound
-                        | Check::KnownEndpoint
-                        | Check::SameGroupEndpoint
-                        | Check::EndpointRole
-                ));
-        assert_eq!(
-            observed,
-            observes,
-            "{unit:?} reports {what} {} what it observed, against its check",
-            if observed { "with" } else { "without" }
-        );
+        assert!(observed, "{unit:?} reports {what} without what it observed");
     }
 
     /// Runs `unit` when its prerequisite is admitted and records its status
@@ -2850,11 +2818,10 @@ mod tests {
         assert_eq!(evaluation.occurrence_candidates().len(), 2);
     }
 
-    /// A notice of a check whose Findings carry occurrence Evidence, as a
-    /// requested locale's do, must carry what it observed.
+    /// A notice must carry what it observed, as a requested locale's does.
     #[test]
     #[should_panic(expected = "reports a notice without what it observed")]
-    fn a_notice_of_an_observed_check_without_an_observation_fails_the_test() {
+    fn a_notice_without_an_observation_fails_the_test() {
         let mut evaluation = Evaluation::default();
         evaluation
             .check(requested_en(), Ok(()), Ok::<(), Blocking>)
@@ -3385,34 +3352,10 @@ mod tests {
         assert!(evaluation.occurrence_candidates().is_empty());
     }
 
-    /// A blocking candidate of a check whose Findings carry occurrence
-    /// Evidence, as Phase 0's do, must carry what it observed.
+    /// A blocking candidate must carry what it observed, as Phase 0's do.
     #[test]
     #[should_panic(expected = "without what it observed")]
-    fn a_candidate_of_an_observed_phase_without_an_observation_fails_the_test() {
+    fn a_candidate_without_an_observation_fails_the_test() {
         let _ = Evaluation::default().check(BOOTSTRAP, Ok(()), |()| Err::<(), _>(MISSING));
-    }
-
-    /// A blocking candidate of a check whose Findings carry no occurrence
-    /// Evidence yet carries no observation.
-    #[test]
-    #[should_panic(expected = "with what it observed")]
-    fn a_candidate_of_another_phase_with_an_observation_fails_the_test() {
-        use crate::resolver::hydration::{unit, HydrationSubject};
-        use crate::resolver::locales::fixtures::target;
-        let data = through(crate::resolver::evidence_component::ComponentPath::data_root());
-        let group = serde_json::from_value(serde_json::json!("web")).unwrap();
-        let relation = unit(
-            HydrationSubject::Relation(group, target("server"), target("server")),
-            Check::DistinctEndpoints,
-        );
-        let equal = Blocking {
-            code: Code::HydrationRelationInvalid,
-            reason: Some(Reason::EqualEndpoint),
-            details: None,
-        };
-        let _ = Evaluation::default().check_found(relation, Ok(()), |()| {
-            Err::<(), _>(Found::observed(equal, data))
-        });
     }
 }

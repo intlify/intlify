@@ -294,8 +294,7 @@ mod tests {
     }
 
     /// Records `unit` as finding `code` with `reason` through `observation`,
-    /// as a check whose Findings carry occurrence Evidence does, and returns
-    /// the Finding's key.
+    /// as a check does, and returns the Finding's key.
     fn found_observed(
         evaluation: &mut Evaluation,
         unit: &Unit,

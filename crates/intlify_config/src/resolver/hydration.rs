@@ -33,7 +33,12 @@
 //! that names no declared Target ID beside the declared Target IDs, one that
 //! names no member of its group beside the group's members, each the set it
 //! must belong to, and one whose Target Profile lacks its field's role beside
-//! that Target Profile.
+//! that Target Profile. A relation is observed at each of its occurrences:
+//! between equal endpoints alone, repeated beside its other occurrences, and
+//! with endpoints of other locales, effective defaults, or statically
+//! incompatible Target Profiles beside where it found both endpoints'. A
+//! Target ID that takes both roles is observed at each of its occurrences in
+//! one role beside those in the other.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -42,7 +47,9 @@ use crate::model::{DeploymentGroup, DeploymentGroupId, HydrationRelation, NonEmp
 use crate::structural::Edge;
 
 use super::artifact_resolution::{self, AdmittedArtifact};
-use super::declaration_observer::{beside, each_beside, DeclarationObserver, ObserverInvariant};
+use super::declaration_observer::{
+    beside, each_beside, each_beside_all, DeclarationObserver, ObserverInvariant,
+};
 use super::evaluation::{
     and, both, within, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant,
     Found, Phase, Reason, Subject, Unit,
@@ -331,15 +338,18 @@ impl<'p, 't, 's> Shared<'_, 'p, 't, 's> {
             // role.
             if server != client {
                 let serving = taken.entry(server).or_default();
-                serving.serves = true;
+                serving.serving.extend(positions);
                 serving.bytes = and(serving.bytes.clone(), checked.server);
                 let hydrating = taken.entry(client).or_default();
-                hydrating.hydrates = true;
+                hydrating.hydrating.extend(positions);
                 hydrating.bytes = and(hydrating.bytes.clone(), checked.client);
             }
             holds = and(holds, checked.holds);
         }
-        holds = and(holds, single_roles(evaluation, id, &taken)?);
+        holds = and(
+            holds,
+            single_roles(evaluation, (id, self.observer), &taken)?,
+        );
         Ok(holds.map(|()| {
             occurrences
                 .into_keys()
@@ -402,18 +412,19 @@ struct Gate<'p, 't, 's> {
 }
 
 /// The roles one Target ID takes among its group's relations between
-/// distinct endpoints, and the bytes of each endpoint that names it there.
+/// distinct endpoints, by the positions of the relations that give it each,
+/// and the bytes of each endpoint that names it there.
 struct Taken {
-    serves: bool,
-    hydrates: bool,
+    serving: Vec<usize>,
+    hydrating: Vec<usize>,
     bytes: Admitted<()>,
 }
 
 impl Default for Taken {
     fn default() -> Self {
         Self {
-            serves: false,
-            hydrates: false,
+            serving: Vec::new(),
+            hydrating: Vec::new(),
             bytes: Ok(()),
         }
     }
@@ -421,23 +432,36 @@ impl Default for Taken {
 
 /// Each Target ID that serves or hydrates between two distinct endpoints
 /// takes one role in its group, waiting only on the bytes of the endpoints
-/// that name it there.
+/// that name it there. One that takes both is observed at each of its
+/// occurrences in one role, beside its occurrences in the other (D15:2249,
+/// 2387), through `observer` when there is one.
 fn single_roles(
     evaluation: &mut Evaluation,
-    id: &DeploymentGroupId,
+    (id, observer): (&DeploymentGroupId, Option<&DeclarationObserver<'_>>),
     taken: &BTreeMap<&TargetId, Taken>,
-) -> Result<Admitted<()>, EvaluationInvariant> {
+) -> Result<Admitted<()>, HydrationInvariant> {
     let mut holds = Ok(());
     for (&target, roles) in taken {
-        let single = evaluation.check(
+        let dual = !roles.serving.is_empty() && !roles.hydrating.is_empty();
+        let observed = if dual {
+            let serving = relations_at(observer, id, &roles.serving, Some(EndpointField::Server))?;
+            let hydrating =
+                relations_at(observer, id, &roles.hydrating, Some(EndpointField::Client))?;
+            let mut observed = each_beside_all(&serving, all_of(&hydrating).as_deref());
+            observed.extend(each_beside_all(&hydrating, all_of(&serving).as_deref()));
+            observed
+        } else {
+            Vec::new()
+        };
+        let single = evaluation.check_found(
             unit(
                 HydrationSubject::Roles(id.clone(), target.clone()),
                 Check::SingleRole,
             ),
             roles.bytes.clone(),
             |()| {
-                if roles.serves && roles.hydrates {
-                    Err(invalid(Reason::DualRole))
+                if dual {
+                    Err(Found::each(invalid(Reason::DualRole), observed))
                 } else {
                     Ok(())
                 }
@@ -446,6 +470,54 @@ fn single_roles(
         holds = and(holds, single);
     }
     Ok(holds)
+}
+
+/// Each location at `at`, once every one was observed.
+fn all_of(at: &[Option<EvidenceProjection>]) -> Option<Vec<EvidenceProjection>> {
+    at.iter().cloned().collect()
+}
+
+/// Where the target `id` declares its effective default, as Phase 11 found
+/// it: its own override, or else the project's default it inherits.
+fn default_at(
+    observer: &DeclarationObserver<'_>,
+    id: &TargetId,
+    facts: &TargetFacts<'_>,
+) -> Result<EvidenceProjection, ObserverInvariant> {
+    if facts.default_origin == Some(Reason::ExplicitOverride) {
+        observer.value(&["targetProfiles", id.as_str(), "defaultRequestedLocale"])
+    } else {
+        observer.value(&["defaultRequestedLocale"])
+    }
+}
+
+/// The relation at each of `positions` in the group `id`, or the endpoint
+/// `field` names in it, at its token (D15:790), when there is a declaration to
+/// observe.
+fn relations_at(
+    observer: Option<&DeclarationObserver<'_>>,
+    id: &DeploymentGroupId,
+    positions: &[usize],
+    field: Option<EndpointField>,
+) -> Result<Vec<Option<EvidenceProjection>>, ObserverInvariant> {
+    positions
+        .iter()
+        .map(|&index| {
+            observer
+                .map(|observer| {
+                    let index = u64::try_from(index).map_err(|_| ObserverInvariant::Missing)?;
+                    let mut edges = vec![
+                        Edge::Member("deploymentGroups"),
+                        Edge::Member(id.as_str()),
+                        Edge::Member("hydrationRelations"),
+                        Edge::Index(index),
+                    ];
+                    edges.extend(field.map(|field| Edge::Member(field.name())));
+                    observer.nested(&edges)
+                })
+                .transpose()
+        })
+        .collect()
 }
 
 /// One relation's checks, over the positions of its occurrences in the
@@ -512,27 +584,7 @@ impl Relation<'_> {
             EndpointField::Client => self.client,
             EndpointField::Server => self.server,
         };
-        // Each occurrence of the endpoint at its token, when there is a
-        // declaration to observe.
-        let at = self
-            .positions
-            .iter()
-            .map(|&index| {
-                shared
-                    .observer
-                    .map(|observer| {
-                        let index = u64::try_from(index).map_err(|_| ObserverInvariant::Missing)?;
-                        observer.nested(&[
-                            Edge::Member("deploymentGroups"),
-                            Edge::Member(self.id.as_str()),
-                            Edge::Member("hydrationRelations"),
-                            Edge::Index(index),
-                            Edge::Member(field.name()),
-                        ])
-                    })
-                    .transpose()
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let at = relations_at(shared.observer, self.id, self.positions, Some(field))?;
         let bytes = evaluation.check_found(
             self.endpoint_unit(field, Check::WithinBound),
             gate.policy.clone(),
@@ -612,6 +664,10 @@ impl Relation<'_> {
     /// after both endpoints' bytes; the same locales and effective default,
     /// after what Phase 11 found of both; and static compatibility, after both
     /// Target Profiles. No check of the relation waits on another's failure.
+    /// A check of the relation that fails observes each of its occurrences
+    /// (D15:2387): between equal endpoints alone, repeated beside the other
+    /// occurrences, and otherwise beside where it found both endpoints'
+    /// locales, effective defaults, or Target Profiles (D15:2249).
     fn check(
         &self,
         evaluation: &mut Evaluation,
@@ -620,64 +676,111 @@ impl Relation<'_> {
     ) -> Result<Checked, HydrationInvariant> {
         let client = self.endpoint(evaluation, shared, gate, EndpointField::Client)?;
         let server = self.endpoint(evaluation, shared, gate, EndpointField::Server)?;
+        let at = relations_at(shared.observer, self.id, self.positions, None)?;
         let bytes = and(server.bytes.clone(), client.bytes.clone());
         let distinct =
-            evaluation.check(self.unit(Check::DistinctEndpoints), bytes.clone(), |()| {
+            evaluation.check_found(self.unit(Check::DistinctEndpoints), bytes.clone(), |()| {
                 if self.server == self.client {
-                    Err(invalid(Reason::EqualEndpoint))
+                    // The relation compares its own two fields, no other
+                    // location.
+                    let equal = invalid(Reason::EqualEndpoint);
+                    Err(Found::each(equal, each_beside_all(&at, Some(&[]))))
                 } else {
                     Ok(())
                 }
             })?;
-        let once = evaluation.check(self.unit(Check::UniqueRelation), bytes, |()| {
+        let once = evaluation.check_found(self.unit(Check::UniqueRelation), bytes, |()| {
             if self.positions.len() == 1 {
                 Ok(())
             } else {
-                Err(invalid(Reason::DuplicateRelation))
+                Err(Found::repeated(invalid(Reason::DuplicateRelation), &at))
             }
         })?;
         let facts = both(server.facts, client.facts);
-        let requested = evaluation.check(
+        let requested_input = facts
+            .clone()
+            .and_then(|(server, client)| both(server.requested.clone(), client.requested.clone()));
+        // Where each endpoint requests its locales, once both are resolved.
+        let at_requested = match (shared.observer, &requested_input) {
+            (Some(observer), Ok(_)) => Some(
+                [self.server, self.client]
+                    .map(|id| observer.value(&["targetProfiles", id.as_str(), "requestedLocales"]))
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>()?,
+            ),
+            _ => None,
+        };
+        let requested = evaluation.check_found(
             self.unit(Check::SameRequestedLocales),
-            facts.clone().and_then(|(server, client)| {
-                both(server.requested.clone(), client.requested.clone())
-            }),
+            requested_input,
             |(server, client)| {
                 if server == client {
                     Ok(())
                 } else {
-                    Err(locale_policy(Reason::RequestedLocales))
+                    let other = locale_policy(Reason::RequestedLocales);
+                    Err(Found::each(
+                        other,
+                        each_beside_all(&at, at_requested.as_deref()),
+                    ))
                 }
             },
         )?;
-        let default = evaluation.check(
+        let default_input = facts.clone().and_then(|(server, client)| {
+            both(
+                server.effective_default.clone(),
+                client.effective_default.clone(),
+            )
+        });
+        // Where each endpoint's effective default is declared, once both are
+        // resolved.
+        let at_defaults = match (shared.observer, &facts, &default_input) {
+            (Some(observer), Ok((server, client)), Ok(_)) => Some(vec![
+                default_at(observer, self.server, server)?,
+                default_at(observer, self.client, client)?,
+            ]),
+            _ => None,
+        };
+        let default = evaluation.check_found(
             self.unit(Check::SameEffectiveDefault),
-            facts.clone().and_then(|(server, client)| {
-                both(
-                    server.effective_default.clone(),
-                    client.effective_default.clone(),
-                )
-            }),
+            default_input,
             |(server, client)| {
                 if server == client {
                     Ok(())
                 } else {
-                    Err(locale_policy(Reason::EffectiveDefault))
+                    let other = locale_policy(Reason::EffectiveDefault);
+                    Err(Found::each(
+                        other,
+                        each_beside_all(&at, at_defaults.as_deref()),
+                    ))
                 }
             },
         )?;
-        let compatible = evaluation.check(
+        let profiles =
+            facts.and_then(|(server, client)| both(server.profile.clone(), client.profile.clone()));
+        // Both Target Profiles, once Phase 9 resolved them.
+        let at_profiles = match &profiles {
+            Ok(((server, _), (client, _))) => Some(vec![
+                artifact_resolution::admitted(server)?,
+                artifact_resolution::admitted(client)?,
+            ]),
+            Err(_) => None,
+        };
+        let compatible = evaluation.check_found(
             self.unit(Check::StaticCompatibility),
-            facts.and_then(|(server, client)| both(server.profile.clone(), client.profile.clone())),
+            profiles,
             |((_, server), (_, client))| {
                 if statically_compatible(server, client) {
                     Ok(())
                 } else {
-                    Err(Blocking {
+                    let incompatible = Blocking {
                         code: Code::HydrationCapabilityIncompatible,
                         reason: None,
                         details: None,
-                    })
+                    };
+                    Err(Found::each(
+                        incompatible,
+                        each_beside_all(&at, at_profiles.as_deref()),
+                    ))
                 }
             },
         )?;
@@ -991,6 +1094,23 @@ mod tests {
             })
         }
 
+        /// The view of the relation at `index` of `group_id`.
+        fn relation_at(&self, group_id: &str, index: u64) -> Value {
+            self.at(|observer| {
+                observer.nested(&[
+                    Edge::Member("deploymentGroups"),
+                    Edge::Member(group_id),
+                    Edge::Member("hydrationRelations"),
+                    Edge::Index(index),
+                ])
+            })
+        }
+
+        /// The view of where the target `id` requests its locales.
+        fn requested_at(&self, id: &str) -> Value {
+            self.at(|observer| observer.value(&["targetProfiles", id, "requestedLocales"]))
+        }
+
         /// The view of the Target Profile the target `id` names, as the
         /// roles now declare it.
         fn profile(&self, id: &str) -> Value {
@@ -1213,15 +1333,38 @@ mod tests {
             let repeated = relation("web", "ssr", "browser", Check::UniqueRelation);
             let found = issues(&evaluation);
             assert!(found.contains(&(
-                equal,
+                equal.clone(),
                 "project-profile-hydration-relation-invalid",
                 Some("equal-endpoint")
             )));
             assert!(found.contains(&(
-                repeated,
+                repeated.clone(),
                 "project-profile-hydration-relation-invalid",
                 Some("duplicate-relation")
             )));
+            // The repeated pair at each occurrence beside the other; the equal
+            // endpoints' relation on its own, and its client beside the Target
+            // Profile without the role.
+            let at = |index| inputs.relation_at("web", index);
+            assert_eq!(
+                observed(&evaluation),
+                [
+                    (repeated.clone(), at(0), vec![at(2)]),
+                    (repeated, at(2), vec![at(0)]),
+                    (
+                        on_endpoint(
+                            "web",
+                            "ssr",
+                            "ssr",
+                            EndpointField::Client,
+                            Check::EndpointRole
+                        ),
+                        inputs.endpoint_at("web", 1, "client"),
+                        vec![inputs.profile("ssr")]
+                    ),
+                    (equal, at(1), vec![]),
+                ]
+            );
             // Between the equal endpoints the locales and the Target Profiles
             // are still compared, and each field's role is still checked:
             // `ssr`'s Target Profile does not hydrate.
@@ -1294,7 +1437,8 @@ mod tests {
                 ]
             );
             // Each endpoint at its occurrence: beside the declared Target IDs,
-            // the group's members, or the Target Profile it compared.
+            // the group's members, or the Target Profile it compared; and the
+            // relation beside where both endpoints request their locales.
             let targets = inputs.at(|observer| observer.value(&["targetProfiles"]));
             let members =
                 inputs.at(|observer| observer.value(&["deploymentGroups", "web", "members"]));
@@ -1320,6 +1464,11 @@ mod tests {
                         worker(Check::EndpointRole),
                         at_worker,
                         vec![inputs.profile("worker")]
+                    ),
+                    (
+                        relation("web", "ssr", "worker", Check::SameRequestedLocales),
+                        inputs.relation_at("web", 1),
+                        vec![inputs.requested_at("ssr"), inputs.requested_at("worker")]
                     ),
                 ]
             );
@@ -1349,7 +1498,8 @@ mod tests {
     #[test]
     fn a_repeated_relation_observes_each_occurrence_of_its_endpoint() {
         // `ssr -> phone` twice: one subject, so one result for each failed
-        // check, observed at both occurrences (D15:2387).
+        // check, observed at both occurrences (D15:2387), and the repeat
+        // itself at each occurrence beside the other.
         let mut inputs = Inputs::new();
         inputs.relate(
             "web",
@@ -1361,6 +1511,8 @@ mod tests {
             let members =
                 inputs.at(|observer| observer.value(&["deploymentGroups", "web", "members"]));
             let at = |index| inputs.endpoint_at("web", index, "client");
+            let repeated = relation("web", "ssr", "phone", Check::UniqueRelation);
+            let relation_at = |index| inputs.relation_at("web", index);
             assert_eq!(
                 observed(&evaluation),
                 [
@@ -1372,6 +1524,8 @@ mod tests {
                         vec![members.clone()]
                     ),
                     (phone(Check::SameGroupEndpoint), at(2), vec![members]),
+                    (repeated.clone(), relation_at(0), vec![relation_at(2)]),
+                    (repeated, relation_at(2), vec![relation_at(0)]),
                 ]
             );
         });
@@ -1393,6 +1547,23 @@ mod tests {
                     "project-profile-hydration-relation-invalid",
                     Some("dual-role")
                 )]
+            );
+            // `browser` serves in the relation at 1 and hydrates in the one at
+            // 0: each occurrence beside those in the other role.
+            let (serving, hydrating) = (
+                inputs.endpoint_at("web", 1, "server"),
+                inputs.endpoint_at("web", 0, "client"),
+            );
+            assert_eq!(
+                observed(&evaluation),
+                [
+                    (
+                        roles("web", "browser"),
+                        serving.clone(),
+                        vec![hydrating.clone()]
+                    ),
+                    (roles("web", "browser"), hydrating, vec![serving]),
+                ]
             );
             // Every relation of the group held but the roles did not.
             let causes = hydration
@@ -1487,6 +1658,15 @@ mod tests {
                     relation("web", "ssr", "browser", Check::StaticCompatibility),
                     "project-profile-hydration-capability-incompatible",
                     None
+                )]
+            );
+            // The relation, beside both Target Profiles it compared.
+            assert_eq!(
+                observed(&evaluation),
+                [(
+                    relation("web", "ssr", "browser", Check::StaticCompatibility),
+                    inputs.relation_at("web", 0),
+                    vec![inputs.profile("ssr"), inputs.profile("browser")]
                 )]
             );
             assert!(hydration.unwrap().complete().is_err());
@@ -1603,6 +1783,29 @@ mod tests {
                         relation("web", "ssr", "browser", Check::SameEffectiveDefault),
                         "project-profile-hydration-locale-policy-incompatible",
                         Some("effective-default")
+                    ),
+                ]
+            );
+            // The relation beside where each endpoint declares what it
+            // compared: `ssr` its own default, `browser` the project's.
+            let at = inputs.relation_at("web", 0);
+            assert_eq!(
+                observed(&evaluation),
+                [
+                    (
+                        relation("web", "ssr", "browser", Check::SameRequestedLocales),
+                        at.clone(),
+                        vec![inputs.requested_at("ssr"), inputs.requested_at("browser")]
+                    ),
+                    (
+                        relation("web", "ssr", "browser", Check::SameEffectiveDefault),
+                        at,
+                        vec![
+                            inputs.at(|observer| {
+                                observer.value(&["targetProfiles", "ssr", "defaultRequestedLocale"])
+                            }),
+                            inputs.at(|observer| observer.value(&["defaultRequestedLocale"])),
+                        ]
                     ),
                 ]
             );
