@@ -458,13 +458,18 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
         )?,
         Err(causes) => Err(causes),
     };
-    // The table owns every cell's Basis, so no Basis exists unless every cell
-    // is decided, and its Coverage Decision Evidence.
+    // The table owns every cell's Basis and its Coverage Decision Evidence,
+    // so neither exists unless every cell is decided (D15:1609; plan 025
+    // decision #225). The Evidence observes the decision sources in the
+    // declaration's file.
     let owner = unit(CoverageSubject::Table, Check::CompleteTable);
     let table = evaluation.check(owner.clone(), cells, Ok)?;
-    if let (Ok(cells), Some(observer)) = (&table, observer) {
-        let decisions = decision_evidence(cells, &domains, (observer, default_declared))?;
-        evaluation.decided(&owner, decisions)?;
+    if let Ok(cells) = &table {
+        let decisions = match observer {
+            Some(observer) => decision_evidence(cells, &domains, (observer, default_declared))?,
+            None => Vec::new(),
+        };
+        evaluation.decided(&owner, cells.clone(), decisions)?;
     }
     // The default mode exists whenever the declared coverage does, which the
     // rule counts wait on too, and the span whenever the table does, so
@@ -2429,15 +2434,19 @@ mod tests {
         }
     }
 
-    /// A cell two rules of one mode decide maps to each, in domain order; a
-    /// table that is not established keeps none, nor does an evaluation
-    /// without the declaration's file (D15:1609, 1611).
+    /// A cell two rules of one mode decide maps to each, in domain order. An
+    /// established table owns every cell's Basis, the declaration's file or
+    /// not, and a table that is not established keeps neither Basis nor
+    /// mapping, nor does an evaluation without the file keep a mapping
+    /// (D15:1607, 1609, 1611).
     #[test]
     fn each_matched_domain_is_mapped_and_an_unestablished_table_keeps_none() {
         let locale_only = json!({"requestedLocales": ["fr"], "mode": "fallback-allowed"});
         let same_mode = json!({"intentSurfaceClasses": ["checkout"], "mode": "fallback-allowed"});
         let declaration = declared(json!({"rules": [locale_only, same_mode]}));
         let resolved = resolve(&declaration);
+        let basis = resolved.policy.as_ref().unwrap().basis();
+        assert_eq!(resolved.evaluation.decision_basis(), basis);
         let both: Vec<_> = decisions(&resolved)
             .into_iter()
             .filter(|(locale, surface, ..)| (*locale, *surface) == ("fr", "checkout"))
@@ -2463,6 +2472,7 @@ mod tests {
         let other_mode = json!({"intentSurfaceClasses": ["checkout"], "mode": "direct-required"});
         let conflicting = resolve(&declared(json!({"rules": [locale_only, other_mode]})));
         assert!(conflicting.policy.is_err());
+        assert!(conflicting.evaluation.decision_basis().is_empty());
         assert_eq!(decisions(&conflicting), []);
         // Without the declaration's file, nothing is observed.
         let unobserved = resolve_fields(
@@ -2470,6 +2480,7 @@ mod tests {
             &setup(ROOM, &vocabulary()),
         );
         assert!(unobserved.policy.is_ok());
+        assert_eq!(unobserved.evaluation.decision_basis(), basis);
         assert_eq!(decisions(&unobserved), []);
     }
 

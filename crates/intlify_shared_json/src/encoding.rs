@@ -77,6 +77,12 @@ impl Domain {
 }
 
 fn length(value: &Value, depth: usize) -> Result<u64, EncodingFailure> {
+    measure(value, depth, MAX_BYTES)
+}
+
+/// The length of `C(value)` at nesting `depth`, which fails past `capacity`
+/// bytes at the first value that exceeds it.
+fn measure(value: &Value, depth: usize, capacity: u64) -> Result<u64, EncodingFailure> {
     if depth > MAX_DEPTH {
         return Err(EncodingFailure::Depth);
     }
@@ -90,7 +96,7 @@ fn length(value: &Value, depth: usize) -> Result<u64, EncodingFailure> {
             count(items.len())?;
             let mut total = 8;
             for child in items {
-                total = add(total, length(child, depth + 1)?)?;
+                total = add(total, measure(child, depth + 1, capacity)?)?;
             }
             total
         }
@@ -99,13 +105,13 @@ fn length(value: &Value, depth: usize) -> Result<u64, EncodingFailure> {
             let mut total = 8;
             for (key, child) in members {
                 total = add(total, add(9, count(key.len())?)?)?;
-                total = add(total, length(child, depth + 1)?)?;
+                total = add(total, measure(child, depth + 1, capacity)?)?;
             }
             total
         }
     };
     let total = add(9, payload)?;
-    if total > MAX_BYTES {
+    if total > capacity {
         return Err(EncodingFailure::Capacity);
     }
     Ok(total)
@@ -187,6 +193,20 @@ pub fn encode(value: &Value) -> Result<Vec<u8>, EncodingFailure> {
     write(value, &mut output)?;
     debug_assert_eq!(output.len(), bytes);
     Ok(output)
+}
+
+/// The length of `C(value)`: the bytes [`encode`] writes for `value`, counted
+/// without writing them and past the reader capacity that bounds what
+/// [`encode`] writes, since a semantic bound that counts canonical bytes may be
+/// larger than that capacity.
+///
+/// # Errors
+///
+/// Returns [`EncodingFailure::Number`] for a number,
+/// [`EncodingFailure::Depth`] past the nesting capacity, and
+/// [`EncodingFailure::Overflow`] for a length past `u64`.
+pub fn encoded_length(value: &Value) -> Result<u64, EncodingFailure> {
+    measure(value, 1, u64::MAX)
 }
 
 /// Compute `H(D, V)` for one registered domain and admitted value.
@@ -329,6 +349,38 @@ mod tests {
             encode(&Value::String(string)),
             Err(EncodingFailure::Capacity)
         );
+    }
+
+    /// The length is what `encode` writes, and past the reader capacity it
+    /// is still the exact length while `encode` fails.
+    #[test]
+    fn the_encoded_length_counts_past_the_reader_capacity() {
+        for value in [
+            Value::Null,
+            json!(true),
+            json!(""),
+            json!(["a", null, {"b": [false]}]),
+            json!({"z": "1", "é": {"a": []}}),
+        ] {
+            assert_eq!(
+                encoded_length(&value),
+                Ok(u64::try_from(encode(&value).unwrap().len()).unwrap())
+            );
+        }
+        let string = Value::String("a".repeat(usize::try_from(MAX_BYTES - 8).unwrap()));
+        assert_eq!(encode(&string), Err(EncodingFailure::Capacity));
+        assert_eq!(encoded_length(&string), Ok(MAX_BYTES + 1));
+        let nested = json!({"value": [string]});
+        assert_eq!(
+            encoded_length(&nested),
+            Ok(MAX_BYTES + 1 + 9 + 8 + 9 + 5 + 9 + 8)
+        );
+        assert_eq!(encoded_length(&json!([1])), Err(EncodingFailure::Number));
+        let mut deep = Value::Null;
+        for _ in 0..MAX_DEPTH {
+            deep = Value::Array(vec![deep]);
+        }
+        assert_eq!(encoded_length(&deep), Err(EncodingFailure::Depth));
     }
 
     #[test]
