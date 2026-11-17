@@ -24,6 +24,7 @@ pub(crate) mod evaluation;
 pub(crate) mod evidence;
 pub(crate) mod evidence_component;
 pub(crate) mod evidence_index;
+pub(crate) mod evidence_metadata;
 pub(crate) mod evidence_path;
 pub(crate) mod evidence_selector;
 pub(crate) mod evidence_source;

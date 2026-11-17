@@ -286,6 +286,17 @@ pub(crate) struct RedactedToken {
 }
 
 impl RedactedToken {
+    /// A token as long as every token without a collision ordinal, which
+    /// measures a path before tokens are assigned: path admission comes before
+    /// token generation, so a path's bytes never count an ordinal (D15:724;
+    /// plan 025 interpretation #234).
+    pub(crate) const fn measuring() -> Self {
+        Self {
+            digest: [0; 32],
+            collision: None,
+        }
+    }
+
     /// The token's view, `{ token, collision? }`, the ordinal as a decimal
     /// string (D15:2452, 2468).
     pub(crate) fn view(&self) -> Value {

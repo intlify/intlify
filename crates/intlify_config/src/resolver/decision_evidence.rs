@@ -31,9 +31,11 @@ use serde_json::{json, Value};
 use crate::construction::registry::check::RecordKind;
 use crate::locale::CanonicalLocale;
 
+use super::capability::EvidenceMetadataLimits;
 use super::coverage::{unit, CoverageSubject, Domain};
 use super::evaluation::{Check, Unit};
 use super::evidence::{Evidence, EvidenceProjection};
+use super::evidence_metadata::MetadataBound;
 use super::evidence_token::{EvidenceTokens, Redacted};
 use super::record_view::{RecordViews, ViewInvariant};
 use super::token::{rule_domain, Specification};
@@ -48,6 +50,23 @@ pub(crate) struct DecisionEvidence {
     /// The matched rule domain, or none for the project default.
     pub(crate) source: Option<Domain>,
     pub(crate) evidence: EvidenceProjection,
+}
+
+impl DecisionEvidence {
+    /// The candidate with its Evidence as path admission leaves it under
+    /// `limits` (D15:1851).
+    ///
+    /// # Errors
+    ///
+    /// Returns the first path bound, in the table's order, that its value
+    /// locator or component path exceeds.
+    pub(crate) fn admitted(&self, limits: &EvidenceMetadataLimits) -> Result<Self, MetadataBound> {
+        Ok(Self {
+            cell: self.cell.clone(),
+            source: self.source.clone(),
+            evidence: self.evidence.admitted(limits)?,
+        })
+    }
 }
 
 /// A resolver bug the records refuse.

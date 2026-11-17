@@ -43,6 +43,7 @@
 
 use std::sync::Arc;
 
+use intlify_shared_json::encoding::encoded_length;
 use serde_json::{json, Value};
 
 use crate::artifacts::count;
@@ -200,6 +201,45 @@ fn view(segments: &[PathSegment]) -> Value {
     Value::Array(segments.iter().map(PathSegment::view).collect())
 }
 
+/// `segments` as path admission measures them, each component a token
+/// replaces written as a token without a collision ordinal.
+fn measured(segments: &[Segment]) -> Vec<PathSegment> {
+    segments
+        .iter()
+        .map(|segment| match segment {
+            Segment::SafeMember(name) => PathSegment::SafeMember(Arc::clone(name)),
+            Segment::ArrayIndex(index) => PathSegment::ArrayIndex(*index),
+            Segment::RedactedMember(_) => PathSegment::RedactedMember(RedactedToken::measuring()),
+        })
+        .collect()
+}
+
+/// What 015's path bounds count of a projected path: its segments, and the
+/// length of `C` of the view Evidence retains it as, each token written
+/// without a collision ordinal (D15:1834, 1835; plan 025 interpretations
+/// #234 and #238).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PathSize {
+    pub(crate) segments: u64,
+    pub(crate) bytes: u64,
+}
+
+impl PathSize {
+    /// The size of a path of `segments` segments whose retained view is
+    /// `view`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `view` cannot be encoded. A path view holds no number and
+    /// nests only a few levels, so that would be a defect.
+    pub(crate) fn of(segments: usize, view: &Value) -> Self {
+        Self {
+            segments: count(segments),
+            bytes: encoded_length(view).expect("a path view is a shallow number-free value"),
+        }
+    }
+}
+
 /// A Logical input path as Evidence projects it, before tokens are
 /// assigned. The empty path is the input root.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -224,6 +264,12 @@ impl InputPath {
     /// The components that tokens replace, one per unsafe member.
     pub(crate) fn redacted(&self) -> impl Iterator<Item = &Redacted> {
         components(&self.0)
+    }
+
+    /// What the path bounds count of the path: its segments and its view,
+    /// the array of their views (D15:2497).
+    pub(crate) fn size(&self) -> PathSize {
+        PathSize::of(self.0.len(), &view(&measured(&self.0)))
     }
 
     /// The Logical input path Evidence retains, `None` when `tokens` was not
@@ -275,6 +321,23 @@ impl ValueLocation {
             || Self::RedactedLogicalPath(segments(steps, &component)),
             |pointer| Self::ExactJsonPointer(pointer.into()),
         ))
+    }
+
+    /// What the path bounds count of the locator: an exact pointer's
+    /// segments are its reference tokens, each led by `/`, and the view is
+    /// the variant's object (D15:2498).
+    pub(crate) fn size(&self) -> PathSize {
+        let (segments, locator) = match self {
+            Self::ExactJsonPointer(pointer) => (
+                pointer.matches('/').count(),
+                PortableValueLocator::ExactJsonPointer(Arc::clone(pointer)),
+            ),
+            Self::RedactedLogicalPath(segments) => (
+                segments.len(),
+                PortableValueLocator::RedactedLogicalPath(measured(segments)),
+            ),
+        };
+        PathSize::of(segments, &locator.view())
     }
 
     /// The components that tokens replace, one per unsafe member.
@@ -355,8 +418,10 @@ mod tests {
     use crate::resolver::locales::fixtures::canonicalizer;
     use crate::structural::{AuthoringSchema, Edge};
 
+    use intlify_shared_json::encoding::encoded_length;
+
     use super::{
-        InputPath, KeyFacts, LogicalInputPath, PathSegment, PortableValueLocator, Step,
+        InputPath, KeyFacts, LogicalInputPath, PathSegment, PathSize, PortableValueLocator, Step,
         ValueLocation,
     };
 
@@ -814,5 +879,52 @@ mod tests {
         ];
         assert_eq!(after.steps(&schema, &alias)[4], Step::Safe("iw-IL"));
         assert_eq!(before.steps(&schema, &alias)[4], Step::Unsafe);
+    }
+
+    /// A path's size is its segments and the length of `C` of its retained
+    /// view, each token written as one without a collision ordinal is, so a
+    /// collision adds nothing; an exact pointer's segments are its reference
+    /// tokens, which an escaped `/` does not separate (plan 025
+    /// interpretations #234 and #238).
+    #[test]
+    fn a_path_is_measured_as_evidence_retains_it_without_collision_ordinals() {
+        let bytes = |view: &serde_json::Value| encoded_length(view).unwrap();
+        let steps = [Step::Safe("profiles"), Step::Unsafe, Step::Index(0)];
+        let file = input(O::ConfigurationFile, &steps);
+        let kept = &retain_inputs(std::slice::from_ref(&file), &Sha256)[0];
+        assert_eq!(
+            file.size(),
+            PathSize {
+                segments: 3,
+                bytes: bytes(&kept.view())
+            }
+        );
+        let programmatic = input(O::ConfigurationProgrammatic, &steps);
+        let collided = &retain_inputs(&[file.clone(), programmatic], &Constant)[0];
+        assert!(bytes(&collided.view()) > file.size().bytes);
+        let redacted = value(O::ConfigurationFile, &steps);
+        let kept = &retain_values(std::slice::from_ref(&redacted), &Sha256)[0];
+        assert_eq!(
+            redacted.size(),
+            PathSize {
+                segments: 3,
+                bytes: bytes(&kept.view())
+            }
+        );
+        let pointer = value(O::ConfigurationFile, &[Step::Safe("a/b"), Step::Index(0)]);
+        assert_eq!(
+            pointer.size(),
+            PathSize {
+                segments: 2,
+                bytes: bytes(&json!({ "exact-json-pointer": "/a~1b/0" }))
+            }
+        );
+        assert_eq!(
+            value(O::ConfigurationFile, &[]).size(),
+            PathSize {
+                segments: 0,
+                bytes: bytes(&json!({ "exact-json-pointer": "" }))
+            }
+        );
     }
 }

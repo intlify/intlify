@@ -37,6 +37,7 @@ use serde_json::{json, Value};
 use crate::artifacts::count;
 
 use super::capability::{CapabilityBound, BOOTSTRAP_ONLY, POLICY_COMPARABLE};
+use super::evidence_path::PathSize;
 use super::evidence_source::hex;
 use super::evidence_token::{EvidenceTokenInvariant, EvidenceTokens, JsonType, Redacted};
 use super::limits::Group;
@@ -305,6 +306,26 @@ impl ComponentPath {
         })
     }
 
+    /// What the path bounds count of the path: its segments and its view,
+    /// the array of their views (D15:2502), each redacted key written as a
+    /// token without a collision ordinal (plan 025 interpretations #234 and
+    /// #238).
+    pub(crate) fn size(&self) -> PathSize {
+        let measured = ResolverInputComponentPath(
+            self.segments
+                .iter()
+                .map(|segment| match segment {
+                    Segment::FixedRole(role) => PathComponent::FixedRole(*role),
+                    Segment::SafeKey(bytes) => PathComponent::SafeKey(Arc::clone(bytes)),
+                    Segment::RedactedKey(_) => {
+                        PathComponent::RedactedKey(RedactedToken::measuring())
+                    }
+                })
+                .collect(),
+        );
+        PathSize::of(self.segments.len(), &measured.view())
+    }
+
     /// The path Evidence retains, `None` when `tokens` was not assigned a
     /// component of the path.
     pub(crate) fn retained(
@@ -375,13 +396,14 @@ mod tests {
     use serde_json::json;
 
     use crate::resolver::capability::{BootstrapBoundId, BootstrapGroup, CapabilityBound};
+    use crate::resolver::evidence_path::PathSize;
     use crate::resolver::evidence_source::hex;
     use crate::resolver::evidence_token::{EvidenceTokens, JsonType};
     use crate::resolver::limits::{BoundId, Group};
     use crate::resolver::origin::SafeOriginKind as O;
     use crate::resolver::specification::Slot;
     use crate::resolver::token::{Sha256, Specification};
-    use intlify_shared_json::encoding::encode;
+    use intlify_shared_json::encoding::{encode, encoded_length};
 
     use std::sync::Arc;
 
@@ -690,5 +712,34 @@ mod tests {
         assert!(ComponentPath::specification(Slot::Coverage)
             .retained(PROFILE, &tokens)
             .is_some());
+    }
+
+    /// A component path's size is its segments and the length of `C` of its
+    /// retained view, a redacted key's token written as one without a
+    /// collision ordinal is (plan 025 interpretations #234 and #238).
+    #[test]
+    fn a_component_path_is_measured_as_evidence_retains_it() {
+        let paths = [
+            ComponentPath::specification(Slot::Coverage),
+            ComponentPath::vocabulary_member(Key::Identity(json!("checkout"))).unwrap(),
+            ComponentPath::artifact_member(Key::Unsafe(JsonType::Object)).unwrap(),
+            ComponentPath::capability(bootstrap(
+                BootstrapGroup::EvidenceMetadata,
+                "maxTokenInputs",
+            ))
+            .unwrap(),
+        ];
+        for (path, retained) in paths.iter().zip(retain(&paths)) {
+            let view = retained.view();
+            assert_eq!(
+                path.size(),
+                PathSize {
+                    segments: view.as_array().unwrap().len() as u64,
+                    bytes: encoded_length(&view).unwrap(),
+                }
+            );
+        }
+        let segments: Vec<u64> = paths.iter().map(|path| path.size().segments).collect();
+        assert_eq!(segments, [1, 2, 2, 3]);
     }
 }
