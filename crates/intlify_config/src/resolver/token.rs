@@ -360,6 +360,21 @@ impl Tokens {
     pub(crate) const fn comparisons(&self) -> u64 {
         self.comparisons
     }
+
+    /// The token records built, one per distinct record.
+    pub(crate) fn records(&self) -> u64 {
+        crate::artifacts::count(self.tokens.len())
+    }
+
+    /// The tokens of both `self` and `other`, which were assigned to
+    /// subjects of disjoint phases, so that no colliding set spans both, or
+    /// of one subject kind's every subject, whose tokens are equal wherever
+    /// they were assigned.
+    pub(crate) fn merge(mut self, other: Self) -> Self {
+        self.tokens.extend(other.tokens);
+        self.comparisons += other.comparisons;
+        self
+    }
 }
 
 /// The token of every record of `sets`, each set the records of one key that
@@ -1437,6 +1452,37 @@ mod tests {
         assert_eq!(tokens.comparisons(), 3);
     }
 
+    /// The tokens of subjects of other phases merge into each side's own
+    /// tokens, comparisons, and records: what assigning them together gives,
+    /// since no colliding set spans both.
+    #[test]
+    fn tokens_of_other_phases_merge_into_what_assigning_them_together_gives() {
+        let left = [requested(key("fr")), requested(key("en"))];
+        let right = [
+            Subject::Negotiation(NegotiationSubject::Key(key("en"))),
+            Subject::Negotiation(NegotiationSubject::Key(key("ja"))),
+        ];
+        let (one, other) = (
+            Tokens::assign(PROFILE, &left, &Constant),
+            Tokens::assign(PROFILE, &right, &Constant),
+        );
+        let merged = one.clone().merge(other.clone());
+        for subject in &left {
+            assert_eq!(merged.token(PROFILE, subject), one.token(PROFILE, subject));
+        }
+        for subject in &right {
+            assert_eq!(
+                merged.token(PROFILE, subject),
+                other.token(PROFILE, subject)
+            );
+        }
+        assert_eq!((merged.comparisons(), merged.records()), (2, 4));
+        assert_eq!(
+            merged,
+            Tokens::assign(PROFILE, left.iter().chain(&right), &Constant)
+        );
+    }
+
     #[test]
     fn equal_digests_in_other_phases_or_kinds_form_no_colliding_set() {
         let subjects = [
@@ -1565,5 +1611,17 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Subjects with one record build one token record (plan 025
+    /// interpretation #239).
+    #[test]
+    fn subjects_with_one_record_build_one_token_record() {
+        let subjects = [
+            requested(key("en")),
+            requested(key("en")),
+            requested(key("fr")),
+        ];
+        assert_eq!(Tokens::assign(PROFILE, &subjects, &Sha256).records(), 2);
     }
 }

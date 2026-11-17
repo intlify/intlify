@@ -222,6 +222,21 @@ impl EvidenceProjection {
         Ok(admitted)
     }
 
+    /// The metadata work units of the record: one for each source identity,
+    /// locator, Logical input path or value locator, selector, and component
+    /// path it carries (D15:1839; plan 025 interpretation #239).
+    pub(crate) fn work(&self) -> u64 {
+        match &self.parts {
+            Parts::Configuration {
+                locator, location, ..
+            } => {
+                let path = !matches!(location, Location::Entry(None));
+                1 + u64::from(locator.is_some()) + u64::from(path)
+            }
+            Parts::Selector(_) | Parts::ResolverInput(_) => 1,
+        }
+    }
+
     /// Every component of the record that a token replaces.
     pub(crate) fn redacted(&self) -> Vec<&Redacted> {
         match &self.parts {
@@ -817,5 +832,52 @@ mod tests {
         .unwrap();
         assert_eq!(selector.admitted(&paths(1, 1)), Ok(selector.clone()));
         assert_eq!(selector.required_path(), None);
+    }
+
+    fn entry_work(source: Source<'_>, path: Option<&[Step<'_>]>) -> u64 {
+        EvidenceProjection::entry_source(O::ConfigurationFile, source, path, None)
+            .unwrap()
+            .work()
+    }
+
+    /// A record's metadata work units are one for its source identity, its
+    /// locator, and its Logical input path or value locator, or one for its
+    /// selector or component path (plan 025 interpretation #239).
+    #[test]
+    fn a_record_counts_a_work_unit_for_each_part_it_carries() {
+        let identity = exact(FILE);
+        let at = locator("storefront/intlify.config.json");
+        let located = Source {
+            identity: &identity,
+            marked: true,
+            locator: Some(&at),
+        };
+        let bare = Source {
+            locator: None,
+            ..located
+        };
+        let steps = [Step::Safe("profiles")];
+        assert_eq!(entry_work(located, Some(&steps)), 3);
+        assert_eq!(entry_work(bare, Some(&steps)), 2);
+        assert_eq!(entry_work(located, None), 2);
+        assert_eq!(entry_work(bare, None), 1);
+        let value = |source| {
+            EvidenceProjection::configuration_value(O::ConfigurationFile, source, &steps, None)
+                .unwrap()
+                .work()
+        };
+        assert_eq!(value(located), 3);
+        assert_eq!(value(bare), 2);
+        let input = ComponentPath::specification(Slot::Coverage);
+        assert_eq!(EvidenceProjection::resolver_input(input).work(), 1);
+        let declared: Vec<ProfileId> = vec![serde_json::from_value(json!("app")).unwrap()];
+        let selector = EvidenceProjection::selector(
+            O::ProfileSelectorCli,
+            &SelectorInput::string("app", Bound::new(64).unwrap()),
+            Bound::new(64).unwrap(),
+            &declared,
+        )
+        .unwrap();
+        assert_eq!(selector.work(), 1);
     }
 }
