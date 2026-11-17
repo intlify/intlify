@@ -42,7 +42,8 @@ use crate::input_limits::Bound;
 
 use super::capability::CapabilityBound;
 use super::evaluation::{
-    Actual, Check, Details, Evaluation, Finding, IssueKey, Status, Subject, Suggestion, Unit,
+    Actual, Check, Details, Evaluation, ExhaustedBound, Finding, IssueKey, Status, Subject,
+    Suggestion, Unit,
 };
 use super::specification::Slot;
 use super::structural_admission::StructuralSubject;
@@ -70,26 +71,40 @@ pub(crate) enum ViewInvariant {
 pub(crate) struct RecordViews<'a> {
     specification: Specification<'a>,
     tokens: Tokens,
+    /// The token of the diagnostic domain, which the terminal
+    /// reporting-limit Finding of an exhausted domain names while no unit is
+    /// recorded over it (D15:2359; plan 025 decision #227). The domain is the
+    /// one subject of its kind, so its token is the same assigned alone.
+    domain: Tokens,
 }
 
 impl<'a> RecordViews<'a> {
     /// Assigns, under `digest`, the token of the subject of every unit
-    /// `evaluation` recorded, and of the diagnostic domain, which the
-    /// terminal reporting-limit Finding of an exhausted domain names while no
-    /// unit is recorded over it (D15:2359; plan 025 decision #227).
+    /// `evaluation` recorded, and of the diagnostic domain.
     pub(crate) fn assign(
         specification: Specification<'a>,
         evaluation: &Evaluation,
         digest: &impl Digest,
     ) -> Self {
-        let domain = Subject::DiagnosticDomain;
-        let subjects = evaluation
-            .statuses()
-            .map(|(unit, _)| &unit.subject)
-            .chain([&domain]);
+        let subjects = evaluation.statuses().map(|(unit, _)| &unit.subject);
+        Self::new(
+            specification,
+            Tokens::assign(specification, subjects, digest),
+            digest,
+        )
+    }
+
+    /// The views under the subject tokens `tokens`, with the diagnostic
+    /// domain's token assigned under `digest`.
+    pub(crate) fn new(
+        specification: Specification<'a>,
+        tokens: Tokens,
+        digest: &impl Digest,
+    ) -> Self {
         Self {
             specification,
-            tokens: Tokens::assign(specification, subjects, digest),
+            tokens,
+            domain: Tokens::assign(specification, [&Subject::DiagnosticDomain], digest),
         }
     }
 
@@ -286,6 +301,7 @@ impl<'a> RecordViews<'a> {
     fn subject(&self, unit: &Unit) -> Result<Value, ViewInvariant> {
         self.tokens
             .token(self.specification, &unit.subject)
+            .or_else(|| self.domain.token(self.specification, &unit.subject))
             .map(|token| token.view())
             .ok_or_else(|| ViewInvariant::SubjectWithoutToken(unit.clone()))
     }
@@ -342,7 +358,15 @@ fn member_value(finding: &Finding<'_>, member: DetailsMember) -> Option<Value> {
         }
         (M::Bound, Some(Details::Limit(exceeded))) => exceeded.bound.name.to_owned(),
         (M::Bound, Some(Details::Shortfall(shortfall))) => shortfall.bound.name.to_owned(),
-        (M::Bound, Some(Details::Exhausted(bound))) => bound.name.to_owned(),
+        (M::Bound, Some(Details::Exhausted(ExhaustedBound::Domain(bound)))) => {
+            bound.name.to_owned()
+        }
+        // An `evidenceMetadata` bound is named by its capability bound path
+        // (plan 025 decision #231).
+        (M::Bound, Some(Details::Exhausted(ExhaustedBound::Capability(bound)))) => {
+            let bound = CapabilityBound::BootstrapOnly(*bound);
+            format!("{}.{}", bound.namespace(), bound.path())
+        }
         // A capability bound's path names its namespace and group.
         (M::Bound, Some(Details::BootstrapLimit(exceeded))) => {
             let bound = CapabilityBound::BootstrapOnly(exceeded.bound);
