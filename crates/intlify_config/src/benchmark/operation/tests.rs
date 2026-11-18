@@ -37,7 +37,7 @@ fn analysis(value: &Value) -> Analysis {
         .unwrap()
 }
 
-pub(crate) fn operations() -> [Prepared; 15] {
+pub(crate) fn operations() -> [Prepared; 16] {
     let source: Arc<[u8]> = Arc::from(serde_json::to_vec(&minimal_config()).unwrap());
     let doc = Arc::new(
         materialize_file(Arc::clone(&source), crate::materialize_tests::limits()).unwrap(),
@@ -78,6 +78,7 @@ pub(crate) fn operations() -> [Prepared; 15] {
         construction_operation(Operation::ConstructionIdentity),
         evidence_operation(Operation::SharedEvidence),
         evidence_operation(Operation::EntryEvidence),
+        evidence_operation(Operation::OutcomeFinalization),
     ]
 }
 
@@ -314,6 +315,11 @@ fn every_active_pair_calls_its_real_core_operation_between_exact_markers() {
                 assert!(retained.exhausted.is_none());
                 assert!(!retained.slices.is_empty());
                 assert!(resolved.invocation.is_some());
+            }
+            Output::OutcomeFinalization(resolved) => {
+                let outcome = resolved.result.as_ref().unwrap();
+                assert!(outcome.profile.is_some());
+                assert!(outcome.shared.is_some());
             }
             _ => panic!("unexpected owner operation result"),
         }

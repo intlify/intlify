@@ -49181,6 +49181,266 @@
           }
         ]
       }
+    },
+    {
+      "declaration": {
+        "operation": "outcome-finalization",
+        "fixture": {
+          "evidence": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "outcome-finalization-checked"
+      },
+      "inputContext": "c698e5b211f15a6c66dc7650ab5feb58e32076496e08262b1b0963ac3f1ccb3d",
+      "result": {
+        "shared": "24ec9299cdf03d143dc313c0d9469fb6fbded9b9161101b84be6f177c9895692",
+        "entry": "a64a4c6c03cc8aeb9105dd835febe8b50b1393269fa6d676bcc953c6e31a07cd"
+      },
+      "logicalWork": "241145632600801bbc22f3f145726dbc44acb962b4c6acd74ce52508e4e0b792",
+      "work": {
+        "profileIdentity": "intlify-config-outcome-finalization-work",
+        "profileRevision": "0",
+        "operation": "outcome-finalization",
+        "facts": [
+          {
+            "kind": "outcome-finalization-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "25"
+            }
+          },
+          {
+            "kind": "outcome-finalization-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "478"
+            }
+          },
+          {
+            "kind": "outcome-finalization-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "outcome-finalization",
+        "fixture": {
+          "evidence": "blocked"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "outcome-finalization-blocked"
+      },
+      "inputContext": "26ae2e49fb3052778455422564e397d6bcaf2ccee1a24a90dbe1604a98d9e10b",
+      "result": {
+        "shared": "88ceba7e48c9567865eab42b4dbbc040f17f634d03fc4c8142253113ef48b61c",
+        "entry": "8bdd0a508d97c6976916756f05a2814297890a95d3bc4e61b375e9ef550e5634"
+      },
+      "logicalWork": "d39ed96e47b841c73e480e9f3d77ec4f270014e4aa0f598a0caaab1ed7082e2b",
+      "work": {
+        "profileIdentity": "intlify-config-outcome-finalization-work",
+        "profileRevision": "0",
+        "operation": "outcome-finalization",
+        "facts": [
+          {
+            "kind": "outcome-finalization-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "19"
+            }
+          },
+          {
+            "kind": "outcome-finalization-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "423"
+            }
+          },
+          {
+            "kind": "outcome-finalization-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "outcome-finalization",
+        "fixture": {
+          "evidence": "dense"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "outcome-finalization-blocked"
+      },
+      "inputContext": "b6337154a284cc9ab5fc61c2a89a31b5f42649de4a241c24710afc24c55ac706",
+      "result": {
+        "shared": "a53aefe41b2511e7d4a60cf6213674881a16aff1187556daf69ff8a3ceb0bb0f",
+        "entry": "47c9857a917b9c2f5fedefe9a10d83f96860680efdc6c8af1aeb25892db57b4f"
+      },
+      "logicalWork": "8423cfd4b2bc702c97207abb7013349d70de96b74bac53d721c70558a9748cd2",
+      "work": {
+        "profileIdentity": "intlify-config-outcome-finalization-work",
+        "profileRevision": "0",
+        "operation": "outcome-finalization",
+        "facts": [
+          {
+            "kind": "outcome-finalization-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "283"
+            }
+          },
+          {
+            "kind": "outcome-finalization-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3421"
+            }
+          },
+          {
+            "kind": "outcome-finalization-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "outcome-finalization",
+        "fixture": {
+          "evidence": "malformed"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "outcome-finalization-blocked"
+      },
+      "inputContext": "13ad69bc8214e5630cf5659153da6683951a3246527a72742d17c0147726e6cd",
+      "result": {
+        "shared": "4f8780c5dd1e1bf0e58fef5e16d956c0c5255964fc8b407817fd1c8a98990a7e",
+        "entry": "3feff828ed3d88cd0ff182e714d65cf986af53ced8be893d2059527d233905ef"
+      },
+      "logicalWork": "b705c171b8b92d69721c10646c7d0c91e0e8cd4f30892b633bb6d6b6975bc811",
+      "work": {
+        "profileIdentity": "intlify-config-outcome-finalization-work",
+        "profileRevision": "0",
+        "operation": "outcome-finalization",
+        "facts": [
+          {
+            "kind": "outcome-finalization-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "19"
+            }
+          },
+          {
+            "kind": "outcome-finalization-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "outcome-finalization-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "outcome-finalization",
+        "fixture": {
+          "evidence": "truncated"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "outcome-finalization-blocked"
+      },
+      "inputContext": "1b582c626065150fa1df8d0652150e40320238a137bc7faf8f277df28297bbab",
+      "result": {
+        "shared": "83997f7d3307a8f33f346130a369df97d2223917237f74d220f8e3b7c3843a0f",
+        "entry": "24cd2cb63ca3d0ddeb03f60ffca0af65a77ad63160d4acf0761fdf1ed0bec7a7"
+      },
+      "logicalWork": "8a93853f09cf5b36c4880f15cd2bc2c57c14f0fb025610789b6a96a593251e5d",
+      "work": {
+        "profileIdentity": "intlify-config-outcome-finalization-work",
+        "profileRevision": "0",
+        "operation": "outcome-finalization",
+        "facts": [
+          {
+            "kind": "outcome-finalization-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "25"
+            }
+          },
+          {
+            "kind": "outcome-finalization-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "100"
+            }
+          },
+          {
+            "kind": "outcome-finalization-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1651"
+            }
+          }
+        ]
+      }
     }
   ]
 }

@@ -73,6 +73,74 @@ pub fn draft7_schema<T: JsonSchema>() -> Result<Value, serde_json::Error> {
     Ok(value)
 }
 
+/// Each member path of `value` under `start`, and where it first occurs: the
+/// holding object's pointer and the member's name. The positions of an array
+/// whose items all have the same member paths fold into `*`; an array whose
+/// items differ, such as an inventory with an entry of its own kind at each
+/// position, keeps every position apart.
+#[cfg(all(test, feature = "benchmark"))]
+pub(crate) fn member_paths(
+    value: &Value,
+    start: &str,
+) -> std::collections::BTreeMap<String, (String, String)> {
+    let mut paths = std::collections::BTreeMap::new();
+    let mut pending = vec![(start.to_owned(), start.to_owned())];
+    while let Some((pointer, folded)) = pending.pop() {
+        match value.pointer(&pointer) {
+            Some(Value::Object(members)) => {
+                for name in members.keys() {
+                    let step = name.replace('~', "~0").replace('/', "~1");
+                    let path = format!("{folded}/{step}");
+                    paths
+                        .entry(path.clone())
+                        .or_insert_with(|| (pointer.clone(), name.clone()));
+                    pending.push((format!("{pointer}/{step}"), path));
+                }
+            }
+            Some(Value::Array(items)) => {
+                let shapes = items
+                    .iter()
+                    .map(|item| member_paths(item, "").into_keys().collect::<Vec<_>>())
+                    .collect::<Vec<_>>();
+                let alike = shapes.windows(2).all(|pair| pair[0] == pair[1]);
+                pending.extend((0..items.len()).map(|index| {
+                    let step = if alike {
+                        "*".to_owned()
+                    } else {
+                        index.to_string()
+                    };
+                    (format!("{pointer}/{index}"), format!("{folded}/{step}"))
+                }));
+            }
+            _ => {}
+        }
+    }
+    paths
+}
+
+/// The member paths of `record` under `start` whose omission `schema` and
+/// `decodes` judge differently. Each path is left out once, where it first
+/// occurs.
+#[cfg(all(test, feature = "benchmark"))]
+pub(crate) fn omission_disagreements(
+    record: &Value,
+    start: &str,
+    schema: &jsonschema::Validator,
+    decodes: impl Fn(Value) -> bool,
+) -> Vec<String> {
+    member_paths(record, start)
+        .into_iter()
+        .filter(|(_, (pointer, name))| {
+            let mut left_out = record.clone();
+            if let Some(Value::Object(parent)) = left_out.pointer_mut(pointer) {
+                parent.remove(name);
+            }
+            schema.is_valid(&left_out) != decodes(left_out)
+        })
+        .map(|(path, _)| path)
+        .collect()
+}
+
 /// Sort object members by unsigned UTF-8 bytes and produce stable JSON bytes.
 ///
 /// Array order and all field semantics are retained. String arrays use the
@@ -188,6 +256,29 @@ mod tests {
         assert_eq!(
             schema["properties"]["nullable"]["type"],
             json!(["string", "null"])
+        );
+    }
+
+    /// The positions of an array fold together only when its items have the
+    /// same member paths, so each position of an inventory whose entries are
+    /// of different kinds is tried apart.
+    #[cfg(feature = "benchmark")]
+    #[test]
+    fn only_the_positions_of_items_alike_are_folded() {
+        let paths = |value: &Value| member_paths(value, "").into_keys().collect::<Vec<_>>();
+        assert_eq!(
+            paths(&json!({"list": [{"a": 1}, {"a": 2}]})),
+            ["/list", "/list/*/a"]
+        );
+        assert_eq!(
+            paths(&json!({"fields": [{"value": {"commit": null}}, {"value": {"identity": "x"}}]})),
+            [
+                "/fields",
+                "/fields/0/value",
+                "/fields/0/value/commit",
+                "/fields/1/value",
+                "/fields/1/value/identity"
+            ]
         );
     }
 

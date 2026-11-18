@@ -379,6 +379,16 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
             prepared,
             &crate::benchmark::evidence::InputFacts::entry(prepared),
         )?,
+        // Finalization also takes the committed resolver's identity.
+        Prepared::OutcomeFinalization(prepared) => {
+            evidence_input(
+                &mut frame,
+                candidate,
+                &prepared.evidence,
+                &crate::benchmark::evidence::InputFacts::outcome(&prepared.evidence),
+            )?;
+            frame.text(&prepared.identity.text());
+        }
     }
     Ok(frame.finish())
 }
@@ -405,7 +415,7 @@ fn evidence_input(
         candidate.declaration.selector,
         prepared.structural.max_profile_id_bytes,
     );
-    let source = recipe.source(&super::evidence_limits());
+    let source = recipe.source(&recipe.limits());
     if candidate.declaration.selector != super::Selector::App
         || !prepared.selector.benchmark_matches_fixture(&expected)
         || *prepared.source != *source

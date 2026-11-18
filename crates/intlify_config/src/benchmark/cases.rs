@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Finite owner case declarations for the fifteen active boundaries.
+//! Finite owner case declarations for the sixteen active boundaries.
 //! This is not a common Run Plan, case-identity codec, or a complete 015 suite.
 //! Preparation yields an unadmitted candidate; the separate fixture registry
 //! binds its exact input/result/work before method-bound collection can use it.
@@ -28,8 +28,10 @@ mod construction_inputs;
 pub(super) use construction_inputs::ConstructionRecipe;
 mod evidence_inputs;
 #[cfg(test)]
+pub(super) use evidence_inputs::limits as evidence_limits;
+pub(super) use evidence_inputs::EvidenceRecipe;
+#[cfg(test)]
 pub(super) use evidence_inputs::DENSE;
-pub(super) use evidence_inputs::{limits as evidence_limits, EvidenceRecipe};
 mod context;
 pub(super) mod prepare;
 pub(super) mod registry;
@@ -158,6 +160,8 @@ pub(super) enum ExpectedKind {
     ConstructionIdentityDerived,
     SharedEvidenceComplete,
     EntryEvidenceComplete,
+    OutcomeFinalizationChecked,
+    OutcomeFinalizationBlocked,
 }
 
 #[derive(
@@ -403,7 +407,8 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 | Operation::ConstructionAuthorityAdmission
                 | Operation::ConstructionIdentity
                 | Operation::SharedEvidence
-                | Operation::EntryEvidence => unreachable!(),
+                | Operation::EntryEvidence
+                | Operation::OutcomeFinalization => unreachable!(),
             };
             let selector = if operation == Operation::ProfileSelection {
                 Selector::App
@@ -906,12 +911,26 @@ pub(super) fn declarations() -> Vec<Declaration> {
     }
     // Then its Entry projection stage over each recipe, the one without a
     // value too, whose Entry domain commits whole (plan 025 decision #260).
-    for recipe in EvidenceRecipe::ALL {
+    for recipe in EvidenceRecipe::ENTRY {
         cases.push(declaration(
             Operation::EntryEvidence,
             Recipe::Evidence(recipe),
             Selector::App,
             ExpectedKind::EntryEvidenceComplete,
+        ));
+    }
+    // Then outcome finalization over each recipe: the example checked, and
+    // every other recipe blocked (plan 025 decision #262).
+    for recipe in EvidenceRecipe::ALL {
+        cases.push(declaration(
+            Operation::OutcomeFinalization,
+            Recipe::Evidence(recipe),
+            Selector::App,
+            if recipe.checked() {
+                ExpectedKind::OutcomeFinalizationChecked
+            } else {
+                ExpectedKind::OutcomeFinalizationBlocked
+            },
         ));
     }
     cases

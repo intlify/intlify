@@ -267,10 +267,8 @@ fn cover(evidence: &ResolutionEvidence<'_>) -> Result<(), FinalizationInvariant>
     }
 }
 
-/// Whether the mandatory reserve of `outcome` fits `limits`: the lengths of
-/// `C` of the outcome envelope, of each exhausted domain's terminal Finding
-/// and `TerminalState`, and of the Entry reserve's Shared-unavailability cause,
-/// together (D15:1847, 2014, 2518).
+/// Whether the mandatory reserve of `outcome` fits `limits`
+/// (D15:1847, 2014, 2518).
 ///
 /// # Errors
 ///
@@ -279,6 +277,19 @@ pub(crate) fn reserve(
     outcome: &Outcome<'_, '_>,
     limits: &MandatoryReserveLimits,
 ) -> Result<(), FinalizationInvariant> {
+    let bytes = reserved_bytes(outcome);
+    let limit = limits.max_canonical_bytes.get();
+    if bytes > limit {
+        return Err(FinalizationInvariant::Reserve { bytes, limit });
+    }
+    Ok(())
+}
+
+/// The mandatory reserve of `outcome` in `maxCanonicalBytes`' unit: the
+/// lengths of `C` of the outcome envelope, of each exhausted domain's
+/// terminal Finding and `TerminalState`, and of the Entry reserve's
+/// Shared-unavailability cause, together (D15:1847, 2014, 2518).
+pub(crate) fn reserved_bytes(outcome: &Outcome<'_, '_>) -> u64 {
     let evidence = &outcome.evidence;
     let envelope = json!({
         "outcome": if outcome.checked.is_some() { "checked" } else { "blocked" },
@@ -290,15 +301,10 @@ pub(crate) fn reserve(
             .into_iter()
             .chain(&terminal.cause)
     });
-    let bytes = std::iter::once(&envelope)
+    std::iter::once(&envelope)
         .chain(reserved)
         .map(bytes)
-        .fold(0, u64::saturating_add);
-    let limit = limits.max_canonical_bytes.get();
-    if bytes > limit {
-        return Err(FinalizationInvariant::Reserve { bytes, limit });
-    }
-    Ok(())
+        .fold(0, u64::saturating_add)
 }
 
 /// The length of `C` of `view`, a reserved view without numbers.

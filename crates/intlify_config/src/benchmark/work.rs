@@ -158,6 +158,9 @@ pub(super) enum WorkKind {
     EntryEvidenceTokenInputs,
     EntryEvidenceCollisionComparisons,
     EntryEvidenceMetadataWorkUnits,
+    OutcomeFinalizationEntryRecords,
+    OutcomeFinalizationSharedRecords,
+    OutcomeFinalizationReserveCanonicalBytes,
 }
 
 impl WorkKind {
@@ -326,6 +329,12 @@ impl WorkKind {
         Self::EntryEvidenceMetadataWorkUnits,
     ];
 
+    const OUTCOME_FINALIZATION: [Self; 3] = [
+        Self::OutcomeFinalizationEntryRecords,
+        Self::OutcomeFinalizationSharedRecords,
+        Self::OutcomeFinalizationReserveCanonicalBytes,
+    ];
+
     pub(super) fn for_operation(operation: Operation) -> &'static [Self] {
         match operation {
             Operation::LocaleCanonicalization => &Self::LOCALE,
@@ -339,6 +348,7 @@ impl WorkKind {
             Operation::ConstructionIdentity => &Self::CONSTRUCTION_IDENTITY,
             Operation::SharedEvidence => &Self::SHARED_EVIDENCE,
             Operation::EntryEvidence => &Self::ENTRY_EVIDENCE,
+            Operation::OutcomeFinalization => &Self::OUTCOME_FINALIZATION,
             _ => &Self::INPUT,
         }
     }
@@ -415,7 +425,9 @@ impl WorkKind {
             | Self::TargetAndGroupBlockingIssues
             | Self::HydrationBlockingIssues
             | Self::SharedEvidenceRecords
-            | Self::EntryEvidenceRecords => WorkUnit::RetainedRecord,
+            | Self::EntryEvidenceRecords
+            | Self::OutcomeFinalizationEntryRecords
+            | Self::OutcomeFinalizationSharedRecords => WorkUnit::RetainedRecord,
             Self::LocaleOccurrences
             | Self::LocalePolicyResolutionOccurrences
             | Self::LocalePolicyResolutionCanonicalizedOccurrences
@@ -464,7 +476,8 @@ impl WorkKind {
             | Self::EntryEvidenceMaximumSingleEvidenceBytes
             | Self::EntryEvidenceTotalEvidenceBytes
             | Self::EntryEvidenceCanonicalBytes
-            | Self::EntryEvidenceMaximumLogicalPathCanonicalBytes => WorkUnit::CanonicalOctet,
+            | Self::EntryEvidenceMaximumLogicalPathCanonicalBytes
+            | Self::OutcomeFinalizationReserveCanonicalBytes => WorkUnit::CanonicalOctet,
             Self::ResourcePolicyReferences
             | Self::ResolvedBindingReferences
             | Self::ResolvedBindingDistinctReferences
@@ -630,6 +643,7 @@ impl LogicalWork {
                 }
                 Operation::SharedEvidence => "intlify-config-shared-evidence-work",
                 Operation::EntryEvidence => "intlify-config-entry-evidence-work",
+                Operation::OutcomeFinalization => "intlify-config-outcome-finalization-work",
                 _ => "intlify-config-minimum-input-work",
             }
             .into(),
@@ -719,6 +733,9 @@ impl LogicalWork {
             }
             (Prepared::EntryEvidence(_), Output::EntryEvidence(resolved)) => {
                 work.entry_evidence(resolved)?;
+            }
+            (Prepared::OutcomeFinalization(_), Output::OutcomeFinalization(resolved)) => {
+                work.outcome_finalization(resolved)?;
             }
             _ => return Err(WorkFailure::OperationMismatch),
         }

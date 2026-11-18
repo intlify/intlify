@@ -48,6 +48,7 @@ use super::operation::{OutputFailure, Schema};
 use super::quantity::Quantity;
 
 pub(super) mod entry;
+pub(super) mod outcome;
 
 /// The fixture provider's identity type, which every specification here is
 /// spelled in.
@@ -244,6 +245,24 @@ pub(super) struct Retained {
     pub(super) exhausted: Option<(Unit, ExhaustedBound)>,
 }
 
+impl RetainedRecord {
+    fn of(retained: &crate::resolver::reporting::Retained<'_>) -> Self {
+        Self {
+            kind: retained.kind,
+            view: retained.view.clone(),
+            bytes: retained.bytes,
+            causes: match retained.record {
+                Record::Status(Status::NotEvaluated(causes)) => count(causes.keys().count()),
+                _ => 0,
+            },
+            related: match &retained.record {
+                Record::Occurrence(occurrence) => count(occurrence.related().len()),
+                _ => 0,
+            },
+        }
+    }
+}
+
 impl Retained {
     fn of(committed: &Committed<'_>) -> Self {
         Self {
@@ -253,25 +272,7 @@ impl Retained {
                 .map(|slice| RetainedSlice {
                     unit: slice.unit.clone(),
                     candidates: slice.candidates.clone(),
-                    records: slice
-                        .records
-                        .iter()
-                        .map(|retained| RetainedRecord {
-                            kind: retained.kind,
-                            view: retained.view.clone(),
-                            bytes: retained.bytes,
-                            causes: match retained.record {
-                                Record::Status(Status::NotEvaluated(causes)) => {
-                                    count(causes.keys().count())
-                                }
-                                _ => 0,
-                            },
-                            related: match &retained.record {
-                                Record::Occurrence(occurrence) => count(occurrence.related().len()),
-                                _ => 0,
-                            },
-                        })
-                        .collect(),
+                    records: slice.records.iter().map(RetainedRecord::of).collect(),
                 })
                 .collect(),
             exhausted: committed
@@ -384,6 +385,17 @@ impl InputFacts {
             "every-evaluation-phase-of-the-invocation",
             "complete-invocation-on-an-evaluation-of-its-own-before-interval",
             "shared-slices-copied-after-end-read-or-resolver-defect",
+        )
+    }
+
+    /// Outcome finalization's, which takes what both projection stages left.
+    pub(super) fn outcome(prepared: &PreparedEvidence) -> Self {
+        Self::of(
+            prepared,
+            "the-outcome-of-one-file-entry-invocation",
+            "every-evaluation-phase-and-both-projection-stages-of-the-invocation",
+            "complete-invocation-and-both-projection-stages-on-an-evaluation-of-its-own-before-interval",
+            "outcome-copied-after-end-read-or-resolver-defect",
         )
     }
 

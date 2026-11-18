@@ -28,7 +28,7 @@ fn reseal(value: &mut Value) -> Vec<u8> {
 }
 
 #[test]
-fn actual_owner_run_projects_all_fifteen_pairs_and_raw_samples_through_report_admission() {
+fn actual_owner_run_projects_all_sixteen_pairs_and_raw_samples_through_report_admission() {
     let run = capture();
     let artifacts = produce(&run).unwrap();
     let checked = validate(&run, &artifacts).unwrap();
@@ -39,7 +39,7 @@ fn actual_owner_run_projects_all_fifteen_pairs_and_raw_samples_through_report_ad
             checked.measured_cases,
             checked.non_measured_cases
         ),
-        (354, 354, 0)
+        (359, 359, 0)
     );
     let evidence = value(artifacts.evidence.as_ref().unwrap());
     let evaluation = value(&artifacts.evaluation);
@@ -98,7 +98,7 @@ fn actual_owner_run_projects_all_fifteen_pairs_and_raw_samples_through_report_ad
         assert_eq!(row["metric"], "wall_duration");
         assert_eq!(row["unit"], "nanosecond");
     }
-    assert_eq!(pairs.len(), 15);
+    assert_eq!(pairs.len(), 16);
     assert_eq!(
         report["body"]["sections"][0]["numericPolicy"],
         "observational-only-no-numeric-decisions"
@@ -141,7 +141,7 @@ fn missing_unsupported_malformed_and_duplicate_native_inputs_keep_the_complete_n
         assert_eq!(admitted.outcome, outcome);
         assert_eq!(
             (admitted.measured_cases, admitted.non_measured_cases),
-            (0, 354)
+            (0, 359)
         );
         assert!(artifacts.evidence.is_none());
         let evaluation = value(&artifacts.evaluation);
@@ -155,7 +155,7 @@ fn missing_unsupported_malformed_and_duplicate_native_inputs_keep_the_complete_n
                 .as_array()
                 .unwrap()
                 .len(),
-            354
+            359
         );
         let report = value(&artifacts.report);
         assert_eq!(report["body"]["sections"][0]["rows"], json!([]));
@@ -164,7 +164,7 @@ fn missing_unsupported_malformed_and_duplicate_native_inputs_keep_the_complete_n
                 .as_array()
                 .unwrap()
                 .len(),
-            354
+            359
         );
     }
 }
@@ -348,6 +348,35 @@ fn complete_schemas_are_fresh_and_agree_with_the_independent_draft7_oracle() {
             }
         }
     }
+
+    // The evidence decoder requires a member, null included, exactly when the
+    // schema does. Each case is tried in a record of its own, so every try
+    // decodes and validates one case, and a case whose member paths all occur
+    // in an earlier one adds nothing to try. The first also has every member
+    // outside the cases tried.
+    let oracle =
+        jsonschema::draft7::new(&schema::measurement_evidence_set_schema().unwrap()).unwrap();
+    let mut evidence = value(artifacts.evidence.as_ref().unwrap());
+    let cases = std::mem::take(evidence["body"]["cases"].as_array_mut().unwrap());
+    let decodes = |left_out| serde_json::from_value::<measurement::Evidence>(left_out).is_ok();
+    let mut seen = std::collections::BTreeSet::new();
+    let mut disagreements = Vec::new();
+    for case in cases {
+        let paths = schema::member_paths(&case, "")
+            .into_keys()
+            .collect::<Vec<_>>();
+        if paths.iter().all(|path| seen.contains(path)) {
+            continue;
+        }
+        let start = if seen.is_empty() { "" } else { "/body/cases/0" };
+        seen.extend(paths);
+        let mut alone = evidence.clone();
+        alone["body"]["cases"] = Value::Array(vec![case]);
+        disagreements.extend(schema::omission_disagreements(
+            &alone, start, &oracle, decodes,
+        ));
+    }
+    assert_eq!(disagreements, Vec::<String>::new());
 }
 
 #[test]

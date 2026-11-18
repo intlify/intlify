@@ -96,6 +96,7 @@ pub struct ReportedIdentifier<T> {
 /// The compiler and backend a measured build was produced with.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[schemars(transform = crate::schema::require_nullable_members)]
 pub struct Toolchain {
     pub compiler: VersionedIdentity,
     #[serde(deserialize_with = "Option::deserialize")]

@@ -99,6 +99,7 @@ pub struct InventoryEntry {
 /// The complete Run Plan body.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[schemars(transform = crate::schema::require_nullable_members)]
 pub struct Body {
     pub measurement_run: RecordIdentity,
     pub measurement_profile: VersionedIdentity,

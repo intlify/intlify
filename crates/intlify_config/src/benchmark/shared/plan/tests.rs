@@ -54,6 +54,31 @@ fn complete_schemas_are_fresh_closed_and_accept_actual_issued_plan_and_case_inpu
         let value = case_identity_input(projection).unwrap();
         assert!(case_validator.is_valid(&value));
     }
+    // Each decoder requires a member, null included, exactly when its schema
+    // does. The identity input is written, never read back; what a reader
+    // decodes is the projection inside it, and a projection whose member paths
+    // all occur in an earlier one has none left to try.
+    let decodes = |left_out| serde_json::from_value::<RunPlanRecord>(left_out).is_ok();
+    assert_eq!(
+        crate::schema::omission_disagreements(&value, "", &plan_validator, decodes),
+        Vec::<String>::new()
+    );
+    let decodes = |left_out: Value| {
+        serde_json::from_value::<CaseProjection>(left_out["projection"].clone()).is_ok()
+    };
+    let mut seen = std::collections::BTreeSet::new();
+    for projection in plan.projections() {
+        let input = case_identity_input(projection).unwrap();
+        let paths = crate::schema::member_paths(&input, "/projection");
+        if paths.keys().all(|path| seen.contains(path)) {
+            continue;
+        }
+        seen.extend(paths.into_keys());
+        assert_eq!(
+            crate::schema::omission_disagreements(&input, "/projection", &case_validator, decodes),
+            Vec::<String>::new()
+        );
+    }
     let mut null_context = value.clone();
     null_context["envelope"]["creationContext"] = Value::Null;
     assert!(!plan_validator.is_valid(&null_context));
@@ -89,7 +114,7 @@ fn each_case_projection_carries_the_execution_state_its_prepared_case_runs_in() 
 fn issuance_freezes_unique_case_inventory_but_fresh_instances_do_not_change_case_identity() {
     let first = issue();
     let second = issue();
-    assert_eq!(first.document().body.case_inventory.len(), 354);
+    assert_eq!(first.document().body.case_inventory.len(), 359);
     assert_eq!(
         first.document().body.case_inventory,
         second.document().body.case_inventory
@@ -160,7 +185,7 @@ fn native_capture_uses_the_plan_already_issued_before_collection_and_retains_it_
         value["result"]["plan"]["commonRunPlan"],
         serde_json::to_value(identity).unwrap()
     );
-    assert_eq!(value["result"]["attempts"].as_array().unwrap().len(), 354);
+    assert_eq!(value["result"]["attempts"].as_array().unwrap().len(), 359);
 }
 
 #[test]

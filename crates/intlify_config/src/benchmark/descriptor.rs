@@ -346,6 +346,7 @@ pub(super) fn prepared_core(operation: Operation, icu4x: Option<Engine>) -> Exec
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[schemars(transform = intlify_measurement::schema::require_nullable_members)]
 pub(super) struct Descriptors {
     pub(super) boundary: Boundary,
     pub(super) method: Method,
@@ -381,6 +382,8 @@ pub(super) struct Descriptors {
     pub(super) shared_evidence_input: Option<super::evidence::InputFacts>,
     #[serde(deserialize_with = "Option::deserialize")]
     pub(super) entry_evidence_input: Option<super::evidence::InputFacts>,
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub(super) outcome_finalization_input: Option<super::evidence::InputFacts>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -401,6 +404,7 @@ pub(super) enum DescriptorIssue {
     ConstructionInputBindingMismatch,
     SharedEvidenceInputBindingMismatch,
     EntryEvidenceInputBindingMismatch,
+    OutcomeFinalizationInputBindingMismatch,
 }
 
 impl Descriptors {
@@ -467,6 +471,7 @@ impl Descriptors {
             construction_input: construction(prepared),
             shared_evidence_input: evidence(prepared),
             entry_evidence_input: entry_evidence(prepared),
+            outcome_finalization_input: outcome_finalization(prepared),
         }
     }
 
@@ -531,6 +536,9 @@ impl Descriptors {
         }
         if self.entry_evidence_input != entry_evidence(prepared) {
             issues.push(DescriptorIssue::EntryEvidenceInputBindingMismatch);
+        }
+        if self.outcome_finalization_input != outcome_finalization(prepared) {
+            issues.push(DescriptorIssue::OutcomeFinalizationInputBindingMismatch);
         }
         issues
     }
@@ -687,6 +695,16 @@ fn evidence(prepared: &Prepared) -> Option<super::evidence::InputFacts> {
 fn entry_evidence(prepared: &Prepared) -> Option<super::evidence::InputFacts> {
     match prepared {
         Prepared::EntryEvidence(prepared) => Some(super::evidence::InputFacts::entry(prepared)),
+        _ => None,
+    }
+}
+
+/// The invocation facts of an outcome finalization case.
+fn outcome_finalization(prepared: &Prepared) -> Option<super::evidence::InputFacts> {
+    match prepared {
+        Prepared::OutcomeFinalization(prepared) => {
+            Some(super::evidence::InputFacts::outcome(&prepared.evidence))
+        }
         _ => None,
     }
 }

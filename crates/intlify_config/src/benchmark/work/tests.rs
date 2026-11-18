@@ -177,6 +177,13 @@ fn every_active_operation_retains_the_complete_ordered_vocabulary_and_its_stages
                 .facts
                 .iter()
                 .all(|item| item.stage == WorkStage::OperationResult));
+        } else if prepared.operation() == Operation::OutcomeFinalization {
+            // The records each projection orders and the mandatory reserve.
+            assert_eq!(work.facts.len(), 3);
+            assert!(work
+                .facts
+                .iter()
+                .all(|item| item.stage == WorkStage::OperationResult));
         } else {
             assert_eq!(work.facts.len(), 14);
             assert_eq!(fact(&work, WorkKind::LogicalValueNodes).stage, input_stage);
@@ -1002,7 +1009,9 @@ fn the_shared_evidence_work_counts_what_the_stage_committed() {
                     findings as u64
                 );
             }
-            R::Malformed => unreachable!("only a recipe with a value has a Shared projection"),
+            R::Malformed | R::Truncated => {
+                unreachable!("only the valued recipes the Shared bounds hold have a stage case")
+            }
         }
     }
 }
@@ -1038,7 +1047,7 @@ fn the_entry_evidence_work_counts_what_the_stage_committed() {
         WorkValue::Exact { value } => value.get(),
         _ => panic!("{kind:?}"),
     };
-    for recipe in R::ALL {
+    for recipe in R::ENTRY {
         let candidate = entry_candidate(recipe);
         let work = &candidate.logical_work;
         let Output::EntryEvidence(resolved) = &candidate.output else {
@@ -1138,6 +1147,7 @@ fn the_entry_evidence_work_counts_what_the_stage_committed() {
                     occurrences
                 );
             }
+            R::Truncated => unreachable!("only the Shared domain's bound exhausts it"),
             R::Malformed => {
                 assert!(exact(work, WorkKind::EntryEvidenceFindings) > 0);
                 assert!(exact(work, WorkKind::EntryEvidenceCauseOccurrences) > 0);
@@ -1163,4 +1173,61 @@ fn an_entry_resolution_without_its_invocation_count_has_no_work() {
         LogicalWork::observe(&candidate.prepared, &Output::EntryEvidence(resolved)),
         Err(WorkFailure::InvalidOrdinaryResult)
     ));
+}
+
+/// Outcome finalization's work is the records each projection orders and the
+/// mandatory reserve: no Shared record without a value, the truncated
+/// recipe's Shared records cut at their bound, and its reserve holding the
+/// Shared terminal Finding and state beside the envelope every outcome
+/// reserves (D15:1847, 2408).
+#[test]
+fn the_outcome_finalization_work_counts_the_records_and_the_reserve() {
+    use crate::benchmark::cases::prepare::prepare;
+    use crate::benchmark::cases::{declarations, EvidenceRecipe as R, Recipe};
+
+    let exact = |work: &LogicalWork, kind| match fact(work, kind).observation {
+        WorkValue::Exact { value } => value.get(),
+        _ => panic!("{kind:?}"),
+    };
+    let mut envelope = None;
+    for recipe in R::ALL {
+        let declaration = declarations()
+            .into_iter()
+            .find(|case| {
+                case.operation == Operation::OutcomeFinalization
+                    && case.fixture == Recipe::Evidence(recipe)
+            })
+            .unwrap();
+        let candidate = prepare(&declaration).unwrap();
+        let work = &candidate.logical_work;
+        let Output::OutcomeFinalization(resolved) = &candidate.output else {
+            unreachable!()
+        };
+        let outcome = resolved.result.as_ref().unwrap();
+        let shared = exact(work, WorkKind::OutcomeFinalizationSharedRecords);
+        let reserve = exact(work, WorkKind::OutcomeFinalizationReserveCanonicalBytes);
+        assert_eq!(
+            exact(work, WorkKind::OutcomeFinalizationEntryRecords),
+            outcome.entry.records.len() as u64
+        );
+        assert_eq!(
+            shared,
+            outcome
+                .shared
+                .as_ref()
+                .map_or(0, |projection| projection.records.len() as u64)
+        );
+        assert_eq!(reserve, outcome.reserve);
+        match recipe {
+            R::Malformed => assert_eq!(shared, 0),
+            R::Truncated => {
+                assert_eq!(shared, 100);
+                assert!(reserve > envelope.unwrap());
+            }
+            R::Storefront | R::Blocked | R::Dense => {
+                assert!(shared > 100);
+                assert_eq!(*envelope.get_or_insert(reserve), reserve, "{recipe:?}");
+            }
+        }
+    }
 }

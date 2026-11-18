@@ -250,7 +250,7 @@ mod tests {
     /// without a value and the cause that names it (D15:1165, 1176-1183).
     #[test]
     fn each_recipe_commits_the_entry_domain_whole() {
-        for recipe in R::ALL {
+        for recipe in R::ENTRY {
             let retained = prepared(recipe).resolve_entry().unwrap().result.unwrap();
             assert!(retained.exhausted.is_none(), "{recipe:?}");
             let findings = kinds(&retained, RecordKind::EntryFinding);
@@ -261,6 +261,7 @@ mod tests {
                 R::Blocked => assert!(findings == 0 && occurrences > 0 && causes == 0),
                 R::Dense => assert!(occurrences >= 2 * crate::benchmark::cases::DENSE),
                 R::Malformed => assert!(findings > 0 && occurrences > 0 && causes > 0),
+                R::Truncated => unreachable!("only the Shared domain's bound exhausts it"),
             }
         }
     }
@@ -269,7 +270,7 @@ mod tests {
     /// projection, which finalization only orders (D15:2143).
     #[test]
     fn the_stage_commits_the_records_of_the_entry_projection() {
-        for recipe in R::ALL {
+        for recipe in R::ENTRY {
             let prepared = prepared(recipe);
             let invocation = prepared.invocation();
             let mut evaluation = Evaluation::default();
@@ -439,7 +440,7 @@ mod tests {
     fn every_recipe_has_its_own_entry_observation_and_an_empty_shared_domain() {
         let empty = Frame::new("entry-evidence-shared").finish();
         let mut seen = Vec::new();
-        for recipe in R::ALL {
+        for recipe in R::ENTRY {
             let resolved = prepared(recipe).resolve_entry().unwrap();
             let observation = observe(&resolved).unwrap();
             assert_eq!(observation, observe(&resolved).unwrap());

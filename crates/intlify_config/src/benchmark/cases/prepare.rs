@@ -29,8 +29,8 @@ use super::super::operation::{
 use super::super::work::LogicalWork;
 use super::policy_inputs::{capacity, tuple_of};
 use super::{
-    declarations, evidence_limits, Declaration, Engine, ExpectedKind, HydrationRecipe, Icu4xRecipe,
-    LimitEdge, LimitKind, LocalePolicyResolutionRecipe, Recipe, ResourcePolicyRecipe, Selector,
+    declarations, Declaration, Engine, ExpectedKind, HydrationRecipe, Icu4xRecipe, LimitEdge,
+    LimitKind, LocalePolicyResolutionRecipe, Recipe, ResourcePolicyRecipe, Selector,
     TargetAndGroupRecipe,
 };
 
@@ -124,7 +124,7 @@ pub(in crate::benchmark) fn prepare(
     }
     if matches!(
         declaration.operation,
-        Operation::SharedEvidence | Operation::EntryEvidence
+        Operation::SharedEvidence | Operation::EntryEvidence | Operation::OutcomeFinalization
     ) {
         return prepare_evidence(declaration);
     }
@@ -303,7 +303,8 @@ pub(in crate::benchmark) fn prepare(
             | Operation::ConstructionAuthorityAdmission
             | Operation::ConstructionIdentity
             | Operation::SharedEvidence
-            | Operation::EntryEvidence => unreachable!(),
+            | Operation::EntryEvidence
+            | Operation::OutcomeFinalization => unreachable!(),
         }
     };
     // Only dispatch is repeated here; both reference preparation and timed calls
@@ -331,7 +332,8 @@ pub(in crate::benchmark) fn prepare(
         | Prepared::Construction(_)
         | Prepared::ConstructionIdentity(_)
         | Prepared::SharedEvidence(_)
-        | Prepared::EntryEvidence(_) => {
+        | Prepared::EntryEvidence(_)
+        | Prepared::OutcomeFinalization(_) => {
             unreachable!(
                 "Phases 7, 4, 9, 11, 12, and 13, construction, and the Evidence stages have their \
                  own preparation"
@@ -1244,6 +1246,7 @@ fn select_config(config: &Value, selector: Selector) -> Result<SelectedConfig, P
 /// evaluation phases run before each interval, and the Shared projection
 /// stage over it once (D15:2771, 2775).
 fn prepare_evidence(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
+    use crate::benchmark::evidence::outcome::PreparedOutcome;
     use crate::benchmark::evidence::{self, PreparedEvidence, Retained};
     use crate::boundary::verification::VerificationInput;
     use crate::resolver::evidence_metadata::fixtures::unbounded;
@@ -1251,7 +1254,7 @@ fn prepare_evidence(declaration: &Declaration) -> Result<Candidate, PreparationF
     let Recipe::Evidence(recipe) = declaration.fixture else {
         return Err(PreparationFailure::UndeclaredCase);
     };
-    let limits = evidence_limits();
+    let limits = recipe.limits();
     let fixture = recipe.fixture(&limits);
     let (input, structural) = fixture_capacity();
     let selected = fixture
@@ -1278,30 +1281,58 @@ fn prepare_evidence(declaration: &Declaration) -> Result<Candidate, PreparationF
         Ok(retained) if retained.exhausted.is_none() => Ok(kind),
         Ok(_) | Err(_) => Err(PreparationFailure::Observation),
     };
-    let (kind, output, prepared) = if declaration.operation == Operation::SharedEvidence {
-        let resolved = prepared
-            .resolve_shared()
-            .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
-        (
-            whole(
-                resolved.result.as_ref(),
-                ExpectedKind::SharedEvidenceComplete,
-            )?,
-            Output::SharedEvidence(resolved),
-            Prepared::SharedEvidence(Box::new(prepared)),
-        )
-    } else {
-        let resolved = prepared
-            .resolve_entry()
-            .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
-        (
-            whole(
-                resolved.result.as_ref(),
-                ExpectedKind::EntryEvidenceComplete,
-            )?,
-            Output::EntryEvidence(resolved),
-            Prepared::EntryEvidence(Box::new(prepared)),
-        )
+    let (kind, output, prepared) = match declaration.operation {
+        Operation::SharedEvidence => {
+            let resolved = prepared
+                .resolve_shared()
+                .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
+            (
+                whole(
+                    resolved.result.as_ref(),
+                    ExpectedKind::SharedEvidenceComplete,
+                )?,
+                Output::SharedEvidence(resolved),
+                Prepared::SharedEvidence(Box::new(prepared)),
+            )
+        }
+        Operation::EntryEvidence => {
+            let resolved = prepared
+                .resolve_entry()
+                .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
+            (
+                whole(
+                    resolved.result.as_ref(),
+                    ExpectedKind::EntryEvidenceComplete,
+                )?,
+                Output::EntryEvidence(resolved),
+                Prepared::EntryEvidence(Box::new(prepared)),
+            )
+        }
+        _ => {
+            // Finalization puts the committed resolver's identity in the
+            // outcome, which is checked exactly when it carries a profile.
+            let root = crate::construction::root::ConstructionRoot::built_in()
+                .map_err(|_| PreparationFailure::CoreInvariant)?;
+            let prepared = PreparedOutcome {
+                evidence: prepared,
+                identity: crate::construction::resolver::committed().identity(root),
+            };
+            let resolved = prepared
+                .resolve()
+                .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
+            let kind = match &resolved.result {
+                Ok(outcome) if outcome.profile.is_some() => {
+                    ExpectedKind::OutcomeFinalizationChecked
+                }
+                Ok(_) => ExpectedKind::OutcomeFinalizationBlocked,
+                Err(_) => return Err(PreparationFailure::Observation),
+            };
+            (
+                kind,
+                Output::OutcomeFinalization(Box::new(resolved)),
+                Prepared::OutcomeFinalization(Box::new(prepared)),
+            )
+        }
     };
     if declaration.expected_kind != kind {
         return Err(PreparationFailure::UnexpectedOutputKind);
