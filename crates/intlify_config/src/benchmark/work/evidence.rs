@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-use crate::benchmark::evidence::{entry, require_observable, Resolved};
+use crate::benchmark::evidence::{entry, outcome, require_observable, Resolved};
 use crate::construction::registry::check::RecordKind;
 
 use super::{LogicalWork, WorkFailure, WorkKind, WorkStage, WorkValue};
@@ -153,6 +153,39 @@ impl LogicalWork {
             (
                 WorkKind::EntryEvidenceMetadataWorkUnits,
                 invocation.metadata_work_units,
+            ),
+        ] {
+            self.set(kind, WorkStage::OperationResult, WorkValue::exact(value));
+        }
+        Ok(())
+    }
+
+    /// The workload of outcome finalization: the records each domain's
+    /// projection orders, and the mandatory reserve in `maxCanonicalBytes`'
+    /// unit (D15:1847, 2143, 2796).
+    pub(super) fn outcome_finalization(
+        &mut self,
+        resolved: &outcome::Resolved,
+    ) -> Result<(), WorkFailure> {
+        let retained = outcome::require_observable(resolved)
+            .map_err(|_| WorkFailure::InvalidOrdinaryResult)?;
+        for (kind, value) in [
+            (
+                WorkKind::OutcomeFinalizationEntryRecords,
+                count(retained.entry.records.len())?,
+            ),
+            (
+                WorkKind::OutcomeFinalizationSharedRecords,
+                count(
+                    retained
+                        .shared
+                        .as_ref()
+                        .map_or(0, |projection| projection.records.len()),
+                )?,
+            ),
+            (
+                WorkKind::OutcomeFinalizationReserveCanonicalBytes,
+                retained.reserve,
             ),
         ] {
             self.set(kind, WorkStage::OperationResult, WorkValue::exact(value));

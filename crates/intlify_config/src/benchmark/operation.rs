@@ -98,10 +98,11 @@ pub(super) enum Operation {
     ConstructionIdentity,
     SharedEvidence,
     EntryEvidence,
+    OutcomeFinalization,
 }
 
 impl Operation {
-    pub(super) const ALL: [Self; 15] = [
+    pub(super) const ALL: [Self; 16] = [
         Self::FileMaterialization,
         Self::StructuralAnalysis,
         Self::AuthoringConstruction,
@@ -117,6 +118,7 @@ impl Operation {
         Self::ConstructionIdentity,
         Self::SharedEvidence,
         Self::EntryEvidence,
+        Self::OutcomeFinalization,
     ];
     pub(super) const fn phase(self) -> &'static str {
         match self {
@@ -133,7 +135,9 @@ impl Operation {
             Self::ConstructionAuthorityAdmission | Self::ConstructionIdentity => {
                 "profile_resolver_construct"
             }
-            Self::SharedEvidence | Self::EntryEvidence => "profile_evidence_materialize",
+            Self::SharedEvidence | Self::EntryEvidence | Self::OutcomeFinalization => {
+                "profile_evidence_materialize"
+            }
         }
     }
     pub(super) const fn cost(self) -> &'static str {
@@ -153,6 +157,7 @@ impl Operation {
             Self::ConstructionIdentity => "construction_identity",
             Self::SharedEvidence => "shared_evidence",
             Self::EntryEvidence => "entry_evidence",
+            Self::OutcomeFinalization => "outcome_finalization",
         }
     }
     pub(super) const fn boundary(self) -> &'static str {
@@ -172,6 +177,7 @@ impl Operation {
             Self::ConstructionIdentity => "resolver-construction-identity/0",
             Self::SharedEvidence => "shared-evidence-projection/0",
             Self::EntryEvidence => "entry-evidence-projection/0",
+            Self::OutcomeFinalization => "outcome-finalization/0",
         }
     }
     /// The pair and boundary of the peak live memory measured over this
@@ -227,6 +233,7 @@ pub(super) enum Prepared {
     ConstructionIdentity(Box<construction::PreparedIdentity>),
     SharedEvidence(Box<evidence::PreparedEvidence>),
     EntryEvidence(Box<evidence::PreparedEvidence>),
+    OutcomeFinalization(Box<evidence::outcome::PreparedOutcome>),
     Icu4xLocale {
         engine: locale_icu4x::PreparedEngine,
         input: Arc<str>,
@@ -249,6 +256,7 @@ pub(super) enum Output {
     ConstructionIdentity(ConstructionIdentity),
     SharedEvidence(evidence::Resolved),
     EntryEvidence(evidence::entry::Resolved),
+    OutcomeFinalization(Box<evidence::outcome::Resolved>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -287,6 +295,7 @@ impl Prepared {
             Self::ConstructionIdentity(_) => Operation::ConstructionIdentity,
             Self::SharedEvidence(_) => Operation::SharedEvidence,
             Self::EntryEvidence(_) => Operation::EntryEvidence,
+            Self::OutcomeFinalization(_) => Operation::OutcomeFinalization,
         }
     }
 
@@ -574,6 +583,35 @@ impl Prepared {
                     )),
                 })
             }
+            Self::OutcomeFinalization(prepared) => {
+                // Every evaluation phase of the invocation and both projection
+                // stages, whose result finalization takes, run before the
+                // start mark on an evaluation of their own; the outcome
+                // borrows it, so it is copied out after the end mark.
+                let inputs = &prepared.evidence;
+                let invocation = inputs.invocation();
+                let mut evaluation = Evaluation::default();
+                let mut set = None;
+                let invoked = inputs
+                    .invoke(&mut evaluation, &invocation, &mut set)
+                    .ok_or_else(I::unavailable)?;
+                let stage = evidence::shared((&evaluation, &invoked, &invocation))
+                    .ok()
+                    .ok_or_else(I::unavailable)?;
+                let stage = evidence::entry::entry((stage, &evaluation, &invoked, &invocation))
+                    .ok()
+                    .ok_or_else(I::unavailable)?;
+                let measured = instrument.interval(
+                    (stage, &evaluation, &invoked, prepared.identity, &invocation),
+                    evidence::outcome::finalization,
+                )?;
+                Ok(Interval {
+                    quantity: measured.quantity,
+                    output: Output::OutcomeFinalization(Box::new(
+                        evidence::outcome::Resolved::retain(&invocation, measured.output),
+                    )),
+                })
+            }
             Self::Icu4xLocale { engine, input } => {
                 // A fresh engine is admitted and bound before the start mark
                 // and released after the end mark.
@@ -648,6 +686,7 @@ impl Output {
             Self::ConstructionIdentity(identity) => Ok(construction::observe_identity(identity)),
             Self::SharedEvidence(resolved) => evidence::observe(resolved),
             Self::EntryEvidence(resolved) => evidence::entry::observe(resolved),
+            Self::OutcomeFinalization(resolved) => evidence::outcome::observe(resolved),
         }
     }
 }

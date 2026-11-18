@@ -147,7 +147,7 @@ impl Recipe {
         if let Self::Evidence(recipe) = self {
             // The configuration file the invocation reads; the input context
             // binds the members and the invocation's other inputs.
-            return Arc::from(recipe.source(&super::evidence_limits()));
+            return Arc::from(recipe.source(&recipe.limits()));
         }
         if let Self::Construction(recipe) = self {
             // What each component declares; the input context binds every

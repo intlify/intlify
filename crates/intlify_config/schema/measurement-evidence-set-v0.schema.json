@@ -1371,6 +1371,16 @@
         "method": {
           "$ref": "#/definitions/Method"
         },
+        "outcomeFinalizationInput": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/InputFacts9"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "resolvedBindingInput": {
           "anyOf": [
             {
@@ -2421,6 +2431,11 @@
         {
           "const": "malformed",
           "description": "The example's file without its last byte, which is no JSON: no value,\nso no unit reports into the Shared domain (D15:2369; plan 025\ndecision #260).",
+          "type": "string"
+        },
+        {
+          "const": "truncated",
+          "description": "The example under a Shared `maxRecords` its Shared records outgrow:\nthe Shared domain is exhausted, so the bundle is incomplete and the\noutcome blocked (D15:1185, 2408; plan 025 decision #262).",
           "type": "string"
         }
       ]
@@ -3874,7 +3889,8 @@
         "construction-authority-admission",
         "construction-identity",
         "shared-evidence",
-        "entry-evidence"
+        "entry-evidence",
+        "outcome-finalization"
       ],
       "type": "string"
     },
@@ -5042,7 +5058,10 @@
         "entry-evidence-subject-occurrences",
         "entry-evidence-token-inputs",
         "entry-evidence-collision-comparisons",
-        "entry-evidence-metadata-work-units"
+        "entry-evidence-metadata-work-units",
+        "outcome-finalization-entry-records",
+        "outcome-finalization-shared-records",
+        "outcome-finalization-reserve-canonical-bytes"
       ],
       "type": "string"
     },

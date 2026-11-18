@@ -6,7 +6,8 @@
 //! profile `app` of the complete fixture configuration with every policy and
 //! Target Profile it names submitted once and each reference naming one
 //! exactly, and one change of it for each kind of outcome a stage reports:
-//! blocking Findings after materialization, many Findings, and no value.
+//! blocking Findings after materialization, many Findings, no value, and a
+//! Shared domain its bound exhausts.
 //! Every reference's semantic digest is computed from the envelope it names,
 //! never written by hand.
 
@@ -40,6 +41,10 @@ pub(in crate::benchmark) enum EvidenceRecipe {
     /// so no unit reports into the Shared domain (D15:2369; plan 025
     /// decision #260).
     Malformed,
+    /// The example under a Shared `maxRecords` its Shared records outgrow:
+    /// the Shared domain is exhausted, so the bundle is incomplete and the
+    /// outcome blocked (D15:1185, 2408; plan 025 decision #262).
+    Truncated,
 }
 
 /// A configuration and the members submitted with it, in submission order.
@@ -53,6 +58,9 @@ pub(in crate::benchmark) const DENSE: usize = 64;
 
 /// A value no diagnostic count of these inputs reaches.
 const ROOM: u64 = 1 << 40;
+
+/// The Shared records `Truncated` admits, fewer than the example's.
+const TRUNCATED: u64 = 100;
 
 /// Each policy slot besides `resourceLimits`, the kind its role takes, and
 /// the identity of the artifact it names.
@@ -93,7 +101,17 @@ const TARGETS: [(&str, &str, &str); 2] = [
 ];
 
 impl EvidenceRecipe {
-    pub(in crate::benchmark) const ALL: [Self; 4] = [
+    pub(in crate::benchmark) const ALL: [Self; 5] = [
+        Self::Storefront,
+        Self::Blocked,
+        Self::Dense,
+        Self::Malformed,
+        Self::Truncated,
+    ];
+
+    /// The recipes of the Entry projection stage: every one but the one that
+    /// exhausts only the Shared domain, which the Shared bounds' edges cover.
+    pub(in crate::benchmark) const ENTRY: [Self; 4] = [
         Self::Storefront,
         Self::Blocked,
         Self::Dense,
@@ -104,6 +122,32 @@ impl EvidenceRecipe {
     /// applies to (D15:2369, 2771).
     pub(in crate::benchmark) const VALUED: [Self; 3] =
         [Self::Storefront, Self::Blocked, Self::Dense];
+
+    /// Whether the recipe's outcome is checked: only the example's is.
+    pub(in crate::benchmark) fn checked(self) -> bool {
+        self == Self::Storefront
+    }
+
+    /// The bounds both the capability and the selected policy set for this
+    /// recipe: [`limits`], but `Truncated`'s Shared `maxRecords`.
+    pub(in crate::benchmark) fn limits(self) -> ResolutionLimits {
+        let limits = limits();
+        if self != Self::Truncated {
+            return limits;
+        }
+        let bounds = limits.bounds();
+        ResolutionLimits::from_bounds(|id| {
+            if id.group == Group::DiagnosticsShared && id.name == "maxRecords" {
+                Bound::new(TRUNCATED)
+            } else {
+                bounds
+                    .iter()
+                    .find(|(bound, _)| *bound == id)
+                    .map(|&(_, value)| value)
+            }
+        })
+        .expect("every bound of the limits is set")
+    }
 
     /// The configuration file of this recipe under `limits`.
     pub(in crate::benchmark) fn source(self, limits: &ResolutionLimits) -> Vec<u8> {
@@ -140,7 +184,7 @@ impl EvidenceRecipe {
             members.push(member);
         }
         match self {
-            Self::Storefront | Self::Malformed => {}
+            Self::Storefront | Self::Malformed | Self::Truncated => {}
             Self::Blocked => {
                 app.as_object_mut()
                     .expect("the example's declaration is an object")
@@ -226,6 +270,7 @@ mod tests {
         let limits = limits();
         let example = EvidenceRecipe::Storefront.fixture(&limits).config;
         assert_eq!(EvidenceRecipe::Malformed.fixture(&limits).config, example);
+        assert_eq!(EvidenceRecipe::Truncated.fixture(&limits).config, example);
         let blocked = EvidenceRecipe::Blocked.fixture(&limits).config;
         let dense = EvidenceRecipe::Dense.fixture(&limits).config;
         let mut restored = blocked.clone();
@@ -275,9 +320,13 @@ mod tests {
             member_bytes: u64::MAX,
             total_member_bytes: u64::MAX,
         };
-        for (operation, change) in [Operation::SharedEvidence, Operation::EntryEvidence]
-            .into_iter()
-            .flat_map(|operation| (0..6).map(move |change| (operation, change)))
+        for (operation, change) in [
+            Operation::SharedEvidence,
+            Operation::EntryEvidence,
+            Operation::OutcomeFinalization,
+        ]
+        .into_iter()
+        .flat_map(|operation| (0..6).map(move |change| (operation, change)))
         {
             let declaration = declarations()
                 .into_iter()
@@ -288,10 +337,12 @@ mod tests {
                 .unwrap();
             let mut candidate = prepare(&declaration).unwrap();
             assert!(observe(&candidate).is_ok());
-            let (Prepared::SharedEvidence(prepared) | Prepared::EntryEvidence(prepared)) =
-                &mut candidate.prepared
-            else {
-                unreachable!()
+            let prepared = match &mut candidate.prepared {
+                Prepared::SharedEvidence(prepared) | Prepared::EntryEvidence(prepared) => {
+                    &mut **prepared
+                }
+                Prepared::OutcomeFinalization(prepared) => &mut prepared.evidence,
+                _ => unreachable!(),
             };
             let bound = prepared.structural.max_profile_id_bytes;
             match change {
@@ -348,6 +399,29 @@ mod tests {
             }
         }
         assert!(!EvidenceRecipe::VALUED.contains(&EvidenceRecipe::Malformed));
+    }
+
+    /// Only `Truncated`'s Shared `maxRecords` differs from every other
+    /// recipe's bounds, and its Shared records outgrow it.
+    #[test]
+    fn only_the_truncated_recipe_tightens_a_bound() {
+        let base = limits().bounds();
+        for recipe in EvidenceRecipe::ALL {
+            let differ: Vec<_> = recipe
+                .limits()
+                .bounds()
+                .into_iter()
+                .filter(|bound| !base.contains(bound))
+                .collect();
+            if recipe == EvidenceRecipe::Truncated {
+                assert_eq!(differ.len(), 1);
+                assert_eq!(differ[0].0.group, Group::DiagnosticsShared);
+                assert_eq!(differ[0].0.name, "maxRecords");
+                assert_eq!(differ[0].1.get(), TRUNCATED);
+            } else {
+                assert!(differ.is_empty(), "{recipe:?}");
+            }
+        }
     }
 
     /// Every diagnostic bound is at its room, and every other bound is the

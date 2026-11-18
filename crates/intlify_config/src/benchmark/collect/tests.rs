@@ -142,6 +142,9 @@ fn fixture_observation(prepared: &Prepared) -> (Observation, LogicalWork) {
         Output::EntryEvidence(resolved) => {
             assert!(resolved.result.as_ref().unwrap().exhausted.is_none());
         }
+        Output::OutcomeFinalization(resolved) => {
+            assert!(resolved.result.is_ok());
+        }
         _ => panic!("fixture preparation did not produce its known result"),
     }
     (
