@@ -122,7 +122,10 @@ pub(in crate::benchmark) fn prepare(
     ) {
         return prepare_construction(declaration);
     }
-    if declaration.operation == Operation::SharedEvidence {
+    if matches!(
+        declaration.operation,
+        Operation::SharedEvidence | Operation::EntryEvidence
+    ) {
         return prepare_evidence(declaration);
     }
     let source = declaration.fixture.source();
@@ -299,7 +302,8 @@ pub(in crate::benchmark) fn prepare(
             | Operation::HydrationRelationValidation
             | Operation::ConstructionAuthorityAdmission
             | Operation::ConstructionIdentity
-            | Operation::SharedEvidence => unreachable!(),
+            | Operation::SharedEvidence
+            | Operation::EntryEvidence => unreachable!(),
         }
     };
     // Only dispatch is repeated here; both reference preparation and timed calls
@@ -326,7 +330,8 @@ pub(in crate::benchmark) fn prepare(
         | Prepared::Hydration(_)
         | Prepared::Construction(_)
         | Prepared::ConstructionIdentity(_)
-        | Prepared::SharedEvidence(_) => {
+        | Prepared::SharedEvidence(_)
+        | Prepared::EntryEvidence(_) => {
             unreachable!(
                 "Phases 7, 4, 9, 11, 12, and 13, construction, and the Evidence stages have their \
                  own preparation"
@@ -1239,7 +1244,7 @@ fn select_config(config: &Value, selector: Selector) -> Result<SelectedConfig, P
 /// evaluation phases run before each interval, and the Shared projection
 /// stage over it once (D15:2771, 2775).
 fn prepare_evidence(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
-    use crate::benchmark::evidence::{self, PreparedEvidence};
+    use crate::benchmark::evidence::{self, PreparedEvidence, Retained};
     use crate::boundary::verification::VerificationInput;
     use crate::resolver::evidence_metadata::fixtures::unbounded;
 
@@ -1254,9 +1259,7 @@ fn prepare_evidence(declaration: &Declaration) -> Result<Candidate, PreparationF
         .first()
         .ok_or(PreparationFailure::CoreInvariant)?;
     let prepared = PreparedEvidence {
-        source: Arc::from(
-            serde_json::to_vec(&fixture.config).map_err(|_| PreparationFailure::CoreInvariant)?,
-        ),
+        source: Arc::from(recipe.source(&limits)),
         input,
         structural,
         file: FileFixture::new(&limits),
@@ -1270,18 +1273,39 @@ fn prepare_evidence(declaration: &Declaration) -> Result<Candidate, PreparationF
         collection: submitted(&fixture.members)?,
         vocabulary: evidence::vocabulary().ok_or(PreparationFailure::CoreInvariant)?,
     };
-    let resolved = prepared
-        .resolve_shared()
-        .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
-    let kind = match &resolved.result {
-        Ok(retained) if retained.exhausted.is_none() => ExpectedKind::SharedEvidenceComplete,
-        Ok(_) | Err(_) => return Err(PreparationFailure::Observation),
+    // Each stage's domain commits whole in every declared case.
+    let whole = |result: Result<&Retained, _>, kind| match result {
+        Ok(retained) if retained.exhausted.is_none() => Ok(kind),
+        Ok(_) | Err(_) => Err(PreparationFailure::Observation),
+    };
+    let (kind, output, prepared) = if declaration.operation == Operation::SharedEvidence {
+        let resolved = prepared
+            .resolve_shared()
+            .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
+        (
+            whole(
+                resolved.result.as_ref(),
+                ExpectedKind::SharedEvidenceComplete,
+            )?,
+            Output::SharedEvidence(resolved),
+            Prepared::SharedEvidence(Box::new(prepared)),
+        )
+    } else {
+        let resolved = prepared
+            .resolve_entry()
+            .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
+        (
+            whole(
+                resolved.result.as_ref(),
+                ExpectedKind::EntryEvidenceComplete,
+            )?,
+            Output::EntryEvidence(resolved),
+            Prepared::EntryEvidence(Box::new(prepared)),
+        )
     };
     if declaration.expected_kind != kind {
         return Err(PreparationFailure::UnexpectedOutputKind);
     }
-    let output = Output::SharedEvidence(resolved);
-    let prepared = Prepared::SharedEvidence(Box::new(prepared));
     let observation = output
         .observe()
         .map_err(|_| PreparationFailure::Observation)?;

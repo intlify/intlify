@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Finite owner case declarations for the fourteen active boundaries.
+//! Finite owner case declarations for the fifteen active boundaries.
 //! This is not a common Run Plan, case-identity codec, or a complete 015 suite.
 //! Preparation yields an unadmitted candidate; the separate fixture registry
 //! binds its exact input/result/work before method-bound collection can use it.
@@ -157,6 +157,7 @@ pub(super) enum ExpectedKind {
     ConstructionRefused,
     ConstructionIdentityDerived,
     SharedEvidenceComplete,
+    EntryEvidenceComplete,
 }
 
 #[derive(
@@ -401,7 +402,8 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 | Operation::HydrationRelationValidation
                 | Operation::ConstructionAuthorityAdmission
                 | Operation::ConstructionIdentity
-                | Operation::SharedEvidence => unreachable!(),
+                | Operation::SharedEvidence
+                | Operation::EntryEvidence => unreachable!(),
             };
             let selector = if operation == Operation::ProfileSelection {
                 Selector::App
@@ -892,14 +894,24 @@ pub(super) fn declarations() -> Vec<Declaration> {
         }
     }
     // Append 015's Shared projection stage without changing any of the 347
-    // rows: one file entry's complete invocation of each recipe, whose Shared
-    // domain commits whole (plan 025 decisions #34 and #255).
-    for recipe in EvidenceRecipe::ALL {
+    // rows: one file entry's complete invocation of each recipe with a value,
+    // whose Shared domain commits whole (plan 025 decisions #34 and #255).
+    for recipe in EvidenceRecipe::VALUED {
         cases.push(declaration(
             Operation::SharedEvidence,
             Recipe::Evidence(recipe),
             Selector::App,
             ExpectedKind::SharedEvidenceComplete,
+        ));
+    }
+    // Then its Entry projection stage over each recipe, the one without a
+    // value too, whose Entry domain commits whole (plan 025 decision #260).
+    for recipe in EvidenceRecipe::ALL {
+        cases.push(declaration(
+            Operation::EntryEvidence,
+            Recipe::Evidence(recipe),
+            Selector::App,
+            ExpectedKind::EntryEvidenceComplete,
         ));
     }
     cases

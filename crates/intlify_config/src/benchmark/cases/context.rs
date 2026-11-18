@@ -367,7 +367,18 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
         Prepared::ConstructionIdentity(prepared) => {
             construction_input(&mut frame, candidate, prepared.resolver.input())?;
         }
-        Prepared::SharedEvidence(prepared) => evidence_input(&mut frame, candidate, prepared)?,
+        Prepared::SharedEvidence(prepared) => evidence_input(
+            &mut frame,
+            candidate,
+            prepared,
+            &crate::benchmark::evidence::InputFacts::observe(prepared),
+        )?,
+        Prepared::EntryEvidence(prepared) => evidence_input(
+            &mut frame,
+            candidate,
+            prepared,
+            &crate::benchmark::evidence::InputFacts::entry(prepared),
+        )?,
     }
     Ok(frame.finish())
 }
@@ -377,11 +388,12 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
 /// schema, every member in submission order and the limits the collection
 /// was read under, every bound of the capability, the Verification Input's
 /// pins, every specification asserted and the active one supported with the
-/// fixture provider's pins, and the vocabulary.
+/// fixture provider's pins, the vocabulary, and the stage's `facts`.
 fn evidence_input(
     frame: &mut Frame,
     candidate: &Candidate,
     prepared: &crate::benchmark::evidence::PreparedEvidence,
+    facts: &crate::benchmark::evidence::InputFacts,
 ) -> Result<(), ContextFailure> {
     use crate::locale::fixtures::fixture_pins;
     use crate::locale::VersionedIdentity;
@@ -393,8 +405,7 @@ fn evidence_input(
         candidate.declaration.selector,
         prepared.structural.max_profile_id_bytes,
     );
-    let source = serde_json::to_vec(&recipe.fixture(&super::evidence_limits()).config)
-        .map_err(|_| ContextFailure::Encoding)?;
+    let source = recipe.source(&super::evidence_limits());
     if candidate.declaration.selector != super::Selector::App
         || !prepared.selector.benchmark_matches_fixture(&expected)
         || *prepared.source != *source
@@ -467,10 +478,7 @@ fn evidence_input(
         frame.text(member.as_str());
     }
     frame.text(intact.semantic_digest().as_str());
-    frame.json(
-        &serde_json::to_value(crate::benchmark::evidence::InputFacts::observe(prepared))
-            .map_err(|_| ContextFailure::Encoding)?,
-    );
+    frame.json(&serde_json::to_value(facts).map_err(|_| ContextFailure::Encoding)?);
     Ok(())
 }
 

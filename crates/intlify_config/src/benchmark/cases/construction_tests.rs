@@ -31,7 +31,7 @@ fn observed(operation: Operation, recipe: ConstructionRecipe) -> Observation {
 #[test]
 fn construction_cases_keep_the_304_rows_and_append_after_them() {
     let cases = declarations();
-    assert_eq!(cases.len(), 350);
+    assert_eq!(cases.len(), 354);
     assert!(cases[..304].iter().all(|case| !matches!(
         case.operation,
         Operation::ConstructionAuthorityAdmission | Operation::ConstructionIdentity
@@ -210,10 +210,17 @@ fn bound_edges_keep_the_318_rows_and_append_after_them() {
         start += count;
     }
     assert_eq!(start, 343 + 4);
-    // 015's Evidence stages follow.
-    assert!(cases[start..]
-        .iter()
-        .all(|case| case.operation == Operation::SharedEvidence));
+    // 015's Evidence stages follow: the Shared projection stage over each
+    // recipe with a value, then the Entry projection stage over each recipe.
+    let stages: Vec<Operation> = cases[start..].iter().map(|case| case.operation).collect();
+    assert_eq!(
+        stages,
+        [
+            [Operation::SharedEvidence; 3].as_slice(),
+            &[Operation::EntryEvidence; 4]
+        ]
+        .concat()
+    );
 }
 
 /// Each edge's input is at its bound or one past it, a first-over input is

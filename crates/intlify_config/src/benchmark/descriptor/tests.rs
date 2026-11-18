@@ -63,8 +63,8 @@ fn all_active_pairs_keep_distinct_owner_boundaries_and_exact_method_meaning() {
         assert_eq!(method.numeric_decision_eligibility, "qualified-runner");
         assert!(!method.estimated_overhead_subtraction);
     }
-    assert_eq!(pairs.len(), 14);
-    assert_eq!(identities.len(), 14);
+    assert_eq!(pairs.len(), 15);
+    assert_eq!(identities.len(), 15);
 }
 
 /// A construction case builds a fresh resolver in every interval; the
@@ -757,6 +757,7 @@ fn shared_evidence_descriptor_binds_the_collection() {
         "targetAndGroupInput",
         "hydrationRelationInput",
         "constructionInput",
+        "entryEvidenceInput",
     ] {
         assert_eq!(encoded[field], Value::Null, "{field}");
     }
@@ -786,6 +787,70 @@ fn shared_evidence_descriptor_binds_the_collection() {
                 .shared_evidence_input
                 .is_some(),
             operation.operation() == Operation::SharedEvidence
+        );
+    }
+}
+
+#[test]
+fn entry_evidence_descriptor_binds_the_collection() {
+    let mut operation = prepared(Operation::EntryEvidence);
+    let descriptors = Descriptors::for_acquisition(&operation, clock(1));
+    // Each invocation builds its own evaluation.
+    assert_eq!(descriptors.execution.scratch_reuse_state, "fresh");
+    let encoded = serde_json::to_value(&descriptors).unwrap();
+    // 015's second Evidence materialization stage, of a file entry, after
+    // the Shared one.
+    let boundary = &encoded["boundary"];
+    assert_eq!(boundary["identity"], "entry-evidence-projection/0");
+    assert_eq!(boundary["phase"], "profile_evidence_materialize");
+    assert_eq!(boundary["cost"], "entry_evidence");
+    let input = &encoded["entryEvidenceInput"];
+    assert_eq!(
+        input["scope"],
+        "the-entry-domain-of-one-file-entry-invocation"
+    );
+    assert_eq!(input["entryKind"], "file");
+    assert_eq!(input["submittedMembers"], "9");
+    for field in [
+        "localeInput",
+        "localePolicyResolutionInput",
+        "admittedLocaleInput",
+        "resourcePolicyInput",
+        "artifactCollectionInput",
+        "resolvedBindingInput",
+        "targetAndGroupInput",
+        "hydrationRelationInput",
+        "constructionInput",
+        "sharedEvidenceInput",
+    ] {
+        assert_eq!(encoded[field], Value::Null, "{field}");
+    }
+    // Another collection, of seven members, is another input.
+    let Prepared::Hydration(other) = prepared(Operation::HydrationRelationValidation) else {
+        unreachable!()
+    };
+    let Prepared::EntryEvidence(evidence) = &mut operation else {
+        unreachable!()
+    };
+    evidence.collection = other.collection;
+    assert_eq!(
+        descriptors.validate(&operation, clock(1)),
+        [DescriptorIssue::EntryEvidenceInputBindingMismatch]
+    );
+    let original = prepared(Operation::EntryEvidence);
+    let mut missing = encoded;
+    missing["entryEvidenceInput"] = Value::Null;
+    let decoded: Descriptors = serde_json::from_value(missing).unwrap();
+    assert_eq!(
+        decoded.validate(&original, clock(1)),
+        [DescriptorIssue::EntryEvidenceInputBindingMismatch]
+    );
+    for operation in &operations() {
+        assert_eq!(
+            Descriptors::for_acquisition(operation, clock(1))
+                .entry_evidence_input
+                .is_some(),
+            operation.operation() == Operation::EntryEvidence
         );
     }
 }

@@ -6,9 +6,9 @@
 //! profile `app` of the complete fixture configuration with every policy and
 //! Target Profile it names submitted once and each reference naming one
 //! exactly, and one change of it for each kind of outcome a stage reports:
-//! blocking Findings after materialization, and many Findings. Every
-//! reference's semantic digest is computed from the envelope it names, never
-//! written by hand.
+//! blocking Findings after materialization, many Findings, and no value.
+//! Every reference's semantic digest is computed from the envelope it names,
+//! never written by hand.
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -36,6 +36,10 @@ pub(in crate::benchmark) enum EvidenceRecipe {
     /// outside the project's that its Target Profile has no direction for:
     /// many Findings, each of a target of its own.
     Dense,
+    /// The example's file without its last byte, which is no JSON: no value,
+    /// so no unit reports into the Shared domain (D15:2369; plan 025
+    /// decision #260).
+    Malformed,
 }
 
 /// A configuration and the members submitted with it, in submission order.
@@ -89,7 +93,27 @@ const TARGETS: [(&str, &str, &str); 2] = [
 ];
 
 impl EvidenceRecipe {
-    pub(in crate::benchmark) const ALL: [Self; 3] = [Self::Storefront, Self::Blocked, Self::Dense];
+    pub(in crate::benchmark) const ALL: [Self; 4] = [
+        Self::Storefront,
+        Self::Blocked,
+        Self::Dense,
+        Self::Malformed,
+    ];
+
+    /// The recipes with a value, the only ones the Shared projection stage
+    /// applies to (D15:2369, 2771).
+    pub(in crate::benchmark) const VALUED: [Self; 3] =
+        [Self::Storefront, Self::Blocked, Self::Dense];
+
+    /// The configuration file of this recipe under `limits`.
+    pub(in crate::benchmark) fn source(self, limits: &ResolutionLimits) -> Vec<u8> {
+        let mut source =
+            serde_json::to_vec(&self.fixture(limits).config).expect("a JSON value encodes");
+        if self == Self::Malformed {
+            source.pop();
+        }
+        source
+    }
 
     /// The configuration and members of this recipe, the selected policy
     /// setting `limits` and submitted first.
@@ -116,7 +140,7 @@ impl EvidenceRecipe {
             members.push(member);
         }
         match self {
-            Self::Storefront => {}
+            Self::Storefront | Self::Malformed => {}
             Self::Blocked => {
                 app.as_object_mut()
                     .expect("the example's declaration is an object")
@@ -201,6 +225,7 @@ mod tests {
     fn each_recipe_changes_only_what_it_names() {
         let limits = limits();
         let example = EvidenceRecipe::Storefront.fixture(&limits).config;
+        assert_eq!(EvidenceRecipe::Malformed.fixture(&limits).config, example);
         let blocked = EvidenceRecipe::Blocked.fixture(&limits).config;
         let dense = EvidenceRecipe::Dense.fixture(&limits).config;
         let mut restored = blocked.clone();
@@ -226,10 +251,11 @@ mod tests {
         assert_eq!(restored, example);
     }
 
-    /// The input context refuses a candidate bound to another input: another
-    /// recipe kind, another selector even with its own selector input,
-    /// another selector input, another recipe's configuration, no vocabulary
-    /// assertion, and a vocabulary that is not admitted.
+    /// The input context of either stage refuses a candidate bound to
+    /// another input: another recipe kind, another selector even with its
+    /// own selector input, another selector input, another recipe's
+    /// configuration, no vocabulary assertion, and a vocabulary that is not
+    /// admitted.
     #[test]
     fn the_input_context_refuses_a_candidate_bound_to_another_input() {
         use std::sync::Arc;
@@ -240,7 +266,7 @@ mod tests {
         use crate::benchmark::cases::context::{observe, ContextFailure};
         use crate::benchmark::cases::prepare::{prepare, selector_input};
         use crate::benchmark::cases::{declarations, Recipe, Selector};
-        use crate::benchmark::operation::Prepared;
+        use crate::benchmark::operation::{Operation, Prepared};
 
         let room = VocabularyLimits {
             artifact_bytes: u64::MAX,
@@ -249,14 +275,22 @@ mod tests {
             member_bytes: u64::MAX,
             total_member_bytes: u64::MAX,
         };
-        let declaration = declarations()
+        for (operation, change) in [Operation::SharedEvidence, Operation::EntryEvidence]
             .into_iter()
-            .find(|case| case.fixture == Recipe::Evidence(EvidenceRecipe::Storefront))
-            .unwrap();
-        for change in 0..6 {
+            .flat_map(|operation| (0..6).map(move |change| (operation, change)))
+        {
+            let declaration = declarations()
+                .into_iter()
+                .find(|case| {
+                    case.operation == operation
+                        && case.fixture == Recipe::Evidence(EvidenceRecipe::Storefront)
+                })
+                .unwrap();
             let mut candidate = prepare(&declaration).unwrap();
             assert!(observe(&candidate).is_ok());
-            let Prepared::SharedEvidence(prepared) = &mut candidate.prepared else {
+            let (Prepared::SharedEvidence(prepared) | Prepared::EntryEvidence(prepared)) =
+                &mut candidate.prepared
+            else {
                 unreachable!()
             };
             let bound = prepared.structural.max_profile_id_bytes;
@@ -287,9 +321,33 @@ mod tests {
             assert_eq!(
                 observe(&candidate),
                 Err(ContextFailure::EvidenceInputMismatch),
-                "change {change}"
+                "{operation:?} change {change}"
             );
         }
+    }
+
+    /// Each file is its configuration's JSON, but the malformed one, which is
+    /// the example's without its last byte and so no JSON.
+    #[test]
+    fn only_the_malformed_file_is_no_json() {
+        let limits = limits();
+        for recipe in EvidenceRecipe::ALL {
+            let source = recipe.source(&limits);
+            let parsed = serde_json::from_slice::<Value>(&source);
+            if recipe == EvidenceRecipe::Malformed {
+                assert!(parsed.is_err());
+                let mut example = EvidenceRecipe::Storefront.source(&limits);
+                assert_eq!(example.pop(), Some(b'}'));
+                assert_eq!(source, example);
+            } else {
+                assert_eq!(
+                    parsed.unwrap(),
+                    recipe.fixture(&limits).config,
+                    "{recipe:?}"
+                );
+            }
+        }
+        assert!(!EvidenceRecipe::VALUED.contains(&EvidenceRecipe::Malformed));
     }
 
     /// Every diagnostic bound is at its room, and every other bound is the

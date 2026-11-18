@@ -379,6 +379,8 @@ pub(super) struct Descriptors {
     pub(super) construction_input: Option<super::construction::InputFacts>,
     #[serde(deserialize_with = "Option::deserialize")]
     pub(super) shared_evidence_input: Option<super::evidence::InputFacts>,
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub(super) entry_evidence_input: Option<super::evidence::InputFacts>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -398,6 +400,7 @@ pub(super) enum DescriptorIssue {
     HydrationRelationInputBindingMismatch,
     ConstructionInputBindingMismatch,
     SharedEvidenceInputBindingMismatch,
+    EntryEvidenceInputBindingMismatch,
 }
 
 impl Descriptors {
@@ -463,6 +466,7 @@ impl Descriptors {
             hydration_relation_input: hydration(prepared),
             construction_input: construction(prepared),
             shared_evidence_input: evidence(prepared),
+            entry_evidence_input: entry_evidence(prepared),
         }
     }
 
@@ -524,6 +528,9 @@ impl Descriptors {
         }
         if self.shared_evidence_input != evidence(prepared) {
             issues.push(DescriptorIssue::SharedEvidenceInputBindingMismatch);
+        }
+        if self.entry_evidence_input != entry_evidence(prepared) {
+            issues.push(DescriptorIssue::EntryEvidenceInputBindingMismatch);
         }
         issues
     }
@@ -668,10 +675,18 @@ fn construction(prepared: &Prepared) -> Option<super::construction::InputFacts> 
     }
 }
 
-/// The invocation facts of an Evidence stage case.
+/// The invocation facts of a Shared projection stage case.
 fn evidence(prepared: &Prepared) -> Option<super::evidence::InputFacts> {
     match prepared {
         Prepared::SharedEvidence(prepared) => Some(super::evidence::InputFacts::observe(prepared)),
+        _ => None,
+    }
+}
+
+/// The invocation facts of an Entry projection stage case.
+fn entry_evidence(prepared: &Prepared) -> Option<super::evidence::InputFacts> {
+    match prepared {
+        Prepared::EntryEvidence(prepared) => Some(super::evidence::InputFacts::entry(prepared)),
         _ => None,
     }
 }

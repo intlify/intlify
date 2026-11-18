@@ -10,9 +10,9 @@
 //! Verification Input pinning the selected policy, and a sealed vocabulary.
 //! The interval runs one stage: the Shared projection stage counts the Shared
 //! scope's Evidence metadata work and plans the Shared domain's slices (plan
-//! 025 decision #253). The slices borrow the evaluation, so after the end
-//! read they are copied out. Neither the result nor its observation is a
-//! Profile or a shared artifact.
+//! 025 decision #253), and the Entry projection stage is [`entry`]'s. The
+//! slices borrow the evaluation, so after the end read they are copied out.
+//! Neither the result nor its observation is a Profile or a shared artifact.
 
 use std::sync::Arc;
 
@@ -46,6 +46,8 @@ use crate::structural::StructuralLimits;
 use super::observation::{Frame, Observation};
 use super::operation::{OutputFailure, Schema};
 use super::quantity::Quantity;
+
+pub(super) mod entry;
 
 /// The fixture provider's identity type, which every specification here is
 /// spelled in.
@@ -179,6 +181,24 @@ impl PreparedEvidence {
         let stage = shared((&evaluation, &invoked, &invocation));
         Some(Resolved::retain(&evaluation, &invocation, stage))
     }
+
+    /// One untimed invocation of the Entry projection stage, after the Shared
+    /// one, retained as a timed one is, or `None` on a resolver defect before
+    /// the stage.
+    pub(super) fn resolve_entry(&self) -> Option<entry::Resolved> {
+        let invocation = self.invocation();
+        let mut evaluation = Evaluation::default();
+        let mut set = None;
+        let invoked = self.invoke(&mut evaluation, &invocation, &mut set)?;
+        let stage = shared((&evaluation, &invoked, &invocation)).ok()?;
+        let stage = entry::entry((stage, &evaluation, &invoked, &invocation));
+        Some(entry::Resolved::retain(
+            &evaluation,
+            &invoked,
+            &invocation,
+            stage,
+        ))
+    }
 }
 
 /// The Shared projection stage: what every timed invocation of
@@ -194,14 +214,16 @@ pub(super) fn shared<'e, 'a>(
 }
 
 /// One committed record as the output retains it: its record kind, its view,
-/// the length of `C` of its accounting view (D15:2518), and, for a
-/// not-evaluated status, its distinct causal Finding Keys.
+/// the length of `C` of its accounting view (D15:2518), for a not-evaluated
+/// status its distinct causal Finding Keys, and for a Finding Occurrence its
+/// distinct related Evidence records.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct RetainedRecord {
     pub(super) kind: RecordKind,
     pub(super) view: Value,
     pub(super) bytes: u64,
     pub(super) causes: u64,
+    pub(super) related: u64,
 }
 
 /// One committed slice as the output retains it: its owner, what its
@@ -242,6 +264,10 @@ impl Retained {
                                 Record::Status(Status::NotEvaluated(causes)) => {
                                     count(causes.keys().count())
                                 }
+                                _ => 0,
+                            },
+                            related: match &retained.record {
+                                Record::Occurrence(occurrence) => count(occurrence.related().len()),
                                 _ => 0,
                             },
                         })
@@ -310,16 +336,22 @@ impl Resolved {
         invocation: &Invocation<'_, Id>,
         stage: Result<SharedStage<'_, '_>, ResolverInvariant>,
     ) -> Self {
-        let profile = &invocation.supported.project_profile().specification;
-        let specification = Specification {
-            identity: profile.identity,
-            revision: profile.revision,
-        };
+        let specification = specification(invocation);
         Self {
             result: stage.map(|stage| Retained::of(stage.committed())),
             scope: SharedScopeWork::of(evaluation, specification),
             specification,
         }
+    }
+}
+
+/// The Profile Specification whose tokens `invocation`'s records carry: the
+/// Active Project Profile Specification's.
+fn specification(invocation: &Invocation<'_, Id>) -> Specification<'static> {
+    let profile = &invocation.supported.project_profile().specification;
+    Specification {
+        identity: profile.identity,
+        revision: profile.revision,
     }
 }
 
@@ -344,9 +376,37 @@ pub(super) struct InputFacts {
 }
 
 impl InputFacts {
+    /// The Shared projection stage's.
     pub(super) fn observe(prepared: &PreparedEvidence) -> Self {
+        Self::of(
+            prepared,
+            "the-shared-domain-of-one-file-entry-invocation",
+            "every-evaluation-phase-of-the-invocation",
+            "complete-invocation-on-an-evaluation-of-its-own-before-interval",
+            "shared-slices-copied-after-end-read-or-resolver-defect",
+        )
+    }
+
+    /// The Entry projection stage's, which takes what the Shared one left.
+    pub(super) fn entry(prepared: &PreparedEvidence) -> Self {
+        Self::of(
+            prepared,
+            "the-entry-domain-of-one-file-entry-invocation",
+            "every-evaluation-phase-and-the-shared-projection-stage-of-the-invocation",
+            "complete-invocation-and-shared-projection-on-an-evaluation-of-its-own-before-interval",
+            "entry-slices-copied-after-end-read-or-resolver-defect",
+        )
+    }
+
+    fn of(
+        prepared: &PreparedEvidence,
+        scope: &str,
+        prerequisites: &str,
+        structural_preparation: &str,
+        ordinary_output: &str,
+    ) -> Self {
         Self {
-            scope: "the-shared-domain-of-one-file-entry-invocation".into(),
+            scope: scope.into(),
             entry_kind: "file".into(),
             specifications:
                 "fixture-active-profile-specification-and-every-slot-asserting-what-it-supports"
@@ -357,11 +417,10 @@ impl InputFacts {
             verification: "fixture-owned-verification-input-pinning-the-selected-policy".into(),
             canonicalization: "finite-fixture-provider-under-its-own-pins".into(),
             submitted_members: Quantity::new(count(prepared.collection.members().len())),
-            prerequisites: "every-evaluation-phase-of-the-invocation".into(),
+            prerequisites: prerequisites.into(),
             input_storage: "borrowed-evaluation-and-invocation-state-over-resident-inputs".into(),
-            structural_preparation:
-                "complete-invocation-on-an-evaluation-of-its-own-before-interval".into(),
-            ordinary_output: "shared-slices-copied-after-end-read-or-resolver-defect".into(),
+            structural_preparation: structural_preparation.into(),
+            ordinary_output: ordinary_output.into(),
         }
     }
 }
@@ -369,8 +428,12 @@ impl InputFacts {
 /// A resolver defect is no blocked outcome: the case fails rather than
 /// completing as an expected failure. Logical work uses this screen.
 pub(super) fn require_observable(resolved: &Resolved) -> Result<&Retained, OutputFailure> {
-    resolved
-        .result
+    observable(&resolved.result)
+}
+
+/// What a stage committed, or the failure a resolver defect is.
+fn observable(result: &Result<Retained, ResolverInvariant>) -> Result<&Retained, OutputFailure> {
+    result
         .as_ref()
         .map_err(|_| OutputFailure::EvidenceMaterializationInvariant)
 }
@@ -392,15 +455,27 @@ fn unit(
 }
 
 /// The Shared semantic output, framed in its own checksum domain; the stage
-/// has no entry-specific Evidence (D15:2794): each committed slice's owner,
-/// candidate counts, and records in order, and how the domain was exhausted,
-/// if it was.
+/// has no entry-specific Evidence (D15:2794).
 pub(super) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure> {
     let retained = require_observable(resolved)?;
     let mut frame = Frame::new("shared-evidence");
+    domain(&mut frame, resolved.specification, retained)?;
+    Ok(Observation {
+        shared: frame.finish(),
+        entry: None,
+    })
+}
+
+/// What a domain committed: each committed slice's owner, candidate counts,
+/// and records in order, and how the domain was exhausted, if it was.
+fn domain(
+    frame: &mut Frame,
+    specification: Specification<'_>,
+    retained: &Retained,
+) -> Result<(), OutputFailure> {
     frame.uint(count(retained.slices.len()));
     for slice in &retained.slices {
-        unit(&mut frame, resolved.specification, &slice.unit)?;
+        unit(frame, specification, &slice.unit)?;
         let candidates = &slice.candidates;
         frame.uint(candidates.findings);
         frame.uint(candidates.related);
@@ -418,7 +493,7 @@ pub(super) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure>
     }
     frame.flag(retained.exhausted.is_some());
     if let Some((cursor, bound)) = &retained.exhausted {
-        unit(&mut frame, resolved.specification, cursor)?;
+        unit(frame, specification, cursor)?;
         match bound {
             ExhaustedBound::Domain(id) => {
                 frame.uint(0);
@@ -432,10 +507,7 @@ pub(super) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure>
             }
         }
     }
-    Ok(Observation {
-        shared: frame.finish(),
-        entry: None,
-    })
+    Ok(())
 }
 
 #[cfg(test)]
@@ -444,7 +516,7 @@ mod tests {
     use crate::benchmark::cases::evidence_limits;
     use crate::benchmark::cases::prepare::prepare;
     use crate::benchmark::cases::{declarations, EvidenceRecipe as R, Recipe};
-    use crate::benchmark::operation::Prepared;
+    use crate::benchmark::operation::{Operation, Prepared};
     use crate::input_limits::Bound;
     use crate::resolver::capability::EvidenceMetadataLimits;
     use crate::resolver::evidence_metadata::fixtures::{unbounded, with};
@@ -457,7 +529,11 @@ mod tests {
     fn prepared(recipe: R) -> PreparedEvidence {
         let declaration = declarations()
             .into_iter()
-            .find(|case| case.fixture == Recipe::Evidence(recipe) && case.limit.is_none())
+            .find(|case| {
+                case.operation == Operation::SharedEvidence
+                    && case.fixture == Recipe::Evidence(recipe)
+                    && case.limit.is_none()
+            })
             .unwrap();
         let Prepared::SharedEvidence(prepared) = prepare(&declaration).unwrap().prepared else {
             unreachable!()
@@ -519,7 +595,7 @@ mod tests {
     /// projection, which finalization only orders (D15:2143).
     #[test]
     fn the_stage_commits_the_records_of_the_shared_projection() {
-        for recipe in R::ALL {
+        for recipe in R::VALUED {
             let prepared = prepared(recipe);
             let invocation = prepared.invocation();
             let mut evaluation = Evaluation::default();
@@ -555,7 +631,7 @@ mod tests {
 
     /// The capability over `evidence_limits`, but `tight` at its limit, with
     /// `metadata` for its `evidenceMetadata` bounds.
-    fn capability(
+    pub(super) fn capability(
         tight: Option<(BoundId, u64)>,
         metadata: EvidenceMetadataLimits,
     ) -> ImplementationCapability {
@@ -607,6 +683,40 @@ mod tests {
         }
     }
 
+    /// Each count of the Shared scope is what its bound counts: at the count
+    /// the Shared domain is not exhausted, and one under it it is, naming the
+    /// bound (D15:1851). A count of 0 has no bound under it.
+    #[test]
+    fn the_shared_scope_work_is_what_its_bounds_count() {
+        let scope = prepared(R::Storefront).resolve_shared().unwrap().scope;
+        for (bound, counted) in [
+            (MetadataBound::SubjectOccurrences, scope.subject_occurrences),
+            (MetadataBound::TokenInputs, scope.token_inputs),
+            (
+                MetadataBound::CollisionComparisons,
+                scope.collision_comparisons,
+            ),
+            (MetadataBound::MetadataWorkUnits, scope.metadata_work_units),
+        ] {
+            if counted == 0 {
+                assert_eq!(bound, MetadataBound::CollisionComparisons);
+                continue;
+            }
+            let exhausted = |limit| {
+                let mut prepared = prepared(R::Storefront);
+                prepared.capability = capability(None, with(bound, limit));
+                let retained = prepared.resolve_shared().unwrap().result.unwrap();
+                retained.exhausted.map(|(_, bound)| bound)
+            };
+            assert_eq!(exhausted(counted), None, "{bound:?}");
+            assert_eq!(
+                exhausted(counted - 1),
+                Some(ExhaustedBound::Capability(bound.id())),
+                "{bound:?}"
+            );
+        }
+    }
+
     /// How a domain was exhausted is observed whole, apart from a domain
     /// committed whole: the cursor, the bound's group and name, and whether
     /// it is a bound of the domain or of the capability.
@@ -652,7 +762,7 @@ mod tests {
     #[test]
     fn every_recipe_has_its_own_shared_observation_and_no_entry_domain() {
         let mut seen = Vec::new();
-        for recipe in R::ALL {
+        for recipe in R::VALUED {
             let resolved = prepared(recipe).resolve_shared().unwrap();
             let observation = observe(&resolved).unwrap();
             assert_eq!(observation, observe(&resolved).unwrap());
