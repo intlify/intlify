@@ -145,12 +145,14 @@ pub(crate) enum Record<'e> {
     EntryDependency(EntryDependency),
 }
 
-/// A retained record, of its record kind, with `C` of its accounting view
+/// A retained record, of its record kind, with its view and the length of
+/// `C` of its accounting view, `{ owner, record: { <record kind>: view } }`
 /// (D15:2518).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Retained<'e> {
     pub(crate) kind: RecordKind,
     pub(crate) record: Record<'e>,
+    pub(crate) view: Value,
     pub(crate) bytes: u64,
 }
 
@@ -619,10 +621,11 @@ impl<'e, 's> Reporting<'e, 's> {
         record: Record<'e>,
         view: Value,
     ) -> Result<Retained<'e>, ReportingInvariant> {
-        let accounting = self.views.accounting(owner, kind, view)?;
+        let accounting = self.views.accounting(owner, kind, view.clone())?;
         Ok(Retained {
             kind,
             record,
+            view,
             bytes: bytes(&accounting),
         })
     }
