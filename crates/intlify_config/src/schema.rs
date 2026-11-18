@@ -73,9 +73,11 @@ pub fn draft7_schema<T: JsonSchema>() -> Result<Value, serde_json::Error> {
     Ok(value)
 }
 
-/// Each member path of `value` under `start`, with array positions folded into
-/// `*`, and where it first occurs: the holding object's pointer and the
-/// member's name.
+/// Each member path of `value` under `start`, and where it first occurs: the
+/// holding object's pointer and the member's name. The positions of an array
+/// whose items all have the same member paths fold into `*`; an array whose
+/// items differ, such as an inventory with an entry of its own kind at each
+/// position, keeps every position apart.
 #[cfg(all(test, feature = "benchmark"))]
 pub(crate) fn member_paths(
     value: &Value,
@@ -95,9 +97,21 @@ pub(crate) fn member_paths(
                     pending.push((format!("{pointer}/{step}"), path));
                 }
             }
-            Some(Value::Array(items)) => pending.extend(
-                (0..items.len()).map(|index| (format!("{pointer}/{index}"), format!("{folded}/*"))),
-            ),
+            Some(Value::Array(items)) => {
+                let shapes = items
+                    .iter()
+                    .map(|item| member_paths(item, "").into_keys().collect::<Vec<_>>())
+                    .collect::<Vec<_>>();
+                let alike = shapes.windows(2).all(|pair| pair[0] == pair[1]);
+                pending.extend((0..items.len()).map(|index| {
+                    let step = if alike {
+                        "*".to_owned()
+                    } else {
+                        index.to_string()
+                    };
+                    (format!("{pointer}/{index}"), format!("{folded}/{step}"))
+                }));
+            }
             _ => {}
         }
     }
@@ -242,6 +256,29 @@ mod tests {
         assert_eq!(
             schema["properties"]["nullable"]["type"],
             json!(["string", "null"])
+        );
+    }
+
+    /// The positions of an array fold together only when its items have the
+    /// same member paths, so each position of an inventory whose entries are
+    /// of different kinds is tried apart.
+    #[cfg(feature = "benchmark")]
+    #[test]
+    fn only_the_positions_of_items_alike_are_folded() {
+        let paths = |value: &Value| member_paths(value, "").into_keys().collect::<Vec<_>>();
+        assert_eq!(
+            paths(&json!({"list": [{"a": 1}, {"a": 2}]})),
+            ["/list", "/list/*/a"]
+        );
+        assert_eq!(
+            paths(&json!({"fields": [{"value": {"commit": null}}, {"value": {"identity": "x"}}]})),
+            [
+                "/fields",
+                "/fields/0/value",
+                "/fields/0/value/commit",
+                "/fields/1/value",
+                "/fields/1/value/identity"
+            ]
         );
     }
 

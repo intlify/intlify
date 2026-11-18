@@ -350,28 +350,33 @@ fn complete_schemas_are_fresh_and_agree_with_the_independent_draft7_oracle() {
     }
 
     // The evidence decoder requires a member, null included, exactly when the
-    // schema does. A member path is left out where it first occurs, so a case
-    // whose paths all occur in an earlier case adds only bytes to every try.
+    // schema does. Each case is tried in a record of its own, so every try
+    // decodes and validates one case, and a case whose member paths all occur
+    // in an earlier one adds nothing to try. The first also has every member
+    // outside the cases tried.
     let oracle =
         jsonschema::draft7::new(&schema::measurement_evidence_set_schema().unwrap()).unwrap();
     let mut evidence = value(artifacts.evidence.as_ref().unwrap());
-    let mut seen = std::collections::BTreeSet::new();
-    evidence["body"]["cases"]
-        .as_array_mut()
-        .unwrap()
-        .retain(|case| {
-            let paths = schema::member_paths(case, "")
-                .into_keys()
-                .collect::<Vec<_>>();
-            let adds = paths.iter().any(|path| !seen.contains(path));
-            seen.extend(paths);
-            adds
-        });
+    let cases = std::mem::take(evidence["body"]["cases"].as_array_mut().unwrap());
     let decodes = |left_out| serde_json::from_value::<measurement::Evidence>(left_out).is_ok();
-    assert_eq!(
-        schema::omission_disagreements(&evidence, "", &oracle, decodes),
-        Vec::<String>::new()
-    );
+    let mut seen = std::collections::BTreeSet::new();
+    let mut disagreements = Vec::new();
+    for case in cases {
+        let paths = schema::member_paths(&case, "")
+            .into_keys()
+            .collect::<Vec<_>>();
+        if paths.iter().all(|path| seen.contains(path)) {
+            continue;
+        }
+        let start = if seen.is_empty() { "" } else { "/body/cases/0" };
+        seen.extend(paths);
+        let mut alone = evidence.clone();
+        alone["body"]["cases"] = Value::Array(vec![case]);
+        disagreements.extend(schema::omission_disagreements(
+            &alone, start, &oracle, decodes,
+        ));
+    }
+    assert_eq!(disagreements, Vec::<String>::new());
 }
 
 #[test]
