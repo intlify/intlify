@@ -486,7 +486,7 @@ fn first_over<const N: usize>(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::collections::BTreeSet;
     use std::sync::Arc;
 
@@ -518,7 +518,7 @@ mod tests {
 
     use super::{report, Committed, Exhausted, Reported};
 
-    const PROFILE: Specification<'static> = Specification {
+    pub(crate) const PROFILE: Specification<'static> = Specification {
         identity: "intlify-project-profile",
         revision: "0",
     };
@@ -531,7 +531,7 @@ mod tests {
     ];
 
     /// Every diagnostic bound at its largest value, but `bound` at `limit`.
-    fn limits_with(bound: Option<(BoundId, u64)>) -> DiagnosticsLimits {
+    pub(crate) fn limits_with(bound: Option<(BoundId, u64)>) -> DiagnosticsLimits {
         limits_of(bound.as_slice())
     }
 
@@ -703,7 +703,7 @@ mod tests {
     /// occurrences each relating the other members of its name, and the
     /// root-value bounds waiting on both, with no Shared projection
     /// (D15:802, 2149, 2369).
-    fn entered() -> (Evaluation, Causes) {
+    pub(crate) fn entered() -> (Evaluation, Causes) {
         let fixture = FileFixture::new(&fixture_limits(100));
         let mut evaluation = Evaluation::default();
         let file = fixture.file(Arc::from(&br#"{"a":1,"a":2,"a":3,"b":1e400}"#[..]));
@@ -717,7 +717,7 @@ mod tests {
     /// the project's that their Target Profiles have no direction for, and
     /// whose coverage rule names a surface class outside the vocabulary, so
     /// the decision table and the `targets` group's owner wait.
-    fn failing() -> Inputs {
+    pub(crate) fn failing() -> Inputs {
         let mut inputs = Inputs::complete();
         for target in ["browser", "server"] {
             inputs.declaration()["targetProfiles"][target]["requestedLocales"] =
