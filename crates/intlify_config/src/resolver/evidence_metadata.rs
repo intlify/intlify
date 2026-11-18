@@ -28,16 +28,18 @@
 //! comparisons, and metadata work units, so no token of a scope is generated
 //! past its token inputs' bound.
 //!
-//! A subject occurrence is a raw candidate the evaluation recorded, before
-//! its logical subject is deduplicated. A token input is the subject of a
-//! recorded unit, one for each unit, or a redacted component of an admitted
-//! candidate's Evidence. A collision comparison is one pair of a colliding set
-//! of subject or evidence token records. A metadata work unit is one source
-//! identity, locator, Logical input path or value locator, selector, or
-//! component path that an admitted candidate's Evidence carries, or one token
-//! record (plan 025 interpretation #239). The diagnostic domain's subject
-//! token, which only the reserved terminal records name, is outside the
-//! counts (plan 025 interpretation #237).
+//! A subject occurrence is a raw candidate the evaluation recorded, before its
+//! logical subject is deduplicated. A token input is the subject of a recorded
+//! unit, one for each unit, or a redacted component of an admitted candidate's
+//! Evidence or of an entry dependency record, whose tokens share Evidence's
+//! colliding sets (D15:2194; plan 025 interpretation #245). A collision
+//! comparison is one pair of a colliding set of subject or evidence token
+//! records. A metadata work unit is one source identity, locator, Logical
+//! input path or value locator, selector, or component path that an admitted
+//! candidate's Evidence or an entry dependency record carries, or one token
+//! record (D15:1851; plan 025 interpretation #239). The diagnostic domain's
+//! subject token, which only the reserved terminal records name, is outside
+//! the counts (plan 025 interpretation #237).
 
 use std::iter::once;
 
@@ -45,6 +47,7 @@ use crate::input_limits::Bound;
 
 use super::capability::{BootstrapBoundId, BootstrapGroup, EvidenceMetadataLimits};
 use super::decision_evidence::{self, DecisionEvidence};
+use super::dependency::EntryInputs;
 use super::evaluation::{Evaluation, Unit};
 use super::evidence_path::PathSize;
 use super::evidence_token::EvidenceTokens;
@@ -219,14 +222,16 @@ impl Admission {
 }
 
 /// Admits the Evidence of `evaluation`'s candidates under the path bounds of
-/// `limits`, and checks the Evidence metadata work of the complete invocation
-/// and of its Shared scope against the four counts, assigning under `digest`
-/// a scope's tokens only once its token inputs are within their bound. The
-/// subjects of the units that report into the Shared domain have colliding
-/// sets of their own, so the Shared scope's tokens are the invocation's
-/// (D15:1851, 2194; plan 025 decisions #171 and #247).
+/// `limits`, and checks the Evidence metadata work of the complete invocation,
+/// which holds that of the entry dependency records `entry` names, and of its
+/// Shared scope against the four counts, assigning under `digest` a scope's
+/// tokens only once its token inputs are within their bound. The subjects of
+/// the units that report into the Shared domain have colliding sets of their
+/// own, so the Shared scope's tokens are the invocation's (D15:1851, 2194;
+/// plan 025 decisions #171 and #247, interpretation #245).
 pub(crate) fn admit(
     evaluation: &Evaluation,
+    entry: &EntryInputs,
     specification: Specification<'_>,
     limits: &EvidenceMetadataLimits,
     digest: &impl Digest,
@@ -262,6 +267,7 @@ pub(crate) fn admit(
             .holds(limits, Tally::of(evaluation.candidates().count()))?;
         let components = occurrence::redacted(&occurrences)
             .chain(decision_evidence::redacted(&decisions))
+            .chain(entry.redacted())
             .count();
         MetadataBound::TokenInputs.holds(
             limits,
@@ -299,7 +305,9 @@ pub(crate) fn admit(
         ));
         let evidence = EvidenceTokens::assign(
             specification,
-            occurrence::redacted(&occurrences).chain(decision_evidence::redacted(&decisions)),
+            occurrence::redacted(&occurrences)
+                .chain(decision_evidence::redacted(&decisions))
+                .chain(entry.redacted()),
             digest,
         );
         MetadataBound::CollisionComparisons.holds(
@@ -310,7 +318,8 @@ pub(crate) fn admit(
             .iter()
             .flat_map(|candidate| once(&candidate.primary).chain(&candidate.related))
             .chain(decisions.iter().map(|candidate| &candidate.evidence))
-            .map(|projection| Tally::exactly(projection.work()));
+            .map(|projection| Tally::exactly(projection.work()))
+            .chain(once(Tally::exactly(entry.work())));
         MetadataBound::MetadataWorkUnits.holds(
             limits,
             total(projections.chain([subjects.records(), evidence.records()].map(Tally::exactly))),
@@ -385,6 +394,8 @@ mod tests {
     use crate::boundary::source::{file_source_revision, read_pair, SourceLimits};
     use crate::input_limits::Bound;
     use crate::resolver::capability::{BootstrapGroup, BootstrapLimits, EvidenceMetadataLimits};
+    use crate::resolver::dependency::fixtures::{file_entry, redacted_entry};
+    use crate::resolver::dependency::EntryInputs;
     use crate::resolver::evaluation::{
         Blocking, Check, Code, Evaluation, Found, Observation, Phase, Subject, Unit,
     };
@@ -578,13 +589,27 @@ mod tests {
             assert_eq!(admitted(evaluation, &with(bound, largest)), Ok(candidates));
             assert_eq!(admitted(evaluation, &with(bound, largest - 1)), Err(bound));
             assert_eq!(
-                admit(evaluation, PROFILE, &with(bound, largest), &Sha256).exceeded(),
+                admit(
+                    evaluation,
+                    file_entry(),
+                    PROFILE,
+                    &with(bound, largest),
+                    &Sha256
+                )
+                .exceeded(),
                 Exceeded::default()
             );
             // Only the Entry domain's records carry Evidence (plan 025
             // decision #247).
             assert_eq!(
-                admit(evaluation, PROFILE, &with(bound, largest - 1), &Sha256).exceeded(),
+                admit(
+                    evaluation,
+                    file_entry(),
+                    PROFILE,
+                    &with(bound, largest - 1),
+                    &Sha256
+                )
+                .exceeded(),
                 Exceeded {
                     entry: Some(bound),
                     shared: None,
@@ -622,7 +647,11 @@ mod tests {
 
     /// What each count of `evaluation` is under `digest`, as 015's table
     /// counts it, with nothing past a path bound.
-    fn counts(evaluation: &Evaluation, digest: &impl Digest) -> [(MetadataBound, u64); 4] {
+    fn counts(
+        evaluation: &Evaluation,
+        entry: &EntryInputs,
+        digest: &impl Digest,
+    ) -> [(MetadataBound, u64); 4] {
         let subjects = Tokens::assign(
             PROFILE,
             evaluation.statuses().map(|(unit, _)| &unit.subject),
@@ -630,13 +659,15 @@ mod tests {
         );
         let components: Vec<_> = occurrence::redacted(evaluation.occurrence_candidates())
             .chain(decision_evidence::redacted(evaluation.decision_evidence()))
+            .chain(entry.redacted())
             .collect();
         let inputs = evaluation.statuses().count() + components.len();
         let evidence = EvidenceTokens::assign(PROFILE, components, digest);
         let projected: u64 = projections(evaluation)
             .into_iter()
             .map(EvidenceProjection::work)
-            .sum();
+            .sum::<u64>()
+            + entry.work();
         [
             (
                 MetadataBound::SubjectOccurrences,
@@ -689,13 +720,22 @@ mod tests {
     /// every record of a kind collide so the comparisons count too
     /// (D15:1836-1839, 1851; plan 025 decision #247, interpretation #239).
     fn each_count_passes_exactly_and_names_itself_one_over(evaluation: &Evaluation) {
+        let redacted = redacted_entry();
         assert_eq!(
-            admit(evaluation, PROFILE, &unbounded(), &Sha256).exceeded(),
+            admit(evaluation, &redacted, PROFILE, &unbounded(), &Sha256).exceeded(),
             Exceeded::default()
         );
-        let exceeded =
-            |bound, limit| admit(evaluation, PROFILE, &with(bound, limit), &Constant).exceeded();
-        let scopes: Vec<(MetadataBound, u64, u64)> = counts(evaluation, &Constant)
+        let exceeded = |bound, limit| {
+            admit(
+                evaluation,
+                &redacted,
+                PROFILE,
+                &with(bound, limit),
+                &Constant,
+            )
+            .exceeded()
+        };
+        let scopes: Vec<(MetadataBound, u64, u64)> = counts(evaluation, &redacted, &Constant)
             .into_iter()
             .zip(shared_counts(evaluation, &Constant))
             .map(|((bound, count), (_, shared))| (bound, count, shared))
@@ -771,7 +811,7 @@ mod tests {
                 ),
             ] {
                 assert_eq!(
-                    admit(&evaluation, PROFILE, &limits, &Sha256).exceeded(),
+                    admit(&evaluation, file_entry(), PROFILE, &limits, &Sha256).exceeded(),
                     Exceeded {
                         entry: Some(MetadataBound::LogicalPathSegments),
                         shared: Some(shared),
@@ -883,5 +923,40 @@ mod tests {
         let evidence = EvidenceTokens::assign(PROFILE, components, &Constant);
         assert_eq!((evidence.records(), evidence.comparisons()), (2, 1));
         each_count_passes_exactly_and_names_itself_one_over(&evaluation);
+    }
+
+    /// A file entry's redacted source identity and selector are two token
+    /// inputs, and their projections, the locator among them, and their two
+    /// token records are work, whatever the rest of the invocation counts.
+    /// They are Entry records, so past a bound only for them only the Entry
+    /// domain is exhausted (D15:1837, 1839, 1851; plan 025 decision #247,
+    /// interpretation #245).
+    #[test]
+    fn the_entry_dependencies_count_as_token_inputs_and_work() {
+        let entry = redacted_entry();
+        Inputs::complete().resolve(|evaluation, _| {
+            let [_, (_, plain_inputs), _, (_, plain_work)] =
+                counts(&evaluation, file_entry(), &Sha256);
+            let [_, (_, inputs), _, (_, work)] = counts(&evaluation, &entry, &Sha256);
+            assert_eq!(inputs, plain_inputs + 2);
+            assert_eq!(work, plain_work + 1 + 2);
+            for (bound, count) in [
+                (MetadataBound::TokenInputs, inputs),
+                (MetadataBound::MetadataWorkUnits, work),
+            ] {
+                let exceeded = |limit| {
+                    admit(&evaluation, &entry, PROFILE, &with(bound, limit), &Sha256).exceeded()
+                };
+                assert_eq!(exceeded(count), Exceeded::default(), "{bound:?}");
+                assert_eq!(
+                    exceeded(count - 1),
+                    Exceeded {
+                        entry: Some(bound),
+                        shared: None,
+                    },
+                    "{bound:?}"
+                );
+            }
+        });
     }
 }

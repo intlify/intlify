@@ -495,6 +495,7 @@ mod tests {
     use crate::artifacts::count;
     use crate::input_limits::Bound;
     use crate::materialize_tests::limits;
+    use crate::resolver::dependency::fixtures::file_entry;
     use crate::resolver::entry::admit_entry;
     use crate::resolver::entry::fixtures::FileFixture;
     use crate::resolver::evaluation::{
@@ -730,14 +731,26 @@ mod tests {
     #[test]
     fn each_entry_bound_passes_exactly_and_refuses_one_over() {
         let (evaluation, causes) = entered();
-        let reporting = Reporting::new(&evaluation, PROFILE, Some(&causes), &unbounded(), &Sha256);
+        let reporting = Reporting::new(
+            &evaluation,
+            PROFILE,
+            (Some(&causes), file_entry()),
+            &unbounded(),
+            &Sha256,
+        );
         exactly_and_one_over(&reporting, ReportingDomain::Entry);
     }
 
     #[test]
     fn each_shared_bound_passes_exactly_and_refuses_one_over() {
         failing().resolve(|evaluation, _| {
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
+            let reporting = Reporting::new(
+                &evaluation,
+                PROFILE,
+                (None, file_entry()),
+                &unbounded(),
+                &Sha256,
+            );
             exactly_and_one_over(&reporting, ReportingDomain::Shared);
         });
     }
@@ -749,7 +762,13 @@ mod tests {
     #[test]
     fn unbounded_domains_commit_every_slice_and_index_each_evidence_once() {
         failing().resolve(|evaluation, _| {
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
+            let reporting = Reporting::new(
+                &evaluation,
+                PROFILE,
+                (None, file_entry()),
+                &unbounded(),
+                &Sha256,
+            );
             let reported = report(&reporting, &limits_with(None), None).unwrap();
             let slices = reporting.slices().unwrap();
             for domain in [ReportingDomain::Entry, ReportingDomain::Shared] {
@@ -800,7 +819,13 @@ mod tests {
     #[test]
     fn a_refused_slice_names_the_first_bound_of_the_stage_that_refused_it() {
         let (evaluation, causes) = entered();
-        let reporting = Reporting::new(&evaluation, PROFILE, Some(&causes), &unbounded(), &Sha256);
+        let reporting = Reporting::new(
+            &evaluation,
+            PROFILE,
+            (Some(&causes), file_entry()),
+            &unbounded(),
+            &Sha256,
+        );
         let all = report(&reporting, &limits_with(None), None)
             .unwrap()
             .entry
@@ -861,7 +886,13 @@ mod tests {
     #[test]
     fn an_exhausted_domain_reports_its_terminal_finding_and_state() {
         failing().resolve(|evaluation, _| {
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
+            let reporting = Reporting::new(
+                &evaluation,
+                PROFILE,
+                (None, file_entry()),
+                &unbounded(),
+                &Sha256,
+            );
             let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
             let records = |domain| BoundId {
                 group: match domain {
@@ -930,7 +961,8 @@ mod tests {
                 MetadataBound::MetadataWorkUnits,
             ] {
                 let limits = with(bound, 1);
-                let reporting = Reporting::new(&evaluation, PROFILE, None, &limits, &Sha256);
+                let reporting =
+                    Reporting::new(&evaluation, PROFILE, (None, file_entry()), &limits, &Sha256);
                 let reported = report(&reporting, &limits_with(None), None).unwrap();
                 let exhausted = ExhaustedBound::Capability(bound.id());
                 for domain in [ReportingDomain::Entry, ReportingDomain::Shared] {
@@ -1017,7 +1049,13 @@ mod tests {
     fn past_only_an_invocation_bound_only_the_entry_domain_is_exhausted() {
         failing().resolve(|evaluation, _| {
             let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
-            let within = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
+            let within = Reporting::new(
+                &evaluation,
+                PROFILE,
+                (None, file_entry()),
+                &unbounded(),
+                &Sha256,
+            );
             let within = report(&within, &limits_with(None), None).unwrap().shared;
             assert!(!within.slices.is_empty());
             let mut bounds = vec![(MetadataBound::LogicalPathSegments, 1)];
@@ -1028,7 +1066,8 @@ mod tests {
             );
             for (bound, limit) in bounds {
                 let limits = with(bound, limit);
-                let reporting = Reporting::new(&evaluation, PROFILE, None, &limits, &Sha256);
+                let reporting =
+                    Reporting::new(&evaluation, PROFILE, (None, file_entry()), &limits, &Sha256);
                 assert_eq!(
                     reporting.exceeded(ReportingDomain::Entry),
                     Some(bound),
@@ -1069,7 +1108,13 @@ mod tests {
     fn without_a_shared_unit_a_count_past_its_bound_exhausts_only_the_entry_domain() {
         let (evaluation, causes) = entered();
         let limits = with(MetadataBound::SubjectOccurrences, 1);
-        let reporting = Reporting::new(&evaluation, PROFILE, Some(&causes), &limits, &Sha256);
+        let reporting = Reporting::new(
+            &evaluation,
+            PROFILE,
+            (Some(&causes), file_entry()),
+            &limits,
+            &Sha256,
+        );
         let reported = report(&reporting, &limits_with(None), None).unwrap();
         let first = evaluation.statuses().next().unwrap().0;
         assert_eq!(reported.entry.exhausted.map(|at| at.cursor), Some(first));
@@ -1089,7 +1134,13 @@ mod tests {
     fn a_logical_input_path_past_a_path_bound_is_absent_and_reporting_goes_on() {
         let (evaluation, causes) = entered();
         let paths = |limits: &EvidenceMetadataLimits| -> Vec<serde_json::Value> {
-            let reporting = Reporting::new(&evaluation, PROFILE, Some(&causes), limits, &Sha256);
+            let reporting = Reporting::new(
+                &evaluation,
+                PROFILE,
+                (Some(&causes), file_entry()),
+                limits,
+                &Sha256,
+            );
             assert_eq!(reporting.exceeded(ReportingDomain::Entry), None);
             report(&reporting, &limits_with(None), None)
                 .unwrap()
@@ -1130,7 +1181,13 @@ mod tests {
     #[test]
     fn the_admitted_policy_recounts_what_was_committed_before_it() {
         failing().resolve(|evaluation, _| {
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
+            let reporting = Reporting::new(
+                &evaluation,
+                PROFILE,
+                (None, file_entry()),
+                &unbounded(),
+                &Sha256,
+            );
             let generous = limits_of(&[]);
             let unbounded = report(&reporting, &generous, None).unwrap();
             let all = &unbounded.shared.slices;
@@ -1182,7 +1239,13 @@ mod tests {
     #[test]
     fn the_admitting_units_own_slice_is_planned_under_the_policy() {
         failing().resolve(|evaluation, _| {
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
+            let reporting = Reporting::new(
+                &evaluation,
+                PROFILE,
+                (None, file_entry()),
+                &unbounded(),
+                &Sha256,
+            );
             let unbounded = report(&reporting, &limits_of(&[]), None).unwrap();
             let all = &unbounded.shared.slices;
             let at = all
@@ -1225,7 +1288,13 @@ mod tests {
     #[test]
     fn a_domain_exhausted_before_the_admission_ends_no_later_after_the_recount() {
         failing().resolve(|evaluation, _| {
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
+            let reporting = Reporting::new(
+                &evaluation,
+                PROFILE,
+                (None, file_entry()),
+                &unbounded(),
+                &Sha256,
+            );
             let unbounded = report(&reporting, &limits_of(&[]), None).unwrap();
             let all = &unbounded.shared.slices;
             let before = all
@@ -1272,7 +1341,13 @@ mod tests {
     #[test]
     fn a_domain_with_no_slice_after_the_admission_recounts_at_its_end() {
         let (evaluation, causes) = entered();
-        let reporting = Reporting::new(&evaluation, PROFILE, Some(&causes), &unbounded(), &Sha256);
+        let reporting = Reporting::new(
+            &evaluation,
+            PROFILE,
+            (Some(&causes), file_entry()),
+            &unbounded(),
+            &Sha256,
+        );
         let generous = limits_of(&[]);
         let all = report(&reporting, &generous, None).unwrap().entry.slices;
         assert!(all.iter().all(|slice| *slice.unit < admission()));

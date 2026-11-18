@@ -18,15 +18,44 @@
 //! semantic inputs, never a slot that only decides whether the group is
 //! established, which a materialized dependency records (D15:2516; plan 025
 //! decisions #241 and #242).
+//!
+//! The materialized and entry dependencies' owners wait on nothing, so each is
+//! evaluated whenever its phase runs. `structural-admission` runs only on a
+//! materialized value, and the Resolver Invocation Input Set exists only after
+//! every required component succeeds, so every common and materialized slot is
+//! established then and its owner names all eight; a file entry's
+//! `entry-source`, `profile-selector`, and `origins` are established whenever
+//! `entry-admission` runs (D15:1174, 2516, 3159; plan 025 interpretation
+//! #246). A file entry's dependencies name its source's identity as Evidence
+//! projects it, the Source-content revision its bytes derive, and its locator
+//! when present; the selector under the final projection authority; and the
+//! Safe Origin Kind each common and entry input's slot fixes (D15:701-712,
+//! 743, 2516). An owner's records take its slots' vocabulary order (D15:2143,
+//! 2507; plan 025 interpretation #244).
+
+use std::sync::Arc;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
+use crate::boundary::locator::Locator;
+use crate::boundary::source::file_source_revision;
+use crate::input_limits::Bound;
+use crate::model::ProfileId;
+use crate::structural::selection::SelectorInput;
+
+use super::entry::{EntryFile, SELECTOR_ORIGIN};
 use super::evaluation::{
     Admitted, Blocking, Check, Evaluation, EvaluationInvariant, Subject, Unit,
 };
+use super::evidence::EvidenceInvariant;
+use super::evidence_selector::{SelectorEvidence, SelectorProjection};
+use super::evidence_source::{PortableSourceIdentity, SourceIdentity};
+use super::evidence_token::{EvidenceTokens, Redacted};
+use super::origin::SafeOriginKind;
 use super::resource_policy::PolicySlot;
+use super::token::Specification;
 
 /// One semantic group of the profile view, in the order of 015's semantic
 /// inventory. It reads and writes as its semantic group ID.
@@ -153,6 +182,41 @@ impl MaterializedSlot {
         Self::ConfigurationValue,
         Self::ProfileSelector,
     ];
+
+    /// The slot's ID (D15:2507).
+    pub(crate) const fn id(self) -> &'static str {
+        match self {
+            Self::SpecificationInput => "specification-input",
+            Self::IntentSurfaceClassVocabulary => "intent-surface-class-vocabulary",
+            Self::LocaleCanonicalizationData => "locale-canonicalization-data",
+            Self::ArtifactCollection => "artifact-collection",
+            Self::VerificationInput => "verification-input",
+            Self::ImplementationCapability => "implementation-capability",
+            Self::ConfigurationValue => "configuration-value",
+            Self::ProfileSelector => "profile-selector",
+        }
+    }
+
+    /// The view of the slot's materialized dependency, `{ slot }` (D15:2511).
+    pub(crate) fn view(self) -> Value {
+        json!({ "slot": self.id() })
+    }
+
+    /// The Safe Origin Kind of a common slot, which every entry fixes alike,
+    /// or none for a materialized slot, whose origin depends on the entry.
+    const fn common_origin(self) -> Option<SafeOriginKind> {
+        match self {
+            Self::SpecificationInput => Some(SafeOriginKind::ProfileResolutionSpecificationInput),
+            Self::IntentSurfaceClassVocabulary => {
+                Some(SafeOriginKind::IntentSurfaceClassVocabulary)
+            }
+            Self::LocaleCanonicalizationData => Some(SafeOriginKind::LocaleCanonicalizationData),
+            Self::ArtifactCollection => Some(SafeOriginKind::ProfileResolutionArtifactCollection),
+            Self::VerificationInput => Some(SafeOriginKind::ResourceLimitPolicyVerification),
+            Self::ImplementationCapability => Some(SafeOriginKind::ImplementationCapability),
+            Self::ConfigurationValue | Self::ProfileSelector => None,
+        }
+    }
 }
 
 /// An entry input slot, which an entry dependency names. Each reads and
@@ -176,6 +240,159 @@ impl EntrySlot {
         Self::ProfileSelector,
         Self::Origins,
     ];
+
+    /// The slot's ID (D15:2507).
+    pub(crate) const fn id(self) -> &'static str {
+        match self {
+            Self::EntrySource => "entry-source",
+            Self::CallSiteSource => "call-site-source",
+            Self::ProfileSelector => "profile-selector",
+            Self::Origins => "origins",
+        }
+    }
+}
+
+/// What a file entry's dependency records name besides their slots: its
+/// source's identity as Evidence projects it, the Source-content revision of
+/// its bytes, its locator when present, and the selector as the final
+/// authority projects it (D15:2512, 2516).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct EntryInputs {
+    source: SourceIdentity,
+    revision: Arc<str>,
+    locator: Option<Locator>,
+    selector: SelectorProjection,
+}
+
+impl EntryInputs {
+    /// The inputs of the file entry `file`, whose selector `selector` the
+    /// final projection authority `authority` projects beside the
+    /// independently admitted declared Profile IDs `declared` (D15:806-819).
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug that leaves the source identity or the
+    /// selector without a projection.
+    pub(crate) fn file<'d>(
+        file: &EntryFile<'_>,
+        selector: &SelectorInput,
+        authority: Bound,
+        declared: impl IntoIterator<Item = &'d ProfileId>,
+    ) -> Result<Self, EvidenceInvariant> {
+        let source = file.source;
+        Ok(Self {
+            source: SourceIdentity::project(
+                SafeOriginKind::ConfigurationFile,
+                source.identity,
+                source.marked,
+            )
+            .map_err(EvidenceInvariant::Token)?,
+            revision: Arc::from(file_source_revision(&file.bytes)),
+            locator: source.locator.cloned(),
+            selector: SelectorProjection::project(SELECTOR_ORIGIN, selector, authority, declared)
+                .map_err(EvidenceInvariant::Selector)?,
+        })
+    }
+
+    /// The components that tokens replace: an unmarked source identity and a
+    /// redacted selector.
+    pub(crate) fn redacted(&self) -> impl Iterator<Item = &Redacted> {
+        self.source
+            .redacted()
+            .into_iter()
+            .chain(self.selector.redacted())
+    }
+
+    /// The metadata work units of the records' projections: one for the
+    /// source identity, one for the locator when present, and one for the
+    /// selector (D15:1839, 1851).
+    pub(crate) fn work(&self) -> u64 {
+        2 + u64::from(self.locator.is_some())
+    }
+
+    /// The entry dependency records, in their slots' order, `None` when
+    /// `tokens` was not assigned one of their components.
+    pub(crate) fn retained(
+        &self,
+        specification: Specification<'_>,
+        tokens: &EvidenceTokens,
+    ) -> Option<[EntryDependency; 3]> {
+        Some([
+            EntryDependency::Source {
+                source: self.source.retained(specification, tokens)?,
+                revision: Arc::clone(&self.revision),
+                locator: self.locator.clone(),
+            },
+            EntryDependency::Selector(self.selector.retained(specification, tokens)?),
+            EntryDependency::Origins,
+        ])
+    }
+}
+
+/// One retained entry dependency record of a file entry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum EntryDependency {
+    Source {
+        source: PortableSourceIdentity,
+        revision: Arc<str>,
+        locator: Option<Locator>,
+    },
+    Selector(SelectorEvidence),
+    Origins,
+}
+
+impl EntryDependency {
+    /// The record's entry slot.
+    pub(crate) const fn slot(&self) -> EntrySlot {
+        match self {
+            Self::Source { .. } => EntrySlot::EntrySource,
+            Self::Selector(_) => EntrySlot::ProfileSelector,
+            Self::Origins => EntrySlot::Origins,
+        }
+    }
+
+    /// `{ slot, source, revision, locator? }`, `{ slot, selector }`, or
+    /// `{ slot, origins }`, where `origins` maps each common and entry input's
+    /// slot ID to the Safe Origin Kind a file entry fixes (D15:2512-2513,
+    /// 2516, 3157).
+    pub(crate) fn view(&self) -> Value {
+        let mut view = Map::new();
+        view.insert("slot".to_owned(), json!(self.slot().id()));
+        match self {
+            Self::Source {
+                source,
+                revision,
+                locator,
+            } => {
+                view.insert("source".to_owned(), source.view());
+                view.insert("revision".to_owned(), json!(revision.as_ref()));
+                if let Some(locator) = locator {
+                    view.insert("locator".to_owned(), locator.view());
+                }
+            }
+            Self::Selector(selector) => {
+                view.insert("selector".to_owned(), selector.view());
+            }
+            Self::Origins => {
+                let mut origins: Map<String, Value> = MaterializedSlot::ALL
+                    .into_iter()
+                    .filter_map(|slot| {
+                        Some((slot.id().to_owned(), json!(slot.common_origin()?.id())))
+                    })
+                    .collect();
+                origins.insert(
+                    EntrySlot::EntrySource.id().to_owned(),
+                    json!(SafeOriginKind::ConfigurationFile.id()),
+                );
+                origins.insert(
+                    EntrySlot::ProfileSelector.id().to_owned(),
+                    json!(SELECTOR_ORIGIN.id()),
+                );
+                view.insert("origins".to_owned(), Value::Object(origins));
+            }
+        }
+        Value::Object(view)
+    }
 }
 
 /// The `policies` slots whose references the `requiredPolicies` group holds.
@@ -215,13 +432,95 @@ pub(crate) fn own(
 }
 
 #[cfg(test)]
+pub(crate) mod fixtures {
+    use std::sync::{Arc, LazyLock};
+
+    use serde_json::json;
+
+    use crate::boundary::locator::{read_file_locator, Locator, LocatorCandidate, LocatorVariant};
+    use crate::input_limits::Bound;
+    use crate::model::ProfileId;
+    use crate::resolver::entry::fixtures::FileFixture;
+    use crate::resolver::entry::EntryFile;
+    use crate::resolver::limits::fixture_limits;
+    use crate::structural::selection::SelectorInput;
+
+    use super::EntryInputs;
+
+    /// The final projection authority of the test entries' selectors.
+    pub(crate) fn authority() -> Bound {
+        Bound::new(64).unwrap()
+    }
+
+    /// `app`, the one declared Profile ID of the test entries.
+    pub(crate) fn declared() -> Vec<ProfileId> {
+        vec![serde_json::from_value(json!("app")).unwrap()]
+    }
+
+    /// The selector `text`, or an absent one, under [`authority`].
+    pub(crate) fn selector(text: Option<&str>) -> SelectorInput {
+        text.map_or_else(
+            || SelectorInput::absent(authority()),
+            |text| SelectorInput::string(text, authority()),
+        )
+    }
+
+    /// The entry inputs of `file` with the selector `text`, or an absent
+    /// one.
+    pub(crate) fn inputs(file: &EntryFile<'_>, text: Option<&str>) -> EntryInputs {
+        EntryInputs::file(file, &selector(text), authority(), &declared()).unwrap()
+    }
+
+    /// The non-secret relative-path locator of a test file.
+    pub(crate) fn locator() -> Locator {
+        read_file_locator(
+            Some(LocatorCandidate {
+                variant: LocatorVariant::RelativePath,
+                payload: "storefront/intlify.config.json",
+                non_secret: true,
+            }),
+            Bound::new(u64::MAX - 1).unwrap(),
+        )
+        .unwrap()
+    }
+
+    /// The entry inputs of a test file of `{}`, whose owner marks its source
+    /// identity non-secret, without a locator, and with an absent selector:
+    /// nothing in them is redacted.
+    pub(crate) fn file_entry() -> &'static EntryInputs {
+        static ENTRY: LazyLock<EntryInputs> = LazyLock::new(|| {
+            let fixture = FileFixture::new(&fixture_limits(100));
+            inputs(&fixture.file(Arc::from(&b"{}"[..])), None)
+        });
+        &ENTRY
+    }
+
+    /// The entry inputs of a test file of `{}`, whose owner did not mark its
+    /// source identity, with a locator, and with a selector that names no
+    /// declared profile: the source identity and the selector are redacted.
+    pub(crate) fn redacted_entry() -> EntryInputs {
+        let fixture = FileFixture::new(&fixture_limits(100));
+        let locator = locator();
+        let mut file = fixture.file(Arc::from(&b"{}"[..]));
+        file.source.marked = false;
+        file.source.locator = Some(&locator);
+        inputs(&file, Some("other"))
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use serde_json::json;
 
+    use super::fixtures::{authority, declared, inputs, locator, redacted_entry, selector};
     use super::*;
+    use crate::resolver::entry::fixtures::{FileFixture, FILE};
     use crate::resolver::evaluation::{Code, Phase, Status};
+    use crate::resolver::evidence_source::hex;
+    use crate::resolver::limits::fixture_limits;
     use crate::resolver::subject::SubjectKind;
     use crate::resolver::targets::{self, TargetSubject};
+    use crate::resolver::token::Sha256;
 
     #[test]
     fn groups_and_slots_read_and_write_as_015_spells_them() {
@@ -484,5 +783,113 @@ mod tests {
             check: Check::EstablishedSlots,
         };
         assert_eq!(owned(&materialized), None);
+    }
+
+    const PROFILE: Specification<'static> = Specification {
+        identity: "intlify-project-profile",
+        revision: "0",
+    };
+
+    /// Each slot's ID is the one it reads and writes as, and a materialized
+    /// dependency's view is its slot (D15:2507, 2511).
+    #[test]
+    fn each_slot_is_its_id() {
+        for slot in MaterializedSlot::ALL {
+            assert_eq!(serde_json::to_value(slot).unwrap(), slot.id());
+            assert_eq!(slot.view(), json!({ "slot": slot.id() }));
+        }
+        for slot in EntrySlot::ALL {
+            assert_eq!(serde_json::to_value(slot).unwrap(), slot.id());
+        }
+    }
+
+    /// A file entry's dependencies name its marked source's identity, the
+    /// Source-content revision of its bytes, the selector that names a
+    /// declared Profile ID, and the origin each common and entry input's slot
+    /// fixes (D15:701-712, 743, 807, 2516, 3157).
+    #[test]
+    fn the_dependencies_of_a_file_entry_name_its_source_selector_and_origins() {
+        let fixture = FileFixture::new(&fixture_limits(100));
+        let bytes: Arc<[u8]> = Arc::from(&br#"{"profiles":{}}"#[..]);
+        let entry = inputs(&fixture.file(Arc::clone(&bytes)), Some("app"));
+        assert_eq!(entry.work(), 2);
+        assert_eq!(entry.redacted().count(), 0);
+        let tokens = EvidenceTokens::assign(PROFILE, entry.redacted(), &Sha256);
+        let records = entry.retained(PROFILE, &tokens).unwrap();
+        let slots = records.each_ref().map(EntryDependency::slot);
+        assert_eq!(
+            slots,
+            [
+                EntrySlot::EntrySource,
+                EntrySlot::ProfileSelector,
+                EntrySlot::Origins
+            ]
+        );
+        let views = records.each_ref().map(EntryDependency::view);
+        assert_eq!(
+            views,
+            [
+                json!({
+                    "slot": "entry-source",
+                    "source": { "safe-opaque": hex(FILE.as_bytes()) },
+                    "revision": file_source_revision(&bytes),
+                }),
+                json!({ "slot": "profile-selector", "selector": { "safe-profile-id": "app" } }),
+                json!({
+                    "slot": "origins",
+                    "origins": {
+                        "artifact-collection": "profile-resolution-artifact-collection",
+                        "entry-source": "configuration-file",
+                        "implementation-capability": "implementation-capability",
+                        "intent-surface-class-vocabulary": "intent-surface-class-vocabulary",
+                        "locale-canonicalization-data": "locale-canonicalization-data",
+                        "profile-selector": "profile-selector-cli",
+                        "specification-input": "profile-resolution-specification-input",
+                        "verification-input": "resource-limit-policy-verification",
+                    },
+                }),
+            ]
+        );
+    }
+
+    /// An unmarked source identity and an undeclared selector are redacted,
+    /// so their records wait on the invocation's evidence tokens, and a
+    /// present locator is kept and counted (D15:734-737, 806-808, 1851,
+    /// 2516).
+    #[test]
+    fn a_redacted_entry_dependency_waits_on_its_tokens() {
+        let entry = redacted_entry();
+        assert_eq!(entry.work(), 3);
+        assert_eq!(entry.redacted().count(), 2);
+        let none = EvidenceTokens::assign(PROFILE, std::iter::empty(), &Sha256);
+        assert_eq!(entry.retained(PROFILE, &none), None);
+        let tokens = EvidenceTokens::assign(PROFILE, entry.redacted(), &Sha256);
+        let [source, projected, _] = entry.retained(PROFILE, &tokens).unwrap();
+        // The file's source identity and selector, each under the origin its
+        // slot fixes.
+        let fixture = FileFixture::new(&fixture_limits(100));
+        let file = fixture.file(Arc::from(&b"{}"[..]));
+        let identity = SourceIdentity::project(
+            SafeOriginKind::ConfigurationFile,
+            file.source.identity,
+            false,
+        )
+        .unwrap();
+        let expected = identity.retained(PROFILE, &tokens).unwrap();
+        let source = source.view();
+        assert_eq!(source["source"], expected.view());
+        assert!(source["source"]["redacted"]["token"].is_string());
+        assert_eq!(source["locator"], locator().view());
+        let expected = SelectorProjection::project(
+            SELECTOR_ORIGIN,
+            &selector(Some("other")),
+            authority(),
+            &declared(),
+        )
+        .unwrap()
+        .retained(PROFILE, &tokens)
+        .unwrap();
+        assert_eq!(projected.view()["selector"], expected.view());
+        assert!(expected.view()["redacted-value"]["token"]["token"].is_string());
     }
 }
