@@ -441,8 +441,8 @@ mod tests {
     /// The input context of either stage refuses a candidate bound to
     /// another input: another recipe kind, another selector even with its
     /// own selector input, another selector input, another recipe's
-    /// configuration, no vocabulary assertion, and a vocabulary that is not
-    /// admitted.
+    /// configuration, no vocabulary assertion, another recipe whose file
+    /// differs only in its bounds, and a vocabulary that is not admitted.
     #[test]
     fn the_input_context_refuses_a_candidate_bound_to_another_input() {
         use std::sync::Arc;
@@ -468,7 +468,7 @@ mod tests {
             Operation::OutcomeFinalization,
         ]
         .into_iter()
-        .flat_map(|operation| (0..6).map(move |change| (operation, change)))
+        .flat_map(|operation| (0..7).map(move |change| (operation, change)))
         {
             let declaration = declarations()
                 .into_iter()
@@ -499,6 +499,10 @@ mod tests {
                     prepared.source = Arc::from(serde_json::to_vec(&blocked).unwrap());
                 }
                 4 => prepared.specifications.intent_surface_class_vocabulary = None,
+                // The same file but for its Shared `maxRecords`.
+                5 => {
+                    candidate.declaration.fixture = Recipe::Evidence(EvidenceRecipe::Truncated);
+                }
                 // Members out of order: read, but not admitted.
                 _ => {
                     let artifact = IntentSurfaceClassVocabularyArtifact::sealed(

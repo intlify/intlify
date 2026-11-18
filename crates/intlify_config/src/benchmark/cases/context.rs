@@ -415,9 +415,14 @@ fn evidence_input(
         candidate.declaration.selector,
         prepared.structural.max_profile_id_bytes,
     );
-    // The file under the bounds the capability and the selected policy set,
-    // which an edge's bound changes; the capability's bounds are framed below.
-    let source = recipe.source(prepared.capability.policy_comparable());
+    // The file under the recipe's own bounds, which recipes alike but for
+    // their bounds tell apart, or, at an edge, under the bounds the
+    // capability and the selected policy set, which the edge's bound changes;
+    // the capability's bounds are framed below.
+    let source = match candidate.declaration.limit {
+        None => recipe.source(&recipe.limits()),
+        Some(_) => recipe.source(prepared.capability.policy_comparable()),
+    };
     if candidate.declaration.selector != super::Selector::App
         || !prepared.selector.benchmark_matches_fixture(&expected)
         || *prepared.source != *source
