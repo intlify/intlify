@@ -290,6 +290,10 @@ pub(crate) struct ConfigurationMeasures<'a> {
 /// What Phase 4 settles for the phases after it.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct PolicyOutcome {
+    /// The selector's final projection authority: the admitted compatible
+    /// policy's `maxProfileIdBytes`, or the capability's without such a
+    /// policy (D15:816-817).
+    pub(crate) authority: Bound,
     /// The selector's String Length Fact under the final projection
     /// authority, or none for an absent or non-string selector.
     pub(crate) selector_length: Option<StringLengthFact>,
@@ -551,6 +555,7 @@ pub(crate) fn admit_resource_policy(
     )?;
     let rechecked = and(configured, inspected.every);
     Ok(PolicyOutcome {
+        authority,
         selector_length,
         diagnostics: limits.ok().map(|limits| limits.diagnostics),
         confirmed: both(compatible, rechecked).map(|((policy, evidence), ())| {
@@ -3508,6 +3513,7 @@ mod tests {
             })
         );
         assert_eq!(issues(&evaluation).len(), 1);
+        assert_eq!(outcome.authority, bound(50));
         assert_eq!(outcome.selector_length, Some(StringLengthFact::OverLimit));
         assert_eq!(keys(&outcome.confirmed.unwrap_err()), [key]);
         // At its exact length the selector holds.
@@ -3555,6 +3561,7 @@ mod tests {
             evaluation.shortfall(&incompatible).unwrap().bound,
             MAX_DEPTH
         );
+        assert_eq!(outcome.authority, bound(200));
         assert_eq!(outcome.selector_length, Some(StringLengthFact::Exact(100)));
         // The two members without a tuple share one recheck.
         let subjects = rechecked(&evaluation);
@@ -3574,6 +3581,7 @@ mod tests {
         missing.members.remove(0);
         let (evaluation, outcome) = missing.confirm();
         let undecided = key_of(&evaluation, &decision());
+        assert_eq!(outcome.authority, bound(200));
         assert_eq!(outcome.selector_length, Some(StringLengthFact::Exact(100)));
         assert_eq!(
             waits_on(&evaluation, &recheck(PolicySubject::Selector)),
