@@ -118,6 +118,16 @@ impl FindingOccurrence {
         &self.related
     }
 
+    /// The same occurrence under `ordinal`, for the tests of what reporting
+    /// finalization verifies.
+    #[cfg(test)]
+    pub(crate) fn renumbered(&self, ordinal: u64) -> Self {
+        Self {
+            ordinal,
+            ..self.clone()
+        }
+    }
+
     /// The Finding Occurrence Key: the Finding Key, the primary Evidence,
     /// and the ordinal (D15:256).
     pub(crate) const fn key(&self) -> (&IssueKey, &Evidence, u64) {

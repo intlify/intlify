@@ -70,6 +70,7 @@ use super::exact_resolution::{
     resolve_fields, ArtifactBindings, ReferenceInvariant, ResolvedReferences,
 };
 use super::fallback::{resolve_fallback, MessageFallbackPolicy};
+use super::finalization::FinalizationInvariant;
 use super::groups::{resolve_groups, GroupInvariant, ResolvedGroups};
 use super::hydration::{validate_hydration, HydrationInvariant, ResolvedHydration};
 use super::identity::{resolve_project_identity, ProjectIdentity};
@@ -311,6 +312,10 @@ pub(crate) enum ResolverInvariant {
     Evidence(EvidenceInvariant),
     /// Reporting left a record without its view.
     Reporting(ReportingInvariant),
+    /// Reporting finalization found a record the earlier stages fixed wrong,
+    /// or a reserve past its bound, boxed since a rare bug need not widen
+    /// every result.
+    Finalization(Box<FinalizationInvariant>),
     /// Profile projection lacked a result, for these causes, although the
     /// invocation found no blocking Finding.
     Unprojected(Causes),
@@ -319,6 +324,12 @@ pub(crate) enum ResolverInvariant {
 impl From<ReportingInvariant> for ResolverInvariant {
     fn from(invariant: ReportingInvariant) -> Self {
         Self::Reporting(invariant)
+    }
+}
+
+impl From<FinalizationInvariant> for ResolverInvariant {
+    fn from(invariant: FinalizationInvariant) -> Self {
+        Self::Finalization(Box::new(invariant))
     }
 }
 
@@ -1230,7 +1241,7 @@ pub(super) mod tests {
 
         /// The invocation of `entered`, for `inspect` also with the
         /// invocation's other inputs.
-        fn entered_under<R>(
+        pub(crate) fn entered_under<R>(
             &self,
             bytes: Option<Arc<[u8]>>,
             inspect: impl FnOnce(&Invocation<'_, Id>, Evaluation, Invoked<'_, Id>) -> R,

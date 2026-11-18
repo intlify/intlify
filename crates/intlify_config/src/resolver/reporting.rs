@@ -90,6 +90,26 @@ impl ReportingDomain {
         }
     }
 
+    /// The domain whose projection holds the records of `kind`: the first
+    /// seven of 015's record kinds are Entry-owned, the other five
+    /// Shared-owned (D15:2518).
+    pub(crate) const fn holding(kind: RecordKind) -> Self {
+        match kind {
+            RecordKind::EntryFinding
+            | RecordKind::EntryEvaluationStatus
+            | RecordKind::FindingOccurrence
+            | RecordKind::CoverageDecisionEvidence
+            | RecordKind::EvidenceIndex
+            | RecordKind::EntryDependency
+            | RecordKind::SharedUnavailabilityCause => Self::Entry,
+            RecordKind::SharedFinding
+            | RecordKind::SharedEvaluationStatus
+            | RecordKind::CoverageDecisionBasis
+            | RecordKind::SemanticDependency
+            | RecordKind::MaterializedDependency => Self::Shared,
+        }
+    }
+
     /// The domain's ID, as its terminal state names it (D15:2489).
     pub(crate) const fn id(self) -> &'static str {
         match self {
