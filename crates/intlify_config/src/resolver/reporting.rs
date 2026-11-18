@@ -35,13 +35,15 @@
 //! retained record with `C` of its accounting view (D15:2518). The bounds of
 //! each stage come with their own stage.
 //!
-//! Before any slice, the Evidence of every candidate passes path admission,
-//! and the resolver's own Evidence metadata work is checked against the
-//! capability's `evidenceMetadata` bounds, over the complete invocation and
-//! over its Shared scope (D15:1851). A domain whose scope exceeds one of them
-//! plans no slice, and only the subject tokens of the Shared scope, when it
-//! fits, and those the reserved terminal records name are assigned (plan 025
-//! decisions #229, #236, and #247, interpretation #237).
+//! The resolver's own Evidence metadata work is checked against the
+//! capability's `evidenceMetadata` bounds in two scopes, each before its
+//! domain plans any slice: the Shared projection stage checks the Shared
+//! scope's, and the Entry projection stage then passes the Evidence of every
+//! candidate through path admission and checks the complete invocation's
+//! (D15:1851, 2775; plan 025 decision #253). A domain whose scope exceeds one
+//! of them plans no slice, and only the subject tokens of the Shared scope,
+//! when it fits, and those the reserved terminal records name are assigned
+//! (plan 025 decisions #229, #236, and #247, interpretation #237).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -52,7 +54,6 @@ use serde_json::{json, Value};
 use crate::construction::registry::check::RecordKind;
 use crate::locale::CanonicalLocale;
 
-use super::capability::EvidenceMetadataLimits;
 use super::coverage::{self, Basis, CoverageSubject, Decision};
 use super::decision_evidence::{
     self, CoverageDecisionEvidence, DecisionEvidence, DecisionInvariant,
@@ -64,7 +65,7 @@ use super::evaluation::{
     Unit,
 };
 use super::evidence::Evidence;
-use super::evidence_metadata::{self, Admission, Exceeded, MetadataBound};
+use super::evidence_metadata::{Admission, Exceeded, MetadataBound, SharedScope};
 use super::evidence_token::EvidenceTokens;
 use super::occurrence::{self, FindingOccurrence, OccurrenceCandidate, OccurrenceInvariant};
 use super::record_view::{RecordViews, ViewInvariant};
@@ -246,24 +247,26 @@ pub(crate) struct Reporting<'e, 's> {
 }
 
 impl<'e, 's> Reporting<'e, 's> {
-    /// The reporting of `evaluation`, whose Shared projection `unavailable`
-    /// names the causes of when it is absent. Path admission and the
-    /// resolver's own Evidence metadata work come first, under the
-    /// capability's `limits`, and only within them does `digest` assign the
-    /// subject tokens of every unit it recorded and the evidence tokens of
-    /// every Evidence its records may carry, together, before any slice is
-    /// planned (D15:1851, 2194). When only the complete invocation exceeds a
-    /// bound, `digest` assigns the subject tokens of the units that report
-    /// into the Shared domain, which reports as within every bound (plan 025
-    /// decision #247). The reserved terminal records of a domain whose scope
-    /// exceeds a bound name the subject token of its first unit, whose subject
-    /// kind's colliding sets are its own, so `digest` assigns the tokens of
-    /// that kind's subjects alone (plan 025 interpretation #237).
-    pub(crate) fn new(
+    /// The reporting of `evaluation`'s Shared domain, which the Shared
+    /// projection stage plans: its records' views are built under the subject
+    /// tokens of the Shared scope, `scope`, when the scope is within every
+    /// `evidenceMetadata` bound, and a domain whose scope exceeds one plans
+    /// no slice (D15:1851, 2775; plan 025 decisions #229 and #253). Besides
+    /// the subjects of its own scope, a Shared record names only the Phase 0
+    /// Finding that leaves a group unestablished, as the cause in its
+    /// owner's status (D15:2145, 2516), and Phase 0's unit is the Entry
+    /// domain's first, so the views also hold the tokens that the Entry
+    /// domain's reserved terminal records name, which every outcome assigns
+    /// (plan 025 interpretations #237 and #257). The Entry projection stage
+    /// completes it ([`Self::complete`]); until then it reports the Shared
+    /// domain alone. `unavailable` names the causes of the Shared
+    /// projection's absence when it is absent, and `entry` what the entry
+    /// dependency records name, both Entry records.
+    pub(crate) fn shared(
         evaluation: &'e Evaluation,
         specification: Specification<'s>,
         (unavailable, entry): (Option<&'e Causes>, &'e EntryInputs),
-        limits: &EvidenceMetadataLimits,
+        scope: &SharedScope,
         digest: &impl Digest,
     ) -> Self {
         let mut statuses: BTreeMap<Unit, Vec<&Status>> = BTreeMap::new();
@@ -274,7 +277,6 @@ impl<'e, 's> Reporting<'e, 's> {
         for candidate in evaluation.occurrence_candidates() {
             *found.entry(candidate.finding.unit()).or_default() += 1;
         }
-        let mut occurrences: BTreeMap<&Unit, Vec<OccurrenceCandidate>> = BTreeMap::new();
         let mut findings: BTreeMap<&Unit, Vec<Finding<'_>>> = BTreeMap::new();
         for finding in evaluation.findings() {
             findings
@@ -282,30 +284,63 @@ impl<'e, 's> Reporting<'e, 's> {
                 .or_default()
                 .push(finding);
         }
-        let admission = evidence_metadata::admit(evaluation, entry, specification, limits, digest);
+        let subjects = match scope {
+            SharedScope::Within(tokens) => tokens.clone().merge(reserved(
+                evaluation,
+                &found,
+                specification,
+                digest,
+                &[ReportingDomain::Entry],
+            )),
+            SharedScope::Exceeded { .. } => {
+                Tokens::assign(specification, std::iter::empty(), digest)
+            }
+        };
+        Self {
+            evaluation,
+            specification,
+            views: RecordViews::new(specification, subjects, digest),
+            tokens: EvidenceTokens::assign(specification, std::iter::empty(), digest),
+            unavailable,
+            entry,
+            statuses,
+            found,
+            occurrences: BTreeMap::new(),
+            decisions: Vec::new(),
+            findings,
+            exceeded: Exceeded {
+                entry: None,
+                shared: scope.exceeded(),
+            },
+        }
+    }
+
+    /// The reporting of both domains, which the Entry projection stage
+    /// completes from the Shared projection stage's, `self`, with
+    /// `admission`, what path admission and the Evidence metadata work of the
+    /// complete invocation leave (D15:1851, 2775). Within every bound,
+    /// `digest` assigned the subject tokens of every unit the evaluation
+    /// recorded and the evidence tokens of every Evidence its records may
+    /// carry (D15:2194). When only the complete invocation exceeds a bound,
+    /// the Shared domain reports with its own subject tokens, as within every
+    /// bound (plan 025 decision #247). The reserved terminal records of a
+    /// domain whose scope exceeds a bound name the subject token of its first
+    /// unit, whose subject kind's colliding sets are its own, so `digest`
+    /// assigns the tokens of that kind's subjects alone (plan 025
+    /// interpretation #237).
+    pub(crate) fn complete(mut self, admission: Admission, digest: &impl Digest) -> Self {
+        let (evaluation, specification) = (self.evaluation, self.specification);
         let exceeded = admission.exceeded();
         let no_evidence = || EvidenceTokens::assign(specification, std::iter::empty(), digest);
-        // The reserved terminal records of an exhausted domain name the
-        // subject token of its first unit, whose subject kind's colliding sets
-        // are its own, so the tokens of that kind's subjects alone are the
-        // invocation's (plan 025 interpretation #237).
+        let found = &self.found;
         let reserved = |domains: &[ReportingDomain]| {
-            let kinds: BTreeSet<SubjectKind> = domains
-                .iter()
-                .filter_map(|domain| first(evaluation, &found, *domain))
-                .map(|unit| unit.subject.kind())
-                .collect();
-            let subjects = evaluation
-                .statuses()
-                .map(|(unit, _)| &unit.subject)
-                .filter(|subject| kinds.contains(&subject.kind()));
-            Tokens::assign(specification, subjects, digest)
+            reserved(evaluation, found, specification, digest, domains)
         };
         let (subjects, tokens, decisions) = match admission {
             Admission::Admitted(admitted) => {
                 let raw = evaluation.occurrence_candidates();
                 for (raw, candidate) in raw.iter().zip(admitted.occurrences) {
-                    occurrences
+                    self.occurrences
                         .entry(raw.finding.unit())
                         .or_default()
                         .push(candidate);
@@ -323,20 +358,11 @@ impl<'e, 's> Reporting<'e, 's> {
                 Vec::new(),
             ),
         };
-        Self {
-            evaluation,
-            specification,
-            views: RecordViews::new(specification, subjects, digest),
-            tokens,
-            unavailable,
-            entry,
-            statuses,
-            found,
-            occurrences,
-            decisions,
-            findings,
-            exceeded,
-        }
+        self.views = RecordViews::new(specification, subjects, digest);
+        self.tokens = tokens;
+        self.decisions = decisions;
+        self.exceeded = exceeded;
+        self
     }
 
     /// The `evidenceMetadata` bound `domain`'s scope exceeds, if one does:
@@ -669,6 +695,30 @@ impl<'e, 's> Reporting<'e, 's> {
     }
 }
 
+/// The tokens that the reserved terminal records of `domains` name, under
+/// `digest`: each domain's first unit's subject is named, whose subject
+/// kind's colliding sets are its own, so the tokens of that kind's subjects
+/// alone are the invocation's (plan 025 interpretation #237). `found` counts
+/// the occurrence candidates of each unit that found something.
+fn reserved(
+    evaluation: &Evaluation,
+    found: &BTreeMap<&Unit, u64>,
+    specification: Specification<'_>,
+    digest: &impl Digest,
+    domains: &[ReportingDomain],
+) -> Tokens {
+    let kinds: BTreeSet<SubjectKind> = domains
+        .iter()
+        .filter_map(|domain| first(evaluation, found, *domain))
+        .map(|unit| unit.subject.kind())
+        .collect();
+    let subjects = evaluation
+        .statuses()
+        .map(|(unit, _)| &unit.subject)
+        .filter(|subject| kinds.contains(&subject.kind()));
+    Tokens::assign(specification, subjects, digest)
+}
+
 /// The first unit of `evaluation`, in canonical unit order, that reports
 /// into `domain`, `found` counting the occurrence candidates of each unit
 /// that found something.
@@ -731,6 +781,38 @@ fn count(length: usize) -> u64 {
 }
 
 #[cfg(test)]
+impl<'e, 's> Reporting<'e, 's> {
+    /// The reporting of `evaluation` as the two projection stages build it
+    /// in turn under the capability's `limits`.
+    pub(crate) fn new(
+        evaluation: &'e Evaluation,
+        specification: Specification<'s>,
+        (unavailable, entry): (Option<&'e Causes>, &'e EntryInputs),
+        limits: &super::capability::EvidenceMetadataLimits,
+        digest: &impl Digest,
+    ) -> Self {
+        let scope =
+            super::evidence_metadata::shared_scope(evaluation, specification, limits, digest);
+        let shared = Self::shared(
+            evaluation,
+            specification,
+            (unavailable, entry),
+            &scope,
+            digest,
+        );
+        let admission = super::evidence_metadata::invocation(
+            evaluation,
+            entry,
+            specification,
+            limits,
+            digest,
+            scope,
+        );
+        shared.complete(admission, digest)
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
     use std::sync::Arc;
@@ -738,7 +820,7 @@ mod tests {
     use intlify_shared_json::encoding::encoded_length;
     use serde_json::{json, Value};
 
-    use crate::construction::registry::check::RecordKind;
+    use crate::construction::registry::check::{CheckRegistry, RecordKind};
     use crate::materialize_tests::limits;
     use crate::resolver::dependency::fixtures::{file_entry, redacted_entry};
     use crate::resolver::dependency::{self, MaterializedSlot, SemanticGroup};
@@ -762,6 +844,51 @@ mod tests {
         identity: "intlify-project-profile",
         revision: "0",
     };
+
+    /// Of the units that report into the Entry domain, only Phase 0's can be
+    /// the cause in the status of a unit that reports into the Shared one:
+    /// the only later row that waits on a Phase 0 or Phase 1 row is the
+    /// profile specification group's owner, waiting on Phase 0's (D15:2145,
+    /// 2516; plan 025 interpretation #257).
+    /// Phase 0's unit is the Entry domain's first, so the Shared projection
+    /// stage's views need no other Entry subject's token than those the
+    /// Entry domain's reserved terminal records name.
+    #[test]
+    fn only_phase_0_is_a_cause_a_shared_status_can_name() {
+        let registry = CheckRegistry::revision_zero();
+        let entry = |id: &str| {
+            registry
+                .rows
+                .iter()
+                .find(|row| row.check_id == id)
+                .is_some_and(|row| ReportingDomain::of(row.phase_id) == ReportingDomain::Entry)
+        };
+        let waits: Vec<(&str, &str)> = registry
+            .rows
+            .iter()
+            .filter(|row| ReportingDomain::of(row.phase_id) == ReportingDomain::Shared)
+            .flat_map(|row| {
+                row.prerequisite_check_ids
+                    .iter()
+                    .filter(|id| entry(id))
+                    .map(|id| (row.check_id.as_str(), id.as_str()))
+            })
+            .collect();
+        assert_eq!(
+            waits,
+            [(
+                "dependency.profile-specification.established",
+                "specification.project-profile.supported"
+            )]
+        );
+        let phase_0 = registry
+            .rows
+            .iter()
+            .find(|row| row.check_id == waits[0].1)
+            .unwrap();
+        assert_eq!(phase_0.phase_id, Phase::ResolverBootstrapAdmission);
+        assert_eq!(phase_0.phase_id, Phase::ALL[0]);
+    }
 
     /// The record kinds of `slice`, in order.
     fn kinds(slice: &Slice<'_>) -> Vec<RecordKind> {

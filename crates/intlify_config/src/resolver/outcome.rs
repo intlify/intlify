@@ -23,16 +23,27 @@
 //! (D15:1153, 1159). Before it decides, reporting finalization verifies what
 //! the earlier stages fixed, and the outcome's reserved records fit the
 //! mandatory reserve ([`super::finalization`]).
+//!
+//! The outcome comes in three crate-private stages, which the
+//! `profile_evidence_materialize` benchmark measures one at a time
+//! (D15:2771, 2775): the Shared projection, which counts the Shared scope's
+//! Evidence metadata work and plans the Shared domain's slices; the Entry
+//! projection, which then admits the paths of every candidate's Evidence,
+//! counts the complete invocation's work, and plans the Entry domain's; and
+//! outcome finalization, which orders each domain's records, verifies them,
+//! and projects the profile (D15:1851, 2143; plan 025 decision #253).
 
 use crate::construction::identity::ConstructionIdentity;
 
 use super::evaluation::{Evaluation, IssueKey};
+use super::evidence_metadata::{self, SharedScope};
 use super::exact_resolution::ArtifactBindings;
 use super::finalization;
+use super::limits::DiagnosticsLimits;
 use super::profile_resolution::{Invocation, Invoked, ResolverInvariant, SemanticState};
 use super::profile_view::{project, ProfileView};
 use super::reporting::{Record, Reporting, ReportingDomain};
-use super::reporting_plan::report;
+use super::reporting_plan::{report_domain, Committed, Reported};
 use super::resolution_evidence::{Projection, Terminal};
 use super::specification::SupportedSpecifications;
 use super::token::{Digest, Specification};
@@ -108,13 +119,33 @@ pub(crate) struct Outcome<'e, 's> {
     pub(crate) evidence: ResolutionEvidence<'e>,
 }
 
-/// Phases 14 and 15 over one file entry's invocation, which `evaluation`
-/// recorded and `invoked` left ([`super::profile_resolution::invoke_file`]):
-/// its outcome under `identity`. The subject and evidence tokens `digest`
-/// assigns once the resolver's own Evidence metadata work is within the
-/// capability's `evidenceMetadata` bounds, and each domain reports under the
-/// capability's `policyComparable` bounds until Phase 4 admits a Resource
-/// Limit Policy, and under the Policy's from then on (D15:1851, 2391).
+/// What the Shared projection stage leaves (D15:2775): the reporting of the
+/// Shared domain, the Evidence metadata work of the Shared scope, and the
+/// slices the Shared domain committed.
+#[derive(Debug)]
+pub(crate) struct SharedStage<'e, 'a> {
+    reporting: Reporting<'e, 'a>,
+    scope: SharedScope,
+    shared: Committed<'e>,
+}
+
+/// What the Entry projection stage leaves (D15:2775): the reporting of both
+/// domains and the slices each committed.
+#[derive(Debug)]
+pub(crate) struct EntryStage<'e, 'a> {
+    reporting: Reporting<'e, 'a>,
+    reported: Reported<'e>,
+}
+
+/// The outcome of one file entry's invocation, which `evaluation` recorded
+/// and `invoked` left ([`super::profile_resolution::invoke_file`]), under
+/// `identity`: its three stages in turn, the Shared projection, the Entry
+/// projection, and outcome finalization (D15:2771, 2775; plan 025 decision
+/// #253). The subject and evidence tokens `digest` assigns once the
+/// resolver's own Evidence metadata work is within the capability's
+/// `evidenceMetadata` bounds, and each domain reports under the capability's
+/// `policyComparable` bounds until Phase 4 admits a Resource Limit Policy,
+/// and under the Policy's from then on (D15:1851, 2391).
 ///
 /// # Errors
 ///
@@ -128,29 +159,122 @@ pub(crate) fn outcome<'e, 's, Id: AsRef<str>>(
     invocation: &Invocation<'_, Id>,
     digest: &impl Digest,
 ) -> Result<Outcome<'e, 's>, ResolverInvariant> {
-    let supported = invocation.supported;
-    let profile = &supported.project_profile().specification;
-    let specification = Specification {
-        identity: profile.identity.as_ref(),
-        revision: profile.revision.as_ref(),
-    };
+    let shared = shared_projection(evaluation, invoked, invocation, digest)?;
+    let entry = entry_projection(shared, evaluation, invoked, invocation, digest)?;
+    finalize(entry, evaluation, invoked, identity, invocation)
+}
+
+/// The Shared projection stage: the Evidence metadata work of the Shared
+/// scope of the invocation `evaluation` recorded and `invoked` left, whose
+/// subject tokens `digest` assigns once it is within the capability's
+/// `evidenceMetadata` bounds, and then the slices of the Shared domain
+/// (D15:1851, 2771, 2775; plan 025 decision #253). Without a value no unit
+/// reports into the Shared domain, which then commits nothing (D15:2369).
+///
+/// # Errors
+///
+/// Returns the resolver bug that leaves a record without its view.
+pub(crate) fn shared_projection<'e, 'a, Id: AsRef<str>>(
+    evaluation: &'e Evaluation,
+    invoked: &'e Invoked<'_, Id>,
+    invocation: &Invocation<'a, Id>,
+    digest: &impl Digest,
+) -> Result<SharedStage<'e, 'a>, ResolverInvariant> {
+    let specification = specification(invocation);
     let capability = invocation.capability;
-    let state = invoked.state.as_ref();
-    let reporting = Reporting::new(
+    let scope = evidence_metadata::shared_scope(
         evaluation,
         specification,
-        (state.err(), &invoked.entry),
         &capability.bootstrap_only().evidence_metadata,
         digest,
     );
-    let policy = state
-        .ok()
-        .and_then(|state| state.policy.diagnostics.as_ref());
-    let reported = report(
+    let reporting = Reporting::shared(
+        evaluation,
+        specification,
+        (invoked.state.as_ref().err(), &invoked.entry),
+        &scope,
+        digest,
+    );
+    let shared = report_domain(
         &reporting,
+        ReportingDomain::Shared,
         &capability.policy_comparable().diagnostics,
-        policy,
+        policy(invoked),
     )?;
+    Ok(SharedStage {
+        reporting,
+        scope,
+        shared,
+    })
+}
+
+/// The Entry projection stage, after the Shared projection stage `stage`:
+/// path admission and the Evidence metadata work of the complete invocation,
+/// whose remaining subject tokens and evidence tokens `digest` assigns once
+/// it is within the capability's `evidenceMetadata` bounds, and then the
+/// slices of the Entry domain (D15:1851, 2771, 2775; plan 025 decision
+/// #253).
+///
+/// # Errors
+///
+/// Returns the resolver bug that leaves a record without its view.
+pub(crate) fn entry_projection<'e, 'a, Id: AsRef<str>>(
+    stage: SharedStage<'e, 'a>,
+    evaluation: &'e Evaluation,
+    invoked: &'e Invoked<'_, Id>,
+    invocation: &Invocation<'a, Id>,
+    digest: &impl Digest,
+) -> Result<EntryStage<'e, 'a>, ResolverInvariant> {
+    let SharedStage {
+        reporting,
+        scope,
+        shared,
+    } = stage;
+    let capability = invocation.capability;
+    let admission = evidence_metadata::invocation(
+        evaluation,
+        &invoked.entry,
+        specification(invocation),
+        &capability.bootstrap_only().evidence_metadata,
+        digest,
+        scope,
+    );
+    let reporting = reporting.complete(admission, digest);
+    let entry = report_domain(
+        &reporting,
+        ReportingDomain::Entry,
+        &capability.policy_comparable().diagnostics,
+        policy(invoked),
+    )?;
+    Ok(EntryStage {
+        reporting,
+        reported: Reported { entry, shared },
+    })
+}
+
+/// Outcome finalization, after the Entry projection stage `stage`, under
+/// `identity` (D15:2771, 2775): each domain's projection in canonical order,
+/// reporting finalization's verification of what the earlier stages fixed,
+/// the profile that Phase 14 projects for a checked outcome, and the
+/// mandatory reserve (D15:1150-1166, 2142-2143).
+///
+/// # Errors
+///
+/// Returns the resolver bug that leaves a record without its view, that
+/// reporting finalization finds in what the earlier stages fixed, or that
+/// leaves the profile without a result no blocking Finding holds back.
+pub(crate) fn finalize<'e, 's, Id: AsRef<str>>(
+    stage: EntryStage<'e, '_>,
+    evaluation: &'e Evaluation,
+    invoked: &'e Invoked<'s, Id>,
+    identity: ConstructionIdentity,
+    invocation: &Invocation<'_, Id>,
+) -> Result<Outcome<'e, 's>, ResolverInvariant> {
+    let EntryStage {
+        reporting,
+        reported,
+    } = stage;
+    let state = invoked.state.as_ref();
     let entry = Projection::finalized(&reporting, ReportingDomain::Entry, reported.entry)?;
     // Without a value no unit reports into the Shared domain, whose
     // projection is then absent (D15:2369).
@@ -162,7 +286,7 @@ pub(crate) fn outcome<'e, 's, Id: AsRef<str>>(
     finalization::verify(evaluation, &evidence)?;
     let checked = match state {
         Ok(state) if evidence.complete() && evaluation.issues().next().is_none() => {
-            Some(checked(state, supported)?)
+            Some(checked(state, invocation.supported)?)
         }
         _ => None,
     };
@@ -171,8 +295,31 @@ pub(crate) fn outcome<'e, 's, Id: AsRef<str>>(
         checked,
         evidence,
     };
-    finalization::reserve(&outcome, &capability.bootstrap_only().mandatory_reserve)?;
+    finalization::reserve(
+        &outcome,
+        &invocation.capability.bootstrap_only().mandatory_reserve,
+    )?;
     Ok(outcome)
+}
+
+/// The Profile Specification whose tokens `invocation`'s records carry: the
+/// Active Project Profile Specification's.
+fn specification<'a, Id: AsRef<str>>(invocation: &Invocation<'a, Id>) -> Specification<'a> {
+    let profile = &invocation.supported.project_profile().specification;
+    Specification {
+        identity: profile.identity.as_ref(),
+        revision: profile.revision.as_ref(),
+    }
+}
+
+/// The diagnostic bounds of the Resource Limit Policy that Phase 4 admitted
+/// in `invoked`, if it admitted one.
+fn policy<'e, Id>(invoked: &'e Invoked<'_, Id>) -> Option<&'e DiagnosticsLimits> {
+    invoked
+        .state
+        .as_ref()
+        .ok()
+        .and_then(|state| state.policy.diagnostics.as_ref())
 }
 
 /// The profile of `state` when no blocking Finding holds a result back: its
@@ -207,10 +354,15 @@ pub(crate) mod tests {
     use crate::construction::registry::check::RecordKind;
     use crate::construction::root::ConstructionRoot;
     use crate::input_limits::Bound;
-    use crate::resolver::evaluation::{Code, IssueKey, Phase, Reason, Status, Unit};
+    use crate::resolver::dependency::{self, SemanticGroup};
+    use crate::resolver::evaluation::{
+        Code, ExhaustedBound, IssueKey, Phase, Reason, Status, Unit,
+    };
+    use crate::resolver::evidence_metadata::fixtures::with;
+    use crate::resolver::evidence_metadata::MetadataBound;
     use crate::resolver::limits::{BoundId, Group, ResolutionLimits};
     use crate::resolver::profile_resolution::tests::{Inputs, ACTIVE};
-    use crate::resolver::reporting::Record;
+    use crate::resolver::reporting::{Record, ReportingDomain};
     use crate::resolver::resolution_evidence::Projection;
 
     /// The Resolver Construction Identity of the committed construction input
@@ -405,6 +557,128 @@ pub(crate) mod tests {
                 assert!(causes.iter().all(|cause| blocking.contains(&cause)));
             },
         );
+    }
+
+    /// A Phase 0 Finding blocks the outcome beside a complete Shared
+    /// projection, in which the owner of the group it leaves unestablished
+    /// is not evaluated, its status naming the Entry-owned Phase 0 Finding as
+    /// its cause (D15:1125, 2145, 2369, 2516; plan 025 interpretation #257).
+    #[test]
+    fn the_shared_projection_names_a_phase_0_finding_as_a_cause() {
+        let mut inputs = Inputs::complete();
+        inputs.unasserted();
+        reporting(&inputs, &[], &[]).outcome(None, identity(), |evaluation, _, outcome| {
+            assert!(outcome.checked.is_none());
+            let evidence = &outcome.evidence;
+            assert!(evidence.complete());
+            let blocking: Vec<&IssueKey> = evaluation.issues().collect();
+            let [phase_0] = blocking[..] else {
+                panic!("{blocking:?}");
+            };
+            assert_eq!(phase_0.unit().phase, Phase::ResolverBootstrapAdmission);
+            assert_eq!(findings(&evidence.entry), blocking);
+            let owner = dependency::unit(SemanticGroup::ProfileSpecification);
+            let status =
+                evidence
+                    .shared
+                    .as_ref()
+                    .unwrap()
+                    .records
+                    .iter()
+                    .find_map(|(unit, retained)| match retained.record {
+                        Record::Status(status) if **unit == owner => Some(status),
+                        _ => None,
+                    });
+            let Some(Status::NotEvaluated(causes)) = status else {
+                panic!("{status:?}");
+            };
+            assert!(causes.keys().eq([phase_0]));
+        });
+    }
+
+    /// The views of `projection`'s records with their owners and kinds, in
+    /// its order, which outlive its evaluation.
+    fn owned(projection: &Projection<'_>) -> Vec<(Unit, RecordKind, Value)> {
+        projection
+            .records
+            .iter()
+            .map(|(unit, retained)| ((*unit).clone(), retained.kind, retained.view.clone()))
+            .collect()
+    }
+
+    /// Past a count of the Shared scope, the Shared projection stage plans no
+    /// slice, and every domain is exhausted at its first unit, each terminal
+    /// Finding naming the bound by its capability path. Past only a count of
+    /// the complete invocation, only the Entry domain is, and the Shared
+    /// projection is the one within every bound (D15:1851, 2408; plan 025
+    /// decisions #229, #231, #247, and #253).
+    #[test]
+    fn an_evidence_metadata_bound_exhausts_the_domains_of_its_scope() {
+        let shared = |unit: &Unit| ReportingDomain::of(unit.phase) == ReportingDomain::Shared;
+        let (within, subjects) = reporting(&Inputs::complete(), &[], &[]).outcome(
+            None,
+            identity(),
+            |evaluation, _, outcome| {
+                let units = evaluation
+                    .statuses()
+                    .filter(|(unit, _)| shared(unit))
+                    .count();
+                (
+                    owned(outcome.evidence.shared.as_ref().unwrap()),
+                    u64::try_from(units).unwrap(),
+                )
+            },
+        );
+        for (bound, limit, every, path) in [
+            (
+                MetadataBound::SubjectOccurrences,
+                1,
+                true,
+                "bootstrapOnly.evidenceMetadata.maxSubjectOccurrences",
+            ),
+            (
+                MetadataBound::TokenInputs,
+                subjects,
+                false,
+                "bootstrapOnly.evidenceMetadata.maxTokenInputs",
+            ),
+        ] {
+            let mut inputs = reporting(&Inputs::complete(), &[], &[]);
+            inputs.metadata(with(bound, limit));
+            inputs.outcome(None, identity(), |evaluation, _, outcome| {
+                assert!(outcome.checked.is_none(), "{bound:?}");
+                let first = |domain: ReportingDomain| {
+                    evaluation
+                        .statuses()
+                        .map(|(unit, _)| unit)
+                        .find(|unit| ReportingDomain::of(unit.phase) == domain)
+                        .unwrap()
+                };
+                let evidence = &outcome.evidence;
+                let entry = evidence.entry.terminal.as_ref().unwrap();
+                assert_eq!(
+                    entry.exhausted.bound,
+                    ExhaustedBound::Capability(bound.id())
+                );
+                assert_eq!(entry.exhausted.cursor, first(ReportingDomain::Entry));
+                assert_eq!(entry.finding["details"]["bound"], path, "{bound:?}");
+                assert!(evidence.entry.records.is_empty(), "{bound:?}");
+                let projection = evidence.shared.as_ref().unwrap();
+                if every {
+                    let terminal = projection.terminal.as_ref().unwrap();
+                    assert_eq!(
+                        terminal.exhausted.bound,
+                        ExhaustedBound::Capability(bound.id())
+                    );
+                    assert_eq!(terminal.exhausted.cursor, first(ReportingDomain::Shared));
+                    assert_eq!(terminal.finding["details"]["bound"], path);
+                    assert!(projection.records.is_empty());
+                } else {
+                    assert!(projection.terminal.is_none(), "{bound:?}");
+                    assert_eq!(owned(projection), within, "{bound:?}");
+                }
+            });
+        }
     }
 
     /// Blocking Findings after materialization block the outcome beside a

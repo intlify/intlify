@@ -8,11 +8,14 @@
 //! four counts of the resolver's own Evidence metadata work, which no adapter
 //! applies (D15:724, 1834-1839, 1851; Decision 015-197).
 //!
-//! Both come once, after the last evaluation phase and before token generation
-//! and any reporting slice (plan 025 decision #230), in two scopes: the
-//! complete invocation, and its Shared scope, the candidates and subjects of
-//! the units that report into the Shared domain, which the construction
-//! context and Materialized Resolution Input Set alone determine. A Logical
+//! Both come once after the last evaluation phase, in two scopes, each before
+//! its domain plans any reporting slice: first the Shared scope, the
+//! candidates and subjects of the units that report into the Shared domain,
+//! which the construction context and Materialized Resolution Input Set alone
+//! determine, in the Shared projection stage ([`shared_scope`]), and then the
+//! complete invocation, whose paths are checked before evidence token
+//! generation, in the Entry projection stage ([`invocation`]) (D15:1851,
+//! 2775; plan 025 decisions #230 and #253). A Logical
 //! input path past either path bound is absent, as path absence is (D15:776).
 //! A value locator or component path past one leaves its Evidence invalid
 //! (D15:842), and the Finding Registry fixes each check's evidence kinds, so
@@ -221,37 +224,111 @@ impl Admission {
     }
 }
 
-/// Admits the Evidence of `evaluation`'s candidates under the path bounds of
-/// `limits`, and checks the Evidence metadata work of the complete invocation,
-/// which holds that of the entry dependency records `entry` names, and of its
-/// Shared scope against the four counts, assigning under `digest` a scope's
-/// tokens only once its token inputs are within their bound. The subjects of
-/// the units that report into the Shared domain have colliding sets of their
-/// own, so the Shared scope's tokens are the invocation's (D15:1851, 2194;
-/// plan 025 decisions #171 and #247, interpretation #245).
-pub(crate) fn admit(
+/// What the Evidence metadata work of an invocation's Shared scope leaves:
+/// the first bound in the table's order the scope exceeds, if one does, and
+/// the tokens of its subjects once its token inputs are within their bound.
+#[derive(Debug)]
+pub(crate) enum SharedScope {
+    /// Every count of the Shared scope is within its bound.
+    Within(Tokens),
+    /// A count of the Shared scope exceeds `bound`. `tokens` are its subject
+    /// tokens when its token inputs were within their bound, which the counts
+    /// of the complete invocation take in.
+    Exceeded {
+        bound: MetadataBound,
+        tokens: Option<Tokens>,
+    },
+}
+
+impl SharedScope {
+    /// The first bound in the table's order the Shared scope exceeds, if one
+    /// does.
+    pub(crate) const fn exceeded(&self) -> Option<MetadataBound> {
+        match self {
+            Self::Within(_) => None,
+            Self::Exceeded { bound, .. } => Some(*bound),
+        }
+    }
+}
+
+/// Whether `unit` reports its Findings and status into the Shared domain.
+fn reports_into_shared(unit: &Unit) -> bool {
+    ReportingDomain::of(unit.phase) == ReportingDomain::Shared
+}
+
+/// Checks the Evidence metadata work of `evaluation`'s Shared scope, the
+/// candidates and subjects of the units that report into the Shared domain,
+/// against the four counts of `limits` in the table's order, assigning under
+/// `digest` the scope's subject tokens only once its token inputs are within
+/// their bound. Those subjects have colliding sets of their own, so their
+/// tokens are the invocation's (D15:1851, 2194; plan 025 decisions #171,
+/// #247, and #253).
+pub(crate) fn shared_scope(
     evaluation: &Evaluation,
-    entry: &EntryInputs,
     specification: Specification<'_>,
     limits: &EvidenceMetadataLimits,
     digest: &impl Digest,
-) -> Admission {
-    let shared = |unit: &Unit| ReportingDomain::of(unit.phase) == ReportingDomain::Shared;
-    let (shared_units, entry_units): (Vec<&Unit>, Vec<&Unit>) = evaluation
+) -> SharedScope {
+    let units: Vec<&Unit> = evaluation
         .statuses()
         .map(|(unit, _)| unit)
-        .partition(|unit| shared(unit));
-    let shared_inputs = MetadataBound::SubjectOccurrences
+        .filter(|unit| reports_into_shared(unit))
+        .collect();
+    let inputs = MetadataBound::SubjectOccurrences
         .holds(
             limits,
             Tally::of(
                 evaluation
                     .candidates()
-                    .filter(|(unit, _)| shared(unit))
+                    .filter(|(unit, _)| reports_into_shared(unit))
                     .count(),
             ),
         )
-        .and_then(|()| MetadataBound::TokenInputs.holds(limits, Tally::of(shared_units.len())));
+        .and_then(|()| MetadataBound::TokenInputs.holds(limits, Tally::of(units.len())));
+    if let Err(bound) = inputs {
+        return SharedScope::Exceeded {
+            bound,
+            tokens: None,
+        };
+    }
+    let tokens = Tokens::assign(
+        specification,
+        units.iter().map(|unit| &unit.subject),
+        digest,
+    );
+    let counted = MetadataBound::CollisionComparisons
+        .holds(limits, Tally::exactly(tokens.comparisons()))
+        .and_then(|()| {
+            MetadataBound::MetadataWorkUnits.holds(limits, Tally::exactly(tokens.records()))
+        });
+    match counted {
+        Ok(()) => SharedScope::Within(tokens),
+        Err(bound) => SharedScope::Exceeded {
+            bound,
+            tokens: Some(tokens),
+        },
+    }
+}
+
+/// Admits the Evidence of `evaluation`'s candidates under the path bounds of
+/// `limits`, and checks the Evidence metadata work of the complete invocation,
+/// which holds that of its Shared scope, `scope`, and of the entry dependency
+/// records `entry` names, against the four counts, assigning under `digest`
+/// the tokens of the other units' subjects and of the admitted Evidence only
+/// once the invocation's token inputs are within their bound (D15:1851, 2194;
+/// plan 025 decisions #247 and #253, interpretation #245).
+pub(crate) fn invocation(
+    evaluation: &Evaluation,
+    entry: &EntryInputs,
+    specification: Specification<'_>,
+    limits: &EvidenceMetadataLimits,
+    digest: &impl Digest,
+    scope: SharedScope,
+) -> Admission {
+    let (shared_units, entry_units): (Vec<&Unit>, Vec<&Unit>) = evaluation
+        .statuses()
+        .map(|(unit, _)| unit)
+        .partition(|unit| reports_into_shared(unit));
     let invocation_inputs = both(
         all(evaluation
             .occurrence_candidates()
@@ -279,24 +356,22 @@ pub(crate) fn admit(
     });
     // The complete invocation holds the Shared scope, so past a bound of the
     // Shared scope it exceeds one no later in the table's order.
-    let shared_tokens = match shared_inputs {
-        Ok(()) => Tokens::assign(
-            specification,
-            shared_units.iter().map(|unit| &unit.subject),
-            digest,
-        ),
-        Err(shared) => {
+    let (exceeded, shared_tokens) = match scope {
+        SharedScope::Within(tokens) => (None, tokens),
+        SharedScope::Exceeded {
+            bound,
+            tokens: Some(tokens),
+        } => (Some(bound), tokens),
+        SharedScope::Exceeded {
+            bound,
+            tokens: None,
+        } => {
             return Admission::Exhausted {
-                entry: invocation_inputs.err().unwrap_or(shared),
-                shared,
+                entry: invocation_inputs.err().unwrap_or(bound),
+                shared: bound,
             }
         }
     };
-    let shared_counted = MetadataBound::CollisionComparisons
-        .holds(limits, Tally::exactly(shared_tokens.comparisons()))
-        .and_then(|()| {
-            MetadataBound::MetadataWorkUnits.holds(limits, Tally::exactly(shared_tokens.records()))
-        });
     let invocation = invocation_inputs.and_then(|(occurrences, decisions)| {
         let subjects = shared_tokens.clone().merge(Tokens::assign(
             specification,
@@ -331,17 +406,31 @@ pub(crate) fn admit(
             evidence,
         })
     });
-    match (shared_counted, invocation) {
-        (Err(shared), invocation) => Admission::Exhausted {
+    match (exceeded, invocation) {
+        (Some(shared), invocation) => Admission::Exhausted {
             entry: invocation.err().unwrap_or(shared),
             shared,
         },
-        (Ok(()), Err(entry)) => Admission::EntryExhausted {
+        (None, Err(entry)) => Admission::EntryExhausted {
             entry,
             shared: shared_tokens,
         },
-        (Ok(()), Ok(admitted)) => Admission::Admitted(admitted),
+        (None, Ok(admitted)) => Admission::Admitted(admitted),
     }
+}
+
+/// Both scopes' Evidence metadata work, as the Shared and the Entry
+/// projection stages check it in turn.
+#[cfg(test)]
+pub(crate) fn admit(
+    evaluation: &Evaluation,
+    entry: &EntryInputs,
+    specification: Specification<'_>,
+    limits: &EvidenceMetadataLimits,
+    digest: &impl Digest,
+) -> Admission {
+    let scope = shared_scope(evaluation, specification, limits, digest);
+    invocation(evaluation, entry, specification, limits, digest, scope)
 }
 
 #[cfg(test)]
@@ -410,7 +499,7 @@ mod tests {
     use crate::resolver::{decision_evidence, occurrence};
 
     use super::fixtures::{unbounded, with};
-    use super::{admit, all, both, path_holds, Exceeded, MetadataBound};
+    use super::{admit, all, both, path_holds, shared_scope, Exceeded, MetadataBound, SharedScope};
     use crate::resolver::reporting::ReportingDomain;
 
     const PROFILE: Specification<'static> = Specification {
@@ -817,6 +906,45 @@ mod tests {
                         shared: Some(shared),
                     }
                 );
+            }
+        });
+    }
+
+    /// The Shared projection stage counts the Shared scope alone, its inputs
+    /// before any token: within every bound it keeps the tokens of the
+    /// scope's subjects, past an input count it keeps none, since none were
+    /// assigned, and past a count of its tokens it keeps them for the counts
+    /// of the complete invocation, under a digest that makes every record of
+    /// a kind collide so the comparisons count too (D15:1851; plan 025
+    /// decision #253).
+    #[test]
+    fn the_shared_scope_keeps_its_tokens_once_its_inputs_are_within_their_bound() {
+        failing().resolve(|evaluation, _| {
+            let subjects = evaluation
+                .statuses()
+                .filter(|(unit, _)| ReportingDomain::of(unit.phase) == ReportingDomain::Shared)
+                .map(|(unit, _)| &unit.subject);
+            let tokens = Tokens::assign(PROFILE, subjects, &Constant);
+            match shared_scope(&evaluation, PROFILE, &unbounded(), &Constant) {
+                SharedScope::Within(within) => assert_eq!(within, tokens),
+                scope @ SharedScope::Exceeded { .. } => panic!("{scope:?}"),
+            }
+            for (bound, counted) in shared_counts(&evaluation, &Constant) {
+                assert!(counted > 1, "{bound:?}");
+                let assigned = !matches!(
+                    bound,
+                    MetadataBound::SubjectOccurrences | MetadataBound::TokenInputs
+                );
+                match shared_scope(&evaluation, PROFILE, &with(bound, counted - 1), &Constant) {
+                    SharedScope::Exceeded {
+                        bound: named,
+                        tokens: kept,
+                    } => {
+                        assert_eq!(named, bound);
+                        assert_eq!(kept, assigned.then(|| tokens.clone()), "{bound:?}");
+                    }
+                    scope @ SharedScope::Within(_) => panic!("{bound:?}: {scope:?}"),
+                }
             }
         });
     }
