@@ -216,6 +216,10 @@ jobs:
         if: runner.os == 'Linux'
         run: vp run vectors:bounds:check
 
+      - name: Validate the 015 Snapshot independent vectors
+        if: runner.os == 'Linux'
+        run: vp run vectors:snapshot:check
+
       - name: Validate the 015 construction root artifacts
         if: runner.os == 'Linux'
         run: vp run construction:check

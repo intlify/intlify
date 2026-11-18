@@ -1,0 +1,542 @@
+// @license MIT
+// @author kazuya kawaguchi (a.k.a. kazupon)
+
+//! 015's canonical Programmatic Entry Snapshot (D15:850-895): the closed tree
+//! a binding builds from a host value without running host behavior, its
+//! framing `S`, the content digest that is also the Programmatic Entry
+//! revision, and what the tree counts under the nine `bootstrapOnly.snapshot`
+//! bounds.
+//!
+//! A canonical tree is already normalized: a number is portable, with
+//! negative zero as positive zero; a string or key is a Unicode-scalar
+//! string; and an object's keys are unique and ordered by their unsigned
+//! UTF-8 bytes, which `BTreeMap<String, _>` keeps by construction
+//! (D15:854-859, 871, 889). Admitting a submitted Snapshot into this form, or
+//! refusing it, is the `programmatic-entry-snapshot` boundary's work. Like
+//! the file entry's value, the tree carries configuration and has no `Debug`.
+
+use std::collections::BTreeMap;
+
+use intlify_shared_json::encoding::digest_bytes;
+use intlify_shared_json::token::hex;
+
+use crate::construction::profile::{MARKER_REASONS, SNAPSHOT_DOMAIN};
+use crate::framing::{frame, Record};
+use crate::materialize::PortableNumber;
+use crate::resolver::capability::{BootstrapBoundId, BootstrapGroup};
+
+/// The tags of `S`: 017's value tags, then a number and a marker (D15:873-886).
+const NULL: u8 = 0x01;
+const FALSE: u8 = 0x02;
+const TRUE: u8 = 0x03;
+const STRING: u8 = 0x04;
+const ARRAY: u8 = 0x05;
+const OBJECT: u8 = 0x06;
+const NUMBER: u8 = 0x07;
+const MARKER: u8 = 0x08;
+
+/// One node of a canonical Snapshot (D15:871).
+#[derive(Clone, PartialEq)]
+pub(crate) enum Node {
+    Null,
+    Boolean(bool),
+    Number(PortableNumber),
+    String(String),
+    Array(Vec<Node>),
+    Object(BTreeMap<String, Node>),
+    Marker(Marker),
+}
+
+/// A rejected-node marker: an ordinary data violation, or the terminal
+/// marker of a bootstrap overrun naming the exceeded `bootstrapOnly.snapshot`
+/// bound and its rejecting witness (D15:861, 867, 889).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Marker {
+    Rejected(MarkerReason),
+    BootstrapLimitExceeded { bound: SnapshotBound, witness: u64 },
+}
+
+/// The closed reasons of an ordinary marker (D15:861).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MarkerReason {
+    UnsupportedType,
+    NonFiniteNumber,
+    NonPortableNumber,
+    InvalidUnicode,
+    NonStringKey,
+    DynamicContainer,
+    DynamicProperty,
+    SparseArray,
+    Cycle,
+}
+
+impl MarkerReason {
+    /// Every ordinary reason, in 015's order.
+    pub(crate) const ALL: [Self; 9] = [
+        Self::UnsupportedType,
+        Self::NonFiniteNumber,
+        Self::NonPortableNumber,
+        Self::InvalidUnicode,
+        Self::NonStringKey,
+        Self::DynamicContainer,
+        Self::DynamicProperty,
+        Self::SparseArray,
+        Self::Cycle,
+    ];
+
+    /// The reason ID, as the Profile Specification lists it.
+    pub(crate) const fn id(self) -> &'static str {
+        MARKER_REASONS[self as usize]
+    }
+}
+
+/// The reason ID of a bootstrap overrun's marker.
+pub(crate) const BOOTSTRAP_LIMIT_EXCEEDED: &str = MARKER_REASONS[9];
+
+/// A `bootstrapOnly.snapshot` bound, in the table's order (D15:1796-1804).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SnapshotBound {
+    Nodes,
+    Depth,
+    CollectionEntries,
+    TotalStringBytes,
+    SingleStringBytes,
+    RejectedMarkers,
+    EnvelopeCanonicalBytes,
+    SingleMarkerCanonicalBytes,
+    TraversalUnits,
+}
+
+impl SnapshotBound {
+    /// Every bound, in the table's order.
+    pub(crate) const ALL: [Self; 9] = [
+        Self::Nodes,
+        Self::Depth,
+        Self::CollectionEntries,
+        Self::TotalStringBytes,
+        Self::SingleStringBytes,
+        Self::RejectedMarkers,
+        Self::EnvelopeCanonicalBytes,
+        Self::SingleMarkerCanonicalBytes,
+        Self::TraversalUnits,
+    ];
+
+    /// Where the bound sits in `bootstrapOnly`.
+    pub(crate) const fn id(self) -> BootstrapBoundId {
+        let name = match self {
+            Self::Nodes => "maxNodes",
+            Self::Depth => "maxDepth",
+            Self::CollectionEntries => "maxCollectionEntries",
+            Self::TotalStringBytes => "maxTotalStringBytes",
+            Self::SingleStringBytes => "maxSingleStringBytes",
+            Self::RejectedMarkers => "maxRejectedMarkers",
+            Self::EnvelopeCanonicalBytes => "maxEnvelopeCanonicalBytes",
+            Self::SingleMarkerCanonicalBytes => "maxSingleMarkerCanonicalBytes",
+            Self::TraversalUnits => "maxTraversalUnits",
+        };
+        BootstrapBoundId {
+            group: BootstrapGroup::Snapshot,
+            name,
+        }
+    }
+
+    /// The bound's capability path, such as `bootstrapOnly.snapshot.maxNodes`,
+    /// which a bootstrap marker's record carries (D15:889).
+    pub(crate) fn path(self) -> String {
+        let id = self.id();
+        format!("bootstrapOnly.{}.{}", id.group.path(), id.name)
+    }
+}
+
+impl Marker {
+    /// The marker record: field `0x01` the reason ID, and for a bootstrap
+    /// overrun `0x02` the bound's path and `0x03` the witness as `U64`
+    /// (D15:889).
+    pub(crate) fn record(self) -> Vec<u8> {
+        match self {
+            Self::Rejected(reason) => Record::new().field(reason.id().as_bytes()).finish(),
+            Self::BootstrapLimitExceeded { bound, witness } => Record::new()
+                .field(BOOTSTRAP_LIMIT_EXCEEDED.as_bytes())
+                .field(bound.path().as_bytes())
+                .field(&witness.to_be_bytes())
+                .finish(),
+        }
+    }
+}
+
+/// `U64(count)` of a container's elements or members.
+fn count(length: usize) -> [u8; 8] {
+    u64::try_from(length)
+        .expect("a collection length fits in u64 on every supported target")
+        .to_be_bytes()
+}
+
+impl Node {
+    /// `S` of this node appended to `output` (D15:875-889).
+    fn frame_into(&self, output: &mut Vec<u8>) {
+        match self {
+            Self::Null => frame(NULL, &[], output),
+            Self::Boolean(false) => frame(FALSE, &[], output),
+            Self::Boolean(true) => frame(TRUE, &[], output),
+            Self::String(text) => frame(STRING, text.as_bytes(), output),
+            Self::Number(number) => frame(NUMBER, &number.get().to_bits().to_be_bytes(), output),
+            Self::Array(elements) => {
+                let mut payload = count(elements.len()).to_vec();
+                for element in elements {
+                    element.frame_into(&mut payload);
+                }
+                frame(ARRAY, &payload, output);
+            }
+            Self::Object(members) => {
+                let mut payload = count(members.len()).to_vec();
+                for (key, value) in members {
+                    frame(STRING, key.as_bytes(), &mut payload);
+                    value.frame_into(&mut payload);
+                }
+                frame(OBJECT, &payload, output);
+            }
+            Self::Marker(marker) => frame(MARKER, &marker.record(), output),
+        }
+    }
+
+    /// `S(self)`, the canonical bytes two equal Snapshots share (D15:889).
+    pub(crate) fn framed(&self) -> Vec<u8> {
+        let mut output = Vec::new();
+        self.frame_into(&mut output);
+        output
+    }
+
+    /// The snapshot-content digest, which is also the Programmatic Entry
+    /// revision: SHA-256 over `intlify.programmatic-entry-snapshot.v0`
+    /// followed by `S(root)`, as `sha256:` and 64 lowercase hexadecimal
+    /// digits (D15:889).
+    pub(crate) fn digest(&self) -> String {
+        let mut preimage = SNAPSHOT_DOMAIN.as_bytes().to_vec();
+        self.frame_into(&mut preimage);
+        format!("sha256:{}", hex(digest_bytes(&preimage)))
+    }
+}
+
+/// What a canonical tree counts under the nine `bootstrapOnly.snapshot`
+/// bounds, each in its unit (D15:1796-1804): every node, a marker included;
+/// tree levels with the root at one; object members and array elements;
+/// the UTF-8 bytes of every string and key, and the longest one; markers;
+/// the bytes of `S(root)` and of the longest marker frame; and the nodes and
+/// edges a traversal visits, an edge being one member or element.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct SnapshotCounts {
+    pub(crate) nodes: u64,
+    pub(crate) depth: u64,
+    pub(crate) collection_entries: u64,
+    pub(crate) total_string_bytes: u64,
+    pub(crate) single_string_bytes: u64,
+    pub(crate) rejected_markers: u64,
+    pub(crate) envelope_canonical_bytes: u64,
+    pub(crate) single_marker_canonical_bytes: u64,
+    pub(crate) traversal_units: u64,
+}
+
+fn wide(value: usize) -> u64 {
+    u64::try_from(value).expect("a length fits in u64 on every supported target")
+}
+
+impl SnapshotCounts {
+    /// The counts of the tree rooted at `root`.
+    pub(crate) fn of(root: &Node) -> Self {
+        let mut counts = Self {
+            envelope_canonical_bytes: wide(root.framed().len()),
+            ..Self::default()
+        };
+        counts.visit(root, 1);
+        counts.traversal_units = counts.nodes + counts.collection_entries;
+        counts
+    }
+
+    fn string(&mut self, text: &str) {
+        let bytes = wide(text.len());
+        self.total_string_bytes += bytes;
+        self.single_string_bytes = self.single_string_bytes.max(bytes);
+    }
+
+    fn visit(&mut self, node: &Node, depth: u64) {
+        self.nodes += 1;
+        self.depth = self.depth.max(depth);
+        match node {
+            Node::Null | Node::Boolean(_) | Node::Number(_) => {}
+            Node::String(text) => self.string(text),
+            Node::Array(elements) => {
+                self.collection_entries += wide(elements.len());
+                for element in elements {
+                    self.visit(element, depth + 1);
+                }
+            }
+            Node::Object(members) => {
+                self.collection_entries += wide(members.len());
+                for (key, value) in members {
+                    self.string(key);
+                    self.visit(value, depth + 1);
+                }
+            }
+            Node::Marker(marker) => {
+                self.rejected_markers += 1;
+                // The marker's frame: its tag, the payload's length, and the record.
+                let frame = wide(1 + 8 + marker.record().len());
+                self.single_marker_canonical_bytes = self.single_marker_canonical_bytes.max(frame);
+            }
+        }
+    }
+
+    /// Each count beside the bound that limits it, in the table's order.
+    pub(crate) const fn by_bound(&self) -> [(SnapshotBound, u64); 9] {
+        [
+            (SnapshotBound::Nodes, self.nodes),
+            (SnapshotBound::Depth, self.depth),
+            (SnapshotBound::CollectionEntries, self.collection_entries),
+            (SnapshotBound::TotalStringBytes, self.total_string_bytes),
+            (SnapshotBound::SingleStringBytes, self.single_string_bytes),
+            (SnapshotBound::RejectedMarkers, self.rejected_markers),
+            (
+                SnapshotBound::EnvelopeCanonicalBytes,
+                self.envelope_canonical_bytes,
+            ),
+            (
+                SnapshotBound::SingleMarkerCanonicalBytes,
+                self.single_marker_canonical_bytes,
+            ),
+            (SnapshotBound::TraversalUnits, self.traversal_units),
+        ]
+    }
+}
+
+/// A canonical tree built from a JSON value, for tests: every number must be
+/// portable.
+#[cfg(test)]
+pub(crate) fn from_json(value: &serde_json::Value) -> Node {
+    use serde_json::Value;
+    match value {
+        Value::Null => Node::Null,
+        Value::Bool(value) => Node::Boolean(*value),
+        Value::Number(number) => Node::Number(
+            number
+                .as_f64()
+                .and_then(PortableNumber::new)
+                .expect("a portable number"),
+        ),
+        Value::String(text) => Node::String(text.clone()),
+        Value::Array(elements) => Node::Array(elements.iter().map(from_json).collect()),
+        Value::Object(members) => Node::Object(
+            members
+                .iter()
+                .map(|(key, value)| (key.clone(), from_json(value)))
+                .collect(),
+        ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use serde_json::json;
+
+    use super::*;
+    use crate::materialize::materialize_file;
+    use crate::materialize_tests::limits;
+
+    fn bytes(hex: &str) -> Vec<u8> {
+        (0..hex.len())
+            .step_by(2)
+            .map(|index| u8::from_str_radix(&hex[index..index + 2], 16).unwrap())
+            .collect()
+    }
+
+    fn number(value: f64) -> Node {
+        Node::Number(PortableNumber::new(value).unwrap())
+    }
+
+    /// A tree with every variant: an object holding an array of a null, a
+    /// true, 1.5, and `"x"`, and a cycle marker.
+    fn tree() -> Node {
+        let mut members = from_json(&json!({ "a": [null, true, 1.5, "x"] }));
+        let Node::Object(map) = &mut members else {
+            unreachable!()
+        };
+        map.insert(
+            "b".to_owned(),
+            Node::Marker(Marker::Rejected(MarkerReason::Cycle)),
+        );
+        members
+    }
+
+    /// `S` of the tree and its digest, computed outside this crate with
+    /// Python's `struct` and `hashlib` from 015's framing.
+    const TREE: &str = "06000000000000007100000000000000020400000000000000016105000000000000003500000000000000040100000000000000000300000000000000000700000000000000083ff8000000000000040000000000000001780400000000000000016208000000000000000e0100000000000000056379636c65";
+    const DIGEST: &str = "sha256:6a85cb2bd154bea87ba2c6e0d488e10e9c61bb5849f46bd58bc4e710001e6281";
+
+    /// Each variant frames with its tag, an object its members in key order
+    /// after their count, and a marker its record, and the digest is
+    /// SHA-256 over the domain separator and `S(root)` (D15:875-889).
+    #[test]
+    fn the_tree_frames_and_digests_as_015_defines() {
+        assert_eq!(tree().framed(), bytes(TREE));
+        assert_eq!(tree().digest(), DIGEST);
+    }
+
+    /// The scalars frame with their tags over an empty payload, a string
+    /// over its UTF-8 bytes, and a number over its eight big-endian binary64
+    /// bytes, negative zero as positive zero.
+    #[test]
+    fn each_scalar_frames_with_its_tag() {
+        let frame = |tag: u8, payload: &[u8]| {
+            let mut output = vec![tag];
+            output.extend_from_slice(&u64::try_from(payload.len()).unwrap().to_be_bytes());
+            output.extend_from_slice(payload);
+            output
+        };
+        assert_eq!(Node::Null.framed(), frame(0x01, &[]));
+        assert_eq!(Node::Boolean(false).framed(), frame(0x02, &[]));
+        assert_eq!(Node::Boolean(true).framed(), frame(0x03, &[]));
+        assert_eq!(
+            Node::String("é".to_owned()).framed(),
+            frame(0x04, "é".as_bytes())
+        );
+        assert_eq!(
+            number(-2.5).framed(),
+            frame(0x07, &(-2.5_f64).to_bits().to_be_bytes())
+        );
+        assert_eq!(number(-0.0).framed(), number(0.0).framed());
+        assert_eq!(number(-0.0).framed(), frame(0x07, &[0; 8]));
+    }
+
+    /// Object members frame in the unsigned UTF-8 order of their keys,
+    /// whatever order they were inserted in: `é` (0xc3 0xa9) after `z`.
+    #[test]
+    fn object_members_frame_in_unsigned_utf8_key_order() {
+        let object = from_json(&json!({ "é": 1, "z": 2, "a": 3 }));
+        let Node::Object(members) = &object else {
+            unreachable!()
+        };
+        assert_eq!(
+            members.keys().map(String::as_str).collect::<Vec<_>>(),
+            ["a", "z", "é"]
+        );
+        let mut expected = 3_u64.to_be_bytes().to_vec();
+        for (key, value) in [("a", 3.0), ("z", 2.0), ("é", 1.0)] {
+            frame(0x04, key.as_bytes(), &mut expected);
+            expected.extend(number(value).framed());
+        }
+        let mut framed = Vec::new();
+        frame(0x06, &expected, &mut framed);
+        assert_eq!(object.framed(), framed);
+    }
+
+    /// An ordinary marker's record has only its reason; a bootstrap
+    /// marker's has the reason, the bound's capability path, and the witness
+    /// as `U64`, each reason being one of the Profile Specification's.
+    #[test]
+    fn a_marker_record_holds_its_reason_and_any_bound_and_witness() {
+        assert_eq!(
+            Node::Marker(Marker::Rejected(MarkerReason::Cycle)).framed(),
+            bytes("08000000000000000e0100000000000000056379636c65")
+        );
+        let overrun = Marker::BootstrapLimitExceeded {
+            bound: SnapshotBound::Nodes,
+            witness: 5,
+        };
+        assert_eq!(
+            Node::Marker(overrun).framed(),
+            bytes("08000000000000005a010000000000000018626f6f7473747261702d6c696d69742d657863656564656402000000000000001f626f6f7473747261704f6e6c792e736e617073686f742e6d61784e6f6465730300000000000000080000000000000005")
+        );
+        let ids: Vec<&str> = MarkerReason::ALL.iter().map(|reason| reason.id()).collect();
+        assert_eq!(ids, MARKER_REASONS[..9]);
+        assert_eq!(BOOTSTRAP_LIMIT_EXCEEDED, "bootstrap-limit-exceeded");
+    }
+
+    /// Each bound's path names the capability's `bootstrapOnly.snapshot`
+    /// bound, in the capability's own order.
+    #[test]
+    fn each_bound_names_its_capability_path() {
+        use crate::resolver::capability::BootstrapLimits;
+
+        let snapshot: Vec<BootstrapBoundId> = BootstrapLimits::MINIMUM
+            .bounds()
+            .into_iter()
+            .map(|(id, _)| id)
+            .filter(|id| id.group == BootstrapGroup::Snapshot)
+            .collect();
+        assert_eq!(SnapshotBound::ALL.map(SnapshotBound::id).to_vec(), snapshot);
+        assert_eq!(
+            SnapshotBound::TraversalUnits.path(),
+            "bootstrapOnly.snapshot.maxTraversalUnits"
+        );
+    }
+
+    /// The tree counts every node and marker, its levels from the root at
+    /// one, its members and elements, its string and key bytes, its
+    /// markers, its frame and longest marker frame, and its nodes and edges.
+    #[test]
+    fn the_counts_follow_each_bound_unit() {
+        let counts = SnapshotCounts::of(&tree());
+        assert_eq!(
+            counts,
+            SnapshotCounts {
+                nodes: 7,
+                depth: 3,
+                collection_entries: 6,
+                total_string_bytes: 3,
+                single_string_bytes: 1,
+                rejected_markers: 1,
+                envelope_canonical_bytes: 122,
+                single_marker_canonical_bytes: 23,
+                traversal_units: 13,
+            }
+        );
+        assert_eq!(counts.envelope_canonical_bytes, wide(bytes(TREE).len()));
+        assert_eq!(
+            counts.by_bound().map(|(bound, _)| bound),
+            SnapshotBound::ALL
+        );
+        let overrun = Node::Marker(Marker::BootstrapLimitExceeded {
+            bound: SnapshotBound::SingleMarkerCanonicalBytes,
+            witness: u64::MAX - 1,
+        });
+        // The longest marker frame: the longest path, `maxSingleMarkerCanonicalBytes`.
+        assert_eq!(
+            SnapshotCounts::of(&overrun).single_marker_canonical_bytes,
+            120
+        );
+    }
+
+    /// Without a marker, the five counts the root-value bounds share are
+    /// those the file entry counts for the same JSON value (D15:1889).
+    #[test]
+    fn a_marker_free_tree_counts_as_the_same_json_value() {
+        let value = json!({
+            "schemaVersion": "0",
+            "locales": ["ja", "en", "日本"],
+            "nested": { "deep": [[1, 2.5], { "k": null }], "flag": false },
+        });
+        let source: Arc<[u8]> = serde_json::to_vec(&value).unwrap().into();
+        let document = materialize_file(source, limits()).ok().unwrap();
+        let file = document.counts().value;
+        let snapshot = SnapshotCounts::of(&from_json(&value));
+        assert_eq!(
+            (
+                snapshot.nodes,
+                snapshot.depth,
+                snapshot.collection_entries,
+                snapshot.total_string_bytes,
+                snapshot.single_string_bytes,
+            ),
+            (
+                file.nodes,
+                file.depth,
+                file.collection_entries,
+                file.total_string_bytes,
+                file.single_string_bytes,
+            )
+        );
+        assert_eq!(snapshot.rejected_markers, 0);
+        assert_eq!(snapshot.traversal_units, 2 * snapshot.nodes - 1);
+    }
+}

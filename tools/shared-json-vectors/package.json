@@ -15,6 +15,7 @@
     "check:pattern": "node scripts/verify-pattern.mjs",
     "check:profile-view": "node scripts/verify-profile-view.mjs",
     "check:registries": "node scripts/verify-registries.mjs",
+    "check:snapshot": "node scripts/verify-snapshot.mjs",
     "check:validator-schemas": "node scripts/verify-validator-schemas.mjs",
     "check:validator-values": "node scripts/verify-validator-values.mjs",
     "check:verification": "node scripts/verify-verification.mjs",

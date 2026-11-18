@@ -80,6 +80,10 @@ name = "generate_framing_vectors"
 required-features = ["vectors"]
 
 [[example]]
+name = "generate_snapshot_vectors"
+required-features = ["vectors"]
+
+[[example]]
 name = "generate_pattern_vectors"
 required-features = ["vectors"]
 

@@ -60,7 +60,12 @@ pub(crate) struct PortableNumber(f64);
 
 impl PortableNumber {
     fn from_token(token: &str) -> Option<Self> {
-        let value: f64 = token.parse().ok()?;
+        Self::new(token.parse().ok()?)
+    }
+
+    /// A finite binary64 value whose magnitude is at most
+    /// `9007199254740991`, with negative zero as positive zero (D15:856).
+    pub(crate) fn new(value: f64) -> Option<Self> {
         if !value.is_finite() || value.abs() > 9_007_199_254_740_991.0 {
             return None;
         }

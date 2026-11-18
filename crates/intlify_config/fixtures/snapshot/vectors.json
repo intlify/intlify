@@ -1,0 +1,1006 @@
+{
+  "note": "Canonical Programmatic Entry Snapshots written by intlify_config. Each node is an object with one member naming its variant: null, boolean, number as the shortest decimal that reads back as its binary64 value, string, array of nodes, object as [key, node] pairs in ascending unsigned UTF-8 order of their unique keys, or marker with its reason and, for bootstrap-limit-exceeded, its capability bound path and decimal witness. An independent implementation frames every tree with design 015's S, digests intlify.programmatic-entry-snapshot.v0 followed by those bytes with SHA-256, and counts it under each bootstrapOnly.snapshot bound. Hexadecimal stands for bytes, and decimal strings for counts and witnesses.",
+  "snapshots": [
+    {
+      "id": "null",
+      "snapshot": {
+        "null": null
+      },
+      "bytes": "010000000000000000",
+      "digest": "sha256:1dcd2e02d5702083fb37800e12fca137b28d2b85ccddc89f378a06638607db7e",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "0",
+        "maxEnvelopeCanonicalBytes": "9",
+        "maxSingleMarkerCanonicalBytes": "0",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "false",
+      "snapshot": {
+        "boolean": false
+      },
+      "bytes": "020000000000000000",
+      "digest": "sha256:bb18c218ec9c4c4ef1a33dabf60f1526019fbe2837cca2d01a7b8847f9e16982",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "0",
+        "maxEnvelopeCanonicalBytes": "9",
+        "maxSingleMarkerCanonicalBytes": "0",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "true",
+      "snapshot": {
+        "boolean": true
+      },
+      "bytes": "030000000000000000",
+      "digest": "sha256:d6116aa60802e0cc7d1ad331ae5e3bcd03e898ec413ae0a665d3a066b0e7aeab",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "0",
+        "maxEnvelopeCanonicalBytes": "9",
+        "maxSingleMarkerCanonicalBytes": "0",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "empty-string",
+      "snapshot": {
+        "string": ""
+      },
+      "bytes": "040000000000000000",
+      "digest": "sha256:38f56a2ed8986e9f625128ae4eb02b0f799c5b2bf7a54bacf13c3675428b9974",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "0",
+        "maxEnvelopeCanonicalBytes": "9",
+        "maxSingleMarkerCanonicalBytes": "0",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "multi-byte-string",
+      "snapshot": {
+        "string": "日本語é"
+      },
+      "bytes": "04000000000000000be697a5e69cace8aa9ec3a9",
+      "digest": "sha256:af633e14e8268878a466dbc0a8f54283457e7827da68a781918df6923f4f9b0b",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "11",
+        "maxSingleStringBytes": "11",
+        "maxRejectedMarkers": "0",
+        "maxEnvelopeCanonicalBytes": "20",
+        "maxSingleMarkerCanonicalBytes": "0",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "zero",
+      "snapshot": {
+        "number": "0"
+      },
+      "bytes": "0700000000000000080000000000000000",
+      "digest": "sha256:a902c882df4577ec52dba9a9e7e348e9b1f910459e6ef7a6c27a944013f3b10d",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "0",
+        "maxEnvelopeCanonicalBytes": "17",
+        "maxSingleMarkerCanonicalBytes": "0",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "one",
+      "snapshot": {
+        "number": "1"
+      },
+      "bytes": "0700000000000000083ff0000000000000",
+      "digest": "sha256:ff279eb1086eebdce5b29329a94d77ee7a3296551e678e9cfde3b190e6c555b8",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "0",
+        "maxEnvelopeCanonicalBytes": "17",
+        "maxSingleMarkerCanonicalBytes": "0",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "negative-integer",
+      "snapshot": {
+        "number": "-42"
+      },
+      "bytes": "070000000000000008c045000000000000",
+      "digest": "sha256:93912f80e6359d064b3108cd5cdbf5f9176e42c447248909194721b87aeef39b",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "0",
+        "maxEnvelopeCanonicalBytes": "17",
+        "maxSingleMarkerCanonicalBytes": "0",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "fraction",
+      "snapshot": {
+        "number": "0.5"
+      },
+      "bytes": "0700000000000000083fe0000000000000",
+      "digest": "sha256:de3ddef1cce00321fa33322991597e1e9018a25b24ae3e7b01a49a45357abeeb",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "0",
+        "maxEnvelopeCanonicalBytes": "17",
+        "maxSingleMarkerCanonicalBytes": "0",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "decimal",
+      "snapshot": {
+        "number": "1234.5678"
+      },
+      "bytes": "07000000000000000840934a456d5cfaad",
+      "digest": "sha256:cbd4f7d5d012bf5456e5e915d0411a5d91e543e027eaabc297f447752ada605d",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "0",
+        "maxEnvelopeCanonicalBytes": "17",
+        "maxSingleMarkerCanonicalBytes": "0",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "small",
+      "snapshot": {
+        "number": "0.0000001"
+      },
+      "bytes": "0700000000000000083e7ad7f29abcaf48",
+      "digest": "sha256:a0ff20d4266c6ac25bf1ae0c02fdac7875affc813daede858c8d144e1ebfefae",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "0",
+        "maxEnvelopeCanonicalBytes": "17",
+        "maxSingleMarkerCanonicalBytes": "0",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "largest-portable",
+      "snapshot": {
+        "number": "9007199254740991"
+      },
+      "bytes": "070000000000000008433fffffffffffff",
+      "digest": "sha256:6936eebb3fed6d619f4fe4360035fc82d54c79e6eaaf6202cbdbd65e51b8e834",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "0",
+        "maxEnvelopeCanonicalBytes": "17",
+        "maxSingleMarkerCanonicalBytes": "0",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "smallest-portable",
+      "snapshot": {
+        "number": "-9007199254740991"
+      },
+      "bytes": "070000000000000008c33fffffffffffff",
+      "digest": "sha256:761053c45b73b9af5e0279ae19785a5c15a991b115c229404333ac0efc809740",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "0",
+        "maxEnvelopeCanonicalBytes": "17",
+        "maxSingleMarkerCanonicalBytes": "0",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "empty-array",
+      "snapshot": {
+        "array": []
+      },
+      "bytes": "0500000000000000080000000000000000",
+      "digest": "sha256:af6688ff8e040089fc4357f858cdc784b55b73cbc4928bf511deab34a8e38c39",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "0",
+        "maxEnvelopeCanonicalBytes": "17",
+        "maxSingleMarkerCanonicalBytes": "0",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "empty-object",
+      "snapshot": {
+        "object": []
+      },
+      "bytes": "0600000000000000080000000000000000",
+      "digest": "sha256:7ad59436d157c6b1043fa8c346771b13f22f07536002743184bcb7e85904efd8",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "0",
+        "maxEnvelopeCanonicalBytes": "17",
+        "maxSingleMarkerCanonicalBytes": "0",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "array-of-scalars",
+      "snapshot": {
+        "array": [
+          {
+            "null": null
+          },
+          {
+            "boolean": true
+          },
+          {
+            "number": "2"
+          },
+          {
+            "string": "s"
+          }
+        ]
+      },
+      "bytes": "0500000000000000350000000000000004010000000000000000030000000000000000070000000000000008400000000000000004000000000000000173",
+      "digest": "sha256:ac1426325964671111e209299acd4ba10b58de811fcdbdb9891b1f1a210e7daa",
+      "counts": {
+        "maxNodes": "5",
+        "maxDepth": "2",
+        "maxCollectionEntries": "4",
+        "maxTotalStringBytes": "1",
+        "maxSingleStringBytes": "1",
+        "maxRejectedMarkers": "0",
+        "maxEnvelopeCanonicalBytes": "62",
+        "maxSingleMarkerCanonicalBytes": "0",
+        "maxTraversalUnits": "9"
+      }
+    },
+    {
+      "id": "object-key-order",
+      "snapshot": {
+        "object": [
+          [
+            "Z",
+            {
+              "number": "5"
+            }
+          ],
+          [
+            "a",
+            {
+              "number": "4"
+            }
+          ],
+          [
+            "aa",
+            {
+              "number": "3"
+            }
+          ],
+          [
+            "z",
+            {
+              "number": "2"
+            }
+          ],
+          [
+            "é",
+            {
+              "number": "1"
+            }
+          ]
+        ]
+      },
+      "bytes": "06000000000000009100000000000000050400000000000000015a0700000000000000084014000000000000040000000000000001610700000000000000084010000000000000040000000000000002616107000000000000000840080000000000000400000000000000017a0700000000000000084000000000000000040000000000000002c3a90700000000000000083ff0000000000000",
+      "digest": "sha256:d6cce05d3f4751be1966e77d059c8ca31dc1bb37d94402b5de41a8818a18b17b",
+      "counts": {
+        "maxNodes": "6",
+        "maxDepth": "2",
+        "maxCollectionEntries": "5",
+        "maxTotalStringBytes": "7",
+        "maxSingleStringBytes": "2",
+        "maxRejectedMarkers": "0",
+        "maxEnvelopeCanonicalBytes": "154",
+        "maxSingleMarkerCanonicalBytes": "0",
+        "maxTraversalUnits": "11"
+      }
+    },
+    {
+      "id": "nested",
+      "snapshot": {
+        "object": [
+          [
+            "a",
+            {
+              "array": [
+                {
+                  "array": [
+                    {
+                      "array": []
+                    }
+                  ]
+                },
+                {
+                  "object": [
+                    [
+                      "k",
+                      {
+                        "null": null
+                      }
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            "b",
+            {
+              "object": [
+                [
+                  "c",
+                  {
+                    "object": [
+                      [
+                        "d",
+                        {
+                          "string": "e"
+                        }
+                      ]
+                    ]
+                  }
+                ]
+              ]
+            }
+          ]
+        ]
+      },
+      "bytes": "0600000000000000b300000000000000020400000000000000016105000000000000004e00000000000000020500000000000000190000000000000001050000000000000008000000000000000006000000000000001b00000000000000010400000000000000016b0100000000000000000400000000000000016206000000000000003700000000000000010400000000000000016306000000000000001c00000000000000010400000000000000016404000000000000000165",
+      "digest": "sha256:ca3c313c1aba0bcfd5407d4e9e9cd7b408bd09828003253fa13cfa64476ff9a9",
+      "counts": {
+        "maxNodes": "9",
+        "maxDepth": "4",
+        "maxCollectionEntries": "8",
+        "maxTotalStringBytes": "6",
+        "maxSingleStringBytes": "1",
+        "maxRejectedMarkers": "0",
+        "maxEnvelopeCanonicalBytes": "188",
+        "maxSingleMarkerCanonicalBytes": "0",
+        "maxTraversalUnits": "17"
+      }
+    },
+    {
+      "id": "configuration",
+      "snapshot": {
+        "object": [
+          [
+            "project",
+            {
+              "object": [
+                [
+                  "requestedLocales",
+                  {
+                    "array": [
+                      {
+                        "string": "en"
+                      },
+                      {
+                        "string": "ja"
+                      },
+                      {
+                        "string": "zh-Hant"
+                      }
+                    ]
+                  }
+                ],
+                [
+                  "sourceLocale",
+                  {
+                    "string": "en"
+                  }
+                ],
+                [
+                  "strict",
+                  {
+                    "boolean": true
+                  }
+                ]
+              ]
+            }
+          ],
+          [
+            "schemaVersion",
+            {
+              "string": "0"
+            }
+          ],
+          [
+            "targets",
+            {
+              "object": [
+                [
+                  "browser",
+                  {
+                    "object": [
+                      [
+                        "budget",
+                        {
+                          "number": "48.5"
+                        }
+                      ],
+                      [
+                        "fallback",
+                        {
+                          "null": null
+                        }
+                      ],
+                      [
+                        "legacy",
+                        {
+                          "boolean": false
+                        }
+                      ]
+                    ]
+                  }
+                ]
+              ]
+            }
+          ]
+        ]
+      },
+      "bytes": "060000000000000165000000000000000304000000000000000770726f6a65637406000000000000009000000000000000030400000000000000107265717565737465644c6f63616c657305000000000000002e0000000000000003040000000000000002656e0400000000000000026a610400000000000000077a682d48616e7404000000000000000c736f757263654c6f63616c65040000000000000002656e04000000000000000673747269637403000000000000000004000000000000000d736368656d6156657273696f6e040000000000000001300400000000000000077461726765747306000000000000007b000000000000000104000000000000000762726f7773657206000000000000005a0000000000000003040000000000000006627564676574070000000000000008404840000000000004000000000000000866616c6c6261636b0100000000000000000400000000000000066c6567616379020000000000000000",
+      "digest": "sha256:9f82ff25705ce8ef6365b68d0e84616fd69b58d44386a2815823e6fe5909c5d4",
+      "counts": {
+        "maxNodes": "14",
+        "maxDepth": "4",
+        "maxCollectionEntries": "13",
+        "maxTotalStringBytes": "102",
+        "maxSingleStringBytes": "16",
+        "maxRejectedMarkers": "0",
+        "maxEnvelopeCanonicalBytes": "366",
+        "maxSingleMarkerCanonicalBytes": "0",
+        "maxTraversalUnits": "27"
+      }
+    },
+    {
+      "id": "markers-among-values",
+      "snapshot": {
+        "object": [
+          [
+            "a",
+            {
+              "array": [
+                {
+                  "number": "1"
+                },
+                {
+                  "marker": {
+                    "reason": "sparse-array"
+                  }
+                },
+                {
+                  "marker": {
+                    "reason": "non-finite-number"
+                  }
+                }
+              ]
+            }
+          ],
+          [
+            "b",
+            {
+              "marker": {
+                "reason": "dynamic-container"
+              }
+            }
+          ],
+          [
+            "c",
+            {
+              "marker": {
+                "reason": "bootstrap-limit-exceeded",
+                "bound": "bootstrapOnly.snapshot.maxCollectionEntries",
+                "witness": "7"
+              }
+            }
+          ]
+        ]
+      },
+      "bytes": "06000000000000011b00000000000000030400000000000000016105000000000000005a00000000000000030700000000000000083ff000000000000008000000000000001501000000000000000c7370617273652d617272617908000000000000001a0100000000000000116e6f6e2d66696e6974652d6e756d6265720400000000000000016208000000000000001a01000000000000001164796e616d69632d636f6e7461696e657204000000000000000163080000000000000066010000000000000018626f6f7473747261702d6c696d69742d657863656564656402000000000000002b626f6f7473747261704f6e6c792e736e617073686f742e6d6178436f6c6c656374696f6e456e74726965730300000000000000080000000000000007",
+      "digest": "sha256:bdc93c7d7b261783b181b554ddb0982766a4c4c6cab8c36ee0857212d07a9454",
+      "counts": {
+        "maxNodes": "7",
+        "maxDepth": "3",
+        "maxCollectionEntries": "6",
+        "maxTotalStringBytes": "3",
+        "maxSingleStringBytes": "1",
+        "maxRejectedMarkers": "4",
+        "maxEnvelopeCanonicalBytes": "292",
+        "maxSingleMarkerCanonicalBytes": "111",
+        "maxTraversalUnits": "13"
+      }
+    },
+    {
+      "id": "marker-unsupported-type",
+      "snapshot": {
+        "marker": {
+          "reason": "unsupported-type"
+        }
+      },
+      "bytes": "080000000000000019010000000000000010756e737570706f727465642d74797065",
+      "digest": "sha256:728adcf700e1e23d1346c0d97d37ac59a3d47a8984fe75882e7dfda427244aa4",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "1",
+        "maxEnvelopeCanonicalBytes": "34",
+        "maxSingleMarkerCanonicalBytes": "34",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "marker-non-finite-number",
+      "snapshot": {
+        "marker": {
+          "reason": "non-finite-number"
+        }
+      },
+      "bytes": "08000000000000001a0100000000000000116e6f6e2d66696e6974652d6e756d626572",
+      "digest": "sha256:f74eeaf0beda7f16649f6dd98c1840244e5b5bd075167715d6215cb07821e0e5",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "1",
+        "maxEnvelopeCanonicalBytes": "35",
+        "maxSingleMarkerCanonicalBytes": "35",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "marker-non-portable-number",
+      "snapshot": {
+        "marker": {
+          "reason": "non-portable-number"
+        }
+      },
+      "bytes": "08000000000000001c0100000000000000136e6f6e2d706f727461626c652d6e756d626572",
+      "digest": "sha256:3ad23b113fe344205c4c54d23eb08ff1dbeb94e559bc95479482d65a9e010340",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "1",
+        "maxEnvelopeCanonicalBytes": "37",
+        "maxSingleMarkerCanonicalBytes": "37",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "marker-invalid-unicode",
+      "snapshot": {
+        "marker": {
+          "reason": "invalid-unicode"
+        }
+      },
+      "bytes": "08000000000000001801000000000000000f696e76616c69642d756e69636f6465",
+      "digest": "sha256:c299e86ebc47ce5b642b2f92ed9a16b1332afee5aa2d3303bd4a193f69febaef",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "1",
+        "maxEnvelopeCanonicalBytes": "33",
+        "maxSingleMarkerCanonicalBytes": "33",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "marker-non-string-key",
+      "snapshot": {
+        "marker": {
+          "reason": "non-string-key"
+        }
+      },
+      "bytes": "08000000000000001701000000000000000e6e6f6e2d737472696e672d6b6579",
+      "digest": "sha256:5c28a218379818d5e43affb3c9fbf3533a2f58c0edcd19d8ac50d116e7b7ca85",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "1",
+        "maxEnvelopeCanonicalBytes": "32",
+        "maxSingleMarkerCanonicalBytes": "32",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "marker-dynamic-container",
+      "snapshot": {
+        "marker": {
+          "reason": "dynamic-container"
+        }
+      },
+      "bytes": "08000000000000001a01000000000000001164796e616d69632d636f6e7461696e6572",
+      "digest": "sha256:709cbadc816959f401580bcd5489345d7e15c8645e2cb706d5d31cce3f2b793f",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "1",
+        "maxEnvelopeCanonicalBytes": "35",
+        "maxSingleMarkerCanonicalBytes": "35",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "marker-dynamic-property",
+      "snapshot": {
+        "marker": {
+          "reason": "dynamic-property"
+        }
+      },
+      "bytes": "08000000000000001901000000000000001064796e616d69632d70726f7065727479",
+      "digest": "sha256:b14e24ddfe06992a346e36ffbb0f68c7368feec54aedfdf6a44a492af12079cb",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "1",
+        "maxEnvelopeCanonicalBytes": "34",
+        "maxSingleMarkerCanonicalBytes": "34",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "marker-sparse-array",
+      "snapshot": {
+        "marker": {
+          "reason": "sparse-array"
+        }
+      },
+      "bytes": "08000000000000001501000000000000000c7370617273652d6172726179",
+      "digest": "sha256:9d719149321a84a775c535756dea7659952c8737f0ac8d8f27e1d38feb364a98",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "1",
+        "maxEnvelopeCanonicalBytes": "30",
+        "maxSingleMarkerCanonicalBytes": "30",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "marker-cycle",
+      "snapshot": {
+        "marker": {
+          "reason": "cycle"
+        }
+      },
+      "bytes": "08000000000000000e0100000000000000056379636c65",
+      "digest": "sha256:3b30e6132bbd89b69d2f58b9303de3d162a93db0c933a6705ebf4074554c69fd",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "1",
+        "maxEnvelopeCanonicalBytes": "23",
+        "maxSingleMarkerCanonicalBytes": "23",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "bootstrap-maxNodes",
+      "snapshot": {
+        "marker": {
+          "reason": "bootstrap-limit-exceeded",
+          "bound": "bootstrapOnly.snapshot.maxNodes",
+          "witness": "2"
+        }
+      },
+      "bytes": "08000000000000005a010000000000000018626f6f7473747261702d6c696d69742d657863656564656402000000000000001f626f6f7473747261704f6e6c792e736e617073686f742e6d61784e6f6465730300000000000000080000000000000002",
+      "digest": "sha256:695219b00fb1694848a868568e2e9708caa2dc48ba9210d9a53d5392acbc8ee0",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "1",
+        "maxEnvelopeCanonicalBytes": "99",
+        "maxSingleMarkerCanonicalBytes": "99",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "bootstrap-maxDepth",
+      "snapshot": {
+        "marker": {
+          "reason": "bootstrap-limit-exceeded",
+          "bound": "bootstrapOnly.snapshot.maxDepth",
+          "witness": "1002"
+        }
+      },
+      "bytes": "08000000000000005a010000000000000018626f6f7473747261702d6c696d69742d657863656564656402000000000000001f626f6f7473747261704f6e6c792e736e617073686f742e6d6178446570746803000000000000000800000000000003ea",
+      "digest": "sha256:cec665be2cb4be41e95a41278e1b09bcd23315a85c24f3cebb34274893c05dfc",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "1",
+        "maxEnvelopeCanonicalBytes": "99",
+        "maxSingleMarkerCanonicalBytes": "99",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "bootstrap-maxCollectionEntries",
+      "snapshot": {
+        "marker": {
+          "reason": "bootstrap-limit-exceeded",
+          "bound": "bootstrapOnly.snapshot.maxCollectionEntries",
+          "witness": "2002"
+        }
+      },
+      "bytes": "080000000000000066010000000000000018626f6f7473747261702d6c696d69742d657863656564656402000000000000002b626f6f7473747261704f6e6c792e736e617073686f742e6d6178436f6c6c656374696f6e456e747269657303000000000000000800000000000007d2",
+      "digest": "sha256:6628be316c41099fb198cd5ca1997aaa5de26bdeb88b6189fc243d2c9a452117",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "1",
+        "maxEnvelopeCanonicalBytes": "111",
+        "maxSingleMarkerCanonicalBytes": "111",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "bootstrap-maxTotalStringBytes",
+      "snapshot": {
+        "marker": {
+          "reason": "bootstrap-limit-exceeded",
+          "bound": "bootstrapOnly.snapshot.maxTotalStringBytes",
+          "witness": "3002"
+        }
+      },
+      "bytes": "080000000000000065010000000000000018626f6f7473747261702d6c696d69742d657863656564656402000000000000002a626f6f7473747261704f6e6c792e736e617073686f742e6d6178546f74616c537472696e6742797465730300000000000000080000000000000bba",
+      "digest": "sha256:680ed8bdf9fd996459facd42a98642a117160b058554c73d99dcf7edc80a2853",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "1",
+        "maxEnvelopeCanonicalBytes": "110",
+        "maxSingleMarkerCanonicalBytes": "110",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "bootstrap-maxSingleStringBytes",
+      "snapshot": {
+        "marker": {
+          "reason": "bootstrap-limit-exceeded",
+          "bound": "bootstrapOnly.snapshot.maxSingleStringBytes",
+          "witness": "4002"
+        }
+      },
+      "bytes": "080000000000000066010000000000000018626f6f7473747261702d6c696d69742d657863656564656402000000000000002b626f6f7473747261704f6e6c792e736e617073686f742e6d617853696e676c65537472696e6742797465730300000000000000080000000000000fa2",
+      "digest": "sha256:36f90afedeea0dc299559906dffd2ec4cba7b686c1a7423081d2d82634911937",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "1",
+        "maxEnvelopeCanonicalBytes": "111",
+        "maxSingleMarkerCanonicalBytes": "111",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "bootstrap-maxRejectedMarkers",
+      "snapshot": {
+        "marker": {
+          "reason": "bootstrap-limit-exceeded",
+          "bound": "bootstrapOnly.snapshot.maxRejectedMarkers",
+          "witness": "5002"
+        }
+      },
+      "bytes": "080000000000000064010000000000000018626f6f7473747261702d6c696d69742d6578636565646564020000000000000029626f6f7473747261704f6e6c792e736e617073686f742e6d617852656a65637465644d61726b657273030000000000000008000000000000138a",
+      "digest": "sha256:3ca2b9b0dd1a31327cee00327b915c7554570cddaa1c001245c007f9ae854f1e",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "1",
+        "maxEnvelopeCanonicalBytes": "109",
+        "maxSingleMarkerCanonicalBytes": "109",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "bootstrap-maxEnvelopeCanonicalBytes",
+      "snapshot": {
+        "marker": {
+          "reason": "bootstrap-limit-exceeded",
+          "bound": "bootstrapOnly.snapshot.maxEnvelopeCanonicalBytes",
+          "witness": "6002"
+        }
+      },
+      "bytes": "08000000000000006b010000000000000018626f6f7473747261702d6c696d69742d6578636565646564020000000000000030626f6f7473747261704f6e6c792e736e617073686f742e6d6178456e76656c6f706543616e6f6e6963616c42797465730300000000000000080000000000001772",
+      "digest": "sha256:ddc7badc616dde6bb029fb58db48afec594e01236324e61eb2ec4ce219b73fb1",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "1",
+        "maxEnvelopeCanonicalBytes": "116",
+        "maxSingleMarkerCanonicalBytes": "116",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "bootstrap-maxSingleMarkerCanonicalBytes",
+      "snapshot": {
+        "marker": {
+          "reason": "bootstrap-limit-exceeded",
+          "bound": "bootstrapOnly.snapshot.maxSingleMarkerCanonicalBytes",
+          "witness": "7002"
+        }
+      },
+      "bytes": "08000000000000006f010000000000000018626f6f7473747261702d6c696d69742d6578636565646564020000000000000034626f6f7473747261704f6e6c792e736e617073686f742e6d617853696e676c654d61726b657243616e6f6e6963616c42797465730300000000000000080000000000001b5a",
+      "digest": "sha256:5e7c1e4b48881d66d483208a22e7957e29524cb72aa3d3c77cbf6def2abb3bb0",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "1",
+        "maxEnvelopeCanonicalBytes": "120",
+        "maxSingleMarkerCanonicalBytes": "120",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "bootstrap-maxTraversalUnits",
+      "snapshot": {
+        "marker": {
+          "reason": "bootstrap-limit-exceeded",
+          "bound": "bootstrapOnly.snapshot.maxTraversalUnits",
+          "witness": "8002"
+        }
+      },
+      "bytes": "080000000000000063010000000000000018626f6f7473747261702d6c696d69742d6578636565646564020000000000000028626f6f7473747261704f6e6c792e736e617073686f742e6d617854726176657273616c556e6974730300000000000000080000000000001f42",
+      "digest": "sha256:a1157b2572804373772b916d66de61f435e34f97f60eb0a6916e2a7a422d1f35",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "1",
+        "maxEnvelopeCanonicalBytes": "108",
+        "maxSingleMarkerCanonicalBytes": "108",
+        "maxTraversalUnits": "1"
+      }
+    },
+    {
+      "id": "bootstrap-largest-witness",
+      "snapshot": {
+        "marker": {
+          "reason": "bootstrap-limit-exceeded",
+          "bound": "bootstrapOnly.snapshot.maxSingleMarkerCanonicalBytes",
+          "witness": "18446744073709551614"
+        }
+      },
+      "bytes": "08000000000000006f010000000000000018626f6f7473747261702d6c696d69742d6578636565646564020000000000000034626f6f7473747261704f6e6c792e736e617073686f742e6d617853696e676c654d61726b657243616e6f6e6963616c4279746573030000000000000008fffffffffffffffe",
+      "digest": "sha256:f4bcaf19b9502f80adcc5a9a3b37ade1cc56ce477f927d88d3518b08bcfee44e",
+      "counts": {
+        "maxNodes": "1",
+        "maxDepth": "1",
+        "maxCollectionEntries": "0",
+        "maxTotalStringBytes": "0",
+        "maxSingleStringBytes": "0",
+        "maxRejectedMarkers": "1",
+        "maxEnvelopeCanonicalBytes": "120",
+        "maxSingleMarkerCanonicalBytes": "120",
+        "maxTraversalUnits": "1"
+      }
+    }
+  ]
+}
