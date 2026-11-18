@@ -1325,6 +1325,16 @@
             }
           ]
         },
+        "entryEvidenceInput": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/InputFacts9"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "execution": {
           "$ref": "#/definitions/Execution"
         },
@@ -2406,6 +2416,11 @@
         {
           "const": "dense",
           "description": "The example with [`DENSE`] more targets, each requesting a locale\noutside the project's that its Target Profile has no direction for:\nmany Findings, each of a target of its own.",
+          "type": "string"
+        },
+        {
+          "const": "malformed",
+          "description": "The example's file without its last byte, which is no JSON: no value,\nso no unit reports into the Shared domain (D15:2369; plan 025\ndecision #260).",
           "type": "string"
         }
       ]
@@ -3858,7 +3873,8 @@
         "hydration-relation-validation",
         "construction-authority-admission",
         "construction-identity",
-        "shared-evidence"
+        "shared-evidence",
+        "entry-evidence"
       ],
       "type": "string"
     },
@@ -5009,7 +5025,24 @@
         "shared-evidence-subject-occurrences",
         "shared-evidence-token-inputs",
         "shared-evidence-collision-comparisons",
-        "shared-evidence-metadata-work-units"
+        "shared-evidence-metadata-work-units",
+        "entry-evidence-finding-candidates",
+        "entry-evidence-findings",
+        "entry-evidence-maximum-related-evidence-per-occurrence-group",
+        "entry-evidence-related-evidence-occurrences",
+        "entry-evidence-maximum-single-evidence-bytes",
+        "entry-evidence-total-evidence-bytes",
+        "entry-evidence-evaluation-statuses",
+        "entry-evidence-maximum-causes-per-status",
+        "entry-evidence-cause-occurrences",
+        "entry-evidence-records",
+        "entry-evidence-canonical-bytes",
+        "entry-evidence-maximum-logical-path-segments",
+        "entry-evidence-maximum-logical-path-canonical-bytes",
+        "entry-evidence-subject-occurrences",
+        "entry-evidence-token-inputs",
+        "entry-evidence-collision-comparisons",
+        "entry-evidence-metadata-work-units"
       ],
       "type": "string"
     },
@@ -5060,7 +5093,10 @@
         "subject-occurrence",
         "token-input",
         "collision-comparison",
-        "evidence-metadata-work"
+        "evidence-metadata-work",
+        "related-evidence",
+        "related-evidence-occurrence",
+        "path-segment"
       ],
       "type": "string"
     },

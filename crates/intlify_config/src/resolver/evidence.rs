@@ -207,19 +207,31 @@ impl EvidenceProjection {
             path_holds(limits, size)?;
         }
         let mut admitted = self.clone();
-        if let Parts::Configuration {
-            location: Location::Entry(path),
-            ..
-        } = &mut admitted.parts
+        if self
+            .entry_path()
+            .is_some_and(|size| path_holds(limits, size).is_err())
         {
-            if path
-                .as_ref()
-                .is_some_and(|path| path_holds(limits, path.size()).is_err())
+            if let Parts::Configuration {
+                location: Location::Entry(path),
+                ..
+            } = &mut admitted.parts
             {
                 *path = None;
             }
         }
         Ok(admitted)
+    }
+
+    /// The size of the Logical input path of Entry Source Evidence, which
+    /// path admission leaves absent past either path bound (D15:776, 1851).
+    pub(crate) fn entry_path(&self) -> Option<PathSize> {
+        match &self.parts {
+            Parts::Configuration {
+                location: Location::Entry(Some(path)),
+                ..
+            } => Some(path.size()),
+            Parts::Configuration { .. } | Parts::Selector(_) | Parts::ResolverInput(_) => None,
+        }
     }
 
     /// The metadata work units of the record: one for each source identity,

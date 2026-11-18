@@ -147,10 +147,7 @@ impl Recipe {
         if let Self::Evidence(recipe) = self {
             // The configuration file the invocation reads; the input context
             // binds the members and the invocation's other inputs.
-            return Arc::from(
-                serde_json::to_vec(&recipe.fixture(&super::evidence_limits()).config)
-                    .expect("finite owner evidence fixture"),
-            );
+            return Arc::from(recipe.source(&super::evidence_limits()));
         }
         if let Self::Construction(recipe) = self {
             // What each component declares; the input context binds every

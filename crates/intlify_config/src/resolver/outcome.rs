@@ -146,6 +146,15 @@ pub(crate) struct EntryStage<'e, 'a> {
     reported: Reported<'e>,
 }
 
+#[cfg(feature = "benchmark")]
+impl<'e> EntryStage<'e, '_> {
+    /// The slices the Entry domain committed, and how a slice it refused
+    /// exhausted it, if one did.
+    pub(crate) const fn committed(&self) -> &Committed<'e> {
+        &self.reported.entry
+    }
+}
+
 /// The outcome of one file entry's invocation, which `evaluation` recorded
 /// and `invoked` left ([`super::profile_resolution::invoke_file`]), under
 /// `identity`: its three stages in turn, the Shared projection, the Entry

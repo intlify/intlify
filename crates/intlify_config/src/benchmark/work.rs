@@ -141,6 +141,23 @@ pub(super) enum WorkKind {
     SharedEvidenceTokenInputs,
     SharedEvidenceCollisionComparisons,
     SharedEvidenceMetadataWorkUnits,
+    EntryEvidenceFindingCandidates,
+    EntryEvidenceFindings,
+    EntryEvidenceMaximumRelatedEvidencePerOccurrenceGroup,
+    EntryEvidenceRelatedEvidenceOccurrences,
+    EntryEvidenceMaximumSingleEvidenceBytes,
+    EntryEvidenceTotalEvidenceBytes,
+    EntryEvidenceEvaluationStatuses,
+    EntryEvidenceMaximumCausesPerStatus,
+    EntryEvidenceCauseOccurrences,
+    EntryEvidenceRecords,
+    EntryEvidenceCanonicalBytes,
+    EntryEvidenceMaximumLogicalPathSegments,
+    EntryEvidenceMaximumLogicalPathCanonicalBytes,
+    EntryEvidenceSubjectOccurrences,
+    EntryEvidenceTokenInputs,
+    EntryEvidenceCollisionComparisons,
+    EntryEvidenceMetadataWorkUnits,
 }
 
 impl WorkKind {
@@ -289,6 +306,26 @@ impl WorkKind {
         Self::SharedEvidenceMetadataWorkUnits,
     ];
 
+    const ENTRY_EVIDENCE: [Self; 17] = [
+        Self::EntryEvidenceFindingCandidates,
+        Self::EntryEvidenceFindings,
+        Self::EntryEvidenceMaximumRelatedEvidencePerOccurrenceGroup,
+        Self::EntryEvidenceRelatedEvidenceOccurrences,
+        Self::EntryEvidenceMaximumSingleEvidenceBytes,
+        Self::EntryEvidenceTotalEvidenceBytes,
+        Self::EntryEvidenceEvaluationStatuses,
+        Self::EntryEvidenceMaximumCausesPerStatus,
+        Self::EntryEvidenceCauseOccurrences,
+        Self::EntryEvidenceRecords,
+        Self::EntryEvidenceCanonicalBytes,
+        Self::EntryEvidenceMaximumLogicalPathSegments,
+        Self::EntryEvidenceMaximumLogicalPathCanonicalBytes,
+        Self::EntryEvidenceSubjectOccurrences,
+        Self::EntryEvidenceTokenInputs,
+        Self::EntryEvidenceCollisionComparisons,
+        Self::EntryEvidenceMetadataWorkUnits,
+    ];
+
     pub(super) fn for_operation(operation: Operation) -> &'static [Self] {
         match operation {
             Operation::LocaleCanonicalization => &Self::LOCALE,
@@ -301,6 +338,7 @@ impl WorkKind {
             Operation::ConstructionAuthorityAdmission => &Self::CONSTRUCTION,
             Operation::ConstructionIdentity => &Self::CONSTRUCTION_IDENTITY,
             Operation::SharedEvidence => &Self::SHARED_EVIDENCE,
+            Operation::EntryEvidence => &Self::ENTRY_EVIDENCE,
             _ => &Self::INPUT,
         }
     }
@@ -315,15 +353,31 @@ impl WorkKind {
             | Self::ConstructionMaximumRegistryMemberBytes
             | Self::ConstructionTotalRegistryArtifactBytes
             | Self::ConstructionIdentityPreimageBytes => WorkUnit::Octet,
-            Self::SharedEvidenceFindingCandidates => WorkUnit::FindingCandidate,
-            Self::SharedEvidenceFindings => WorkUnit::FindingKey,
-            Self::SharedEvidenceMaximumCausesPerStatus | Self::SharedEvidenceCauseOccurrences => {
-                WorkUnit::CausalFindingKey
+            Self::SharedEvidenceFindingCandidates | Self::EntryEvidenceFindingCandidates => {
+                WorkUnit::FindingCandidate
             }
-            Self::SharedEvidenceSubjectOccurrences => WorkUnit::SubjectOccurrence,
-            Self::SharedEvidenceTokenInputs => WorkUnit::TokenInput,
-            Self::SharedEvidenceCollisionComparisons => WorkUnit::CollisionComparison,
-            Self::SharedEvidenceMetadataWorkUnits => WorkUnit::EvidenceMetadataWork,
+            Self::SharedEvidenceFindings | Self::EntryEvidenceFindings => WorkUnit::FindingKey,
+            Self::SharedEvidenceMaximumCausesPerStatus
+            | Self::SharedEvidenceCauseOccurrences
+            | Self::EntryEvidenceMaximumCausesPerStatus
+            | Self::EntryEvidenceCauseOccurrences => WorkUnit::CausalFindingKey,
+            Self::EntryEvidenceMaximumRelatedEvidencePerOccurrenceGroup => {
+                WorkUnit::RelatedEvidence
+            }
+            Self::EntryEvidenceRelatedEvidenceOccurrences => WorkUnit::RelatedEvidenceOccurrence,
+            Self::EntryEvidenceMaximumLogicalPathSegments => WorkUnit::PathSegment,
+            Self::SharedEvidenceSubjectOccurrences | Self::EntryEvidenceSubjectOccurrences => {
+                WorkUnit::SubjectOccurrence
+            }
+            Self::SharedEvidenceTokenInputs | Self::EntryEvidenceTokenInputs => {
+                WorkUnit::TokenInput
+            }
+            Self::SharedEvidenceCollisionComparisons | Self::EntryEvidenceCollisionComparisons => {
+                WorkUnit::CollisionComparison
+            }
+            Self::SharedEvidenceMetadataWorkUnits | Self::EntryEvidenceMetadataWorkUnits => {
+                WorkUnit::EvidenceMetadataWork
+            }
             Self::ConstructionConfigurationSchemas => WorkUnit::ConfigurationSchema,
             Self::ConstructionSchemaNodes => WorkUnit::SchemaNode,
             Self::ConstructionSchemaReferences => WorkUnit::SchemaReference,
@@ -360,7 +414,8 @@ impl WorkKind {
             | Self::ResolvedBindingBlockingIssues
             | Self::TargetAndGroupBlockingIssues
             | Self::HydrationBlockingIssues
-            | Self::SharedEvidenceRecords => WorkUnit::RetainedRecord,
+            | Self::SharedEvidenceRecords
+            | Self::EntryEvidenceRecords => WorkUnit::RetainedRecord,
             Self::LocaleOccurrences
             | Self::LocalePolicyResolutionOccurrences
             | Self::LocalePolicyResolutionCanonicalizedOccurrences
@@ -389,7 +444,8 @@ impl WorkKind {
             | Self::TargetAndGroupNotEvaluatedUnits
             | Self::HydrationEvaluationUnits
             | Self::HydrationNotEvaluatedUnits
-            | Self::SharedEvidenceEvaluationStatuses => WorkUnit::EvaluationUnit,
+            | Self::SharedEvidenceEvaluationStatuses
+            | Self::EntryEvidenceEvaluationStatuses => WorkUnit::EvaluationUnit,
             Self::ResourcePolicyArtifactOccurrences
             | Self::ResourcePolicyPolicyArtifacts
             | Self::ResourcePolicyTargetProfileArtifacts
@@ -404,7 +460,11 @@ impl WorkKind {
             | Self::ResourcePolicyReferenceCanonicalBytes
             | Self::ArtifactCollectionArtifactCanonicalBytes
             | Self::ResolvedBindingReferenceCanonicalBytes
-            | Self::SharedEvidenceCanonicalBytes => WorkUnit::CanonicalOctet,
+            | Self::SharedEvidenceCanonicalBytes
+            | Self::EntryEvidenceMaximumSingleEvidenceBytes
+            | Self::EntryEvidenceTotalEvidenceBytes
+            | Self::EntryEvidenceCanonicalBytes
+            | Self::EntryEvidenceMaximumLogicalPathCanonicalBytes => WorkUnit::CanonicalOctet,
             Self::ResourcePolicyReferences
             | Self::ResolvedBindingReferences
             | Self::ResolvedBindingDistinctReferences
@@ -473,6 +533,9 @@ enum WorkUnit {
     TokenInput,
     CollisionComparison,
     EvidenceMetadataWork,
+    RelatedEvidence,
+    RelatedEvidenceOccurrence,
+    PathSegment,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -566,6 +629,7 @@ impl LogicalWork {
                     "intlify-config-resolver-construction-identity-work"
                 }
                 Operation::SharedEvidence => "intlify-config-shared-evidence-work",
+                Operation::EntryEvidence => "intlify-config-entry-evidence-work",
                 _ => "intlify-config-minimum-input-work",
             }
             .into(),
@@ -652,6 +716,9 @@ impl LogicalWork {
             }
             (Prepared::SharedEvidence(_), Output::SharedEvidence(resolved)) => {
                 work.shared_evidence(resolved)?;
+            }
+            (Prepared::EntryEvidence(_), Output::EntryEvidence(resolved)) => {
+                work.entry_evidence(resolved)?;
             }
             _ => return Err(WorkFailure::OperationMismatch),
         }

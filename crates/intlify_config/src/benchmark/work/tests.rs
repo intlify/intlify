@@ -169,6 +169,14 @@ fn every_active_operation_retains_the_complete_ordered_vocabulary_and_its_stages
                 .facts
                 .iter()
                 .all(|item| item.stage == WorkStage::OperationResult));
+        } else if prepared.operation() == Operation::EntryEvidence {
+            // The Entry domain's eleven counts and the complete invocation's
+            // six, of what the stage committed and counted.
+            assert_eq!(work.facts.len(), 17);
+            assert!(work
+                .facts
+                .iter()
+                .all(|item| item.stage == WorkStage::OperationResult));
         } else {
             assert_eq!(work.facts.len(), 14);
             assert_eq!(fact(&work, WorkKind::LogicalValueNodes).stage, input_stage);
@@ -933,15 +941,19 @@ fn sample_capture_rechecks_work_even_when_the_semantic_checksum_matches() {
 fn the_shared_evidence_work_counts_what_the_stage_committed() {
     use crate::benchmark::cases::prepare::prepare;
     use crate::benchmark::cases::{declarations, EvidenceRecipe as R, Recipe, DENSE};
+    use crate::benchmark::operation::Operation;
 
     let exact = |work: &LogicalWork, kind| match fact(work, kind).observation {
         WorkValue::Exact { value } => value.get(),
         _ => panic!("{kind:?}"),
     };
-    for recipe in R::ALL {
+    for recipe in R::VALUED {
         let declaration = declarations()
             .into_iter()
-            .find(|case| case.fixture == Recipe::Evidence(recipe))
+            .find(|case| {
+                case.operation == Operation::SharedEvidence
+                    && case.fixture == Recipe::Evidence(recipe)
+            })
             .unwrap();
         let candidate = prepare(&declaration).unwrap();
         let work = &candidate.logical_work;
@@ -990,6 +1002,165 @@ fn the_shared_evidence_work_counts_what_the_stage_committed() {
                     findings as u64
                 );
             }
+            R::Malformed => unreachable!("only a recipe with a value has a Shared projection"),
         }
     }
+}
+
+/// An Entry projection stage case's declaration and its prepared candidate.
+fn entry_candidate(
+    recipe: crate::benchmark::cases::EvidenceRecipe,
+) -> crate::benchmark::cases::prepare::Candidate {
+    use crate::benchmark::cases::prepare::prepare;
+    use crate::benchmark::cases::{declarations, Recipe};
+
+    let declaration = declarations()
+        .into_iter()
+        .find(|case| {
+            case.operation == Operation::EntryEvidence && case.fixture == Recipe::Evidence(recipe)
+        })
+        .unwrap();
+    prepare(&declaration).unwrap()
+}
+
+/// The Entry projection stage's work is what its Entry domain committed and
+/// the complete invocation counted, each in its bound's unit: the example
+/// commits no Finding Occurrence, the dense recipe one with a related
+/// Evidence for each of its Shared Findings, and the file without a value
+/// its Entry Finding and the causes it is of, with no path (D15:1851,
+/// 1946-1956, 2796).
+#[test]
+fn the_entry_evidence_work_counts_what_the_stage_committed() {
+    use crate::benchmark::cases::{EvidenceRecipe as R, DENSE};
+    use crate::construction::registry::check::RecordKind;
+
+    let exact = |work: &LogicalWork, kind| match fact(work, kind).observation {
+        WorkValue::Exact { value } => value.get(),
+        _ => panic!("{kind:?}"),
+    };
+    for recipe in R::ALL {
+        let candidate = entry_candidate(recipe);
+        let work = &candidate.logical_work;
+        let Output::EntryEvidence(resolved) = &candidate.output else {
+            unreachable!()
+        };
+        let retained = resolved.result.as_ref().unwrap();
+        let invocation = resolved.invocation.unwrap();
+        let slices = &retained.slices;
+        let records: Vec<_> = slices.iter().flat_map(|slice| &slice.records).collect();
+        let evidence: Vec<u64> = slices
+            .iter()
+            .flat_map(|slice| slice.candidates.evidence.iter().copied())
+            .collect();
+        let of = |kind| records.iter().filter(|record| record.kind == kind).count() as u64;
+        for (kind, value) in [
+            (
+                WorkKind::EntryEvidenceFindingCandidates,
+                slices.iter().map(|slice| slice.candidates.findings).sum(),
+            ),
+            (
+                WorkKind::EntryEvidenceFindings,
+                of(RecordKind::EntryFinding),
+            ),
+            (
+                WorkKind::EntryEvidenceMaximumRelatedEvidencePerOccurrenceGroup,
+                records
+                    .iter()
+                    .map(|record| record.related)
+                    .max()
+                    .unwrap_or(0),
+            ),
+            (
+                WorkKind::EntryEvidenceRelatedEvidenceOccurrences,
+                slices.iter().map(|slice| slice.candidates.related).sum(),
+            ),
+            (
+                WorkKind::EntryEvidenceMaximumSingleEvidenceBytes,
+                evidence.iter().copied().max().unwrap_or(0),
+            ),
+            (
+                WorkKind::EntryEvidenceTotalEvidenceBytes,
+                evidence.iter().sum(),
+            ),
+            (
+                WorkKind::EntryEvidenceEvaluationStatuses,
+                of(RecordKind::EntryEvaluationStatus),
+            ),
+            (
+                WorkKind::EntryEvidenceMaximumCausesPerStatus,
+                records
+                    .iter()
+                    .map(|record| record.causes)
+                    .max()
+                    .unwrap_or(0),
+            ),
+            (
+                WorkKind::EntryEvidenceCauseOccurrences,
+                slices.iter().map(|slice| slice.candidates.causes).sum(),
+            ),
+            (WorkKind::EntryEvidenceRecords, records.len() as u64),
+            (
+                WorkKind::EntryEvidenceCanonicalBytes,
+                records.iter().map(|record| record.bytes).sum(),
+            ),
+            (
+                WorkKind::EntryEvidenceMaximumLogicalPathSegments,
+                invocation.path_segments,
+            ),
+            (
+                WorkKind::EntryEvidenceMaximumLogicalPathCanonicalBytes,
+                invocation.path_bytes,
+            ),
+            (
+                WorkKind::EntryEvidenceSubjectOccurrences,
+                invocation.subject_occurrences,
+            ),
+            (WorkKind::EntryEvidenceTokenInputs, invocation.token_inputs),
+            (
+                WorkKind::EntryEvidenceCollisionComparisons,
+                invocation.collision_comparisons,
+            ),
+            (
+                WorkKind::EntryEvidenceMetadataWorkUnits,
+                invocation.metadata_work_units,
+            ),
+        ] {
+            assert_eq!(exact(work, kind), value, "{recipe:?} {kind:?}");
+        }
+        let occurrences = exact(work, WorkKind::EntryEvidenceFindingCandidates);
+        match recipe {
+            R::Storefront => assert_eq!(occurrences, 0),
+            R::Blocked => assert!(occurrences > 0),
+            R::Dense => {
+                assert_eq!(occurrences, 2 * DENSE as u64);
+                assert_eq!(
+                    exact(work, WorkKind::EntryEvidenceRelatedEvidenceOccurrences),
+                    occurrences
+                );
+            }
+            R::Malformed => {
+                assert!(exact(work, WorkKind::EntryEvidenceFindings) > 0);
+                assert!(exact(work, WorkKind::EntryEvidenceCauseOccurrences) > 0);
+                assert_eq!(
+                    exact(work, WorkKind::EntryEvidenceMaximumLogicalPathSegments),
+                    0
+                );
+            }
+        }
+    }
+}
+
+/// Without the complete invocation's count, which a path past its bound
+/// ends, an Entry projection stage case has no work to compare.
+#[test]
+fn an_entry_resolution_without_its_invocation_count_has_no_work() {
+    let candidate = entry_candidate(crate::benchmark::cases::EvidenceRecipe::Storefront);
+    let Output::EntryEvidence(mut resolved) = candidate.output else {
+        unreachable!()
+    };
+    resolved.invocation = None;
+    assert!(matches!(
+        LogicalWork::observe(&candidate.prepared, &Output::EntryEvidence(resolved)),
+        Err(WorkFailure::InvalidOrdinaryResult)
+    ));
 }
