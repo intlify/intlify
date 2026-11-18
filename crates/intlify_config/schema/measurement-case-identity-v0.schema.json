@@ -575,7 +575,17 @@
         "construction-registry-single-member-artifact-bytes",
         "construction-cross-authority-checks",
         "construction-schema-validation-work-units",
-        "construction-registry-validation-work-units"
+        "construction-registry-validation-work-units",
+        "shared-finding-occurrences",
+        "shared-findings",
+        "shared-evaluation-status-entries",
+        "shared-suppression-causes-per-status",
+        "shared-suppression-cause-occurrences",
+        "shared-records",
+        "shared-total-canonical-bytes",
+        "shared-scope-subject-occurrences",
+        "shared-scope-token-inputs",
+        "shared-scope-metadata-work-units"
       ],
       "type": "string"
     },

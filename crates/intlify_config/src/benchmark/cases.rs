@@ -94,6 +94,16 @@ pub(super) enum LimitKind {
     ConstructionCrossAuthorityChecks,
     ConstructionSchemaValidationWorkUnits,
     ConstructionRegistryValidationWorkUnits,
+    SharedFindingOccurrences,
+    SharedFindings,
+    SharedEvaluationStatusEntries,
+    SharedSuppressionCausesPerStatus,
+    SharedSuppressionCauseOccurrences,
+    SharedRecords,
+    SharedTotalCanonicalBytes,
+    SharedScopeSubjectOccurrences,
+    SharedScopeTokenInputs,
+    SharedScopeMetadataWorkUnits,
 }
 
 impl LimitKind {
@@ -159,6 +169,7 @@ pub(super) enum ExpectedKind {
     ConstructionRefused,
     ConstructionIdentityDerived,
     SharedEvidenceComplete,
+    SharedEvidenceExhausted,
     EntryEvidenceComplete,
     OutcomeFinalizationChecked,
     OutcomeFinalizationBlocked,
@@ -932,6 +943,25 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 ExpectedKind::OutcomeFinalizationBlocked
             },
         ));
+    }
+    // Then the exact and first-over edges of each bound the Shared projection
+    // stage counts: at the count the Shared domain commits whole, and one
+    // under it the bound exhausts it (plan 025 decisions #256 and #263).
+    for (limit, recipe) in evidence_inputs::SHARED_EDGES {
+        for edge in [LimitEdge::Exact, LimitEdge::FirstOver] {
+            let mut case = declaration(
+                Operation::SharedEvidence,
+                Recipe::Evidence(recipe),
+                Selector::App,
+                if edge == LimitEdge::Exact {
+                    ExpectedKind::SharedEvidenceComplete
+                } else {
+                    ExpectedKind::SharedEvidenceExhausted
+                },
+            );
+            case.limit = Some((limit, edge));
+            cases.push(case);
+        }
     }
     cases
 }

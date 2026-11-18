@@ -606,6 +606,19 @@ pub(super) struct LogicalWork {
     facts: Vec<WorkFact>,
 }
 
+impl LogicalWork {
+    /// The exact value of `kind`, when the work holds one.
+    pub(super) fn exact(&self, kind: WorkKind) -> Option<u64> {
+        self.facts
+            .iter()
+            .find(|fact| fact.kind == kind)
+            .and_then(|fact| match fact.observation {
+                WorkValue::Exact { value } => Some(value.get()),
+                _ => None,
+            })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum WorkFailure {
