@@ -205,7 +205,23 @@ pub(in crate::benchmark) fn prepare(
             | LimitKind::SharedTotalCanonicalBytes
             | LimitKind::SharedScopeSubjectOccurrences
             | LimitKind::SharedScopeTokenInputs
-            | LimitKind::SharedScopeMetadataWorkUnits => {
+            | LimitKind::SharedScopeMetadataWorkUnits
+            | LimitKind::EntryFindingOccurrences
+            | LimitKind::EntryFindings
+            | LimitKind::EntryRelatedEvidencePerOccurrenceGroup
+            | LimitKind::EntryRelatedEvidenceOccurrences
+            | LimitKind::EntrySingleEvidenceBytes
+            | LimitKind::EntryTotalEvidenceBytes
+            | LimitKind::EntryEvaluationStatusEntries
+            | LimitKind::EntrySuppressionCausesPerStatus
+            | LimitKind::EntrySuppressionCauseOccurrences
+            | LimitKind::EntryRecords
+            | LimitKind::EntryTotalCanonicalBytes
+            | LimitKind::InvocationLogicalPathSegments
+            | LimitKind::InvocationLogicalPathCanonicalBytes
+            | LimitKind::InvocationSubjectOccurrences
+            | LimitKind::InvocationTokenInputs
+            | LimitKind::InvocationMetadataWorkUnits => {
                 return Err(PreparationFailure::UndeclaredCase);
             }
         };
@@ -275,7 +291,23 @@ pub(in crate::benchmark) fn prepare(
             | LimitKind::SharedTotalCanonicalBytes
             | LimitKind::SharedScopeSubjectOccurrences
             | LimitKind::SharedScopeTokenInputs
-            | LimitKind::SharedScopeMetadataWorkUnits => unreachable!(),
+            | LimitKind::SharedScopeMetadataWorkUnits
+            | LimitKind::EntryFindingOccurrences
+            | LimitKind::EntryFindings
+            | LimitKind::EntryRelatedEvidencePerOccurrenceGroup
+            | LimitKind::EntryRelatedEvidenceOccurrences
+            | LimitKind::EntrySingleEvidenceBytes
+            | LimitKind::EntryTotalEvidenceBytes
+            | LimitKind::EntryEvaluationStatusEntries
+            | LimitKind::EntrySuppressionCausesPerStatus
+            | LimitKind::EntrySuppressionCauseOccurrences
+            | LimitKind::EntryRecords
+            | LimitKind::EntryTotalCanonicalBytes
+            | LimitKind::InvocationLogicalPathSegments
+            | LimitKind::InvocationLogicalPathCanonicalBytes
+            | LimitKind::InvocationSubjectOccurrences
+            | LimitKind::InvocationTokenInputs
+            | LimitKind::InvocationMetadataWorkUnits => unreachable!(),
         }
     }
     let prepared = if declaration.operation == Operation::FileMaterialization {
@@ -1265,11 +1297,11 @@ fn select_config(config: &Value, selector: Selector) -> Result<SelectedConfig, P
 /// One file entry's complete invocation under fixture-owned inputs, whose
 /// evaluation phases run before each interval, and one of 015's Evidence
 /// materialization stages over it once (D15:2771, 2775). An edge of a bound
-/// the Shared projection stage counts sits at the count an unbounded baseline
-/// run's logical work reports for it, or one under it (plan 025 decision
-/// #263).
+/// a projection stage counts sits at the count an unbounded baseline run of
+/// that stage reports in its logical work, or one under it (plan 025
+/// decisions #263 and #264).
 fn prepare_evidence(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
-    use super::evidence_inputs::SharedBound;
+    use super::evidence_inputs::EvidenceBound;
     use crate::benchmark::evidence::outcome::PreparedOutcome;
     use crate::benchmark::evidence::Retained;
     use crate::resolver::evidence_metadata::fixtures::unbounded;
@@ -1281,7 +1313,7 @@ fn prepare_evidence(declaration: &Declaration) -> Result<Candidate, PreparationF
     let edge = declaration
         .limit
         .map(|(kind, edge)| {
-            SharedBound::of(kind)
+            EvidenceBound::of(kind)
                 .map(|(bound, work)| (bound, work, edge))
                 .ok_or(PreparationFailure::UndeclaredCase)
         })
@@ -1290,16 +1322,27 @@ fn prepare_evidence(declaration: &Declaration) -> Result<Candidate, PreparationF
         None => (recipe.limits(), unbounded()),
         Some((bound, work, edge)) => {
             let baseline = evidence_inputs(recipe, selector, recipe.limits(), unbounded())?;
-            let resolved = baseline
-                .resolve_shared()
-                .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
-            let counted = LogicalWork::observe(
-                &Prepared::SharedEvidence(Box::new(baseline)),
-                &Output::SharedEvidence(resolved),
-            )
-            .map_err(|_| PreparationFailure::Observation)?
-            .exact(work)
-            .ok_or(PreparationFailure::Observation)?;
+            let (prepared, output) = if declaration.operation == Operation::EntryEvidence {
+                let resolved = baseline
+                    .resolve_entry()
+                    .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
+                (
+                    Prepared::EntryEvidence(Box::new(baseline)),
+                    Output::EntryEvidence(resolved),
+                )
+            } else {
+                let resolved = baseline
+                    .resolve_shared()
+                    .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
+                (
+                    Prepared::SharedEvidence(Box::new(baseline)),
+                    Output::SharedEvidence(resolved),
+                )
+            };
+            let counted = LogicalWork::observe(&prepared, &output)
+                .map_err(|_| PreparationFailure::Observation)?
+                .exact(work)
+                .ok_or(PreparationFailure::Observation)?;
             let limit = match edge {
                 LimitEdge::Exact => Some(counted),
                 LimitEdge::FirstOver => counted.checked_sub(1),
@@ -1345,11 +1388,22 @@ fn prepare_evidence(declaration: &Declaration) -> Result<Candidate, PreparationF
             let resolved = prepared
                 .resolve_entry()
                 .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
-            (
-                whole(
+            // A first-over edge's bound exhausts the Entry domain; the edges'
+            // tests check that its terminal Finding names that bound.
+            let kind = match (&resolved.result, edge) {
+                (Ok(retained), Some((_, _, LimitEdge::FirstOver)))
+                    if retained.exhausted.is_some() =>
+                {
+                    ExpectedKind::EntryEvidenceExhausted
+                }
+                (_, None | Some((_, _, LimitEdge::Exact))) => whole(
                     resolved.result.as_ref(),
                     ExpectedKind::EntryEvidenceComplete,
                 )?,
+                _ => return Err(PreparationFailure::Observation),
+            };
+            (
+                kind,
                 Output::EntryEvidence(resolved),
                 Prepared::EntryEvidence(Box::new(prepared)),
             )

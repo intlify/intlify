@@ -314,7 +314,7 @@ fn every_active_pair_calls_its_real_core_operation_between_exact_markers() {
                 let retained = resolved.result.as_ref().unwrap();
                 assert!(retained.exhausted.is_none());
                 assert!(!retained.slices.is_empty());
-                assert!(resolved.invocation.is_some());
+                assert!(resolved.invocation.admitted.is_some());
             }
             Output::OutcomeFinalization(resolved) => {
                 let outcome = resolved.result.as_ref().unwrap();

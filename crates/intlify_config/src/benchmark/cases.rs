@@ -104,6 +104,22 @@ pub(super) enum LimitKind {
     SharedScopeSubjectOccurrences,
     SharedScopeTokenInputs,
     SharedScopeMetadataWorkUnits,
+    EntryFindingOccurrences,
+    EntryFindings,
+    EntryRelatedEvidencePerOccurrenceGroup,
+    EntryRelatedEvidenceOccurrences,
+    EntrySingleEvidenceBytes,
+    EntryTotalEvidenceBytes,
+    EntryEvaluationStatusEntries,
+    EntrySuppressionCausesPerStatus,
+    EntrySuppressionCauseOccurrences,
+    EntryRecords,
+    EntryTotalCanonicalBytes,
+    InvocationLogicalPathSegments,
+    InvocationLogicalPathCanonicalBytes,
+    InvocationSubjectOccurrences,
+    InvocationTokenInputs,
+    InvocationMetadataWorkUnits,
 }
 
 impl LimitKind {
@@ -171,6 +187,7 @@ pub(super) enum ExpectedKind {
     SharedEvidenceComplete,
     SharedEvidenceExhausted,
     EntryEvidenceComplete,
+    EntryEvidenceExhausted,
     OutcomeFinalizationChecked,
     OutcomeFinalizationBlocked,
 }
@@ -920,8 +937,9 @@ pub(super) fn declarations() -> Vec<Declaration> {
             ExpectedKind::SharedEvidenceComplete,
         ));
     }
-    // Then its Entry projection stage over each recipe, the one without a
-    // value too, whose Entry domain commits whole (plan 025 decision #260).
+    // Then its Entry projection stage over each recipe, the ones without a
+    // value too, whose Entry domain commits whole (plan 025 decisions #260
+    // and #264).
     for recipe in EvidenceRecipe::ENTRY {
         cases.push(declaration(
             Operation::EntryEvidence,
@@ -957,6 +975,25 @@ pub(super) fn declarations() -> Vec<Declaration> {
                     ExpectedKind::SharedEvidenceComplete
                 } else {
                     ExpectedKind::SharedEvidenceExhausted
+                },
+            );
+            case.limit = Some((limit, edge));
+            cases.push(case);
+        }
+    }
+    // Then the exact and first-over edges of each bound the Entry projection
+    // stage counts: at the count the Entry domain commits whole, and one
+    // under it the bound exhausts it (plan 025 decisions #256 and #264).
+    for (limit, recipe) in evidence_inputs::ENTRY_EDGES {
+        for edge in [LimitEdge::Exact, LimitEdge::FirstOver] {
+            let mut case = declaration(
+                Operation::EntryEvidence,
+                Recipe::Evidence(recipe),
+                Selector::App,
+                if edge == LimitEdge::Exact {
+                    ExpectedKind::EntryEvidenceComplete
+                } else {
+                    ExpectedKind::EntryEvidenceExhausted
                 },
             );
             case.limit = Some((limit, edge));
