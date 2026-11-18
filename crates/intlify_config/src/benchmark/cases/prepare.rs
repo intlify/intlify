@@ -195,7 +195,17 @@ pub(in crate::benchmark) fn prepare(
             | LimitKind::ConstructionRegistrySingleMemberArtifactBytes
             | LimitKind::ConstructionCrossAuthorityChecks
             | LimitKind::ConstructionSchemaValidationWorkUnits
-            | LimitKind::ConstructionRegistryValidationWorkUnits => {
+            | LimitKind::ConstructionRegistryValidationWorkUnits
+            | LimitKind::SharedFindingOccurrences
+            | LimitKind::SharedFindings
+            | LimitKind::SharedEvaluationStatusEntries
+            | LimitKind::SharedSuppressionCausesPerStatus
+            | LimitKind::SharedSuppressionCauseOccurrences
+            | LimitKind::SharedRecords
+            | LimitKind::SharedTotalCanonicalBytes
+            | LimitKind::SharedScopeSubjectOccurrences
+            | LimitKind::SharedScopeTokenInputs
+            | LimitKind::SharedScopeMetadataWorkUnits => {
                 return Err(PreparationFailure::UndeclaredCase);
             }
         };
@@ -255,7 +265,17 @@ pub(in crate::benchmark) fn prepare(
             | LimitKind::ConstructionRegistrySingleMemberArtifactBytes
             | LimitKind::ConstructionCrossAuthorityChecks
             | LimitKind::ConstructionSchemaValidationWorkUnits
-            | LimitKind::ConstructionRegistryValidationWorkUnits => unreachable!(),
+            | LimitKind::ConstructionRegistryValidationWorkUnits
+            | LimitKind::SharedFindingOccurrences
+            | LimitKind::SharedFindings
+            | LimitKind::SharedEvaluationStatusEntries
+            | LimitKind::SharedSuppressionCausesPerStatus
+            | LimitKind::SharedSuppressionCauseOccurrences
+            | LimitKind::SharedRecords
+            | LimitKind::SharedTotalCanonicalBytes
+            | LimitKind::SharedScopeSubjectOccurrences
+            | LimitKind::SharedScopeTokenInputs
+            | LimitKind::SharedScopeMetadataWorkUnits => unreachable!(),
         }
     }
     let prepared = if declaration.operation == Operation::FileMaterialization {
@@ -1243,39 +1263,54 @@ fn select_config(config: &Value, selector: Selector) -> Result<SelectedConfig, P
 }
 
 /// One file entry's complete invocation under fixture-owned inputs, whose
-/// evaluation phases run before each interval, and the Shared projection
-/// stage over it once (D15:2771, 2775).
+/// evaluation phases run before each interval, and one of 015's Evidence
+/// materialization stages over it once (D15:2771, 2775). An edge of a bound
+/// the Shared projection stage counts sits at the count an unbounded baseline
+/// run's logical work reports for it, or one under it (plan 025 decision
+/// #263).
 fn prepare_evidence(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
+    use super::evidence_inputs::SharedBound;
     use crate::benchmark::evidence::outcome::PreparedOutcome;
-    use crate::benchmark::evidence::{self, PreparedEvidence, Retained};
-    use crate::boundary::verification::VerificationInput;
+    use crate::benchmark::evidence::Retained;
     use crate::resolver::evidence_metadata::fixtures::unbounded;
 
     let Recipe::Evidence(recipe) = declaration.fixture else {
         return Err(PreparationFailure::UndeclaredCase);
     };
-    let limits = recipe.limits();
-    let fixture = recipe.fixture(&limits);
-    let (input, structural) = fixture_capacity();
-    let selected = fixture
-        .members
-        .first()
-        .ok_or(PreparationFailure::CoreInvariant)?;
-    let prepared = PreparedEvidence {
-        source: Arc::from(recipe.source(&limits)),
-        input,
-        structural,
-        file: FileFixture::new(&limits),
-        schema: configuration_schema().clone(),
-        selector: selector_input(declaration.selector, structural.max_profile_id_bytes),
-        supported: evidence::supported().ok_or(PreparationFailure::CoreInvariant)?,
-        specifications: evidence::specifications(),
-        capability: ImplementationCapability::fixture_owned(limits)
-            .with_evidence_metadata(unbounded()),
-        verification: VerificationInput::fixture_owned([tuple_of(selected)]),
-        collection: submitted(&fixture.members)?,
-        vocabulary: evidence::vocabulary().ok_or(PreparationFailure::CoreInvariant)?,
+    let selector = declaration.selector;
+    let edge = declaration
+        .limit
+        .map(|(kind, edge)| {
+            SharedBound::of(kind)
+                .map(|(bound, work)| (bound, work, edge))
+                .ok_or(PreparationFailure::UndeclaredCase)
+        })
+        .transpose()?;
+    let (limits, metadata) = match edge {
+        None => (recipe.limits(), unbounded()),
+        Some((bound, work, edge)) => {
+            let baseline = evidence_inputs(recipe, selector, recipe.limits(), unbounded())?;
+            let resolved = baseline
+                .resolve_shared()
+                .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
+            let counted = LogicalWork::observe(
+                &Prepared::SharedEvidence(Box::new(baseline)),
+                &Output::SharedEvidence(resolved),
+            )
+            .map_err(|_| PreparationFailure::Observation)?
+            .exact(work)
+            .ok_or(PreparationFailure::Observation)?;
+            let limit = match edge {
+                LimitEdge::Exact => Some(counted),
+                LimitEdge::FirstOver => counted.checked_sub(1),
+            }
+            .and_then(Bound::new)
+            .ok_or(PreparationFailure::UnrepresentableCounterEdge)?;
+            bound.limits(recipe, limit)
+        }
     };
+    let (input, _) = fixture_capacity();
+    let prepared = evidence_inputs(recipe, selector, limits, metadata)?;
     // Each stage's domain commits whole in every declared case.
     let whole = |result: Result<&Retained, _>, kind| match result {
         Ok(retained) if retained.exhausted.is_none() => Ok(kind),
@@ -1286,11 +1321,22 @@ fn prepare_evidence(declaration: &Declaration) -> Result<Candidate, PreparationF
             let resolved = prepared
                 .resolve_shared()
                 .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
-            (
-                whole(
+            // A first-over edge's bound exhausts the Shared domain; the edges'
+            // tests check that its terminal Finding names that bound.
+            let kind = match (&resolved.result, edge) {
+                (Ok(retained), Some((_, _, LimitEdge::FirstOver)))
+                    if retained.exhausted.is_some() =>
+                {
+                    ExpectedKind::SharedEvidenceExhausted
+                }
+                (_, None | Some((_, _, LimitEdge::Exact))) => whole(
                     resolved.result.as_ref(),
                     ExpectedKind::SharedEvidenceComplete,
                 )?,
+                _ => return Err(PreparationFailure::Observation),
+            };
+            (
+                kind,
                 Output::SharedEvidence(resolved),
                 Prepared::SharedEvidence(Box::new(prepared)),
             )
@@ -1349,6 +1395,42 @@ fn prepare_evidence(declaration: &Declaration) -> Result<Candidate, PreparationF
         output,
         observation,
         logical_work,
+    })
+}
+
+/// The invocation's inputs over `recipe`'s configuration under `selector`:
+/// the capability and the selected policy setting `limits`, the capability's
+/// `evidenceMetadata` bounds `metadata`, and the fixture provider, the
+/// specifications, the Verification Input, and the vocabulary.
+fn evidence_inputs(
+    recipe: super::EvidenceRecipe,
+    selector: Selector,
+    limits: crate::resolver::limits::ResolutionLimits,
+    metadata: crate::resolver::capability::EvidenceMetadataLimits,
+) -> Result<crate::benchmark::evidence::PreparedEvidence, PreparationFailure> {
+    use crate::benchmark::evidence::{self, PreparedEvidence};
+    use crate::boundary::verification::VerificationInput;
+
+    let fixture = recipe.fixture(&limits);
+    let (input, structural) = fixture_capacity();
+    let selected = fixture
+        .members
+        .first()
+        .ok_or(PreparationFailure::CoreInvariant)?;
+    Ok(PreparedEvidence {
+        source: Arc::from(recipe.source(&limits)),
+        input,
+        structural,
+        file: FileFixture::new(&limits),
+        schema: configuration_schema().clone(),
+        selector: selector_input(selector, structural.max_profile_id_bytes),
+        supported: evidence::supported().ok_or(PreparationFailure::CoreInvariant)?,
+        specifications: evidence::specifications(),
+        verification: VerificationInput::fixture_owned([tuple_of(selected)]),
+        collection: submitted(&fixture.members)?,
+        vocabulary: evidence::vocabulary().ok_or(PreparationFailure::CoreInvariant)?,
+        capability: ImplementationCapability::fixture_owned(limits)
+            .with_evidence_metadata(metadata),
     })
 }
 

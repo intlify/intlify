@@ -424,7 +424,6 @@ pub(crate) mod fixtures {
     use crate::input_limits::Bound;
     use crate::resolver::capability::{BootstrapLimits, EvidenceMetadataLimits};
 
-    #[cfg(test)]
     use super::MetadataBound;
 
     /// The capability's minimum vector, but every bound the resolver applies
@@ -443,7 +442,6 @@ pub(crate) mod fixtures {
     }
 
     /// `unbounded`, but `bound` at `limit`.
-    #[cfg(test)]
     pub(crate) fn with(bound: MetadataBound, limit: u64) -> EvidenceMetadataLimits {
         let mut limits = unbounded();
         let limit = Bound::new(limit).unwrap();

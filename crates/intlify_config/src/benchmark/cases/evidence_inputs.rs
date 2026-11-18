@@ -16,11 +16,153 @@ use serde_json::{json, Value};
 
 use crate::artifacts::content::sample;
 use crate::artifacts::envelope::{envelope_of, ArtifactKind};
+use crate::benchmark::work::WorkKind;
 use crate::input_limits::Bound;
 use crate::profile_fixtures::complete_config;
-use crate::resolver::limits::{Group, ResolutionLimits};
+use crate::resolver::capability::EvidenceMetadataLimits;
+use crate::resolver::evaluation::ExhaustedBound;
+use crate::resolver::evidence_metadata::fixtures::{unbounded, with};
+use crate::resolver::evidence_metadata::MetadataBound;
+use crate::resolver::limits::{BoundId, Group, ResolutionLimits};
 
 use super::policy_inputs::{capacity, reference_value, selected_policy, tuple_of};
+use super::LimitKind;
+
+/// Each bound the Shared projection stage counts itself, and the recipe
+/// whose count of it is at least 2, so that its first-over edge is a bound:
+/// the Finding and cause counts are the blocked recipe's, the others the
+/// example's. A collision comparison under SHA-256 is never counted, so it
+/// has no edge (plan 025 decisions #256 and #263).
+pub(in crate::benchmark) const SHARED_EDGES: [(LimitKind, EvidenceRecipe); 10] = [
+    (LimitKind::SharedFindingOccurrences, EvidenceRecipe::Blocked),
+    (LimitKind::SharedFindings, EvidenceRecipe::Blocked),
+    (
+        LimitKind::SharedEvaluationStatusEntries,
+        EvidenceRecipe::Storefront,
+    ),
+    (
+        LimitKind::SharedSuppressionCausesPerStatus,
+        EvidenceRecipe::Blocked,
+    ),
+    (
+        LimitKind::SharedSuppressionCauseOccurrences,
+        EvidenceRecipe::Blocked,
+    ),
+    (LimitKind::SharedRecords, EvidenceRecipe::Storefront),
+    (
+        LimitKind::SharedTotalCanonicalBytes,
+        EvidenceRecipe::Storefront,
+    ),
+    (
+        LimitKind::SharedScopeSubjectOccurrences,
+        EvidenceRecipe::Storefront,
+    ),
+    (
+        LimitKind::SharedScopeTokenInputs,
+        EvidenceRecipe::Storefront,
+    ),
+    (
+        LimitKind::SharedScopeMetadataWorkUnits,
+        EvidenceRecipe::Storefront,
+    ),
+];
+
+/// A bound the Shared projection stage counts: one of `diagnostics.shared`,
+/// which both the capability and the selected policy set, or one of the
+/// Shared scope's `evidenceMetadata` counts, which only the capability sets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::benchmark) enum SharedBound {
+    Diagnostic(&'static str),
+    Metadata(MetadataBound),
+}
+
+impl SharedBound {
+    /// The bound `kind` names and the work kind that counts it, in its unit.
+    pub(in crate::benchmark) const fn of(kind: LimitKind) -> Option<(Self, WorkKind)> {
+        Some(match kind {
+            LimitKind::SharedFindingOccurrences => (
+                Self::Diagnostic("maxFindingOccurrences"),
+                WorkKind::SharedEvidenceFindingCandidates,
+            ),
+            LimitKind::SharedFindings => (
+                Self::Diagnostic("maxFindings"),
+                WorkKind::SharedEvidenceFindings,
+            ),
+            LimitKind::SharedEvaluationStatusEntries => (
+                Self::Diagnostic("maxEvaluationStatusEntries"),
+                WorkKind::SharedEvidenceEvaluationStatuses,
+            ),
+            LimitKind::SharedSuppressionCausesPerStatus => (
+                Self::Diagnostic("maxSuppressionCausesPerStatus"),
+                WorkKind::SharedEvidenceMaximumCausesPerStatus,
+            ),
+            LimitKind::SharedSuppressionCauseOccurrences => (
+                Self::Diagnostic("maxSuppressionCauseOccurrences"),
+                WorkKind::SharedEvidenceCauseOccurrences,
+            ),
+            LimitKind::SharedRecords => (
+                Self::Diagnostic("maxRecords"),
+                WorkKind::SharedEvidenceRecords,
+            ),
+            LimitKind::SharedTotalCanonicalBytes => (
+                Self::Diagnostic("maxTotalCanonicalBytes"),
+                WorkKind::SharedEvidenceCanonicalBytes,
+            ),
+            LimitKind::SharedScopeSubjectOccurrences => (
+                Self::Metadata(MetadataBound::SubjectOccurrences),
+                WorkKind::SharedEvidenceSubjectOccurrences,
+            ),
+            LimitKind::SharedScopeTokenInputs => (
+                Self::Metadata(MetadataBound::TokenInputs),
+                WorkKind::SharedEvidenceTokenInputs,
+            ),
+            LimitKind::SharedScopeMetadataWorkUnits => (
+                Self::Metadata(MetadataBound::MetadataWorkUnits),
+                WorkKind::SharedEvidenceMetadataWorkUnits,
+            ),
+            _ => return None,
+        })
+    }
+
+    /// The bound an exhausted Shared domain's terminal Finding names.
+    pub(in crate::benchmark) fn exhausted(self) -> ExhaustedBound {
+        match self {
+            Self::Diagnostic(name) => ExhaustedBound::Domain(BoundId {
+                group: Group::DiagnosticsShared,
+                name,
+            }),
+            Self::Metadata(bound) => ExhaustedBound::Capability(bound.id()),
+        }
+    }
+
+    /// `recipe`'s bounds, the capability's and the policy's, and the
+    /// capability's `evidenceMetadata` bounds, with this bound at `limit`.
+    pub(in crate::benchmark) fn limits(
+        self,
+        recipe: EvidenceRecipe,
+        limit: Bound,
+    ) -> (ResolutionLimits, EvidenceMetadataLimits) {
+        let limits = recipe.limits();
+        match self {
+            Self::Diagnostic(name) => {
+                let bounds = limits.bounds();
+                let limits = ResolutionLimits::from_bounds(|id| {
+                    if id.group == Group::DiagnosticsShared && id.name == name {
+                        Some(limit)
+                    } else {
+                        bounds
+                            .iter()
+                            .find(|(bound, _)| *bound == id)
+                            .map(|&(_, value)| value)
+                    }
+                })
+                .expect("every bound of the limits is set");
+                (limits, unbounded())
+            }
+            Self::Metadata(bound) => (limits, with(bound, limit.get())),
+        }
+    }
+}
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
@@ -299,8 +441,8 @@ mod tests {
     /// The input context of either stage refuses a candidate bound to
     /// another input: another recipe kind, another selector even with its
     /// own selector input, another selector input, another recipe's
-    /// configuration, no vocabulary assertion, and a vocabulary that is not
-    /// admitted.
+    /// configuration, no vocabulary assertion, another recipe whose file
+    /// differs only in its bounds, and a vocabulary that is not admitted.
     #[test]
     fn the_input_context_refuses_a_candidate_bound_to_another_input() {
         use std::sync::Arc;
@@ -326,7 +468,7 @@ mod tests {
             Operation::OutcomeFinalization,
         ]
         .into_iter()
-        .flat_map(|operation| (0..6).map(move |change| (operation, change)))
+        .flat_map(|operation| (0..7).map(move |change| (operation, change)))
         {
             let declaration = declarations()
                 .into_iter()
@@ -357,6 +499,10 @@ mod tests {
                     prepared.source = Arc::from(serde_json::to_vec(&blocked).unwrap());
                 }
                 4 => prepared.specifications.intent_surface_class_vocabulary = None,
+                // The same file but for its Shared `maxRecords`.
+                5 => {
+                    candidate.declaration.fixture = Recipe::Evidence(EvidenceRecipe::Truncated);
+                }
                 // Members out of order: read, but not admitted.
                 _ => {
                     let artifact = IntentSurfaceClassVocabularyArtifact::sealed(
@@ -420,6 +566,81 @@ mod tests {
                 assert_eq!(differ[0].1.get(), TRUNCATED);
             } else {
                 assert!(differ.is_empty(), "{recipe:?}");
+            }
+        }
+    }
+
+    /// Each bound the Shared projection stage counts has an exact and a
+    /// first-over edge on its recipe, one apart: the exact edge's limit is the
+    /// count the recipe's unbounded case reports in its logical work, and its
+    /// Shared domain commits whole, and the first-over edge's bound exhausts
+    /// the Shared domain, which its terminal Finding names (plan 025 decision
+    /// #263).
+    #[test]
+    fn each_shared_edge_sits_at_its_count_and_one_under() {
+        use crate::benchmark::cases::prepare::prepare;
+        use crate::benchmark::cases::{declarations, Declaration, LimitEdge, Recipe};
+        use crate::benchmark::operation::{Operation, Output, Prepared};
+
+        let case = |recipe, limit: Option<(LimitKind, LimitEdge)>| -> Declaration {
+            declarations()
+                .into_iter()
+                .find(|case| {
+                    case.operation == Operation::SharedEvidence
+                        && case.fixture == Recipe::Evidence(recipe)
+                        && case.limit == limit
+                })
+                .unwrap()
+        };
+        for (kind, recipe) in SHARED_EDGES {
+            let (bound, work) = SharedBound::of(kind).unwrap();
+            let counted = prepare(&case(recipe, None))
+                .unwrap()
+                .logical_work
+                .exact(work)
+                .unwrap();
+            for (edge, limit) in [
+                (LimitEdge::Exact, counted),
+                (LimitEdge::FirstOver, counted - 1),
+            ] {
+                let candidate = prepare(&case(recipe, Some((kind, edge)))).unwrap();
+                let Prepared::SharedEvidence(prepared) = &candidate.prepared else {
+                    unreachable!()
+                };
+                let set = match bound {
+                    SharedBound::Diagnostic(name) => {
+                        prepared
+                            .capability
+                            .policy_comparable()
+                            .bounds()
+                            .into_iter()
+                            .find(|(id, _)| id.group == Group::DiagnosticsShared && id.name == name)
+                            .unwrap()
+                            .1
+                    }
+                    SharedBound::Metadata(metadata) => {
+                        let limits = prepared.capability.bootstrap_only().evidence_metadata;
+                        match metadata {
+                            MetadataBound::SubjectOccurrences => limits.max_subject_occurrences,
+                            MetadataBound::TokenInputs => limits.max_token_inputs,
+                            MetadataBound::MetadataWorkUnits => limits.max_metadata_work_units,
+                            _ => unreachable!("only the Shared scope's counts have edges"),
+                        }
+                    }
+                };
+                assert_eq!(set.get(), limit, "{kind:?} {edge:?}");
+                let Output::SharedEvidence(resolved) = &candidate.output else {
+                    unreachable!()
+                };
+                let exhausted = resolved
+                    .result
+                    .as_ref()
+                    .unwrap()
+                    .exhausted
+                    .as_ref()
+                    .map(|(_, bound)| *bound);
+                let expected = (edge == LimitEdge::FirstOver).then(|| bound.exhausted());
+                assert_eq!(exhausted, expected, "{kind:?} {edge:?}");
             }
         }
     }
