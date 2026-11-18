@@ -6,7 +6,10 @@
  * design 015's framing S of it, its content digest, and its counts under the
  * nine bootstrapOnly.snapshot bounds. This script shares no code with it: it
  * reads the notation, checks that the notation is canonical, frames and
- * digests every tree from design 015, and counts it under each bound.
+ * digests every tree from design 015, and counts it under each bound. A
+ * notation that is not canonical, a member named twice in one object of the
+ * JSON text, or a node after the bootstrap-limit-exceeded marker is refused
+ * (plan 025 decision #297).
  */
 
 import { createHash } from 'node:crypto'
@@ -68,6 +71,63 @@ function u64(value) {
 }
 
 /**
+ * The shortest decimal that reads back as a binary64 value, without an
+ * exponent, as the Rust crate writes a number.
+ *
+ * @param number - A finite number.
+ * @returns Its decimal.
+ */
+function decimal(number) {
+  const text = String(number)
+  const small = /^(-?)(\d)(?:\.(\d+))?e-(\d+)$/.exec(text)
+  if (small === null) {
+    return text
+  }
+  const [, sign, lead, rest = '', power] = small
+  return `${sign}0.${'0'.repeat(Number(power) - 1)}${lead}${rest}`
+}
+
+/**
+ * Refuse a member named twice in one object of a JSON text, whose earlier
+ * value JSON.parse would drop unseen.
+ *
+ * @param text - A JSON text that JSON.parse accepts.
+ */
+function rejectRepeatedMembers(text) {
+  // The names of each open object, and null for each open array.
+  const open = []
+  let name = false
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index]
+    if (char === '"') {
+      let end = index + 1
+      while (text[end] !== '"') {
+        end += text[end] === '\\' ? 2 : 1
+      }
+      const names = open.at(-1)
+      if (names instanceof Set && name) {
+        const member = JSON.parse(text.slice(index, end + 1))
+        if (names.has(member)) {
+          throw new Error(`a member is named twice in one object: ${JSON.stringify(member)}`)
+        }
+        names.add(member)
+        name = false
+      }
+      index = end
+    } else if (char === '{') {
+      open.push(new Set())
+      name = true
+    } else if (char === '[') {
+      open.push(null)
+    } else if (char === '}' || char === ']') {
+      open.pop()
+    } else if (char === ',') {
+      name = open.at(-1) instanceof Set
+    }
+  }
+}
+
+/**
  * Frame one payload as its tag, its byte length, and its bytes.
  *
  * @param tag - The one-byte tag.
@@ -105,8 +165,12 @@ function markerRecord(marker) {
     if (!BOUNDS.includes(name) || Object.keys(marker).length !== 3) {
       throw new Error(`malformed overrun marker: ${JSON.stringify(marker)}`)
     }
-    if (!/^(?:0|[1-9]\d*)$/.test(witness) || BigInt(witness) >= 2n ** 64n) {
-      throw new Error(`witness out of U64: ${witness}`)
+    if (
+      typeof witness !== 'string' ||
+      !/^(?:0|[1-9]\d*)$/.test(witness) ||
+      BigInt(witness) >= 2n ** 64n
+    ) {
+      throw new Error(`a witness is not a decimal string within U64: ${JSON.stringify(witness)}`)
     }
     return Buffer.concat([
       frame(1, Buffer.from(reason, 'ascii')),
@@ -126,9 +190,14 @@ function markerRecord(marker) {
  * @param node - The node's notation.
  * @param depth - Its tree level, the root at one.
  * @param counts - The counts so far.
+ * @param walk - Whether the traversal passed the bootstrap-limit-exceeded
+ *   marker, and the marker reasons and bounds the trees hold.
  * @returns The node's frame.
  */
-function snapshot(node, depth, counts) {
+function snapshot(node, depth, counts, walk) {
+  if (walk.overrun) {
+    throw new Error(`a node follows the ${OVERRUN} marker: ${JSON.stringify(node)}`)
+  }
   const entries = Object.entries(node)
   if (entries.length !== 1) {
     throw new Error(`a node names one variant: ${JSON.stringify(node)}`)
@@ -144,13 +213,24 @@ function snapshot(node, depth, counts) {
   }
   switch (variant) {
     case 'null':
+      if (value !== null) {
+        throw new Error(`a null holds ${JSON.stringify(value)}`)
+      }
       return frame(TAG.null, Buffer.alloc(0))
     case 'boolean':
+      if (typeof value !== 'boolean') {
+        throw new Error(`a boolean holds ${JSON.stringify(value)}`)
+      }
       return frame(value ? TAG.true : TAG.false, Buffer.alloc(0))
     case 'number': {
       const number = Number(value)
-      if (!Number.isFinite(number) || Math.abs(number) > LARGEST || Object.is(number, -0)) {
-        throw new Error(`not a canonical portable number: ${value}`)
+      if (
+        !Number.isFinite(number) ||
+        Math.abs(number) > LARGEST ||
+        Object.is(number, -0) ||
+        decimal(number) !== value
+      ) {
+        throw new Error(`not a canonical portable number: ${JSON.stringify(value)}`)
       }
       const bytes = Buffer.alloc(8)
       bytes.writeDoubleBE(number)
@@ -160,22 +240,32 @@ function snapshot(node, depth, counts) {
       return string(value)
     case 'array': {
       counts.maxCollectionEntries += value.length
-      const elements = value.map(element => snapshot(element, depth + 1, counts))
+      const elements = value.map(element => snapshot(element, depth + 1, counts, walk))
       return frame(TAG.array, Buffer.concat([u64(value.length), ...elements]))
     }
     case 'object': {
       counts.maxCollectionEntries += value.length
-      const members = value.flatMap(([key, member], index) => {
+      const members = value.flatMap((pair, index) => {
+        if (pair.length !== 2) {
+          throw new Error(`an object member is not one [key, node] pair: ${JSON.stringify(pair)}`)
+        }
+        const [key, member] = pair
         if (index > 0 && Buffer.compare(utf8(value[index - 1][0]), utf8(key)) >= 0) {
           throw new Error(`keys are not unique and ascending at ${JSON.stringify(key)}`)
         }
-        return [string(key), snapshot(member, depth + 1, counts)]
+        return [string(key), snapshot(member, depth + 1, counts, walk)]
       })
       return frame(TAG.object, Buffer.concat([u64(value.length), ...members]))
     }
     case 'marker': {
       counts.maxRejectedMarkers += 1
       const framed = frame(TAG.marker, markerRecord(value))
+      if (value.reason === OVERRUN) {
+        walk.overrun = true
+        walk.bounds.add(value.bound.slice(23))
+      } else {
+        walk.reasons.add(value.reason)
+      }
       counts.maxSingleMarkerCanonicalBytes = Math.max(
         counts.maxSingleMarkerCanonicalBytes,
         framed.length
@@ -187,15 +277,24 @@ function snapshot(node, depth, counts) {
   }
 }
 
-const vectors = JSON.parse(readFileSync(vectorsPath, 'utf8'))
+const text = readFileSync(vectorsPath, 'utf8')
+const vectors = JSON.parse(text)
 const failures = []
 const fail = message => failures.push(message)
+try {
+  rejectRepeatedMembers(text)
+} catch (error) {
+  fail(error.message)
+}
 
+// The marker reasons and bounds the trees hold.
+const covered = { reasons: new Set(), bounds: new Set() }
 for (const { id, snapshot: root, bytes, digest, counts } of vectors.snapshots) {
   const counted = Object.fromEntries(BOUNDS.map(bound => [bound, 0]))
+  const walk = { overrun: false, reasons: covered.reasons, bounds: covered.bounds }
   let framed
   try {
-    framed = snapshot(root, 1, counted)
+    framed = snapshot(root, 1, counted, walk)
   } catch (error) {
     fail(`${id}: ${error.message}`)
     continue
@@ -220,12 +319,12 @@ for (const { id, snapshot: root, bytes, digest, counts } of vectors.snapshots) {
 }
 
 for (const reason of REASONS) {
-  if (!vectors.snapshots.some(({ id }) => id === `marker-${reason}`)) {
+  if (!covered.reasons.has(reason)) {
     fail(`no vector holds a ${reason} marker`)
   }
 }
 for (const bound of BOUNDS) {
-  if (!vectors.snapshots.some(({ id }) => id === `bootstrap-${bound}`)) {
+  if (!covered.bounds.has(bound)) {
     fail(`no vector holds an overrun of ${bound}`)
   }
 }

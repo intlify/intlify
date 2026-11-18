@@ -218,11 +218,13 @@ pub fn document() -> Value {
             &Node::Marker(Marker::BootstrapLimitExceeded { bound, witness }),
         ));
     }
+    // The largest witness is one over the largest bound, `u64::MAX - 1`, so
+    // its U64 has every bit set (D15:139, 2002; plan 025 decision #297).
     snapshots.push(vector(
         "bootstrap-largest-witness",
         &Node::Marker(Marker::BootstrapLimitExceeded {
             bound: SnapshotBound::SingleMarkerCanonicalBytes,
-            witness: u64::MAX - 1,
+            witness: u64::MAX,
         }),
     ));
     json!({ "note": NOTE, "snapshots": snapshots })

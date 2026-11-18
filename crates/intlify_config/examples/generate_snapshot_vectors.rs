@@ -17,10 +17,14 @@ use serde_json::Value;
 const ARTIFACT: &str = "fixtures/snapshot/vectors.json";
 
 fn main() -> ExitCode {
-    let write = match std::env::args().nth(1).as_deref() {
-        None | Some("--check") => false,
-        Some("--write") => true,
-        Some(_) => {
+    // At most one flag: an extra argument, as in `--write --check`, is refused
+    // before anything is written (plan 025 decision #297).
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let write = match args.as_slice() {
+        [] => false,
+        [flag] if flag == "--check" => false,
+        [flag] if flag == "--write" => true,
+        _ => {
             eprintln!("usage: generate_snapshot_vectors [--check | --write]");
             return ExitCode::FAILURE;
         }
