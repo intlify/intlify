@@ -23,8 +23,10 @@
 //!
 //! A domain that a bound exhausted also holds its terminal Finding and terminal
 //! state, which take its reserved slots rather than being records of a slice
-//! (D15:1972, 2408, 2518). Resolution Evidence reserves no Rust struct or wire
-//! encoding (D15:1161), so the projection keeps them beside its records.
+//! (D15:1972, 2408, 2518), and, without a Shared projection, the Entry reserve
+//! holds the Shared-unavailability cause that names the Entry terminal Finding
+//! (D15:2014). Resolution Evidence reserves no Rust struct or wire encoding
+//! (D15:1161), so the projection keeps them beside its records.
 
 use serde_json::Value;
 
@@ -36,12 +38,14 @@ use super::reporting::{Record, Reporting, ReportingDomain, ReportingInvariant, R
 use super::reporting_plan::{Committed, Exhausted};
 
 /// An exhausted domain's terminal reporting-limit Finding and terminal state,
-/// as their views, with how the domain was exhausted.
+/// as their views, with how the domain was exhausted, and the view of the
+/// Shared-unavailability cause its reserve holds, if it holds one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Terminal<'e> {
     pub(crate) exhausted: Exhausted<'e>,
     pub(crate) finding: Value,
     pub(crate) state: Value,
+    pub(crate) cause: Option<Value>,
 }
 
 /// One diagnostic domain's Resolution Evidence projection.
@@ -87,13 +91,14 @@ impl<'e> Projection<'e> {
         let terminal = committed
             .exhausted
             .map(|exhausted| {
-                reporting
-                    .terminal(domain, exhausted.cursor, exhausted.bound)
-                    .map(|(finding, state)| Terminal {
-                        exhausted,
-                        finding,
-                        state,
-                    })
+                let (finding, state) =
+                    reporting.terminal(domain, exhausted.cursor, exhausted.bound)?;
+                Ok::<_, ReportingInvariant>(Terminal {
+                    exhausted,
+                    finding,
+                    state,
+                    cause: reporting.reserved_cause()?,
+                })
             })
             .transpose()?;
         Ok(Self {
@@ -120,7 +125,7 @@ mod tests {
 
     use crate::construction::registry::check::RecordKind;
     use crate::resolver::dependency::fixtures::file_entry;
-    use crate::resolver::evaluation::{IssueKey, Unit};
+    use crate::resolver::evaluation::{IssueKey, Reason, Unit};
     use crate::resolver::evidence::Evidence;
     use crate::resolver::evidence_metadata::fixtures::unbounded;
     use crate::resolver::limits::{BoundId, Group};
@@ -380,15 +385,46 @@ mod tests {
                 let (finding, state) = reporting
                     .terminal(domain, exhausted.cursor, exhausted.bound)
                     .unwrap();
+                // With a Shared projection, no reserve holds a cause.
                 assert_eq!(
                     projection.terminal,
                     Some(Terminal {
                         exhausted,
                         finding,
                         state,
+                        cause: None,
                     })
                 );
             }
         });
+    }
+
+    /// Without a Shared projection, the reserve of the exhausted Entry domain
+    /// also holds the Shared-unavailability cause that names its terminal
+    /// Finding (D15:2014, 2408).
+    #[test]
+    fn without_a_value_the_entry_reserve_holds_the_unavailability_cause() {
+        let (evaluation, causes) = entered();
+        let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
+        let reporting = Reporting::new(
+            &evaluation,
+            PROFILE,
+            (Some(&causes), file_entry()),
+            &unbounded(),
+            &Sha256,
+        );
+        let bound = BoundId {
+            group: Group::DiagnosticsEntry,
+            name: "maxRecords",
+        };
+        let reported = report(&reporting, &limits_with(Some((bound, 1))), None).unwrap();
+        let entry = Projection::finalized(&reporting, ReportingDomain::Entry, reported.entry)
+            .unwrap()
+            .terminal
+            .unwrap();
+        let cause = views
+            .shared_unavailability_cause(&IssueKey::terminal(Reason::Entry))
+            .unwrap();
+        assert_eq!(entry.cause, Some(cause));
     }
 }
