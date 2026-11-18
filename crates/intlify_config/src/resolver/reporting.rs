@@ -17,9 +17,11 @@
 //! (D15:1607-1609, 2207). The unit owns every record of its slices, and units
 //! report in canonical unit order, so the earliest unit that refers to an
 //! Evidence owns its index record (D15:1972, 2205). The owner of an
-//! established group's semantic dependency reports it into its Shared slice
-//! (D15:2516); the materialized and entry dependency records come later (plan
-//! 025 decision #221).
+//! established group's semantic dependency reports it into its Shared slice,
+//! the materialized dependencies' owner reports one for every slot into its
+//! Shared slice, and the entry dependencies' owner reports the entry's, which
+//! the caller supplies, into its Entry slice after the index records
+//! (D15:2516, 2518).
 //!
 //! A slice has two stages (D15:2209). Its candidates are what the candidate
 //! stage counts before any ordinal or record exists: each Finding candidate,
@@ -55,7 +57,8 @@ use super::coverage::{self, Basis, CoverageSubject, Decision};
 use super::decision_evidence::{
     self, CoverageDecisionEvidence, DecisionEvidence, DecisionInvariant,
 };
-use super::dependency::{self, SemanticGroup};
+use super::dependency::{self, EntryDependency, EntryInputs, MaterializedSlot, SemanticGroup};
+use super::entry::OWNER as ENTRY_OWNER;
 use super::evaluation::{
     Causes, Check, Details, Evaluation, ExhaustedBound, Finding, IssueKey, Phase, Reason, Status,
     Unit,
@@ -65,6 +68,7 @@ use super::evidence_metadata::{self, Admission, Exceeded, MetadataBound};
 use super::evidence_token::EvidenceTokens;
 use super::occurrence::{self, FindingOccurrence, OccurrenceCandidate, OccurrenceInvariant};
 use super::record_view::{RecordViews, ViewInvariant};
+use super::structural_admission::OWNER as MATERIALIZED_OWNER;
 use super::subject::SubjectKind;
 use super::token::{rule_domain, Digest, Specification, Tokens};
 
@@ -135,6 +139,10 @@ pub(crate) enum Record<'e> {
     DecisionBasis(&'e (CanonicalLocale, Token), &'e Basis),
     /// The semantic dependency of an established group (D15:2510, 2516).
     SemanticDependency(SemanticGroup),
+    /// The materialized dependency of an established slot (D15:2511, 2516).
+    MaterializedDependency(MaterializedSlot),
+    /// An entry dependency (D15:2512-2513, 2516).
+    EntryDependency(EntryDependency),
 }
 
 /// A retained record, of its record kind, with `C` of its accounting view
@@ -162,6 +170,8 @@ pub(crate) enum ReportingInvariant {
     View(Box<ViewInvariant>),
     Occurrence(Box<OccurrenceInvariant>),
     Decision(Box<DecisionInvariant>),
+    /// The evidence tokens leave out a component of an entry dependency.
+    EntryToken,
 }
 
 impl From<ViewInvariant> for ReportingInvariant {
@@ -192,6 +202,8 @@ pub(crate) struct Reporting<'e, 's> {
     tokens: EvidenceTokens,
     /// Why the Shared projection is unavailable, when it is (D15:2369).
     unavailable: Option<&'e Causes>,
+    /// What the entry dependency records name.
+    entry: &'e EntryInputs,
     /// The statuses of each unit's raw candidates (D15:2203).
     statuses: BTreeMap<Unit, Vec<&'e Status>>,
     /// How many occurrence candidates each unit that found something has: a
@@ -228,7 +240,7 @@ impl<'e, 's> Reporting<'e, 's> {
     pub(crate) fn new(
         evaluation: &'e Evaluation,
         specification: Specification<'s>,
-        unavailable: Option<&'e Causes>,
+        (unavailable, entry): (Option<&'e Causes>, &'e EntryInputs),
         limits: &EvidenceMetadataLimits,
         digest: &impl Digest,
     ) -> Self {
@@ -248,7 +260,7 @@ impl<'e, 's> Reporting<'e, 's> {
                 .or_default()
                 .push(finding);
         }
-        let admission = evidence_metadata::admit(evaluation, specification, limits, digest);
+        let admission = evidence_metadata::admit(evaluation, entry, specification, limits, digest);
         let exceeded = admission.exceeded();
         let no_evidence = || EvidenceTokens::assign(specification, std::iter::empty(), digest);
         // The reserved terminal records of an exhausted domain name the
@@ -295,6 +307,7 @@ impl<'e, 's> Reporting<'e, 's> {
             views: RecordViews::new(specification, subjects, digest),
             tokens,
             unavailable,
+            entry,
             statuses,
             found,
             occurrences,
@@ -435,6 +448,19 @@ impl<'e, 's> Reporting<'e, 's> {
                         )?);
                     }
                 }
+                // The owner requires no check, so it is evaluated whenever
+                // `structural-admission` runs, and every slot is established
+                // then (D15:1174, 2516, 3159; plan 025 interpretation #246).
+                if *unit == MATERIALIZED_OWNER {
+                    for slot in MaterializedSlot::ALL {
+                        records.push(self.retained(
+                            unit,
+                            RecordKind::MaterializedDependency,
+                            Record::MaterializedDependency(slot),
+                            slot.view(),
+                        )?);
+                    }
+                }
             }
         }
         Ok(records)
@@ -499,8 +525,9 @@ impl<'e, 's> Reporting<'e, 's> {
     /// The Entry records `unit` owns besides its own Findings and status:
     /// the occurrences of its Findings, the Coverage Decision Evidence of
     /// the decision table, an index record for each Evidence they refer to
-    /// that `indexed` does not hold, and the Shared-unavailability causes
-    /// that name its Findings (D15:2207).
+    /// that `indexed` does not hold, the entry dependencies of their owner,
+    /// and the Shared-unavailability causes that name its Findings (D15:2207,
+    /// 2516).
     fn entry(
         &self,
         unit: &'e Unit,
@@ -548,6 +575,24 @@ impl<'e, 's> Reporting<'e, 's> {
                 Record::Evidence(evidence),
                 view,
             )?);
+        }
+        // The owner requires no check, so it is evaluated whenever
+        // `entry-admission` runs, and a file entry's slots are established
+        // then (D15:2516, 3159; plan 025 interpretation #246).
+        if *unit == ENTRY_OWNER {
+            let dependencies = self
+                .entry
+                .retained(self.specification, &self.tokens)
+                .ok_or(ReportingInvariant::EntryToken)?;
+            for dependency in dependencies {
+                let view = dependency.view();
+                records.push(self.retained(
+                    unit,
+                    RecordKind::EntryDependency,
+                    Record::EntryDependency(dependency),
+                    view,
+                )?);
+            }
         }
         for cause in self
             .unavailable
@@ -654,16 +699,20 @@ mod tests {
 
     use crate::construction::registry::check::RecordKind;
     use crate::materialize_tests::limits;
-    use crate::resolver::dependency::{self, SemanticGroup};
+    use crate::resolver::dependency::fixtures::{file_entry, redacted_entry};
+    use crate::resolver::dependency::{self, MaterializedSlot, SemanticGroup};
     use crate::resolver::entry::admit_entry;
     use crate::resolver::entry::fixtures::FileFixture;
+    use crate::resolver::entry::OWNER as ENTRY_OWNER;
     use crate::resolver::evaluation::{Blocking, Check, Code, Evaluation, Phase, Status, Unit};
     use crate::resolver::evidence::Evidence;
     use crate::resolver::evidence_metadata::fixtures::unbounded;
+    use crate::resolver::evidence_token::EvidenceTokens;
     use crate::resolver::limits::fixture_limits;
     use crate::resolver::profile_resolution::tests::Inputs;
     use crate::resolver::record_view::RecordViews;
     use crate::resolver::specification::Slot;
+    use crate::resolver::structural_admission::OWNER as MATERIALIZED_OWNER;
     use crate::resolver::token::{Sha256, Specification};
 
     use super::{basis_view, table, Candidates, Record, Reporting, ReportingDomain, Slice};
@@ -720,7 +769,13 @@ mod tests {
     fn a_complete_invocation_reports_each_status_into_its_own_domain() {
         Inputs::complete().resolve(|evaluation, _| {
             assert!(evaluation.findings().is_empty());
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
+            let reporting = Reporting::new(
+                &evaluation,
+                PROFILE,
+                (None, file_entry()),
+                &unbounded(),
+                &Sha256,
+            );
             let slices = reporting.slices().unwrap();
             let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
             let table = table();
@@ -770,12 +825,20 @@ mod tests {
                 };
                 let basis = if slice.unit == &table { cells } else { 0 };
                 let semantic = usize::from(dependency::owned(slice.unit).is_some());
+                let materialized = if slice.unit == &MATERIALIZED_OWNER {
+                    8
+                } else {
+                    0
+                };
+                let entry = if slice.unit == &ENTRY_OWNER { 3 } else { 0 };
                 assert_eq!(
                     kinds(slice),
                     [
                         vec![status],
+                        vec![RecordKind::EntryDependency; entry],
                         vec![RecordKind::CoverageDecisionBasis; basis],
                         vec![RecordKind::SemanticDependency; semantic],
+                        vec![RecordKind::MaterializedDependency; materialized],
                     ]
                     .concat(),
                     "{:?}",
@@ -824,7 +887,13 @@ mod tests {
                 json!(["ja", "en", "fr"]);
         }
         inputs.resolve(|evaluation, _| {
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
+            let reporting = Reporting::new(
+                &evaluation,
+                PROFILE,
+                (None, file_entry()),
+                &unbounded(),
+                &Sha256,
+            );
             let slices = reporting.slices().unwrap();
             let subsets: Vec<&Slice<'_>> = slices
                 .iter()
@@ -906,7 +975,13 @@ mod tests {
         let Ok(Err(causes)) = admit_entry(&mut evaluation, &file, limits()) else {
             panic!("the file is not strict JSON");
         };
-        let reporting = Reporting::new(&evaluation, PROFILE, Some(&causes), &unbounded(), &Sha256);
+        let reporting = Reporting::new(
+            &evaluation,
+            PROFILE,
+            (Some(&causes), file_entry()),
+            &unbounded(),
+            &Sha256,
+        );
         let slices = reporting.slices().unwrap();
         assert!(slices
             .iter()
@@ -979,7 +1054,13 @@ mod tests {
             panic!("every value waits");
         };
         assert_eq!(causes.keys().count(), 1);
-        let reporting = Reporting::new(&waiting, PROFILE, None, &unbounded(), &Sha256);
+        let reporting = Reporting::new(
+            &waiting,
+            PROFILE,
+            (None, file_entry()),
+            &unbounded(),
+            &Sha256,
+        );
         let counted = |reporting: &Reporting<'_, '_>| {
             reporting
                 .candidates(&unit, ReportingDomain::Shared)
@@ -1002,7 +1083,7 @@ mod tests {
             counted(&Reporting::new(
                 &evaluated,
                 PROFILE,
-                None,
+                (None, file_entry()),
                 &unbounded(),
                 &Sha256
             )),
@@ -1020,7 +1101,13 @@ mod tests {
         inputs.declaration()["coverage"]["rules"] =
             json!([{"intentSurfaceClasses": ["unknown"], "mode": "fallback-allowed"}]);
         inputs.resolve(|evaluation, _| {
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
+            let reporting = Reporting::new(
+                &evaluation,
+                PROFILE,
+                (None, file_entry()),
+                &unbounded(),
+                &Sha256,
+            );
             let slices = reporting.slices().unwrap();
             let table = table();
             let owned: Vec<&Slice<'_>> =
@@ -1076,7 +1163,13 @@ mod tests {
     #[test]
     fn each_established_group_reports_its_semantic_dependency() {
         Inputs::complete().resolve(|evaluation, _| {
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
+            let reporting = Reporting::new(
+                &evaluation,
+                PROFILE,
+                (None, file_entry()),
+                &unbounded(),
+                &Sha256,
+            );
             let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
             let slices = reporting.slices().unwrap();
             assert_eq!(semantic(&slices, &views), by_owner());
@@ -1091,7 +1184,13 @@ mod tests {
         inputs.declaration()["coverage"]["rules"] =
             json!([{"intentSurfaceClasses": ["unknown"], "mode": "fallback-allowed"}]);
         inputs.resolve(|evaluation, _| {
-            let reporting = Reporting::new(&evaluation, PROFILE, None, &unbounded(), &Sha256);
+            let reporting = Reporting::new(
+                &evaluation,
+                PROFILE,
+                (None, file_entry()),
+                &unbounded(),
+                &Sha256,
+            );
             let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
             let slices = reporting.slices().unwrap();
             let established: Vec<SemanticGroup> = by_owner()
@@ -1103,6 +1202,72 @@ mod tests {
             assert!(!established.contains(&SemanticGroup::Coverage));
             assert!(established.contains(&SemanticGroup::ProjectLocales));
             assert_eq!(semantic(&slices, &views), established);
+        });
+    }
+
+    /// The owner of the materialized dependencies reports one for every
+    /// slot, in the slots' order, and the owner of the entry dependencies
+    /// reports the entry's, after their statuses (D15:2507, 2516, 2518).
+    #[test]
+    fn each_dependency_owner_reports_every_slot_it_names() {
+        let entry = redacted_entry();
+        Inputs::complete().resolve(|evaluation, _| {
+            let reporting =
+                Reporting::new(&evaluation, PROFILE, (None, &entry), &unbounded(), &Sha256);
+            let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
+            let slices = reporting.slices().unwrap();
+            let owned = |owner: &Unit, domain| {
+                let slice = slices
+                    .iter()
+                    .find(|slice| slice.unit == owner && slice.domain == domain)
+                    .unwrap();
+                for retained in &slice.records[1..] {
+                    let (kind, view) = match &retained.record {
+                        Record::MaterializedDependency(slot) => {
+                            (RecordKind::MaterializedDependency, slot.view())
+                        }
+                        Record::EntryDependency(dependency) => {
+                            (RecordKind::EntryDependency, dependency.view())
+                        }
+                        other => panic!("{other:?}"),
+                    };
+                    assert_eq!(retained.kind, kind);
+                    let accounting = views.accounting(owner, retained.kind, view).unwrap();
+                    assert_eq!(retained.bytes, encoded_length(&accounting).unwrap());
+                }
+                slice
+                    .records
+                    .iter()
+                    .map(|retained| retained.record.clone())
+                    .collect::<Vec<_>>()
+            };
+            let only = |kind| {
+                slices
+                    .iter()
+                    .flat_map(|slice| &slice.records)
+                    .filter(|retained| retained.kind == kind)
+                    .count()
+            };
+            assert_eq!(only(RecordKind::MaterializedDependency), 8);
+            assert_eq!(only(RecordKind::EntryDependency), 3);
+            let materialized = owned(&MATERIALIZED_OWNER, ReportingDomain::Shared);
+            assert!(matches!(materialized[0], Record::Status(_)));
+            assert_eq!(
+                materialized[1..],
+                MaterializedSlot::ALL.map(Record::MaterializedDependency)
+            );
+            // The tokens of the entry's redacted components: under this
+            // digest nothing else in the invocation collides with them.
+            let tokens = EvidenceTokens::assign(PROFILE, entry.redacted(), &Sha256);
+            let entries = owned(&ENTRY_OWNER, ReportingDomain::Entry);
+            assert!(matches!(entries[0], Record::Status(_)));
+            assert_eq!(
+                entries[1..],
+                entry
+                    .retained(PROFILE, &tokens)
+                    .unwrap()
+                    .map(Record::EntryDependency)
+            );
         });
     }
 }
