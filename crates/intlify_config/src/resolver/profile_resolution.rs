@@ -30,28 +30,41 @@
 //! returns is crate-private semantic state, not a `LocalizationProjectProfile`,
 //! a checked or blocked outcome, or Resolution Evidence. The profile
 //! projection is 015's Implementation Phase 5.
+//!
+//! [`invoke_file`] runs one file entry's invocation from Phase 0: Phase 1 over
+//! the file, Phases 2 and 3 over the value it admits, and these phases over
+//! the configuration Phase 3 selected. Without a value it leaves instead the
+//! blocking Phase 1 Finding Keys that make the Shared projection unavailable
+//! (D15:2369). Either way it leaves what the entry dependency records name,
+//! the selector projected under the final projection authority Phase 4 fixed,
+//! or the capability's without a value, beside the Profile IDs the root
+//! declares (D15:807, 816-817, 2516). The construction and invocation inputs
+//! it takes are assembled outside it (plan 025 PR 4g).
 
 use crate::artifacts::collection::FormalCollection;
 use crate::artifacts::vocabulary::FormalVocabulary;
 use crate::boundary::capability::ImplementationCapability;
 use crate::boundary::verification::VerificationInput;
-use crate::input_limits::ValueCounts;
+use crate::input_limits::{InputLimits, ValueCounts};
 use crate::locale::{
     CanonicalizationFailure, FormalData, Provider, SemanticPins, VersionedIdentity,
 };
 use crate::model::{IntlifyConfig, ProfileDeclaration, ProfileId};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::selection::{ProvisionalSelection, SelectionInvariant, SelectorInput};
-use crate::structural::{AdmissionInvariant, StructuralAnalysis};
+use crate::structural::{
+    AdmissionInvariant, AuthoringSchema, StructuralAnalysis, StructuralLimits,
+};
 
 use super::artifact_resolution::{admit_collection, ArtifactSet, CollectionInvariant};
 use super::coverage::{resolve_coverage, CoveragePolicy};
 use super::declaration_fields::DeclarationFields;
 use super::declaration_observer::{DeclarationObserver, ObserverInvariant};
 use super::delivery::{resolve_delivery, DeliveryPolicy};
-use super::dependency::{own, SemanticGroup, OPTIONAL_POLICIES, REQUIRED_POLICIES};
-use super::entry::{EntryFile, EntryInvariant};
+use super::dependency::{own, EntryInputs, SemanticGroup, OPTIONAL_POLICIES, REQUIRED_POLICIES};
+use super::entry::{admit_entry, EntryFile, EntryInvariant};
 use super::evaluation::{and, Admitted, Causes, Evaluation, EvaluationInvariant};
+use super::evidence::EvidenceInvariant;
 use super::evidence_component::ComponentInvariant;
 use super::exact_resolution::{
     resolve_fields, ArtifactBindings, ReferenceInvariant, ResolvedReferences,
@@ -62,16 +75,16 @@ use super::hydration::{validate_hydration, HydrationInvariant, ResolvedHydration
 use super::identity::{resolve_project_identity, ProjectIdentity};
 use super::locales::{resolve_locales, LocaleInvariant, ResolvedLocales};
 use super::negotiation::{resolve_negotiation, NegotiationProfile};
-use super::profile_selection::ProfileSelectionInvariant;
+use super::profile_selection::{select_profile, ProfileSelectionInvariant};
 use super::resource_policy::{
     admit_resource_policy, ConfigurationMeasures, DeclarationReferences, PolicyInvariant,
     PolicyOutcome,
 };
 use super::specification::{
-    admit_specifications, SpecificationInput, SpecificationInvariant, SpecificationSet,
-    SupportedSpecifications,
+    admit_project_profile, admit_specifications, SpecificationInput, SpecificationInvariant,
+    SpecificationSet, SupportedSpecifications,
 };
-use super::structural_admission::StructuralInvariant;
+use super::structural_admission::{admit_structure, whole, StructuralInvariant};
 use super::targets::{resolve_targets, ResolvedTargets, TargetInvariant};
 use super::vocabulary::SurfaceVocabulary;
 
@@ -191,6 +204,15 @@ impl<'a> SelectedConfiguration<'a> {
             structural_units: self.structural_units.clone(),
         }
     }
+
+    /// Every Profile ID the root's `profiles` object declares, in unsigned
+    /// byte order, or none when structural admission did not admit the object:
+    /// the declared Profile IDs a selector can name (D15:807).
+    pub(crate) fn declared(&self) -> &[ProfileId] {
+        self.declarations
+            .as_ref()
+            .map_or(&[], |(_, ids)| ids.as_slice())
+    }
 }
 
 /// The resolver bug of checks that admitted what structural admission's
@@ -283,6 +305,9 @@ pub(crate) enum ResolverInvariant {
     /// A later phase looked at a value of the selected declaration that has
     /// no Evidence.
     Observer(ObserverInvariant),
+    /// The entry dependencies named a source identity or a selector without
+    /// a projection.
+    Evidence(EvidenceInvariant),
 }
 
 impl From<ProfileSelectionInvariant> for ResolverInvariant {
@@ -622,6 +647,118 @@ fn held<T>(result: Result<T, &Causes>) -> Admitted<()> {
     result.map(|_| ()).map_err(Causes::clone)
 }
 
+/// The authoring schema structural admission reads a configuration with.
+pub(crate) type ConfigurationSchema = AuthoringSchema<PolicyReference, TargetProfileReference>;
+
+/// What one file entry's invocation leaves for its outcome: the semantic
+/// state once the entry materialized a value, or else the blocking Phase 1
+/// Finding Keys that leave the Shared projection unavailable (D15:2369), and
+/// what the entry dependency records name (D15:2516).
+#[derive(Debug)]
+pub(crate) struct Invoked<'s, Id> {
+    pub(crate) state: Result<SemanticState<'s, Id>, Causes>,
+    pub(crate) entry: EntryInputs,
+}
+
+/// One file entry's invocation over `evaluation`: Phase 0, then Phase 1 over
+/// `file` under `limits`, Phase 2 over the value Phase 1 admits with `schema`
+/// under `structural`, Phase 3 selecting `selector`'s declaration, and the
+/// semantic phases over the configuration, or, without a declaration Phase 3
+/// selected, over the causes of its absence (D15:2131). Without a value there
+/// is no Shared projection and so no semantic state (D15:2369). The selector's
+/// final projection authority is the one Phase 4 fixed, or the capability's
+/// without a value, and the Profile IDs it may name are those the root's
+/// `profiles` object declares, none without a value (D15:807, 816-817).
+///
+/// # Errors
+///
+/// Returns the resolver bug that a phase or the entry dependencies found.
+pub(crate) fn invoke_file<'s, P, D>(
+    evaluation: &mut Evaluation,
+    (file, limits): (&EntryFile<'_>, InputLimits),
+    (schema, structural, selector): (&ConfigurationSchema, StructuralLimits, &SelectorInput),
+    invocation: &Invocation<'s, P::Identity>,
+    data: D,
+    set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
+) -> Result<Invoked<'s, P::Identity>, ResolverInvariant>
+where
+    P: Provider,
+    P::Identity: AsRef<str>,
+    D: FormalData<Provider = P>,
+{
+    let project_profile =
+        admit_project_profile(evaluation, invocation.supported, invocation.specifications)?;
+    let document = match admit_entry(evaluation, file, limits)? {
+        Ok(document) => document,
+        Err(causes) => {
+            let authority = invocation
+                .capability
+                .policy_comparable()
+                .configuration_input
+                .structural
+                .max_profile_id_bytes;
+            let entry = EntryInputs::file(file, selector, authority, std::iter::empty())
+                .map_err(ResolverInvariant::Evidence)?;
+            return Ok(Invoked {
+                state: Err(causes),
+                entry,
+            });
+        }
+    };
+    let structure = admit_structure(
+        evaluation,
+        file,
+        document,
+        schema,
+        structural,
+        held(project_profile.as_ref()),
+    )?;
+    // Phase 3 records its checks whatever Phase 2 admitted, with its causes
+    // where it admitted nothing (D15:2131). The semantic phases read the
+    // declaration it selects once structural admission admitted its boundary
+    // and its `resourceLimits` reference, whatever else of it or of the root
+    // it rejected (plan 025 interpretation #218), and without one each check
+    // that reads the declaration waits on the causes (D15:2131).
+    let selection = select_profile(
+        evaluation,
+        file,
+        structure.as_ref().ok(),
+        selector,
+        structural,
+    )?;
+    let root = whole(evaluation);
+    let configuration = match (&structure, &selection) {
+        (Ok(analysis), Ok(selection)) => {
+            SelectedConfiguration::new(evaluation, (analysis, file), (selector, selection), root)?
+        }
+        (_, Err(causes)) => {
+            SelectedConfiguration::unselected(structure.as_ref().ok(), (selector, causes), root)?
+        }
+        (Err(_), Ok(_)) => {
+            return Err(ProfileSelectionInvariant::UnreportedFailure.into());
+        }
+    };
+    let state = resolve_profile(
+        evaluation,
+        &project_profile,
+        &configuration,
+        invocation,
+        data,
+        set,
+    )?;
+    let entry = EntryInputs::file(
+        file,
+        selector,
+        state.policy.authority,
+        configuration.declared(),
+    )
+    .map_err(ResolverInvariant::Evidence)?;
+    Ok(Invoked {
+        state: Ok(state),
+        entry,
+    })
+}
+
 // `handoff`'s tests resolve the same inputs.
 #[cfg(test)]
 pub(super) mod tests {
@@ -636,6 +773,7 @@ pub(super) mod tests {
     use crate::artifacts::content::sample;
     use crate::artifacts::envelope::{envelope_of, ArtifactKind, ExactTuple, FormalMember};
     use crate::artifacts::vectors::vocabulary::{self as vectors, formal_of};
+    use crate::boundary::source::file_source_revision;
     use crate::construction::registry::check::testing::{check_id, requirements};
     use crate::construction::registry::check::CheckRegistry;
     use crate::input_limits::{Bound, InputLimits, RawInputLimits};
@@ -650,29 +788,29 @@ pub(super) mod tests {
     use crate::resolver::delivery::PlacementMode;
     use crate::resolver::dependency::{self, SemanticGroup};
     use crate::resolver::entry::fixtures::FileFixture;
-    use crate::resolver::entry::{admit_entry, input, EntryFile, OWNER};
+    use crate::resolver::entry::{admit_entry, input, OWNER};
     use crate::resolver::evaluation::{
         Check, Code, IssueKey, Phase, Reason, Status, Subject, Unit,
     };
+    use crate::resolver::evidence_token::EvidenceTokens;
     use crate::resolver::exact_resolution;
     use crate::resolver::groups::{self, GroupSubject};
     use crate::resolver::hydration::{self, HydrationSubject};
     use crate::resolver::limits::{fixture_limits, ResolutionLimits, SECTION};
     use crate::resolver::locales::fixtures::canonical;
     use crate::resolver::locales::{self, LocaleKey, LocaleSubject, Location};
-    use crate::resolver::profile_selection::{
-        capability, select_profile, selector, SelectionSubject,
-    };
+    use crate::resolver::profile_selection::{capability, selector, SelectionSubject};
     use crate::resolver::profile_view::{project, ProfileView};
     use crate::resolver::resource_policy::{self, PolicySlot, PolicySubject, ReferenceField};
     use crate::resolver::specification::{
         admit_project_profile, ActiveProfileSpecification, Slot, VocabularyAssertion, DATA,
     };
-    use crate::resolver::structural_admission::{admit_structure, selection, whole, CAPABILITY};
+    use crate::resolver::structural_admission::{selection, CAPABILITY};
     use crate::resolver::subject::SubjectKind;
     use crate::resolver::targets::{self, TargetSubject};
+    use crate::resolver::token::{Sha256, Specification};
     use crate::structural::selection::{Selection, StringLengthFact};
-    use crate::structural::{AuthoringSchema, StructuralLimits};
+    use crate::structural::AuthoringSchema;
 
     type Id = &'static str;
     type Schema = AuthoringSchema<PolicyReference, TargetProfileReference>;
@@ -1010,6 +1148,37 @@ pub(super) mod tests {
 
         /// Selects `policy`, submitted first in place of the selected one,
         /// and pins it.
+        /// The invocation of the configuration's file, or of `bytes` when
+        /// given, for `inspect` with what it recorded and what it left.
+        fn entered<R>(
+            &self,
+            bytes: Option<Arc<[u8]>>,
+            inspect: impl FnOnce(Evaluation, Invoked<'_, Id>) -> R,
+        ) -> R {
+            let (config, limits) = entry_input(&self.config, &self.capability);
+            let fixture = FileFixture::new(&self.capability);
+            let file = fixture.file(bytes.unwrap_or(config));
+            let selector = self.selector();
+            self.invoked(|invocation| {
+                let mut evaluation = Evaluation::default();
+                let mut set = None;
+                let invoked = invoke_file(
+                    &mut evaluation,
+                    (&file, limits),
+                    (
+                        &Schema::for_model().unwrap(),
+                        self.capability.configuration_input.structural,
+                        &selector,
+                    ),
+                    invocation,
+                    FixtureProvider::new(),
+                    &mut set,
+                )
+                .unwrap();
+                inspect(evaluation, invoked)
+            })
+        }
+
         fn select_policy(&mut self, policy: Value) {
             self.pinned = tuple_of(&policy);
             self.declaration()["policies"]["resourceLimits"] = reference_value(&self.pinned);
@@ -1131,14 +1300,19 @@ pub(super) mod tests {
             let selector = self.selector();
             self.invoked(|invocation| {
                 let mut set = None;
-                let state = invoke_entry(
+                let state = invoke_file(
                     &mut evaluation,
                     (&file, limits),
-                    (self.capability.configuration_input.structural, &selector),
+                    (
+                        &Schema::for_model().unwrap(),
+                        self.capability.configuration_input.structural,
+                        &selector,
+                    ),
                     invocation,
                     FixtureProvider::new(),
                     &mut set,
-                );
+                )
+                .map(|invoked| invoked.state.ok());
                 let registry = CheckRegistry::revision_zero();
                 let requirements = requirements(&registry);
                 for (unit, status) in evaluation.statuses() {
@@ -1179,15 +1353,20 @@ pub(super) mod tests {
             self.invoked(|invocation| {
                 let mut evaluation = Evaluation::default();
                 let mut set = None;
-                let state = invoke_entry(
+                let state = invoke_file(
                     &mut evaluation,
                     (&file, limits),
-                    (self.capability.configuration_input.structural, &selector),
+                    (
+                        &Schema::for_model().unwrap(),
+                        self.capability.configuration_input.structural,
+                        &selector,
+                    ),
                     invocation,
                     FixtureProvider::new(),
                     &mut set,
                 )
                 .unwrap()
+                .state
                 .expect("entry admits the file");
                 let view = project(&state, invocation.supported);
                 inspect(evaluation, view)
@@ -1232,82 +1411,6 @@ pub(super) mod tests {
             data,
             set,
         )
-    }
-
-    /// One invocation over `evaluation` from its entry: Phase 0, then Phase 1
-    /// over `file` under `limits`, Phase 2 over the value Phase 1 admits with
-    /// the model's configuration schema under `structural`, Phase 3 selecting
-    /// `selector`'s declaration, and the semantic phases over the
-    /// configuration, or, without a declaration Phase 3 selected, over the
-    /// causes of its absence (D15:2131). Without a value there is no Shared
-    /// projection and so no semantic state (D15:2369).
-    fn invoke_entry<'s, P, D>(
-        evaluation: &mut Evaluation,
-        (file, limits): (&EntryFile<'_>, InputLimits),
-        (structural, selector): (StructuralLimits, &SelectorInput),
-        invocation: &Invocation<'s, P::Identity>,
-        data: D,
-        set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
-    ) -> Result<Option<SemanticState<'s, P::Identity>>, ResolverInvariant>
-    where
-        P: Provider,
-        P::Identity: AsRef<str>,
-        D: FormalData<Provider = P>,
-    {
-        let project_profile =
-            admit_project_profile(evaluation, invocation.supported, invocation.specifications)?;
-        let Ok(document) = admit_entry(evaluation, file, limits)? else {
-            return Ok(None);
-        };
-        let schema = Schema::for_model().unwrap();
-        let structure = admit_structure(
-            evaluation,
-            file,
-            document,
-            &schema,
-            structural,
-            held(project_profile.as_ref()),
-        )?;
-        // Phase 3 records its checks whatever Phase 2 admitted, with its
-        // causes where it admitted nothing (D15:2131). The semantic phases
-        // read the declaration it selects once structural admission admitted
-        // its boundary and its `resourceLimits` reference, whatever else of it
-        // or of the root it rejected (plan 025 interpretation #218), and
-        // without one each check that reads the declaration waits on the
-        // causes (D15:2131).
-        let selection = select_profile(
-            evaluation,
-            file,
-            structure.as_ref().ok(),
-            selector,
-            structural,
-        )?;
-        let root = whole(evaluation);
-        let configuration = match (&structure, &selection) {
-            (Ok(analysis), Ok(selection)) => SelectedConfiguration::new(
-                evaluation,
-                (analysis, file),
-                (selector, selection),
-                root,
-            )?,
-            (_, Err(causes)) => SelectedConfiguration::unselected(
-                structure.as_ref().ok(),
-                (selector, causes),
-                root,
-            )?,
-            (Err(_), Ok(_)) => {
-                return Err(ProfileSelectionInvariant::UnreportedFailure.into());
-            }
-        };
-        resolve_profile(
-            evaluation,
-            &project_profile,
-            &configuration,
-            invocation,
-            data,
-            set,
-        )
-        .map(Some)
     }
 
     /// The check ID of the Check Registry row a unit belongs to.
@@ -1567,15 +1670,19 @@ pub(super) mod tests {
         inputs.invoked(|invocation| {
             let mut evaluation = Evaluation::default();
             let mut set = None;
-            let state = invoke_entry(
+            let invoked = invoke_file(
                 &mut evaluation,
                 (&file, limits),
-                (inputs.capability.configuration_input.structural, &selector),
+                (
+                    &Schema::for_model().unwrap(),
+                    inputs.capability.configuration_input.structural,
+                    &selector,
+                ),
                 invocation,
                 FixtureProvider::new(),
                 &mut set,
             );
-            assert!(matches!(state, Ok(None)));
+            assert!(matches!(invoked, Ok(Invoked { state: Err(_), .. })));
             let phases: BTreeSet<Phase> =
                 evaluation.statuses().map(|(unit, _)| unit.phase).collect();
             assert_eq!(
@@ -1584,6 +1691,65 @@ pub(super) mod tests {
             );
             let codes: Vec<Code> = evaluation.issues().map(IssueKey::code).collect();
             assert_eq!(codes, [Code::JsonInvalid]);
+        });
+    }
+
+    /// The views of the entry dependency records `invoked` names, their
+    /// redacted components' tokens assigned on their own: nothing else in
+    /// these invocations collides with them under this digest.
+    fn entry_views(invoked: &Invoked<'_, Id>) -> [Value; 3] {
+        let specification = Specification {
+            identity: "intlify-project-profile",
+            revision: "0",
+        };
+        let tokens = EvidenceTokens::assign(specification, invoked.entry.redacted(), &Sha256);
+        invoked
+            .entry
+            .retained(specification, &tokens)
+            .unwrap()
+            .map(|record| record.view())
+    }
+
+    /// The selector the entry dependencies name is projected under the final
+    /// projection authority beside the declared Profile IDs: the selected
+    /// declaration's ID is a safe Profile ID; past the policy's bound it is
+    /// over the limit and redacted; and without a value the capability
+    /// measures it, with no declared Profile ID to name. The entry source
+    /// names the Source-content revision of the file's bytes (D15:743, 807,
+    /// 816-819, 2516).
+    #[test]
+    fn the_entry_dependencies_name_the_final_selector_projection() {
+        let complete = Inputs::complete();
+        let (bytes, _) = entry_input(&complete.config, &complete.capability);
+        complete.entered(None, |_, invoked| {
+            assert!(invoked.state.is_ok());
+            let [source, selector, _] = entry_views(&invoked);
+            assert_eq!(selector["selector"], json!({ "safe-profile-id": "web" }));
+            assert_eq!(source["revision"], json!(file_source_revision(&bytes)));
+        });
+        let mut limited = Inputs::complete();
+        let mut limits = policy_limits();
+        limits.configuration_input.structural.max_profile_id_bytes = bound(2);
+        limited.select_policy(resource_limit_policy(&limits));
+        limited.entered(None, |_, invoked| {
+            let state = invoked.state.as_ref().unwrap();
+            assert_eq!(state.policy.authority, bound(2));
+            let [_, selector, _] = entry_views(&invoked);
+            let redacted = &selector["selector"]["redacted-value"];
+            assert_eq!(redacted["type"], json!("string"));
+            assert_eq!(redacted["length"], json!("over-limit"));
+        });
+        let broken: Arc<[u8]> = Arc::from(&br#"{"schemaVersion":"#[..]);
+        complete.entered(Some(Arc::clone(&broken)), |_, invoked| {
+            let causes = invoked.state.as_ref().unwrap_err();
+            assert_eq!(
+                causes.keys().map(IssueKey::unit).collect::<Vec<_>>(),
+                [&input(Check::WellFormedJson)]
+            );
+            let [source, selector, _] = entry_views(&invoked);
+            let redacted = &selector["selector"]["redacted-value"];
+            assert_eq!(redacted["length"], json!({ "exact": "3" }));
+            assert_eq!(source["revision"], json!(file_source_revision(&broken)));
         });
     }
 
