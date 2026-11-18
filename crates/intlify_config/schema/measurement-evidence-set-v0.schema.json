@@ -1422,7 +1422,23 @@
           ]
         }
       },
-      "required": ["boundary", "method", "execution"],
+      "required": [
+        "boundary",
+        "method",
+        "execution",
+        "admittedLocaleInput",
+        "artifactCollectionInput",
+        "constructionInput",
+        "entryEvidenceInput",
+        "hydrationRelationInput",
+        "localeInput",
+        "localePolicyResolutionInput",
+        "outcomeFinalizationInput",
+        "resolvedBindingInput",
+        "resourcePolicyInput",
+        "sharedEvidenceInput",
+        "targetAndGroupInput"
+      ],
       "type": "object"
     },
     "Detail": {
@@ -3574,7 +3590,7 @@
           "$ref": "#/definitions/NativeObservationChecksum"
         }
       },
-      "required": ["shared"],
+      "required": ["shared", "entry"],
       "type": "object"
     },
     "Observation2": {
@@ -4832,7 +4848,7 @@
           "$ref": "#/definitions/VersionedIdentity"
         }
       },
-      "required": ["compiler", "backend"],
+      "required": ["compiler", "backend", "commit"],
       "type": "object"
     },
     "UInt64": {
@@ -4881,7 +4897,7 @@
           "$ref": "#/definitions/Selector2"
         }
       },
-      "required": ["recipe", "selector"],
+      "required": ["recipe", "selector", "limit"],
       "type": "object"
     },
     "VersionedIdentity": {

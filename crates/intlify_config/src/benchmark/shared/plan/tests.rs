@@ -54,6 +54,31 @@ fn complete_schemas_are_fresh_closed_and_accept_actual_issued_plan_and_case_inpu
         let value = case_identity_input(projection).unwrap();
         assert!(case_validator.is_valid(&value));
     }
+    // Each decoder requires a member, null included, exactly when its schema
+    // does. The identity input is written, never read back; what a reader
+    // decodes is the projection inside it, and a projection whose member paths
+    // all occur in an earlier one has none left to try.
+    let decodes = |left_out| serde_json::from_value::<RunPlanRecord>(left_out).is_ok();
+    assert_eq!(
+        crate::schema::omission_disagreements(&value, "", &plan_validator, decodes),
+        Vec::<String>::new()
+    );
+    let decodes = |left_out: Value| {
+        serde_json::from_value::<CaseProjection>(left_out["projection"].clone()).is_ok()
+    };
+    let mut seen = std::collections::BTreeSet::new();
+    for projection in plan.projections() {
+        let input = case_identity_input(projection).unwrap();
+        let paths = crate::schema::member_paths(&input, "/projection");
+        if paths.keys().all(|path| seen.contains(path)) {
+            continue;
+        }
+        seen.extend(paths.into_keys());
+        assert_eq!(
+            crate::schema::omission_disagreements(&input, "/projection", &case_validator, decodes),
+            Vec::<String>::new()
+        );
+    }
     let mut null_context = value.clone();
     null_context["envelope"]["creationContext"] = Value::Null;
     assert!(!plan_validator.is_valid(&null_context));

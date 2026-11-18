@@ -346,6 +346,7 @@ pub(super) fn prepared_core(operation: Operation, icu4x: Option<Engine>) -> Exec
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[schemars(transform = intlify_measurement::schema::require_nullable_members)]
 pub(super) struct Descriptors {
     pub(super) boundary: Boundary,
     pub(super) method: Method,

@@ -83,6 +83,7 @@ impl<'de> Deserialize<'de> for Digest {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[schemars(transform = intlify_measurement::schema::require_nullable_members)]
 pub(crate) struct Observation {
     pub(crate) shared: Digest,
     #[serde(deserialize_with = "Option::deserialize")]

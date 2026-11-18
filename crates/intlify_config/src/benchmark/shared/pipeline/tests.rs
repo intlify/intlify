@@ -348,6 +348,30 @@ fn complete_schemas_are_fresh_and_agree_with_the_independent_draft7_oracle() {
             }
         }
     }
+
+    // The evidence decoder requires a member, null included, exactly when the
+    // schema does. A member path is left out where it first occurs, so a case
+    // whose paths all occur in an earlier case adds only bytes to every try.
+    let oracle =
+        jsonschema::draft7::new(&schema::measurement_evidence_set_schema().unwrap()).unwrap();
+    let mut evidence = value(artifacts.evidence.as_ref().unwrap());
+    let mut seen = std::collections::BTreeSet::new();
+    evidence["body"]["cases"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|case| {
+            let paths = schema::member_paths(case, "")
+                .into_keys()
+                .collect::<Vec<_>>();
+            let adds = paths.iter().any(|path| !seen.contains(path));
+            seen.extend(paths);
+            adds
+        });
+    let decodes = |left_out| serde_json::from_value::<measurement::Evidence>(left_out).is_ok();
+    assert_eq!(
+        schema::omission_disagreements(&evidence, "", &oracle, decodes),
+        Vec::<String>::new()
+    );
 }
 
 #[test]

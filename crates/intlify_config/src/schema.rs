@@ -73,6 +73,60 @@ pub fn draft7_schema<T: JsonSchema>() -> Result<Value, serde_json::Error> {
     Ok(value)
 }
 
+/// Each member path of `value` under `start`, with array positions folded into
+/// `*`, and where it first occurs: the holding object's pointer and the
+/// member's name.
+#[cfg(all(test, feature = "benchmark"))]
+pub(crate) fn member_paths(
+    value: &Value,
+    start: &str,
+) -> std::collections::BTreeMap<String, (String, String)> {
+    let mut paths = std::collections::BTreeMap::new();
+    let mut pending = vec![(start.to_owned(), start.to_owned())];
+    while let Some((pointer, folded)) = pending.pop() {
+        match value.pointer(&pointer) {
+            Some(Value::Object(members)) => {
+                for name in members.keys() {
+                    let step = name.replace('~', "~0").replace('/', "~1");
+                    let path = format!("{folded}/{step}");
+                    paths
+                        .entry(path.clone())
+                        .or_insert_with(|| (pointer.clone(), name.clone()));
+                    pending.push((format!("{pointer}/{step}"), path));
+                }
+            }
+            Some(Value::Array(items)) => pending.extend(
+                (0..items.len()).map(|index| (format!("{pointer}/{index}"), format!("{folded}/*"))),
+            ),
+            _ => {}
+        }
+    }
+    paths
+}
+
+/// The member paths of `record` under `start` whose omission `schema` and
+/// `decodes` judge differently. Each path is left out once, where it first
+/// occurs.
+#[cfg(all(test, feature = "benchmark"))]
+pub(crate) fn omission_disagreements(
+    record: &Value,
+    start: &str,
+    schema: &jsonschema::Validator,
+    decodes: impl Fn(Value) -> bool,
+) -> Vec<String> {
+    member_paths(record, start)
+        .into_iter()
+        .filter(|(_, (pointer, name))| {
+            let mut left_out = record.clone();
+            if let Some(Value::Object(parent)) = left_out.pointer_mut(pointer) {
+                parent.remove(name);
+            }
+            schema.is_valid(&left_out) != decodes(left_out)
+        })
+        .map(|(path, _)| path)
+        .collect()
+}
+
 /// Sort object members by unsigned UTF-8 bytes and produce stable JSON bytes.
 ///
 /// Array order and all field semantics are retained. String arrays use the

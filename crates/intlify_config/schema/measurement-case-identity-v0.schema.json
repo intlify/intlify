@@ -1307,7 +1307,7 @@
           "$ref": "#/definitions/Selector"
         }
       },
-      "required": ["recipe", "selector"],
+      "required": ["recipe", "selector", "limit"],
       "type": "object"
     },
     "VersionedIdentity": {

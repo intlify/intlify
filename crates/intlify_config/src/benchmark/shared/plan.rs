@@ -81,6 +81,7 @@ pub(in crate::benchmark) fn present<'de, D: Deserializer<'de>, T: Deserialize<'d
 /// The entry kind and the resolver state appear only on the cases they apply to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[schemars(transform = intlify_measurement::schema::require_nullable_members)]
 struct Variant {
     recipe: Recipe,
     #[serde(deserialize_with = "Option::deserialize")]
