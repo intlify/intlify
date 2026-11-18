@@ -85,33 +85,25 @@ pub(crate) struct Reported<'e> {
     pub(crate) shared: Committed<'e>,
 }
 
-/// Plans and commits the slices of `reporting`, each domain on its own in
-/// canonical unit order, under `capability`'s limits until Phase 4 admits a
-/// Resource Limit Policy, whose limits `policy` gives, and under the Policy's
-/// from then on.
+/// Plans and commits the slices of `reporting`'s `domain` in canonical unit
+/// order, under `capability`'s limits until Phase 4 admits a Resource Limit
+/// Policy, whose limits `policy` gives, and under the Policy's from then on.
 ///
 /// # Errors
 ///
 /// Returns the resolver bug that leaves a slice without its records.
-pub(crate) fn report<'e>(
+pub(crate) fn report_domain<'e>(
     reporting: &Reporting<'e, '_>,
+    domain: ReportingDomain,
     capability: &DiagnosticsLimits,
     policy: Option<&DiagnosticsLimits>,
-) -> Result<Reported<'e>, ReportingInvariant> {
-    Ok(Reported {
-        entry: plan(
-            reporting,
-            ReportingDomain::Entry,
-            Bounds::Entry(&capability.entry),
-            policy.map(|policy| Bounds::Entry(&policy.entry)),
-        )?,
-        shared: plan(
-            reporting,
-            ReportingDomain::Shared,
-            Bounds::Shared(&capability.shared),
-            policy.map(|policy| Bounds::Shared(&policy.shared)),
-        )?,
-    })
+) -> Result<Committed<'e>, ReportingInvariant> {
+    plan(
+        reporting,
+        domain,
+        Bounds::of(domain, capability),
+        policy.map(|policy| Bounds::of(domain, policy)),
+    )
 }
 
 /// The slices of `domain`: none when the resolver's own Evidence metadata
@@ -324,6 +316,16 @@ enum Bounds<'l> {
     Shared(&'l SharedDiagnosticsLimits),
 }
 
+impl<'l> Bounds<'l> {
+    /// `domain`'s bounds in `limits`.
+    const fn of(domain: ReportingDomain, limits: &'l DiagnosticsLimits) -> Self {
+        match domain {
+            ReportingDomain::Entry => Self::Entry(&limits.entry),
+            ReportingDomain::Shared => Self::Shared(&limits.shared),
+        }
+    }
+}
+
 impl Bounds<'_> {
     /// `counted` once a slice's candidate stage counted `candidates`, or the
     /// first bound it exceeds.
@@ -485,6 +487,23 @@ fn first_over<const N: usize>(
         .map(|(name, ..)| BoundId { group, name })
 }
 
+/// Plans and commits the slices of `reporting`, each domain on its own.
+///
+/// # Errors
+///
+/// Returns the resolver bug that leaves a slice without its records.
+#[cfg(test)]
+pub(crate) fn report<'e>(
+    reporting: &Reporting<'e, '_>,
+    capability: &DiagnosticsLimits,
+    policy: Option<&DiagnosticsLimits>,
+) -> Result<Reported<'e>, ReportingInvariant> {
+    Ok(Reported {
+        entry: report_domain(reporting, ReportingDomain::Entry, capability, policy)?,
+        shared: report_domain(reporting, ReportingDomain::Shared, capability, policy)?,
+    })
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use std::collections::BTreeSet;
@@ -516,7 +535,7 @@ pub(crate) mod tests {
     use crate::resolver::resource_policy::{self, PolicySubject};
     use crate::resolver::token::{Sha256, Specification, Tokens};
 
-    use super::{report, Committed, Exhausted, Reported};
+    use super::{report, report_domain, Committed, Exhausted, Reported};
 
     pub(crate) const PROFILE: Specification<'static> = Specification {
         identity: "intlify-project-profile",
@@ -1099,6 +1118,41 @@ pub(crate) mod tests {
                 assert_eq!(reported.shared, within, "{bound:?}");
             }
         });
+    }
+
+    /// The Shared projection stage plans the Shared domain before the Entry
+    /// projection stage counts the complete invocation, under the subject
+    /// tokens of the Shared scope and those the Entry domain's reserved
+    /// terminal records name, and commits what it would under every unit's,
+    /// a Phase 0 Finding that a Shared status names among them (D15:1851,
+    /// 2145, 2516, 2659, 2775; plan 025 decision #253, interpretation #257).
+    #[test]
+    fn the_shared_domain_commits_alike_under_its_own_scopes_tokens() {
+        let alike = |evaluation: Evaluation| {
+            let limits = unbounded();
+            let scope = crate::resolver::evidence_metadata::shared_scope(
+                &evaluation,
+                PROFILE,
+                &limits,
+                &Sha256,
+            );
+            let shared =
+                Reporting::shared(&evaluation, PROFILE, (None, file_entry()), &scope, &Sha256);
+            let alone =
+                report_domain(&shared, ReportingDomain::Shared, &limits_with(None), None).unwrap();
+            assert!(!alone.slices.is_empty());
+            let complete =
+                Reporting::new(&evaluation, PROFILE, (None, file_entry()), &limits, &Sha256);
+            let both = report(&complete, &limits_with(None), None).unwrap();
+            assert_eq!(alone, both.shared);
+        };
+        Inputs::complete().resolve(|evaluation, _| alike(evaluation));
+        failing().resolve(|evaluation, _| alike(evaluation));
+        // A group's owner then waits on the Phase 0 Finding, which its Shared
+        // status names.
+        let mut unasserted = Inputs::complete();
+        unasserted.unasserted();
+        unasserted.resolve(|evaluation, _| alike(evaluation));
     }
 
     /// With no unit that reports into the Shared domain, a count past its

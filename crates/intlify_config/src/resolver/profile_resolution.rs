@@ -809,6 +809,7 @@ pub(super) mod tests {
     use crate::materialize::materialize_file;
     use crate::model::CoverageMode;
     use crate::profile_fixtures::complete_config;
+    use crate::resolver::capability::EvidenceMetadataLimits;
     use crate::resolver::delivery::PlacementMode;
     use crate::resolver::dependency::{self, SemanticGroup};
     use crate::resolver::entry::fixtures::FileFixture;
@@ -1072,6 +1073,11 @@ pub(super) mod tests {
         /// What trusted setup pinned in 018's Verification Input: the policy
         /// the declaration selects, whatever a test then changes.
         pinned: ExactTuple,
+        /// The capability's `evidenceMetadata` bounds. At their minima the
+        /// resolver's own Evidence metadata work would exhaust both
+        /// diagnostic domains of every outcome, so they are `unbounded`
+        /// unless a test sets them.
+        metadata: EvidenceMetadataLimits,
     }
 
     impl Inputs {
@@ -1102,6 +1108,7 @@ pub(super) mod tests {
                 surfaces: &vectors::MEMBERS,
                 capability: capability_limits(),
                 pinned: tuple_of(&policy),
+                metadata: unbounded(),
             };
             inputs.select_policy(policy);
             for (slot, kind, identity) in POLICIES {
@@ -1174,6 +1181,18 @@ pub(super) mod tests {
             &mut self.config["profiles"][self.selected]
         }
 
+        /// The capability's `evidenceMetadata` bounds `limits` in place of
+        /// the unbounded ones.
+        pub(crate) fn metadata(&mut self, limits: EvidenceMetadataLimits) {
+            self.metadata = limits;
+        }
+
+        /// The specification input without its `project-profile` assertion,
+        /// which Phase 0 then finds missing (D15:1125).
+        pub(crate) fn unasserted(&mut self) {
+            self.specifications.project_profile = None;
+        }
+
         /// The same inputs with the selected declaration declared again under
         /// `id`, which the selector then names: two declarations differing
         /// only in their Profile IDs.
@@ -1188,6 +1207,7 @@ pub(super) mod tests {
                 surfaces: self.surfaces,
                 capability: self.capability.clone(),
                 pinned: self.pinned.clone(),
+                metadata: self.metadata,
             }
         }
 
@@ -1234,6 +1254,7 @@ pub(super) mod tests {
                 surfaces: self.surfaces,
                 capability: tightened(&self.capability, capability),
                 pinned: self.pinned.clone(),
+                metadata: self.metadata,
             };
             inputs.select_policy(resource_limit_policy(&tightened(&policy_limits(), policy)));
             inputs
@@ -1304,6 +1325,7 @@ pub(super) mod tests {
                 surfaces: self.surfaces,
                 capability: self.capability.clone(),
                 pinned: self.pinned.clone(),
+                metadata: self.metadata,
             }
         }
 
@@ -1350,10 +1372,8 @@ pub(super) mod tests {
                 ActiveProfileSpecification::fixture(ACTIVE),
                 Supported::new(vec![fixture_pins()]).unwrap(),
             );
-            // At the minima the resolver's own Evidence metadata work would
-            // exhaust both diagnostic domains of every outcome.
             let capability = ImplementationCapability::fixture_owned(self.capability.clone())
-                .with_evidence_metadata(unbounded());
+                .with_evidence_metadata(self.metadata);
             let collection = collection(&self.members);
             let vocabulary = formal_of(self.surfaces);
             let verification = VerificationInput::fixture_owned([self.pinned.clone()]);
@@ -2661,7 +2681,7 @@ pub(super) mod tests {
     #[test]
     fn a_missing_project_profile_slot_leaves_only_its_groups_owner_waiting() {
         let mut inputs = Inputs::complete();
-        inputs.specifications.project_profile = None;
+        inputs.unasserted();
         inputs.resolve(|evaluation, state| {
             assert_eq!(
                 issues(&evaluation),
