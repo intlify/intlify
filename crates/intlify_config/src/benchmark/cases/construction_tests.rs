@@ -31,7 +31,7 @@ fn observed(operation: Operation, recipe: ConstructionRecipe) -> Observation {
 #[test]
 fn construction_cases_keep_the_304_rows_and_append_after_them() {
     let cases = declarations();
-    assert_eq!(cases.len(), 347);
+    assert_eq!(cases.len(), 350);
     assert!(cases[..304].iter().all(|case| !matches!(
         case.operation,
         Operation::ConstructionAuthorityAdmission | Operation::ConstructionIdentity
@@ -210,7 +210,10 @@ fn bound_edges_keep_the_318_rows_and_append_after_them() {
         start += count;
     }
     assert_eq!(start, 343 + 4);
-    assert_eq!(cases.len(), start);
+    // 015's Evidence stages follow.
+    assert!(cases[start..]
+        .iter()
+        .all(|case| case.operation == Operation::SharedEvidence));
 }
 
 /// Each edge's input is at its bound or one past it, a first-over input is
@@ -220,7 +223,7 @@ fn bound_edges_keep_the_318_rows_and_append_after_them() {
 fn each_edge_is_at_its_bound_or_one_past_it() {
     use super::construction_inputs::bound;
 
-    for declaration in &declarations()[318..] {
+    for declaration in &declarations()[318..347] {
         let (kind, edge) = declaration.limit.unwrap();
         let bound = bound(kind).unwrap();
         let candidate = prepare(declaration).unwrap();

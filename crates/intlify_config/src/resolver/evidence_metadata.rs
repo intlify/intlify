@@ -419,25 +419,12 @@ pub(crate) fn invocation(
     }
 }
 
-/// Both scopes' Evidence metadata work, as the Shared and the Entry
-/// projection stages check it in turn.
-#[cfg(test)]
-pub(crate) fn admit(
-    evaluation: &Evaluation,
-    entry: &EntryInputs,
-    specification: Specification<'_>,
-    limits: &EvidenceMetadataLimits,
-    digest: &impl Digest,
-) -> Admission {
-    let scope = shared_scope(evaluation, specification, limits, digest);
-    invocation(evaluation, entry, specification, limits, digest, scope)
-}
-
-#[cfg(test)]
+#[cfg(any(test, feature = "benchmark"))]
 pub(crate) mod fixtures {
     use crate::input_limits::Bound;
     use crate::resolver::capability::{BootstrapLimits, EvidenceMetadataLimits};
 
+    #[cfg(test)]
     use super::MetadataBound;
 
     /// The capability's minimum vector, but every bound the resolver applies
@@ -456,6 +443,7 @@ pub(crate) mod fixtures {
     }
 
     /// `unbounded`, but `bound` at `limit`.
+    #[cfg(test)]
     pub(crate) fn with(bound: MetadataBound, limit: u64) -> EvidenceMetadataLimits {
         let mut limits = unbounded();
         let limit = Bound::new(limit).unwrap();
@@ -471,6 +459,20 @@ pub(crate) mod fixtures {
         }
         limits
     }
+}
+
+/// Both scopes' Evidence metadata work, as the Shared and the Entry
+/// projection stages check it in turn.
+#[cfg(test)]
+pub(crate) fn admit(
+    evaluation: &Evaluation,
+    entry: &EntryInputs,
+    specification: Specification<'_>,
+    limits: &EvidenceMetadataLimits,
+    digest: &impl Digest,
+) -> Admission {
+    let scope = shared_scope(evaluation, specification, limits, digest);
+    invocation(evaluation, entry, specification, limits, digest, scope)
 }
 
 #[cfg(test)]

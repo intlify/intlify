@@ -16,6 +16,7 @@ use crate::references::{PolicyReference, TargetProfileReference};
 use crate::resolver::declaration_observer::DeclarationObserver;
 use crate::resolver::entry::fixtures::FileFixture;
 use crate::resolver::entry::EntryFile;
+use crate::resolver::evaluation::Evaluation;
 use crate::resolver::limits::ResolutionLimits;
 use crate::structural::selection::{
     InvalidSelectorType, Selection, SelectionFailure, SelectionInvariant, SelectionPrerequisite,
@@ -33,8 +34,8 @@ use super::locale_resolution::Canonicalizers;
 use super::measure::{Measured, MeasurementFailure};
 use super::observation::{self, Frame, Observation};
 use super::{
-    artifact_collection, construction, hydration_relation, locale, locale_icu4x, locale_resolution,
-    resolved_binding, resource_policy, target_group,
+    artifact_collection, construction, evidence, hydration_relation, locale, locale_icu4x,
+    locale_resolution, resolved_binding, resource_policy, target_group,
 };
 
 pub(super) type Config = IntlifyConfig<PolicyReference, TargetProfileReference>;
@@ -95,10 +96,11 @@ pub(super) enum Operation {
     HydrationRelationValidation,
     ConstructionAuthorityAdmission,
     ConstructionIdentity,
+    SharedEvidence,
 }
 
 impl Operation {
-    pub(super) const ALL: [Self; 13] = [
+    pub(super) const ALL: [Self; 14] = [
         Self::FileMaterialization,
         Self::StructuralAnalysis,
         Self::AuthoringConstruction,
@@ -112,6 +114,7 @@ impl Operation {
         Self::HydrationRelationValidation,
         Self::ConstructionAuthorityAdmission,
         Self::ConstructionIdentity,
+        Self::SharedEvidence,
     ];
     pub(super) const fn phase(self) -> &'static str {
         match self {
@@ -128,6 +131,7 @@ impl Operation {
             Self::ConstructionAuthorityAdmission | Self::ConstructionIdentity => {
                 "profile_resolver_construct"
             }
+            Self::SharedEvidence => "profile_evidence_materialize",
         }
     }
     pub(super) const fn cost(self) -> &'static str {
@@ -145,6 +149,7 @@ impl Operation {
             Self::HydrationRelationValidation => "hydration_relation_validation",
             Self::ConstructionAuthorityAdmission => "construction_authority_admission",
             Self::ConstructionIdentity => "construction_identity",
+            Self::SharedEvidence => "shared_evidence",
         }
     }
     pub(super) const fn boundary(self) -> &'static str {
@@ -162,6 +167,7 @@ impl Operation {
             Self::HydrationRelationValidation => "hydration-relation-validation/0",
             Self::ConstructionAuthorityAdmission => "resolver-construction/0",
             Self::ConstructionIdentity => "resolver-construction-identity/0",
+            Self::SharedEvidence => "shared-evidence-projection/0",
         }
     }
     /// The pair and boundary of the peak live memory measured over this
@@ -215,6 +221,7 @@ pub(super) enum Prepared {
     Hydration(Box<hydration_relation::PreparedHydration>),
     Construction(Box<construction::PreparedConstruction>),
     ConstructionIdentity(Box<construction::PreparedIdentity>),
+    SharedEvidence(Box<evidence::PreparedEvidence>),
     Icu4xLocale {
         engine: locale_icu4x::PreparedEngine,
         input: Arc<str>,
@@ -235,6 +242,7 @@ pub(super) enum Output {
     Hydration(hydration_relation::Resolved),
     Construction(Box<construction::Resolved>),
     ConstructionIdentity(ConstructionIdentity),
+    SharedEvidence(evidence::Resolved),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -252,6 +260,7 @@ pub(super) enum OutputFailure {
     ResolvedBindingInvariant,
     TargetAndGroupResolutionInvariant,
     HydrationRelationValidationInvariant,
+    EvidenceMaterializationInvariant,
 }
 
 impl Prepared {
@@ -270,6 +279,7 @@ impl Prepared {
             Self::Hydration(_) => Operation::HydrationRelationValidation,
             Self::Construction(_) => Operation::ConstructionAuthorityAdmission,
             Self::ConstructionIdentity(_) => Operation::ConstructionIdentity,
+            Self::SharedEvidence(_) => Operation::SharedEvidence,
         }
     }
 
@@ -507,6 +517,27 @@ impl Prepared {
                     output: Output::ConstructionIdentity(measured.output),
                 })
             }
+            Self::SharedEvidence(prepared) => {
+                // Every evaluation phase of the invocation runs before the
+                // start mark, on an evaluation of its own; the Shared slices
+                // borrow it, so they are copied out after the end mark.
+                let invocation = prepared.invocation();
+                let mut evaluation = Evaluation::default();
+                let mut set = None;
+                let invoked = prepared
+                    .invoke(&mut evaluation, &invocation, &mut set)
+                    .ok_or_else(I::unavailable)?;
+                let measured =
+                    instrument.interval((&evaluation, &invoked, &invocation), evidence::shared)?;
+                Ok(Interval {
+                    quantity: measured.quantity,
+                    output: Output::SharedEvidence(evidence::Resolved::retain(
+                        &evaluation,
+                        &invocation,
+                        measured.output,
+                    )),
+                })
+            }
             Self::Icu4xLocale { engine, input } => {
                 // A fresh engine is admitted and bound before the start mark
                 // and released after the end mark.
@@ -579,6 +610,7 @@ impl Output {
             Self::Hydration(resolved) => hydration_relation::observe(resolved),
             Self::Construction(resolved) => construction::observe(resolved),
             Self::ConstructionIdentity(identity) => Ok(construction::observe_identity(identity)),
+            Self::SharedEvidence(resolved) => evidence::observe(resolved),
         }
     }
 }

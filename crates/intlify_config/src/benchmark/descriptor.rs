@@ -377,6 +377,8 @@ pub(super) struct Descriptors {
     pub(super) hydration_relation_input: Option<super::hydration_relation::InputFacts>,
     #[serde(deserialize_with = "Option::deserialize")]
     pub(super) construction_input: Option<super::construction::InputFacts>,
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub(super) shared_evidence_input: Option<super::evidence::InputFacts>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -395,6 +397,7 @@ pub(super) enum DescriptorIssue {
     TargetAndGroupInputBindingMismatch,
     HydrationRelationInputBindingMismatch,
     ConstructionInputBindingMismatch,
+    SharedEvidenceInputBindingMismatch,
 }
 
 impl Descriptors {
@@ -459,6 +462,7 @@ impl Descriptors {
             target_and_group_input: targets(prepared),
             hydration_relation_input: hydration(prepared),
             construction_input: construction(prepared),
+            shared_evidence_input: evidence(prepared),
         }
     }
 
@@ -517,6 +521,9 @@ impl Descriptors {
         }
         if self.construction_input != construction(prepared) {
             issues.push(DescriptorIssue::ConstructionInputBindingMismatch);
+        }
+        if self.shared_evidence_input != evidence(prepared) {
+            issues.push(DescriptorIssue::SharedEvidenceInputBindingMismatch);
         }
         issues
     }
@@ -657,6 +664,14 @@ fn construction(prepared: &Prepared) -> Option<super::construction::InputFacts> 
         Prepared::ConstructionIdentity(prepared) => {
             Some(super::construction::InputFacts::identity(prepared))
         }
+        _ => None,
+    }
+}
+
+/// The invocation facts of an Evidence stage case.
+fn evidence(prepared: &Prepared) -> Option<super::evidence::InputFacts> {
+    match prepared {
+        Prepared::SharedEvidence(prepared) => Some(super::evidence::InputFacts::observe(prepared)),
         _ => None,
     }
 }

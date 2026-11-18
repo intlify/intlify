@@ -58,9 +58,21 @@ pub(in crate::benchmark) enum Recipe {
     TargetAndGroup(super::TargetAndGroupRecipe),
     Hydration(super::HydrationRecipe),
     Construction(super::ConstructionRecipe),
+    Evidence(super::EvidenceRecipe),
 }
 
 impl Recipe {
+    /// The entry kind of a case whose cost both entry kinds have: a file
+    /// entry's invocation for an Evidence stage (D15:2792; plan 025 decision
+    /// #255). `None` for every other case, whose cost names its entry or has
+    /// none.
+    pub(in crate::benchmark) const fn entry_kind(self) -> Option<super::EntryKind> {
+        match self {
+            Self::Evidence(_) => Some(super::EntryKind::File),
+            _ => None,
+        }
+    }
+
     /// The engine state of a case canonicalizing through the ICU4X provider;
     /// `None` for every other case.
     pub(in crate::benchmark) const fn icu4x_engine(self) -> Option<super::Engine> {
@@ -130,6 +142,14 @@ impl Recipe {
             return Arc::from(
                 serde_json::to_vec(&recipe.fixture().config)
                     .expect("finite owner hydration fixture"),
+            );
+        }
+        if let Self::Evidence(recipe) = self {
+            // The configuration file the invocation reads; the input context
+            // binds the members and the invocation's other inputs.
+            return Arc::from(
+                serde_json::to_vec(&recipe.fixture(&super::evidence_limits()).config)
+                    .expect("finite owner evidence fixture"),
             );
         }
         if let Self::Construction(recipe) = self {

@@ -31,6 +31,7 @@ pub(in crate::benchmark) enum ContextFailure {
     TargetInputMismatch,
     HydrationInputMismatch,
     ConstructionInputMismatch,
+    EvidenceInputMismatch,
 }
 
 pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
@@ -366,8 +367,111 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
         Prepared::ConstructionIdentity(prepared) => {
             construction_input(&mut frame, candidate, prepared.resolver.input())?;
         }
+        Prepared::SharedEvidence(prepared) => evidence_input(&mut frame, candidate, prepared)?,
     }
     Ok(frame.finish())
+}
+
+/// One file entry's complete invocation: the recipe's configuration file
+/// under the App selector, the bounds it is read and analyzed under and the
+/// schema, every member in submission order and the limits the collection
+/// was read under, every bound of the capability, the Verification Input's
+/// pins, every specification asserted and the active one supported with the
+/// fixture provider's pins, and the vocabulary.
+fn evidence_input(
+    frame: &mut Frame,
+    candidate: &Candidate,
+    prepared: &crate::benchmark::evidence::PreparedEvidence,
+) -> Result<(), ContextFailure> {
+    use crate::locale::fixtures::fixture_pins;
+    use crate::locale::VersionedIdentity;
+
+    let Recipe::Evidence(recipe) = candidate.declaration.fixture else {
+        return Err(ContextFailure::EvidenceInputMismatch);
+    };
+    let expected = selector_input(
+        candidate.declaration.selector,
+        prepared.structural.max_profile_id_bytes,
+    );
+    let source = serde_json::to_vec(&recipe.fixture(&super::evidence_limits()).config)
+        .map_err(|_| ContextFailure::Encoding)?;
+    if candidate.declaration.selector != super::Selector::App
+        || !prepared.selector.benchmark_matches_fixture(&expected)
+        || *prepared.source != *source
+    {
+        return Err(ContextFailure::EvidenceInputMismatch);
+    }
+    frame.bytes(&prepared.source);
+    input_limits(frame, prepared.input);
+    structural_limits(frame, prepared.structural);
+    frame.json(prepared.schema.schema_body());
+    let members = prepared.collection.members();
+    frame.uint(u64::try_from(members.len()).map_err(|_| ContextFailure::Encoding)?);
+    for member in members {
+        frame.bytes(member.canonical_body());
+    }
+    let read = super::prepare::COLLECTION_LIMITS;
+    for bound in [read.member_bytes, read.total_bytes, read.depth] {
+        frame.uint(bound);
+    }
+    for (id, bound) in prepared.capability.policy_comparable().bounds() {
+        frame.text(id.group.path());
+        frame.text(id.name);
+        frame.uint(bound.get());
+    }
+    for (id, bound) in prepared.capability.bootstrap_only().bounds() {
+        frame.text(id.group.path());
+        frame.text(id.name);
+        frame.uint(bound.get());
+    }
+    frame.json(&prepared.verification.normalized());
+    let mut versioned = |identity: Option<&VersionedIdentity<&str>>| {
+        frame.flag(identity.is_some());
+        if let Some(identity) = identity {
+            frame.text(identity.identity);
+            frame.text(identity.revision);
+        }
+    };
+    let asserted = &prepared.specifications;
+    versioned(asserted.project_profile.as_ref());
+    versioned(asserted.locale_canonicalization.as_ref());
+    versioned(asserted.locale_negotiation.as_ref());
+    versioned(asserted.message_locale_fallback.as_ref());
+    versioned(asserted.coverage.as_ref());
+    versioned(asserted.delivery_graph.as_ref());
+    versioned(asserted.delivery_placement.as_ref());
+    let vocabulary = asserted
+        .intent_surface_class_vocabulary
+        .as_ref()
+        .ok_or(ContextFailure::EvidenceInputMismatch)?;
+    frame.text(vocabulary.identity);
+    frame.text(vocabulary.revision);
+    frame.text(vocabulary.semantic_digest);
+    let active = prepared.supported.project_profile();
+    frame.text(active.specification.identity);
+    frame.text(active.specification.revision);
+    frame.text(active.semantic_digest);
+    let pins = fixture_pins();
+    frame.text(pins.specification.identity);
+    frame.text(pins.specification.revision);
+    frame.text(pins.dataset.identity);
+    frame.text(pins.dataset.semantic_digest);
+    let intact = prepared
+        .vocabulary
+        .admit()
+        .map_err(|_| ContextFailure::EvidenceInputMismatch)?;
+    frame.text(intact.identity().as_str());
+    frame.text(intact.revision().as_str());
+    frame.uint(u64::try_from(intact.members().len()).map_err(|_| ContextFailure::Encoding)?);
+    for member in intact.members() {
+        frame.text(member.as_str());
+    }
+    frame.text(intact.semantic_digest().as_str());
+    frame.json(
+        &serde_json::to_value(crate::benchmark::evidence::InputFacts::observe(prepared))
+            .map_err(|_| ContextFailure::Encoding)?,
+    );
+    Ok(())
 }
 
 /// Every byte of the input construction is given, and each component's

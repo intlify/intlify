@@ -63,8 +63,8 @@ fn all_active_pairs_keep_distinct_owner_boundaries_and_exact_method_meaning() {
         assert_eq!(method.numeric_decision_eligibility, "qualified-runner");
         assert!(!method.estimated_overhead_subtraction);
     }
-    assert_eq!(pairs.len(), 13);
-    assert_eq!(identities.len(), 13);
+    assert_eq!(pairs.len(), 14);
+    assert_eq!(identities.len(), 14);
 }
 
 /// A construction case builds a fresh resolver in every interval; the
@@ -728,6 +728,64 @@ fn hydration_relation_descriptor_binds_the_configuration_and_the_collection() {
                 .hydration_relation_input
                 .is_some(),
             operation.operation() == Operation::HydrationRelationValidation
+        );
+    }
+}
+
+#[test]
+fn shared_evidence_descriptor_binds_the_collection() {
+    let mut operation = prepared(Operation::SharedEvidence);
+    let descriptors = Descriptors::for_acquisition(&operation, clock(1));
+    // Each invocation builds its own evaluation.
+    assert_eq!(descriptors.execution.scratch_reuse_state, "fresh");
+    let encoded = serde_json::to_value(&descriptors).unwrap();
+    // 015's first Evidence materialization stage, of a file entry.
+    let boundary = &encoded["boundary"];
+    assert_eq!(boundary["identity"], "shared-evidence-projection/0");
+    assert_eq!(boundary["phase"], "profile_evidence_materialize");
+    assert_eq!(boundary["cost"], "shared_evidence");
+    let input = &encoded["sharedEvidenceInput"];
+    assert_eq!(input["entryKind"], "file");
+    assert_eq!(input["submittedMembers"], "9");
+    for field in [
+        "localeInput",
+        "localePolicyResolutionInput",
+        "admittedLocaleInput",
+        "resourcePolicyInput",
+        "artifactCollectionInput",
+        "resolvedBindingInput",
+        "targetAndGroupInput",
+        "hydrationRelationInput",
+        "constructionInput",
+    ] {
+        assert_eq!(encoded[field], Value::Null, "{field}");
+    }
+    // Another collection, of seven members, is another input.
+    let Prepared::Hydration(other) = prepared(Operation::HydrationRelationValidation) else {
+        unreachable!()
+    };
+    let Prepared::SharedEvidence(evidence) = &mut operation else {
+        unreachable!()
+    };
+    evidence.collection = other.collection;
+    assert_eq!(
+        descriptors.validate(&operation, clock(1)),
+        [DescriptorIssue::SharedEvidenceInputBindingMismatch]
+    );
+    let original = prepared(Operation::SharedEvidence);
+    let mut missing = encoded;
+    missing["sharedEvidenceInput"] = Value::Null;
+    let decoded: Descriptors = serde_json::from_value(missing).unwrap();
+    assert_eq!(
+        decoded.validate(&original, clock(1)),
+        [DescriptorIssue::SharedEvidenceInputBindingMismatch]
+    );
+    for operation in &operations() {
+        assert_eq!(
+            Descriptors::for_acquisition(operation, clock(1))
+                .shared_evidence_input
+                .is_some(),
+            operation.operation() == Operation::SharedEvidence
         );
     }
 }

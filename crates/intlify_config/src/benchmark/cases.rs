@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Finite owner case declarations for the thirteen active boundaries.
+//! Finite owner case declarations for the fourteen active boundaries.
 //! This is not a common Run Plan, case-identity codec, or a complete 015 suite.
 //! Preparation yields an unadmitted candidate; the separate fixture registry
 //! binds its exact input/result/work before method-bound collection can use it.
@@ -26,6 +26,10 @@ mod hydration_inputs;
 pub(super) use hydration_inputs::HydrationRecipe;
 mod construction_inputs;
 pub(super) use construction_inputs::ConstructionRecipe;
+mod evidence_inputs;
+#[cfg(test)]
+pub(super) use evidence_inputs::DENSE;
+pub(super) use evidence_inputs::{limits as evidence_limits, EvidenceRecipe};
 mod context;
 pub(super) mod prepare;
 pub(super) mod registry;
@@ -152,6 +156,7 @@ pub(super) enum ExpectedKind {
     ConstructionConstructed,
     ConstructionRefused,
     ConstructionIdentityDerived,
+    SharedEvidenceComplete,
 }
 
 #[derive(
@@ -395,7 +400,8 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 | Operation::TargetAndGroupResolution
                 | Operation::HydrationRelationValidation
                 | Operation::ConstructionAuthorityAdmission
-                | Operation::ConstructionIdentity => unreachable!(),
+                | Operation::ConstructionIdentity
+                | Operation::SharedEvidence => unreachable!(),
             };
             let selector = if operation == Operation::ProfileSelection {
                 Selector::App
@@ -884,6 +890,17 @@ pub(super) fn declarations() -> Vec<Declaration> {
             case.limit = Some((limit, edge));
             cases.push(case);
         }
+    }
+    // Append 015's Shared projection stage without changing any of the 347
+    // rows: one file entry's complete invocation of each recipe, whose Shared
+    // domain commits whole (plan 025 decisions #34 and #255).
+    for recipe in EvidenceRecipe::ALL {
+        cases.push(declaration(
+            Operation::SharedEvidence,
+            Recipe::Evidence(recipe),
+            Selector::App,
+            ExpectedKind::SharedEvidenceComplete,
+        ));
     }
     cases
 }

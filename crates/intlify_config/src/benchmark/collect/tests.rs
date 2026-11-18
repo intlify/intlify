@@ -136,6 +136,9 @@ fn fixture_observation(prepared: &Prepared) -> (Observation, LogicalWork) {
                 crate::construction::resolver::committed().identity(root)
             );
         }
+        Output::SharedEvidence(resolved) => {
+            assert!(resolved.result.as_ref().unwrap().exhausted.is_none());
+        }
         _ => panic!("fixture preparation did not produce its known result"),
     }
     (
