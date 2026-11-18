@@ -161,6 +161,14 @@ fn every_active_operation_retains_the_complete_ordered_vocabulary_and_its_stages
         } else if prepared.operation() == Operation::ConstructionIdentity {
             assert_eq!(work.facts.len(), 1);
             assert_eq!(work.facts[0].stage, WorkStage::OperationResult);
+        } else if prepared.operation() == Operation::SharedEvidence {
+            // The Shared domain's seven counts and the Shared scope's four, of
+            // what the stage committed and counted.
+            assert_eq!(work.facts.len(), 11);
+            assert!(work
+                .facts
+                .iter()
+                .all(|item| item.stage == WorkStage::OperationResult));
         } else {
             assert_eq!(work.facts.len(), 14);
             assert_eq!(fact(&work, WorkKind::LogicalValueNodes).stage, input_stage);
@@ -914,4 +922,74 @@ fn sample_capture_rechecks_work_even_when_the_semantic_checksum_matches() {
     };
     assert_eq!(mismatch.expected, work);
     assert_ne!(mismatch.actual, work);
+}
+
+/// The Shared projection stage's work is what its Shared domain committed and
+/// its Shared scope counted, each in its bound's unit: the example commits no
+/// Finding, the blocked recipe's statuses name the Findings they wait on, and
+/// the dense recipe commits a Finding of each of its targets' two checks
+/// (D15:1851, 1962-1970, 2796).
+#[test]
+fn the_shared_evidence_work_counts_what_the_stage_committed() {
+    use crate::benchmark::cases::prepare::prepare;
+    use crate::benchmark::cases::{declarations, EvidenceRecipe as R, Recipe, DENSE};
+
+    let exact = |work: &LogicalWork, kind| match fact(work, kind).observation {
+        WorkValue::Exact { value } => value.get(),
+        _ => panic!("{kind:?}"),
+    };
+    for recipe in R::ALL {
+        let declaration = declarations()
+            .into_iter()
+            .find(|case| case.fixture == Recipe::Evidence(recipe))
+            .unwrap();
+        let candidate = prepare(&declaration).unwrap();
+        let work = &candidate.logical_work;
+        let Output::SharedEvidence(resolved) = &candidate.output else {
+            unreachable!()
+        };
+        let retained = resolved.result.as_ref().unwrap();
+        let records: Vec<_> = retained
+            .slices
+            .iter()
+            .flat_map(|slice| &slice.records)
+            .collect();
+        let findings = records
+            .iter()
+            .filter(|record| {
+                record.kind == crate::construction::registry::check::RecordKind::SharedFinding
+            })
+            .count();
+        assert_eq!(
+            exact(work, WorkKind::SharedEvidenceFindings),
+            findings as u64
+        );
+        assert_eq!(
+            exact(work, WorkKind::SharedEvidenceRecords),
+            records.len() as u64
+        );
+        assert_eq!(
+            exact(work, WorkKind::SharedEvidenceCanonicalBytes),
+            records.iter().map(|record| record.bytes).sum::<u64>()
+        );
+        assert_eq!(
+            exact(work, WorkKind::SharedEvidenceTokenInputs),
+            resolved.scope.token_inputs
+        );
+        let causes = exact(work, WorkKind::SharedEvidenceMaximumCausesPerStatus);
+        match recipe {
+            R::Storefront => {
+                assert_eq!(findings, 0);
+                assert_eq!(causes, 0);
+            }
+            R::Blocked => assert!(findings > 0 && causes > 0),
+            R::Dense => {
+                assert_eq!(findings, 2 * DENSE);
+                assert_eq!(
+                    exact(work, WorkKind::SharedEvidenceFindingCandidates),
+                    findings as u64
+                );
+            }
+        }
+    }
 }

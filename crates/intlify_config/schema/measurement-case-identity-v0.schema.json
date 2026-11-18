@@ -404,6 +404,25 @@
       "enum": ["file", "programmatic"],
       "type": "string"
     },
+    "EvidenceRecipe": {
+      "oneOf": [
+        {
+          "const": "storefront",
+          "description": "015's example: no Finding.",
+          "type": "string"
+        },
+        {
+          "const": "blocked",
+          "description": "The example without its project default and with a target locale that\nis no string: blocking Findings after materialization (D15:1907; plan\n025 interpretation #252).",
+          "type": "string"
+        },
+        {
+          "const": "dense",
+          "description": "The example with [`DENSE`] more targets, each requesting a locale\noutside the project's that its Target Profile has no direction for:\nmany Findings, each of a target of its own.",
+          "type": "string"
+        }
+      ]
+    },
     "Execution": {
       "additionalProperties": false,
       "description": "The complete execution state of one measured case.",
@@ -811,7 +830,8 @@
         "target-and-group-resolution",
         "hydration-relation-validation",
         "construction-authority-admission",
-        "construction-identity"
+        "construction-identity",
+        "shared-evidence"
       ],
       "type": "string"
     },
@@ -1059,6 +1079,16 @@
             }
           },
           "required": ["construction"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "evidence": {
+              "$ref": "#/definitions/EvidenceRecipe"
+            }
+          },
+          "required": ["evidence"],
           "type": "object"
         }
       ]
@@ -1401,7 +1431,18 @@
         "construction-total-registry-artifact-bytes",
         "construction-registry-validation-work-units",
         "construction-cross-authority-checks",
-        "construction-identity-preimage-bytes"
+        "construction-identity-preimage-bytes",
+        "shared-evidence-finding-candidates",
+        "shared-evidence-findings",
+        "shared-evidence-evaluation-statuses",
+        "shared-evidence-maximum-causes-per-status",
+        "shared-evidence-cause-occurrences",
+        "shared-evidence-records",
+        "shared-evidence-canonical-bytes",
+        "shared-evidence-subject-occurrences",
+        "shared-evidence-token-inputs",
+        "shared-evidence-collision-comparisons",
+        "shared-evidence-metadata-work-units"
       ],
       "type": "string"
     },
@@ -1445,7 +1486,14 @@
         "schema-reference",
         "validation-pair",
         "registry-row",
-        "cross-authority-check"
+        "cross-authority-check",
+        "finding-candidate",
+        "finding-key",
+        "causal-finding-key",
+        "subject-occurrence",
+        "token-input",
+        "collision-comparison",
+        "evidence-metadata-work"
       ],
       "type": "string"
     },

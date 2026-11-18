@@ -21,6 +21,7 @@ use super::quantity::Quantity;
 mod binding;
 mod collection;
 mod construction;
+mod evidence;
 mod hydration;
 mod policy;
 mod resolution;
@@ -129,6 +130,17 @@ pub(super) enum WorkKind {
     ConstructionRegistryValidationWorkUnits,
     ConstructionCrossAuthorityChecks,
     ConstructionIdentityPreimageBytes,
+    SharedEvidenceFindingCandidates,
+    SharedEvidenceFindings,
+    SharedEvidenceEvaluationStatuses,
+    SharedEvidenceMaximumCausesPerStatus,
+    SharedEvidenceCauseOccurrences,
+    SharedEvidenceRecords,
+    SharedEvidenceCanonicalBytes,
+    SharedEvidenceSubjectOccurrences,
+    SharedEvidenceTokenInputs,
+    SharedEvidenceCollisionComparisons,
+    SharedEvidenceMetadataWorkUnits,
 }
 
 impl WorkKind {
@@ -261,6 +273,22 @@ impl WorkKind {
 
     const CONSTRUCTION_IDENTITY: [Self; 1] = [Self::ConstructionIdentityPreimageBytes];
 
+    /// The Shared domain's seven `diagnostics.shared` counts over what it
+    /// committed, and the Shared scope's four `evidenceMetadata` counts.
+    const SHARED_EVIDENCE: [Self; 11] = [
+        Self::SharedEvidenceFindingCandidates,
+        Self::SharedEvidenceFindings,
+        Self::SharedEvidenceEvaluationStatuses,
+        Self::SharedEvidenceMaximumCausesPerStatus,
+        Self::SharedEvidenceCauseOccurrences,
+        Self::SharedEvidenceRecords,
+        Self::SharedEvidenceCanonicalBytes,
+        Self::SharedEvidenceSubjectOccurrences,
+        Self::SharedEvidenceTokenInputs,
+        Self::SharedEvidenceCollisionComparisons,
+        Self::SharedEvidenceMetadataWorkUnits,
+    ];
+
     pub(super) fn for_operation(operation: Operation) -> &'static [Self] {
         match operation {
             Operation::LocaleCanonicalization => &Self::LOCALE,
@@ -272,6 +300,7 @@ impl WorkKind {
             Operation::HydrationRelationValidation => &Self::HYDRATION,
             Operation::ConstructionAuthorityAdmission => &Self::CONSTRUCTION,
             Operation::ConstructionIdentity => &Self::CONSTRUCTION_IDENTITY,
+            Operation::SharedEvidence => &Self::SHARED_EVIDENCE,
             _ => &Self::INPUT,
         }
     }
@@ -286,6 +315,15 @@ impl WorkKind {
             | Self::ConstructionMaximumRegistryMemberBytes
             | Self::ConstructionTotalRegistryArtifactBytes
             | Self::ConstructionIdentityPreimageBytes => WorkUnit::Octet,
+            Self::SharedEvidenceFindingCandidates => WorkUnit::FindingCandidate,
+            Self::SharedEvidenceFindings => WorkUnit::FindingKey,
+            Self::SharedEvidenceMaximumCausesPerStatus | Self::SharedEvidenceCauseOccurrences => {
+                WorkUnit::CausalFindingKey
+            }
+            Self::SharedEvidenceSubjectOccurrences => WorkUnit::SubjectOccurrence,
+            Self::SharedEvidenceTokenInputs => WorkUnit::TokenInput,
+            Self::SharedEvidenceCollisionComparisons => WorkUnit::CollisionComparison,
+            Self::SharedEvidenceMetadataWorkUnits => WorkUnit::EvidenceMetadataWork,
             Self::ConstructionConfigurationSchemas => WorkUnit::ConfigurationSchema,
             Self::ConstructionSchemaNodes => WorkUnit::SchemaNode,
             Self::ConstructionSchemaReferences => WorkUnit::SchemaReference,
@@ -321,7 +359,8 @@ impl WorkKind {
             | Self::ArtifactCollectionBlockingIssues
             | Self::ResolvedBindingBlockingIssues
             | Self::TargetAndGroupBlockingIssues
-            | Self::HydrationBlockingIssues => WorkUnit::RetainedRecord,
+            | Self::HydrationBlockingIssues
+            | Self::SharedEvidenceRecords => WorkUnit::RetainedRecord,
             Self::LocaleOccurrences
             | Self::LocalePolicyResolutionOccurrences
             | Self::LocalePolicyResolutionCanonicalizedOccurrences
@@ -349,7 +388,8 @@ impl WorkKind {
             | Self::TargetAndGroupEvaluationUnits
             | Self::TargetAndGroupNotEvaluatedUnits
             | Self::HydrationEvaluationUnits
-            | Self::HydrationNotEvaluatedUnits => WorkUnit::EvaluationUnit,
+            | Self::HydrationNotEvaluatedUnits
+            | Self::SharedEvidenceEvaluationStatuses => WorkUnit::EvaluationUnit,
             Self::ResourcePolicyArtifactOccurrences
             | Self::ResourcePolicyPolicyArtifacts
             | Self::ResourcePolicyTargetProfileArtifacts
@@ -363,7 +403,8 @@ impl WorkKind {
             Self::ResourcePolicyArtifactCanonicalBytes
             | Self::ResourcePolicyReferenceCanonicalBytes
             | Self::ArtifactCollectionArtifactCanonicalBytes
-            | Self::ResolvedBindingReferenceCanonicalBytes => WorkUnit::CanonicalOctet,
+            | Self::ResolvedBindingReferenceCanonicalBytes
+            | Self::SharedEvidenceCanonicalBytes => WorkUnit::CanonicalOctet,
             Self::ResourcePolicyReferences
             | Self::ResolvedBindingReferences
             | Self::ResolvedBindingDistinctReferences
@@ -425,6 +466,13 @@ enum WorkUnit {
     ValidationPair,
     RegistryRow,
     CrossAuthorityCheck,
+    FindingCandidate,
+    FindingKey,
+    CausalFindingKey,
+    SubjectOccurrence,
+    TokenInput,
+    CollisionComparison,
+    EvidenceMetadataWork,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -517,6 +565,7 @@ impl LogicalWork {
                 Operation::ConstructionIdentity => {
                     "intlify-config-resolver-construction-identity-work"
                 }
+                Operation::SharedEvidence => "intlify-config-shared-evidence-work",
                 _ => "intlify-config-minimum-input-work",
             }
             .into(),
@@ -600,6 +649,9 @@ impl LogicalWork {
             }
             (Prepared::ConstructionIdentity(prepared), Output::ConstructionIdentity(_)) => {
                 work.construction_identity(prepared)?;
+            }
+            (Prepared::SharedEvidence(_), Output::SharedEvidence(resolved)) => {
+                work.shared_evidence(resolved)?;
             }
             _ => return Err(WorkFailure::OperationMismatch),
         }

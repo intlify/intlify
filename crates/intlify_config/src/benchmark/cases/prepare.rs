@@ -27,10 +27,10 @@ use super::super::operation::{
     observer, Analysis, Config, ConfigFile, Operation, Output, Prepared, Schema,
 };
 use super::super::work::LogicalWork;
-use super::policy_inputs::capacity;
+use super::policy_inputs::{capacity, tuple_of};
 use super::{
-    declarations, Declaration, Engine, ExpectedKind, HydrationRecipe, Icu4xRecipe, LimitEdge,
-    LimitKind, LocalePolicyResolutionRecipe, Recipe, ResourcePolicyRecipe, Selector,
+    declarations, evidence_limits, Declaration, Engine, ExpectedKind, HydrationRecipe, Icu4xRecipe,
+    LimitEdge, LimitKind, LocalePolicyResolutionRecipe, Recipe, ResourcePolicyRecipe, Selector,
     TargetAndGroupRecipe,
 };
 
@@ -121,6 +121,9 @@ pub(in crate::benchmark) fn prepare(
         Operation::ConstructionAuthorityAdmission | Operation::ConstructionIdentity
     ) {
         return prepare_construction(declaration);
+    }
+    if declaration.operation == Operation::SharedEvidence {
+        return prepare_evidence(declaration);
     }
     let source = declaration.fixture.source();
     let (mut input_limits, mut structural_limits) = fixture_capacity();
@@ -295,7 +298,8 @@ pub(in crate::benchmark) fn prepare(
             | Operation::TargetAndGroupResolution
             | Operation::HydrationRelationValidation
             | Operation::ConstructionAuthorityAdmission
-            | Operation::ConstructionIdentity => unreachable!(),
+            | Operation::ConstructionIdentity
+            | Operation::SharedEvidence => unreachable!(),
         }
     };
     // Only dispatch is repeated here; both reference preparation and timed calls
@@ -321,9 +325,11 @@ pub(in crate::benchmark) fn prepare(
         | Prepared::TargetAndGroup(_)
         | Prepared::Hydration(_)
         | Prepared::Construction(_)
-        | Prepared::ConstructionIdentity(_) => {
+        | Prepared::ConstructionIdentity(_)
+        | Prepared::SharedEvidence(_) => {
             unreachable!(
-                "Phases 7, 4, 9, 11, 12, and 13 and construction have their own preparation"
+                "Phases 7, 4, 9, 11, 12, and 13, construction, and the Evidence stages have their \
+                 own preparation"
             )
         }
     };
@@ -1226,6 +1232,68 @@ fn select_config(config: &Value, selector: Selector) -> Result<SelectedConfig, P
         config,
         selector,
         selected,
+    })
+}
+
+/// One file entry's complete invocation under fixture-owned inputs, whose
+/// evaluation phases run before each interval, and the Shared projection
+/// stage over it once (D15:2771, 2775).
+fn prepare_evidence(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
+    use crate::benchmark::evidence::{self, PreparedEvidence};
+    use crate::boundary::verification::VerificationInput;
+    use crate::resolver::evidence_metadata::fixtures::unbounded;
+
+    let Recipe::Evidence(recipe) = declaration.fixture else {
+        return Err(PreparationFailure::UndeclaredCase);
+    };
+    let limits = evidence_limits();
+    let fixture = recipe.fixture(&limits);
+    let (input, structural) = fixture_capacity();
+    let selected = fixture
+        .members
+        .first()
+        .ok_or(PreparationFailure::CoreInvariant)?;
+    let prepared = PreparedEvidence {
+        source: Arc::from(
+            serde_json::to_vec(&fixture.config).map_err(|_| PreparationFailure::CoreInvariant)?,
+        ),
+        input,
+        structural,
+        file: FileFixture::new(&limits),
+        schema: configuration_schema().clone(),
+        selector: selector_input(declaration.selector, structural.max_profile_id_bytes),
+        supported: evidence::supported().ok_or(PreparationFailure::CoreInvariant)?,
+        specifications: evidence::specifications(),
+        capability: ImplementationCapability::fixture_owned(limits)
+            .with_evidence_metadata(unbounded()),
+        verification: VerificationInput::fixture_owned([tuple_of(selected)]),
+        collection: submitted(&fixture.members)?,
+        vocabulary: evidence::vocabulary().ok_or(PreparationFailure::CoreInvariant)?,
+    };
+    let resolved = prepared
+        .resolve_shared()
+        .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
+    let kind = match &resolved.result {
+        Ok(retained) if retained.exhausted.is_none() => ExpectedKind::SharedEvidenceComplete,
+        Ok(_) | Err(_) => return Err(PreparationFailure::Observation),
+    };
+    if declaration.expected_kind != kind {
+        return Err(PreparationFailure::UnexpectedOutputKind);
+    }
+    let output = Output::SharedEvidence(resolved);
+    let prepared = Prepared::SharedEvidence(Box::new(prepared));
+    let observation = output
+        .observe()
+        .map_err(|_| PreparationFailure::Observation)?;
+    let logical_work =
+        LogicalWork::observe(&prepared, &output).map_err(|_| PreparationFailure::Observation)?;
+    Ok(Candidate {
+        declaration: declaration.clone(),
+        input_limits: Some(input),
+        prepared,
+        output,
+        observation,
+        logical_work,
     })
 }
 

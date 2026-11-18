@@ -14,7 +14,7 @@ fn smoke_profile_fixes_the_complete_inventory_and_observational_sampling() {
     let profile = AdmittedProfile::smoke(&registry);
     let document = profile.document();
     assert_eq!(document.cases(), declarations());
-    assert_eq!(document.cases().len(), 347);
+    assert_eq!(document.cases().len(), 350);
     for operation in Operation::ALL {
         assert!(document
             .cases()
@@ -71,7 +71,7 @@ fn the_profile_declares_exactly_the_execution_states_its_cases_run_in() {
     // Each operation's own state, and both engine states of each operation
     // that the ICU4X cases run. Phases 7 and 8's own state is the one their
     // reused engine runs in, so it is declared once.
-    assert_eq!(declared.len(), 16);
+    assert_eq!(declared.len(), 17);
     assert_eq!(used.len(), declared.len());
 }
 
@@ -361,7 +361,7 @@ mod native {
         }
         drop(registry);
         drop(profile);
-        assert_eq!(retained.len(), 347);
+        assert_eq!(retained.len(), 350);
         assert!(!serde_json::to_vec(&retained).unwrap().is_empty());
         // This array alone is not a complete Owner Result, admitted Run Plan,
         // or common Measurement Evidence; build/environment and record gates
@@ -410,7 +410,7 @@ mod native {
         }
         for ordinal in [
             Quantity::new(1),
-            Quantity::new(347),
+            Quantity::new(350),
             Quantity::new(u64::MAX),
         ] {
             assert!(matches!(

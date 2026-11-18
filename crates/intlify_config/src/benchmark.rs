@@ -28,6 +28,8 @@ mod descriptor;
 #[cfg(feature = "benchmark")]
 mod environment;
 #[cfg(feature = "benchmark")]
+mod evidence;
+#[cfg(feature = "benchmark")]
 mod hydration_relation;
 #[cfg(feature = "benchmark")]
 mod instrument;

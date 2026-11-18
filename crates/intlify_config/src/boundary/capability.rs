@@ -109,7 +109,7 @@ impl ImplementationCapability {
     /// The same capability with its `evidenceMetadata` bounds replaced, for
     /// the tests of an invocation's outcome: at their minima, the resolver's
     /// own Evidence metadata work exhausts both diagnostic domains.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "benchmark"))]
     pub(crate) fn with_evidence_metadata(
         mut self,
         limits: crate::resolver::capability::EvidenceMetadataLimits,

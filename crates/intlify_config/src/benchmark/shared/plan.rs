@@ -223,7 +223,7 @@ impl CaseProjection {
                 recipe: declaration.fixture,
                 limit: declaration.limit,
                 selector: declaration.selector,
-                entry_kind: None,
+                entry_kind: declaration.fixture.entry_kind(),
                 resolver: None,
             },
             scale: Scale::Value,

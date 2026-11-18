@@ -37,7 +37,7 @@ fn analysis(value: &Value) -> Analysis {
         .unwrap()
 }
 
-pub(crate) fn operations() -> [Prepared; 13] {
+pub(crate) fn operations() -> [Prepared; 14] {
     let source: Arc<[u8]> = Arc::from(serde_json::to_vec(&minimal_config()).unwrap());
     let doc = Arc::new(
         materialize_file(Arc::clone(&source), crate::materialize_tests::limits()).unwrap(),
@@ -76,7 +76,21 @@ pub(crate) fn operations() -> [Prepared; 13] {
         hydration_operation(),
         construction_operation(Operation::ConstructionAuthorityAdmission),
         construction_operation(Operation::ConstructionIdentity),
+        evidence_operation(),
     ]
+}
+
+/// The Shared projection stage over 015's example.
+pub(crate) fn evidence_operation() -> Prepared {
+    use crate::benchmark::cases::{declarations, EvidenceRecipe, Recipe};
+
+    let declaration = declarations()
+        .into_iter()
+        .find(|case| case.fixture == Recipe::Evidence(EvidenceRecipe::Storefront))
+        .unwrap();
+    crate::benchmark::cases::prepare::prepare(&declaration)
+        .unwrap()
+        .prepared
 }
 
 /// Construction, or the identity, from the committed input, as its case
@@ -285,6 +299,11 @@ fn every_active_pair_calls_its_real_core_operation_between_exact_markers() {
                     *identity,
                     crate::construction::resolver::committed().identity(root)
                 );
+            }
+            Output::SharedEvidence(resolved) => {
+                let retained = resolved.result.as_ref().unwrap();
+                assert!(retained.exhausted.is_none());
+                assert!(!retained.slices.is_empty());
             }
             _ => panic!("unexpected owner operation result"),
         }

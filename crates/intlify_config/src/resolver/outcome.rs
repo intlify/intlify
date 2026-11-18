@@ -129,6 +129,15 @@ pub(crate) struct SharedStage<'e, 'a> {
     shared: Committed<'e>,
 }
 
+#[cfg(feature = "benchmark")]
+impl<'e> SharedStage<'e, '_> {
+    /// The slices the Shared domain committed, and how a slice it refused
+    /// exhausted it, if one did.
+    pub(crate) const fn committed(&self) -> &Committed<'e> {
+        &self.shared
+    }
+}
+
 /// What the Entry projection stage leaves (D15:2775): the reporting of both
 /// domains and the slices each committed.
 #[derive(Debug)]

@@ -510,7 +510,7 @@ impl<Id: Clone> SpecificationSet<Id> {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "benchmark"))]
 impl<Id: From<&'static str>> SupportedSpecifications<Id> {
     /// Revision "0" around a fixture's active profile specification and
     /// canonicalization specifications: 015-135 names the toolchain-supplied
@@ -536,7 +536,7 @@ impl<Id: From<&'static str>> SupportedSpecifications<Id> {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "benchmark"))]
 impl<Id: From<&'static str>> ActiveProfileSpecification<Id> {
     /// A fixture's active profile specification, which carries
     /// [`FIXTURE_PROFILE_DIGEST`].
@@ -548,9 +548,9 @@ impl<Id: From<&'static str>> ActiveProfileSpecification<Id> {
     }
 }
 
-/// The semantic digest of the resolver tests' active profile specification.
-/// No committed specification has it.
-#[cfg(test)]
+/// The semantic digest of the resolver tests' and benchmarks' active profile
+/// specification. No committed specification has it.
+#[cfg(any(test, feature = "benchmark"))]
 pub(crate) const FIXTURE_PROFILE_DIGEST: &str =
     "sha256:1111111111111111111111111111111111111111111111111111111111111111";
 
