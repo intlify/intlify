@@ -1307,9 +1307,11 @@ pub(crate) struct Evaluation {
     candidates: BTreeMap<Unit, Status>,
     issues: BTreeMap<IssueKey, Option<Details>>,
     notices: BTreeMap<IssueKey, Option<Suggestion>>,
-    /// The Finding Occurrence candidate of every blocking candidate that
-    /// carried what it observed, in the order the units ran.
+    /// The Finding Occurrence candidate of every candidate, blocking or
+    /// not, that carried what it observed, in the order the units ran.
     occurrences: Vec<OccurrenceCandidate>,
+    /// The Finding Key of every candidate that carried nothing it observed.
+    unobserved: BTreeSet<IssueKey>,
     /// The Coverage Decision Basis of the established decision table, in
     /// cell order.
     basis: Cells,
@@ -1594,12 +1596,17 @@ impl Evaluation {
             payloads.insert(key, blocking.details);
         }
         for (blocking, observation) in found {
-            if let Some(Observation { primary, related }) = observation {
-                self.occurrences.push(OccurrenceCandidate {
-                    finding: key(&blocking),
-                    primary,
-                    related,
-                });
+            match observation {
+                Some(Observation { primary, related }) => {
+                    self.occurrences.push(OccurrenceCandidate {
+                        finding: key(&blocking),
+                        primary,
+                        related,
+                    });
+                }
+                None => {
+                    self.unobserved.insert(key(&blocking));
+                }
             }
         }
         let keys = payloads.keys().cloned().collect();
@@ -1650,12 +1657,17 @@ impl Evaluation {
                 }
             }
         }
-        if let Some(Observation { primary, related }) = observation {
-            self.occurrences.push(OccurrenceCandidate {
-                finding: key,
-                primary,
-                related,
-            });
+        match observation {
+            Some(Observation { primary, related }) => {
+                self.occurrences.push(OccurrenceCandidate {
+                    finding: key,
+                    primary,
+                    related,
+                });
+            }
+            None => {
+                self.unobserved.insert(key);
+            }
         }
         Ok(())
     }
@@ -1725,10 +1737,17 @@ impl Evaluation {
         self.notices.keys()
     }
 
-    /// The Finding Occurrence candidate of every blocking candidate that
-    /// carried what it observed.
+    /// The Finding Occurrence candidate of every candidate, blocking or
+    /// not, that carried what it observed.
     pub(crate) fn occurrence_candidates(&self) -> &[OccurrenceCandidate] {
         &self.occurrences
+    }
+
+    /// The Finding Key of every candidate, blocking or not, that carried
+    /// nothing it observed: no ordinary one may, since each contributes one
+    /// Finding Occurrence candidate (D15:2385).
+    pub(crate) const fn unobserved(&self) -> &BTreeSet<IssueKey> {
+        &self.unobserved
     }
 
     /// Records each cell's Coverage Decision Basis `basis` and the Coverage

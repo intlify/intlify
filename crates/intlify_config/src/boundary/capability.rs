@@ -95,6 +95,17 @@ impl ImplementationCapability {
         self
     }
 
+    /// The same capability with its `mandatoryReserve` bounds replaced, for
+    /// the tests of the outcome's reserve.
+    #[cfg(test)]
+    pub(crate) fn with_mandatory_reserve(
+        mut self,
+        limits: crate::resolver::capability::MandatoryReserveLimits,
+    ) -> Self {
+        self.bootstrap_only.mandatory_reserve = limits;
+        self
+    }
+
     /// The same capability with its `evidenceMetadata` bounds replaced, for
     /// the tests of an invocation's outcome: at their minima, the resolver's
     /// own Evidence metadata work exhausts both diagnostic domains.

@@ -31,6 +31,7 @@ pub(crate) mod evidence_source;
 pub(crate) mod evidence_token;
 pub(crate) mod exact_resolution;
 pub(crate) mod fallback;
+pub(crate) mod finalization;
 pub(crate) mod groups;
 pub(crate) mod handoff;
 pub(crate) mod hydration;

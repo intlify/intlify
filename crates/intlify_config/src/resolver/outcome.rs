@@ -20,14 +20,15 @@
 //! established (D15:1152, 1157, 1185, 2142, 2369). Only a checked outcome
 //! carries the profile view and its Resolved Profile Artifact Bindings; a
 //! blocked one carries neither, however many results were established
-//! (D15:1153, 1159). Reporting finalization's checks of what the earlier
-//! stages fixed, and the mandatory reserve, come later (plan 025 decision
-//! #251).
+//! (D15:1153, 1159). Before it decides, reporting finalization verifies what
+//! the earlier stages fixed, and the outcome's reserved records fit the
+//! mandatory reserve ([`super::finalization`]).
 
 use crate::construction::identity::ConstructionIdentity;
 
 use super::evaluation::{Evaluation, IssueKey};
 use super::exact_resolution::ArtifactBindings;
+use super::finalization;
 use super::profile_resolution::{Invocation, Invoked, ResolverInvariant, SemanticState};
 use super::profile_view::{project, ProfileView};
 use super::reporting::{Record, Reporting, ReportingDomain};
@@ -117,8 +118,9 @@ pub(crate) struct Outcome<'e, 's> {
 ///
 /// # Errors
 ///
-/// Returns the resolver bug that leaves a record without its view, or the
-/// profile without a result that no blocking Finding holds back.
+/// Returns the resolver bug that leaves a record without its view, that
+/// reporting finalization finds in what the earlier stages fixed, or that
+/// leaves the profile without a result no blocking Finding holds back.
 pub(crate) fn outcome<'e, 's, Id: AsRef<str>>(
     evaluation: &'e Evaluation,
     invoked: &'e Invoked<'s, Id>,
@@ -157,17 +159,20 @@ pub(crate) fn outcome<'e, 's, Id: AsRef<str>>(
         .then(|| Projection::finalized(&reporting, ReportingDomain::Shared, reported.shared))
         .transpose()?;
     let evidence = ResolutionEvidence { entry, shared };
+    finalization::verify(evaluation, &evidence)?;
     let checked = match state {
         Ok(state) if evidence.complete() && evaluation.issues().next().is_none() => {
             Some(checked(state, supported)?)
         }
         _ => None,
     };
-    Ok(Outcome {
+    let outcome = Outcome {
         identity,
         checked,
         evidence,
-    })
+    };
+    finalization::reserve(&outcome, &capability.bootstrap_only().mandatory_reserve)?;
+    Ok(outcome)
 }
 
 /// The profile of `state` when no blocking Finding holds a result back: its
@@ -189,8 +194,9 @@ fn checked<'e, 's, Id: AsRef<str>>(
     Ok(Checked { profile, bindings })
 }
 
+// `finalization`'s tests take the same inputs.
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::sync::{Arc, OnceLock};
 
     use serde_json::{json, Value};
@@ -209,7 +215,7 @@ mod tests {
 
     /// The Resolver Construction Identity of the committed construction input
     /// under the built-in root.
-    fn identity() -> ConstructionIdentity {
+    pub(crate) fn identity() -> ConstructionIdentity {
         static IDENTITY: OnceLock<ConstructionIdentity> = OnceLock::new();
         *IDENTITY.get_or_init(|| {
             let root = ConstructionRoot::built_in().unwrap();
@@ -217,14 +223,14 @@ mod tests {
         })
     }
 
-    fn entry(name: &'static str) -> BoundId {
+    pub(crate) fn entry(name: &'static str) -> BoundId {
         BoundId {
             group: Group::DiagnosticsEntry,
             name,
         }
     }
 
-    fn shared(name: &'static str) -> BoundId {
+    pub(crate) fn shared(name: &'static str) -> BoundId {
         BoundId {
             group: Group::DiagnosticsShared,
             name,
@@ -256,7 +262,7 @@ mod tests {
     /// `inputs` with `diagnostics` of `capability` in the capability and of
     /// `policy` in the policy: the policy's own values leave too little room
     /// for the records of 015's example.
-    fn reporting(
+    pub(crate) fn reporting(
         inputs: &Inputs,
         capability: &[(BoundId, u64)],
         policy: &[(BoundId, u64)],
@@ -265,7 +271,7 @@ mod tests {
     }
 
     /// A file that is no JSON.
-    fn no_json() -> Arc<[u8]> {
+    pub(crate) fn no_json() -> Arc<[u8]> {
         Arc::from(&b"{"[..])
     }
 
@@ -297,7 +303,7 @@ mod tests {
     /// check of a locale spelling, a target's among them (D15:1907; plan 025
     /// interpretations #219 and #252): structural admission finds the target
     /// locale on its own.
-    fn blocked() -> Inputs {
+    pub(crate) fn blocked() -> Inputs {
         let mut inputs = Inputs::complete();
         let declaration = inputs.declaration();
         declaration
@@ -446,15 +452,19 @@ mod tests {
     /// incomplete, with one terminal state for each exhausted domain, Entry
     /// before Shared, and the outcome blocked, though no Finding blocks:
     /// the Entry domain past its `maxFindingOccurrences` by the second
-    /// warning's occurrence, the Shared one past its `maxRecords`, or both
-    /// (D15:1157, 1185, 2408, 3443, 3450).
+    /// warning's occurrence, the Shared one past its `maxRecords` or, at the
+    /// second warning, its `maxFindings`, or both. The complete Entry
+    /// projection keeps the occurrences of the Shared Findings omitted with
+    /// the Shared suffix (D15:1157, 1185, 2408, 3443, 3450).
     #[test]
     fn an_exhausted_domain_blocks_an_outcome_no_finding_blocks() {
         let occurrences = (entry("maxFindingOccurrences"), 1);
         let records = (shared("maxRecords"), 1);
+        let findings = (shared("maxFindings"), 1);
         for (tight, domains) in [
             (vec![occurrences], vec!["entry"]),
             (vec![records], vec!["shared"]),
+            (vec![findings], vec!["shared"]),
             (vec![occurrences, records], vec!["entry", "shared"]),
         ] {
             let mut inputs = reporting(&Inputs::complete(), &[], &tight);

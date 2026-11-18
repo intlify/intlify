@@ -1835,6 +1835,20 @@ fn owned_dependencies(kind: SubjectKind) -> Vec<OwnedDependency> {
     }
 }
 
+/// The ordinary Evidence record kinds the units of `check` of `kind` may own:
+/// the `possibleEvidenceRecordKinds` of its Check Registry row, which
+/// reporting finalization verifies each record's owner against (D15:2143,
+/// 3224). A check its kind does not run has no row, so its units may own
+/// none.
+pub(crate) fn possible_record_kinds(kind: SubjectKind, check: Check) -> Vec<RecordKind> {
+    kind.checks()
+        .iter()
+        .position(|&own| own == check)
+        .map_or_else(Vec::new, |rank| {
+            record_kinds(kind, finding_codes(kind)[rank], &owned_dependencies(kind))
+        })
+}
+
 /// The ordinary Evidence record kinds a check's units may own, by 015's
 /// rules: every unit's evaluation status, in the Entry domain for phases 0
 /// and 1 and the Shared one after (D15:177, 1171); where the check reports
@@ -2218,11 +2232,8 @@ pub(crate) mod testing {
     /// The ordinary Evidence record kinds the units of `check` of `kind` may
     /// own.
     pub(crate) fn record_kinds(kind: SubjectKind, check: Check) -> Vec<RecordKind> {
-        super::record_kinds(
-            kind,
-            possible_codes(kind, check),
-            &super::owned_dependencies(kind),
-        )
+        assert!(kind.checks().contains(&check), "the kind runs the check");
+        super::possible_record_kinds(kind, check)
     }
 
     /// What the payloads of `check` of `kind` derive from.
