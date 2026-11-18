@@ -95,6 +95,18 @@ impl ImplementationCapability {
         self
     }
 
+    /// The same capability with its `evidenceMetadata` bounds replaced, for
+    /// the tests of an invocation's outcome: at their minima, the resolver's
+    /// own Evidence metadata work exhausts both diagnostic domains.
+    #[cfg(test)]
+    pub(crate) fn with_evidence_metadata(
+        mut self,
+        limits: crate::resolver::capability::EvidenceMetadataLimits,
+    ) -> Self {
+        self.bootstrap_only.evidence_metadata = limits;
+        self
+    }
+
     /// The Capability Specification the capability asserts.
     pub(crate) const fn specification(&self) -> &VersionedIdentity<String> {
         &self.specification

@@ -524,6 +524,24 @@ impl<'e, 's> Reporting<'e, 's> {
         Ok((finding, state))
     }
 
+    /// The view of the Shared-unavailability cause that the reserve of an
+    /// exhausted domain holds: without a Shared projection, the Entry reserve
+    /// holds one naming the Entry terminal Finding, so that an Entry overrun
+    /// before materialization still explains `shared: null` (D15:2014, 2408).
+    /// Without a Shared projection no unit reports into the Shared domain, so
+    /// only the Entry domain can be exhausted then (D15:2369).
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug that leaves the cause without its view.
+    pub(crate) fn reserved_cause(&self) -> Result<Option<Value>, ReportingInvariant> {
+        let key = IssueKey::terminal(ReportingDomain::Entry.reason());
+        Ok(self
+            .unavailable
+            .map(|_| self.views.shared_unavailability_cause(&key))
+            .transpose()?)
+    }
+
     /// The Entry records `unit` owns besides its own Findings and status:
     /// the occurrences of its Findings, the Coverage Decision Evidence of
     /// the decision table, an index record for each Evidence they refer to

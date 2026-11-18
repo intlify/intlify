@@ -40,6 +40,7 @@ pub(crate) mod locales;
 pub(crate) mod negotiation;
 pub(crate) mod occurrence;
 pub(crate) mod origin;
+pub(crate) mod outcome;
 pub(crate) mod profile_resolution;
 pub(crate) mod profile_selection;
 pub(crate) mod profile_view;

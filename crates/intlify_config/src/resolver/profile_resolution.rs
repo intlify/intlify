@@ -76,6 +76,7 @@ use super::identity::{resolve_project_identity, ProjectIdentity};
 use super::locales::{resolve_locales, LocaleInvariant, ResolvedLocales};
 use super::negotiation::{resolve_negotiation, NegotiationProfile};
 use super::profile_selection::{select_profile, ProfileSelectionInvariant};
+use super::reporting::ReportingInvariant;
 use super::resource_policy::{
     admit_resource_policy, ConfigurationMeasures, DeclarationReferences, PolicyInvariant,
     PolicyOutcome,
@@ -308,6 +309,17 @@ pub(crate) enum ResolverInvariant {
     /// The entry dependencies named a source identity or a selector without
     /// a projection.
     Evidence(EvidenceInvariant),
+    /// Reporting left a record without its view.
+    Reporting(ReportingInvariant),
+    /// Profile projection lacked a result, for these causes, although the
+    /// invocation found no blocking Finding.
+    Unprojected(Causes),
+}
+
+impl From<ReportingInvariant> for ResolverInvariant {
+    fn from(invariant: ReportingInvariant) -> Self {
+        Self::Reporting(invariant)
+    }
 }
 
 impl From<ProfileSelectionInvariant> for ResolverInvariant {
@@ -774,6 +786,7 @@ pub(super) mod tests {
     use crate::artifacts::envelope::{envelope_of, ArtifactKind, ExactTuple, FormalMember};
     use crate::artifacts::vectors::vocabulary::{self as vectors, formal_of};
     use crate::boundary::source::file_source_revision;
+    use crate::construction::identity::ConstructionIdentity;
     use crate::construction::registry::check::testing::{check_id, requirements};
     use crate::construction::registry::check::CheckRegistry;
     use crate::input_limits::{Bound, InputLimits, RawInputLimits};
@@ -792,13 +805,15 @@ pub(super) mod tests {
     use crate::resolver::evaluation::{
         Check, Code, IssueKey, Phase, Reason, Status, Subject, Unit,
     };
+    use crate::resolver::evidence_metadata::fixtures::unbounded;
     use crate::resolver::evidence_token::EvidenceTokens;
     use crate::resolver::exact_resolution;
     use crate::resolver::groups::{self, GroupSubject};
     use crate::resolver::hydration::{self, HydrationSubject};
-    use crate::resolver::limits::{fixture_limits, ResolutionLimits, SECTION};
+    use crate::resolver::limits::{fixture_limits, BoundId, ResolutionLimits, SECTION};
     use crate::resolver::locales::fixtures::canonical;
     use crate::resolver::locales::{self, LocaleKey, LocaleSubject, Location};
+    use crate::resolver::outcome::{outcome, Outcome};
     use crate::resolver::profile_selection::{capability, selector, SelectionSubject};
     use crate::resolver::profile_view::{project, ProfileView};
     use crate::resolver::resource_policy::{self, PolicySlot, PolicySubject, ReferenceField};
@@ -815,7 +830,9 @@ pub(super) mod tests {
     type Id = &'static str;
     type Schema = AuthoringSchema<PolicyReference, TargetProfileReference>;
 
-    const ACTIVE: VersionedIdentity<Id> = VersionedIdentity {
+    /// The Active Project Profile Specification the invocations here run
+    /// under.
+    pub(crate) const ACTIVE: VersionedIdentity<Id> = VersionedIdentity {
         identity: "test-only-profile-specification",
         revision: "0",
     };
@@ -919,6 +936,23 @@ pub(super) mod tests {
             "1",
             json!({ SECTION: limits.section() }),
         )
+    }
+
+    /// `limits`, but each of `bounds` at its limit.
+    fn tightened(limits: &ResolutionLimits, bounds: &[(BoundId, u64)]) -> ResolutionLimits {
+        let current = limits.bounds();
+        ResolutionLimits::from_bounds(|id| {
+            bounds.iter().find(|(bound, _)| *bound == id).map_or_else(
+                || {
+                    current
+                        .iter()
+                        .find(|(bound, _)| *bound == id)
+                        .map(|&(_, value)| value)
+                },
+                |&(_, limit)| Bound::new(limit),
+            )
+        })
+        .unwrap()
     }
 
     /// A sealed envelope of `kind` with an admitted content.
@@ -1146,14 +1180,60 @@ pub(super) mod tests {
             }
         }
 
-        /// Selects `policy`, submitted first in place of the selected one,
-        /// and pins it.
         /// The invocation of the configuration's file, or of `bytes` when
         /// given, for `inspect` with what it recorded and what it left.
         fn entered<R>(
             &self,
             bytes: Option<Arc<[u8]>>,
             inspect: impl FnOnce(Evaluation, Invoked<'_, Id>) -> R,
+        ) -> R {
+            self.entered_under(bytes, |_, evaluation, invoked| inspect(evaluation, invoked))
+        }
+
+        /// The outcome of the invocation of the configuration's file, or of
+        /// `bytes` when given, under `identity`, for `inspect` with what the
+        /// invocation recorded and what it left.
+        pub(crate) fn outcome<R>(
+            &self,
+            bytes: Option<Arc<[u8]>>,
+            identity: ConstructionIdentity,
+            inspect: impl FnOnce(&Evaluation, &Invoked<'_, Id>, Outcome<'_, '_>) -> R,
+        ) -> R {
+            self.entered_under(bytes, |invocation, evaluation, invoked| {
+                let outcome =
+                    outcome(&evaluation, &invoked, identity, invocation, &Sha256).unwrap();
+                inspect(&evaluation, &invoked, outcome)
+            })
+        }
+
+        /// The same inputs with each of `capability` at its limit among the
+        /// capability's `policyComparable` bounds, and the selected policy's
+        /// bounds each of `policy` at its limit, which a test keeps
+        /// compatible with the capability.
+        pub(crate) fn bounding(
+            &self,
+            capability: &[(BoundId, u64)],
+            policy: &[(BoundId, u64)],
+        ) -> Self {
+            let mut inputs = Self {
+                config: self.config.clone(),
+                selected: self.selected,
+                members: self.members.clone(),
+                specifications: self.specifications.clone(),
+                surfaces: self.surfaces,
+                capability: tightened(&self.capability, capability),
+                pinned: self.pinned.clone(),
+            };
+            inputs.select_policy(resource_limit_policy(&tightened(&policy_limits(), policy)));
+            inputs
+        }
+
+        /// The invocation of `entered`, for `inspect` also with the
+        /// invocation's other inputs.
+        fn entered_under<R>(
+            &self,
+            bytes: Option<Arc<[u8]>>,
+            inspect: impl FnOnce(&Invocation<'_, Id>, Evaluation, Invoked<'_, Id>) -> R,
         ) -> R {
             let (config, limits) = entry_input(&self.config, &self.capability);
             let fixture = FileFixture::new(&self.capability);
@@ -1175,10 +1255,12 @@ pub(super) mod tests {
                     &mut set,
                 )
                 .unwrap();
-                inspect(evaluation, invoked)
+                inspect(invocation, evaluation, invoked)
             })
         }
 
+        /// Selects `policy`, submitted first in place of the selected one,
+        /// and pins it.
         fn select_policy(&mut self, policy: Value) {
             self.pinned = tuple_of(&policy);
             self.declaration()["policies"]["resourceLimits"] = reference_value(&self.pinned);
@@ -1257,7 +1339,10 @@ pub(super) mod tests {
                 ActiveProfileSpecification::fixture(ACTIVE),
                 Supported::new(vec![fixture_pins()]).unwrap(),
             );
-            let capability = ImplementationCapability::fixture_owned(self.capability.clone());
+            // At the minima the resolver's own Evidence metadata work would
+            // exhaust both diagnostic domains of every outcome.
+            let capability = ImplementationCapability::fixture_owned(self.capability.clone())
+                .with_evidence_metadata(unbounded());
             let collection = collection(&self.members);
             let vocabulary = formal_of(self.surfaces);
             let verification = VerificationInput::fixture_owned([self.pinned.clone()]);
