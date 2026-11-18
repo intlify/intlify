@@ -49184,6 +49184,184 @@
     },
     {
       "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "inadmissible"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "entry-evidence-complete"
+      },
+      "inputContext": "ed081e9b4871e2d4b995eeb8f0687b5dd9c6f6163a339e5b121c044ad807cb7c",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "2d03c5adc4e13f9a757423a36daffa1e6bb51d9307729cb3a9143b8d24d489ec"
+      },
+      "logicalWork": "c86f126d45206138fbb6b1a6a84570624e4f0cb20c2bc6827bc07a7cbdba374e",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "582"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3828"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "10"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "26"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "29382"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "229"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
         "operation": "outcome-finalization",
         "fixture": {
           "evidence": "storefront"
@@ -49437,6 +49615,58 @@
             "observation": {
               "state": "exact",
               "value": "1651"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "outcome-finalization",
+        "fixture": {
+          "evidence": "inadmissible"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "outcome-finalization-blocked"
+      },
+      "inputContext": "00c766e4858e425dc288a43745e1742ceae4e26018bd7b30bb1685bcd5dd1772",
+      "result": {
+        "shared": "4f8780c5dd1e1bf0e58fef5e16d956c0c5255964fc8b407817fd1c8a98990a7e",
+        "entry": "1aeb133f0b4ba778ddc81f39c7c49f15b4ef5f70ef4e058727b010b5e4c631b0"
+      },
+      "logicalWork": "b56f969d0ad88388444e2c51a8ff0d0783d26c0ddf9bc93d92823dbe00fd262a",
+      "work": {
+        "profileIdentity": "intlify-config-outcome-finalization-work",
+        "profileRevision": "0",
+        "operation": "outcome-finalization",
+        "facts": [
+          {
+            "kind": "outcome-finalization-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "26"
+            }
+          },
+          {
+            "kind": "outcome-finalization-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "outcome-finalization-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
             }
           }
         ]
@@ -51917,6 +52147,5702 @@
             "observation": {
               "state": "exact",
               "value": "268"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "inadmissible"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-finding-occurrences", "exact"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-complete"
+      },
+      "inputContext": "5956315f4718efcd83616ce16774117717a293f2e5eed0677e3532c56f6d7fc8",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "43bedac1f983ca9124e4624e58eec2dcfa699a12cc5272f3f107245bd0f0c15e"
+      },
+      "logicalWork": "c86f126d45206138fbb6b1a6a84570624e4f0cb20c2bc6827bc07a7cbdba374e",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "582"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3828"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "10"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "26"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "29382"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "229"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "inadmissible"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-finding-occurrences", "first-over"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-exhausted"
+      },
+      "inputContext": "1efe137febf24d75e49c1c46f3a8eb9008e2f0fdd6c20941d73b03024a1ec5c6",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "568b5476f90887fccf18a887f36830558ea47eb9bde9a3458c15666bd1fc9b78"
+      },
+      "logicalWork": "95a76b80e4d65a3e88d16e86685e43ebb044e3ed9d1442696660b03b1dcd09ab",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "541"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3246"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "16"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "16164"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "229"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "inadmissible"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-findings", "exact"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-complete"
+      },
+      "inputContext": "e194fe876910e2ce30448c4781079f287cc55f47e8bfec5a5a1a09218ebf8276",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "1ad85838fa12b4015026a1ad31fe96acd706b5c42a9919ed68e921bfb642c8f1"
+      },
+      "logicalWork": "c86f126d45206138fbb6b1a6a84570624e4f0cb20c2bc6827bc07a7cbdba374e",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "582"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3828"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "10"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "26"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "29382"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "229"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "inadmissible"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-findings", "first-over"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-exhausted"
+      },
+      "inputContext": "c0a5a5a58ef3208c09282e0de10de998a5a30bec5fe5fbc2d8bd001362a1faf6",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "529dca9f4fa9ca30c794b6cddcf7c6d2ba4ad4d988fc74f884d62b52119bb609"
+      },
+      "logicalWork": "95a76b80e4d65a3e88d16e86685e43ebb044e3ed9d1442696660b03b1dcd09ab",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "541"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3246"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "16"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "16164"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "229"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "inadmissible"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-related-evidence-per-occurrence-group", "exact"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-complete"
+      },
+      "inputContext": "82524607f5a3562732636bddb7100587c209055e32df4ce9f727f6437455cbdc",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "30ab9de8b6bfe00af0600929402e2ce7ecc4b17f060fa004358196ca9ecb1096"
+      },
+      "logicalWork": "c86f126d45206138fbb6b1a6a84570624e4f0cb20c2bc6827bc07a7cbdba374e",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "582"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3828"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "10"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "26"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "29382"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "229"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "inadmissible"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-related-evidence-per-occurrence-group", "first-over"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-exhausted"
+      },
+      "inputContext": "237485d855e87a5b72685ea494dc689dfc27b4cfdfa319f5cebf72b94b62e63e",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "9be1b56b9c616897e725ccac076db08531e43adcd07746f8227512e58d78cabd"
+      },
+      "logicalWork": "340ddedf653b60db52313a5b0e2cdfd8d54623961aee966d1772e7e4c250b5c8",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6033"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "229"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "inadmissible"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-related-evidence-occurrences", "exact"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-complete"
+      },
+      "inputContext": "283a450db3043dac003248190ac441187e42d785e742f30107a91c8fea46c490",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "7bad17c5b36e3aeae2fe7d8a12e3b95d2e2f82b9d458914a4549d483570fde44"
+      },
+      "logicalWork": "c86f126d45206138fbb6b1a6a84570624e4f0cb20c2bc6827bc07a7cbdba374e",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "582"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3828"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "10"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "26"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "29382"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "229"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "inadmissible"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-related-evidence-occurrences", "first-over"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-exhausted"
+      },
+      "inputContext": "1606edf7c436ed408e35fd4123961a03d43b155de006b56f400ec7fd0b591e85",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "03263334948c5975c6a971bf2081adecf2c49e3ec643ee2b57e03263ec66484d"
+      },
+      "logicalWork": "340ddedf653b60db52313a5b0e2cdfd8d54623961aee966d1772e7e4c250b5c8",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6033"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "229"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "inadmissible"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-single-evidence-bytes", "exact"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-complete"
+      },
+      "inputContext": "0803b6c8b437ddfdfe4938b0250e35457983441df3e2ade605f4ae875d040893",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "330c190471808a87f16396b4d1ad123bbb2a46f4f95ed14a487448c3c48522b0"
+      },
+      "logicalWork": "c86f126d45206138fbb6b1a6a84570624e4f0cb20c2bc6827bc07a7cbdba374e",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "582"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3828"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "10"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "26"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "29382"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "229"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "inadmissible"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-single-evidence-bytes", "first-over"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-exhausted"
+      },
+      "inputContext": "4afc1fc3b0b8f4dd411fab7df9fa2094e9fe239a155385bb87d1a3a2cd0e72f9",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "bf17b560c19978a73fec30622620235e0b584cad60a1ddc11274a4899226dedf"
+      },
+      "logicalWork": "95a76b80e4d65a3e88d16e86685e43ebb044e3ed9d1442696660b03b1dcd09ab",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "541"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3246"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "16"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "16164"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "229"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "inadmissible"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-total-evidence-bytes", "exact"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-complete"
+      },
+      "inputContext": "c447eaf96dd99b73139fdc4df5459f1c4f6a134d711b20d6faa516804bff4683",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "970aa9fe6df9732e5c1f8c3a6ea9f1b7e383b2b4534bb01759f8be104a418c53"
+      },
+      "logicalWork": "c86f126d45206138fbb6b1a6a84570624e4f0cb20c2bc6827bc07a7cbdba374e",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "582"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3828"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "10"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "26"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "29382"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "229"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "inadmissible"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-total-evidence-bytes", "first-over"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-exhausted"
+      },
+      "inputContext": "0e59ccb9fc6f17d8c3fe9d3f5912042e19be0c45c49b4b0948dce258ad747ce2",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "0a058a8972515469fff039deb3aafe42e6fbb681edd73472b3c1bbf9dc3b6adc"
+      },
+      "logicalWork": "95a76b80e4d65a3e88d16e86685e43ebb044e3ed9d1442696660b03b1dcd09ab",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "541"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3246"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "16"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "16164"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "229"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-evaluation-status-entries", "exact"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-complete"
+      },
+      "inputContext": "6ed1e32b3b3a01e853f08e6e868bbf2c577af88b5b88f77355e51b4be7c3ec68",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "87b72ca8097ebf1e9811f18a02b87182252627a560491894b583af2c41e7c84b"
+      },
+      "logicalWork": "809f043bd569f93ee5fd560a711bad98979220cef8b06eb07e367e72f385e945",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "25"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20462"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "87"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "495"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "464"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "285"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-evaluation-status-entries", "first-over"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-exhausted"
+      },
+      "inputContext": "78c48976c29c7809078d826c76526d5ded9392113843e658cbe4f7671900ca4f",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "7e2c59a3f28acc9b94bdbfab9069522f8124f286d6abdcf3adc89c64bdb585a7"
+      },
+      "logicalWork": "3a05ee649f9fb06e63c2a521c886d57838a39c3331fd8a6889328de32c2e8acc",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "11"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "14"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "10088"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "87"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "495"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "464"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "285"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "inadmissible"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-suppression-causes-per-status", "exact"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-complete"
+      },
+      "inputContext": "c2106d44c58ac901b18c96389eca97b1ff6d9470630b6538d4707f9ba6dd58a4",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "78f459ad3ecddb2694f9008f65a39ff466b17946b8009c5f51b23799832afe7f"
+      },
+      "logicalWork": "c86f126d45206138fbb6b1a6a84570624e4f0cb20c2bc6827bc07a7cbdba374e",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "582"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3828"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "10"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "26"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "29382"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "229"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "inadmissible"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-suppression-causes-per-status", "first-over"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-exhausted"
+      },
+      "inputContext": "74d87af29f758468ef1350b3052dc033c0cbd91af2f00cf3c4553332d8aa3c6d",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "296148348faa9910f6d007899d7ae890de0a07f6e6675126854b2298eafc9152"
+      },
+      "logicalWork": "c837c760e0f40acbf3ddd659452e6260fca4fb8a0073cb872bf2c1e9dd837268",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "582"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3828"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "21"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "21187"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "229"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "inadmissible"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-suppression-cause-occurrences", "exact"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-complete"
+      },
+      "inputContext": "f8b6f0f2dbfd69b7ec96de6810e3dbb8deb6a412700b824b4dda427a3fa7f847",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "10dd3ec43d916779efef83e767d2f359907c9905f5d3899c9e25d7ec2d618a70"
+      },
+      "logicalWork": "c86f126d45206138fbb6b1a6a84570624e4f0cb20c2bc6827bc07a7cbdba374e",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "582"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3828"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "10"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "26"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "29382"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "229"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "inadmissible"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-suppression-cause-occurrences", "first-over"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-exhausted"
+      },
+      "inputContext": "a82931d7486705694a131ae2389905004e1de6a94c2784c555c6ed0bee1a6487",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "b23ea2cdd47ae860ad2c56cd4500667c934ba649cd3eecd4f7a0e5abda2774f0"
+      },
+      "logicalWork": "6f184a3ab3137ed3eba6969092e1b74e80bb4382eef7285f7bcf665960eb7cf5",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "582"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3828"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "11"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "25"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "27731"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "229"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "13"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-records", "exact"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-complete"
+      },
+      "inputContext": "3117305d8c09c1025a93ad49eeb3c90e310a54f6e79fdf66092b092726ceb249",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "bedf6f61993586b3003256fe721df2bbab2109be82a308851a376f578aa9abf6"
+      },
+      "logicalWork": "809f043bd569f93ee5fd560a711bad98979220cef8b06eb07e367e72f385e945",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "25"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20462"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "87"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "495"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "464"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "285"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-records", "first-over"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-exhausted"
+      },
+      "inputContext": "d70c75fe98716c0c4e4cc49d08cab32bf0a23c45637082e898813f81ca34f80a",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "c970e0bef34fb672d4750df91729db3aae6a19d710df2f7462d7717b3938dd7c"
+      },
+      "logicalWork": "dea1cd4cecebeb6833228048b4529b4af04d5ce24dfb281285cd1cca9546e377",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "15"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "10817"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "87"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "495"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "464"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "285"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-total-canonical-bytes", "exact"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-complete"
+      },
+      "inputContext": "bc1f3f8298b8d1db4af7550cd5be0215e159779ba0d61a429372b8e50dbc9746",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "63fe43058fa1cd0a31acefb39bdc3abba47147c289ea9c344f9fb22db69fa401"
+      },
+      "logicalWork": "809f043bd569f93ee5fd560a711bad98979220cef8b06eb07e367e72f385e945",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "25"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20462"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "87"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "495"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "464"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "285"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["entry-total-canonical-bytes", "first-over"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-exhausted"
+      },
+      "inputContext": "fd69dad0489f1cfc07bc1b72dbef2f8aeeb3e6ae5f4dd9b8523a7540292335c4",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "a99a00eace315caa5770944e7e69d4437ee25ec6625a96c7334dc9f0da8f87cf"
+      },
+      "logicalWork": "dea1cd4cecebeb6833228048b4529b4af04d5ce24dfb281285cd1cca9546e377",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "15"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "10817"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "87"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "495"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "464"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "285"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["invocation-logical-path-segments", "exact"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-complete"
+      },
+      "inputContext": "a4464ffe4116bc40eb7f96d539f24fb85a44dd67f9d33651cbb8025c141b8420",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "65806055528918a99227d57b2b00fdfef2552e2747b7f7af3aae6ffa16e43e3c"
+      },
+      "logicalWork": "809f043bd569f93ee5fd560a711bad98979220cef8b06eb07e367e72f385e945",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "25"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20462"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "87"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "495"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "464"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "285"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["invocation-logical-path-segments", "first-over"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-exhausted"
+      },
+      "inputContext": "63236e63ae6465cfaf3847c661646011dceacd2b988d12ba3adde9bc232aa5ba",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "f455ba5d6520141c0022b108217a16a780f8e2010c392c5d390c4b4e4a3e1400"
+      },
+      "logicalWork": "3e36a0e6556f2da43b793bf7ad3a3f142131dab7305fc19de3c2d81acac216e2",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "87"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "evidence-paths-not-admitted"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "evidence-paths-not-admitted"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "evidence-paths-not-admitted"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "evidence-paths-not-admitted"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["invocation-logical-path-canonical-bytes", "exact"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-complete"
+      },
+      "inputContext": "b5b88937bbca643bbb9d1c2dd6ddcc1e7363c9a7ffd8630a437e947d0badfa41",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "65806055528918a99227d57b2b00fdfef2552e2747b7f7af3aae6ffa16e43e3c"
+      },
+      "logicalWork": "809f043bd569f93ee5fd560a711bad98979220cef8b06eb07e367e72f385e945",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "25"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20462"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "87"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "495"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "464"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "285"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["invocation-logical-path-canonical-bytes", "first-over"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-exhausted"
+      },
+      "inputContext": "f63a08a496bc06196c9fbdc8ef0d2c9207854021bdd9560ca5db63c7c13da118",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "d15f71702ed0105319f25a06e35783d57a7e273365791627e7d43b38112f0f7e"
+      },
+      "logicalWork": "3e36a0e6556f2da43b793bf7ad3a3f142131dab7305fc19de3c2d81acac216e2",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "87"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "evidence-paths-not-admitted"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "evidence-paths-not-admitted"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "evidence-paths-not-admitted"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "evidence-paths-not-admitted"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["invocation-subject-occurrences", "exact"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-complete"
+      },
+      "inputContext": "a1e1af22fa0d9a1f28e649615968a9f7375440d03a725cfbd49b6fc0f031de0c",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "65806055528918a99227d57b2b00fdfef2552e2747b7f7af3aae6ffa16e43e3c"
+      },
+      "logicalWork": "809f043bd569f93ee5fd560a711bad98979220cef8b06eb07e367e72f385e945",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "25"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20462"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "87"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "495"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "464"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "285"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["invocation-subject-occurrences", "first-over"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-exhausted"
+      },
+      "inputContext": "8bf3208d956faa15d3cb291c602a34e7dd877ea3b442fce2ea4ccb331f792f2e",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "c552d357a281bc04375baf701e4e9f3768fdd8f0fec5e6d6e3b423178dd53e6d"
+      },
+      "logicalWork": "50836bc7984bd193beafb1772c155ecf8bc0267ae77774fcb3f1729d645d1c81",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "87"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "495"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "464"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "285"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["invocation-token-inputs", "exact"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-complete"
+      },
+      "inputContext": "1045299c00fbe37934671ee500d343413c800466566441dcf7f95e8265b148f9",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "65806055528918a99227d57b2b00fdfef2552e2747b7f7af3aae6ffa16e43e3c"
+      },
+      "logicalWork": "809f043bd569f93ee5fd560a711bad98979220cef8b06eb07e367e72f385e945",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "25"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20462"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "87"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "495"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "464"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "285"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["invocation-token-inputs", "first-over"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-exhausted"
+      },
+      "inputContext": "e15ca4cb29210f43215f11eb0c8972c609622066c719dd50dd7cf8c94bd25fbc",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "402985a7caef0eb081eac1c0a7288034f9691e6bdf6f0928f9d4feb0c385ebc6"
+      },
+      "logicalWork": "50836bc7984bd193beafb1772c155ecf8bc0267ae77774fcb3f1729d645d1c81",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "87"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "495"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "464"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "285"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["invocation-metadata-work-units", "exact"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-complete"
+      },
+      "inputContext": "019c9a712e1e38edee77f1fa767410737d0ca33fdb465ef77f3f370f7d3bd023",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "65806055528918a99227d57b2b00fdfef2552e2747b7f7af3aae6ffa16e43e3c"
+      },
+      "logicalWork": "809f043bd569f93ee5fd560a711bad98979220cef8b06eb07e367e72f385e945",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "12"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "25"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20462"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "87"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "495"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "464"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "285"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "entry-evidence",
+        "fixture": {
+          "evidence": "storefront"
+        },
+        "fixtureRevision": "0",
+        "limit": ["invocation-metadata-work-units", "first-over"],
+        "selector": "app",
+        "expectedKind": "entry-evidence-exhausted"
+      },
+      "inputContext": "596c4fe4f0052b916d5191eea166ed2adb7669b1c0e9464d977965548d0592aa",
+      "result": {
+        "shared": "49835f92a79259e5d04c77c83f0a4429c3b2e2f609f56d96f5563b916c24384f",
+        "entry": "894f59edeb79e4e0899302af3bca8df307a509138c6ec01caf1d5c624f1dcd11"
+      },
+      "logicalWork": "50836bc7984bd193beafb1772c155ecf8bc0267ae77774fcb3f1729d645d1c81",
+      "work": {
+        "profileIdentity": "intlify-config-entry-evidence-work",
+        "profileRevision": "0",
+        "operation": "entry-evidence",
+        "facts": [
+          {
+            "kind": "entry-evidence-finding-candidates",
+            "unit": "finding-candidate",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-findings",
+            "unit": "finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-related-evidence-per-occurrence-group",
+            "unit": "related-evidence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-related-evidence-occurrences",
+            "unit": "related-evidence-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-single-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-total-evidence-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-evaluation-statuses",
+            "unit": "evaluation-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-causes-per-status",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-cause-occurrences",
+            "unit": "causal-finding-key",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-segments",
+            "unit": "path-segment",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5"
+            }
+          },
+          {
+            "kind": "entry-evidence-maximum-logical-path-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "87"
+            }
+          },
+          {
+            "kind": "entry-evidence-subject-occurrences",
+            "unit": "subject-occurrence",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "495"
+            }
+          },
+          {
+            "kind": "entry-evidence-token-inputs",
+            "unit": "token-input",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "464"
+            }
+          },
+          {
+            "kind": "entry-evidence-collision-comparisons",
+            "unit": "collision-comparison",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "entry-evidence-metadata-work-units",
+            "unit": "evidence-metadata-work",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "285"
             }
           }
         ]

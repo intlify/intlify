@@ -4,7 +4,7 @@
 use crate::benchmark::evidence::{entry, outcome, require_observable, Resolved};
 use crate::construction::registry::check::RecordKind;
 
-use super::{LogicalWork, WorkFailure, WorkKind, WorkStage, WorkValue};
+use super::{LogicalWork, UnavailableWork, WorkFailure, WorkKind, WorkStage, WorkValue};
 
 fn count(value: usize) -> Result<u64, WorkFailure> {
     u64::try_from(value).map_err(|_| WorkFailure::UnrepresentableCounter)
@@ -83,9 +83,7 @@ impl LogicalWork {
     pub(super) fn entry_evidence(&mut self, resolved: &entry::Resolved) -> Result<(), WorkFailure> {
         let retained =
             entry::require_observable(resolved).map_err(|_| WorkFailure::InvalidOrdinaryResult)?;
-        let invocation = resolved
-            .invocation
-            .ok_or(WorkFailure::InvalidOrdinaryResult)?;
+        let invocation = resolved.invocation;
         let slices = &retained.slices;
         let records = || slices.iter().flat_map(|slice| &slice.records);
         let of = |kind: RecordKind| count(records().filter(|record| record.kind == kind).count());
@@ -141,21 +139,41 @@ impl LogicalWork {
                 WorkKind::EntryEvidenceMaximumLogicalPathCanonicalBytes,
                 invocation.path_bytes,
             ),
+        ] {
+            self.set(kind, WorkStage::OperationResult, WorkValue::exact(value));
+        }
+        // A path past its bound ends the count before what path admission
+        // leaves, as a file past its bytes ends it before its value (plan 025
+        // decisions #232 and #265).
+        let admitted = invocation.admitted;
+        for (kind, value) in [
             (
                 WorkKind::EntryEvidenceSubjectOccurrences,
-                invocation.subject_occurrences,
+                admitted.map(|work| work.subject_occurrences),
             ),
-            (WorkKind::EntryEvidenceTokenInputs, invocation.token_inputs),
+            (
+                WorkKind::EntryEvidenceTokenInputs,
+                admitted.map(|work| work.token_inputs),
+            ),
             (
                 WorkKind::EntryEvidenceCollisionComparisons,
-                invocation.collision_comparisons,
+                admitted.map(|work| work.collision_comparisons),
             ),
             (
                 WorkKind::EntryEvidenceMetadataWorkUnits,
-                invocation.metadata_work_units,
+                admitted.map(|work| work.metadata_work_units),
             ),
         ] {
-            self.set(kind, WorkStage::OperationResult, WorkValue::exact(value));
+            self.set(
+                kind,
+                WorkStage::OperationResult,
+                value.map_or(
+                    WorkValue::Unavailable {
+                        reason: UnavailableWork::EvidencePathsNotAdmitted,
+                    },
+                    WorkValue::exact,
+                ),
+            );
         }
         Ok(())
     }

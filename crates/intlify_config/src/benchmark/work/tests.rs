@@ -1009,7 +1009,7 @@ fn the_shared_evidence_work_counts_what_the_stage_committed() {
                     findings as u64
                 );
             }
-            R::Malformed | R::Truncated => {
+            R::Malformed | R::Truncated | R::Inadmissible => {
                 unreachable!("only the valued recipes the Shared bounds hold have a stage case")
             }
         }
@@ -1054,7 +1054,8 @@ fn the_entry_evidence_work_counts_what_the_stage_committed() {
             unreachable!()
         };
         let retained = resolved.result.as_ref().unwrap();
-        let invocation = resolved.invocation.unwrap();
+        let invocation = resolved.invocation;
+        let admitted = invocation.admitted.unwrap();
         let slices = &retained.slices;
         let records: Vec<_> = slices.iter().flat_map(|slice| &slice.records).collect();
         let evidence: Vec<u64> = slices
@@ -1122,16 +1123,16 @@ fn the_entry_evidence_work_counts_what_the_stage_committed() {
             ),
             (
                 WorkKind::EntryEvidenceSubjectOccurrences,
-                invocation.subject_occurrences,
+                admitted.subject_occurrences,
             ),
-            (WorkKind::EntryEvidenceTokenInputs, invocation.token_inputs),
+            (WorkKind::EntryEvidenceTokenInputs, admitted.token_inputs),
             (
                 WorkKind::EntryEvidenceCollisionComparisons,
-                invocation.collision_comparisons,
+                admitted.collision_comparisons,
             ),
             (
                 WorkKind::EntryEvidenceMetadataWorkUnits,
-                invocation.metadata_work_units,
+                admitted.metadata_work_units,
             ),
         ] {
             assert_eq!(exact(work, kind), value, "{recipe:?} {kind:?}");
@@ -1148,6 +1149,22 @@ fn the_entry_evidence_work_counts_what_the_stage_committed() {
                 );
             }
             R::Truncated => unreachable!("only the Shared domain's bound exhausts it"),
+            R::Inadmissible => {
+                // Two Entry Findings, the duplicates related, and the
+                // statuses that wait on both name both as causes.
+                assert_eq!(exact(work, WorkKind::EntryEvidenceFindings), 2);
+                assert_eq!(
+                    exact(
+                        work,
+                        WorkKind::EntryEvidenceMaximumRelatedEvidencePerOccurrenceGroup
+                    ),
+                    2
+                );
+                assert_eq!(
+                    exact(work, WorkKind::EntryEvidenceMaximumCausesPerStatus),
+                    2
+                );
+            }
             R::Malformed => {
                 assert!(exact(work, WorkKind::EntryEvidenceFindings) > 0);
                 assert!(exact(work, WorkKind::EntryEvidenceCauseOccurrences) > 0);
@@ -1160,19 +1177,40 @@ fn the_entry_evidence_work_counts_what_the_stage_committed() {
     }
 }
 
-/// Without the complete invocation's count, which a path past its bound
-/// ends, an Entry projection stage case has no work to compare.
+/// A path past its bound ends the complete invocation's count before what
+/// path admission leaves: those four counts are unavailable for that reason,
+/// and the largest path and the Entry domain's counts stay exact (plan 025
+/// decisions #232 and #265).
 #[test]
-fn an_entry_resolution_without_its_invocation_count_has_no_work() {
+fn a_path_past_its_bound_leaves_the_admitted_counts_unavailable() {
     let candidate = entry_candidate(crate::benchmark::cases::EvidenceRecipe::Storefront);
+    let complete = LogicalWork::observe(&candidate.prepared, &candidate.output).unwrap();
     let Output::EntryEvidence(mut resolved) = candidate.output else {
         unreachable!()
     };
-    resolved.invocation = None;
-    assert!(matches!(
-        LogicalWork::observe(&candidate.prepared, &Output::EntryEvidence(resolved)),
-        Err(WorkFailure::InvalidOrdinaryResult)
-    ));
+    resolved.invocation.admitted = None;
+    let ended =
+        LogicalWork::observe(&candidate.prepared, &Output::EntryEvidence(resolved)).unwrap();
+    let unavailable = [
+        WorkKind::EntryEvidenceSubjectOccurrences,
+        WorkKind::EntryEvidenceTokenInputs,
+        WorkKind::EntryEvidenceCollisionComparisons,
+        WorkKind::EntryEvidenceMetadataWorkUnits,
+    ];
+    assert_eq!(complete.facts.len(), ended.facts.len());
+    for (complete, ended) in complete.facts.iter().zip(&ended.facts) {
+        assert_eq!(complete.kind, ended.kind);
+        if unavailable.contains(&ended.kind) {
+            assert_eq!(
+                ended.observation,
+                WorkValue::Unavailable {
+                    reason: UnavailableWork::EvidencePathsNotAdmitted
+                }
+            );
+        } else {
+            assert_eq!(complete, ended);
+        }
+    }
 }
 
 /// Outcome finalization's work is the records each projection orders and the
@@ -1219,7 +1257,7 @@ fn the_outcome_finalization_work_counts_the_records_and_the_reserve() {
         );
         assert_eq!(reserve, outcome.reserve);
         match recipe {
-            R::Malformed => assert_eq!(shared, 0),
+            R::Malformed | R::Inadmissible => assert_eq!(shared, 0),
             R::Truncated => {
                 assert_eq!(shared, 100);
                 assert!(reserve > envelope.unwrap());

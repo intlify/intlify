@@ -263,7 +263,7 @@ mod tests {
             assert_eq!(outcome.profile.is_some(), recipe.checked(), "{recipe:?}");
             assert!(outcome.entry.terminal.is_none(), "{recipe:?}");
             match recipe {
-                R::Malformed => assert!(outcome.shared.is_none()),
+                R::Malformed | R::Inadmissible => assert!(outcome.shared.is_none()),
                 R::Truncated => {
                     assert!(outcome.shared.unwrap().terminal.is_some());
                 }

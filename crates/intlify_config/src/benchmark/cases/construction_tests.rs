@@ -31,7 +31,7 @@ fn observed(operation: Operation, recipe: ConstructionRecipe) -> Observation {
 #[test]
 fn construction_cases_keep_the_304_rows_and_append_after_them() {
     let cases = declarations();
-    assert_eq!(cases.len(), 379);
+    assert_eq!(cases.len(), 413);
     assert!(cases[..304].iter().all(|case| !matches!(
         case.operation,
         Operation::ConstructionAuthorityAdmission | Operation::ConstructionIdentity
@@ -212,15 +212,17 @@ fn bound_edges_keep_the_318_rows_and_append_after_them() {
     assert_eq!(start, 343 + 4);
     // 015's Evidence stages follow: the Shared projection stage over each
     // recipe with a value, the Entry projection stage over each recipe but the
-    // truncated one, and outcome finalization over each recipe.
+    // truncated one, outcome finalization over each recipe, and then the
+    // edges of the bounds the Shared and the Entry projection stages count.
     let stages: Vec<Operation> = cases[start..].iter().map(|case| case.operation).collect();
     assert_eq!(
         stages,
         [
             [Operation::SharedEvidence; 3].as_slice(),
-            &[Operation::EntryEvidence; 4],
-            &[Operation::OutcomeFinalization; 5],
+            &[Operation::EntryEvidence; 5],
+            &[Operation::OutcomeFinalization; 6],
             &[Operation::SharedEvidence; 20],
+            &[Operation::EntryEvidence; 32],
         ]
         .concat()
     );

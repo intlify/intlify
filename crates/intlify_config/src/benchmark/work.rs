@@ -569,6 +569,7 @@ enum UnavailableWork {
     LocalePolicyResolutionRequestedNotResolved,
     ArtifactCollectionNotAdmitted,
     ArtifactReferencesNotResolved,
+    EvidencePathsNotAdmitted,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]

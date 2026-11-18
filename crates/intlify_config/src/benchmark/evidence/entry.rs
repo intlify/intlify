@@ -50,6 +50,15 @@ pub(in crate::benchmark) fn entry<'e, 'a>(
 pub(in crate::benchmark) struct InvocationWork {
     pub(in crate::benchmark) path_segments: u64,
     pub(in crate::benchmark) path_bytes: u64,
+    /// `None` when a path a record cannot do without exceeds a path bound,
+    /// which ends the count before what path admission leaves (plan 025
+    /// decision #232).
+    pub(in crate::benchmark) admitted: Option<AdmittedWork>,
+}
+
+/// What the complete invocation counts over what path admission leaves.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::benchmark) struct AdmittedWork {
     pub(in crate::benchmark) subject_occurrences: u64,
     pub(in crate::benchmark) token_inputs: u64,
     pub(in crate::benchmark) collision_comparisons: u64,
@@ -59,15 +68,13 @@ pub(in crate::benchmark) struct InvocationWork {
 impl InvocationWork {
     /// Counted over `evaluation` and the entry dependency records `entry`
     /// under `specification`'s tokens and `limits`' path bounds, outside the
-    /// interval, as `evidence_metadata::invocation` counts them; `None` when
-    /// a path a record cannot do without exceeds a path bound, which ends the
-    /// count (D15:842; plan 025 decision #232).
+    /// interval, as `evidence_metadata::invocation` counts them.
     fn of(
         evaluation: &Evaluation,
         entry: &EntryInputs,
         specification: Specification<'_>,
         limits: &EvidenceMetadataLimits,
-    ) -> Option<Self> {
+    ) -> Self {
         let candidates = evaluation.occurrence_candidates();
         let decisions = evaluation.decision_evidence();
         let sizes: Vec<_> = candidates
@@ -81,12 +88,29 @@ impl InvocationWork {
                     .chain(projection.entry_path())
             })
             .collect();
-        let occurrences = candidates
+        Self {
+            path_segments: sizes.iter().map(|size| size.segments).max().unwrap_or(0),
+            path_bytes: sizes.iter().map(|size| size.bytes).max().unwrap_or(0),
+            admitted: AdmittedWork::of(evaluation, entry, specification, limits),
+        }
+    }
+}
+
+impl AdmittedWork {
+    fn of(
+        evaluation: &Evaluation,
+        entry: &EntryInputs,
+        specification: Specification<'_>,
+        limits: &EvidenceMetadataLimits,
+    ) -> Option<Self> {
+        let occurrences = evaluation
+            .occurrence_candidates()
             .iter()
             .map(|candidate| candidate.admitted(limits))
             .collect::<Result<Vec<_>, _>>()
             .ok()?;
-        let decisions = decisions
+        let decisions = evaluation
+            .decision_evidence()
             .iter()
             .map(|candidate| candidate.admitted(limits))
             .collect::<Result<Vec<_>, _>>()
@@ -110,8 +134,6 @@ impl InvocationWork {
             .map(EvidenceProjection::work)
             .sum();
         Some(Self {
-            path_segments: sizes.iter().map(|size| size.segments).max().unwrap_or(0),
-            path_bytes: sizes.iter().map(|size| size.bytes).max().unwrap_or(0),
             subject_occurrences: count(evaluation.candidates().count()),
             token_inputs: count(units.len()) + count(redacted().count()),
             collision_comparisons: subjects.comparisons() + evidence.comparisons(),
@@ -128,7 +150,7 @@ impl InvocationWork {
 /// Specification its subjects' records belong to.
 pub(in crate::benchmark) struct Resolved {
     pub(in crate::benchmark) result: Result<Retained, ResolverInvariant>,
-    pub(in crate::benchmark) invocation: Option<InvocationWork>,
+    pub(in crate::benchmark) invocation: InvocationWork,
     pub(in crate::benchmark) specification: Specification<'static>,
 }
 
@@ -261,6 +283,7 @@ mod tests {
                 R::Blocked => assert!(findings == 0 && occurrences > 0 && causes == 0),
                 R::Dense => assert!(occurrences >= 2 * crate::benchmark::cases::DENSE),
                 R::Malformed => assert!(findings > 0 && occurrences > 0 && causes > 0),
+                R::Inadmissible => assert!(findings == 2 && occurrences > 2 && causes > 0),
                 R::Truncated => unreachable!("only the Shared domain's bound exhausts it"),
             }
         }
@@ -310,7 +333,7 @@ mod tests {
     #[test]
     fn the_largest_path_of_a_file_without_a_value_is_its_logical_input_path() {
         let resolved = duplicate(unbounded());
-        let work = resolved.invocation.unwrap();
+        let work = resolved.invocation;
         assert!(work.path_segments > 0 && work.path_bytes > 0);
         let absent = duplicate(with(
             MetadataBound::LogicalPathSegments,
@@ -326,7 +349,7 @@ mod tests {
     /// past its bound. A count of 0 has no bound under it.
     #[test]
     fn the_invocation_work_is_what_its_bounds_count() {
-        let segments = duplicate(unbounded()).invocation.unwrap().path_segments;
+        let segments = duplicate(unbounded()).invocation.path_segments;
         // The duplicate's path left absent by its bound, beside `limits`.
         let absent = |mut limits: EvidenceMetadataLimits| {
             limits.max_logical_path_segments =
@@ -340,9 +363,9 @@ mod tests {
             &absent,
         ];
         for (input, resolve) in inputs.iter().enumerate() {
-            let work = resolve(unbounded()).invocation.unwrap();
+            let work = resolve(unbounded()).invocation.admitted.unwrap();
             if input == 3 {
-                assert_ne!(Some(work), duplicate(unbounded()).invocation);
+                assert_ne!(Some(work), duplicate(unbounded()).invocation.admitted);
             }
             for (bound, counted) in [
                 (MetadataBound::SubjectOccurrences, work.subject_occurrences),
@@ -376,11 +399,7 @@ mod tests {
     fn the_largest_path_is_what_each_path_bound_counts() {
         let observed = |resolved: &Resolved| observe(resolved).unwrap();
         let unbounded = observed(&under(R::Storefront, unbounded()));
-        let work = prepared(R::Storefront)
-            .resolve_entry()
-            .unwrap()
-            .invocation
-            .unwrap();
+        let work = prepared(R::Storefront).resolve_entry().unwrap().invocation;
         for (bound, counted) in [
             (MetadataBound::LogicalPathSegments, work.path_segments),
             (MetadataBound::LogicalPathCanonicalBytes, work.path_bytes),
@@ -398,18 +417,34 @@ mod tests {
         }
     }
 
-    /// A path a record cannot do without past a path bound exhausts the
-    /// Entry domain and ends the complete invocation's count (D15:842).
+    /// A path a record cannot do without past a path bound, a Finding
+    /// occurrence's or Coverage Decision Evidence's, exhausts the Entry
+    /// domain and ends the complete invocation's count before what path
+    /// admission leaves, while the largest path is still the input's (plan
+    /// 025 decision #232).
     #[test]
     fn a_required_path_past_its_bound_ends_the_invocation_count() {
-        let resolved = under(R::Storefront, with(MetadataBound::LogicalPathSegments, 1));
-        assert_eq!(resolved.invocation, None);
-        assert_eq!(
-            resolved.result.unwrap().exhausted.map(|(_, bound)| bound),
-            Some(ExhaustedBound::Capability(
-                MetadataBound::LogicalPathSegments.id()
-            ))
-        );
+        // The example's required paths are its Coverage Decision Evidence's,
+        // and the blocked recipe's its Finding occurrences'.
+        for recipe in [R::Storefront, R::Blocked] {
+            let resolved = under(recipe, with(MetadataBound::LogicalPathSegments, 1));
+            assert_eq!(resolved.invocation.admitted, None, "{recipe:?}");
+            let unbounded = under(recipe, unbounded()).invocation;
+            assert_eq!(
+                (
+                    resolved.invocation.path_segments,
+                    resolved.invocation.path_bytes
+                ),
+                (unbounded.path_segments, unbounded.path_bytes)
+            );
+            assert_eq!(
+                resolved.result.unwrap().exhausted.map(|(_, bound)| bound),
+                Some(ExhaustedBound::Capability(
+                    MetadataBound::LogicalPathSegments.id()
+                )),
+                "{recipe:?}"
+            );
+        }
     }
 
     /// An Entry domain a diagnostic bound exhausts is retained with its

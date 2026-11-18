@@ -67,45 +67,105 @@ pub(in crate::benchmark) const SHARED_EDGES: [(LimitKind, EvidenceRecipe); 10] =
     ),
 ];
 
-/// A bound the Shared projection stage counts: one of `diagnostics.shared`,
+/// Each bound the Entry projection stage counts itself, and the recipe whose
+/// count of it is at least 2: the Entry Finding, related Evidence, and cause
+/// counts are the inadmissible recipe's, the others the example's, whose
+/// largest path is one Evidence cannot do without. A collision comparison
+/// under SHA-256 is never counted, so it has no edge (plan 025 decisions
+/// #256 and #264).
+pub(in crate::benchmark) const ENTRY_EDGES: [(LimitKind, EvidenceRecipe); 16] = [
+    (
+        LimitKind::EntryFindingOccurrences,
+        EvidenceRecipe::Inadmissible,
+    ),
+    (LimitKind::EntryFindings, EvidenceRecipe::Inadmissible),
+    (
+        LimitKind::EntryRelatedEvidencePerOccurrenceGroup,
+        EvidenceRecipe::Inadmissible,
+    ),
+    (
+        LimitKind::EntryRelatedEvidenceOccurrences,
+        EvidenceRecipe::Inadmissible,
+    ),
+    (
+        LimitKind::EntrySingleEvidenceBytes,
+        EvidenceRecipe::Inadmissible,
+    ),
+    (
+        LimitKind::EntryTotalEvidenceBytes,
+        EvidenceRecipe::Inadmissible,
+    ),
+    (
+        LimitKind::EntryEvaluationStatusEntries,
+        EvidenceRecipe::Storefront,
+    ),
+    (
+        LimitKind::EntrySuppressionCausesPerStatus,
+        EvidenceRecipe::Inadmissible,
+    ),
+    (
+        LimitKind::EntrySuppressionCauseOccurrences,
+        EvidenceRecipe::Inadmissible,
+    ),
+    (LimitKind::EntryRecords, EvidenceRecipe::Storefront),
+    (
+        LimitKind::EntryTotalCanonicalBytes,
+        EvidenceRecipe::Storefront,
+    ),
+    (
+        LimitKind::InvocationLogicalPathSegments,
+        EvidenceRecipe::Storefront,
+    ),
+    (
+        LimitKind::InvocationLogicalPathCanonicalBytes,
+        EvidenceRecipe::Storefront,
+    ),
+    (
+        LimitKind::InvocationSubjectOccurrences,
+        EvidenceRecipe::Storefront,
+    ),
+    (LimitKind::InvocationTokenInputs, EvidenceRecipe::Storefront),
+    (
+        LimitKind::InvocationMetadataWorkUnits,
+        EvidenceRecipe::Storefront,
+    ),
+];
+
+/// A bound an Evidence projection stage counts: one of a diagnostic domain's,
 /// which both the capability and the selected policy set, or one of the
-/// Shared scope's `evidenceMetadata` counts, which only the capability sets.
+/// `evidenceMetadata` counts, which only the capability sets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::benchmark) enum SharedBound {
-    Diagnostic(&'static str),
+pub(in crate::benchmark) enum EvidenceBound {
+    Diagnostic(Group, &'static str),
     Metadata(MetadataBound),
 }
 
-impl SharedBound {
+impl EvidenceBound {
     /// The bound `kind` names and the work kind that counts it, in its unit.
-    pub(in crate::benchmark) const fn of(kind: LimitKind) -> Option<(Self, WorkKind)> {
+    pub(in crate::benchmark) fn of(kind: LimitKind) -> Option<(Self, WorkKind)> {
+        let shared = |name| Self::Diagnostic(Group::DiagnosticsShared, name);
+        let entry = |name| Self::Diagnostic(Group::DiagnosticsEntry, name);
         Some(match kind {
             LimitKind::SharedFindingOccurrences => (
-                Self::Diagnostic("maxFindingOccurrences"),
+                shared("maxFindingOccurrences"),
                 WorkKind::SharedEvidenceFindingCandidates,
             ),
-            LimitKind::SharedFindings => (
-                Self::Diagnostic("maxFindings"),
-                WorkKind::SharedEvidenceFindings,
-            ),
+            LimitKind::SharedFindings => (shared("maxFindings"), WorkKind::SharedEvidenceFindings),
             LimitKind::SharedEvaluationStatusEntries => (
-                Self::Diagnostic("maxEvaluationStatusEntries"),
+                shared("maxEvaluationStatusEntries"),
                 WorkKind::SharedEvidenceEvaluationStatuses,
             ),
             LimitKind::SharedSuppressionCausesPerStatus => (
-                Self::Diagnostic("maxSuppressionCausesPerStatus"),
+                shared("maxSuppressionCausesPerStatus"),
                 WorkKind::SharedEvidenceMaximumCausesPerStatus,
             ),
             LimitKind::SharedSuppressionCauseOccurrences => (
-                Self::Diagnostic("maxSuppressionCauseOccurrences"),
+                shared("maxSuppressionCauseOccurrences"),
                 WorkKind::SharedEvidenceCauseOccurrences,
             ),
-            LimitKind::SharedRecords => (
-                Self::Diagnostic("maxRecords"),
-                WorkKind::SharedEvidenceRecords,
-            ),
+            LimitKind::SharedRecords => (shared("maxRecords"), WorkKind::SharedEvidenceRecords),
             LimitKind::SharedTotalCanonicalBytes => (
-                Self::Diagnostic("maxTotalCanonicalBytes"),
+                shared("maxTotalCanonicalBytes"),
                 WorkKind::SharedEvidenceCanonicalBytes,
             ),
             LimitKind::SharedScopeSubjectOccurrences => (
@@ -120,17 +180,72 @@ impl SharedBound {
                 Self::Metadata(MetadataBound::MetadataWorkUnits),
                 WorkKind::SharedEvidenceMetadataWorkUnits,
             ),
+            LimitKind::EntryFindingOccurrences => (
+                entry("maxFindingOccurrences"),
+                WorkKind::EntryEvidenceFindingCandidates,
+            ),
+            LimitKind::EntryFindings => (entry("maxFindings"), WorkKind::EntryEvidenceFindings),
+            LimitKind::EntryRelatedEvidencePerOccurrenceGroup => (
+                entry("maxRelatedEvidencePerOccurrenceGroup"),
+                WorkKind::EntryEvidenceMaximumRelatedEvidencePerOccurrenceGroup,
+            ),
+            LimitKind::EntryRelatedEvidenceOccurrences => (
+                entry("maxRelatedEvidenceOccurrences"),
+                WorkKind::EntryEvidenceRelatedEvidenceOccurrences,
+            ),
+            LimitKind::EntrySingleEvidenceBytes => (
+                entry("maxSingleEvidenceBytes"),
+                WorkKind::EntryEvidenceMaximumSingleEvidenceBytes,
+            ),
+            LimitKind::EntryTotalEvidenceBytes => (
+                entry("maxTotalEvidenceBytes"),
+                WorkKind::EntryEvidenceTotalEvidenceBytes,
+            ),
+            LimitKind::EntryEvaluationStatusEntries => (
+                entry("maxEvaluationStatusEntries"),
+                WorkKind::EntryEvidenceEvaluationStatuses,
+            ),
+            LimitKind::EntrySuppressionCausesPerStatus => (
+                entry("maxSuppressionCausesPerStatus"),
+                WorkKind::EntryEvidenceMaximumCausesPerStatus,
+            ),
+            LimitKind::EntrySuppressionCauseOccurrences => (
+                entry("maxSuppressionCauseOccurrences"),
+                WorkKind::EntryEvidenceCauseOccurrences,
+            ),
+            LimitKind::EntryRecords => (entry("maxRecords"), WorkKind::EntryEvidenceRecords),
+            LimitKind::EntryTotalCanonicalBytes => (
+                entry("maxTotalCanonicalBytes"),
+                WorkKind::EntryEvidenceCanonicalBytes,
+            ),
+            LimitKind::InvocationLogicalPathSegments => (
+                Self::Metadata(MetadataBound::LogicalPathSegments),
+                WorkKind::EntryEvidenceMaximumLogicalPathSegments,
+            ),
+            LimitKind::InvocationLogicalPathCanonicalBytes => (
+                Self::Metadata(MetadataBound::LogicalPathCanonicalBytes),
+                WorkKind::EntryEvidenceMaximumLogicalPathCanonicalBytes,
+            ),
+            LimitKind::InvocationSubjectOccurrences => (
+                Self::Metadata(MetadataBound::SubjectOccurrences),
+                WorkKind::EntryEvidenceSubjectOccurrences,
+            ),
+            LimitKind::InvocationTokenInputs => (
+                Self::Metadata(MetadataBound::TokenInputs),
+                WorkKind::EntryEvidenceTokenInputs,
+            ),
+            LimitKind::InvocationMetadataWorkUnits => (
+                Self::Metadata(MetadataBound::MetadataWorkUnits),
+                WorkKind::EntryEvidenceMetadataWorkUnits,
+            ),
             _ => return None,
         })
     }
 
-    /// The bound an exhausted Shared domain's terminal Finding names.
+    /// The bound an exhausted domain's terminal Finding names.
     pub(in crate::benchmark) fn exhausted(self) -> ExhaustedBound {
         match self {
-            Self::Diagnostic(name) => ExhaustedBound::Domain(BoundId {
-                group: Group::DiagnosticsShared,
-                name,
-            }),
+            Self::Diagnostic(group, name) => ExhaustedBound::Domain(BoundId { group, name }),
             Self::Metadata(bound) => ExhaustedBound::Capability(bound.id()),
         }
     }
@@ -144,10 +259,10 @@ impl SharedBound {
     ) -> (ResolutionLimits, EvidenceMetadataLimits) {
         let limits = recipe.limits();
         match self {
-            Self::Diagnostic(name) => {
+            Self::Diagnostic(group, name) => {
                 let bounds = limits.bounds();
                 let limits = ResolutionLimits::from_bounds(|id| {
-                    if id.group == Group::DiagnosticsShared && id.name == name {
+                    if id.group == group && id.name == name {
                         Some(limit)
                     } else {
                         bounds
@@ -187,6 +302,13 @@ pub(in crate::benchmark) enum EvidenceRecipe {
     /// the Shared domain is exhausted, so the bundle is incomplete and the
     /// outcome blocked (D15:1185, 2408; plan 025 decision #262).
     Truncated,
+    /// The example's file with its project default three times and a locale
+    /// string a lone surrogate: two Entry Findings, one of the duplicate
+    /// members, whose two occurrences each relate the other two, and one of
+    /// the string that is no JSON-compatible value, and the statuses that
+    /// wait on both name both as causes; no value (D15:3440; plan 025
+    /// decision #264).
+    Inadmissible,
 }
 
 /// A configuration and the members submitted with it, in submission order.
@@ -243,21 +365,23 @@ const TARGETS: [(&str, &str, &str); 2] = [
 ];
 
 impl EvidenceRecipe {
-    pub(in crate::benchmark) const ALL: [Self; 5] = [
+    pub(in crate::benchmark) const ALL: [Self; 6] = [
         Self::Storefront,
         Self::Blocked,
         Self::Dense,
         Self::Malformed,
         Self::Truncated,
+        Self::Inadmissible,
     ];
 
     /// The recipes of the Entry projection stage: every one but the one that
     /// exhausts only the Shared domain, which the Shared bounds' edges cover.
-    pub(in crate::benchmark) const ENTRY: [Self; 4] = [
+    pub(in crate::benchmark) const ENTRY: [Self; 5] = [
         Self::Storefront,
         Self::Blocked,
         Self::Dense,
         Self::Malformed,
+        Self::Inadmissible,
     ];
 
     /// The recipes with a value, the only ones the Shared projection stage
@@ -295,8 +419,19 @@ impl EvidenceRecipe {
     pub(in crate::benchmark) fn source(self, limits: &ResolutionLimits) -> Vec<u8> {
         let mut source =
             serde_json::to_vec(&self.fixture(limits).config).expect("a JSON value encodes");
-        if self == Self::Malformed {
-            source.pop();
+        match self {
+            Self::Malformed => {
+                source.pop();
+            }
+            Self::Inadmissible => {
+                let default = r#""defaultRequestedLocale":"en""#;
+                source = String::from_utf8(source)
+                    .expect("an encoded JSON value is UTF-8")
+                    .replacen(default, &[default; 3].join(","), 1)
+                    .replacen(r#""ja""#, r#""\ud800""#, 1)
+                    .into_bytes();
+            }
+            Self::Storefront | Self::Blocked | Self::Dense | Self::Truncated => {}
         }
         source
     }
@@ -326,7 +461,7 @@ impl EvidenceRecipe {
             members.push(member);
         }
         match self {
-            Self::Storefront | Self::Malformed | Self::Truncated => {}
+            Self::Storefront | Self::Malformed | Self::Truncated | Self::Inadmissible => {}
             Self::Blocked => {
                 app.as_object_mut()
                     .expect("the example's declaration is an object")
@@ -524,9 +659,10 @@ mod tests {
     }
 
     /// Each file is its configuration's JSON, but the malformed one, which is
-    /// the example's without its last byte and so no JSON.
+    /// the example's without its last byte and so no JSON, and the
+    /// inadmissible one, which no JSON-compatible value holds.
     #[test]
-    fn only_the_malformed_file_is_no_json() {
+    fn only_the_malformed_and_inadmissible_files_are_no_json() {
         let limits = limits();
         for recipe in EvidenceRecipe::ALL {
             let source = recipe.source(&limits);
@@ -536,6 +672,8 @@ mod tests {
                 let mut example = EvidenceRecipe::Storefront.source(&limits);
                 assert_eq!(example.pop(), Some(b'}'));
                 assert_eq!(source, example);
+            } else if recipe == EvidenceRecipe::Inadmissible {
+                assert!(parsed.is_err());
             } else {
                 assert_eq!(
                     parsed.unwrap(),
@@ -570,30 +708,32 @@ mod tests {
         }
     }
 
-    /// Each bound the Shared projection stage counts has an exact and a
-    /// first-over edge on its recipe, one apart: the exact edge's limit is the
-    /// count the recipe's unbounded case reports in its logical work, and its
-    /// Shared domain commits whole, and the first-over edge's bound exhausts
-    /// the Shared domain, which its terminal Finding names (plan 025 decision
-    /// #263).
-    #[test]
-    fn each_shared_edge_sits_at_its_count_and_one_under() {
+    /// Each edge of `edges` on `operation` sits on its recipe at the count
+    /// the recipe's unbounded case reports in its logical work, and one
+    /// under it: the capability sets the bound to that limit, and only the
+    /// first-over edge's domain is exhausted, naming the bound, as `exhausted`
+    /// reads it from the output.
+    fn each_edge_sits_at_its_count_and_one_under(
+        operation: crate::benchmark::operation::Operation,
+        edges: &[(LimitKind, EvidenceRecipe)],
+        exhausted: impl Fn(&crate::benchmark::operation::Output) -> Option<ExhaustedBound>,
+    ) {
         use crate::benchmark::cases::prepare::prepare;
         use crate::benchmark::cases::{declarations, Declaration, LimitEdge, Recipe};
-        use crate::benchmark::operation::{Operation, Output, Prepared};
+        use crate::benchmark::operation::Prepared;
 
         let case = |recipe, limit: Option<(LimitKind, LimitEdge)>| -> Declaration {
             declarations()
                 .into_iter()
                 .find(|case| {
-                    case.operation == Operation::SharedEvidence
+                    case.operation == operation
                         && case.fixture == Recipe::Evidence(recipe)
                         && case.limit == limit
                 })
                 .unwrap()
         };
-        for (kind, recipe) in SHARED_EDGES {
-            let (bound, work) = SharedBound::of(kind).unwrap();
+        for &(kind, recipe) in edges {
+            let (bound, work) = EvidenceBound::of(kind).unwrap();
             let counted = prepare(&case(recipe, None))
                 .unwrap()
                 .logical_work
@@ -603,46 +743,104 @@ mod tests {
                 (LimitEdge::Exact, counted),
                 (LimitEdge::FirstOver, counted - 1),
             ] {
-                let candidate = prepare(&case(recipe, Some((kind, edge)))).unwrap();
-                let Prepared::SharedEvidence(prepared) = &candidate.prepared else {
+                let candidate = prepare(&case(recipe, Some((kind, edge))))
+                    .unwrap_or_else(|error| panic!("{kind:?} {edge:?}: {error:?}"));
+                let (Prepared::SharedEvidence(prepared) | Prepared::EntryEvidence(prepared)) =
+                    &candidate.prepared
+                else {
                     unreachable!()
                 };
+                let capability = &prepared.capability;
                 let set = match bound {
-                    SharedBound::Diagnostic(name) => {
-                        prepared
-                            .capability
-                            .policy_comparable()
-                            .bounds()
-                            .into_iter()
-                            .find(|(id, _)| id.group == Group::DiagnosticsShared && id.name == name)
-                            .unwrap()
-                            .1
-                    }
-                    SharedBound::Metadata(metadata) => {
-                        let limits = prepared.capability.bootstrap_only().evidence_metadata;
-                        match metadata {
-                            MetadataBound::SubjectOccurrences => limits.max_subject_occurrences,
-                            MetadataBound::TokenInputs => limits.max_token_inputs,
-                            MetadataBound::MetadataWorkUnits => limits.max_metadata_work_units,
-                            _ => unreachable!("only the Shared scope's counts have edges"),
-                        }
-                    }
+                    EvidenceBound::Diagnostic(group, name) => capability
+                        .policy_comparable()
+                        .bounds()
+                        .into_iter()
+                        .find(|(id, _)| id.group == group && id.name == name)
+                        .map(|(_, value)| value),
+                    EvidenceBound::Metadata(metadata) => capability
+                        .bootstrap_only()
+                        .bounds()
+                        .into_iter()
+                        .find(|(id, _)| *id == metadata.id())
+                        .map(|(_, value)| value),
                 };
-                assert_eq!(set.get(), limit, "{kind:?} {edge:?}");
-                let Output::SharedEvidence(resolved) = &candidate.output else {
-                    unreachable!()
-                };
-                let exhausted = resolved
-                    .result
-                    .as_ref()
-                    .unwrap()
-                    .exhausted
-                    .as_ref()
-                    .map(|(_, bound)| *bound);
+                assert_eq!(set.unwrap().get(), limit, "{kind:?} {edge:?}");
                 let expected = (edge == LimitEdge::FirstOver).then(|| bound.exhausted());
-                assert_eq!(exhausted, expected, "{kind:?} {edge:?}");
+                assert_eq!(exhausted(&candidate.output), expected, "{kind:?} {edge:?}");
             }
         }
+    }
+
+    /// Each bound the Shared projection stage counts has an exact and a
+    /// first-over edge on its recipe, one apart: the exact edge's limit is the
+    /// count the recipe's unbounded case reports in its logical work, and its
+    /// Shared domain commits whole, and the first-over edge's bound exhausts
+    /// the Shared domain, which its terminal Finding names (plan 025 decision
+    /// #263).
+    #[test]
+    fn each_shared_edge_sits_at_its_count_and_one_under() {
+        use crate::benchmark::operation::{Operation, Output};
+
+        each_edge_sits_at_its_count_and_one_under(
+            Operation::SharedEvidence,
+            &SHARED_EDGES,
+            |output| {
+                let Output::SharedEvidence(resolved) = output else {
+                    unreachable!()
+                };
+                let retained = resolved.result.as_ref().unwrap();
+                retained.exhausted.as_ref().map(|(_, bound)| *bound)
+            },
+        );
+    }
+
+    /// Each bound the Entry projection stage counts has an exact and a
+    /// first-over edge on its recipe, one apart: the exact edge's limit is the
+    /// count the recipe's unbounded Entry case reports in its logical work,
+    /// and its Entry domain commits whole, and the first-over edge's bound
+    /// exhausts the Entry domain, which its terminal Finding names (plan 025
+    /// decision #264).
+    #[test]
+    fn each_entry_edge_sits_at_its_count_and_one_under() {
+        use crate::benchmark::operation::{Operation, Output};
+
+        each_edge_sits_at_its_count_and_one_under(
+            Operation::EntryEvidence,
+            &ENTRY_EDGES,
+            |output| {
+                let Output::EntryEvidence(resolved) = output else {
+                    unreachable!()
+                };
+                let retained = resolved.result.as_ref().unwrap();
+                retained.exhausted.as_ref().map(|(_, bound)| *bound)
+            },
+        );
+    }
+
+    /// The inadmissible file is the example's with its project default three
+    /// times and the first `ja` a lone surrogate, which no JSON-compatible
+    /// value holds.
+    #[test]
+    fn the_inadmissible_file_repeats_a_member_and_holds_a_lone_surrogate() {
+        let limits = limits();
+        let source = String::from_utf8(EvidenceRecipe::Inadmissible.source(&limits)).unwrap();
+        let example = String::from_utf8(EvidenceRecipe::Storefront.source(&limits)).unwrap();
+        let default = r#""defaultRequestedLocale":"en""#;
+        assert_eq!(
+            source.matches(default).count(),
+            example.matches(default).count() + 2
+        );
+        assert_eq!(source.matches(r#""\ud800""#).count(), 1);
+        assert_eq!(
+            source.replacen(r#""\ud800""#, r#""ja""#, 1).replacen(
+                &[default; 3].join(","),
+                default,
+                1
+            ),
+            example
+        );
+        assert!(serde_json::from_str::<Value>(&source).is_err());
     }
 
     /// Every diagnostic bound is at its room, and every other bound is the
