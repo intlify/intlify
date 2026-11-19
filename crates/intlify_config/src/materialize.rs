@@ -16,8 +16,9 @@
 //! Raw source is immutable shared input. A successful document owns its decoded
 //! values and source map, not borrowed scratch. No reusable workspace, global
 //! cache, or capacity-retention policy is introduced by this implementation.
-//! Spans and typed failures below are internal observations, not formal 015
-//! Evidence, Source Identities, Finding Registry records, or Resolver Outcomes.
+//! Spans, loci, and typed failures below are internal observations, not formal
+//! 015 Evidence, Source Identities, Finding Registry records, or Resolver
+//! Outcomes.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -88,13 +89,14 @@ pub(crate) enum NodeKind {
 }
 
 pub(crate) struct ObjectMember {
-    key_span: ByteSpan,
+    key: Locus,
     value: NodeId,
 }
 
 impl ObjectMember {
-    pub(crate) const fn key_span(&self) -> ByteSpan {
-        self.key_span
+    /// Where the member's key is.
+    pub(crate) const fn key(&self) -> Locus {
+        self.key
     }
     pub(crate) const fn value(&self) -> NodeId {
         self.value
@@ -103,15 +105,16 @@ impl ObjectMember {
 
 pub(crate) struct LocatedNode {
     kind: NodeKind,
-    span: ByteSpan,
+    locus: Locus,
 }
 
 impl LocatedNode {
     pub(crate) const fn kind(&self) -> &NodeKind {
         &self.kind
     }
-    pub(crate) const fn span(&self) -> ByteSpan {
-        self.span
+    /// Where the value is.
+    pub(crate) const fn locus(&self) -> Locus {
+        self.locus
     }
 }
 
@@ -123,9 +126,18 @@ pub(crate) struct InputCounts {
 }
 
 pub(crate) struct MaterializedDocument {
-    source: Arc<[u8]>,
     nodes: Vec<LocatedNode>,
-    counts: InputCounts,
+    value_counts: ValueCounts,
+    /// The file the document was materialized from.
+    file: Option<FileInput>,
+}
+
+/// What a document keeps of its file: the bytes its loci span, and the
+/// counts only a file has.
+struct FileInput {
+    source: Arc<[u8]>,
+    file_bytes: u64,
+    parser_tokens: u64,
 }
 
 impl MaterializedDocument {
@@ -136,13 +148,24 @@ impl MaterializedDocument {
     pub(crate) fn node(&self, id: NodeId) -> &LocatedNode {
         &self.nodes[id.0]
     }
-    pub(crate) const fn counts(&self) -> InputCounts {
-        self.counts
+    /// The complete root value's counts.
+    pub(crate) const fn value_counts(&self) -> ValueCounts {
+        self.value_counts
     }
-    pub(crate) fn raw_span(&self, span: ByteSpan) -> &[u8] {
+    /// The file's counts beside the value's; none without a file.
+    pub(crate) fn counts(&self) -> Option<InputCounts> {
+        self.file.as_ref().map(|file| InputCounts {
+            file_bytes: file.file_bytes,
+            parser_tokens: file.parser_tokens,
+            value: self.value_counts,
+        })
+    }
+    /// The file's bytes in `span`; none without a file.
+    pub(crate) fn raw_span(&self, span: ByteSpan) -> Option<&[u8]> {
+        let file = self.file.as_ref()?;
         let start = usize::try_from(span.start).expect("parser-proven source offset");
         let end = usize::try_from(span.end).expect("parser-proven source offset");
-        &self.source[start..end]
+        Some(&file.source[start..end])
     }
 }
 
@@ -329,9 +352,13 @@ pub(crate) fn materialize_file(
         std::str::from_utf8(&source).expect("strict tokenization validated every byte as UTF-8");
     let nodes = build_nodes(text, parsed.tokens, parsed.counts.value.nodes);
     Ok(MaterializedDocument {
-        source,
         nodes,
-        counts: parsed.counts,
+        value_counts: parsed.counts.value,
+        file: Some(FileInput {
+            source,
+            file_bytes: parsed.counts.file_bytes,
+            parser_tokens: parsed.counts.parser_tokens,
+        }),
     })
 }
 
@@ -344,9 +371,11 @@ pub(crate) fn member_name(source: &[u8], key: ByteSpan) -> String {
 }
 
 mod lex;
+mod locus;
 mod parse;
 mod typed;
 
+pub(crate) use locus::Locus;
 pub(crate) use typed::DecodeError;
 
 impl MaterializedDocument {
@@ -402,6 +431,8 @@ fn decode_string(source: &str, span: ByteSpan) -> String {
 
 struct BuildFrame {
     owner: NodeId,
+    /// Where the owner's opening token starts.
+    start: u64,
     pending_key: Option<(String, ByteSpan)>,
     expects_key: bool,
 }
@@ -418,7 +449,8 @@ fn build_nodes(source: &str, tokens: Vec<Token>, node_count: u64) -> Vec<Located
         match token.kind {
             TokenKind::CloseArray | TokenKind::CloseObject => {
                 let frame = stack.pop().expect("validated container close");
-                nodes[frame.owner.0].span.end = token.span.end;
+                nodes[frame.owner.0].locus =
+                    Locus::file(ByteSpan::new(frame.start, token.span.end));
                 continue;
             }
             TokenKind::Colon => continue,
@@ -454,18 +486,17 @@ fn build_nodes(source: &str, tokens: Vec<Token>, node_count: u64) -> Vec<Located
         let id = NodeId(nodes.len());
         nodes.push(LocatedNode {
             kind,
-            span: token.span,
+            locus: Locus::file(token.span),
         });
         if let Some(frame) = stack.last_mut() {
             match &mut nodes[frame.owner.0].kind {
                 NodeKind::Array(items) => items.push(id),
                 NodeKind::Object(members) => {
-                    let (name, key_span) =
-                        frame.pending_key.take().expect("validated member value");
+                    let (name, key) = frame.pending_key.take().expect("validated member value");
                     members.insert(
                         name,
                         ObjectMember {
-                            key_span,
+                            key: Locus::file(key),
                             value: id,
                         },
                     );
@@ -476,6 +507,7 @@ fn build_nodes(source: &str, tokens: Vec<Token>, node_count: u64) -> Vec<Located
         if let Some(expects_key) = container {
             stack.push(BuildFrame {
                 owner: id,
+                start: token.span.start,
                 pending_key: None,
                 expects_key,
             });

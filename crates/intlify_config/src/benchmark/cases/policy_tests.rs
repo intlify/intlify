@@ -427,9 +427,9 @@ fn the_inputs_hand_phase_4_what_the_earlier_phases_measured() {
     let (limits, _) = super::prepare::fixture_capacity();
     let counts = materialize_file(Arc::clone(&source), limits)
         .unwrap()
-        .counts();
-    assert_eq!(inputs.measures.value, Ok(counts.value));
-    assert!(counts.value.nodes > 1);
+        .value_counts();
+    assert_eq!(inputs.measures.value, Ok(counts));
+    assert!(counts.nodes > 1);
     // `app` is the only declared Profile ID.
     let app = serde_json::from_value(serde_json::json!("app")).unwrap();
     assert_eq!(inputs.measures.profile_ids, Ok(&[app][..]));

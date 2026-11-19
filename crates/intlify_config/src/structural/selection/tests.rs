@@ -57,10 +57,7 @@ fn omission_and_explicit_single_selection_agree_and_own_their_outputs() {
             .unwrap(),
     );
     assert_eq!(omitted.id(), explicit.id());
-    assert_eq!(
-        omitted.declaration_key_span(),
-        explicit.declaration_key_span()
-    );
+    assert_eq!(omitted.declaration_key(), explicit.declaration_key());
     drop(analysis);
     assert_eq!(omitted.id().as_str(), "app");
     assert_eq!(omitted.resource_limits(), explicit.resource_limits());

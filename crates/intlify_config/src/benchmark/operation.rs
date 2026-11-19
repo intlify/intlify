@@ -702,7 +702,7 @@ fn observe_selection(selection: &Selection<PolicyReference>) -> Result<Observati
                     .map_err(|_| OutputFailure::ObservationEncoding)?,
             );
             let mut entry = Frame::new("selected-declaration-source");
-            entry.span(selected.declaration_key_span());
+            entry.locus(selected.declaration_key());
             Some(entry.finish())
         }
         Selection::Rejected(failure) => {

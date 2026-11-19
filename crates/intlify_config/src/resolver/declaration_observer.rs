@@ -9,7 +9,7 @@
 //! The phases after profile selection observe their Findings through it.
 
 use crate::input_limits::Bound;
-use crate::materialize::{ByteSpan, MaterializedDocument, NodeId, NodeKind, ObjectMember};
+use crate::materialize::{Locus, MaterializedDocument, NodeId, NodeKind, ObjectMember};
 use crate::structural::selection::SelectorInput;
 use crate::structural::Edge;
 
@@ -91,7 +91,7 @@ impl<'a> DeclarationObserver<'a> {
     /// Evidence.
     pub(crate) fn value(&self, path: &[&str]) -> Result<EvidenceProjection, ObserverInvariant> {
         let node = self.node(path)?;
-        self.at(&self.edges(path, None), self.document.node(node).span())
+        self.at(&self.edges(path, None), self.document.node(node).locus())
     }
 
     /// The element at `index` of the array at the member path `path` under
@@ -113,7 +113,7 @@ impl<'a> DeclarationObserver<'a> {
         let position = u64::try_from(index).map_err(|_| ObserverInvariant::Missing)?;
         let mut edges = self.edges(path, None);
         edges.push(Edge::Index(position));
-        self.at(&edges, self.document.node(element).span())
+        self.at(&edges, self.document.node(element).locus())
     }
 
     /// The value at the internal path `steps` under the declaration, through
@@ -142,7 +142,7 @@ impl<'a> DeclarationObserver<'a> {
             .into_iter()
             .chain(steps.iter().copied())
             .collect();
-        self.at(&edges, self.document.node(node).span())
+        self.at(&edges, self.document.node(node).locus())
     }
 
     /// The key of the member `name` of the object at the member path `path`
@@ -163,7 +163,7 @@ impl<'a> DeclarationObserver<'a> {
             return Err(ObserverInvariant::Missing);
         };
         let member = members.get(name).ok_or(ObserverInvariant::Missing)?;
-        self.at(&self.edges(path, Some(name)), member.key_span())
+        self.at(&self.edges(path, Some(name)), member.key())
     }
 
     /// The key of the member at `rank`, in the unsigned byte order of member
@@ -180,7 +180,7 @@ impl<'a> DeclarationObserver<'a> {
         rank: usize,
     ) -> Result<EvidenceProjection, ObserverInvariant> {
         let (name, member) = self.ranked(path, rank)?;
-        self.at(&self.edges(path, Some(name)), member.key_span())
+        self.at(&self.edges(path, Some(name)), member.key())
     }
 
     /// The value of that member, at its token (D15:790).
@@ -197,7 +197,7 @@ impl<'a> DeclarationObserver<'a> {
         let (name, member) = self.ranked(path, rank)?;
         self.at(
             &self.edges(path, Some(name)),
-            self.document.node(member.value()).span(),
+            self.document.node(member.value()).locus(),
         )
     }
 
@@ -243,7 +243,7 @@ impl<'a> DeclarationObserver<'a> {
     ///
     /// Returns the resolver bug of a root that has no Evidence.
     pub(crate) fn root(&self) -> Result<EvidenceProjection, ObserverInvariant> {
-        self.at(&[], self.document.node(self.document.root()).span())
+        self.at(&[], self.document.node(self.document.root()).locus())
     }
 
     /// The root's `profiles` object, the declarations as one location, at its
@@ -255,7 +255,7 @@ impl<'a> DeclarationObserver<'a> {
     pub(crate) fn declarations(&self) -> Result<EvidenceProjection, ObserverInvariant> {
         self.at(
             &[Edge::Member("profiles")],
-            self.document.node(self.profiles).span(),
+            self.document.node(self.profiles).locus(),
         )
     }
 
@@ -272,10 +272,7 @@ impl<'a> DeclarationObserver<'a> {
             return Err(ObserverInvariant::Missing);
         };
         let member = members.get(id).ok_or(ObserverInvariant::Missing)?;
-        self.at(
-            &[Edge::Member("profiles"), Edge::Member(id)],
-            member.key_span(),
-        )
+        self.at(&[Edge::Member("profiles"), Edge::Member(id)], member.key())
     }
 
     /// Every string value and object key in the configuration longer than
@@ -309,7 +306,7 @@ impl<'a> DeclarationObserver<'a> {
             NodeKind::String(text) => {
                 let bytes = utf8_bytes(text);
                 if bytes > limit {
-                    found.push((bytes, self.at(path, located.span())?));
+                    found.push((bytes, self.at(path, located.locus())?));
                 }
             }
             NodeKind::Array(elements) => {
@@ -324,7 +321,7 @@ impl<'a> DeclarationObserver<'a> {
                     path.push(Edge::Member(name));
                     let bytes = utf8_bytes(name);
                     if bytes > limit {
-                        found.push((bytes, self.at(path, member.key_span())?));
+                        found.push((bytes, self.at(path, member.key())?));
                     }
                     self.walk(member.value(), path, limit, found)?;
                     path.pop();
@@ -361,15 +358,14 @@ impl<'a> DeclarationObserver<'a> {
         Ok(Observation { primary, related })
     }
 
-    /// The value at the internal path `edges` from the root, at the token
-    /// `span`.
+    /// The value at the internal path `edges` from the root, at `locus`.
     fn at(
         &self,
         edges: &[Edge<'_>],
-        span: ByteSpan,
+        locus: Locus,
     ) -> Result<EvidenceProjection, ObserverInvariant> {
         self.file
-            .value_evidence_after(edges, span, self.locales)
+            .value_evidence_after(edges, locus, self.locales)
             .map_err(ObserverInvariant::Evidence)
     }
 }

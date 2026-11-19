@@ -689,7 +689,7 @@ mod tests {
         });
         let source: Arc<[u8]> = serde_json::to_vec(&value).unwrap().into();
         let document = materialize_file(source, limits()).ok().unwrap();
-        let file = document.counts().value;
+        let file = document.value_counts();
         let snapshot = SnapshotCounts::of(&from_json(&value));
         assert_eq!(
             (

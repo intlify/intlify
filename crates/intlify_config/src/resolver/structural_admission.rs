@@ -54,7 +54,7 @@ use std::cell::OnceCell;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::materialize::{ByteSpan, MaterializedDocument, NodeId, NodeKind};
+use crate::materialize::{Locus, MaterializedDocument, NodeId, NodeKind};
 use crate::structural::facts::{
     self, At, Candidate, CandidateId, Entry, Facts, FieldPathId, Level, Outcome, ScopeId,
 };
@@ -191,7 +191,7 @@ impl StructuralSubject {
 pub(crate) enum EntryKey {
     Identity(Arc<str>),
     /// None for the logical subject.
-    Content(Option<ByteSpan>),
+    Content(Option<Locus>),
 }
 
 impl EntryKey {
@@ -617,10 +617,10 @@ struct Observer<'f, 'd> {
 
 /// The materialized document indexed for observation: each value's parent
 /// and the edge from it, a member's name or an element's index, and each
-/// member's name by the span of its key, which is the member's alone.
+/// member's name by the locus of its key, which is the member's alone.
 struct Tree<'d> {
     parents: BTreeMap<NodeId, (NodeId, Edge<'d>)>,
-    names: BTreeMap<ByteSpan, &'d str>,
+    names: BTreeMap<Locus, &'d str>,
 }
 
 impl<'f, 'd> Observer<'f, 'd> {
@@ -647,7 +647,7 @@ impl<'f, 'd> Observer<'f, 'd> {
                             let name = name.as_str();
                             tree.parents
                                 .insert(member.value(), (node, Edge::Member(name)));
-                            tree.names.insert(member.key_span(), name);
+                            tree.names.insert(member.key(), name);
                             pending.push(member.value());
                         }
                     }
@@ -678,23 +678,23 @@ impl<'f, 'd> Observer<'f, 'd> {
     }
 
     /// The name of the member whose key is at `key`.
-    fn name(&self, key: ByteSpan) -> &'d str {
+    fn name(&self, key: Locus) -> &'d str {
         self.tree()
             .names
             .get(&key)
             .copied()
-            .expect("a key's span is its member's")
+            .expect("a key's locus is its member's")
     }
 
-    /// What a check observed at `edges`, at the token `span`.
+    /// What a check observed at `edges`, at `locus`.
     fn observation(
         &self,
         edges: &[Edge<'_>],
-        span: ByteSpan,
+        locus: Locus,
     ) -> Result<Observation, StructuralInvariant> {
         let primary = self
             .file
-            .value_evidence(edges, span)
+            .value_evidence(edges, locus)
             .map_err(StructuralInvariant::Evidence)?;
         Ok(Observation {
             primary,
@@ -705,21 +705,21 @@ impl<'f, 'd> Observer<'f, 'd> {
     /// The root, at its token.
     fn root(&self) -> Result<Observation, StructuralInvariant> {
         let root = self.document.root();
-        self.observation(&[], self.document.node(root).span())
+        self.observation(&[], self.document.node(root).locus())
     }
 
     /// The root's `schemaVersion` member: at its value's token, or at the
     /// root's when it is missing (D15:790).
     fn version(&self) -> Result<Observation, StructuralInvariant> {
         let root = self.document.root();
-        let span = match self.document.node(root).kind() {
+        let locus = match self.document.node(root).kind() {
             NodeKind::Object(members) => members.get("schemaVersion").map_or_else(
-                || self.document.node(root).span(),
-                |member| self.document.node(member.value()).span(),
+                || self.document.node(root).locus(),
+                |member| self.document.node(member.value()).locus(),
             ),
-            _ => self.document.node(root).span(),
+            _ => self.document.node(root).locus(),
         };
-        self.observation(&[Edge::Member("schemaVersion")], span)
+        self.observation(&[Edge::Member("schemaVersion")], locus)
     }
 
     /// The analysis's measure at the root, beside the capability's bound
@@ -744,13 +744,13 @@ impl<'f, 'd> Observer<'f, 'd> {
         candidate: &Candidate,
     ) -> Result<Observation, StructuralInvariant> {
         match candidate.at {
-            At::Value(node) => self.observation(&self.path(node), self.document.node(node).span()),
+            At::Value(node) => self.observation(&self.path(node), self.document.node(node).locus()),
             At::Missing { object } => {
                 let steps = facts.steps(candidate.path);
                 let name = steps.last().expect("a missing member's path names it");
                 let mut edges: Vec<Edge<'_>> = self.path(object);
                 edges.push(Edge::Member(name.name()));
-                self.observation(&edges, self.document.node(object).span())
+                self.observation(&edges, self.document.node(object).locus())
             }
             At::Member { object, key } => {
                 let mut edges = self.path(object);

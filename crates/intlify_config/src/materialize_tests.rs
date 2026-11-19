@@ -7,8 +7,8 @@ use crate::input_limits::{
     Bound, CountRelation, InputBound, InputLimits, RawInputLimits, ValueLimits,
 };
 use crate::materialize::{
-    materialize_file, ByteSpan, Inadmissible, Incompatibility, InputFailure, MaterializedDocument,
-    NodeKind, PathStep,
+    materialize_file, ByteSpan, Inadmissible, Incompatibility, InputFailure, Locus,
+    MaterializedDocument, NodeKind, PathStep,
 };
 
 // Explicit test-owned capacity, not a product default or admitted capability.
@@ -89,6 +89,17 @@ fn member(source: &[u8], text: &[u8], nth: usize) -> PathStep {
     PathStep::Member(span_of(source, text, nth))
 }
 
+/// The byte span of `at`, a locus in a file document.
+fn bytes(at: Locus) -> ByteSpan {
+    at.bytes().expect("a file document's locus")
+}
+
+/// The bytes of `doc`'s file at `at`.
+fn raw(doc: &MaterializedDocument, at: Locus) -> &[u8] {
+    doc.raw_span(bytes(at))
+        .expect("a file document keeps its file")
+}
+
 /// The span `text` occupies in `source`, at its `nth` occurrence.
 fn span_of(source: &[u8], text: &[u8], nth: usize) -> ByteSpan {
     let start = source
@@ -122,7 +133,7 @@ fn portable_numbers_use_binary64_values_and_preserve_raw_tokens() {
             panic!("number expected");
         };
         assert_eq!(number.get().to_bits(), expected.to_bits());
-        assert_eq!(doc.raw_span(root.span()), source.as_bytes());
+        assert_eq!(raw(&doc, root.locus()), source.as_bytes());
     }
     for source in [
         "9007199254740992",
@@ -268,18 +279,18 @@ fn source_map_retains_key_value_container_and_eof_positions() {
         panic!()
     };
     assert_eq!(
-        doc.raw_span(root.span()),
+        raw(&doc, root.locus()),
         &source.as_bytes()[2..source.len() - 1]
     );
     let member = &members["日本語"];
-    assert_eq!(doc.raw_span(member.key_span()), "\"日本語\"".as_bytes());
+    assert_eq!(raw(&doc, member.key()), "\"日本語\"".as_bytes());
     let value = doc.node(member.value());
-    assert_eq!(doc.raw_span(value.span()), b"[ -0, \"\\u0061\" ]");
+    assert_eq!(raw(&doc, value.locus()), b"[ -0, \"\\u0061\" ]");
     let NodeKind::Array(items) = value.kind() else {
         panic!()
     };
-    assert_eq!(doc.raw_span(doc.node(items[0]).span()), b"-0");
-    assert_eq!(doc.raw_span(doc.node(items[1]).span()), b"\"\\u0061\"");
+    assert_eq!(raw(&doc, doc.node(items[0]).locus()), b"-0");
+    assert_eq!(raw(&doc, doc.node(items[1]).locus()), b"\"\\u0061\"");
     let NodeKind::String(text) = doc.node(items[1]).kind() else {
         panic!()
     };
@@ -298,7 +309,7 @@ fn complete_logical_counts_are_independent_of_escaping_and_member_order() {
         r#"{"a":["é",null],"b":{"a":"é"}}"#,
         r#"{"b":{"\u0061":"\u00e9"},"\u0061":["\u00e9",null]}"#,
     ] {
-        let counts = document(source).counts().value;
+        let counts = document(source).value_counts();
         assert_eq!(counts.nodes, 6);
         assert_eq!(counts.depth, 3);
         assert_eq!(counts.collection_entries, 5);
@@ -377,7 +388,7 @@ fn file_byte_and_token_limits_have_distinct_counting_domains() {
     input_limits.raw.max_file_bytes = Bound::new(u64::try_from(source.len()).unwrap()).unwrap();
     input_limits.raw.max_parser_tokens = Bound::new(9).unwrap();
     let doc = materialize_file(Arc::from(source.as_slice()), input_limits).unwrap();
-    assert_eq!(doc.counts().parser_tokens, 9);
+    assert_eq!(doc.counts().unwrap().parser_tokens, 9);
     input_limits.raw.max_parser_tokens = Bound::new(8).unwrap();
     let error = materialize_file(Arc::from(source.as_slice()), input_limits)
         .err()
@@ -437,12 +448,9 @@ fn owned_results_and_per_invocation_state_survive_failure_and_input_release() {
         let _ = failure(source);
     }
     let second = document("null");
-    assert_eq!(second.counts().value.nodes, 1);
-    assert_eq!(second.counts().parser_tokens, 1);
-    assert_eq!(
-        doc.raw_span(doc.node(doc.root()).span()),
-        br#"{"x":"first"}"#
-    );
+    assert_eq!(second.value_counts().nodes, 1);
+    assert_eq!(second.counts().unwrap().parser_tokens, 1);
+    assert_eq!(raw(&doc, doc.node(doc.root()).locus()), br#"{"x":"first"}"#);
 }
 
 #[test]
@@ -450,7 +458,7 @@ fn deeply_nested_input_and_failure_cleanup_do_not_recurse_on_the_rust_stack() {
     let depth = 20_000;
     let source = format!("{}null{}", "[".repeat(depth), "]".repeat(depth));
     let doc = document(&source);
-    assert_eq!(doc.counts().value.depth, u64::try_from(depth + 1).unwrap());
+    assert_eq!(doc.value_counts().depth, u64::try_from(depth + 1).unwrap());
     drop(doc);
     let invalid = format!("{}null", "[".repeat(depth));
     assert!(matches!(
@@ -489,13 +497,13 @@ fn assert_document_matches(doc: &MaterializedDocument, expected: &serde_json::Va
             (NodeKind::Object(members), Value::Object(expected)) => {
                 assert_eq!(members.len(), expected.len());
                 for (name, member) in members {
-                    let key: String =
-                        serde_json::from_slice(doc.raw_span(member.key_span())).unwrap();
+                    let key: String = serde_json::from_slice(raw(doc, member.key())).unwrap();
                     assert_eq!(&key, name);
-                    let value_span = doc.node(member.value()).span();
-                    assert!(member.key_span().start_byte() > node.span().start_byte());
-                    assert!(member.key_span().end_byte() < value_span.start_byte());
-                    assert!(value_span.end_byte() < node.span().end_byte());
+                    let (object, key) = (bytes(node.locus()), bytes(member.key()));
+                    let value = bytes(doc.node(member.value()).locus());
+                    assert!(key.start_byte() > object.start_byte());
+                    assert!(key.end_byte() < value.start_byte());
+                    assert!(value.end_byte() < object.end_byte());
                     pending.push((member.value(), &expected[name]));
                 }
             }
@@ -533,10 +541,10 @@ fn materialized_values_match_independent_decoder_over_finite_generated_corpus() 
             let pretty_doc = document(&pretty);
             assert_document_matches(&compact_doc, &value);
             assert_document_matches(&pretty_doc, &value);
-            assert_eq!(compact_doc.counts().value, pretty_doc.counts().value);
+            assert_eq!(compact_doc.value_counts(), pretty_doc.value_counts());
             assert_eq!(
-                compact_doc.counts().parser_tokens,
-                pretty_doc.counts().parser_tokens
+                compact_doc.counts().unwrap().parser_tokens,
+                pretty_doc.counts().unwrap().parser_tokens
             );
         }
     }
@@ -565,7 +573,7 @@ fn escaped_scalar_lengths_match_owned_decoding_at_unicode_boundaries() {
         };
         assert_eq!(actual, expected);
         assert_eq!(
-            doc.counts().value.total_string_bytes,
+            doc.value_counts().total_string_bytes,
             u64::try_from(expected.len()).unwrap()
         );
     }
@@ -648,7 +656,7 @@ fn deep_object_indexes_also_cleanup_without_recursive_value_destruction() {
     let depth = 10_000;
     let source = format!("{}null{}", "{\"x\":".repeat(depth), "}".repeat(depth));
     let doc = document(&source);
-    assert_eq!(doc.counts().value.depth, u64::try_from(depth + 1).unwrap());
+    assert_eq!(doc.value_counts().depth, u64::try_from(depth + 1).unwrap());
     drop(doc);
     let invalid = format!("{}null", "{\"x\":".repeat(depth));
     assert!(matches!(

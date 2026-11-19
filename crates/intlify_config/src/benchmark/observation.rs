@@ -14,8 +14,8 @@ use serde_json::Value;
 
 use crate::input_limits::{CountRelation, InputBound, LimitViolation, ValueCounts};
 use crate::materialize::{
-    ByteSpan, Incompatibility, InputFailure, MaterializationError, MaterializedDocument, NodeId,
-    NodeKind, ObjectMember, PathId, PathStep, Paths,
+    ByteSpan, Incompatibility, InputFailure, Locus, MaterializationError, MaterializedDocument,
+    NodeId, NodeKind, ObjectMember, PathId, PathStep, Paths,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -140,6 +140,10 @@ impl Frame {
             self.span(span);
         }
     }
+    /// A locus in a file document, as its token's byte span.
+    pub(crate) fn locus(&mut self, at: Locus) {
+        self.span(at.bytes().expect("the benchmark observes file documents"));
+    }
     pub(crate) fn value_counts(&mut self, counts: ValueCounts) {
         self.uint(counts.nodes);
         self.uint(counts.depth);
@@ -208,7 +212,7 @@ pub(crate) fn document(doc: &MaterializedDocument) -> Observation {
     let mut pending = vec![doc.root()];
     while let Some(id) = pending.pop() {
         let node = doc.node(id);
-        entry.span(node.span());
+        entry.locus(node.locus());
         match node.kind() {
             NodeKind::Null => shared.uint(0),
             NodeKind::Boolean(value) => {
@@ -233,19 +237,20 @@ pub(crate) fn document(doc: &MaterializedDocument) -> Observation {
                 shared.uint(u64::try_from(items.len()).expect("bounded map"));
                 for (name, member) in items {
                     shared.text(name);
-                    entry.span(member.key_span());
+                    entry.locus(member.key());
                 }
                 pending.extend(items.values().rev().map(ObjectMember::value));
             }
         }
     }
-    let counts = doc.counts();
-    shared.value_counts(counts.value);
+    shared.value_counts(doc.value_counts());
+    let counts = doc.counts().expect("the benchmark observes file documents");
     entry.uint(counts.file_bytes);
     entry.uint(counts.parser_tokens);
     // The successful materializer retains unchanged source. Fixture-only entry
     // observation covers that output too, separately from normalized value identity.
-    entry.bytes(doc.raw_span(ByteSpan::new(0, counts.file_bytes)));
+    let source = doc.raw_span(ByteSpan::new(0, counts.file_bytes));
+    entry.bytes(source.expect("a file document keeps its file"));
     Observation {
         shared: shared.finish(),
         entry: Some(entry.finish()),

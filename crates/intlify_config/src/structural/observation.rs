@@ -47,7 +47,7 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
     }
 
     pub(crate) fn benchmark_input_counts(&self) -> InputCounts {
-        self.doc.counts()
+        self.doc.counts().expect("the benchmark analyzes files")
     }
 
     pub(crate) fn benchmark_profile_counts(&self) -> Option<(u64, u64)> {
@@ -100,7 +100,7 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
                     shared.uint(actual);
                 }
             }
-            entry.span(issue.span);
+            entry.locus(issue.locus);
         }
         shared.flag(self.evaluation.is_some());
         if let Some(evaluation) = &self.evaluation {
@@ -157,7 +157,7 @@ fn observe_issues(
         if let Some(field) = &issue.missing_field {
             shared.text(field);
         }
-        entry.span(issue.span);
+        entry.locus(issue.locus);
         observe_issues(&issue.alternatives, locations, order, shared, entry);
     }
 }

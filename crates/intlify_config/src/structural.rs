@@ -15,7 +15,7 @@ use serde::de::{value::BorrowedStrDeserializer, DeserializeOwned};
 use serde::Deserialize;
 
 use crate::input_limits::{Bound, ValueCounts};
-use crate::materialize::{ByteSpan, DecodeError, MaterializedDocument, NodeId, NodeKind};
+use crate::materialize::{DecodeError, Locus, MaterializedDocument, NodeId, NodeKind};
 use crate::model::{valid_identity, IntlifyConfig, ProfileDeclaration, ProfileId};
 use eval::{EvaluationFailure, FragmentState, SchemaEvaluation};
 pub(crate) use place::{Edge, Place};
@@ -57,7 +57,7 @@ pub(crate) enum StructuralFailure {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct AdmissionIssue {
     pub(crate) reason: StructuralFailure,
-    pub(crate) span: ByteSpan,
+    pub(crate) locus: Locus,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -192,7 +192,7 @@ impl<Policy, Target> AuthoringSchema<Policy, Target> {
             Err(EvaluationFailure::WorkLimit { limit, actual }) => {
                 result.issues.push(AdmissionIssue {
                     reason: StructuralFailure::StructuralWorkLimit { limit, actual },
-                    span: result.doc.node(result.doc.root()).span(),
+                    locus: result.doc.node(result.doc.root()).locus(),
                 });
             }
             Err(EvaluationFailure::AccountingOverflow | EvaluationFailure::AccountingMismatch) => {
@@ -298,7 +298,7 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
     }
     /// The materialized root's value counts, which Phase 4 rechecks.
     pub(crate) fn value_counts(&self) -> ValueCounts {
-        self.doc.counts().value
+        self.doc.value_counts()
     }
     pub(crate) const fn version_selected(&self) -> bool {
         self.selected_version
@@ -317,14 +317,14 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
         let NodeKind::Object(fields) = root.kind() else {
             self.issues.push(AdmissionIssue {
                 reason: StructuralFailure::RootTypeInvalid,
-                span: root.span(),
+                locus: root.locus(),
             });
             return;
         };
         let Some(version) = fields.get("schemaVersion") else {
             self.issues.push(AdmissionIssue {
                 reason: StructuralFailure::SchemaVersionMissing,
-                span: root.span(),
+                locus: root.locus(),
             });
             return;
         };
@@ -335,11 +335,11 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
             }
             NodeKind::String(_) => self.issues.push(AdmissionIssue {
                 reason: StructuralFailure::SchemaVersionUnsupported,
-                span: value.span(),
+                locus: value.locus(),
             }),
             _ => self.issues.push(AdmissionIssue {
                 reason: StructuralFailure::SchemaVersionTypeInvalid,
-                span: value.span(),
+                locus: value.locus(),
             }),
         }
     }

@@ -35,7 +35,7 @@ use std::sync::Arc;
 
 use crate::input_limits::{CountRelation, InputBound, InputLimits, LimitViolation};
 use crate::materialize::{
-    materialize_file, member_name, ByteSpan, Inadmissible, Incompatibility, InputFailure,
+    materialize_file, member_name, ByteSpan, Inadmissible, Incompatibility, InputFailure, Locus,
     MaterializedDocument, PathStep,
 };
 use crate::structural::Edge;
@@ -136,8 +136,8 @@ pub(crate) const SELECTOR_ORIGIN: SafeOriginKind = SafeOriginKind::ProfileSelect
 
 impl EntryFile<'_> {
     /// Materialized Value Evidence in the file: the value at the internal
-    /// path `edges` from the root, each member classified, at the token
-    /// `span` (D15:776, 790).
+    /// path `edges` from the root, each member classified, with the span of
+    /// its token at `locus` when the locus has one (D15:776, 790).
     ///
     /// # Errors
     ///
@@ -145,9 +145,9 @@ impl EntryFile<'_> {
     pub(crate) fn value_evidence(
         &self,
         edges: &[Edge<'_>],
-        span: ByteSpan,
+        locus: Locus,
     ) -> Result<EvidenceProjection, EvidenceInvariant> {
-        self.value_evidence_after(edges, span, None)
+        self.value_evidence_after(edges, locus, None)
     }
 
     /// The same, in a record constructed once `specification-admission`
@@ -159,11 +159,13 @@ impl EntryFile<'_> {
     pub(crate) fn value_evidence_after(
         &self,
         edges: &[Edge<'_>],
-        span: ByteSpan,
+        locus: Locus,
         locales: Option<&dyn LocaleKeys>,
     ) -> Result<EvidenceProjection, EvidenceInvariant> {
         let steps = (self.classify)(edges, locales);
-        let span = SourceSpan::admit(span.start_byte(), span.end_byte(), &self.bytes);
+        let span = locus
+            .bytes()
+            .and_then(|span| SourceSpan::admit(span.start_byte(), span.end_byte(), &self.bytes));
         EvidenceProjection::configuration_value(
             SafeOriginKind::ConfigurationFile,
             self.source,

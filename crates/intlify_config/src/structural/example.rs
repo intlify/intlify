@@ -150,7 +150,7 @@ fn pointer_span(doc: &MaterializedDocument, pointer: &str, key: bool) -> Option<
             NodeKind::Object(members) => {
                 let member = members.get(&name)?;
                 if key && tokens.peek().is_none() {
-                    return Some(member.key_span());
+                    return member.key().bytes();
                 }
                 member.value()
             }
@@ -158,7 +158,7 @@ fn pointer_span(doc: &MaterializedDocument, pointer: &str, key: bool) -> Option<
             _ => return None,
         };
     }
-    Some(doc.node(node).span())
+    doc.node(node).locus().bytes()
 }
 
 /// What the pointer of the spelling at `location` names. A JSON Pointer
@@ -343,7 +343,7 @@ pub fn resolve(source: &[u8], selector: Option<&str>) -> Result<Value, String> {
                         None,
                     ),
                     source,
-                    Some(issue.span),
+                    issue.locus.bytes(),
                 )
             })
             .collect::<Vec<_>>();
@@ -355,7 +355,7 @@ pub fn resolve(source: &[u8], selector: Option<&str>) -> Result<Value, String> {
                     IssueKind::TypeInvalid => ("TypeInvalid", "Value has the wrong type for this configuration field.".to_owned()),
                     IssueKind::ValueInvalid => ("ValueInvalid", "Value does not satisfy the configuration schema. Check the generated schema for this field.".to_owned()),
                 };
-                located(diagnostic(code, message, None), source, Some(issue.span))
+                located(diagnostic(code, message, None), source, issue.locus.bytes())
             }));
         }
         output["diagnostics"] = json!(errors);

@@ -12,7 +12,7 @@ use serde::de::{value::BorrowedStrDeserializer, DeserializeOwned};
 use serde::Deserialize;
 
 use crate::input_limits::Bound;
-use crate::materialize::{ByteSpan, DecodeError, NodeKind};
+use crate::materialize::{DecodeError, Locus, NodeKind};
 use crate::model::{valid_identity, ProfileId};
 
 use super::{AdmissionInvariant, FragmentState, StructuralAnalysis};
@@ -243,7 +243,7 @@ pub(crate) enum SelectionInvariant {
 pub(crate) struct ProvisionalSelection<Policy> {
     id: ProfileId,
     resource_limits: Policy,
-    declaration_key_span: ByteSpan,
+    declaration_key: Locus,
 }
 
 impl<Policy> ProvisionalSelection<Policy> {
@@ -253,8 +253,9 @@ impl<Policy> ProvisionalSelection<Policy> {
     pub(crate) const fn resource_limits(&self) -> &Policy {
         &self.resource_limits
     }
-    pub(crate) const fn declaration_key_span(&self) -> ByteSpan {
-        self.declaration_key_span
+    /// Where the selected declaration's key is.
+    pub(crate) const fn declaration_key(&self) -> Locus {
+        self.declaration_key
     }
 }
 
@@ -375,7 +376,7 @@ impl<Policy: DeserializeOwned, Target> StructuralAnalysis<Policy, Target> {
         Ok(Selection::Selected(ProvisionalSelection {
             id,
             resource_limits,
-            declaration_key_span: member.key_span(),
+            declaration_key: member.key(),
         }))
     }
 }
