@@ -1305,7 +1305,8 @@ const role = (name, rank) => ({ role: name, rank: String(rank) })
  * members, the canonicalization data's root, and the artifact collection's
  * root and members, each member with an admitted key and then a redacted
  * one; the verification input's `pins`; and every `policyComparable` bound
- * with the `bootstrapOnly` bounds of `rawInput` and `artifactBootstrap`.
+ * with the `bootstrapOnly` bounds of `rawInput`, `snapshot`, and
+ * `artifactBootstrap`.
  * The `diagnostics` groups share one parent role, ranked where the first of
  * them stands.
  *
@@ -1349,7 +1350,7 @@ function reachablePaths(kind) {
         }))
       })
       const bootstrap = BOOTSTRAP_GROUPS.flatMap(([path, bounds], group) =>
-        ['rawInput', 'artifactBootstrap'].includes(path)
+        ['rawInput', 'snapshot', 'artifactBootstrap'].includes(path)
           ? bounds.map(([name], rank) => ({
               origin,
               roles: [role('bootstrapOnly', 1), role(path, group), role(name, rank)]

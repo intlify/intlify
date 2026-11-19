@@ -25,7 +25,8 @@
 //! ranks, and the key that ends it, as the Resolver Input Component Path
 //! builds them. No Finding reaches the verification `mode` role, the root of
 //! the Specification Input, the verification input, or the capability, or a
-//! `bootstrapOnly` group other than `rawInput` and `artifactBootstrap`.
+//! `bootstrapOnly` group other than `rawInput`, `snapshot`, and
+//! `artifactBootstrap`.
 //!
 //! Construction reads the policies with the registry cross-references (row
 //! 41): one for each evidence kind, in 015's order, whose members and
@@ -492,7 +493,9 @@ fn reachable_paths(kind: EvidenceKind) -> Vec<PathShape> {
                 CapabilityBound::PolicyComparable(_) => true,
                 CapabilityBound::BootstrapOnly(id) => matches!(
                     id.group,
-                    BootstrapGroup::RawInput | BootstrapGroup::ArtifactBootstrap
+                    BootstrapGroup::RawInput
+                        | BootstrapGroup::Snapshot
+                        | BootstrapGroup::ArtifactBootstrap
                 ),
             })
             .filter_map(|(bound, _)| ComponentPath::capability(bound).ok())
@@ -800,7 +803,7 @@ mod tests {
         assert_eq!(verification.len(), 1);
         assert_eq!(roles(&verification[0]), [("pins", "1")]);
         let capability = shapes(EvidenceKind::ImplementationCapability);
-        assert_eq!(capability.len(), 52 + 2 + 4);
+        assert_eq!(capability.len(), 52 + 2 + 9 + 4);
         assert!(capability
             .iter()
             .all(|shape| !shape.roles.is_empty() && shape.key.is_none()));
@@ -814,6 +817,15 @@ mod tests {
             [
                 "rawInput",
                 "rawInput",
+                "snapshot",
+                "snapshot",
+                "snapshot",
+                "snapshot",
+                "snapshot",
+                "snapshot",
+                "snapshot",
+                "snapshot",
+                "snapshot",
                 "artifactBootstrap",
                 "artifactBootstrap",
                 "artifactBootstrap",

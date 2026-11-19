@@ -166,6 +166,348 @@
       }
     },
     {
+      "checkId": "entry.input.within-snapshot-nodes",
+      "phaseId": "entry-admission",
+      "ruleId": "015.entry.input.within-snapshot-nodes",
+      "subjectKind": "complete-input",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "complete-input",
+      "subjectKindRank": "1",
+      "checkRank": "2",
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "entry-finding",
+        "entry-evaluation-status",
+        "finding-occurrence",
+        "evidence-index",
+        "shared-unavailability-cause"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "entry.input.within-snapshot-depth",
+      "phaseId": "entry-admission",
+      "ruleId": "015.entry.input.within-snapshot-depth",
+      "subjectKind": "complete-input",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "complete-input",
+      "subjectKindRank": "1",
+      "checkRank": "3",
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "entry-finding",
+        "entry-evaluation-status",
+        "finding-occurrence",
+        "evidence-index",
+        "shared-unavailability-cause"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "entry.input.within-snapshot-collection-entries",
+      "phaseId": "entry-admission",
+      "ruleId": "015.entry.input.within-snapshot-collection-entries",
+      "subjectKind": "complete-input",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "complete-input",
+      "subjectKindRank": "1",
+      "checkRank": "4",
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "entry-finding",
+        "entry-evaluation-status",
+        "finding-occurrence",
+        "evidence-index",
+        "shared-unavailability-cause"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "entry.input.within-snapshot-total-string-bytes",
+      "phaseId": "entry-admission",
+      "ruleId": "015.entry.input.within-snapshot-total-string-bytes",
+      "subjectKind": "complete-input",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "complete-input",
+      "subjectKindRank": "1",
+      "checkRank": "5",
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "entry-finding",
+        "entry-evaluation-status",
+        "finding-occurrence",
+        "evidence-index",
+        "shared-unavailability-cause"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "entry.input.within-snapshot-single-string-bytes",
+      "phaseId": "entry-admission",
+      "ruleId": "015.entry.input.within-snapshot-single-string-bytes",
+      "subjectKind": "complete-input",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "complete-input",
+      "subjectKindRank": "1",
+      "checkRank": "6",
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "entry-finding",
+        "entry-evaluation-status",
+        "finding-occurrence",
+        "evidence-index",
+        "shared-unavailability-cause"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "entry.input.within-snapshot-rejected-markers",
+      "phaseId": "entry-admission",
+      "ruleId": "015.entry.input.within-snapshot-rejected-markers",
+      "subjectKind": "complete-input",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "complete-input",
+      "subjectKindRank": "1",
+      "checkRank": "7",
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "entry-finding",
+        "entry-evaluation-status",
+        "finding-occurrence",
+        "evidence-index",
+        "shared-unavailability-cause"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "entry.input.within-snapshot-envelope-canonical-bytes",
+      "phaseId": "entry-admission",
+      "ruleId": "015.entry.input.within-snapshot-envelope-canonical-bytes",
+      "subjectKind": "complete-input",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "complete-input",
+      "subjectKindRank": "1",
+      "checkRank": "8",
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "entry-finding",
+        "entry-evaluation-status",
+        "finding-occurrence",
+        "evidence-index",
+        "shared-unavailability-cause"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "entry.input.within-snapshot-single-marker-canonical-bytes",
+      "phaseId": "entry-admission",
+      "ruleId": "015.entry.input.within-snapshot-single-marker-canonical-bytes",
+      "subjectKind": "complete-input",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "complete-input",
+      "subjectKindRank": "1",
+      "checkRank": "9",
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "entry-finding",
+        "entry-evaluation-status",
+        "finding-occurrence",
+        "evidence-index",
+        "shared-unavailability-cause"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "entry.input.within-snapshot-traversal-units",
+      "phaseId": "entry-admission",
+      "ruleId": "015.entry.input.within-snapshot-traversal-units",
+      "subjectKind": "complete-input",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "complete-input",
+      "subjectKindRank": "1",
+      "checkRank": "10",
+      "prerequisiteCheckIds": [],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "entry-finding",
+        "entry-evaluation-status",
+        "finding-occurrence",
+        "evidence-index",
+        "shared-unavailability-cause"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
       "checkId": "entry.input.well-formed-json",
       "phaseId": "entry-admission",
       "ruleId": "015.entry.input.well-formed-json",
@@ -174,7 +516,7 @@
       "subjectContentProjection": "none",
       "owningScope": "complete-input",
       "subjectKindRank": "1",
-      "checkRank": "2",
+      "checkRank": "11",
       "prerequisiteCheckIds": [
         "entry.input.within-parser-tokens"
       ],
@@ -209,7 +551,7 @@
       "subjectContentProjection": "none",
       "owningScope": "complete-input",
       "subjectKindRank": "1",
-      "checkRank": "3",
+      "checkRank": "12",
       "prerequisiteCheckIds": [
         "entry.input.well-formed-json"
       ],
@@ -244,8 +586,17 @@
       "subjectContentProjection": "none",
       "owningScope": "complete-input",
       "subjectKindRank": "1",
-      "checkRank": "4",
+      "checkRank": "13",
       "prerequisiteCheckIds": [
+        "entry.input.within-snapshot-nodes",
+        "entry.input.within-snapshot-depth",
+        "entry.input.within-snapshot-collection-entries",
+        "entry.input.within-snapshot-total-string-bytes",
+        "entry.input.within-snapshot-single-string-bytes",
+        "entry.input.within-snapshot-rejected-markers",
+        "entry.input.within-snapshot-envelope-canonical-bytes",
+        "entry.input.within-snapshot-single-marker-canonical-bytes",
+        "entry.input.within-snapshot-traversal-units",
         "entry.input.well-formed-json"
       ],
       "possibleFindingCodes": [
@@ -291,7 +642,7 @@
       "subjectContentProjection": "none",
       "owningScope": "complete-input",
       "subjectKindRank": "1",
-      "checkRank": "5",
+      "checkRank": "14",
       "prerequisiteCheckIds": [
         "entry.input.unique-members",
         "entry.input.json-compatible"
@@ -334,7 +685,7 @@
       "subjectContentProjection": "none",
       "owningScope": "complete-input",
       "subjectKindRank": "1",
-      "checkRank": "6",
+      "checkRank": "15",
       "prerequisiteCheckIds": [
         "entry.input.unique-members",
         "entry.input.json-compatible"
@@ -377,7 +728,7 @@
       "subjectContentProjection": "none",
       "owningScope": "complete-input",
       "subjectKindRank": "1",
-      "checkRank": "7",
+      "checkRank": "16",
       "prerequisiteCheckIds": [
         "entry.input.unique-members",
         "entry.input.json-compatible"
@@ -420,7 +771,7 @@
       "subjectContentProjection": "none",
       "owningScope": "complete-input",
       "subjectKindRank": "1",
-      "checkRank": "8",
+      "checkRank": "17",
       "prerequisiteCheckIds": [
         "entry.input.unique-members",
         "entry.input.json-compatible"
@@ -463,7 +814,7 @@
       "subjectContentProjection": "none",
       "owningScope": "complete-input",
       "subjectKindRank": "1",
-      "checkRank": "9",
+      "checkRank": "18",
       "prerequisiteCheckIds": [
         "entry.input.unique-members",
         "entry.input.json-compatible"

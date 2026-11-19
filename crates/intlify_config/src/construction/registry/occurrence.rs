@@ -320,6 +320,25 @@ const fn raw(
     }
 }
 
+/// A pair of a Snapshot-bound check, whose Entry Source Evidence comes only
+/// through a Programmatic Entry Snapshot (Decision 015-202).
+const fn snapshot(
+    check: &'static str,
+    code: Code,
+    primary: EvidenceKind,
+    related: &'static [EvidenceKind],
+    shapes: &'static [Shape],
+) -> Pair {
+    Pair {
+        check,
+        code,
+        primary: Some(primary),
+        related,
+        entry: &[SafeOriginKind::ConfigurationProgrammatic],
+        shapes,
+    }
+}
+
 /// The pair of the terminal reporting Finding, which has no occurrence.
 const fn none(check: &'static str, code: Code) -> Pair {
     Pair {
@@ -334,7 +353,7 @@ const fn none(check: &'static str, code: Code) -> Pair {
 
 /// Every (check, code) pair of the Check Registry, in its order.
 #[rustfmt::skip]
-const PAIRS: [Pair; 180] = {
+const PAIRS: [Pair; 189] = {
     use Code as C;
     use Shape as S;
     [
@@ -344,6 +363,15 @@ const PAIRS: [Pair; 180] = {
         // entry-admission
         raw("entry.input.within-file-bytes", C::BootstrapLimitExceeded, ES, &[IC], &[S::Bound("bootstrapOnly.rawInput.maxFileBytes")]),
         raw("entry.input.within-parser-tokens", C::BootstrapLimitExceeded, ES, &[IC], &[S::Bound("bootstrapOnly.rawInput.maxParserTokens")]),
+        snapshot("entry.input.within-snapshot-nodes", C::BootstrapLimitExceeded, ES, &[IC], &[S::Bound("bootstrapOnly.snapshot.maxNodes")]),
+        snapshot("entry.input.within-snapshot-depth", C::BootstrapLimitExceeded, ES, &[IC], &[S::Bound("bootstrapOnly.snapshot.maxDepth")]),
+        snapshot("entry.input.within-snapshot-collection-entries", C::BootstrapLimitExceeded, ES, &[IC], &[S::Bound("bootstrapOnly.snapshot.maxCollectionEntries")]),
+        snapshot("entry.input.within-snapshot-total-string-bytes", C::BootstrapLimitExceeded, ES, &[IC], &[S::Bound("bootstrapOnly.snapshot.maxTotalStringBytes")]),
+        snapshot("entry.input.within-snapshot-single-string-bytes", C::BootstrapLimitExceeded, ES, &[IC], &[S::Bound("bootstrapOnly.snapshot.maxSingleStringBytes")]),
+        snapshot("entry.input.within-snapshot-rejected-markers", C::BootstrapLimitExceeded, ES, &[IC], &[S::Bound("bootstrapOnly.snapshot.maxRejectedMarkers")]),
+        snapshot("entry.input.within-snapshot-envelope-canonical-bytes", C::BootstrapLimitExceeded, ES, &[IC], &[S::Bound("bootstrapOnly.snapshot.maxEnvelopeCanonicalBytes")]),
+        snapshot("entry.input.within-snapshot-single-marker-canonical-bytes", C::BootstrapLimitExceeded, ES, &[IC], &[S::Bound("bootstrapOnly.snapshot.maxSingleMarkerCanonicalBytes")]),
+        snapshot("entry.input.within-snapshot-traversal-units", C::BootstrapLimitExceeded, ES, &[IC], &[S::Bound("bootstrapOnly.snapshot.maxTraversalUnits")]),
         raw("entry.input.well-formed-json", C::JsonInvalid, ES, &[], &[]),
         raw("entry.input.unique-members", C::JsonMemberDuplicate, ES, &[ES], &[]),
         pair("entry.input.json-compatible", C::InputNotJsonCompatible, ES, &[], &[]),
@@ -1004,11 +1032,9 @@ mod tests {
                 .origins
                 .clone()
         };
-        // Only raw-file checks report it with Entry Source Evidence.
-        assert_eq!(
-            origins_of(&bootstrap, ES),
-            [SafeOriginKind::ConfigurationFile]
-        );
+        // Only the raw-file and Snapshot-bound checks report it with Entry
+        // Source Evidence, each through its own entry path.
+        assert_eq!(origins_of(&bootstrap, ES), CONFIGURATION);
         let paths_of = |row: &FindingRow, kind: EvidenceKind| -> Vec<PathShape> {
             row.evidence_disclosure_policies
                 .iter()
@@ -1017,7 +1043,7 @@ mod tests {
                 .paths
                 .clone()
         };
-        assert_eq!(paths_of(&bootstrap, IC).len(), 2 + 4);
+        assert_eq!(paths_of(&bootstrap, IC).len(), 2 + 9 + 4);
         let limits = row(Code::ResourceLimitExceeded);
         assert_eq!(kinds(&limits), [ES, CV, PS, AI, IC]);
         assert_eq!(origins_of(&limits, ES), CONFIGURATION);
@@ -1069,7 +1095,7 @@ mod tests {
             .map(|shape| serde_json::to_string(shape).unwrap())
             .collect();
         assert_eq!(carried, pinned);
-        assert_eq!(pinned.len(), 74);
+        assert_eq!(pinned.len(), 83);
         assert!(are_reachable(&registry.rows, &registry.policies));
     }
 

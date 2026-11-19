@@ -553,6 +553,7 @@ mod tests {
         Status, Unit,
     };
     use crate::resolver::limits::{fixture_limits, Group};
+    use crate::resolver::subject::{EntryPath, SubjectKind};
 
     use serde_json::{json, Value};
 
@@ -673,12 +674,15 @@ mod tests {
             .statuses()
             .map(|(unit, _)| unit.clone())
             .collect();
+        let recorded: Vec<Unit> = SubjectKind::CompleteInput
+            .checks()
+            .iter()
+            .filter(|check| check.recorded_for(EntryPath::File))
+            .map(|&check| input(check))
+            .collect();
         assert_eq!(units.len(), 11);
         assert_eq!(units[0], OWNER);
-        assert!(units[1..]
-            .iter()
-            .zip(crate::resolver::subject::SubjectKind::CompleteInput.checks())
-            .all(|(unit, &check)| *unit == input(check)));
+        assert_eq!(units[1..], recorded);
         assert!(statuses(&evaluation).values().all(Option::is_none));
     }
 
@@ -747,13 +751,17 @@ mod tests {
         );
     }
 
-    /// A document exists only when every check admits it: a check a test
-    /// makes block holds the document back as a failure that strict file
-    /// entry found would (D15:2369).
+    /// A document exists only when every check a file records admits it: a
+    /// check a test makes block holds the document back as a failure that
+    /// strict file entry found would (D15:2369; Decision 015-202).
     #[test]
     fn a_document_needs_every_check_to_admit_it() {
         let fixture = FileFixture::new(&fixture_limits(100));
-        for &check in crate::resolver::subject::SubjectKind::CompleteInput.checks() {
+        for &check in SubjectKind::CompleteInput
+            .checks()
+            .iter()
+            .filter(|check| check.recorded_for(EntryPath::File))
+        {
             let mut evaluation = Evaluation::blocking(input(check));
             let file = fixture.file(Arc::from(&br#"{"a":1}"#[..]));
             let admitted = admit_entry(&mut evaluation, &file, limits()).unwrap();

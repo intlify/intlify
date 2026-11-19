@@ -153,7 +153,7 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:b292e136441a2390f05f04f3ad62e00b6c60185781820ecb5672813706e285c8";
+    "sha256:65af97897193eddc6be19fdb46680eb659d9bc528c4189ed4688f32c7a181eb3";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
@@ -888,6 +888,15 @@ const fn check_ids(kind: SubjectKind) -> &'static [&'static str] {
         K::CompleteInput => &[
             "entry.input.within-file-bytes",
             "entry.input.within-parser-tokens",
+            "entry.input.within-snapshot-nodes",
+            "entry.input.within-snapshot-depth",
+            "entry.input.within-snapshot-collection-entries",
+            "entry.input.within-snapshot-total-string-bytes",
+            "entry.input.within-snapshot-single-string-bytes",
+            "entry.input.within-snapshot-rejected-markers",
+            "entry.input.within-snapshot-envelope-canonical-bytes",
+            "entry.input.within-snapshot-single-marker-canonical-bytes",
+            "entry.input.within-snapshot-traversal-units",
             "entry.input.well-formed-json",
             "entry.input.unique-members",
             "entry.input.json-compatible",
@@ -1108,6 +1117,21 @@ const NOT_YET: &[&str] = &[];
 /// duplicate members or values outside the JSON-compatible domain.
 const MATERIALIZABLE: &[&str] = &["entry.input.unique-members", "entry.input.json-compatible"];
 
+/// What the JSON-compatible domain waits on: a Snapshot within its nine
+/// bounds, or a file of strict JSON.
+const DECODED: &[&str] = &[
+    "entry.input.within-snapshot-nodes",
+    "entry.input.within-snapshot-depth",
+    "entry.input.within-snapshot-collection-entries",
+    "entry.input.within-snapshot-total-string-bytes",
+    "entry.input.within-snapshot-single-string-bytes",
+    "entry.input.within-snapshot-rejected-markers",
+    "entry.input.within-snapshot-envelope-canonical-bytes",
+    "entry.input.within-snapshot-single-marker-canonical-bytes",
+    "entry.input.within-snapshot-traversal-units",
+    "entry.input.well-formed-json",
+];
+
 /// What a check under the admitted Resource Limit Policy waits on: every
 /// Policy recheck, in row order (D15:1677).
 const CONFIRMED_POLICY: &[&str] = &[
@@ -1262,16 +1286,29 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
             &["structural.group.field-type"],
         ],
         // The parser's tokens wait on the file's bytes and strict JSON on the
-        // tokens; duplicate members and the JSON-compatible domain need a
-        // syntactically parsed file, and the root-value bounds measure the
-        // root that entry materializes, so they wait on both (D15:802, 1794,
-        // 1795, 1876, 2289).
+        // tokens; duplicate members need a syntactically parsed file, the
+        // JSON-compatible domain a parsed file or a Snapshot within its
+        // bounds, which read the admitted Snapshot alone, and the root-value
+        // bounds measure the root that entry materializes, so they wait on
+        // both (D15:802, 869, 1794-1804, 1876, 2289). A unit waits only on the
+        // checks its entry path records (Decision 015-202), and the
+        // JSON-compatible domain's pass alone needs the Snapshot's bounds
+        // (plan 025 decision #266).
         K::CompleteInput => &[
             NONE,
             &["entry.input.within-file-bytes"],
+            NONE,
+            NONE,
+            NONE,
+            NONE,
+            NONE,
+            NONE,
+            NONE,
+            NONE,
+            NONE,
             &["entry.input.within-parser-tokens"],
             &["entry.input.well-formed-json"],
-            &["entry.input.well-formed-json"],
+            DECODED,
             MATERIALIZABLE,
             MATERIALIZABLE,
             MATERIALIZABLE,
@@ -1650,6 +1687,15 @@ const fn finding_codes(kind: SubjectKind) -> &'static [&'static [Code]] {
         | K::TargetsDependency
         | K::DeploymentGroupsDependency => &[NO_FINDING],
         K::CompleteInput => &[
+            &[C::BootstrapLimitExceeded],
+            &[C::BootstrapLimitExceeded],
+            &[C::BootstrapLimitExceeded],
+            &[C::BootstrapLimitExceeded],
+            &[C::BootstrapLimitExceeded],
+            &[C::BootstrapLimitExceeded],
+            &[C::BootstrapLimitExceeded],
+            &[C::BootstrapLimitExceeded],
+            &[C::BootstrapLimitExceeded],
             &[C::BootstrapLimitExceeded],
             &[C::BootstrapLimitExceeded],
             &[C::JsonInvalid],
@@ -2296,6 +2342,7 @@ mod tests {
     use super::*;
     use crate::construction::admission::{ConstructionAdmission, DRAFT_7};
     use crate::construction::validator::schema::Schema;
+    use crate::snapshot::SnapshotBound;
 
     fn registry() -> CheckRegistry {
         CheckRegistry::revision_zero()
@@ -2333,7 +2380,7 @@ mod tests {
             .map(|row| (row.subject_kind, row.check_id.as_str()))
             .collect();
         assert_eq!(written, listed);
-        assert_eq!(rows.len(), 169);
+        assert_eq!(rows.len(), 178);
         for kind in SubjectKind::ALL {
             assert_eq!(check_ids(kind).len(), kind.checks().len(), "{kind:?}");
         }
@@ -2681,8 +2728,24 @@ mod tests {
         );
         assert_eq!(
             prerequisites(K::CompleteInput, Check::JsonCompatible),
-            ["entry.input.well-formed-json"]
+            DECODED
         );
+        // The nine Snapshot checks follow the raw file's in the bounds' table
+        // order, each named by its bound without `max`, in kebab case.
+        for bound in SnapshotBound::ALL {
+            let name = bound.id().name.strip_prefix("max").unwrap();
+            let mut kebab = String::new();
+            for letter in name.chars() {
+                if letter.is_ascii_uppercase() && !kebab.is_empty() {
+                    kebab.push('-');
+                }
+                kebab.push(letter.to_ascii_lowercase());
+            }
+            let id = format!("entry.input.within-snapshot-{kebab}");
+            assert_eq!(check_ids(K::CompleteInput)[2 + bound as usize], id);
+            assert_eq!(DECODED[bound as usize], id);
+        }
+        assert_eq!(DECODED[9..], ["entry.input.well-formed-json"]);
         assert_eq!(
             prerequisites(K::CompleteInput, Check::WithinSingleStringBytes),
             MATERIALIZABLE
@@ -2693,6 +2756,8 @@ mod tests {
             (K::ProjectProfileSlot, Check::SupportedAssertion),
             (K::EntryDependencies, Check::EstablishedSlots),
             (K::CompleteInput, Check::WithinFileBytes),
+            (K::CompleteInput, Check::WithinSnapshotNodes),
+            (K::CompleteInput, Check::WithinSnapshotTraversalUnits),
             (K::CapabilityArtifacts, Check::WithinCapability),
         ] {
             assert!(prerequisites(kind, check).is_empty(), "{kind:?}");
@@ -2866,6 +2931,11 @@ mod tests {
             (
                 K::CompleteInput,
                 Check::WithinFileBytes,
+                C::BootstrapLimitExceeded,
+            ),
+            (
+                K::CompleteInput,
+                Check::WithinSnapshotSingleMarkerCanonicalBytes,
                 C::BootstrapLimitExceeded,
             ),
             (K::CompleteInput, Check::WellFormedJson, C::JsonInvalid),

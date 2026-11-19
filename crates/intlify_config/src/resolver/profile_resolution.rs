@@ -833,7 +833,7 @@ pub(super) mod tests {
         admit_project_profile, ActiveProfileSpecification, Slot, VocabularyAssertion, DATA,
     };
     use crate::resolver::structural_admission::{selection, CAPABILITY};
-    use crate::resolver::subject::SubjectKind;
+    use crate::resolver::subject::{EntryPath, SubjectKind};
     use crate::resolver::targets::{self, TargetSubject};
     use crate::resolver::token::{Sha256, Specification};
     use crate::structural::selection::{Selection, StringLengthFact};
@@ -2212,8 +2212,8 @@ pub(super) mod tests {
         });
     }
 
-    /// Every check of every kind but the kinds declared only, of which no
-    /// invocation records a unit yet.
+    /// Every check a file entry records, of every kind but the kinds declared
+    /// only, of which no invocation records a unit yet (Decision 015-202).
     #[test]
     fn a_complete_invocation_runs_every_check_of_every_kind() {
         Inputs::complete().resolve(|evaluation, _| {
@@ -2225,6 +2225,7 @@ pub(super) mod tests {
                 .into_iter()
                 .filter(|kind| !kind.declared_only())
                 .flat_map(|kind| kind.checks().iter().map(move |&check| (kind, check)))
+                .filter(|(_, check)| check.recorded_for(EntryPath::File))
                 .collect();
             assert_eq!(ran, listed);
         });
@@ -2301,8 +2302,24 @@ pub(super) mod tests {
                 "{dependent} waits on {prerequisite}"
             );
         }
+        // A file records no unit of a check only a Snapshot has something to
+        // examine for, so a wait on one is observed once a programmatic
+        // invocation exists (Decision 015-202).
+        let recorded: BTreeSet<&str> = registry
+            .rows
+            .iter()
+            .filter(|row| {
+                let rank: usize = row.check_rank.parse().unwrap();
+                row.subject_kind.checks()[rank].recorded_for(EntryPath::File)
+            })
+            .map(|row| row.check_id.as_str())
+            .collect();
         for row in &registry.rows {
-            for prerequisite in &row.prerequisite_check_ids {
+            for prerequisite in row
+                .prerequisite_check_ids
+                .iter()
+                .filter(|prerequisite| recorded.contains(prerequisite.as_str()))
+            {
                 assert!(
                     waits.contains(&(row.check_id.as_str(), prerequisite.as_str())),
                     "{} lists {prerequisite}",

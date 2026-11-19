@@ -201,12 +201,32 @@ pub(crate) enum Check {
     WithinFileBytes,
     /// Strict parsing stays within `bootstrapOnly.rawInput.maxParserTokens`.
     WithinParserTokens,
+    /// The Programmatic Entry Snapshot's terminal marker names no overrun of
+    /// `bootstrapOnly.snapshot.maxNodes`; each Snapshot bound below likewise.
+    WithinSnapshotNodes,
+    /// No overrun of `bootstrapOnly.snapshot.maxDepth`.
+    WithinSnapshotDepth,
+    /// No overrun of `bootstrapOnly.snapshot.maxCollectionEntries`.
+    WithinSnapshotCollectionEntries,
+    /// No overrun of `bootstrapOnly.snapshot.maxTotalStringBytes`.
+    WithinSnapshotTotalStringBytes,
+    /// No overrun of `bootstrapOnly.snapshot.maxSingleStringBytes`.
+    WithinSnapshotSingleStringBytes,
+    /// No overrun of `bootstrapOnly.snapshot.maxRejectedMarkers`.
+    WithinSnapshotRejectedMarkers,
+    /// No overrun of `bootstrapOnly.snapshot.maxEnvelopeCanonicalBytes`.
+    WithinSnapshotEnvelopeCanonicalBytes,
+    /// No overrun of `bootstrapOnly.snapshot.maxSingleMarkerCanonicalBytes`.
+    WithinSnapshotSingleMarkerCanonicalBytes,
+    /// No overrun of `bootstrapOnly.snapshot.maxTraversalUnits`.
+    WithinSnapshotTraversalUnits,
     /// The file is valid UTF-8 and strict JSON.
     WellFormedJson,
     /// No object of the file repeats a member name.
     UniqueMembers,
     /// Every string, member name, and number lies in the portable
-    /// JSON-compatible domain.
+    /// JSON-compatible domain: a file's, or a Snapshot's, which then holds no
+    /// ordinary rejected-node marker.
     JsonCompatible,
     /// The materialized root's logical values stay within `maxNodes`.
     WithinNodes,
