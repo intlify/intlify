@@ -675,7 +675,8 @@ impl LogicalWork {
         };
         match (prepared, output) {
             (Prepared::Entry { .. }, Output::Entry(Ok(doc))) => {
-                work.input(doc.counts(), WorkStage::OperationResult);
+                let counts = doc.counts().expect("the benchmark materializes files");
+                work.input(counts, WorkStage::OperationResult);
             }
             (Prepared::Entry { .. }, Output::Entry(Err(error))) => work.failed_input(error),
             (Prepared::Structural { .. }, Output::Structural(Ok(analysis))) => {

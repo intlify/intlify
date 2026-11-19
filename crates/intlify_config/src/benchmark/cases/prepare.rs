@@ -133,7 +133,9 @@ pub(in crate::benchmark) fn prepare(
     if let Some((kind, edge)) = declaration.limit {
         let baseline = materialize_file(Arc::clone(&source), input_limits)
             .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?;
-        let counts = baseline.counts();
+        let counts = baseline
+            .counts()
+            .expect("a materialized file has its counts");
         let actual = match kind {
             LimitKind::FileBytes => counts.file_bytes,
             LimitKind::ParserTokens => counts.parser_tokens,

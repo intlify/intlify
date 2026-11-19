@@ -108,7 +108,7 @@ impl PreparedPolicy {
                 target_profiles: Ok(&declaration.target_profiles),
             },
             measures: ConfigurationMeasures {
-                value: Ok(self.analysis.benchmark_input_counts().value),
+                value: Ok(self.analysis.value_counts()),
                 // A prepared configuration is complete: every declaration's
                 // key is a Profile ID.
                 declarations: Ok(

@@ -18,7 +18,7 @@
 //! evaluated as well, under that entry (D15:2184, 2190).
 
 use crate::input_limits::Bound;
-use crate::materialize::{ByteSpan, MaterializedDocument, NodeId, NodeKind, ObjectMember};
+use crate::materialize::{Locus, MaterializedDocument, NodeId, NodeKind, ObjectMember};
 use crate::model::valid_identity;
 
 use super::facts::{
@@ -47,7 +47,7 @@ pub(super) struct SchemaIssue {
     pub(super) kind: IssueKind,
     pub(super) schema: SchemaId,
     pub(super) subject: NodeId,
-    pub(super) span: ByteSpan,
+    pub(super) locus: Locus,
     pub(super) role: LocationRole,
     /// Only a known required field copied from the compiled schema, never an
     /// arbitrary configuration key, selector, or rejected scalar.
@@ -183,7 +183,7 @@ impl<'input> Walker<'input> {
         kind: IssueKind,
         schema: SchemaId,
         subject: NodeId,
-        span: ByteSpan,
+        locus: Locus,
         role: LocationRole,
         missing_field: Option<&str>,
     ) {
@@ -192,7 +192,7 @@ impl<'input> Walker<'input> {
                 kind,
                 schema,
                 subject,
-                span,
+                locus,
                 role,
                 missing_field: missing_field.map(str::to_owned),
                 alternatives: Vec::new(),
@@ -205,7 +205,7 @@ impl<'input> Walker<'input> {
             kind,
             schema,
             subject,
-            self.doc.node(subject).span(),
+            self.doc.node(subject).locus(),
             LocationRole::Value,
             None,
         );
@@ -306,7 +306,7 @@ impl<'input> Walker<'input> {
             Entry {
                 map,
                 value: member.value(),
-                key: member.key_span(),
+                key: member.key(),
                 admitted,
             },
         );
@@ -517,7 +517,7 @@ impl<'input> Walker<'input> {
                             IssueKind::RequiredFieldMissing,
                             id,
                             subject,
-                            doc.node(subject).span(),
+                            doc.node(subject).locus(),
                             LocationRole::MissingField,
                             Some(name),
                         );
@@ -577,7 +577,7 @@ impl<'input> Walker<'input> {
                             kind,
                             id,
                             subject,
-                            member.key_span(),
+                            member.key(),
                             LocationRole::MemberKey,
                             None,
                         );
@@ -595,7 +595,7 @@ impl<'input> Walker<'input> {
                                 position,
                                 At::Member {
                                     object: subject,
-                                    key: member.key_span(),
+                                    key: member.key(),
                                 },
                                 Outcome::Failed,
                             );

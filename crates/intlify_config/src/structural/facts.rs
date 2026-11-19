@@ -7,12 +7,12 @@
 //! check looked, and its outcome. The Check Registry's units and Findings of
 //! structural admission are built from them (D15:2184).
 //!
-//! A candidate holds nodes, spans, and the names the configuration schema
+//! A candidate holds nodes, loci, and the names the configuration schema
 //! defines, never a name or a value from the configuration.
 
 use std::collections::BTreeMap;
 
-use crate::materialize::{ByteSpan, NodeId};
+use crate::materialize::{Locus, NodeId};
 
 /// A closed schema keyword class of structural admission, in the order of a
 /// scope level's rows, and the key of an identity map (D15:2173).
@@ -56,7 +56,7 @@ pub(crate) struct Entry {
     /// The entry's value.
     pub(crate) value: NodeId,
     /// Where the entry's key is.
-    pub(crate) key: ByteSpan,
+    pub(crate) key: Locus,
     /// Whether the key has the identifier syntax.
     pub(crate) admitted: bool,
 }
@@ -101,7 +101,7 @@ pub(crate) enum At {
     /// A value.
     Value(NodeId),
     /// An undeclared member of an object, by its key.
-    Member { object: NodeId, key: ByteSpan },
+    Member { object: NodeId, key: Locus },
     /// A required member that the object lacks, which the path names.
     Missing { object: NodeId },
     /// The key of an identity map entry, which the scope holds.
@@ -238,16 +238,21 @@ pub(crate) mod tests {
     use std::sync::Arc;
 
     use super::{At, Check, Entry, Facts, FieldStep, Level, Outcome};
-    use crate::materialize::{materialize_file, ByteSpan, NodeId, NodeKind};
+    use crate::materialize::{materialize_file, Locus, NodeId, NodeKind};
     use crate::materialize_tests::limits;
 
-    /// The nodes of the elements of a three-element array.
-    fn nodes() -> Vec<NodeId> {
-        let doc = materialize_file(Arc::from(&b"[0,1,2]"[..]), limits()).unwrap();
-        let NodeKind::Array(items) = doc.node(doc.root()).kind() else {
+    /// The nodes of the elements of a three-element array, and where the key
+    /// of the member that holds the array is.
+    fn nodes() -> (Vec<NodeId>, Locus) {
+        let doc = materialize_file(Arc::from(&br#"{"items":[0,1,2]}"#[..]), limits()).unwrap();
+        let NodeKind::Object(members) = doc.node(doc.root()).kind() else {
+            unreachable!("an object")
+        };
+        let member = &members["items"];
+        let NodeKind::Array(items) = doc.node(member.value()).kind() else {
             unreachable!("an array")
         };
-        items.clone()
+        (items.clone(), member.key())
     }
 
     /// A path's steps as text, `*` for any element or entry.
@@ -288,11 +293,11 @@ pub(crate) mod tests {
         assert_eq!(facts.scope(Facts::ROOT).level, Level::Root);
         assert_eq!(facts.scope(Facts::ROOT).parent, None);
         assert_eq!(facts.scope(Facts::ROOT).entry, None);
-        let nodes = nodes();
+        let (nodes, key) = nodes();
         let entry = |value: usize| Entry {
             map: nodes[0],
             value: nodes[value],
-            key: ByteSpan::new(2, 7),
+            key,
             admitted: true,
         };
         let profile = facts.enter_scope(Level::Profile, Facts::ROOT, entry(1));

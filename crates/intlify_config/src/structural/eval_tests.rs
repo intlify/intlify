@@ -121,7 +121,7 @@ fn missing_fields_have_known_schema_names_and_owning_object_spans() {
         .any(|i| i.missing_field.as_deref() == Some("requestedLocales")));
     for issue in missing {
         assert_eq!(issue.role, LocationRole::MissingField);
-        assert_eq!(issue.span, doc.node(issue.subject).span());
+        assert_eq!(issue.locus, doc.node(issue.subject).locus());
     }
 }
 
@@ -351,11 +351,11 @@ fn at(result: &SchemaEvaluation, level: Level, path: &str) -> Vec<(Check, Outcom
 }
 
 /// Where the key of `owner`'s member `name` is.
-fn key_span(doc: &MaterializedDocument, owner: NodeId, name: &str) -> crate::materialize::ByteSpan {
+fn member_key(doc: &MaterializedDocument, owner: NodeId, name: &str) -> crate::materialize::Locus {
     let NodeKind::Object(members) = doc.node(owner).kind() else {
         panic!()
     };
-    members[name].key_span()
+    members[name].key()
 }
 
 fn compiled(schema: &Value) -> SchemaProgram {
@@ -438,7 +438,7 @@ fn a_complete_configuration_records_each_check_where_it_applies() {
         }
         assert_eq!(entry.map, map);
         assert_eq!(entry.value, member(&doc, map, name));
-        assert_eq!(entry.key, key_span(&doc, map, name));
+        assert_eq!(entry.key, member_key(&doc, map, name));
     }
 }
 
@@ -498,7 +498,7 @@ fn each_undeclared_member_fails_the_known_check_of_its_object() {
             candidate.at,
             At::Member {
                 object: doc.root(),
-                key: key_span(&doc, doc.root(), name)
+                key: member_key(&doc, doc.root(), name)
             }
         );
     }
@@ -619,7 +619,7 @@ fn identity_keys_are_checked_under_their_map_and_scope_their_entries() {
         assert_eq!(entry.admitted, admitted);
         assert_eq!(entry.map, profiles);
         assert_eq!(entry.value, member(&doc, profiles, name));
-        assert_eq!(entry.key, key_span(&doc, profiles, name));
+        assert_eq!(entry.key, member_key(&doc, profiles, name));
         assert_eq!(facts.scope(scope).level, Level::Profile);
     }
     // Each entry's value is evaluated under its own scope, the failing key's

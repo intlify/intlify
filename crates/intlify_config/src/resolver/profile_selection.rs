@@ -50,7 +50,7 @@ use std::collections::BTreeMap;
 use serde::de::DeserializeOwned;
 
 use crate::input_limits::Bound;
-use crate::materialize::{ByteSpan, MaterializedDocument, NodeId, NodeKind};
+use crate::materialize::{Locus, MaterializedDocument, NodeId, NodeKind};
 use crate::model::{valid_identity, ProfileId};
 use crate::structural::selection::{
     ProvisionalSelection, Selection, SelectionInvariant, SelectorInput, SelectorShape,
@@ -411,7 +411,7 @@ impl Observer<'_, '_> {
         let (document, profiles) = self
             .profiles
             .ok_or(ProfileSelectionInvariant::UnreportedFailure)?;
-        self.value(&[Edge::Member("profiles")], document.node(profiles).span())
+        self.value(&[Edge::Member("profiles")], document.node(profiles).locus())
     }
 
     /// The key of `id` in the root's `profiles` object, at the key's token,
@@ -429,7 +429,7 @@ impl Observer<'_, '_> {
             .ok_or(ProfileSelectionInvariant::UnreportedFailure)?;
         self.value(
             &[Edge::Member("profiles"), Edge::Member(id.as_str())],
-            member.key_span(),
+            member.key(),
         )
     }
 
@@ -456,15 +456,15 @@ impl Observer<'_, '_> {
         Ok(Observation { primary, related })
     }
 
-    /// The value at the internal path `edges`, at the token `span`.
+    /// The value at the internal path `edges`, at `locus`.
     fn value(
         &self,
         edges: &[Edge<'_>],
-        span: ByteSpan,
+        locus: Locus,
     ) -> Result<Observation, ProfileSelectionInvariant> {
         let primary = self
             .file
-            .value_evidence(edges, span)
+            .value_evidence(edges, locus)
             .map_err(ProfileSelectionInvariant::Evidence)?;
         Ok(Observation {
             primary,
