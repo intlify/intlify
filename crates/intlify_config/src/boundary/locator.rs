@@ -1,20 +1,27 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! 015's Portable Source Locator admission for a file entry: a candidate
-//! admitted as the entry's `relative-path` locator, or treated exactly as
-//! locator absence (D15:762-766; 015-081, 015-171).
+//! 015's Portable Source Locator admission: a candidate admitted as a file
+//! entry's `relative-path` locator, or as a Programmatic Entry's or Call-Site
+//! Source's `safe-label` or `safe-uri` locator, or treated exactly as locator
+//! absence (D15:747, 762-766, 796; 015-081, 015-171).
 //!
-//! The adapter constructs the canonical form and classifies it; the core only
-//! validates the variant, the classification, the bound, and the payload, and
-//! never repairs, converts, or guesses one. A file entry's locator is a
-//! `relative-path`: a non-empty configuration-root-relative path whose `/`
-//! separated segments hold no NUL or backslash and are neither empty, `.`, nor
-//! `..`, with no root prefix and no drive prefix, an ASCII letter and `:` at
-//! the start. `bootstrapOnly.evidenceMetadata.maxLocatorBytes` bounds the
-//! payload's UTF-8 bytes. A candidate that is missing, of another variant,
-//! unclassified, over the bound, or malformed is absence: it never fails the
-//! entry, emits no Finding, and leaves nothing behind.
+//! The adapter or frontend constructs the canonical form and classifies it;
+//! the core only validates the variant, the classification, the bound, and
+//! the payload, and never repairs, converts, or guesses one. A file entry's
+//! locator is a `relative-path`: a non-empty configuration-root-relative path
+//! whose `/` separated segments hold no NUL or backslash and are neither
+//! empty, `.`, nor `..`, with no root prefix and no drive prefix, an ASCII
+//! letter and `:` at the start. A programmatic locator is a `safe-label`, a
+//! non-empty string, or a `safe-uri`, an absolute ASCII URI already in
+//! RFC 3986's syntax-based normal form, with no query, fragment, or user
+//! information, a scheme other than `file`, and a port only when it is the
+//! shortest decimal of one that is not its scheme's default: `80` for `http`
+//! and `ws`, `443` for `https` and `wss`.
+//! `bootstrapOnly.evidenceMetadata.maxLocatorBytes` bounds the payload's
+//! UTF-8 bytes. A candidate that is missing, of another variant, unclassified,
+//! over the bound, or malformed is absence: it never fails the entry, emits no
+//! Finding, and leaves nothing behind.
 //!
 //! Evidence compares admitted locators by variant rank, `relative-path`,
 //! `safe-label`, then `safe-uri`, and then by exact payload bytes, after their
@@ -24,6 +31,7 @@
 use serde_json::{json, Value};
 
 use crate::artifacts::count;
+use crate::construction::validator::uri::Reference;
 use crate::input_limits::Bound;
 
 use super::capability::ImplementationCapability;
@@ -100,11 +108,50 @@ pub(crate) fn read_file_locator(
     candidate: Option<LocatorCandidate<'_>>,
     bound: Bound,
 ) -> Option<Locator> {
-    let candidate = candidate?;
-    let admitted = candidate.variant == LocatorVariant::RelativePath
-        && candidate.non_secret
+    admit(candidate?, bound, |variant, payload| {
+        variant == LocatorVariant::RelativePath && relative_path(payload)
+    })
+}
+
+/// A Programmatic Entry's or Call-Site Source's locator under the
+/// capability's bound: the admitted `safe-label` or `safe-uri`, or `None` for
+/// absence.
+pub(crate) fn programmatic_locator(
+    candidate: Option<LocatorCandidate<'_>>,
+    capability: &ImplementationCapability,
+) -> Option<Locator> {
+    read_programmatic_locator(
+        candidate,
+        capability
+            .bootstrap_only()
+            .evidence_metadata
+            .max_locator_bytes,
+    )
+}
+
+/// The admission under `bound`, which [`programmatic_locator`] takes from
+/// the capability.
+pub(crate) fn read_programmatic_locator(
+    candidate: Option<LocatorCandidate<'_>>,
+    bound: Bound,
+) -> Option<Locator> {
+    admit(candidate?, bound, |variant, payload| match variant {
+        LocatorVariant::RelativePath => false,
+        LocatorVariant::SafeLabel => !payload.is_empty(),
+        LocatorVariant::SafeUri => safe_uri(payload),
+    })
+}
+
+/// The candidate as a locator when the adapter classified it non-secret, its
+/// payload is within `bound`, and `canonical` accepts its variant and payload.
+fn admit(
+    candidate: LocatorCandidate<'_>,
+    bound: Bound,
+    canonical: impl FnOnce(LocatorVariant, &str) -> bool,
+) -> Option<Locator> {
+    let admitted = candidate.non_secret
         && count(candidate.payload.len()) <= bound.get()
-        && relative_path(candidate.payload);
+        && canonical(candidate.variant, candidate.payload);
     admitted.then(|| Locator {
         variant: candidate.variant,
         payload: candidate.payload.to_owned(),
@@ -122,6 +169,50 @@ fn relative_path(payload: &str) -> bool {
         && payload
             .split('/')
             .all(|segment| !matches!(segment, "" | "." | ".."))
+}
+
+/// Whether `payload` is a canonical `safe-uri` (D15:764): an absolute URI,
+/// with no query or fragment, that RFC 3986's syntax-based normalization
+/// leaves as it is, whose scheme is not `file`, and whose authority, when
+/// present, has no user information and a canonical port.
+fn safe_uri(payload: &str) -> bool {
+    let Some(uri) = Reference::parse(payload) else {
+        return false;
+    };
+    let Some(scheme) = uri.scheme() else {
+        return false;
+    };
+    uri.query().is_none()
+        && uri.fragment().is_none()
+        && scheme != "file"
+        && uri.authority().is_none_or(|authority| {
+            !authority.contains('@') && canonical_port(scheme, port(authority))
+        })
+        && uri == uri.normalize()
+}
+
+/// The port of an authority with no user information, `None` when no `:`
+/// follows the host. Only a port's `:` follows a registered name or an IP
+/// literal's `]`.
+fn port(authority: &str) -> Option<&str> {
+    let host_end = authority.rfind(']').unwrap_or(0);
+    authority[host_end..]
+        .find(':')
+        .map(|colon| &authority[host_end + colon + 1..])
+}
+
+/// Whether a port, `None` when absent, is the shortest decimal of a port that
+/// is not the scheme's default. Revision `"0"` knows only the defaults of
+/// `http`, `ws`, `https`, and `wss`.
+fn canonical_port(scheme: &str, port: Option<&str>) -> bool {
+    port.is_none_or(|port| {
+        let shortest = port == "0" || port.starts_with(|digit: char| ('1'..='9').contains(&digit));
+        let default = matches!(
+            (scheme, port),
+            ("http" | "ws", "80") | ("https" | "wss", "443")
+        );
+        shortest && !default
+    })
 }
 
 #[cfg(test)]
@@ -296,6 +387,141 @@ mod tests {
         assert!(file_locator(Some(path(payload)), &capability(payload.len())).is_some());
         assert_eq!(
             file_locator(Some(path(payload)), &capability(payload.len() - 1)),
+            None
+        );
+        let label = label("storefront");
+        assert!(programmatic_locator(Some(label), &capability(10)).is_some());
+        assert_eq!(programmatic_locator(Some(label), &capability(9)), None);
+    }
+
+    fn label(payload: &str) -> LocatorCandidate<'_> {
+        LocatorCandidate {
+            variant: LocatorVariant::SafeLabel,
+            ..path(payload)
+        }
+    }
+
+    fn uri(payload: &str) -> LocatorCandidate<'_> {
+        LocatorCandidate {
+            variant: LocatorVariant::SafeUri,
+            ..path(payload)
+        }
+    }
+
+    fn programmatic(candidate: LocatorCandidate<'_>) -> Option<Locator> {
+        read_programmatic_locator(Some(candidate), Bound::new(u64::MAX - 1).unwrap())
+    }
+
+    /// A `safe-label` is any non-empty string the frontend classified,
+    /// compared by its exact bytes and never normalized (D15:763).
+    #[test]
+    fn a_classified_label_is_admitted_as_given() {
+        for payload in ["storefront", "app.ts:12", " ", "設定 / config", "a\\b/../c"] {
+            let locator = programmatic(label(payload)).unwrap();
+            assert_eq!(locator.variant(), LocatorVariant::SafeLabel);
+            assert_eq!(locator.payload(), payload);
+        }
+        let composed = programmatic(label("\u{c5}")).unwrap();
+        let decomposed = programmatic(label("A\u{30a}")).unwrap();
+        assert_ne!(composed, decomposed);
+        assert_eq!(programmatic(label("")), None);
+        let unclassified = LocatorCandidate {
+            non_secret: false,
+            ..label("storefront")
+        };
+        assert_eq!(programmatic(unclassified), None);
+    }
+
+    /// A `safe-uri` is admitted only already canonical: an absolute ASCII URI
+    /// in syntax-based normal form, with a non-default port in its shortest
+    /// decimal, and nothing that revision `"0"` removes (D15:764).
+    #[test]
+    fn a_canonical_uri_is_admitted_as_given() {
+        for payload in [
+            "https://example.com/config/app.ts",
+            "https://example.com",
+            "http://example.com:8080/x",
+            "http://example.com:443/x",
+            "https://example.com:80/x",
+            "ws://example.com:0/",
+            "https://[2001:db8::1]:8443/x",
+            "https://[2001:db8::1]/x",
+            "urn:isbn:0451450523",
+            "vscode-remote://ssh-remote%2Bhost/src/app.ts",
+            "https://example.com/%2F%C3%A9",
+        ] {
+            let locator = programmatic(uri(payload)).unwrap();
+            assert_eq!(locator.variant(), LocatorVariant::SafeUri, "{payload}");
+            assert_eq!(locator.payload(), payload);
+        }
+    }
+
+    #[test]
+    fn a_non_canonical_uri_is_absence() {
+        for payload in [
+            "",
+            "example.com/x",
+            "//example.com/x",
+            "/x",
+            "HTTPS://example.com/x",
+            "https://Example.com/x",
+            "https://user@example.com/x",
+            "https://user:secret@example.com/x",
+            "https://example.com/x?q",
+            "https://example.com/x?",
+            "https://example.com/x#f",
+            "https://example.com/x#",
+            "file:///etc/intlify.json",
+            "file://host/x",
+            "http://example.com:80/x",
+            "ws://example.com:80/",
+            "https://example.com:443/x",
+            "wss://example.com:443/",
+            "https://example.com:0443/x",
+            "https://example.com:00/x",
+            "https://example.com:/x",
+            "https://[2001:db8::1]:443/x",
+            "https://[2001:DB8::1]/x",
+            "https://example.com/a/../b",
+            "https://example.com/./b",
+            "https://example.com/%7Ex",
+            "https://example.com/%2f",
+            "https://example.com/é",
+            "https://example.com/a b",
+            "https://exa%mple.com/",
+        ] {
+            assert_eq!(programmatic(uri(payload)), None, "{payload}");
+        }
+    }
+
+    /// A programmatic locator is a `safe-label` or a `safe-uri`, never a
+    /// `relative-path`, and an unclassified, over-bound, or absent candidate
+    /// is absence (D15:747, 766, 796).
+    #[test]
+    fn a_programmatic_locator_takes_only_its_two_variants() {
+        assert_eq!(programmatic(path("config/intlify.json")), None);
+        let unclassified = LocatorCandidate {
+            non_secret: false,
+            ..uri("https://example.com/x")
+        };
+        assert_eq!(programmatic(unclassified), None);
+        let payload = "https://example.com/設定";
+        assert_eq!(programmatic(uri(payload)), None);
+        let payload = "https://example.com/x";
+        let bound = |value: usize| Bound::new(count(value)).unwrap();
+        assert!(read_programmatic_locator(Some(uri(payload)), bound(payload.len())).is_some());
+        assert_eq!(
+            read_programmatic_locator(Some(uri(payload)), bound(payload.len() - 1)),
+            None
+        );
+        let payload = "設定";
+        assert!(read_programmatic_locator(Some(label(payload)), bound(payload.len())).is_some());
+        assert_eq!(
+            read_programmatic_locator(Some(label(payload)), bound(payload.len() - 1)),
+            None
+        );
+        assert_eq!(
+            read_programmatic_locator(None, Bound::new(u64::MAX - 1).unwrap()),
             None
         );
     }
