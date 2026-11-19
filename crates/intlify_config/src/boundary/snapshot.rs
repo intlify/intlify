@@ -211,8 +211,7 @@ fn within_bounds(
     terminal: Option<&SubmittedNode>,
     limits: &SnapshotLimits,
 ) -> bool {
-    let whole = counts(root, None);
-    let rest = counts(root, terminal);
+    let (whole, rest) = counts(root, terminal);
     whole.envelope_canonical_bytes <= limits.max_envelope_canonical_bytes.get()
         && whole.single_marker_canonical_bytes <= limits.max_single_marker_canonical_bytes.get()
         && rest
@@ -221,55 +220,70 @@ fn within_bounds(
             .all(|(bound, count)| count <= bound.limit(limits).get())
 }
 
-/// The counts of the tree in the units of [`SnapshotCounts`], leaving out
-/// `terminal` and the edge that holds it. A terminal root is counted: every
-/// bound is at least one and its frame is checked whole, so leaving it out
-/// would change nothing.
-fn counts(root: &SubmittedNode, terminal: Option<&SubmittedNode>) -> SnapshotCounts {
-    let mut counts = SnapshotCounts::default();
-    let envelope = visit(&mut counts, root, 1, terminal);
-    SnapshotCounts {
-        envelope_canonical_bytes: envelope,
-        traversal_units: counts.nodes + counts.collection_entries,
-        ..counts
+/// The counts of the whole tree and of the tree without `terminal` and the
+/// edge that holds it, in the units of [`SnapshotCounts`]. One pass counts
+/// both without recursion, so a report of any depth is compared with the
+/// bounds rather than followed down the stack (plan 025 decision #298).
+/// `S(root)` is as long as every node's frame header and own payload
+/// together, an object's key frames included. A terminal root is counted in
+/// both: every bound is at least one and its frame is checked whole, so
+/// leaving it out would change nothing.
+fn counts(
+    root: &SubmittedNode,
+    terminal: Option<&SubmittedNode>,
+) -> (SnapshotCounts, SnapshotCounts) {
+    let mut whole = SnapshotCounts::default();
+    let mut rest = SnapshotCounts::default();
+    // Each node to count, its depth, and whether the rest counts it: all but
+    // the terminal marker, a leaf, below the root.
+    let mut pending = vec![(root, 1, true)];
+    while let Some((node, depth, kept)) = pending.pop() {
+        for counts in [Some(&mut whole), kept.then_some(&mut rest)]
+            .into_iter()
+            .flatten()
+        {
+            own(counts, node, depth);
+        }
+        match node {
+            SubmittedNode::Array(elements) => {
+                for element in elements {
+                    let kept = !is_terminal(element, terminal);
+                    whole.collection_entries += 1;
+                    rest.collection_entries += u64::from(kept);
+                    pending.push((element, depth + 1, kept));
+                }
+            }
+            SubmittedNode::Object(members) => {
+                for (key, value) in members {
+                    let kept = !is_terminal(value, terminal);
+                    for counts in [Some(&mut whole), kept.then_some(&mut rest)]
+                        .into_iter()
+                        .flatten()
+                    {
+                        counts.collection_entries += 1;
+                        counts.envelope_canonical_bytes += FRAME + string(counts, key);
+                    }
+                    pending.push((value, depth + 1, kept));
+                }
+            }
+            _ => {}
+        }
     }
+    for counts in [&mut whole, &mut rest] {
+        counts.traversal_units = counts.nodes + counts.collection_entries;
+    }
+    (whole, rest)
 }
 
-/// Count `node` at `depth` and return the length of its frame.
-fn visit(
-    counts: &mut SnapshotCounts,
-    node: &SubmittedNode,
-    depth: u64,
-    terminal: Option<&SubmittedNode>,
-) -> u64 {
+/// Count `node` at `depth`: the node, its level, its own bytes, and its frame
+/// header and own payload in the envelope. Its members count on their own.
+fn own(counts: &mut SnapshotCounts, node: &SubmittedNode, depth: u64) {
     counts.nodes += 1;
     counts.depth = counts.depth.max(depth);
     let payload = match node {
         SubmittedNode::Null | SubmittedNode::Boolean(_) => 0,
-        SubmittedNode::Number(_) => EIGHT,
+        SubmittedNode::Number(_) | SubmittedNode::Array(_) | SubmittedNode::Object(_) => EIGHT,
         SubmittedNode::String(bytes) => string(counts, bytes),
-        SubmittedNode::Array(elements) => {
-            let mut payload = EIGHT;
-            for element in elements
-                .iter()
-                .filter(|element| !is_terminal(element, terminal))
-            {
-                counts.collection_entries += 1;
-                payload += visit(counts, element, depth + 1, terminal);
-            }
-            payload
-        }
-        SubmittedNode::Object(members) => {
-            let mut payload = EIGHT;
-            for (key, value) in members
-                .iter()
-                .filter(|(_, value)| !is_terminal(value, terminal))
-            {
-                counts.collection_entries += 1;
-                payload += FRAME + string(counts, key) + visit(counts, value, depth + 1, terminal);
-            }
-            payload
-        }
         SubmittedNode::Marker(marker) => {
             counts.rejected_markers += 1;
             let record = marker.record_length();
@@ -278,7 +292,7 @@ fn visit(
             record
         }
     };
-    FRAME + payload
+    counts.envelope_canonical_bytes += FRAME + payload;
 }
 
 /// Count a string or key's bytes and return their number.
@@ -314,59 +328,140 @@ impl SubmittedMarker {
     }
 }
 
-/// Whether every marker is in the closed model.
-fn closed(node: &SubmittedNode) -> bool {
-    match node {
-        SubmittedNode::Null
-        | SubmittedNode::Boolean(_)
-        | SubmittedNode::Number(_)
-        | SubmittedNode::String(_) => true,
-        SubmittedNode::Array(elements) => elements.iter().all(closed),
-        SubmittedNode::Object(members) => members.iter().all(|(_, value)| closed(value)),
-        SubmittedNode::Marker(marker) => marker.model().is_some(),
+/// Whether every marker is in the closed model, checked without recursion.
+fn closed(root: &SubmittedNode) -> bool {
+    let mut pending = vec![root];
+    while let Some(node) = pending.pop() {
+        match node {
+            SubmittedNode::Array(elements) => pending.extend(elements),
+            SubmittedNode::Object(members) => {
+                pending.extend(members.iter().map(|(_, value)| value));
+            }
+            SubmittedNode::Marker(marker) if marker.model().is_none() => return false,
+            _ => {}
+        }
     }
+    true
 }
 
-/// The canonical node, or `None` when a model value is not finite and
+/// A container the canonical tree is being built in: the members built so
+/// far and those to come, and for an object the key of the member being
+/// built.
+enum Open<'a> {
+    Array(Vec<Node>, std::slice::Iter<'a, SubmittedNode>),
+    Object(
+        BTreeMap<String, Node>,
+        std::slice::Iter<'a, (Vec<u8>, SubmittedNode)>,
+        String,
+    ),
+}
+
+/// The canonical tree, or `None` when a model value is not finite and
 /// canonical: a repeated key, a number that is not portable, a string or key
 /// that is not a sequence of Unicode scalar values, a bootstrap marker other
 /// than `terminal`, or a terminal one whose witness is not its bound's limit
 /// plus one (015-199, 015-200). Every marker is in the closed model by now.
+/// Built without recursion: a container opens on a stack, and each finished
+/// node goes into the container on top (plan 025 decision #298).
 fn canonical(
-    node: &SubmittedNode,
+    root: &SubmittedNode,
     terminal: Option<&SubmittedNode>,
     limits: &SnapshotLimits,
 ) -> Option<Node> {
-    Some(match node {
-        SubmittedNode::Null => Node::Null,
-        SubmittedNode::Boolean(value) => Node::Boolean(*value),
-        SubmittedNode::Number(value) => Node::Number(PortableNumber::new(*value)?),
-        SubmittedNode::String(bytes) => Node::String(scalars(bytes)?),
-        SubmittedNode::Array(elements) => Node::Array(
-            elements
-                .iter()
-                .map(|element| canonical(element, terminal, limits))
-                .collect::<Option<_>>()?,
-        ),
-        SubmittedNode::Object(members) => {
-            let mut object = BTreeMap::new();
-            for (key, value) in members {
-                let value = canonical(value, terminal, limits)?;
-                if object.insert(scalars(key)?, value).is_some() {
+    let mut open: Vec<Open<'_>> = Vec::new();
+    let mut node = root;
+    loop {
+        let mut done = match node {
+            SubmittedNode::Null => Node::Null,
+            SubmittedNode::Boolean(value) => Node::Boolean(*value),
+            SubmittedNode::Number(value) => Node::Number(PortableNumber::new(*value)?),
+            SubmittedNode::String(bytes) => Node::String(scalars(bytes)?),
+            SubmittedNode::Marker(marker) => match marker.model()? {
+                Marker::BootstrapLimitExceeded { bound, witness }
+                    if !is_terminal(node, terminal) || witness != bound.limit(limits).get() + 1 =>
+                {
                     return None;
                 }
+                marker => Node::Marker(marker),
+            },
+            SubmittedNode::Array(elements) => {
+                let mut members = elements.iter();
+                if let Some(first) = members.next() {
+                    open.push(Open::Array(Vec::with_capacity(elements.len()), members));
+                    node = first;
+                    continue;
+                }
+                Node::Array(Vec::new())
             }
-            Node::Object(object)
+            SubmittedNode::Object(members) => {
+                let mut members = members.iter();
+                if let Some((key, first)) = members.next() {
+                    open.push(Open::Object(BTreeMap::new(), members, scalars(key)?));
+                    node = first;
+                    continue;
+                }
+                Node::Object(BTreeMap::new())
+            }
+        };
+        // Put the finished node in the container on top, closing each
+        // container that has no member left, until one has a next member.
+        loop {
+            let Some(mut top) = open.pop() else {
+                return Some(done);
+            };
+            let next = match &mut top {
+                Open::Array(built, members) => {
+                    built.push(done);
+                    members.next()
+                }
+                Open::Object(built, members, key) => {
+                    if built.insert(std::mem::take(key), done).is_some() {
+                        return None;
+                    }
+                    match members.next() {
+                        Some((next_key, next)) => {
+                            *key = scalars(next_key)?;
+                            Some(next)
+                        }
+                        None => None,
+                    }
+                }
+            };
+            if let Some(next) = next {
+                open.push(top);
+                node = next;
+                break;
+            }
+            done = match top {
+                Open::Array(built, _) => Node::Array(built),
+                Open::Object(built, _, _) => Node::Object(built),
+            };
         }
-        SubmittedNode::Marker(marker) => match marker.model()? {
-            Marker::BootstrapLimitExceeded { bound, witness }
-                if !is_terminal(node, terminal) || witness != bound.limit(limits).get() + 1 =>
-            {
-                return None;
+    }
+}
+
+impl SubmittedNode {
+    /// Move this node's members into `pending`, leaving it with none.
+    fn release(&mut self, pending: &mut Vec<Self>) {
+        match self {
+            Self::Array(elements) => pending.append(elements),
+            Self::Object(members) => pending.extend(members.drain(..).map(|(_, value)| value)),
+            Self::Null | Self::Boolean(_) | Self::Number(_) | Self::String(_) | Self::Marker(_) => {
             }
-            marker => Node::Marker(marker),
-        },
-    })
+        }
+    }
+}
+
+/// A report's tree is released without recursion, so dropping a deep one,
+/// refused or not, cannot exhaust the stack (plan 025 decision #298).
+impl Drop for SubmittedNode {
+    fn drop(&mut self) {
+        let mut pending = Vec::new();
+        self.release(&mut pending);
+        while let Some(mut node) = pending.pop() {
+            node.release(&mut pending);
+        }
+    }
 }
 
 /// The string the bytes spell, if they are a sequence of Unicode scalar
@@ -724,6 +819,10 @@ mod tests {
             SubmittedNode::String(isolated.clone()),
             SubmittedNode::String(vec![0xff]),
             SubmittedNode::Object(vec![(isolated, SubmittedNode::Null)]),
+            SubmittedNode::Object(vec![
+                (b"a".to_vec(), SubmittedNode::Null),
+                (vec![0xff], SubmittedNode::Null),
+            ]),
             SubmittedNode::Array(vec![SubmittedNode::Null, SubmittedNode::Number(f64::NAN)]),
         ] {
             assert_eq!(refusal(root, &roomy()), EnvelopeOverBound);
@@ -880,16 +979,16 @@ mod tests {
             from_json(&json!({ "é": ["x", {}], "k": -2.5 })),
             overrun(SnapshotBound::Nodes, 2),
         ] {
-            assert_eq!(counts(&submitted(&tree), None), SnapshotCounts::of(&tree));
+            let (whole, rest) = counts(&submitted(&tree), None);
+            assert_eq!(whole, SnapshotCounts::of(&tree));
+            assert_eq!(rest, whole);
         }
-        let SubmittedNode::Object(mut members) = submitted(&rich()) else {
+        let mut reversed = submitted(&rich());
+        let SubmittedNode::Object(members) = &mut reversed else {
             unreachable!()
         };
         members.reverse();
-        assert_eq!(
-            counts(&SubmittedNode::Object(members), None),
-            SnapshotCounts::of(&rich())
-        );
+        assert_eq!(counts(&reversed, None).0, SnapshotCounts::of(&rich()));
         for (tree, rest) in [
             (terminal, rich()),
             (
@@ -897,12 +996,69 @@ mod tests {
                 from_json(&json!([1])),
             ),
         ] {
-            let tree = submitted(&tree);
-            assert_eq!(
-                counts(&tree, terminal_marker(&tree)),
-                SnapshotCounts::of(&rest)
-            );
+            let report = submitted(&tree);
+            let (whole, kept) = counts(&report, terminal_marker(&report));
+            assert_eq!(whole, SnapshotCounts::of(&tree));
+            assert_eq!(kept, SnapshotCounts::of(&rest));
         }
+    }
+
+    /// An empty array or object is admitted as itself, at the root and as a
+    /// member or element (plan 025 decision #298).
+    #[test]
+    fn empty_containers_are_admitted_as_themselves() {
+        for tree in [
+            Node::Array(Vec::new()),
+            Node::Object(BTreeMap::new()),
+            from_json(&json!({ "a": [], "b": {}, "c": [[], {}] })),
+        ] {
+            admits(submitted(&tree), &tree, &roomy());
+        }
+    }
+
+    /// A report nested far deeper than its depth bound is refused rather than
+    /// followed down the stack, and one within roomy bounds is admitted with
+    /// the digest of `S` written level by level here. Both are released
+    /// without recursion (plan 025 decision #298).
+    #[test]
+    fn a_deep_report_is_refused_or_admitted_without_recursion() {
+        use crate::construction::profile::SNAPSHOT_DOMAIN;
+        use intlify_shared_json::encoding::digest_bytes;
+        use intlify_shared_json::token::hex;
+
+        const LEVELS: u64 = 100_000;
+        let chain = || {
+            let mut node = SubmittedNode::Null;
+            for _ in 0..LEVELS {
+                node = SubmittedNode::Array(vec![node]);
+            }
+            node
+        };
+        assert_eq!(
+            refusal(chain(), &under(SnapshotBound::Depth, 64)),
+            EnvelopeOverBound
+        );
+        let mut members = SubmittedNode::Null;
+        for _ in 0..LEVELS {
+            members = SubmittedNode::Object(vec![(b"a".to_vec(), members)]);
+        }
+        assert_eq!(
+            refusal(members, &under(SnapshotBound::Depth, 64)),
+            EnvelopeOverBound
+        );
+        // Each level's array tag, payload length, and count, then null.
+        let mut preimage = SNAPSHOT_DOMAIN.as_bytes().to_vec();
+        for level in 0..LEVELS {
+            preimage.push(0x05);
+            preimage.extend_from_slice(&(17 * (LEVELS - level)).to_be_bytes());
+            preimage.extend_from_slice(&1_u64.to_be_bytes());
+        }
+        preimage.extend_from_slice(&[0x01, 0, 0, 0, 0, 0, 0, 0, 0]);
+        let digest = format!("sha256:{}", hex(digest_bytes(&preimage)));
+        let admitted = read_report(Some(formal(chain(), &digest)), &roomy())
+            .ok()
+            .unwrap();
+        assert_eq!(admitted.digest, digest);
     }
 
     /// `admit` reads the capability's `bootstrapOnly.snapshot` bounds.

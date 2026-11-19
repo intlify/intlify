@@ -191,6 +191,9 @@ impl Marker {
     }
 }
 
+/// A frame's tag and its `U64` payload length (D15:873).
+const HEADER: usize = 1 + 8;
+
 /// `U64(count)` of a container's elements or members.
 fn count(length: usize) -> [u8; 8] {
     u64::try_from(length)
@@ -198,31 +201,69 @@ fn count(length: usize) -> [u8; 8] {
         .to_be_bytes()
 }
 
+/// What framing a tree has left to write, last first.
+enum Step<'a> {
+    Node(&'a Node),
+    Key(&'a str),
+    /// Fill in the payload length of the container whose frame starts here.
+    Close(usize),
+}
+
+/// Open a container's frame in `output`: its tag, a payload length to fill
+/// in when it closes, and its count. Returns where the frame starts.
+fn open(tag: u8, entries: usize, output: &mut Vec<u8>) -> usize {
+    let start = output.len();
+    output.push(tag);
+    output.extend_from_slice(&[0; 8]);
+    output.extend_from_slice(&count(entries));
+    start
+}
+
 impl Node {
-    /// `S` of this node appended to `output` (D15:875-889).
+    /// `S` of this node appended to `output` (D15:875-889), without
+    /// recursion: a container's frame opens with its payload length left to
+    /// fill in, its members follow in place, and the length is written when
+    /// it closes, so neither a deep tree nor a long payload is copied once
+    /// per level (plan 025 decision #298).
     fn frame_into(&self, output: &mut Vec<u8>) {
+        let mut steps = vec![Step::Node(self)];
+        while let Some(step) = steps.pop() {
+            match step {
+                Step::Close(start) => {
+                    let length = wide(output.len() - start - HEADER);
+                    output[start + 1..start + HEADER].copy_from_slice(&length.to_be_bytes());
+                }
+                Step::Key(key) => frame(STRING, key.as_bytes(), output),
+                Step::Node(Self::Null) => frame(NULL, &[], output),
+                Step::Node(Self::Boolean(false)) => frame(FALSE, &[], output),
+                Step::Node(Self::Boolean(true)) => frame(TRUE, &[], output),
+                Step::Node(Self::String(text)) => frame(STRING, text.as_bytes(), output),
+                Step::Node(Self::Number(number)) => {
+                    frame(NUMBER, &number.get().to_bits().to_be_bytes(), output);
+                }
+                Step::Node(Self::Array(elements)) => {
+                    steps.push(Step::Close(open(ARRAY, elements.len(), output)));
+                    steps.extend(elements.iter().rev().map(Step::Node));
+                }
+                Step::Node(Self::Object(members)) => {
+                    steps.push(Step::Close(open(OBJECT, members.len(), output)));
+                    for (key, value) in members.iter().rev() {
+                        steps.push(Step::Node(value));
+                        steps.push(Step::Key(key));
+                    }
+                }
+                Step::Node(Self::Marker(marker)) => frame(MARKER, &marker.record(), output),
+            }
+        }
+    }
+
+    /// Move this node's members into `pending`, leaving it with none.
+    fn release(&mut self, pending: &mut Vec<Self>) {
         match self {
-            Self::Null => frame(NULL, &[], output),
-            Self::Boolean(false) => frame(FALSE, &[], output),
-            Self::Boolean(true) => frame(TRUE, &[], output),
-            Self::String(text) => frame(STRING, text.as_bytes(), output),
-            Self::Number(number) => frame(NUMBER, &number.get().to_bits().to_be_bytes(), output),
-            Self::Array(elements) => {
-                let mut payload = count(elements.len()).to_vec();
-                for element in elements {
-                    element.frame_into(&mut payload);
-                }
-                frame(ARRAY, &payload, output);
+            Self::Array(elements) => pending.append(elements),
+            Self::Object(members) => pending.extend(std::mem::take(members).into_values()),
+            Self::Null | Self::Boolean(_) | Self::Number(_) | Self::String(_) | Self::Marker(_) => {
             }
-            Self::Object(members) => {
-                let mut payload = count(members.len()).to_vec();
-                for (key, value) in members {
-                    frame(STRING, key.as_bytes(), &mut payload);
-                    value.frame_into(&mut payload);
-                }
-                frame(OBJECT, &payload, output);
-            }
-            Self::Marker(marker) => frame(MARKER, &marker.record(), output),
         }
     }
 
@@ -241,6 +282,18 @@ impl Node {
         let mut preimage = SNAPSHOT_DOMAIN.as_bytes().to_vec();
         self.frame_into(&mut preimage);
         format!("sha256:{}", hex(digest_bytes(&preimage)))
+    }
+}
+
+/// A tree is released without recursion, so dropping a deep one cannot
+/// exhaust the stack (plan 025 decision #298).
+impl Drop for Node {
+    fn drop(&mut self) {
+        let mut pending = Vec::new();
+        self.release(&mut pending);
+        while let Some(mut node) = pending.pop() {
+            node.release(&mut pending);
+        }
     }
 }
 
@@ -268,49 +321,55 @@ fn wide(value: usize) -> u64 {
 }
 
 impl SnapshotCounts {
-    /// The counts of the tree rooted at `root`.
+    /// The counts of the tree rooted at `root`, without recursion and without
+    /// framing it: `S(root)` is as long as every node's frame header and own
+    /// payload together, an object's key frames included (plan 025 decision
+    /// #298).
     pub(crate) fn of(root: &Node) -> Self {
-        let mut counts = Self {
-            envelope_canonical_bytes: wide(root.framed().len()),
-            ..Self::default()
-        };
-        counts.visit(root, 1);
+        let mut counts = Self::default();
+        let mut pending = vec![(root, 1)];
+        while let Some((node, depth)) = pending.pop() {
+            counts.nodes += 1;
+            counts.depth = counts.depth.max(depth);
+            let payload = match node {
+                Node::Null | Node::Boolean(_) => 0,
+                Node::Number(_) => 8,
+                Node::String(text) => counts.string(text),
+                Node::Array(elements) => {
+                    counts.collection_entries += wide(elements.len());
+                    pending.extend(elements.iter().map(|element| (element, depth + 1)));
+                    8
+                }
+                Node::Object(members) => {
+                    counts.collection_entries += wide(members.len());
+                    let mut keys = 0;
+                    for (key, value) in members {
+                        keys += wide(HEADER) + counts.string(key);
+                        pending.push((value, depth + 1));
+                    }
+                    8 + keys
+                }
+                Node::Marker(marker) => {
+                    counts.rejected_markers += 1;
+                    let record = wide(marker.record().len());
+                    counts.single_marker_canonical_bytes = counts
+                        .single_marker_canonical_bytes
+                        .max(wide(HEADER) + record);
+                    record
+                }
+            };
+            counts.envelope_canonical_bytes += wide(HEADER) + payload;
+        }
         counts.traversal_units = counts.nodes + counts.collection_entries;
         counts
     }
 
-    fn string(&mut self, text: &str) {
+    /// Count a string or key's UTF-8 bytes and return their number.
+    fn string(&mut self, text: &str) -> u64 {
         let bytes = wide(text.len());
         self.total_string_bytes += bytes;
         self.single_string_bytes = self.single_string_bytes.max(bytes);
-    }
-
-    fn visit(&mut self, node: &Node, depth: u64) {
-        self.nodes += 1;
-        self.depth = self.depth.max(depth);
-        match node {
-            Node::Null | Node::Boolean(_) | Node::Number(_) => {}
-            Node::String(text) => self.string(text),
-            Node::Array(elements) => {
-                self.collection_entries += wide(elements.len());
-                for element in elements {
-                    self.visit(element, depth + 1);
-                }
-            }
-            Node::Object(members) => {
-                self.collection_entries += wide(members.len());
-                for (key, value) in members {
-                    self.string(key);
-                    self.visit(value, depth + 1);
-                }
-            }
-            Node::Marker(marker) => {
-                self.rejected_markers += 1;
-                // The marker's frame: its tag, the payload's length, and the record.
-                let frame = wide(1 + 8 + marker.record().len());
-                self.single_marker_canonical_bytes = self.single_marker_canonical_bytes.max(frame);
-            }
-        }
+        bytes
     }
 
     /// Each count beside the bound that limits it, in the table's order.
@@ -581,6 +640,42 @@ mod tests {
             SnapshotCounts::of(&overrun).single_marker_canonical_bytes,
             120
         );
+    }
+
+    /// A tree far deeper than a stack holds frames, digests, counts, and drops
+    /// without recursion. Each level is written once, a frame header and a
+    /// count, so `S` grows by 17 bytes a level (plan 025 decision #298).
+    #[test]
+    fn a_deep_tree_frames_counts_and_drops_without_recursion() {
+        const LEVELS: u64 = 100_000;
+        let mut tree = Node::Null;
+        for _ in 0..LEVELS {
+            tree = Node::Array(vec![tree]);
+        }
+        let framed = tree.framed();
+        assert_eq!(wide(framed.len()), 17 * LEVELS + 9);
+        let mut head = vec![ARRAY];
+        head.extend_from_slice(&(17 * LEVELS).to_be_bytes());
+        head.extend_from_slice(&1_u64.to_be_bytes());
+        assert_eq!(&framed[..17], head.as_slice());
+        assert_eq!(&framed[framed.len() - 9..], &[NULL, 0, 0, 0, 0, 0, 0, 0, 0]);
+        assert!(tree.digest().starts_with("sha256:"));
+        let counts = SnapshotCounts::of(&tree);
+        assert_eq!(
+            (
+                counts.nodes,
+                counts.depth,
+                counts.collection_entries,
+                counts.envelope_canonical_bytes
+            ),
+            (LEVELS + 1, LEVELS + 1, LEVELS, wide(framed.len()))
+        );
+        let mut members = Node::Null;
+        for _ in 0..LEVELS {
+            members = Node::Object(BTreeMap::from([("a".to_owned(), members)]));
+        }
+        // Each level adds a frame header, a count, and the key's frame.
+        assert_eq!(wide(members.framed().len()), 27 * LEVELS + 9);
     }
 
     /// Without a marker, the five counts the root-value bounds share are
