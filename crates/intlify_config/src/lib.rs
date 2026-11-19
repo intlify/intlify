@@ -122,8 +122,8 @@ mod framing;
 mod input_limits;
 #[allow(dead_code)]
 mod materialize;
-// 015's canonical Programmatic Entry Snapshot; its boundary and the
-// programmatic entry come later.
+// 015's canonical Programmatic Entry Snapshot, which `boundary::snapshot`
+// admits; the programmatic entry comes later.
 #[allow(dead_code)]
 mod snapshot;
 #[allow(dead_code)]

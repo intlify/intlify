@@ -15,6 +15,7 @@ use crate::resolver::origin::SafeOriginKind;
 use super::capability::CapabilityRefusal;
 use super::origin::{self, OriginRefusal};
 use super::selector::SelectorRefusal;
+use super::snapshot::SnapshotRefusal;
 use super::source::SourceRefusal;
 use super::specification::SpecificationRefusal;
 use super::verification::VerificationRefusal;
@@ -31,6 +32,10 @@ pub(crate) struct Component<'a, T> {
 pub(crate) enum Refusal {
     Origin(OriginRefusal),
     Source(SourceRefusal),
+    /// The `programmatic-entry-identity-revision` boundary's, which spells the
+    /// pair's checks with `entry`.
+    EntryIdentity(SourceRefusal),
+    Snapshot(SnapshotRefusal),
     Selector(SelectorRefusal),
     Specification(SpecificationRefusal),
     Vocabulary(EnvelopeFailure),
@@ -46,6 +51,8 @@ impl Refusal {
         match self {
             Self::Origin(_) => "safe-origin-kind",
             Self::Source(_) => "file-source-identity-revision",
+            Self::EntryIdentity(_) => "programmatic-entry-identity-revision",
+            Self::Snapshot(_) => "programmatic-entry-snapshot",
             Self::Selector(_) => "external-profile-selector-binding",
             Self::Specification(_) => "profile-resolution-specification-input",
             Self::Vocabulary(_) => "intent-surface-class-vocabulary-artifact",
@@ -61,6 +68,8 @@ impl Refusal {
         match self {
             Self::Origin(refusal) => refusal.reason(),
             Self::Source(refusal) => refusal.reason(),
+            Self::EntryIdentity(refusal) => refusal.entry_reason(),
+            Self::Snapshot(refusal) => refusal.reason(),
             Self::Selector(refusal) => refusal.reason(),
             Self::Specification(refusal) => refusal.reason(),
             Self::Vocabulary(failure) => failure.reason(),
@@ -123,6 +132,16 @@ mod tests {
                 Refusal::Source(SourceRefusal::UnstableIdentity),
                 "file-source-identity-revision",
                 "unstable-source-identity",
+            ),
+            (
+                Refusal::EntryIdentity(SourceRefusal::UnstableIdentity),
+                "programmatic-entry-identity-revision",
+                "unstable-entry-identity",
+            ),
+            (
+                Refusal::Snapshot(SnapshotRefusal::Malformed),
+                "programmatic-entry-snapshot",
+                "malformed-snapshot",
             ),
             (
                 Refusal::Selector(SelectorRefusal::MalformedNormalized),

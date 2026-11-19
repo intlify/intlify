@@ -12,8 +12,9 @@
 //! string; and an object's keys are unique and ordered by their unsigned
 //! UTF-8 bytes, which `BTreeMap<String, _>` keeps by construction
 //! (D15:854-859, 871, 889). Admitting a submitted Snapshot into this form, or
-//! refusing it, is the `programmatic-entry-snapshot` boundary's work. Like
-//! the file entry's value, the tree carries configuration and has no `Debug`.
+//! refusing it, is the `programmatic-entry-snapshot` boundary's work
+//! ([`crate::boundary::snapshot`]). Like the file entry's value, the tree
+//! carries configuration and has no `Debug`.
 
 use std::collections::BTreeMap;
 
@@ -22,8 +23,9 @@ use intlify_shared_json::token::hex;
 
 use crate::construction::profile::{MARKER_REASONS, SNAPSHOT_DOMAIN};
 use crate::framing::{frame, Record};
+use crate::input_limits::Bound;
 use crate::materialize::PortableNumber;
-use crate::resolver::capability::{BootstrapBoundId, BootstrapGroup};
+use crate::resolver::capability::{BootstrapBoundId, BootstrapGroup, SnapshotLimits};
 
 /// The tags of `S`: 017's value tags, then a number and a marker (D15:873-886).
 const NULL: u8 = 0x01;
@@ -88,6 +90,11 @@ impl MarkerReason {
     pub(crate) const fn id(self) -> &'static str {
         MARKER_REASONS[self as usize]
     }
+
+    /// The ordinary reason whose ID is `id`, if any.
+    pub(crate) fn from_id(id: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|reason| reason.id() == id)
+    }
 }
 
 /// The reason ID of a bootstrap overrun's marker.
@@ -145,6 +152,26 @@ impl SnapshotBound {
     pub(crate) fn path(self) -> String {
         let id = self.id();
         format!("bootstrapOnly.{}.{}", id.group.path(), id.name)
+    }
+
+    /// The bound whose capability path is `path`, if any.
+    pub(crate) fn from_path(path: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|bound| bound.path() == path)
+    }
+
+    /// The bound's value in `limits`.
+    pub(crate) const fn limit(self, limits: &SnapshotLimits) -> Bound {
+        match self {
+            Self::Nodes => limits.max_nodes,
+            Self::Depth => limits.max_depth,
+            Self::CollectionEntries => limits.max_collection_entries,
+            Self::TotalStringBytes => limits.max_total_string_bytes,
+            Self::SingleStringBytes => limits.max_single_string_bytes,
+            Self::RejectedMarkers => limits.max_rejected_markers,
+            Self::EnvelopeCanonicalBytes => limits.max_envelope_canonical_bytes,
+            Self::SingleMarkerCanonicalBytes => limits.max_single_marker_canonical_bytes,
+            Self::TraversalUnits => limits.max_traversal_units,
+        }
     }
 }
 
@@ -468,6 +495,55 @@ mod tests {
         assert_eq!(
             SnapshotBound::TraversalUnits.path(),
             "bootstrapOnly.snapshot.maxTraversalUnits"
+        );
+    }
+
+    /// A reason reads back from its ID and a bound from its path, nothing
+    /// else does, and each bound's limit is its own field of the limits.
+    #[test]
+    fn reasons_and_bounds_read_back_from_their_spellings() {
+        use crate::resolver::capability::BootstrapLimits;
+
+        for reason in MarkerReason::ALL {
+            assert_eq!(MarkerReason::from_id(reason.id()), Some(reason));
+        }
+        for id in [BOOTSTRAP_LIMIT_EXCEEDED, "cycles", "Cycle", ""] {
+            assert_eq!(MarkerReason::from_id(id), None, "{id}");
+        }
+        for bound in SnapshotBound::ALL {
+            assert_eq!(SnapshotBound::from_path(&bound.path()), Some(bound));
+        }
+        for path in [
+            "bootstrapOnly.rawInput.maxFileBytes",
+            "bootstrapOnly.snapshot.maxnodes",
+            "snapshot.maxNodes",
+            "maxNodes",
+        ] {
+            assert_eq!(SnapshotBound::from_path(path), None, "{path}");
+        }
+        let mut limits = BootstrapLimits::MINIMUM;
+        let distinct = |value| Bound::new(value).unwrap();
+        limits.snapshot = SnapshotLimits {
+            max_nodes: distinct(11),
+            max_depth: distinct(12),
+            max_collection_entries: distinct(13),
+            max_total_string_bytes: distinct(14),
+            max_single_string_bytes: distinct(15),
+            max_rejected_markers: distinct(16),
+            max_envelope_canonical_bytes: distinct(17),
+            max_single_marker_canonical_bytes: distinct(18),
+            max_traversal_units: distinct(19),
+        };
+        let snapshot: Vec<(BootstrapBoundId, Bound)> = limits
+            .bounds()
+            .into_iter()
+            .filter(|(id, _)| id.group == BootstrapGroup::Snapshot)
+            .collect();
+        assert_eq!(
+            SnapshotBound::ALL
+                .map(|bound| (bound.id(), bound.limit(&limits.snapshot)))
+                .to_vec(),
+            snapshot
         );
     }
 
