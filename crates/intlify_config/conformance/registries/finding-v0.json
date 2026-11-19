@@ -1357,6 +1357,159 @@
               "rank": "1"
             },
             {
+              "role": "snapshot",
+              "rank": "1"
+            },
+            {
+              "role": "maxNodes",
+              "rank": "0"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "snapshot",
+              "rank": "1"
+            },
+            {
+              "role": "maxDepth",
+              "rank": "1"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "snapshot",
+              "rank": "1"
+            },
+            {
+              "role": "maxCollectionEntries",
+              "rank": "2"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "snapshot",
+              "rank": "1"
+            },
+            {
+              "role": "maxTotalStringBytes",
+              "rank": "3"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "snapshot",
+              "rank": "1"
+            },
+            {
+              "role": "maxSingleStringBytes",
+              "rank": "4"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "snapshot",
+              "rank": "1"
+            },
+            {
+              "role": "maxRejectedMarkers",
+              "rank": "5"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "snapshot",
+              "rank": "1"
+            },
+            {
+              "role": "maxEnvelopeCanonicalBytes",
+              "rank": "6"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "snapshot",
+              "rank": "1"
+            },
+            {
+              "role": "maxSingleMarkerCanonicalBytes",
+              "rank": "7"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "snapshot",
+              "rank": "1"
+            },
+            {
+              "role": "maxTraversalUnits",
+              "rank": "8"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
               "role": "artifactBootstrap",
               "rank": "3"
             },
@@ -5376,6 +5529,15 @@
       "allowedCheckIds": [
         "entry.input.within-file-bytes",
         "entry.input.within-parser-tokens",
+        "entry.input.within-snapshot-nodes",
+        "entry.input.within-snapshot-depth",
+        "entry.input.within-snapshot-collection-entries",
+        "entry.input.within-snapshot-total-string-bytes",
+        "entry.input.within-snapshot-single-string-bytes",
+        "entry.input.within-snapshot-rejected-markers",
+        "entry.input.within-snapshot-envelope-canonical-bytes",
+        "entry.input.within-snapshot-single-marker-canonical-bytes",
+        "entry.input.within-snapshot-traversal-units",
         "resource-policy.resource-limits.within-metadata-scan",
         "resource-policy.resource-limits.within-envelope-depth",
         "resource-policy.resource-limits.within-decoded-allocation",
@@ -5395,6 +5557,42 @@
         },
         {
           "checkId": "entry.input.within-parser-tokens",
+          "kind": "entry-source"
+        },
+        {
+          "checkId": "entry.input.within-snapshot-nodes",
+          "kind": "entry-source"
+        },
+        {
+          "checkId": "entry.input.within-snapshot-depth",
+          "kind": "entry-source"
+        },
+        {
+          "checkId": "entry.input.within-snapshot-collection-entries",
+          "kind": "entry-source"
+        },
+        {
+          "checkId": "entry.input.within-snapshot-total-string-bytes",
+          "kind": "entry-source"
+        },
+        {
+          "checkId": "entry.input.within-snapshot-single-string-bytes",
+          "kind": "entry-source"
+        },
+        {
+          "checkId": "entry.input.within-snapshot-rejected-markers",
+          "kind": "entry-source"
+        },
+        {
+          "checkId": "entry.input.within-snapshot-envelope-canonical-bytes",
+          "kind": "entry-source"
+        },
+        {
+          "checkId": "entry.input.within-snapshot-single-marker-canonical-bytes",
+          "kind": "entry-source"
+        },
+        {
+          "checkId": "entry.input.within-snapshot-traversal-units",
           "kind": "entry-source"
         },
         {
@@ -5423,6 +5621,60 @@
         },
         {
           "checkId": "entry.input.within-parser-tokens",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "entry.input.within-snapshot-nodes",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "entry.input.within-snapshot-depth",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "entry.input.within-snapshot-collection-entries",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "entry.input.within-snapshot-total-string-bytes",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "entry.input.within-snapshot-single-string-bytes",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "entry.input.within-snapshot-rejected-markers",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "entry.input.within-snapshot-envelope-canonical-bytes",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "entry.input.within-snapshot-single-marker-canonical-bytes",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "entry.input.within-snapshot-traversal-units",
           "kinds": [
             "implementation-capability"
           ]
@@ -5526,6 +5778,159 @@
                   "rank": "1"
                 },
                 {
+                  "role": "snapshot",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxNodes",
+                  "rank": "0"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "snapshot",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxDepth",
+                  "rank": "1"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "snapshot",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxCollectionEntries",
+                  "rank": "2"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "snapshot",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxTotalStringBytes",
+                  "rank": "3"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "snapshot",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxSingleStringBytes",
+                  "rank": "4"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "snapshot",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxRejectedMarkers",
+                  "rank": "5"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "snapshot",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxEnvelopeCanonicalBytes",
+                  "rank": "6"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "snapshot",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxSingleMarkerCanonicalBytes",
+                  "rank": "7"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "snapshot",
+                  "rank": "1"
+                },
+                {
+                  "role": "maxTraversalUnits",
+                  "rank": "8"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
                   "role": "artifactBootstrap",
                   "rank": "3"
                 },
@@ -5593,7 +5998,8 @@
         {
           "evidenceKind": "entry-source",
           "origins": [
-            "configuration-file"
+            "configuration-file",
+            "configuration-programmatic"
           ]
         },
         {

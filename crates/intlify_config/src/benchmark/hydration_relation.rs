@@ -422,6 +422,15 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::EstablishedSlots
         | Check::WithinFileBytes
         | Check::WithinParserTokens
+        | Check::WithinSnapshotNodes
+        | Check::WithinSnapshotDepth
+        | Check::WithinSnapshotCollectionEntries
+        | Check::WithinSnapshotTotalStringBytes
+        | Check::WithinSnapshotSingleStringBytes
+        | Check::WithinSnapshotRejectedMarkers
+        | Check::WithinSnapshotEnvelopeCanonicalBytes
+        | Check::WithinSnapshotSingleMarkerCanonicalBytes
+        | Check::WithinSnapshotTraversalUnits
         | Check::WellFormedJson
         | Check::UniqueMembers
         | Check::JsonCompatible

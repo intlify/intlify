@@ -696,6 +696,15 @@ impl SubjectKind {
             Self::CompleteInput => &[
                 Check::WithinFileBytes,
                 Check::WithinParserTokens,
+                Check::WithinSnapshotNodes,
+                Check::WithinSnapshotDepth,
+                Check::WithinSnapshotCollectionEntries,
+                Check::WithinSnapshotTotalStringBytes,
+                Check::WithinSnapshotSingleStringBytes,
+                Check::WithinSnapshotRejectedMarkers,
+                Check::WithinSnapshotEnvelopeCanonicalBytes,
+                Check::WithinSnapshotSingleMarkerCanonicalBytes,
+                Check::WithinSnapshotTraversalUnits,
                 Check::WellFormedJson,
                 Check::UniqueMembers,
                 Check::JsonCompatible,
@@ -744,6 +753,41 @@ impl SubjectKind {
             .filter(|kind| kind.phase() == self.phase())
             .position(|&kind| kind == self)
             .expect("every kind is listed")
+    }
+}
+
+/// The path an invocation enters by: a configuration file, or a Programmatic
+/// Entry Snapshot (D15:2129).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EntryPath {
+    File,
+    Programmatic,
+}
+
+impl Check {
+    /// Whether an invocation through `path` records a unit of this check:
+    /// the raw-byte, parser-token, strict-syntax, and duplicate-member checks
+    /// only for a file, the Snapshot-bound checks only for a Snapshot, and
+    /// every other check for either (Decision 015-202).
+    pub(crate) const fn recorded_for(self, path: EntryPath) -> bool {
+        match self {
+            Self::WithinFileBytes
+            | Self::WithinParserTokens
+            | Self::WellFormedJson
+            | Self::UniqueMembers => matches!(path, EntryPath::File),
+            Self::WithinSnapshotNodes
+            | Self::WithinSnapshotDepth
+            | Self::WithinSnapshotCollectionEntries
+            | Self::WithinSnapshotTotalStringBytes
+            | Self::WithinSnapshotSingleStringBytes
+            | Self::WithinSnapshotRejectedMarkers
+            | Self::WithinSnapshotEnvelopeCanonicalBytes
+            | Self::WithinSnapshotSingleMarkerCanonicalBytes
+            | Self::WithinSnapshotTraversalUnits => {
+                matches!(path, EntryPath::Programmatic)
+            }
+            _ => true,
+        }
     }
 }
 
@@ -1279,14 +1323,24 @@ mod tests {
                     SubjectKind::EntryDependencies,
                     &[Check::EstablishedSlots][..]
                 ),
-                // The bootstrap bounds before the checks they protect, then
-                // the five root-value bounds in table order (D15:1876,
-                // 1999, 2006, 2356).
+                // The bootstrap bounds before the checks they protect, the
+                // raw file's and then the Snapshot's in table order, then
+                // the five root-value bounds in table order (D15:1794-1804,
+                // 1876, 1999, 2006, 2008, 2356).
                 (
                     SubjectKind::CompleteInput,
                     &[
                         Check::WithinFileBytes,
                         Check::WithinParserTokens,
+                        Check::WithinSnapshotNodes,
+                        Check::WithinSnapshotDepth,
+                        Check::WithinSnapshotCollectionEntries,
+                        Check::WithinSnapshotTotalStringBytes,
+                        Check::WithinSnapshotSingleStringBytes,
+                        Check::WithinSnapshotRejectedMarkers,
+                        Check::WithinSnapshotEnvelopeCanonicalBytes,
+                        Check::WithinSnapshotSingleMarkerCanonicalBytes,
+                        Check::WithinSnapshotTraversalUnits,
                         Check::WellFormedJson,
                         Check::UniqueMembers,
                         Check::JsonCompatible,
@@ -1299,6 +1353,65 @@ mod tests {
                 ),
             ]
         );
+    }
+
+    /// A file records the raw-byte, parser-token, strict-syntax, and
+    /// duplicate-member checks, a Snapshot the nine Snapshot-bound checks, and
+    /// either the JSON-compatible domain, the five root-value bounds, and every
+    /// check of another kind (Decision 015-202).
+    #[test]
+    fn each_entry_path_records_the_checks_it_has_something_to_examine() {
+        use Check as C;
+
+        let recorded = |path| -> Vec<Check> {
+            SubjectKind::CompleteInput
+                .checks()
+                .iter()
+                .copied()
+                .filter(|check| check.recorded_for(path))
+                .collect()
+        };
+        let both = [
+            C::JsonCompatible,
+            C::WithinNodes,
+            C::WithinDepth,
+            C::WithinCollectionEntries,
+            C::WithinTotalStringBytes,
+            C::WithinSingleStringBytes,
+        ];
+        let file = [
+            C::WithinFileBytes,
+            C::WithinParserTokens,
+            C::WellFormedJson,
+            C::UniqueMembers,
+        ];
+        let snapshot = [
+            C::WithinSnapshotNodes,
+            C::WithinSnapshotDepth,
+            C::WithinSnapshotCollectionEntries,
+            C::WithinSnapshotTotalStringBytes,
+            C::WithinSnapshotSingleStringBytes,
+            C::WithinSnapshotRejectedMarkers,
+            C::WithinSnapshotEnvelopeCanonicalBytes,
+            C::WithinSnapshotSingleMarkerCanonicalBytes,
+            C::WithinSnapshotTraversalUnits,
+        ];
+        assert_eq!(recorded(EntryPath::File), [&file[..], &both[..]].concat());
+        assert_eq!(
+            recorded(EntryPath::Programmatic),
+            [&snapshot[..], &both[..]].concat()
+        );
+        for kind in SubjectKind::ALL {
+            if kind != SubjectKind::CompleteInput {
+                for check in kind.checks() {
+                    assert!(
+                        check.recorded_for(EntryPath::File)
+                            && check.recorded_for(EntryPath::Programmatic),
+                        "{kind:?} {check:?}"
+                    );
+                }
+            }
+        }
     }
 
     /// The kinds of structural admission, but the `profileSpecification`
