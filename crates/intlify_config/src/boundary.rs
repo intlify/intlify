@@ -18,7 +18,8 @@
 //! or every failure in the rank of its slots (015-168). A file entry's source
 //! identity and revision are admitted against its bytes (015-170), and its
 //! locator candidate is admitted or treated as absence, never as a failure
-//! (015-171). A file Entry Admission Input Set is admitted in a step of its
+//! (015-171), as a Programmatic Entry's or Call-Site Source's `safe-label` or
+//! `safe-uri` candidate is. A file Entry Admission Input Set is admitted in a step of its
 //! own that works like the common one (015-172); both steps share the parts
 //! in `step`. A Programmatic Entry Snapshot is admitted as its canonical tree
 //! or refused by the first failing check of its bounds, its closed model, its
