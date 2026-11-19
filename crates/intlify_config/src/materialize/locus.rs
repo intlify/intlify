@@ -5,11 +5,13 @@
 //! document came from. A locus is opaque: only code that needs a file's byte
 //! coordinates asks for them, and handles a locus without them.
 
-use super::ByteSpan;
+use super::{ByteSpan, NodeId};
 
 /// Where a value, or a member's key, is in the input its document came
 /// from. A file document's locus is its token's byte span, which
-/// Materialized Value Evidence retains (D15:790).
+/// Materialized Value Evidence retains (D15:790). A Snapshot document's is
+/// its node, or the key of the member whose value is that node, and has no
+/// bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Locus(Kind);
 
@@ -17,6 +19,9 @@ pub(crate) struct Locus(Kind);
 enum Kind {
     /// A token's byte span in a file.
     File(ByteSpan),
+    /// A node of a Snapshot's document, or with `key` the key of the member
+    /// whose value it is.
+    Snapshot { node: NodeId, key: bool },
 }
 
 impl Locus {
@@ -25,15 +30,18 @@ impl Locus {
         Self(Kind::File(span))
     }
 
+    /// The locus of the Snapshot document's `node`, or with `key` of the key
+    /// of the member whose value it is.
+    pub(super) const fn snapshot(node: NodeId, key: bool) -> Self {
+        Self(Kind::Snapshot { node, key })
+    }
+
     /// The byte span of the file token at the locus; none without file
     /// coordinates.
-    #[expect(
-        clippy::unnecessary_wraps,
-        reason = "callers handle a locus without file coordinates before one exists"
-    )]
     pub(crate) const fn bytes(self) -> Option<ByteSpan> {
         match self.0 {
             Kind::File(span) => Some(span),
+            Kind::Snapshot { .. } => None,
         }
     }
 }

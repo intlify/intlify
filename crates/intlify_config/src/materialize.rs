@@ -16,6 +16,8 @@
 //! Raw source is immutable shared input. A successful document owns its decoded
 //! values and source map, not borrowed scratch. No reusable workspace, global
 //! cache, or capacity-retention policy is introduced by this implementation.
+//! A Programmatic Entry Snapshot without markers materializes as the same
+//! document, its nodes located in the Snapshot rather than in bytes.
 //! Spans, loci, and typed failures below are internal observations, not formal
 //! 015 Evidence, Source Identities, Finding Registry records, or Resolver
 //! Outcomes.
@@ -373,6 +375,7 @@ pub(crate) fn member_name(source: &[u8], key: ByteSpan) -> String {
 mod lex;
 mod locus;
 mod parse;
+mod snapshot;
 mod typed;
 
 pub(crate) use locus::Locus;

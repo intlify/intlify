@@ -123,7 +123,7 @@ mod input_limits;
 #[allow(dead_code)]
 mod materialize;
 // 015's canonical Programmatic Entry Snapshot, which `boundary::snapshot`
-// admits; the programmatic entry comes later.
+// admits and Phase 1 reads; the programmatic invocation comes later.
 #[allow(dead_code)]
 mod snapshot;
 #[allow(dead_code)]
