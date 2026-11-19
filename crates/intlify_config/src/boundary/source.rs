@@ -1,26 +1,33 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! 015's `file-source-identity-revision` boundary: a file entry's exact
-//! logical source identity and Source-content revision, admitted against the
-//! raw bytes they name or refused with one of the seven reasons of its row
-//! (D15:743, 3146; 015-149, 015-170).
+//! 015's two identity-revision boundaries: `file-source-identity-revision`,
+//! which admits a file entry's exact logical source identity and
+//! Source-content revision against the raw bytes they name, and
+//! `programmatic-entry-identity-revision`, which admits a Programmatic Entry
+//! identity and revision against the digest of the admitted Snapshot. Each
+//! refuses with one of the seven reasons of its row, and the two rows spell
+//! the same checks (D15:743, 3146, 3147; 015-149, 015-170, 015-201).
 //!
 //! An identity is a versioned identity-domain tag, `:`, and a non-empty
 //! payload. The tag is a name, `.v`, and a decimal version without a leading
 //! zero; the name holds lowercase ASCII letters, digits, `.`, and `-`, and
 //! begins and ends with a letter or digit. The domain's adapter defines the
 //! payload, so the boundary only requires one. A revision is derived from the
-//! content: SHA-256 over the domain separator and a one-field record holding
-//! the exact bytes, presented as `sha256:` and 64 lowercase hexadecimal
-//! digits. A path, a timestamp, or an adapter's assertion is never a revision.
+//! content: a file's is SHA-256 over the domain separator and a one-field
+//! record holding the exact bytes, and a Programmatic Entry's is the
+//! snapshot-content digest, each presented as `sha256:` and 64 lowercase
+//! hexadecimal digits. A path, a timestamp, or an adapter's assertion is never
+//! a revision.
 //!
 //! The checks run in the row's order: an identity, then a revision, is
 //! present; each is within its `bootstrapOnly.evidenceMetadata` bound; the
 //! identity has the form; the revision has the presentation; and last the
-//! revision is the one computed over the bytes. The first check that fails
-//! decides. Programmatic Entry and Call-Site Source identities have the same
-//! form, which [`identity_parts`] checks for them too.
+//! revision is the one computed from the content. The first check that fails
+//! decides. A Programmatic Entry's revision is compared with the digest of
+//! its admitted Snapshot, so the pair is admitted only after the Snapshot is.
+//! Call-Site Source identities have the same form, which [`identity_parts`]
+//! checks for them too.
 
 use intlify_shared_json::encoding::digest_bytes;
 use intlify_shared_json::token::hex;
@@ -32,6 +39,7 @@ use crate::input_limits::Bound;
 use crate::references::valid_semantic_digest;
 
 use super::capability::ImplementationCapability;
+use super::snapshot::AdmittedSnapshot;
 
 /// The bounds on one pair: the capability's, or a test's own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,8 +58,8 @@ impl SourceLimits {
     }
 }
 
-/// Why the boundary refuses a pair: one of the seven reasons of its row, in
-/// that order.
+/// Why a boundary refuses a pair: one of the seven checks of its row, in that
+/// order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SourceRefusal {
     MissingIdentity,
@@ -64,12 +72,13 @@ pub(crate) enum SourceRefusal {
     UnstableIdentity,
     /// The revision is not `sha256:` and 64 lowercase hexadecimal digits.
     UnboundRevision,
-    /// The revision is not the one computed over the supplied bytes.
+    /// The revision is not the one computed from the content: the bytes'
+    /// Source-content revision, or the admitted Snapshot's digest.
     SnapshotMismatch,
 }
 
 impl SourceRefusal {
-    /// The reason as 015's boundary table spells it.
+    /// The reason as 015's `file-source-identity-revision` row spells it.
     pub(crate) const fn reason(self) -> &'static str {
         match self {
             Self::MissingIdentity => "missing-source-identity",
@@ -79,6 +88,19 @@ impl SourceRefusal {
             Self::UnstableIdentity => "unstable-source-identity",
             Self::UnboundRevision => "unbound-source-revision",
             Self::SnapshotMismatch => "source-snapshot-mismatch",
+        }
+    }
+
+    /// The reason as the `programmatic-entry-identity-revision` row spells it.
+    pub(crate) const fn entry_reason(self) -> &'static str {
+        match self {
+            Self::MissingIdentity => "missing-entry-identity",
+            Self::MissingRevision => "missing-entry-revision",
+            Self::OverBoundIdentity => "over-bound-entry-identity",
+            Self::OverBoundRevision => "over-bound-entry-revision",
+            Self::UnstableIdentity => "unstable-entry-identity",
+            Self::UnboundRevision => "unbound-entry-revision",
+            Self::SnapshotMismatch => "snapshot-identity-mismatch",
         }
     }
 }
@@ -135,13 +157,54 @@ pub(crate) fn admit(
     read_pair(identity, revision, bytes, SourceLimits::of(capability))
 }
 
-/// The boundary's checks under `limits`, which [`admit`] takes from the
+/// The file boundary's checks under `limits`, which [`admit`] takes from the
 /// capability.
 pub(crate) fn read_pair(
     identity: Option<&str>,
     revision: Option<&str>,
     bytes: &[u8],
     limits: SourceLimits,
+) -> Result<SourcePair, SourceRefusal> {
+    check_pair(identity, revision, limits, |revision| {
+        revision == file_source_revision(bytes)
+    })
+}
+
+/// Admit a submitted Programmatic Entry pair, either part `None` when absent,
+/// against the admitted Snapshot whose digest is the Programmatic Entry
+/// revision, under the capability's bounds (015-201).
+pub(crate) fn admit_entry(
+    identity: Option<&str>,
+    revision: Option<&str>,
+    snapshot: &AdmittedSnapshot,
+    capability: &ImplementationCapability,
+) -> Result<SourcePair, SourceRefusal> {
+    read_entry_pair(
+        identity,
+        revision,
+        snapshot.digest(),
+        SourceLimits::of(capability),
+    )
+}
+
+/// The Programmatic Entry boundary's checks under `limits`, the revision
+/// compared with the Snapshot's `digest`.
+pub(crate) fn read_entry_pair(
+    identity: Option<&str>,
+    revision: Option<&str>,
+    digest: &str,
+    limits: SourceLimits,
+) -> Result<SourcePair, SourceRefusal> {
+    check_pair(identity, revision, limits, |revision| revision == digest)
+}
+
+/// The seven checks in the rows' order; `derived` says whether a revision in
+/// the presentation is the one computed from the content.
+fn check_pair(
+    identity: Option<&str>,
+    revision: Option<&str>,
+    limits: SourceLimits,
+    derived: impl FnOnce(&str) -> bool,
 ) -> Result<SourcePair, SourceRefusal> {
     use SourceRefusal::{
         MissingIdentity, MissingRevision, OverBoundIdentity, OverBoundRevision, SnapshotMismatch,
@@ -160,7 +223,7 @@ pub(crate) fn read_pair(
     if !valid_semantic_digest(revision) {
         return Err(UnboundRevision);
     }
-    if revision != file_source_revision(bytes) {
+    if !derived(revision) {
         return Err(SnapshotMismatch);
     }
     Ok(SourcePair {
@@ -226,6 +289,7 @@ mod tests {
     };
     use crate::locale::VersionedIdentity;
     use crate::resolver::limits::fixture_limits;
+    use crate::snapshot::Node;
 
     const BYTES: &[u8] = b"{\"schemaVersion\":\"0\"}\n";
     /// The revision of `BYTES`, computed outside this crate with Python's
@@ -473,6 +537,120 @@ mod tests {
                 "unstable-source-identity",
                 "unbound-source-revision",
                 "source-snapshot-mismatch",
+            ]
+        );
+    }
+
+    const ENTRY: &str = "intlify-programmatic-entry.v0:storefront";
+
+    /// A Programmatic Entry pair runs the same checks in the same order, its
+    /// revision compared with the Snapshot's digest (D15:743, 3147).
+    #[test]
+    fn the_entry_pair_runs_the_same_checks_against_the_digest() {
+        use SourceRefusal as R;
+
+        let digest = Node::Null.digest();
+        let bound = |value: usize| Bound::new(count(value)).unwrap();
+        let exact = SourceLimits {
+            identity_bytes: bound(ENTRY.len()),
+            revision_bytes: bound(digest.len()),
+        };
+        let read = |identity: Option<&str>, revision: Option<&str>, limits: SourceLimits| {
+            read_entry_pair(identity, revision, &digest, limits)
+        };
+        let pair = read(Some(ENTRY), Some(&digest), exact).unwrap();
+        assert_eq!(pair.identity().tag(), "intlify-programmatic-entry.v0");
+        assert_eq!(pair.revision(), digest);
+        let short_identity = SourceLimits {
+            identity_bytes: bound(ENTRY.len() - 1),
+            ..exact
+        };
+        let short_revision = SourceLimits {
+            revision_bytes: bound(digest.len() - 1),
+            ..exact
+        };
+        let upper = digest.to_ascii_uppercase();
+        let bytes = file_source_revision(b"null");
+        for (identity, revision, limits, refusal) in [
+            (None, None, exact, R::MissingIdentity),
+            (Some(ENTRY), None, exact, R::MissingRevision),
+            (
+                Some(ENTRY),
+                Some(&*digest),
+                short_identity,
+                R::OverBoundIdentity,
+            ),
+            (
+                Some(ENTRY),
+                Some(&*digest),
+                short_revision,
+                R::OverBoundRevision,
+            ),
+            (Some("entry"), Some(&*digest), exact, R::UnstableIdentity),
+            (Some(ENTRY), Some(&*upper), exact, R::UnboundRevision),
+            (Some(ENTRY), Some(&*bytes), exact, R::SnapshotMismatch),
+        ] {
+            assert_eq!(
+                read(identity, revision, limits),
+                Err(refusal),
+                "{refusal:?}"
+            );
+        }
+    }
+
+    /// `admit_entry` reads the capability's bounds and compares the revision
+    /// with the digest of the Snapshot it is given.
+    #[test]
+    fn the_capability_bounds_the_entry_pair() {
+        let snapshot = AdmittedSnapshot::of(Node::Null);
+        let digest = snapshot.digest().to_owned();
+        let (identity, revision) = (ENTRY.len(), digest.len());
+        let under = |snapshot: &AdmittedSnapshot, identity, revision| {
+            admit_entry(
+                Some(ENTRY),
+                Some(&digest),
+                snapshot,
+                &capability(identity, revision),
+            )
+        };
+        assert!(under(&snapshot, identity, revision).is_ok());
+        assert_eq!(
+            under(&snapshot, identity - 1, revision),
+            Err(SourceRefusal::OverBoundIdentity)
+        );
+        assert_eq!(
+            under(&snapshot, identity, revision - 1),
+            Err(SourceRefusal::OverBoundRevision)
+        );
+        let other = AdmittedSnapshot::of(Node::Boolean(true));
+        assert_eq!(
+            under(&other, identity, revision),
+            Err(SourceRefusal::SnapshotMismatch)
+        );
+    }
+
+    #[test]
+    fn each_refusal_has_its_entry_reason() {
+        use SourceRefusal as R;
+        assert_eq!(
+            [
+                R::MissingIdentity,
+                R::MissingRevision,
+                R::OverBoundIdentity,
+                R::OverBoundRevision,
+                R::UnstableIdentity,
+                R::UnboundRevision,
+                R::SnapshotMismatch,
+            ]
+            .map(R::entry_reason),
+            [
+                "missing-entry-identity",
+                "missing-entry-revision",
+                "over-bound-entry-identity",
+                "over-bound-entry-revision",
+                "unstable-entry-identity",
+                "unbound-entry-revision",
+                "snapshot-identity-mismatch",
             ]
         );
     }

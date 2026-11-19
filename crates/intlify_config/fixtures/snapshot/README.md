@@ -38,4 +38,4 @@ The unit tests are at the end of each source file, named here by their function.
 | Each `bootstrapOnly.snapshot` bound counts in its own unit, a marker being a node and the traversal visiting every node and edge (D15:1796-1804) | `snapshot.rs`: `the_counts_follow_each_bound_unit`, `a_marker_free_tree_counts_as_the_same_json_value`. Node: every vector's counts |
 | The committed vectors are the ones this crate writes | `artifacts/vectors/snapshot.rs`: `the_committed_vectors_are_the_ones_this_crate_writes`, `every_vector_reads_back_as_its_snapshot`, `the_vectors_hold_every_variant_reason_and_bound` |
 
-Admitting a submitted Snapshot into this canonical form, or refusing it with one of the reasons of the `programmatic-entry-snapshot` boundary, comes with that boundary.
+The `programmatic-entry-snapshot` boundary (`src/boundary/snapshot.rs`) admits a submitted Snapshot into this canonical form or refuses it with one of the five reasons of its row. Its unit tests check each reason, the order of the checks, the terminal marker left out of the bounds, and that the boundary counts a submitted tree in the units above.

@@ -21,7 +21,8 @@
 //! and then `profile-selector-cli`, an origin's before its value's. A locator
 //! candidate never fails: one that is not admitted is absence in the admitted
 //! set. The construction-identity reference is admitted outside this step,
-//! and a programmatic entry has no step yet (015-172).
+//! and a programmatic entry's step of the same form (015-201) comes with its
+//! call-site boundary.
 
 use std::sync::Arc;
 
