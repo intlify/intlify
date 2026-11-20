@@ -110,6 +110,14 @@ pub(crate) struct SpanCandidate {
     pub(crate) end: f64,
 }
 
+impl SpanCandidate {
+    /// Both coordinates, when each is an integer in `0..=u64::MAX`, which is
+    /// all a byte coordinate can be (D15:745).
+    pub(crate) fn coordinates(self) -> Option<(u64, u64)> {
+        Some((unsigned(self.start)?, unsigned(self.end)?))
+    }
+}
+
 /// A mapping's closed location role, in 015's order (D15:747).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum LocationRole {
@@ -271,6 +279,15 @@ impl AdmittedCallSite {
             .iter()
             .map(|((path, role), span)| (path.as_slice(), *role, *span))
     }
+
+    /// The candidate `path` and `role` are mapped to, if any.
+    pub(crate) fn candidate(
+        &self,
+        path: Vec<StructuralEdge>,
+        role: LocationRole,
+    ) -> Option<SpanCandidate> {
+        self.mappings.get(&(path, role)).copied()
+    }
 }
 
 /// Admit a report, `None` when no sidecar was submitted, under the
@@ -357,15 +374,15 @@ impl SubmittedEdge {
             Self::Key(bytes) => std::str::from_utf8(bytes)
                 .ok()
                 .map(|key| StructuralEdge::Key(key.to_owned())),
-            Self::Index(value) => index(*value).map(StructuralEdge::Index),
+            Self::Index(value) => unsigned(*value).map(StructuralEdge::Index),
         }
     }
 }
 
-/// `value` as an index when it is an integer in `0..=u64::MAX`, which a
-/// binary64 is exactly when it is a non-negative integer below 2^64. Negative
-/// zero is zero.
-fn index(value: f64) -> Option<u64> {
+/// `value` as an unsigned integer when it is an integer in `0..=u64::MAX`,
+/// which a binary64 is exactly when it is a non-negative integer below 2^64.
+/// Negative zero is zero.
+fn unsigned(value: f64) -> Option<u64> {
     // 2^64, the first integer past `u64::MAX`.
     const PAST: f64 = 18_446_744_073_709_551_616.0;
     ((0.0..PAST).contains(&value) && value.fract() == 0.0).then_some(value as u64)
@@ -529,6 +546,60 @@ mod tests {
                 ("/profiles/app".to_owned(), "member-value", (-1.0, 4.0)),
             ]
         );
+    }
+
+    /// An admitted sidecar gives the candidate of one path and one role.
+    #[test]
+    fn a_candidate_is_looked_up_by_its_path_and_role() {
+        let mappings = vec![mapping(vec![key("profiles"), at(0.0)], "node", 1.0, 2.0)];
+        let kept = admitted(sidecar(&revision(), mappings), roomy());
+        let path = |edges: &[StructuralEdge]| edges.to_vec();
+        let element = [
+            StructuralEdge::Key("profiles".to_owned()),
+            StructuralEdge::Index(0),
+        ];
+        assert_eq!(
+            kept.candidate(path(&element), LocationRole::Node),
+            Some(SpanCandidate {
+                start: 1.0,
+                end: 2.0
+            })
+        );
+        assert_eq!(
+            kept.candidate(path(&element), LocationRole::MemberValue),
+            None
+        );
+        assert_eq!(
+            kept.candidate(path(&element[..1]), LocationRole::Node),
+            None
+        );
+    }
+
+    /// A candidate's coordinates are integers in `0..=u64::MAX`, inverted or
+    /// not, or none; whether they make a span is Evidence's question
+    /// (D15:745, 749).
+    #[test]
+    fn a_candidates_coordinates_are_unsigned_integers() {
+        // 2^64, the first integer past `u64::MAX`.
+        const PAST: f64 = 18_446_744_073_709_551_616.0;
+        let coordinates = |start, end| SpanCandidate { start, end }.coordinates();
+        assert_eq!(coordinates(3.0, 9.0), Some((3, 9)));
+        assert_eq!(coordinates(9.0, 3.0), Some((9, 3)));
+        assert_eq!(
+            coordinates(-0.0, GREATEST),
+            Some((0, 18_446_744_073_709_549_568))
+        );
+        for (start, end) in [
+            (-1.0, 1.0),
+            (1.0, -1.0),
+            (0.5, 1.0),
+            (0.0, 1.5),
+            (f64::NAN, 1.0),
+            (0.0, f64::INFINITY),
+            (0.0, PAST),
+        ] {
+            assert_eq!(coordinates(start, end), None, "[{start}, {end})");
+        }
     }
 
     /// No sidecar is absence under any bound, never a failure (D15:144).

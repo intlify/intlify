@@ -12,6 +12,7 @@
 
 pub(crate) mod artifact_resolution;
 pub(crate) mod bootstrap;
+pub(crate) mod call_site_span;
 pub(crate) mod capability;
 pub(crate) mod coverage;
 pub(crate) mod decision_evidence;
