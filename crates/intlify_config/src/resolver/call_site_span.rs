@@ -170,7 +170,7 @@ fn admit(candidate: SpanCandidate, call_site: &AdmittedCallSite) -> Option<Sourc
 /// The call-site source: its identity, whether its frontend marked that
 /// identity non-secret, and its own locator, never the Programmatic Entry's
 /// (D15:747, 796).
-fn source(call_site: &AdmittedCallSite) -> Source<'_> {
+pub(crate) fn source(call_site: &AdmittedCallSite) -> Source<'_> {
     Source {
         identity: call_site.pair().identity(),
         marked: call_site.marked(),
@@ -224,6 +224,16 @@ pub(crate) mod fixtures {
         label: Option<&str>,
         mappings: Vec<SubmittedMapping>,
     ) -> AdmittedCallSite {
+        marked_as(true, source, label, mappings)
+    }
+
+    /// The same, its identity marked non-secret only when `marked`.
+    pub(crate) fn marked_as(
+        marked: bool,
+        source: &str,
+        label: Option<&str>,
+        mappings: Vec<SubmittedMapping>,
+    ) -> AdmittedCallSite {
         let largest = Bound::new(u64::MAX - 1).unwrap();
         let limits = CallSiteLimits {
             pair: SourceLimits {
@@ -237,7 +247,7 @@ pub(crate) mod fixtures {
         let revision = call_site_source_revision(source.as_bytes());
         let submitted = SubmittedCallSite {
             identity: Some(CALL_SITE),
-            marked: true,
+            marked,
             revision: Some(&revision),
             locator: label.map(|payload| LocatorCandidate {
                 variant: LocatorVariant::SafeLabel,

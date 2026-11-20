@@ -155,8 +155,9 @@ impl<'e> EntryStage<'e, '_> {
     }
 }
 
-/// The outcome of one file entry's invocation, which `evaluation` recorded
-/// and `invoked` left ([`super::profile_resolution::invoke_file`]), under
+/// The outcome of one entry's invocation, which `evaluation` recorded and
+/// `invoked` left ([`super::profile_resolution::invoke_file`] or
+/// [`super::profile_resolution::invoke_programmatic`]), under
 /// `identity`: its three stages in turn, the Shared projection, the Entry
 /// projection, and outcome finalization (D15:2771, 2775; plan 025 decision
 /// #253). The subject and evidence tokens `digest` assigns once the
@@ -362,26 +363,36 @@ fn checked<'e, 's, Id: AsRef<str>>(
 // `finalization`'s tests take the same inputs.
 #[cfg(test)]
 pub(crate) mod tests {
+    use std::collections::{BTreeMap, BTreeSet};
     use std::sync::{Arc, OnceLock};
 
     use serde_json::{json, Value};
 
+    use crate::artifacts::envelope::{ExactTuple, FormalMember};
     use crate::construction::flow::construct;
     use crate::construction::flow::testing::committed;
     use crate::construction::identity::{self, ConstructionIdentity};
     use crate::construction::registry::check::RecordKind;
     use crate::construction::root::ConstructionRoot;
     use crate::input_limits::Bound;
+    use crate::resolver::call_site_span::fixtures::CALL_SITE;
     use crate::resolver::dependency::{self, SemanticGroup};
+    use crate::resolver::entry::fixtures::FILE;
     use crate::resolver::evaluation::{
-        Code, ExhaustedBound, IssueKey, Phase, Reason, Status, Unit,
+        Check, Code, ExhaustedBound, IssueKey, Phase, Reason, Status, Unit,
     };
     use crate::resolver::evidence_metadata::fixtures::with;
     use crate::resolver::evidence_metadata::MetadataBound;
+    use crate::resolver::evidence_source::hex;
     use crate::resolver::limits::{BoundId, Group, ResolutionLimits};
     use crate::resolver::profile_resolution::tests::{Inputs, ACTIVE};
+    use crate::resolver::profile_view::ProfileView;
     use crate::resolver::reporting::{Record, ReportingDomain};
     use crate::resolver::resolution_evidence::Projection;
+    use crate::resolver::snapshot_entry::fixtures::ENTRY;
+    use crate::resolver::subject::{EntryPath, SubjectKind};
+
+    use super::Outcome;
 
     /// The Resolver Construction Identity of the committed construction input
     /// under the built-in root.
@@ -863,5 +874,366 @@ pub(crate) mod tests {
         let original = reported(&inputs);
         assert!(!original.is_empty());
         assert_eq!(original, reported(&inputs.reordered()));
+    }
+
+    /// A projection's records with their owners and kinds, as `owned` gives
+    /// them.
+    type Owned = Vec<(Unit, RecordKind, Value)>;
+
+    /// What an outcome shows of its invocation, outliving it: its identity,
+    /// its checked profile view with its bindings' tuples and members, each
+    /// projection's records, the Shared one's terminal Finding and state when
+    /// a bound exhausted it, and the shared-unavailability causes.
+    #[derive(Debug, PartialEq)]
+    struct Shown {
+        identity: ConstructionIdentity,
+        checked: Option<(ProfileView, Vec<(ExactTuple, FormalMember)>)>,
+        shared: Option<(Owned, Option<(Value, Value)>)>,
+        entry: Owned,
+        unavailable: Vec<IssueKey>,
+    }
+
+    fn shown(outcome: &Outcome<'_, '_>) -> Shown {
+        let evidence = &outcome.evidence;
+        Shown {
+            identity: outcome.identity,
+            checked: outcome.checked.as_ref().map(|checked| {
+                let bindings = checked
+                    .bindings
+                    .iter()
+                    .map(|(tuple, artifact)| (tuple.clone(), artifact.member.clone()))
+                    .collect();
+                (checked.profile.clone(), bindings)
+            }),
+            shared: evidence.shared.as_ref().map(|shared| {
+                let terminal = shared.terminal.as_ref();
+                let terminal = terminal.map(|end| (end.finding.clone(), end.state.clone()));
+                (owned(shared), terminal)
+            }),
+            entry: owned(&evidence.entry),
+            unavailable: evidence.unavailable(),
+        }
+    }
+
+    /// The views of `shown`'s Entry records of `kind`, in order.
+    fn entry_views(shown: &Shown, kind: RecordKind) -> Vec<&Value> {
+        shown
+            .entry
+            .iter()
+            .filter(|(_, recorded, _)| *recorded == kind)
+            .map(|(_, _, view)| view)
+            .collect()
+    }
+
+    /// The status view of each unit whose status `shown`'s Entry projection
+    /// holds: Phase 0's and Phase 1's.
+    fn entry_statuses(shown: &Shown) -> BTreeMap<&Unit, &Value> {
+        shown
+            .entry
+            .iter()
+            .filter(|(_, kind, _)| *kind == RecordKind::EntryEvaluationStatus)
+            .map(|(unit, _, view)| (unit, view))
+            .collect()
+    }
+
+    /// The checks of the units `one` holds a status of and `other` does not.
+    fn unshared(one: &Shown, other: &Shown) -> Vec<Check> {
+        let other = entry_statuses(other);
+        entry_statuses(one)
+            .into_keys()
+            .filter(|unit| !other.contains_key(unit))
+            .map(|unit| unit.check)
+            .collect()
+    }
+
+    /// The complete input's checks that only an entry through `path`
+    /// records (Decision 015-202).
+    fn own_checks(path: EntryPath) -> Vec<Check> {
+        let other = match path {
+            EntryPath::File => EntryPath::Programmatic,
+            EntryPath::Programmatic => EntryPath::File,
+        };
+        let checks = SubjectKind::CompleteInput.checks().iter().copied();
+        checks.filter(|check| !check.recorded_for(other)).collect()
+    }
+
+    /// D15:2129, 3228 (Decision 015-202): two entries of one value record the
+    /// same status for each unit both record, and each records its own
+    /// Phase 1 checks besides.
+    fn assert_entry_statuses_agree(file: &Shown, snapshot: &Shown) {
+        let statuses = entry_statuses(snapshot);
+        for (unit, view) in entry_statuses(file) {
+            if let Some(&other) = statuses.get(unit) {
+                assert_eq!(other, view, "{unit:?}");
+            }
+        }
+        assert_eq!(unshared(file, snapshot), own_checks(EntryPath::File));
+        assert_eq!(
+            unshared(snapshot, file),
+            own_checks(EntryPath::Programmatic)
+        );
+    }
+
+    /// D15:204, 743, 2507, 2516: a Snapshot's entry dependencies name the
+    /// file's selector, but for the token of a redacted one, which its origin
+    /// keys; under `configuration-programmatic` each source slot and under
+    /// `profile-selector-programmatic` the selector's; and beside a sidecar
+    /// the `call-site-source` record in its slot's place.
+    fn assert_programmatic_dependencies(file: &Shown, snapshot: &Shown, beside: bool) {
+        let filed = entry_views(file, RecordKind::EntryDependency);
+        let named = entry_views(snapshot, RecordKind::EntryDependency);
+        let slots: Vec<&Value> = named.iter().map(|view| &view["slot"]).collect();
+        let mut expected = vec!["entry-source", "profile-selector", "origins"];
+        if beside {
+            expected.insert(1, "call-site-source");
+        }
+        assert_eq!(slots, expected);
+        assert_ne!(named[0]["source"], filed[0]["source"]);
+        assert_ne!(named[0]["revision"], filed[0]["revision"]);
+        let [.., selector, origins] = named[..] else {
+            panic!("{named:?}");
+        };
+        let (mut selector, mut expected) = (selector.clone(), filed[1].clone());
+        entry_free(&mut selector, true);
+        entry_free(&mut expected, true);
+        assert_eq!(selector, expected);
+        let mut programmatic = filed[2].clone();
+        let entry = &mut programmatic["origins"];
+        entry["entry-source"] = json!("configuration-programmatic");
+        entry["profile-selector"] = json!("profile-selector-programmatic");
+        if beside {
+            entry["call-site-source"] = json!("configuration-programmatic");
+        }
+        assert_eq!(origins, &programmatic);
+    }
+
+    /// D15:2145, 3228: a file and a Programmatic Entry Snapshot of its value,
+    /// without a sidecar and beside one mirroring the file, have the same
+    /// construction identity, checked profile and bindings, and Shared
+    /// projection, every Finding Key in order, status, cause, Coverage
+    /// Decision Basis, semantic and materialized dependency, and terminal
+    /// state included, whether the outcome is checked, blocked after
+    /// materialization or by Phase 0, or incomplete past a Shared bound;
+    /// their Entry projections differ only in Phase 1's own checks and in the
+    /// entry dependencies.
+    #[test]
+    fn a_file_and_a_snapshot_of_its_value_share_their_resolution() {
+        let mut unasserted = Inputs::complete();
+        unasserted.unasserted();
+        for (name, inputs) in [
+            ("checked", reporting(&Inputs::complete(), &[], &[])),
+            ("blocked", blocked()),
+            ("unasserted", reporting(&unasserted, &[], &[])),
+            (
+                "exhausted",
+                reporting(&Inputs::complete(), &[], &[(shared("maxRecords"), 1)]),
+            ),
+        ] {
+            let file = inputs.outcome(None, identity(), |_, _, outcome| shown(&outcome));
+            assert_eq!(file.checked.is_some(), name == "checked");
+            let (_, terminal) = file.shared.as_ref().unwrap();
+            assert_eq!(terminal.is_some(), name == "exhausted");
+            let mirror = inputs.mirror();
+            for call_site in [None, Some(&mirror)] {
+                let snapshot =
+                    inputs.programmatic_outcome(call_site, identity(), |_, _, outcome| {
+                        shown(&outcome)
+                    });
+                assert_eq!(snapshot.identity, file.identity, "{name}");
+                assert_eq!(snapshot.checked, file.checked, "{name}");
+                assert_eq!(snapshot.shared, file.shared, "{name}");
+                assert_eq!(snapshot.unavailable, file.unavailable, "{name}");
+                assert_eq!(
+                    entry_views(&snapshot, RecordKind::EntryFinding),
+                    entry_views(&file, RecordKind::EntryFinding),
+                    "{name}"
+                );
+                assert_entry_statuses_agree(&file, &snapshot);
+                assert_programmatic_dependencies(&file, &snapshot, call_site.is_some());
+            }
+        }
+    }
+
+    /// `view` as either entry names it: each configuration or selector
+    /// origin as its slot, without the source it names, every token blanked,
+    /// since a redacted member's token is its origin's, and, unless
+    /// `spanned`, every span dropped.
+    fn entry_free(view: &mut Value, spanned: bool) {
+        match view {
+            Value::Object(members) => {
+                let slot = match members.get("origin").and_then(Value::as_str) {
+                    Some("configuration-file" | "configuration-programmatic") => "configuration",
+                    Some("profile-selector-cli" | "profile-selector-programmatic") => {
+                        "profile-selector"
+                    }
+                    _ => "",
+                };
+                if !slot.is_empty() {
+                    members.insert("origin".to_owned(), json!(slot));
+                    members.remove("source");
+                }
+                if !spanned {
+                    members.remove("span");
+                }
+                for (name, member) in members.iter_mut() {
+                    if name == "token" {
+                        *member = Value::Null;
+                    } else {
+                        entry_free(member, spanned);
+                    }
+                }
+            }
+            Value::Array(items) => items.iter_mut().for_each(|item| entry_free(item, spanned)),
+            _ => {}
+        }
+    }
+
+    /// `shown`'s Entry records that retain Evidence, in order, each as its
+    /// kind and its view as either entry names it.
+    fn located(shown: &Shown, spanned: bool) -> Vec<String> {
+        let kinds = [
+            RecordKind::FindingOccurrence,
+            RecordKind::CoverageDecisionEvidence,
+            RecordKind::EvidenceIndex,
+        ];
+        shown
+            .entry
+            .iter()
+            .filter(|(_, kind, _)| kinds.contains(kind))
+            .map(|(_, kind, view)| {
+                let mut view = view.clone();
+                entry_free(&mut view, spanned);
+                format!("{} {view}", kind.id())
+            })
+            .collect()
+    }
+
+    /// The source of each configuration Evidence in `shown`'s evidence index,
+    /// which holds every Evidence its records retain, and whether it has a
+    /// span.
+    fn sourced(shown: &Shown) -> BTreeSet<(String, bool)> {
+        entry_views(shown, RecordKind::EvidenceIndex)
+            .into_iter()
+            .filter(|view| {
+                let origin = view["origin"].as_str();
+                origin.is_some_and(|origin| origin.starts_with("configuration-"))
+            })
+            .map(|view| (view["source"].to_string(), view.get("span").is_some()))
+            .collect()
+    }
+
+    /// D15:747, 790, 796, 800, 3228 (Decision 015-203): beside a sidecar that
+    /// mirrors the file, a Snapshot's Entry projection observes every value
+    /// and key at the file's span in the call-site source, so its
+    /// occurrences, Coverage Decision Evidence, and evidence index are the
+    /// file's, in the file's order, but for their origins and sources.
+    /// Without a sidecar it names the Programmatic Entry with no span, and
+    /// holds the same records once spans are set aside, in an order spans no
+    /// longer decide.
+    #[test]
+    fn a_mirroring_sidecar_gives_a_snapshot_the_files_spans() {
+        let named = |identity: &str, spanned| {
+            let source = json!({ "safe-opaque": hex(identity.as_bytes()) });
+            BTreeSet::from([(source.to_string(), spanned)])
+        };
+        for inputs in [reporting(&Inputs::complete(), &[], &[]), blocked()] {
+            let file = inputs.outcome(None, identity(), |_, _, outcome| shown(&outcome));
+            let mirror = inputs.mirror();
+            let mirrored =
+                inputs.programmatic_outcome(Some(&mirror), identity(), |_, _, outcome| {
+                    shown(&outcome)
+                });
+            let bare =
+                inputs.programmatic_outcome(None, identity(), |_, _, outcome| shown(&outcome));
+            assert!(!located(&file, true).is_empty());
+            assert_eq!(located(&mirrored, true), located(&file, true));
+            assert_eq!(sourced(&file), named(FILE, true));
+            assert_eq!(sourced(&mirrored), named(CALL_SITE, true));
+            assert_eq!(sourced(&bare), named(ENTRY, false));
+            let unspanned = |shown: &Shown| {
+                let mut views = located(shown, false);
+                views.sort();
+                views
+            };
+            assert_eq!(unspanned(&bare), unspanned(&file));
+        }
+    }
+
+    /// D15:2369, 3228, 3418: a root-value bound that stops either entry
+    /// before materialization blocks both without a Shared projection, with
+    /// the same Entry Finding Keys and shared-unavailability causes and the
+    /// same status for each unit both record; only each entry's own checks,
+    /// origin, and location differ, a Snapshot's total observed at the root's
+    /// span beside a mirroring sidecar, where a file names none.
+    #[test]
+    fn a_bound_that_stops_either_entry_gives_the_same_finding_keys() {
+        let nodes = BoundId {
+            group: Group::ConfigurationInput,
+            name: "maxNodes",
+        };
+        let inputs = reporting(&Inputs::complete().bounding(&[(nodes, 10)], &[]), &[], &[]);
+        let primary = |shown: &Shown| {
+            let occurrences = entry_views(shown, RecordKind::FindingOccurrence);
+            let [occurrence] = occurrences[..] else {
+                panic!("{occurrences:?}");
+            };
+            occurrence["primary"].clone()
+        };
+        let file = inputs.outcome(None, identity(), |_, _, outcome| shown(&outcome));
+        assert_eq!(file.shared, None);
+        assert_eq!(
+            primary(&file),
+            json!({
+                "kind": "entry-source",
+                "origin": "configuration-file",
+                "source": { "safe-opaque": hex(FILE.as_bytes()) },
+                "path": [],
+            })
+        );
+        let mirror = inputs.mirror();
+        for (call_site, source, span) in [
+            (None, ENTRY, Value::Null),
+            (
+                Some(&mirror),
+                CALL_SITE,
+                json!({ "start": "0", "end": mirror.source().len().to_string() }),
+            ),
+        ] {
+            let snapshot =
+                inputs.programmatic_outcome(call_site, identity(), |evaluation, _, outcome| {
+                    let phases: BTreeSet<Phase> =
+                        evaluation.statuses().map(|(unit, _)| unit.phase).collect();
+                    assert_eq!(
+                        phases,
+                        BTreeSet::from([Phase::ResolverBootstrapAdmission, Phase::EntryAdmission])
+                    );
+                    shown(&outcome)
+                });
+            assert_eq!(snapshot.identity, file.identity);
+            assert_eq!(snapshot.shared, None);
+            assert_eq!(snapshot.unavailable, file.unavailable);
+            let [cause] = &file.unavailable[..] else {
+                panic!("{:?}", file.unavailable);
+            };
+            assert_eq!(cause.unit().check, Check::WithinNodes);
+            for kind in [
+                RecordKind::EntryFinding,
+                RecordKind::SharedUnavailabilityCause,
+            ] {
+                assert_eq!(entry_views(&snapshot, kind), entry_views(&file, kind));
+            }
+            assert_entry_statuses_agree(&file, &snapshot);
+            assert_programmatic_dependencies(&file, &snapshot, call_site.is_some());
+            let mut expected = json!({
+                "kind": "entry-source",
+                "origin": "configuration-programmatic",
+                "source": { "safe-opaque": hex(source.as_bytes()) },
+                "path": [],
+            });
+            if !span.is_null() {
+                expected["span"] = span;
+            }
+            assert_eq!(primary(&snapshot), expected);
+        }
     }
 }

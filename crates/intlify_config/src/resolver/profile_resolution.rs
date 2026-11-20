@@ -33,7 +33,9 @@
 //!
 //! [`invoke_file`] runs one file entry's invocation from Phase 0: Phase 1 over
 //! the file, Phases 2 and 3 over the value it admits, and these phases over
-//! the configuration Phase 3 selected. Without a value it leaves instead the
+//! the configuration Phase 3 selected. [`invoke_programmatic`] runs a
+//! programmatic entry's alike, Phase 1 over its Snapshot
+//! ([`super::snapshot_entry`]). Without a value either leaves instead the
 //! blocking Phase 1 Finding Keys that make the Shared projection unavailable
 //! (D15:2369). Either way it leaves what the entry dependency records name,
 //! the selector projected under the final projection authority Phase 4 fixed,
@@ -45,10 +47,11 @@ use crate::artifacts::collection::FormalCollection;
 use crate::artifacts::vocabulary::FormalVocabulary;
 use crate::boundary::capability::ImplementationCapability;
 use crate::boundary::verification::VerificationInput;
-use crate::input_limits::{InputLimits, ValueCounts};
+use crate::input_limits::{Bound, InputLimits, ValueCounts};
 use crate::locale::{
     CanonicalizationFailure, FormalData, Provider, SemanticPins, VersionedIdentity,
 };
+use crate::materialize::MaterializedDocument;
 use crate::model::{IntlifyConfig, ProfileDeclaration, ProfileId};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::selection::{ProvisionalSelection, SelectionInvariant, SelectorInput};
@@ -81,6 +84,9 @@ use super::reporting::ReportingInvariant;
 use super::resource_policy::{
     admit_resource_policy, ConfigurationMeasures, DeclarationReferences, PolicyInvariant,
     PolicyOutcome,
+};
+use super::snapshot_entry::{
+    admit_snapshot_entry, EntrySnapshot, ProgrammaticEntry, SnapshotEntryLimits,
 };
 use super::specification::{
     admit_project_profile, admit_specifications, SpecificationInput, SpecificationInvariant,
@@ -673,10 +679,10 @@ fn held<T>(result: Result<T, &Causes>) -> Admitted<()> {
 /// The authoring schema structural admission reads a configuration with.
 pub(crate) type ConfigurationSchema = AuthoringSchema<PolicyReference, TargetProfileReference>;
 
-/// What one file entry's invocation leaves for its outcome: the semantic
-/// state once the entry materialized a value, or else the blocking Phase 1
-/// Finding Keys that leave the Shared projection unavailable (D15:2369), and
-/// what the entry dependency records name (D15:2516).
+/// What one entry's invocation leaves for its outcome: the semantic state
+/// once the entry materialized a value, or else the blocking Phase 1 Finding
+/// Keys that leave the Shared projection unavailable (D15:2369), and what the
+/// entry dependency records name (D15:2516).
 #[derive(Debug)]
 pub(crate) struct Invoked<'s, Id> {
     pub(crate) state: Result<SemanticState<'s, Id>, Causes>,
@@ -711,26 +717,122 @@ where
 {
     let project_profile =
         admit_project_profile(evaluation, invocation.supported, invocation.specifications)?;
-    let document = match admit_entry(evaluation, file, limits)? {
-        Ok(document) => document,
-        Err(causes) => {
-            let authority = invocation
+    let resolved = match admit_entry(evaluation, file, limits)? {
+        Ok(document) => resolve_entered(
+            evaluation,
+            (&project_profile, file, document),
+            (schema, structural, selector),
+            invocation,
+            data,
+            set,
+        )?,
+        Err(causes) => Resolved::unentered(causes, invocation),
+    };
+    let entry = EntryInputs::file(file, selector, resolved.authority, &resolved.declared)
+        .map_err(ResolverInvariant::Evidence)?;
+    Ok(Invoked {
+        state: resolved.state,
+        entry,
+    })
+}
+
+/// One programmatic entry's invocation over `evaluation`, as a file entry's
+/// with Phase 1 over the Snapshot of `entry` under `limits`. The phases after
+/// it observe the entry through the document Phase 1 materialized
+/// (D15:2129, 3228).
+///
+/// # Errors
+///
+/// Returns the resolver bug that a phase or the entry dependencies found.
+pub(crate) fn invoke_programmatic<'s, P, D>(
+    evaluation: &mut Evaluation,
+    (entry, limits): (&EntrySnapshot<'_>, SnapshotEntryLimits),
+    (schema, structural, selector): (&ConfigurationSchema, StructuralLimits, &SelectorInput),
+    invocation: &Invocation<'s, P::Identity>,
+    data: D,
+    set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
+) -> Result<Invoked<'s, P::Identity>, ResolverInvariant>
+where
+    P: Provider,
+    P::Identity: AsRef<str>,
+    D: FormalData<Provider = P>,
+{
+    let project_profile =
+        admit_project_profile(evaluation, invocation.supported, invocation.specifications)?;
+    let resolved = match admit_snapshot_entry(evaluation, entry, limits)? {
+        Ok(document) => {
+            // A later phase names a value or a key by its locus in the
+            // document, so the entry is built before the document moves.
+            let programmatic = ProgrammaticEntry::new(entry, &document);
+            resolve_entered(
+                evaluation,
+                (&project_profile, &programmatic, document),
+                (schema, structural, selector),
+                invocation,
+                data,
+                set,
+            )?
+        }
+        Err(causes) => Resolved::unentered(causes, invocation),
+    };
+    let inputs = EntryInputs::programmatic(entry, selector, resolved.authority, &resolved.declared)
+        .map_err(ResolverInvariant::Evidence)?;
+    Ok(Invoked {
+        state: resolved.state,
+        entry: inputs,
+    })
+}
+
+/// What an invocation's phases leave: the semantic state or the causes of its
+/// absence, and for the entry dependencies the selector's final projection
+/// authority and the Profile IDs the selector may name (D15:807, 816-817).
+struct Resolved<'s, Id> {
+    state: Result<SemanticState<'s, Id>, Causes>,
+    authority: Bound,
+    declared: Vec<ProfileId>,
+}
+
+impl<Id> Resolved<'_, Id> {
+    /// Without a value, for `causes`: the capability's authority, and no
+    /// declared Profile ID (D15:2369).
+    fn unentered(causes: Causes, invocation: &Invocation<'_, Id>) -> Self {
+        Self {
+            state: Err(causes),
+            authority: invocation
                 .capability
                 .policy_comparable()
                 .configuration_input
                 .structural
-                .max_profile_id_bytes;
-            let entry = EntryInputs::file(file, selector, authority, std::iter::empty())
-                .map_err(ResolverInvariant::Evidence)?;
-            return Ok(Invoked {
-                state: Err(causes),
-                entry,
-            });
+                .max_profile_id_bytes,
+            declared: Vec::new(),
         }
-    };
+    }
+}
+
+/// The phases after Phase 1 over `document`, the value it admitted, observed
+/// through `entry`: Phases 2 and 3, and the semantic phases over the
+/// configuration Phase 3 selected or over the causes of its absence
+/// (D15:2131).
+fn resolve_entered<'s, P, D>(
+    evaluation: &mut Evaluation,
+    (project_profile, entry, document): (
+        &Admitted<VersionedIdentity<P::Identity>>,
+        &dyn ConfigurationEntry,
+        MaterializedDocument,
+    ),
+    (schema, structural, selector): (&ConfigurationSchema, StructuralLimits, &SelectorInput),
+    invocation: &Invocation<'s, P::Identity>,
+    data: D,
+    set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
+) -> Result<Resolved<'s, P::Identity>, ResolverInvariant>
+where
+    P: Provider,
+    P::Identity: AsRef<str>,
+    D: FormalData<Provider = P>,
+{
     let structure = admit_structure(
         evaluation,
-        file,
+        entry,
         document,
         schema,
         structural,
@@ -744,7 +846,7 @@ where
     // that reads the declaration waits on the causes (D15:2131).
     let selection = select_profile(
         evaluation,
-        file,
+        entry,
         structure.as_ref().ok(),
         selector,
         structural,
@@ -752,7 +854,7 @@ where
     let root = whole(evaluation);
     let configuration = match (&structure, &selection) {
         (Ok(analysis), Ok(selection)) => {
-            SelectedConfiguration::new(evaluation, (analysis, file), (selector, selection), root)?
+            SelectedConfiguration::new(evaluation, (analysis, entry), (selector, selection), root)?
         }
         (_, Err(causes)) => {
             SelectedConfiguration::unselected(structure.as_ref().ok(), (selector, causes), root)?
@@ -763,22 +865,16 @@ where
     };
     let state = resolve_profile(
         evaluation,
-        &project_profile,
+        project_profile,
         &configuration,
         invocation,
         data,
         set,
     )?;
-    let entry = EntryInputs::file(
-        file,
-        selector,
-        state.policy.authority,
-        configuration.declared(),
-    )
-    .map_err(ResolverInvariant::Evidence)?;
-    Ok(Invoked {
+    Ok(Resolved {
+        authority: state.policy.authority,
+        declared: configuration.declared().to_vec(),
         state: Ok(state),
-        entry,
     })
 }
 
@@ -796,7 +892,9 @@ pub(super) mod tests {
     use crate::artifacts::content::sample;
     use crate::artifacts::envelope::{envelope_of, ArtifactKind, ExactTuple, FormalMember};
     use crate::artifacts::vectors::vocabulary::{self as vectors, formal_of};
-    use crate::boundary::source::file_source_revision;
+    use crate::boundary::call_site::AdmittedCallSite;
+    use crate::boundary::snapshot::{read_report, submitted, SnapshotReport};
+    use crate::boundary::source::{file_source_revision, read_entry_pair, SourceLimits};
     use crate::construction::identity::ConstructionIdentity;
     use crate::construction::registry::check::testing::{check_id, requirements};
     use crate::construction::registry::check::CheckRegistry;
@@ -809,26 +907,29 @@ pub(super) mod tests {
     use crate::materialize::materialize_file;
     use crate::model::CoverageMode;
     use crate::profile_fixtures::complete_config;
-    use crate::resolver::capability::EvidenceMetadataLimits;
+    use crate::resolver::call_site_span::fixtures::{mirrored, sidecar};
+    use crate::resolver::capability::{BootstrapLimits, EvidenceMetadataLimits};
     use crate::resolver::delivery::PlacementMode;
-    use crate::resolver::dependency::{self, SemanticGroup};
-    use crate::resolver::entry::fixtures::FileFixture;
+    use crate::resolver::dependency::{self, EntryDependency, SemanticGroup};
+    use crate::resolver::entry::fixtures::{classify, FileFixture};
     use crate::resolver::entry::{admit_entry, input, OWNER};
     use crate::resolver::evaluation::{
         Check, Code, IssueKey, Phase, Reason, Status, Subject, Unit,
     };
+    use crate::resolver::evidence::Source;
     use crate::resolver::evidence_metadata::fixtures::unbounded;
     use crate::resolver::evidence_token::EvidenceTokens;
     use crate::resolver::exact_resolution;
     use crate::resolver::groups::{self, GroupSubject};
     use crate::resolver::hydration::{self, HydrationSubject};
-    use crate::resolver::limits::{fixture_limits, BoundId, ResolutionLimits, SECTION};
+    use crate::resolver::limits::{fixture_limits, BoundId, Group, ResolutionLimits, SECTION};
     use crate::resolver::locales::fixtures::canonical;
     use crate::resolver::locales::{self, LocaleKey, LocaleSubject, Location};
     use crate::resolver::outcome::{outcome, Outcome};
     use crate::resolver::profile_selection::{capability, selector, SelectionSubject};
     use crate::resolver::profile_view::{project, ProfileView};
     use crate::resolver::resource_policy::{self, PolicySlot, PolicySubject, ReferenceField};
+    use crate::resolver::snapshot_entry::fixtures::ENTRY;
     use crate::resolver::specification::{
         admit_project_profile, ActiveProfileSpecification, Slot, VocabularyAssertion, DATA,
     };
@@ -836,6 +937,7 @@ pub(super) mod tests {
     use crate::resolver::subject::{EntryPath, SubjectKind};
     use crate::resolver::targets::{self, TargetSubject};
     use crate::resolver::token::{Sha256, Specification};
+    use crate::snapshot::from_json;
     use crate::structural::selection::{Selection, StringLengthFact};
     use crate::structural::AuthoringSchema;
 
@@ -1291,12 +1393,102 @@ pub(super) mod tests {
             })
         }
 
-        /// Selects `policy`, submitted first in place of the selected one,
-        /// and pins it.
+        /// The invocation of the Programmatic Entry Snapshot of the
+        /// configuration's value, beside `call_site` when given, for
+        /// `inspect` with the invocation's other inputs, what it recorded, and
+        /// what it left: the boundary admits the Snapshot and a pair whose
+        /// revision is its digest, and Phase 1 reads it under the capability's
+        /// root-value bounds, as it reads the file (D15:743, 3228).
+        pub(crate) fn programmatic_under<R>(
+            &self,
+            call_site: Option<&AdmittedCallSite>,
+            inspect: impl FnOnce(&Invocation<'_, Id>, Evaluation, Invoked<'_, Id>) -> R,
+        ) -> R {
+            let root = from_json(&self.config);
+            let room = bound(1_000_000);
+            let bounds = BootstrapLimits::from_bounds(|_| Some(room))
+                .unwrap()
+                .snapshot;
+            let report = SnapshotReport::Formal {
+                root: submitted(&root),
+                digest: root.digest(),
+            };
+            let snapshot = read_report(Some(report), &bounds).unwrap();
+            let pair_limits = SourceLimits {
+                identity_bytes: room,
+                revision_bytes: room,
+            };
+            let digest = snapshot.digest();
+            let pair = read_entry_pair(Some(ENTRY), Some(digest), digest, pair_limits).unwrap();
+            let classify = classify(&self.capability);
+            let entry = EntrySnapshot {
+                snapshot: &snapshot,
+                source: Source {
+                    identity: pair.identity(),
+                    marked: true,
+                    locator: None,
+                },
+                call_site,
+                classify: &*classify,
+            };
+            let limits = SnapshotEntryLimits {
+                snapshot: bounds,
+                value: self.capability.configuration_input.value,
+            };
+            let selector = self.selector();
+            self.invoked(|invocation| {
+                let mut evaluation = Evaluation::default();
+                let mut set = None;
+                let invoked = invoke_programmatic(
+                    &mut evaluation,
+                    (&entry, limits),
+                    (
+                        &Schema::for_model().unwrap(),
+                        self.capability.configuration_input.structural,
+                        &selector,
+                    ),
+                    invocation,
+                    FixtureProvider::new(),
+                    &mut set,
+                )
+                .unwrap();
+                inspect(invocation, evaluation, invoked)
+            })
+        }
+
+        /// The outcome of `programmatic_under`'s invocation under `identity`,
+        /// for `inspect` with what the invocation recorded and what it left.
+        pub(crate) fn programmatic_outcome<R>(
+            &self,
+            call_site: Option<&AdmittedCallSite>,
+            identity: ConstructionIdentity,
+            inspect: impl FnOnce(&Evaluation, &Invoked<'_, Id>, Outcome<'_, '_>) -> R,
+        ) -> R {
+            self.programmatic_under(call_site, |invocation, evaluation, invoked| {
+                let outcome =
+                    outcome(&evaluation, &invoked, identity, invocation, &Sha256).unwrap();
+                inspect(&evaluation, &invoked, outcome)
+            })
+        }
+
+        /// A sidecar whose source is the configuration's file and whose
+        /// mappings give each value and key its token's span there.
+        pub(crate) fn mirror(&self) -> AdmittedCallSite {
+            let text = serde_json::to_string(&self.config).unwrap();
+            sidecar(&text, None, mirrored(&text))
+        }
+
+        /// Selects `policy`, submitted in place of the selected one wherever
+        /// the collection holds it, and pins it.
         fn select_policy(&mut self, policy: Value) {
+            let index = self
+                .members
+                .iter()
+                .position(|member| tuple_of(member) == self.pinned)
+                .expect("the selected Policy is submitted");
             self.pinned = tuple_of(&policy);
             self.declaration()["policies"]["resourceLimits"] = reference_value(&self.pinned);
-            self.members[0] = policy;
+            self.members[index] = policy;
         }
 
         /// The same inputs with every set, object, and the collection in
@@ -1810,20 +2002,18 @@ pub(super) mod tests {
         });
     }
 
-    /// The views of the entry dependency records `invoked` names, their
+    /// The views of the `N` entry dependency records `invoked` names, their
     /// redacted components' tokens assigned on their own: nothing else in
     /// these invocations collides with them under this digest.
-    fn entry_views(invoked: &Invoked<'_, Id>) -> [Value; 3] {
+    fn entry_views<const N: usize>(invoked: &Invoked<'_, Id>) -> [Value; N] {
         let specification = Specification {
             identity: "intlify-project-profile",
             revision: "0",
         };
         let tokens = EvidenceTokens::assign(specification, invoked.entry.redacted(), &Sha256);
-        invoked
-            .entry
-            .retained(specification, &tokens)
-            .unwrap()
-            .map(|record| record.view())
+        let records = invoked.entry.retained(specification, &tokens).unwrap();
+        let views: Vec<Value> = records.iter().map(EntryDependency::view).collect();
+        views.try_into().unwrap()
     }
 
     /// The selector the entry dependencies name is projected under the final
@@ -3416,6 +3606,35 @@ pub(super) mod tests {
                 });
             });
         }
+    }
+
+    /// `bounding` submits the Policy it selects in place of the selected one
+    /// wherever the collection holds it, last once `reordered` reversed the
+    /// collection, so every other member stays submitted and the invocation
+    /// confirms the Policy it pins.
+    #[test]
+    fn bounding_reordered_inputs_replaces_the_selected_policy_where_it_is() {
+        let reordered = Inputs::complete().reordered();
+        let index = reordered
+            .members
+            .iter()
+            .position(|member| tuple_of(member) == reordered.pinned)
+            .unwrap();
+        assert_eq!(index, reordered.members.len() - 1);
+        let id = BoundId {
+            group: Group::ConfigurationInput,
+            name: "maxProfileIdBytes",
+        };
+        let bounded = reordered.bounding(&[], &[(id, 32)]);
+        let policy = resource_limit_policy(&tightened(&policy_limits(), &[(id, 32)]));
+        assert_eq!(bounded.pinned, tuple_of(&policy));
+        let mut members = reordered.members.clone();
+        members[index] = policy;
+        assert_eq!(bounded.members, members);
+        bounded.resolve(|evaluation, state| {
+            assert_eq!(issues(&evaluation), []);
+            assert_eq!(state.policy.authority, bound(32));
+        });
     }
 
     /// Phase 14 needs every semantic result: there is a view exactly when
