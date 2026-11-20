@@ -139,7 +139,7 @@ pub(crate) struct EntryFile<'a> {
 /// An entry as the phases after `entry-admission` observe it: the Safe
 /// Origin Kinds its slots fix, the classification of the members on a
 /// value's path, and the source and span that name a value in it (D15:204,
-/// 776, 790, 800, 804). A file is the only one yet.
+/// 776, 790, 800, 804): a file, or a programmatic entry.
 pub(crate) trait ConfigurationEntry {
     /// The Safe Origin Kind of its configuration (D15:204).
     fn origin(&self) -> SafeOriginKind;

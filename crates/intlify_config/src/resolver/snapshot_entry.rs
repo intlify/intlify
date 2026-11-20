@@ -24,30 +24,43 @@
 //! tree as they count a file of the same value (D15:1889) and report alike,
 //! and a document exists only when every check holds.
 //!
-//! Every candidate is observed through the Programmatic Entry's Entry Source
-//! Evidence: its identity and locator, no span, and the Logical input path the
-//! resolver projects from the position's Snapshot Structural Path, each
-//! member classified as for a file, so no raw key is retained (D15:792-798,
-//! 802, 895, 897). A terminal marker for a key past a string bound stands at
-//! the object that owns the key, and is observed there (D15:867). A bound is
-//! observed beside the capability's bound it exceeds.
+//! Every candidate is observed through the programmatic entry's Entry Source
+//! Evidence, at the Logical input path the resolver projects from the
+//! position's Snapshot Structural Path, each member classified as for a file,
+//! so no raw key is retained (D15:792-798, 802, 895, 897). A marker and a
+//! string are the values at their positions, a key past the single-string
+//! bound is its member's key, and a total is the root's value. The Evidence
+//! names the call-site source and the span the admitted sidecar maps for the
+//! role that location selects, and without such a span the Programmatic
+//! Entry's identity and locator (D15:747, 796, 798, 802). A terminal marker
+//! for a key past a string bound stands at the object that owns the key, and
+//! is observed there (D15:867). A bound is observed beside the capability's
+//! bound it exceeds.
+//!
+//! The phases after Phase 1 observe the entry through [`ProgrammaticEntry`],
+//! which names a value or a key of the document by its locus, under the
+//! programmatic slots' Safe Origin Kinds (D15:204, 800, 804).
 
 use crate::artifacts::count;
+use crate::boundary::call_site::AdmittedCallSite;
 use crate::boundary::snapshot::AdmittedSnapshot;
 use crate::input_limits::{Bound, ValueLimits};
-use crate::materialize::MaterializedDocument;
+use crate::materialize::{Locus, MaterializedDocument};
 use crate::snapshot::{Marker, MarkerReason, Node, SnapshotBound, SnapshotCounts};
 use crate::structural::Edge;
 
+use super::call_site_span::{mapped, named, CallSiteSpans, Located};
 use super::capability::{CapabilityBound, SnapshotLimits};
 use super::entry::{
-    capability, input, root_value_bounds, Classify, EntryInvariant, OWNER, ROOT_VALUE_BOUNDS,
+    capability, input, root_value_bounds, Classify, ConfigurationEntry, EntryInvariant, OWNER,
+    ROOT_VALUE_BOUNDS,
 };
 use super::evaluation::{
     and, Actual, Admitted, Blocking, BootstrapLimitExceeded, Check, Code, Evaluation, Found,
     Observation, Reason,
 };
 use super::evidence::{EvidenceProjection, Source};
+use super::evidence_source::SourceSpan;
 use super::origin::SafeOriginKind;
 
 /// The check of each `bootstrapOnly.snapshot` bound, in the bounds' table
@@ -86,11 +99,13 @@ pub(crate) const SNAPSHOT_BOUNDS: [(Check, SnapshotBound); 9] = [
 ];
 
 /// The Snapshot Phase 1 reads, and what its Evidence names: the source the
-/// Programmatic Entry was admitted under, and the classification of the
-/// members on a position's path, as a file's (D15:776, 792-798).
+/// Programmatic Entry was admitted under, the call-site sidecar admitted
+/// beside it, if one was submitted, and the classification of the members on
+/// a position's path, as a file's (D15:776, 792-798).
 pub(crate) struct EntrySnapshot<'a> {
     pub(crate) snapshot: &'a AdmittedSnapshot,
     pub(crate) source: Source<'a>,
+    pub(crate) call_site: Option<&'a AdmittedCallSite>,
     pub(crate) classify: &'a Classify,
 }
 
@@ -104,17 +119,74 @@ pub(crate) struct SnapshotEntryLimits {
 }
 
 impl EntrySnapshot<'_> {
-    /// Entry Source Evidence at the position the edges `path` lead to from
-    /// the root, each member classified, without a span (D15:792-798, 897).
-    fn evidence(&self, path: &[Edge<'_>]) -> Result<EvidenceProjection, EntryInvariant> {
+    /// Entry Source Evidence of `located` at the position the edges `path`
+    /// lead to from the root, each member classified: in the call-site source
+    /// at the span the sidecar maps for the role there, or without one in the
+    /// Programmatic Entry (D15:747, 792-798, 802, 897).
+    fn evidence(
+        &self,
+        path: &[Edge<'_>],
+        located: Located,
+    ) -> Result<EvidenceProjection, EntryInvariant> {
         let steps = (self.classify)(path, None);
+        let mapped = self
+            .call_site
+            .and_then(|call_site| mapped(call_site, path, located));
+        let (source, span) = named(self.source, mapped);
         EvidenceProjection::entry_source(
             SafeOriginKind::ConfigurationProgrammatic,
-            self.source,
+            source,
             Some(&steps),
-            None,
+            span,
         )
         .map_err(EntryInvariant::Evidence)
+    }
+}
+
+/// A programmatic entry as the phases after `entry-admission` observe it: the
+/// Programmatic Entry's source, the classification of the members on a
+/// value's path, and the spans its admitted sidecar, if any, gives the
+/// document Phase 1 materialized (D15:776, 792-800).
+pub(crate) struct ProgrammaticEntry<'a> {
+    source: Source<'a>,
+    classify: &'a Classify,
+    spans: Option<CallSiteSpans<'a>>,
+}
+
+impl<'a> ProgrammaticEntry<'a> {
+    /// `entry` over `document`, the document Phase 1 materialized from its
+    /// Snapshot.
+    pub(crate) fn new(entry: &EntrySnapshot<'a>, document: &MaterializedDocument) -> Self {
+        Self {
+            source: entry.source,
+            classify: entry.classify,
+            spans: entry
+                .call_site
+                .map(|call_site| CallSiteSpans::new(call_site, document)),
+        }
+    }
+}
+
+/// A programmatic entry's slots are `configuration-programmatic` and
+/// `profile-selector-programmatic`, and a value or a key is named in the
+/// call-site source at the span the sidecar maps for it, and otherwise in the
+/// Programmatic Entry without a span (D15:204, 800).
+impl ConfigurationEntry for ProgrammaticEntry<'_> {
+    fn origin(&self) -> SafeOriginKind {
+        SafeOriginKind::ConfigurationProgrammatic
+    }
+
+    fn selector_origin(&self) -> SafeOriginKind {
+        SafeOriginKind::ProfileSelectorProgrammatic
+    }
+
+    fn classify(&self) -> &Classify {
+        self.classify
+    }
+
+    fn source_at(&self, locus: Locus) -> (Source<'_>, Option<SourceSpan>) {
+        let mapped = self.spans.as_ref().and_then(|spans| spans.at(locus));
+        named(self.source, mapped)
     }
 }
 
@@ -188,15 +260,17 @@ impl Findings {
         let mut candidates = Vec::new();
         for (reason, path) in &scan.ordinary {
             let observation = Observation {
-                primary: entry.evidence(path)?,
+                primary: entry.evidence(path, Located::Value)?,
                 related: Vec::new(),
             };
             candidates.push(Found::observed(incompatible(*reason), observation));
         }
         found.compatible = candidates.into_iter().reduce(Found::and);
         let violations = limits.value.violations(SnapshotCounts::of(root).value());
-        found.bounds = root_value_bounds(&violations, &scan.long, |path| {
-            entry.evidence(path.map_or(&[][..], Vec::as_slice))
+        // A total is observed at the root's value (D15:768).
+        found.bounds = root_value_bounds(&violations, &scan.long, |string| match string {
+            None => entry.evidence(&[], Located::Value),
+            Some((path, located)) => entry.evidence(path, *located),
         })?;
         Ok(found)
     }
@@ -219,7 +293,7 @@ fn overrun(
         return Err(EntryInvariant::UnadmittedMarker);
     }
     let observation = Observation {
-        primary: entry.evidence(path)?,
+        primary: entry.evidence(path, Located::Value)?,
         related: vec![capability(CapabilityBound::BootstrapOnly(bound.id()))?],
     };
     let exceeded = Blocking::bootstrap_limit(BootstrapLimitExceeded {
@@ -266,7 +340,7 @@ struct Scan<'s> {
     /// The terminal marker, with the bound it names and its witness.
     terminal: Option<(SnapshotBound, u64, Edges<'s>)>,
     /// Each string and key longer than `limit`, a key at its member.
-    long: Vec<Edges<'s>>,
+    long: Vec<(Edges<'s>, Located)>,
 }
 
 /// One step of a traversal below the root: entering the edge to a node, or
@@ -295,7 +369,7 @@ impl<'s> Scan<'s> {
                 Step::Enter(edge, node) => {
                     path.push(edge);
                     if let Edge::Member(key) = edge {
-                        scan.string(key, &path);
+                        scan.string(key, &path, Located::Key);
                     }
                     pending.push(Step::Leave);
                     scan.visit(node, &path, &mut pending)?;
@@ -322,7 +396,7 @@ impl<'s> Scan<'s> {
         }
         match node {
             Node::Null | Node::Boolean(_) | Node::Number(_) => {}
-            Node::String(text) => self.string(text, path),
+            Node::String(text) => self.string(text, path, Located::Value),
             Node::Array(elements) => pending.extend(
                 elements
                     .iter()
@@ -344,10 +418,11 @@ impl<'s> Scan<'s> {
         Ok(())
     }
 
-    /// Notes the string or key `text` at `path` when it is past the bound.
-    fn string(&mut self, text: &str, path: &[Edge<'s>]) {
+    /// Notes the string or key `text` at `path`, which Evidence of it
+    /// locates as `located`, when it is past the bound.
+    fn string(&mut self, text: &str, path: &[Edge<'s>], located: Located) {
         if count(text.len()) > self.limit.get() {
-            self.long.push(path.to_vec());
+            self.long.push((path.to_vec(), located));
         }
     }
 }
@@ -394,7 +469,7 @@ pub(crate) mod fixtures {
             }
         }
 
-        /// The entry of `snapshot`, with no locator.
+        /// The entry of `snapshot`, with no locator and no call-site sidecar.
         pub(crate) fn entry<'a>(&'a self, snapshot: &'a AdmittedSnapshot) -> EntrySnapshot<'a> {
             EntrySnapshot {
                 snapshot,
@@ -403,6 +478,7 @@ pub(crate) mod fixtures {
                     marked: true,
                     locator: None,
                 },
+                call_site: None,
                 classify: &*self.classify,
             }
         }
@@ -416,35 +492,53 @@ mod tests {
 
     use serde_json::{json, Value};
 
-    use crate::boundary::locator::{read_programmatic_locator, LocatorCandidate, LocatorVariant};
+    use crate::boundary::call_site::{AdmittedCallSite, SubmittedMapping};
+    use crate::boundary::locator::{
+        read_programmatic_locator, Locator, LocatorCandidate, LocatorVariant,
+    };
     use crate::boundary::snapshot::{read_report, submitted, AdmittedSnapshot, SnapshotReport};
     use crate::construction::registry::check::testing::{check_id, requirements};
     use crate::construction::registry::check::{CheckRegistry, RecordKind};
-    use crate::fixtures::complete_config;
+    use crate::fixtures::{
+        complete_config, minimal_config, FixturePolicyReference, FixtureTargetReference,
+    };
     use crate::input_limits::{Bound, InputLimits, ValueLimits};
-    use crate::materialize::MaterializedDocument;
+    use crate::materialize::{materialize_file, MaterializedDocument};
     use crate::materialize_tests::limits as file_limits;
+    use crate::resolver::call_site_span::fixtures::{mapping, mirrored, sidecar, CALL_SITE};
+    use crate::resolver::call_site_span::Located;
     use crate::resolver::capability::{CapabilityBound, SnapshotLimits};
     use crate::resolver::entry::fixtures::FileFixture;
     use crate::resolver::entry::{
-        admit_entry, capability, input, EntryInvariant, OWNER, ROOT_VALUE_BOUNDS,
+        admit_entry, capability, input, ConfigurationEntry, EntryInvariant, OWNER,
+        ROOT_VALUE_BOUNDS,
     };
     use crate::resolver::evaluation::{
         Actual, Admitted, BootstrapLimitExceeded, Check, Code, Evaluation, IssueKey, Reason,
         Status, Unit,
     };
     use crate::resolver::evidence::Evidence;
+    use crate::resolver::evidence_source::hex;
     use crate::resolver::evidence_token::EvidenceTokens;
-    use crate::resolver::limits::fixture_limits;
+    use crate::resolver::limits::{fixture_limits, ResolutionLimits};
     use crate::resolver::occurrence::{occurrences, redacted, FindingOccurrence};
+    use crate::resolver::origin::SafeOriginKind;
+    use crate::resolver::profile_selection::select_profile;
     use crate::resolver::record_view::RecordViews;
+    use crate::resolver::structural_admission::admit_structure;
     use crate::resolver::subject::{EntryPath, SubjectKind};
     use crate::resolver::token::{Sha256, Specification};
     use crate::snapshot::{from_json, Marker, MarkerReason, Node, SnapshotBound};
-    use crate::structural::Edge;
+    use crate::structural::selection::SelectorInput;
+    use crate::structural::{AuthoringSchema, Edge, StructuralLimits};
 
-    use super::fixtures::SnapshotFixture;
-    use super::{admit_snapshot_entry, incompatible, Scan, SnapshotEntryLimits, SNAPSHOT_BOUNDS};
+    use super::fixtures::{SnapshotFixture, ENTRY};
+    use super::{
+        admit_snapshot_entry, incompatible, ProgrammaticEntry, Scan, SnapshotEntryLimits,
+        SNAPSHOT_BOUNDS,
+    };
+
+    type Schema = AuthoringSchema<FixturePolicyReference, FixtureTargetReference>;
 
     const PROFILE: Specification<'static> = Specification {
         identity: "intlify-project-profile",
@@ -1106,19 +1200,20 @@ mod tests {
             path.push(Edge::Index(last));
             path
         };
-        assert_eq!(scan.long, [below(0)]);
+        assert_eq!(scan.long, [(below(0), Located::Value)]);
         assert_eq!(scan.ordinary, [(MarkerReason::Cycle, below(1))]);
         assert_eq!(scan.terminal, None);
         let scan = Scan::of(&object, limit).unwrap();
         let mut path = vec![Edge::Member("a"); LEVELS];
         path.push(Edge::Member(&long));
-        assert_eq!(scan.long, [path.clone()]);
+        assert_eq!(scan.long, [(path.clone(), Located::Key)]);
         assert!(scan.ordinary.is_empty());
         assert_eq!(scan.terminal, Some((SnapshotBound::Nodes, 2, path)));
     }
 
-    /// D15:792-798: a Snapshot's Entry Source Evidence names the Programmatic
-    /// Entry's identity and the locator admitted with it, and has no span.
+    /// D15:792-798: without a call-site sidecar, a Snapshot's Entry Source
+    /// Evidence names the Programmatic Entry's identity and the locator
+    /// admitted with it, and has no span.
     #[test]
     fn a_snapshot_is_observed_through_its_programmatic_entry() {
         let limits = limits();
@@ -1149,5 +1244,401 @@ mod tests {
                 "path": [{ "array-index": "0" }],
             })
         );
+    }
+
+    /// The byte offsets of the `nth` occurrence of `part` in `text`.
+    fn spot(text: &str, part: &str, nth: usize) -> (usize, usize) {
+        let (start, _) = text.match_indices(part).nth(nth).unwrap();
+        (start, start + part.len())
+    }
+
+    /// The mapping from `path` and `role` to the bytes `[start, end)`.
+    fn spanning(path: &Value, role: &str, (start, end): (usize, usize)) -> SubmittedMapping {
+        let coordinate = |byte: usize| f64::from(u32::try_from(byte).unwrap());
+        mapping(path, role, coordinate(start), coordinate(end))
+    }
+
+    /// The view of the span of the bytes `[start, end)`.
+    fn span_view((start, end): (usize, usize)) -> Value {
+        json!({ "start": start.to_string(), "end": end.to_string() })
+    }
+
+    /// The view of the call-site source identity, which its frontend marks
+    /// non-secret.
+    fn call_site_source() -> Value {
+        json!({ "safe-opaque": hex(CALL_SITE.as_bytes()) })
+    }
+
+    /// The view of the Programmatic Entry identity, which its frontend marks
+    /// non-secret.
+    fn entry_source() -> Value {
+        json!({ "safe-opaque": hex(ENTRY.as_bytes()) })
+    }
+
+    /// Phase 1 over `root` as the boundary admits it under `limits`, beside
+    /// `call_site`.
+    fn entered_beside(
+        root: &Node,
+        limits: SnapshotEntryLimits,
+        call_site: &AdmittedCallSite,
+    ) -> (Evaluation, Admitted<MaterializedDocument>) {
+        let snapshot = admitted(root, &limits.snapshot);
+        let fixture = SnapshotFixture::new(&fixture_limits(100));
+        let mut entry = fixture.entry(&snapshot);
+        entry.call_site = Some(call_site);
+        let mut evaluation = Evaluation::default();
+        let admitted = admit_snapshot_entry(&mut evaluation, &entry, limits).unwrap();
+        (evaluation, admitted)
+    }
+
+    /// D15:747, 802 (Decision 015-203): a marker is observed at the span the
+    /// sidecar maps for the value at its position, `member-value` at a member
+    /// and `node` at an element, in the call-site source. A marker whose
+    /// position has only another role mapped, or none, is observed in the
+    /// Programmatic Entry without a span.
+    #[test]
+    fn a_marker_takes_the_span_mapped_for_the_value_at_its_position() {
+        let value: Value = serde_json::from_str(MARKED).unwrap();
+        let unsupported = r#""!unsupported-type""#;
+        let terminal = r#""!maxRejectedMarkers""#;
+        let at = |part, nth| spot(MARKED, part, nth);
+        let locales = json!(["profiles", "app", "requestedLocales", 1]);
+        let call_site = sidecar(
+            MARKED,
+            None,
+            vec![
+                spanning(&json!(["$schema"]), "member-value", at(unsupported, 0)),
+                spanning(&json!(["$schema"]), "member-key", at(r#""$schema""#, 0)),
+                spanning(&json!(["$schema"]), "node", at(r#""$schema""#, 0)),
+                spanning(&locales, "node", at(unsupported, 1)),
+                spanning(&locales, "member-value", at(r#""en""#, 0)),
+                spanning(
+                    &json!(["profiles", "app", "projectId"]),
+                    "member-key",
+                    at(r#""projectId""#, 0),
+                ),
+                spanning(&json!(["schemaVersion"]), "member-value", at(terminal, 0)),
+            ],
+        );
+        let (evaluation, _) = entered_beside(&tree(&value), limits(), &call_site);
+        let seen: Vec<(Option<Reason>, Value, Value)> = observed(&evaluation)
+            .iter()
+            .map(|occurrence| {
+                let view = occurrence.primary().view();
+                let reason = occurrence.finding().reason();
+                (reason, view["source"].clone(), view["span"].clone())
+            })
+            .collect();
+        let (mapped, entry) = (call_site_source(), entry_source());
+        assert_eq!(
+            seen,
+            [
+                (None, mapped.clone(), span_view(at(terminal, 0))),
+                (Some(Reason::Cycle), entry.clone(), Value::Null),
+                (Some(Reason::DynamicProperty), entry, Value::Null),
+                (
+                    Some(Reason::UnsupportedType),
+                    mapped.clone(),
+                    span_view(at(unsupported, 0))
+                ),
+                (
+                    Some(Reason::UnsupportedType),
+                    mapped,
+                    span_view(at(unsupported, 1))
+                ),
+            ]
+        );
+    }
+
+    /// D15:747, 768, 3228 (Decision 015-203): beside a sidecar that maps every
+    /// value and key of the file of the same text at its token, the root-value
+    /// bounds are observed at the file's spans in the call-site source, a key
+    /// past the single-string bound at its key's rather than its value's; a
+    /// total, observed at the root's value, takes the root's span, where a
+    /// file names none.
+    #[test]
+    fn a_key_a_string_and_a_total_take_the_spans_mapped_for_their_roles() {
+        let value: Value = serde_json::from_str(BOUNDED).unwrap();
+        assert_eq!(serde_json::to_string(&value).unwrap(), BOUNDED);
+        let mut input = file_limits();
+        input.value = tight(1);
+        let (file, _) = filed(&value, input);
+        let call_site = sidecar(BOUNDED, None, mirrored(BOUNDED));
+        let snapshot_limits = SnapshotEntryLimits {
+            value: input.value,
+            ..limits()
+        };
+        let (snapshot, admitted) = entered_beside(&from_json(&value), snapshot_limits, &call_site);
+        assert!(admitted.is_err());
+        let (file, snapshot) = (observed(&file), observed(&snapshot));
+        assert_eq!(snapshot.len(), 6);
+        assert_eq!(snapshot.len(), file.len());
+        let root = span_view((0, BOUNDED.len()));
+        for (file, snapshot) in file.iter().zip(&snapshot) {
+            assert_eq!(snapshot.finding(), file.finding());
+            let mut expected = located(file.primary());
+            let view = expected.as_object_mut().unwrap();
+            view.insert("origin".to_owned(), json!("configuration-programmatic"));
+            if file.finding().unit().check != Check::WithinSingleStringBytes {
+                assert_eq!(view.insert("span".to_owned(), root.clone()), None);
+            }
+            assert_eq!(located(snapshot.primary()), expected);
+            assert_eq!(snapshot.primary().view()["source"], call_site_source());
+        }
+    }
+
+    /// The bounds Phases 2 and 3 run under, which the classification of the
+    /// members on a path reads too.
+    fn structural() -> StructuralLimits {
+        StructuralLimits {
+            max_profiles: Bound::new(100).unwrap(),
+            max_profile_id_bytes: Bound::new(64).unwrap(),
+            max_structural_analysis_units: Bound::new(1_000_000).unwrap(),
+        }
+    }
+
+    fn comparable() -> ResolutionLimits {
+        let mut comparable = fixture_limits(100);
+        comparable.configuration_input.structural = structural();
+        comparable
+    }
+
+    /// Phases 2 and 3 over `document` through `entry`, the selector naming
+    /// `selector`: the Finding Occurrences they found.
+    fn later(
+        entry: &dyn ConfigurationEntry,
+        document: MaterializedDocument,
+        selector: &str,
+    ) -> Vec<FindingOccurrence> {
+        let limits = structural();
+        let mut evaluation = Evaluation::default();
+        let schema = Schema::for_model().unwrap();
+        let analysis =
+            admit_structure(&mut evaluation, entry, document, &schema, limits, Ok(())).unwrap();
+        let input = SelectorInput::string(selector, limits.max_profile_id_bytes);
+        // What Phase 3 selects is beside the point: only its Findings are.
+        let _ = select_profile(
+            &mut evaluation,
+            entry,
+            analysis.as_ref().ok(),
+            &input,
+            limits,
+        )
+        .unwrap();
+        observed(&evaluation)
+    }
+
+    /// Phases 2 and 3 over the file of `value`.
+    fn later_in_file(value: &Value, selector: &str) -> Vec<FindingOccurrence> {
+        let bytes: Arc<[u8]> = Arc::from(serde_json::to_vec(value).unwrap());
+        let document = materialize_file(Arc::clone(&bytes), file_limits()).unwrap();
+        let fixture = FileFixture::new(&comparable());
+        later(&fixture.file(bytes), document, selector)
+    }
+
+    /// Phases 2 and 3 over the document Phase 1 admits from the Snapshot of
+    /// `value`, through its programmatic entry beside `call_site`, the
+    /// Programmatic Entry's locator `locator`.
+    fn later_in_snapshot(
+        value: &Value,
+        call_site: Option<&AdmittedCallSite>,
+        locator: Option<&Locator>,
+        selector: &str,
+    ) -> Vec<FindingOccurrence> {
+        let limits = limits();
+        let snapshot = admitted(&from_json(value), &limits.snapshot);
+        let fixture = SnapshotFixture::new(&comparable());
+        let mut entry = fixture.entry(&snapshot);
+        entry.source.locator = locator;
+        entry.call_site = call_site;
+        let mut evaluation = Evaluation::default();
+        let Ok(document) = admit_snapshot_entry(&mut evaluation, &entry, limits).unwrap() else {
+            panic!("Phase 1 admits the document");
+        };
+        let programmatic = ProgrammaticEntry::new(&entry, &document);
+        later(&programmatic, document, selector)
+    }
+
+    /// Configurations whose Findings in Phases 2 and 3 are observed at each
+    /// kind of location, each with the selector it is resolved under: the
+    /// root of another type, a missing member of the root and of a
+    /// declaration, a member's value, an array element, an undeclared
+    /// member's key, a malformed Profile ID's key, and a selector no
+    /// declaration has, beside the declarations.
+    fn locations() -> Vec<(Value, &'static str)> {
+        let mut unversioned = minimal_config();
+        unversioned.as_object_mut().unwrap().remove("schemaVersion");
+        let mut versioned = minimal_config();
+        versioned["schemaVersion"] = json!(10);
+        let declaration = minimal_config()["profiles"]["app"].clone();
+        let mut mixed = minimal_config();
+        mixed["extra"] = json!(true);
+        let app = &mut mixed["profiles"]["app"];
+        app.as_object_mut().unwrap().remove("projectId");
+        app["requestedLocales"] = json!(["en", 7]);
+        let mut malformed = declaration.clone();
+        malformed["requestedLocales"] = json!("only");
+        mixed["profiles"]["app key"] = malformed;
+        let mut declared = minimal_config();
+        declared["profiles"]["web"] = declaration;
+        vec![
+            (json!([]), "app"),
+            (unversioned, "app"),
+            (versioned, "app"),
+            (mixed, "app"),
+            (declared, "other"),
+        ]
+    }
+
+    /// `view` with each token blanked.
+    fn blank(view: &mut Value) {
+        match view {
+            Value::Object(members) => {
+                for (name, member) in members.iter_mut() {
+                    if name == "token" {
+                        *member = Value::Null;
+                    } else {
+                        blank(member);
+                    }
+                }
+            }
+            Value::Array(items) => items.iter_mut().for_each(blank),
+            _ => {}
+        }
+    }
+
+    /// The view of `evidence` as either entry would name it: the slot of its
+    /// origin rather than the Safe Origin Kind, and neither its source nor a
+    /// token, since a redacted member's token is its origin's.
+    fn entry_free(evidence: &Evidence) -> Value {
+        let mut view = evidence.view();
+        let origin = match evidence.origin() {
+            SafeOriginKind::ConfigurationFile | SafeOriginKind::ConfigurationProgrammatic => {
+                "configuration"
+            }
+            SafeOriginKind::ProfileSelectorCli | SafeOriginKind::ProfileSelectorProgrammatic => {
+                "profile-selector"
+            }
+            other => other.id(),
+        };
+        let members = view.as_object_mut().unwrap();
+        members.remove("source");
+        members.insert("origin".to_owned(), json!(origin));
+        blank(&mut view);
+        view
+    }
+
+    /// Each occurrence of `found`, as its Finding and its Evidence as either
+    /// entry would name it, in an order no token decides.
+    fn entry_free_occurrences(found: &[FindingOccurrence]) -> Vec<(IssueKey, String)> {
+        let mut free: Vec<(IssueKey, String)> = found
+            .iter()
+            .map(|occurrence| {
+                let mut related: Vec<String> = occurrence
+                    .related()
+                    .iter()
+                    .map(|evidence| entry_free(evidence).to_string())
+                    .collect();
+                related.sort();
+                let primary = entry_free(occurrence.primary());
+                (
+                    occurrence.finding().clone(),
+                    json!([primary, related]).to_string(),
+                )
+            })
+            .collect();
+        free.sort();
+        free
+    }
+
+    /// D15:747, 790, 800, 804, 3228 (Decision 015-203): beside a sidecar that
+    /// maps every value and key of the file of the same text at its token,
+    /// Phases 2 and 3 observe the programmatic entry at the file's spans, a
+    /// missing member at its owning object's, in the call-site source and
+    /// under the programmatic origins; nothing else differs from the file's
+    /// Evidence but the tokens of the origins.
+    #[test]
+    fn later_phases_take_a_files_spans_from_a_mirroring_sidecar() {
+        let mut origins = BTreeSet::new();
+        for (value, selector) in locations() {
+            let text = serde_json::to_string(&value).unwrap();
+            let call_site = sidecar(&text, None, mirrored(&text));
+            let file = later_in_file(&value, selector);
+            let snapshot = later_in_snapshot(&value, Some(&call_site), None, selector);
+            assert!(!file.is_empty(), "{text}");
+            assert_eq!(
+                entry_free_occurrences(&snapshot),
+                entry_free_occurrences(&file),
+                "{text}"
+            );
+            for occurrence in &snapshot {
+                let primary = std::iter::once(occurrence.primary());
+                for evidence in primary.chain(occurrence.related()) {
+                    origins.insert(evidence.origin());
+                    if evidence.origin() == SafeOriginKind::ConfigurationProgrammatic {
+                        assert_eq!(evidence.view()["source"], call_site_source());
+                    }
+                }
+            }
+        }
+        assert!(origins.contains(&SafeOriginKind::ConfigurationProgrammatic));
+        assert!(origins.contains(&SafeOriginKind::ProfileSelectorProgrammatic));
+        assert!(!origins.contains(&SafeOriginKind::ConfigurationFile));
+        assert!(!origins.contains(&SafeOriginKind::ProfileSelectorCli));
+    }
+
+    /// D15:796, 800: Materialized Value Evidence names the call-site source,
+    /// with its own locator or none, only where the sidecar maps a span, and
+    /// otherwise the Programmatic Entry's identity and locator, with no span.
+    #[test]
+    fn later_phases_name_the_programmatic_entry_where_no_span_is_mapped() {
+        let mut value = minimal_config();
+        value["extra"] = json!(true);
+        value["more"] = json!(false);
+        let text = serde_json::to_string(&value).unwrap();
+        let extra = spot(&text, r#""extra""#, 0);
+        let mapping = || vec![spanning(&json!(["extra"]), "member-key", extra)];
+        let (unlabeled, labeled) = (
+            sidecar(&text, None, mapping()),
+            sidecar(&text, Some("app.ts"), mapping()),
+        );
+        let label = LocatorCandidate {
+            variant: LocatorVariant::SafeLabel,
+            payload: "storefront entry",
+            non_secret: true,
+        };
+        let locator = read_programmatic_locator(Some(label), Bound::new(64).unwrap()).unwrap();
+        let entry = json!([
+            entry_source(),
+            { "safe-label": "storefront entry" },
+            Value::Null
+        ]);
+        let mapped = |locator: Value| json!([call_site_source(), locator, span_view(extra)]);
+        for (call_site, expected) in [
+            (None, [entry.clone(), entry.clone()]),
+            (Some(&unlabeled), [mapped(Value::Null), entry.clone()]),
+            (
+                Some(&labeled),
+                [mapped(json!({ "safe-label": "app.ts" })), entry],
+            ),
+        ] {
+            let found = later_in_snapshot(&value, call_site, Some(&locator), "app");
+            let mut seen: Vec<Value> = found
+                .iter()
+                .map(|occurrence| {
+                    let view = occurrence.primary().view();
+                    assert_eq!(view["origin"], "configuration-programmatic");
+                    json!([
+                        view["source"].clone(),
+                        view["locator"].clone(),
+                        view["span"].clone()
+                    ])
+                })
+                .collect();
+            seen.sort_by_key(Value::to_string);
+            let mut expected = expected.to_vec();
+            expected.sort_by_key(Value::to_string);
+            assert_eq!(seen, expected);
+        }
     }
 }
