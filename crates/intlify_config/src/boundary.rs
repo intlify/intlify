@@ -19,14 +19,19 @@
 //! identity and revision are admitted against its bytes (015-170), and its
 //! locator candidate is admitted or treated as absence, never as a failure
 //! (015-171), as a Programmatic Entry's or Call-Site Source's `safe-label` or
-//! `safe-uri` candidate is. A file Entry Admission Input Set is admitted in a step of its
-//! own that works like the common one (015-172); both steps share the parts
-//! in `step`. A Programmatic Entry Snapshot is admitted as its canonical tree
-//! or refused by the first failing check of its bounds, its closed model, its
-//! remaining value rules, and its digest (015-199, 015-200), and the
-//! Programmatic Entry identity and revision are admitted like a file's pair,
-//! against the digest of the admitted Snapshot (015-201).
+//! `safe-uri` candidate is. A Programmatic Entry Snapshot is admitted as its
+//! canonical tree or refused by the first failing check of its bounds, its
+//! closed model, its remaining value rules, and its digest (015-199,
+//! 015-200), and the Programmatic Entry identity and revision are admitted
+//! like a file's pair, against the digest of the admitted Snapshot (015-201).
+//! An optional call-site sidecar is admitted with its span candidates as
+//! submitted, or refused in the order of its row's reasons, its own
+//! Call-Site Source pair checked against the sidecar's source bytes. A file
+//! or programmatic Entry Admission Input Set is admitted in a step of its own
+//! that works like the common one (015-172, 015-201); the steps share the
+//! parts in `step`.
 
+pub(crate) mod call_site;
 pub(crate) mod capability;
 pub(crate) mod common;
 pub(crate) mod entry;

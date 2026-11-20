@@ -26,14 +26,17 @@
 //! revision is the one computed from the content. The first check that fails
 //! decides. A Programmatic Entry's revision is compared with the digest of
 //! its admitted Snapshot, so the pair is admitted only after the Snapshot is.
-//! Call-Site Source identities have the same form, which [`identity_parts`]
-//! checks for them too.
+//! The `programmatic-call-site-evidence-input` boundary runs the same checks
+//! on a Call-Site Source pair, spelled as the file row spells them, against
+//! the Call-Site Source revision of the sidecar's source bytes; its row puts
+//! the two bounds before the rest of the sidecar and the other checks after
+//! it ([`super::call_site`]).
 
 use intlify_shared_json::encoding::digest_bytes;
 use intlify_shared_json::token::hex;
 
 use crate::artifacts::count;
-use crate::construction::profile::FILE_SOURCE_REVISION_DOMAIN;
+use crate::construction::profile::{CALL_SITE_SOURCE_REVISION_DOMAIN, FILE_SOURCE_REVISION_DOMAIN};
 use crate::framing::frame;
 use crate::input_limits::Bound;
 use crate::references::valid_semantic_digest;
@@ -49,7 +52,7 @@ pub(crate) struct SourceLimits {
 }
 
 impl SourceLimits {
-    const fn of(capability: &ImplementationCapability) -> Self {
+    pub(super) const fn of(capability: &ImplementationCapability) -> Self {
         let bounds = &capability.bootstrap_only().evidence_metadata;
         Self {
             identity_bytes: bounds.max_source_identity_bytes,
@@ -198,6 +201,20 @@ pub(crate) fn read_entry_pair(
     check_pair(identity, revision, limits, |revision| revision == digest)
 }
 
+/// The Call-Site Source pair's checks under `limits`, the revision compared
+/// with the Call-Site Source revision of `source`, the sidecar's exact source
+/// bytes (D15:741, 743).
+pub(crate) fn read_call_site_pair(
+    identity: Option<&str>,
+    revision: Option<&str>,
+    source: &[u8],
+    limits: SourceLimits,
+) -> Result<SourcePair, SourceRefusal> {
+    check_pair(identity, revision, limits, |revision| {
+        revision == call_site_source_revision(source)
+    })
+}
+
 /// The seven checks in the rows' order; `derived` says whether a revision in
 /// the presentation is the one computed from the content.
 fn check_pair(
@@ -207,18 +224,12 @@ fn check_pair(
     derived: impl FnOnce(&str) -> bool,
 ) -> Result<SourcePair, SourceRefusal> {
     use SourceRefusal::{
-        MissingIdentity, MissingRevision, OverBoundIdentity, OverBoundRevision, SnapshotMismatch,
-        UnboundRevision, UnstableIdentity,
+        MissingIdentity, MissingRevision, SnapshotMismatch, UnboundRevision, UnstableIdentity,
     };
 
     let identity = identity.ok_or(MissingIdentity)?;
     let revision = revision.ok_or(MissingRevision)?;
-    if count(identity.len()) > limits.identity_bytes.get() {
-        return Err(OverBoundIdentity);
-    }
-    if count(revision.len()) > limits.revision_bytes.get() {
-        return Err(OverBoundRevision);
-    }
+    check_bounds(Some(identity), Some(revision), limits)?;
     let (tag, _) = identity_parts(identity).ok_or(UnstableIdentity)?;
     if !valid_semantic_digest(revision) {
         return Err(UnboundRevision);
@@ -233,6 +244,24 @@ fn check_pair(
         },
         revision: revision.to_owned(),
     })
+}
+
+/// The two bound checks, each on its part when present: the identity's UTF-8
+/// bytes, and then the revision's.
+pub(super) fn check_bounds(
+    identity: Option<&str>,
+    revision: Option<&str>,
+    limits: SourceLimits,
+) -> Result<(), SourceRefusal> {
+    let over =
+        |part: Option<&str>, bound: Bound| part.is_some_and(|part| count(part.len()) > bound.get());
+    if over(identity, limits.identity_bytes) {
+        return Err(SourceRefusal::OverBoundIdentity);
+    }
+    if over(revision, limits.revision_bytes) {
+        return Err(SourceRefusal::OverBoundRevision);
+    }
+    Ok(())
 }
 
 /// The tag and the payload of an identity in 015's form, or `None` when it
@@ -273,8 +302,21 @@ fn valid_version(version: &str) -> bool {
 /// `intlify.project-profile.file-source-revision.v0` followed by the record
 /// whose one field `0x01` holds the exact bytes (D15:743, 987).
 pub(crate) fn file_source_revision(bytes: &[u8]) -> String {
-    let mut preimage = Vec::with_capacity(FILE_SOURCE_REVISION_DOMAIN.len() + 9 + bytes.len());
-    preimage.extend_from_slice(FILE_SOURCE_REVISION_DOMAIN.as_bytes());
+    content_revision(FILE_SOURCE_REVISION_DOMAIN, bytes)
+}
+
+/// The Call-Site Source revision of a sidecar's exact source bytes, as
+/// presented: the same over
+/// `intlify.project-profile.call-site-source-revision.v0` (D15:743).
+pub(crate) fn call_site_source_revision(bytes: &[u8]) -> String {
+    content_revision(CALL_SITE_SOURCE_REVISION_DOMAIN, bytes)
+}
+
+/// SHA-256 over `domain` followed by the record whose one field `0x01` holds
+/// `bytes`, presented as `sha256:` and 64 lowercase hexadecimal digits.
+fn content_revision(domain: &str, bytes: &[u8]) -> String {
+    let mut preimage = Vec::with_capacity(domain.len() + 9 + bytes.len());
+    preimage.extend_from_slice(domain.as_bytes());
     frame(0x01, bytes, &mut preimage);
     format!("sha256:{}", hex(digest_bytes(&preimage)))
 }
@@ -339,6 +381,34 @@ mod tests {
             (BYTES, REVISION),
         ] {
             assert_eq!(file_source_revision(bytes), revision, "{bytes:?}");
+        }
+    }
+
+    /// Call-Site Source revisions computed the same way outside this crate,
+    /// over the call-site domain: the same bytes have a different revision in
+    /// each domain.
+    #[test]
+    fn the_call_site_revision_is_the_same_over_its_own_domain() {
+        let source = "defineConfig({ profiles: { app: {} } }) // 設定\n".as_bytes();
+        for (bytes, revision) in [
+            (
+                &b""[..],
+                "sha256:1120c36577e1a30cf623314968e78e9dd17ab18ab89d34b37fd631b30d44cd4e",
+            ),
+            (
+                &b"{}"[..],
+                "sha256:8774e34a24fda7565ff9f2a25f360a7f77fbbbec7e4c467d6c79d627ec6d4af7",
+            ),
+            (
+                BYTES,
+                "sha256:b94dfb77c4a2e23192f4562dd12c627059b57af38c36b9b62acf6026123c0f05",
+            ),
+            (
+                source,
+                "sha256:cce9511720b93089d1cc228ba37453adc6325618bb012c46ebad55190bffb3a0",
+            ),
+        ] {
+            assert_eq!(call_site_source_revision(bytes), revision, "{bytes:?}");
         }
     }
 
@@ -476,6 +546,31 @@ mod tests {
         assert_eq!(
             read(Some(IDENTITY), Some("bad")),
             Err(SourceRefusal::UnboundRevision)
+        );
+    }
+
+    /// Each bound holds its part only when the part is present, the identity
+    /// first.
+    #[test]
+    fn the_bounds_hold_only_the_parts_present() {
+        let one = Bound::new(1).unwrap();
+        let tight = SourceLimits {
+            identity_bytes: one,
+            revision_bytes: one,
+        };
+        assert_eq!(check_bounds(None, None, tight), Ok(()));
+        assert_eq!(check_bounds(Some("x"), Some("y"), tight), Ok(()));
+        assert_eq!(
+            check_bounds(Some("xy"), None, tight),
+            Err(SourceRefusal::OverBoundIdentity)
+        );
+        assert_eq!(
+            check_bounds(None, Some("xy"), tight),
+            Err(SourceRefusal::OverBoundRevision)
+        );
+        assert_eq!(
+            check_bounds(Some("xy"), Some("xy"), tight),
+            Err(SourceRefusal::OverBoundIdentity)
         );
     }
 

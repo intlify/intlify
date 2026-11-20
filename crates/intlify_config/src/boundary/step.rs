@@ -1,17 +1,20 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! The parts every one-step admission shares (015-168, 015-172): a typed input
-//! slot as a binding submits it, one boundary's typed refusal, one failure of
-//! a step, and the admission of a slot's origin beside its value. A step
-//! admits every origin, records an origin's failure before its value's, and
-//! takes its slots in the rank of the Safe Origin Kind each fixes.
+//! The parts every one-step admission shares (015-168, 015-172, 015-201): a
+//! typed input slot as a binding submits it, one boundary's typed refusal, one
+//! failure of a step, and the admission of a slot's origin beside its values.
+//! A step admits every origin, records an origin's failure before its values',
+//! and takes its slots in the rank of the Safe Origin Kind each fixes. A slot
+//! with several value boundaries records their results in the order the step
+//! gives them.
 
 use crate::artifacts::collection::CollectionFailure;
 use crate::artifacts::vocabulary::EnvelopeFailure;
 use crate::locale::EnvelopeReason;
 use crate::resolver::origin::SafeOriginKind;
 
+use super::call_site::CallSiteRefusal;
 use super::capability::CapabilityRefusal;
 use super::origin::{self, OriginRefusal};
 use super::selector::SelectorRefusal;
@@ -36,6 +39,7 @@ pub(crate) enum Refusal {
     /// pair's checks with `entry`.
     EntryIdentity(SourceRefusal),
     Snapshot(SnapshotRefusal),
+    CallSite(CallSiteRefusal),
     Selector(SelectorRefusal),
     Specification(SpecificationRefusal),
     Vocabulary(EnvelopeFailure),
@@ -53,6 +57,7 @@ impl Refusal {
             Self::Source(_) => "file-source-identity-revision",
             Self::EntryIdentity(_) => "programmatic-entry-identity-revision",
             Self::Snapshot(_) => "programmatic-entry-snapshot",
+            Self::CallSite(_) => "programmatic-call-site-evidence-input",
             Self::Selector(_) => "external-profile-selector-binding",
             Self::Specification(_) => "profile-resolution-specification-input",
             Self::Vocabulary(_) => "intent-surface-class-vocabulary-artifact",
@@ -70,6 +75,7 @@ impl Refusal {
             Self::Source(refusal) => refusal.reason(),
             Self::EntryIdentity(refusal) => refusal.entry_reason(),
             Self::Snapshot(refusal) => refusal.reason(),
+            Self::CallSite(refusal) => refusal.reason(),
             Self::Selector(refusal) => refusal.reason(),
             Self::Specification(refusal) => refusal.reason(),
             Self::Vocabulary(failure) => failure.reason(),
@@ -99,12 +105,32 @@ pub(super) fn slot<T>(
     candidate: Option<&str>,
     value: Option<Result<T, Refusal>>,
 ) -> Option<T> {
+    admit_origin(failures, slot, candidate);
+    record(failures, slot, value)
+}
+
+/// Admit one slot's origin candidate and record its failure, before the
+/// slot's values record theirs with [`record`].
+pub(super) fn admit_origin(
+    failures: &mut Vec<InputFailure>,
+    slot: SafeOriginKind,
+    candidate: Option<&str>,
+) {
     if let Err(refusal) = origin::admit(slot, candidate) {
         failures.push(InputFailure {
             slot,
             refusal: Refusal::Origin(refusal),
         });
     }
+}
+
+/// Record the result of one of `slot`'s value boundaries, `None` when the
+/// boundary was not evaluated, and return the admitted value.
+pub(super) fn record<T>(
+    failures: &mut Vec<InputFailure>,
+    slot: SafeOriginKind,
+    value: Option<Result<T, Refusal>>,
+) -> Option<T> {
     match value? {
         Ok(value) => Some(value),
         Err(refusal) => {
@@ -142,6 +168,11 @@ mod tests {
                 Refusal::Snapshot(SnapshotRefusal::Malformed),
                 "programmatic-entry-snapshot",
                 "malformed-snapshot",
+            ),
+            (
+                Refusal::CallSite(CallSiteRefusal::DuplicateMapping),
+                "programmatic-call-site-evidence-input",
+                "duplicate-mapping",
             ),
             (
                 Refusal::Selector(SelectorRefusal::MalformedNormalized),
