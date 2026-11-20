@@ -1525,22 +1525,7 @@ impl Evaluation {
         prerequisite: Admitted<P>,
         evaluate: impl FnOnce(P) -> Result<T, Found>,
     ) -> Result<Admitted<T>, EvaluationInvariant> {
-        let kind = unit.subject.kind();
-        if kind.phase() != unit.phase {
-            return Err(EvaluationInvariant::KindOutsidePhase(unit));
-        }
-        if !kind.checks().contains(&unit.check) {
-            return Err(EvaluationInvariant::CheckOutsideKind(unit));
-        }
-        let logical = unit.logical();
-        if let Err(causes) = &prerequisite {
-            if causes.keys().any(|cause| cause.unit >= logical) {
-                return Err(EvaluationInvariant::CauseNotBefore(unit));
-            }
-        }
-        if self.candidates.contains_key(&unit) {
-            return Err(EvaluationInvariant::UnitRecordedTwice(unit));
-        }
+        let logical = self.recordable(&unit, prerequisite.as_ref().err())?;
         let raw = unit;
         let unit = logical;
         #[cfg(test)]
@@ -1574,6 +1559,58 @@ impl Evaluation {
         };
         self.statuses.insert(unit, status);
         Ok(result)
+    }
+
+    /// Runs `unit`, a check that passes only once `prerequisite` is admitted
+    /// but may find blocking results without it: `seen`, those it found in
+    /// what it inspects whatever the prerequisite gives. With `seen`, the
+    /// unit is evaluated, reports them, and whatever depends on it inherits
+    /// both their keys and the prerequisite's causes, since each blocking
+    /// Finding suppresses what needs the unit's value (D15:2151, 2365, 2369).
+    /// Without `seen`, it waits on the prerequisite, rather than pass on what
+    /// it did not inspect (D15:2006). Either way it is recorded as
+    /// [`Self::check_found`] records a unit.
+    pub(crate) fn check_seen(
+        &mut self,
+        unit: Unit,
+        prerequisite: Admitted<()>,
+        seen: Option<Found>,
+    ) -> Result<Admitted<()>, EvaluationInvariant> {
+        match (seen, prerequisite) {
+            (None, prerequisite) => self.check_found(unit, prerequisite, |()| Ok(())),
+            (Some(found), Ok(())) => self.check_found(unit, Ok(()), |()| Err(found)),
+            (Some(found), Err(causes)) => {
+                self.recordable(&unit, Some(&causes))?;
+                let found = self.check_found(unit, Ok(()), |()| Err::<(), _>(found))?;
+                Ok(found.map_err(|keys| keys.union(causes)))
+            }
+        }
+    }
+
+    /// The unit over `unit`'s logical subject, when `unit` may be recorded
+    /// waiting on `causes`: its subject is of a kind its phase checks, the
+    /// kind runs its check, every cause comes before it, and it was not
+    /// recorded yet; otherwise the resolver bug it is.
+    fn recordable(
+        &self,
+        unit: &Unit,
+        causes: Option<&Causes>,
+    ) -> Result<Unit, EvaluationInvariant> {
+        let kind = unit.subject.kind();
+        if kind.phase() != unit.phase {
+            return Err(EvaluationInvariant::KindOutsidePhase(unit.clone()));
+        }
+        if !kind.checks().contains(&unit.check) {
+            return Err(EvaluationInvariant::CheckOutsideKind(unit.clone()));
+        }
+        let logical = unit.logical();
+        if causes.is_some_and(|causes| causes.keys().any(|cause| cause.unit >= logical)) {
+            return Err(EvaluationInvariant::CauseNotBefore(unit.clone()));
+        }
+        if self.candidates.contains_key(unit) {
+            return Err(EvaluationInvariant::UnitRecordedTwice(unit.clone()));
+        }
+        Ok(logical)
     }
 
     /// Records the blocking candidates `found` of the logical `unit`, whose
@@ -2615,6 +2652,69 @@ mod tests {
                 .err(),
             Some(EvaluationInvariant::UnitRecordedTwice(data()))
         );
+        assert_eq!(evaluation.issues().count(), 1);
+    }
+
+    /// A check that may find blocking results without its prerequisite is
+    /// evaluated with them whatever the prerequisite gives, and what depends
+    /// on it waits on both their keys and the prerequisite's causes; without
+    /// them it waits on the prerequisite (D15:2006, 2151, 2365).
+    #[test]
+    fn a_check_reports_what_it_saw_whatever_its_prerequisite_gives() {
+        use crate::resolver::entry::input;
+        let blocking = |code, reason| Blocking {
+            code,
+            reason,
+            details: None,
+        };
+        let cycle = || Found::from(blocking(Code::InputNotJsonCompatible, Some(Reason::Cycle)));
+        let compatible = input(Check::JsonCompatible);
+        let checks = |causes: &Causes| causes.keys().map(|key| key.unit.check).collect();
+        for (admitted, seen, evaluated, waits) in [
+            (true, false, true, vec![]),
+            (false, false, false, vec![Check::WithinSnapshotNodes]),
+            (true, true, true, vec![Check::JsonCompatible]),
+            (
+                false,
+                true,
+                true,
+                vec![Check::WithinSnapshotNodes, Check::JsonCompatible],
+            ),
+        ] {
+            let mut evaluation = Evaluation::fabricated();
+            let prerequisite = if admitted {
+                Ok(())
+            } else {
+                let overrun = blocking(Code::BootstrapLimitExceeded, None);
+                evaluation
+                    .check(input(Check::WithinSnapshotNodes), Ok(()), |()| {
+                        Err::<(), _>(overrun)
+                    })
+                    .unwrap()
+            };
+            let result = evaluation
+                .check_seen(compatible.clone(), prerequisite, seen.then(cycle))
+                .unwrap();
+            assert_eq!(result.as_ref().err().map_or_else(Vec::new, checks), waits);
+            assert_eq!(
+                evaluation.status(&compatible) == Some(&Status::Evaluated),
+                evaluated
+            );
+        }
+        // A cause after the unit is a resolver bug, and records nothing.
+        let mut evaluation = Evaluation::fabricated();
+        let later = evaluation
+            .check(input(Check::WithinNodes), Ok(()), |()| {
+                Err::<(), _>(blocking(Code::ResourceLimitExceeded, None))
+            })
+            .unwrap();
+        assert_eq!(
+            evaluation
+                .check_seen(compatible.clone(), later, Some(cycle()))
+                .err(),
+            Some(EvaluationInvariant::CauseNotBefore(compatible.clone()))
+        );
+        assert_eq!(evaluation.status(&compatible), None);
         assert_eq!(evaluation.issues().count(), 1);
     }
 

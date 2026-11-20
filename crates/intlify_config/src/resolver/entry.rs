@@ -3,11 +3,12 @@
 
 //! Design 015's Phase 1, `entry-admission`, over strict file entry. The
 //! phase's first kind owns the entry dependency records and waits on nothing
-//! (D15:2516). The complete input is one singleton subject whose ten checks
-//! run in check-rank order, each waiting on the checks whose result it
-//! needs: the parser's tokens on the file's bytes, strict JSON on the tokens
-//! (D15:1794, 1795), duplicate members and the JSON-compatible domain on a
-//! syntactically parsed file (D15:802, 2289), and the five root-value bounds
+//! (D15:2516). The complete input is one singleton subject, of whose checks a
+//! file records ten (Decision 015-202). They run in check-rank order, each
+//! waiting on the checks whose result it needs: the parser's tokens on the
+//! file's bytes, strict JSON on the tokens (D15:1794, 1795), duplicate
+//! members and the JSON-compatible domain on a syntactically parsed file
+//! (D15:802, 2289), and the five root-value bounds
 //! on both, since they bound the complete root that entry materializes
 //! (D15:1876). A check whose prerequisite failed is not evaluated, with the
 //! causes of the failure (D15:2149), and a value exists only when every check
@@ -70,7 +71,7 @@ pub(crate) const fn input(check: Check) -> Unit {
 
 /// The root-value bounds' checks, in check-rank order, with the bound each
 /// applies.
-const ROOT_VALUE_BOUNDS: [(Check, InputBound, &str); 5] = [
+pub(super) const ROOT_VALUE_BOUNDS: [(Check, InputBound, &str); 5] = [
     (Check::WithinNodes, InputBound::Nodes, "maxNodes"),
     (Check::WithinDepth, InputBound::Depth, "maxDepth"),
     (
@@ -105,6 +106,11 @@ pub(crate) enum EntryInvariant {
     Evidence(EvidenceInvariant),
     /// A capability bound has no component path.
     Component(ComponentInvariant),
+    /// A Snapshot holds a bootstrap marker its boundary refuses: one that a
+    /// node follows in canonical traversal order, or whose witness is not
+    /// its bound's limit plus one under the bounds Phase 1 reads (D15:867,
+    /// 869).
+    UnadmittedMarker,
 }
 
 impl From<EvaluationInvariant> for EntryInvariant {
@@ -318,7 +324,16 @@ impl Findings {
             Some(InputFailure::Inadmissible(facts)) => {
                 found.unique = duplicates(file, facts)?;
                 found.compatible = incompatible(file, facts)?;
-                found.bounds = bounds(file, facts)?;
+                found.bounds = root_value_bounds(
+                    &facts.violations,
+                    &facts.long_strings,
+                    |string| match string {
+                        None => file.evidence(Some(ROOT), None),
+                        Some(string) => {
+                            file.evidence(Some(&facts.paths.steps(string.path)), Some(string.span))
+                        }
+                    },
+                )?;
             }
         }
         Ok(found)
@@ -375,21 +390,19 @@ fn incompatible(
     Ok(candidates.into_iter().reduce(Found::and))
 }
 
-/// The root-value bounds' Findings, in check-rank order: each total the
-/// complete value exceeds, observed at the root, and the single-string bound
-/// at every string past it, each beside the capability's bound (D15:1876,
-/// 1884, 2203).
-fn bounds(
-    file: &EntryFile<'_>,
-    facts: &Inadmissible,
+/// The root-value bounds' Findings, in check-rank order: each total of
+/// `violations`, observed at the root, and the single-string bound at each of
+/// `long_strings`, each beside the capability's bound (D15:1876, 1884,
+/// 2203). `at` gives the primary Evidence of a long string, or of the root
+/// for `None`, so either entry reports them alike (D15:1889).
+pub(super) fn root_value_bounds<L>(
+    violations: &[LimitViolation],
+    long_strings: &[L],
+    at: impl Fn(Option<&L>) -> Result<EvidenceProjection, EntryInvariant>,
 ) -> Result<[Option<Found>; 5], EntryInvariant> {
     let mut found: [Option<Found>; 5] = Default::default();
     for (slot, (_, bound, name)) in found.iter_mut().zip(ROOT_VALUE_BOUNDS) {
-        let Some(violation) = facts
-            .violations
-            .iter()
-            .find(|violation| violation.bound == bound)
-        else {
+        let Some(violation) = violations.iter().find(|violation| violation.bound == bound) else {
             continue;
         };
         let exceeded = Blocking::limit(LimitExceeded {
@@ -398,21 +411,20 @@ fn bounds(
             actual: actual(violation),
         });
         let beside = capability(CapabilityBound::PolicyComparable(root_value(name)))?;
-        let observed = |path: &[PathStep], span: Option<ByteSpan>| {
+        let observed = |string: Option<&L>| {
             let observation = Observation {
-                primary: file.evidence(Some(path), span)?,
+                primary: at(string)?,
                 related: vec![beside.clone()],
             };
             Ok::<_, EntryInvariant>(Found::observed(exceeded, observation))
         };
         let candidates = if bound == InputBound::SingleStringBytes {
-            facts
-                .long_strings
+            long_strings
                 .iter()
-                .map(|string| observed(&facts.paths.steps(string.path), Some(string.span)))
+                .map(|string| observed(Some(string)))
                 .collect::<Result<Vec<_>, _>>()?
         } else {
-            vec![observed(ROOT, None)?]
+            vec![observed(None)?]
         };
         *slot = Some(
             candidates
@@ -451,7 +463,7 @@ const fn root_value(name: &'static str) -> BoundId {
 
 /// Resolver-input Evidence of the Implementation Capability's `bound`
 /// (D15:836).
-fn capability(bound: CapabilityBound) -> Result<EvidenceProjection, EntryInvariant> {
+pub(super) fn capability(bound: CapabilityBound) -> Result<EvidenceProjection, EntryInvariant> {
     ComponentPath::capability(bound)
         .map(EvidenceProjection::resolver_input)
         .map_err(EntryInvariant::Component)
@@ -489,6 +501,22 @@ pub(crate) mod fixtures {
 
     use super::{Classify, EntryFile};
 
+    /// The classification of the members on a fact's path in the model's
+    /// configuration schema under the capability's `comparable` bounds,
+    /// which either entry's tests read.
+    pub(crate) fn classify(comparable: &ResolutionLimits) -> Box<Classify> {
+        let comparable = comparable.clone();
+        // The configuration schema the committed construction admits.
+        let schema = committed().configuration_schema();
+        Box::new(move |edges, locales| {
+            KeyFacts {
+                comparable: &comparable,
+                locales,
+            }
+            .steps(schema, edges)
+        })
+    }
+
     /// The source identity the test files are admitted under.
     pub(crate) const FILE: &str = "intlify-file-source.v0:storefront/intlify.config.json";
 
@@ -512,18 +540,9 @@ pub(crate) mod fixtures {
                 .unwrap()
                 .identity()
                 .clone();
-            let comparable = comparable.clone();
-            // The configuration schema the committed construction admits.
-            let schema = committed().configuration_schema();
             Self {
                 identity,
-                classify: Box::new(move |edges, locales| {
-                    KeyFacts {
-                        comparable: &comparable,
-                        locales,
-                    }
-                    .steps(schema, edges)
-                }),
+                classify: classify(comparable),
             }
         }
 

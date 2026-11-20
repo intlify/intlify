@@ -50,6 +50,7 @@ pub(crate) mod reporting;
 pub(crate) mod reporting_plan;
 pub(crate) mod resolution_evidence;
 pub(crate) mod resource_policy;
+pub(crate) mod snapshot_entry;
 pub(crate) mod specification;
 pub(crate) mod structural_admission;
 pub(crate) mod subject;

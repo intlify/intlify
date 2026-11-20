@@ -470,6 +470,37 @@ fn scalars(bytes: &[u8]) -> Option<String> {
     String::from_utf8(bytes.to_vec()).ok()
 }
 
+/// The submitted form of a canonical node, its members in key order, for
+/// tests that run a tree through the boundary.
+#[cfg(test)]
+pub(crate) fn submitted(node: &Node) -> SubmittedNode {
+    match node {
+        Node::Null => SubmittedNode::Null,
+        Node::Boolean(value) => SubmittedNode::Boolean(*value),
+        Node::Number(number) => SubmittedNode::Number(number.get()),
+        Node::String(text) => SubmittedNode::String(text.as_bytes().to_vec()),
+        Node::Array(elements) => SubmittedNode::Array(elements.iter().map(submitted).collect()),
+        Node::Object(members) => SubmittedNode::Object(
+            members
+                .iter()
+                .map(|(key, value)| (key.as_bytes().to_vec(), submitted(value)))
+                .collect(),
+        ),
+        Node::Marker(Marker::Rejected(reason)) => SubmittedNode::Marker(SubmittedMarker {
+            reason: reason.id().to_owned(),
+            bound: None,
+            witness: None,
+        }),
+        Node::Marker(Marker::BootstrapLimitExceeded { bound, witness }) => {
+            SubmittedNode::Marker(SubmittedMarker {
+                reason: BOOTSTRAP_LIMIT_EXCEEDED.to_owned(),
+                bound: Some(bound.path()),
+                witness: Some(*witness),
+            })
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -540,29 +571,6 @@ mod tests {
                 .map(|(key, value)| (key.as_bytes().to_vec(), value))
                 .collect(),
         )
-    }
-
-    /// The submitted form of a canonical node, its members in key order.
-    fn submitted(node: &Node) -> SubmittedNode {
-        match node {
-            Node::Null => SubmittedNode::Null,
-            Node::Boolean(value) => SubmittedNode::Boolean(*value),
-            Node::Number(number) => SubmittedNode::Number(number.get()),
-            Node::String(text) => SubmittedNode::String(text.as_bytes().to_vec()),
-            Node::Array(elements) => SubmittedNode::Array(elements.iter().map(submitted).collect()),
-            Node::Object(members) => SubmittedNode::Object(
-                members
-                    .iter()
-                    .map(|(key, value)| (key.as_bytes().to_vec(), submitted(value)))
-                    .collect(),
-            ),
-            Node::Marker(Marker::Rejected(reason)) => marker(reason.id(), None, None),
-            Node::Marker(Marker::BootstrapLimitExceeded { bound, witness }) => marker(
-                BOOTSTRAP_LIMIT_EXCEEDED,
-                Some(bound.path().as_str()),
-                Some(*witness),
-            ),
-        }
     }
 
     fn rejected(reason: MarkerReason) -> Node {

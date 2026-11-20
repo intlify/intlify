@@ -23,7 +23,7 @@ use intlify_shared_json::token::hex;
 
 use crate::construction::profile::{MARKER_REASONS, SNAPSHOT_DOMAIN};
 use crate::framing::{frame, Record};
-use crate::input_limits::Bound;
+use crate::input_limits::{Bound, ValueCounts};
 use crate::materialize::PortableNumber;
 use crate::resolver::capability::{BootstrapBoundId, BootstrapGroup, SnapshotLimits};
 
@@ -372,6 +372,18 @@ impl SnapshotCounts {
         bytes
     }
 
+    /// The five counts the root-value bounds read, which for a marker-free
+    /// tree equal a file entry's counts of the same value (D15:1889).
+    pub(crate) const fn value(&self) -> ValueCounts {
+        ValueCounts {
+            nodes: self.nodes,
+            depth: self.depth,
+            collection_entries: self.collection_entries,
+            total_string_bytes: self.total_string_bytes,
+            single_string_bytes: self.single_string_bytes,
+        }
+    }
+
     /// Each count beside the bound that limits it, in the table's order.
     pub(crate) const fn by_bound(&self) -> [(SnapshotBound, u64); 9] {
         [
@@ -689,24 +701,8 @@ mod tests {
         });
         let source: Arc<[u8]> = serde_json::to_vec(&value).unwrap().into();
         let document = materialize_file(source, limits()).ok().unwrap();
-        let file = document.value_counts();
         let snapshot = SnapshotCounts::of(&from_json(&value));
-        assert_eq!(
-            (
-                snapshot.nodes,
-                snapshot.depth,
-                snapshot.collection_entries,
-                snapshot.total_string_bytes,
-                snapshot.single_string_bytes,
-            ),
-            (
-                file.nodes,
-                file.depth,
-                file.collection_entries,
-                file.total_string_bytes,
-                file.single_string_bytes,
-            )
-        );
+        assert_eq!(snapshot.value(), document.value_counts());
         assert_eq!(snapshot.rejected_markers, 0);
         assert_eq!(snapshot.traversal_units, 2 * snapshot.nodes - 1);
     }
