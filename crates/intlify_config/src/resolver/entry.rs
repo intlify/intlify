@@ -136,19 +136,32 @@ pub(crate) struct EntryFile<'a> {
     pub(crate) classify: &'a Classify,
 }
 
-/// The Safe Origin Kind of a file entry's External Profile Selector Input:
-/// the entry's `profile-selector-cli` slot (D15:804, 015-172).
-pub(crate) const SELECTOR_ORIGIN: SafeOriginKind = SafeOriginKind::ProfileSelectorCli;
+/// An entry as the phases after `entry-admission` observe it: the Safe
+/// Origin Kinds its slots fix, the classification of the members on a
+/// value's path, and the source and span that name a value in it (D15:204,
+/// 776, 790, 800, 804). A file is the only one yet.
+pub(crate) trait ConfigurationEntry {
+    /// The Safe Origin Kind of its configuration (D15:204).
+    fn origin(&self) -> SafeOriginKind;
 
-impl EntryFile<'_> {
-    /// Materialized Value Evidence in the file: the value at the internal
-    /// path `edges` from the root, each member classified, with the span of
-    /// its token at `locus` when the locus has one (D15:776, 790).
+    /// The Safe Origin Kind of its External Profile Selector Input, which
+    /// profile-selector Evidence records (D15:204, 804).
+    fn selector_origin(&self) -> SafeOriginKind;
+
+    /// The classification of the members on an internal path (D15:776).
+    fn classify(&self) -> &Classify;
+
+    /// The source that names the value at `locus`, and the value's span in
+    /// that source when one applies (D15:790, 800).
+    fn source_at(&self, locus: Locus) -> (Source<'_>, Option<SourceSpan>);
+
+    /// Materialized Value Evidence of the value at the internal path `edges`
+    /// from the root, each member classified, at `locus` (D15:790, 800).
     ///
     /// # Errors
     ///
     /// Returns the resolver bug that leaves the value without Evidence.
-    pub(crate) fn value_evidence(
+    fn value_evidence(
         &self,
         edges: &[Edge<'_>],
         locus: Locus,
@@ -162,24 +175,42 @@ impl EntryFile<'_> {
     /// # Errors
     ///
     /// Returns the resolver bug that leaves the value without Evidence.
-    pub(crate) fn value_evidence_after(
+    fn value_evidence_after(
         &self,
         edges: &[Edge<'_>],
         locus: Locus,
         locales: Option<&dyn LocaleKeys>,
     ) -> Result<EvidenceProjection, EvidenceInvariant> {
-        let steps = (self.classify)(edges, locales);
+        let steps = self.classify()(edges, locales);
+        let (source, span) = self.source_at(locus);
+        EvidenceProjection::configuration_value(self.origin(), source, &steps, span)
+    }
+}
+
+/// A file entry's slots are `configuration-file` and `profile-selector-cli`,
+/// and a value is named in the file, at its token's span (D15:204, 790).
+impl ConfigurationEntry for EntryFile<'_> {
+    fn origin(&self) -> SafeOriginKind {
+        SafeOriginKind::ConfigurationFile
+    }
+
+    fn selector_origin(&self) -> SafeOriginKind {
+        SafeOriginKind::ProfileSelectorCli
+    }
+
+    fn classify(&self) -> &Classify {
+        self.classify
+    }
+
+    fn source_at(&self, locus: Locus) -> (Source<'_>, Option<SourceSpan>) {
         let span = locus
             .bytes()
             .and_then(|span| SourceSpan::admit(span.start_byte(), span.end_byte(), &self.bytes));
-        EvidenceProjection::configuration_value(
-            SafeOriginKind::ConfigurationFile,
-            self.source,
-            &steps,
-            span,
-        )
+        (self.source, span)
     }
+}
 
+impl EntryFile<'_> {
     /// Entry Source Evidence at the internal path `path` when one was
     /// established, the root when it has no step, and at `span` (D15:768,
     /// 780-786).
@@ -495,10 +526,18 @@ pub(crate) mod fixtures {
     use crate::boundary::source::{file_source_revision, read_pair, ExactIdentity, SourceLimits};
     use crate::construction::resolver::committed;
     use crate::input_limits::Bound;
+    #[cfg(test)]
+    use crate::materialize::Locus;
     use crate::resolver::evidence::Source;
     use crate::resolver::evidence_path::KeyFacts;
+    #[cfg(test)]
+    use crate::resolver::evidence_source::SourceSpan;
     use crate::resolver::limits::ResolutionLimits;
+    #[cfg(test)]
+    use crate::resolver::origin::SafeOriginKind;
 
+    #[cfg(test)]
+    use super::ConfigurationEntry;
     use super::{Classify, EntryFile};
 
     /// The classification of the members on a fact's path in the model's
@@ -559,6 +598,30 @@ pub(crate) mod fixtures {
             }
         }
     }
+
+    /// A file under the programmatic slots' Safe Origin Kinds, so an origin
+    /// its Evidence records can only have come from the entry.
+    #[cfg(test)]
+    pub(crate) struct Relabeled<'a>(pub(crate) EntryFile<'a>);
+
+    #[cfg(test)]
+    impl ConfigurationEntry for Relabeled<'_> {
+        fn origin(&self) -> SafeOriginKind {
+            SafeOriginKind::ConfigurationProgrammatic
+        }
+
+        fn selector_origin(&self) -> SafeOriginKind {
+            SafeOriginKind::ProfileSelectorProgrammatic
+        }
+
+        fn classify(&self) -> &Classify {
+            self.0.classify()
+        }
+
+        fn source_at(&self, locus: Locus) -> (Source<'_>, Option<SourceSpan>) {
+            self.0.source_at(locus)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -567,6 +630,7 @@ mod tests {
     use std::sync::Arc;
 
     use crate::input_limits::{Bound, InputBound, InputLimits};
+    use crate::materialize::{materialize_file, Locus, NodeKind};
     use crate::materialize_tests::limits;
     use crate::resolver::capability::{BootstrapBoundId, BootstrapGroup};
     use crate::resolver::evaluation::{
@@ -575,6 +639,7 @@ mod tests {
     };
     use crate::resolver::limits::{fixture_limits, Group};
     use crate::resolver::subject::{EntryPath, SubjectKind};
+    use crate::structural::Edge;
 
     use serde_json::{json, Value};
 
@@ -586,8 +651,11 @@ mod tests {
     use crate::resolver::record_view::RecordViews;
     use crate::resolver::token::{Sha256, Specification};
 
-    use super::fixtures::FileFixture;
-    use super::{admit_entry, capability, input, raw, root_value, OWNER, ROOT_VALUE_BOUNDS};
+    use super::fixtures::{FileFixture, Relabeled};
+    use super::{
+        admit_entry, capability, input, raw, root_value, ConfigurationEntry, OWNER,
+        ROOT_VALUE_BOUNDS,
+    };
 
     const PROFILE: Specification<'static> = Specification {
         identity: "intlify-project-profile",
@@ -1095,6 +1163,46 @@ mod tests {
                 ("maxSingleStringBytes", 2, Actual::AtLeast(3)),
             ]
         );
+    }
+
+    /// D15:790, 800: Materialized Value Evidence takes its origin, source,
+    /// and span from its entry: a file names its own origin at a value's or a
+    /// key's token, and the same file under the programmatic Safe Origin
+    /// Kinds names theirs at the same source and span. The key is one the
+    /// schema defines, since a redacted member's token is its origin's.
+    #[test]
+    fn materialized_value_evidence_takes_what_its_entry_gives() {
+        fn view(entry: &dyn ConfigurationEntry, edges: &[Edge<'_>], locus: Locus) -> Value {
+            let projection = entry.value_evidence(edges, locus).unwrap();
+            let tokens = EvidenceTokens::assign(PROFILE, projection.redacted(), &Sha256);
+            projection.retained(PROFILE, &tokens).unwrap().view()
+        }
+        let source = br#"{"profiles":[1,"b"]}"#;
+        let document = materialize_file(Arc::from(&source[..]), limits()).unwrap();
+        let root = document.node(document.root());
+        let NodeKind::Object(members) = root.kind() else {
+            panic!("an object");
+        };
+        let fixture = FileFixture::new(&fixture_limits(100));
+        let file = fixture.file(Arc::from(&source[..]));
+        let relabeled = Relabeled(fixture.file(Arc::from(&source[..])));
+        for (edges, locus, text) in [
+            (&[][..], root.locus(), &source[..]),
+            (
+                &[Edge::Member("profiles")][..],
+                members["profiles"].key(),
+                &br#""profiles""#[..],
+            ),
+        ] {
+            let named = view(&file, edges, locus);
+            assert_eq!(named["kind"], "configuration-value");
+            assert_eq!(named["origin"], "configuration-file");
+            assert_eq!(named["span"], span(source, text, 0));
+            let mut renamed = view(&relabeled, edges, locus);
+            assert_eq!(renamed["origin"], "configuration-programmatic");
+            renamed["origin"] = json!("configuration-file");
+            assert_eq!(renamed, named);
+        }
     }
 
     /// Any one root-value bound the complete value exceeds holds the

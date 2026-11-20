@@ -45,7 +45,7 @@ use crate::input_limits::Bound;
 use crate::model::ProfileId;
 use crate::structural::selection::SelectorInput;
 
-use super::entry::{EntryFile, SELECTOR_ORIGIN};
+use super::entry::{ConfigurationEntry, EntryFile};
 use super::evaluation::{
     Admitted, Blocking, Check, Evaluation, EvaluationInvariant, Subject, Unit,
 };
@@ -254,14 +254,16 @@ impl EntrySlot {
 
 /// What a file entry's dependency records name besides their slots: its
 /// source's identity as Evidence projects it, the Source-content revision of
-/// its bytes, its locator when present, and the selector as the final
-/// authority projects it (D15:2512, 2516).
+/// its bytes, its locator when present, the selector as the final authority
+/// projects it, and the Safe Origin Kinds the entry fixes (D15:204, 2512,
+/// 2516).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct EntryInputs {
     source: SourceIdentity,
     revision: Arc<str>,
     locator: Option<Locator>,
     selector: SelectorProjection,
+    origins: EntryOrigins,
 }
 
 impl EntryInputs {
@@ -281,16 +283,18 @@ impl EntryInputs {
     ) -> Result<Self, EvidenceInvariant> {
         let source = file.source;
         Ok(Self {
-            source: SourceIdentity::project(
-                SafeOriginKind::ConfigurationFile,
-                source.identity,
-                source.marked,
-            )
-            .map_err(EvidenceInvariant::Token)?,
+            source: SourceIdentity::project(file.origin(), source.identity, source.marked)
+                .map_err(EvidenceInvariant::Token)?,
             revision: Arc::from(file_source_revision(&file.bytes)),
             locator: source.locator.cloned(),
-            selector: SelectorProjection::project(SELECTOR_ORIGIN, selector, authority, declared)
-                .map_err(EvidenceInvariant::Selector)?,
+            selector: SelectorProjection::project(
+                file.selector_origin(),
+                selector,
+                authority,
+                declared,
+            )
+            .map_err(EvidenceInvariant::Selector)?,
+            origins: EntryOrigins::of(file),
         })
     }
 
@@ -324,8 +328,26 @@ impl EntryInputs {
                 locator: self.locator.clone(),
             },
             EntryDependency::Selector(self.selector.retained(specification, tokens)?),
-            EntryDependency::Origins,
+            EntryDependency::Origins(self.origins),
         ])
+    }
+}
+
+/// The Safe Origin Kinds an entry fixes for its `entry-source` and
+/// `profile-selector` slots (D15:204, 2516).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct EntryOrigins {
+    entry_source: SafeOriginKind,
+    profile_selector: SafeOriginKind,
+}
+
+impl EntryOrigins {
+    /// The Safe Origin Kinds `entry` fixes.
+    pub(crate) fn of(entry: &dyn ConfigurationEntry) -> Self {
+        Self {
+            entry_source: entry.origin(),
+            profile_selector: entry.selector_origin(),
+        }
     }
 }
 
@@ -338,7 +360,7 @@ pub(crate) enum EntryDependency {
         locator: Option<Locator>,
     },
     Selector(SelectorEvidence),
-    Origins,
+    Origins(EntryOrigins),
 }
 
 impl EntryDependency {
@@ -347,14 +369,14 @@ impl EntryDependency {
         match self {
             Self::Source { .. } => EntrySlot::EntrySource,
             Self::Selector(_) => EntrySlot::ProfileSelector,
-            Self::Origins => EntrySlot::Origins,
+            Self::Origins(_) => EntrySlot::Origins,
         }
     }
 
     /// `{ slot, source, revision, locator? }`, `{ slot, selector }`, or
-    /// `{ slot, origins }`, where `origins` maps each common and entry input's
-    /// slot ID to the Safe Origin Kind a file entry fixes (D15:2512-2513,
-    /// 2516, 3157).
+    /// `{ slot, origins }`, where `origins` maps each common input's slot ID
+    /// to the Safe Origin Kind its slot fixes and each entry input's to the
+    /// one the entry fixes (D15:204, 2512-2513, 2516, 3157).
     pub(crate) fn view(&self) -> Value {
         let mut view = Map::new();
         view.insert("slot".to_owned(), json!(self.slot().id()));
@@ -373,7 +395,7 @@ impl EntryDependency {
             Self::Selector(selector) => {
                 view.insert("selector".to_owned(), selector.view());
             }
-            Self::Origins => {
+            Self::Origins(entry) => {
                 let mut origins: Map<String, Value> = MaterializedSlot::ALL
                     .into_iter()
                     .filter_map(|slot| {
@@ -382,11 +404,11 @@ impl EntryDependency {
                     .collect();
                 origins.insert(
                     EntrySlot::EntrySource.id().to_owned(),
-                    json!(SafeOriginKind::ConfigurationFile.id()),
+                    json!(entry.entry_source.id()),
                 );
                 origins.insert(
                     EntrySlot::ProfileSelector.id().to_owned(),
-                    json!(SELECTOR_ORIGIN.id()),
+                    json!(entry.profile_selector.id()),
                 );
                 view.insert("origins".to_owned(), Value::Object(origins));
             }
@@ -514,7 +536,7 @@ mod tests {
 
     use super::fixtures::{authority, declared, inputs, locator, redacted_entry, selector};
     use super::*;
-    use crate::resolver::entry::fixtures::{FileFixture, FILE};
+    use crate::resolver::entry::fixtures::{FileFixture, Relabeled, FILE};
     use crate::resolver::evaluation::{Code, Phase, Status};
     use crate::resolver::evidence_source::hex;
     use crate::resolver::limits::fixture_limits;
@@ -852,6 +874,24 @@ mod tests {
         );
     }
 
+    /// The `origins` record names the Safe Origin Kinds its entry fixes for
+    /// the entry's slots, and every common slot's own (D15:204, 2516).
+    #[test]
+    fn the_origins_record_names_the_origins_its_entry_fixes() {
+        let fixture = FileFixture::new(&fixture_limits(100));
+        let file = fixture.file(Arc::from(&b"{}"[..]));
+        let relabeled = Relabeled(fixture.file(Arc::from(&b"{}"[..])));
+        let origins = |entry: &dyn ConfigurationEntry| {
+            EntryDependency::Origins(EntryOrigins::of(entry)).view()["origins"].clone()
+        };
+        let mut expected = origins(&file);
+        assert_eq!(expected["entry-source"], "configuration-file");
+        assert_eq!(expected["profile-selector"], "profile-selector-cli");
+        expected["entry-source"] = json!("configuration-programmatic");
+        expected["profile-selector"] = json!("profile-selector-programmatic");
+        assert_eq!(origins(&relabeled), expected);
+    }
+
     /// An unmarked source identity and an undeclared selector are redacted,
     /// so their records wait on the invocation's evidence tokens, and a
     /// present locator is kept and counted (D15:734-737, 806-808, 1851,
@@ -881,7 +921,7 @@ mod tests {
         assert!(source["source"]["redacted"]["token"].is_string());
         assert_eq!(source["locator"], locator().view());
         let expected = SelectorProjection::project(
-            SELECTOR_ORIGIN,
+            SafeOriginKind::ProfileSelectorCli,
             &selector(Some("other")),
             authority(),
             &declared(),
