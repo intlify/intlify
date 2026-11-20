@@ -20,7 +20,7 @@ use crate::model::{ProfileDeclaration, ProfileId, TargetId};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::resolver::artifact_resolution::{admit_collection, ArtifactSet};
 use crate::resolver::declaration_observer::DeclarationObserver;
-use crate::resolver::entry::EntryFile;
+use crate::resolver::entry::ConfigurationEntry;
 use crate::resolver::evaluation::{
     Actual, Admitted, Causes, Check, Evaluation, IssueKey, LimitExceeded, Status, Subject, Unit,
 };
@@ -91,13 +91,13 @@ impl PreparedHydration {
         .ok()
     }
 
-    /// Where the selected declaration's checks observe it in `file`: the
+    /// Where the selected declaration's checks observe it in `entry`: the
     /// phases after Phase 5 observe through what it bound.
     pub(super) fn observer<'a>(
         &'a self,
-        file: &'a EntryFile<'a>,
+        entry: &'a dyn ConfigurationEntry,
     ) -> Option<DeclarationObserver<'a>> {
-        Some(observer(&self.analysis, file, &self.selected)?.with_locales(&*self.canonicalizer))
+        Some(observer(&self.analysis, entry, &self.selected)?.with_locales(&*self.canonicalizer))
     }
 
     /// The interval's inputs over `set`, when the configuration is complete

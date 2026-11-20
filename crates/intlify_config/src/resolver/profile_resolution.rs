@@ -62,7 +62,7 @@ use super::declaration_fields::DeclarationFields;
 use super::declaration_observer::{DeclarationObserver, ObserverInvariant};
 use super::delivery::{resolve_delivery, DeliveryPolicy};
 use super::dependency::{own, EntryInputs, SemanticGroup, OPTIONAL_POLICIES, REQUIRED_POLICIES};
-use super::entry::{admit_entry, EntryFile, EntryInvariant};
+use super::entry::{admit_entry, ConfigurationEntry, EntryFile, EntryInvariant};
 use super::evaluation::{and, Admitted, Causes, Evaluation, EvaluationInvariant};
 use super::evidence::EvidenceInvariant;
 use super::evidence_component::ComponentInvariant;
@@ -120,10 +120,10 @@ pub(crate) struct SelectedConfiguration<'a> {
 }
 
 impl<'a> SelectedConfiguration<'a> {
-    /// The configuration of `analysis`, which `file` holds, once Phase 3
+    /// The configuration of `analysis`, which `entry` holds, once Phase 3
     /// provisionally selected one of its declarations, `selection`, with
     /// `selector`, each field as `evaluation` recorded structural admission's
-    /// checks under it, observed in the file (D15:790). `whole` is whether
+    /// checks under it, observed in the entry (D15:790). `whole` is whether
     /// structural admission admitted the whole root.
     ///
     /// # Errors
@@ -132,7 +132,7 @@ impl<'a> SelectedConfiguration<'a> {
     /// does not.
     pub(crate) fn new(
         evaluation: &Evaluation,
-        (analysis, file): (&'a Analysis, &'a EntryFile<'a>),
+        (analysis, entry): (&'a Analysis, &'a dyn ConfigurationEntry),
         (selector, selection): (&'a SelectorInput, &'a ProvisionalSelection<PolicyReference>),
         whole: Admitted<()>,
     ) -> Result<Self, ResolverInvariant> {
@@ -143,7 +143,7 @@ impl<'a> SelectedConfiguration<'a> {
             .map_err(admission)?
             .ok_or_else(unreported)?;
         let profiles = analysis.profiles_value().ok_or_else(unreported)?;
-        let observer = DeclarationObserver::new(file, profiles, selection.id().as_str())
+        let observer = DeclarationObserver::new(entry, profiles, selection.id().as_str())
             .map_err(ResolverInvariant::Observer)?;
         Ok(Self {
             fields,

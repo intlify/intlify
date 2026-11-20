@@ -15,7 +15,7 @@ use crate::model::{IntlifyConfig, ProfileId};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::resolver::declaration_observer::DeclarationObserver;
 use crate::resolver::entry::fixtures::FileFixture;
-use crate::resolver::entry::EntryFile;
+use crate::resolver::entry::{ConfigurationEntry, EntryFile};
 use crate::resolver::evaluation::Evaluation;
 use crate::resolver::limits::ResolutionLimits;
 use crate::structural::selection::{
@@ -66,16 +66,16 @@ impl ConfigFile {
 }
 
 /// Where a check after profile selection observes the declaration `selected`
-/// of `analysis`: in `file`, as profile selection hands it on (D15:790), built
-/// before the interval. None when the configuration does not hold the
+/// of `analysis`: in `entry`, as profile selection hands it on (D15:790),
+/// built before the interval. None when the configuration does not hold the
 /// declaration.
 pub(super) fn observer<'a>(
     analysis: &'a Analysis,
-    file: &'a EntryFile<'a>,
+    entry: &'a dyn ConfigurationEntry,
     selected: &'a ProfileId,
 ) -> Option<DeclarationObserver<'a>> {
     let profiles = analysis.profiles_value()?;
-    DeclarationObserver::new(file, profiles, selected.as_str()).ok()
+    DeclarationObserver::new(entry, profiles, selected.as_str()).ok()
 }
 
 #[derive(

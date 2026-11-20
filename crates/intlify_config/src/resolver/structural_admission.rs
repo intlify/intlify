@@ -29,12 +29,12 @@
 //! its other checks are not evaluated (D15:2184).
 //!
 //! Each Finding Occurrence of Phase 2 is observed through Materialized Value
-//! Evidence in the file Phase 1 read (D15:790): a value at its token, a
-//! missing member at the object that lacks it followed by the member's
-//! schema-defined name, an undeclared member or an entry's key at the key's
-//! token, the schema selection at the root or its `schemaVersion` member, and
-//! the analysis's measure at the root beside the capability's bound. A
-//! locator classifies each member of its path, so a key without the
+//! Evidence in the configuration entry Phase 1 read (D15:790): a value at its
+//! token, a missing member at the object that lacks it followed by the
+//! member's schema-defined name, an undeclared member or an entry's key at
+//! the key's token, the schema selection at the root or its `schemaVersion`
+//! member, and the analysis's measure at the root beside the capability's
+//! bound. A locator classifies each member of its path, so a key without the
 //! identifier syntax is redacted while the names its entry's schema defines
 //! are kept (D15:776, 2184).
 //!
@@ -65,7 +65,7 @@ use crate::structural::{
 
 use super::capability::CapabilityBound;
 use super::dependency::{own, SemanticGroup};
-use super::entry::EntryFile;
+use super::entry::ConfigurationEntry;
 use super::evaluation::{
     Actual, Admitted, Blocking, Check, Code, Evaluation, EvaluationInvariant, Found, LimitExceeded,
     Observation, Phase, Subject, Unit,
@@ -371,7 +371,7 @@ impl From<EvaluationInvariant> for StructuralInvariant {
 /// Returns the resolver bug Phase 2 found.
 pub(crate) fn admit_structure<Policy, Target>(
     evaluation: &mut Evaluation,
-    file: &EntryFile<'_>,
+    entry: &dyn ConfigurationEntry,
     document: MaterializedDocument,
     schema: &AuthoringSchema<Policy, Target>,
     limits: StructuralLimits,
@@ -384,7 +384,7 @@ pub(crate) fn admit_structure<Policy, Target>(
     let analysis = schema
         .analyze(Arc::clone(&document), limits)
         .map_err(StructuralInvariant::Admission)?;
-    let observer = Observer::new(file, &document);
+    let observer = Observer::new(entry, &document);
     let failed = |reason| analysis.issues().iter().any(|issue| issue.reason == reason);
     // Each selection check observes the root, or its `schemaVersion` member
     // where the check reads it, present or missing.
@@ -605,12 +605,13 @@ fn found(observed: Option<Observation>, code: Code) -> Result<(), Found> {
 }
 
 /// Where Phase 2 observes what it finds: Materialized Value Evidence in the
-/// file Phase 1 read, at the Portable Value Locator of what a check looked at
-/// and the span of its token (D15:790). A value's locator is its internal
-/// path from the root, each member classified, so an unsafe name is never
-/// retained. The document is indexed once, when a Finding first needs it.
+/// configuration entry Phase 1 read, at the Portable Value Locator of what a
+/// check looked at and the span the entry has for its locus (D15:790, 800).
+/// A value's locator is its internal path from the root, each member
+/// classified, so an unsafe name is never retained. The document is indexed
+/// once, when a Finding first needs it.
 struct Observer<'f, 'd> {
-    file: &'f EntryFile<'f>,
+    entry: &'f dyn ConfigurationEntry,
     document: &'d MaterializedDocument,
     tree: OnceCell<Tree<'d>>,
 }
@@ -624,9 +625,9 @@ struct Tree<'d> {
 }
 
 impl<'f, 'd> Observer<'f, 'd> {
-    fn new(file: &'f EntryFile<'f>, document: &'d MaterializedDocument) -> Self {
+    fn new(entry: &'f dyn ConfigurationEntry, document: &'d MaterializedDocument) -> Self {
         Self {
-            file,
+            entry,
             document,
             tree: OnceCell::new(),
         }
@@ -693,7 +694,7 @@ impl<'f, 'd> Observer<'f, 'd> {
         locus: Locus,
     ) -> Result<Observation, StructuralInvariant> {
         let primary = self
-            .file
+            .entry
             .value_evidence(edges, locus)
             .map_err(StructuralInvariant::Evidence)?;
         Ok(Observation {

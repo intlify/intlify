@@ -26,9 +26,10 @@
 //!
 //! Each Finding Occurrence of Phase 3 is observed where its check looked: the
 //! declarations' count at the `profiles` object and a Profile ID's bytes at
-//! its key, through Materialized Value Evidence in the file Phase 1 read
-//! (D15:790), each beside the capability's bound (D15:836); the selector's
-//! checks at the selector, beside the declarations as one location once
+//! its key, through Materialized Value Evidence in the configuration entry
+//! Phase 1 read (D15:790), each beside the capability's bound (D15:836); the
+//! selector's checks at the selector, under the Safe Origin Kind the entry
+//! fixes for it (D15:804), beside the declarations as one location once
 //! structural admission admitted them (D15:812; plan 025 interpretation
 //! #215), and the bound's beside the capability's bound too. A selector
 //! Finding leaves no declaration selected, and so no Resource Limit Policy,
@@ -59,7 +60,7 @@ use crate::structural::selection::{
 use crate::structural::{AdmissionInvariant, Edge, StructuralAnalysis, StructuralLimits};
 
 use super::capability::CapabilityBound;
-use super::entry::{EntryFile, SELECTOR_ORIGIN};
+use super::entry::ConfigurationEntry;
 use super::evaluation::{
     both, Actual, Admitted, Blocking, Check, Code, Evaluation, EvaluationInvariant, Found,
     Observation, Phase, Subject, Unit,
@@ -144,7 +145,7 @@ impl From<EvaluationInvariant> for ProfileSelectionInvariant {
     }
 }
 
-/// Phase 3 over `analysis`, what Phase 2 admitted in `file`, if anything,
+/// Phase 3 over `analysis`, what Phase 2 admitted in `entry`, if anything,
 /// with `input`, the selector, under `limits`, the capability's values: the
 /// declaration the checks select, provisionally, or the causes of its
 /// absence (D15:2131). Every check is recorded whatever the others found,
@@ -155,7 +156,7 @@ impl From<EvaluationInvariant> for ProfileSelectionInvariant {
 /// Returns the resolver bug Phase 3 found.
 pub(crate) fn select_profile<Policy: DeserializeOwned, Target>(
     evaluation: &mut Evaluation,
-    file: &EntryFile<'_>,
+    entry: &dyn ConfigurationEntry,
     analysis: Option<&StructuralAnalysis<Policy, Target>>,
     input: &SelectorInput,
     limits: StructuralLimits,
@@ -173,7 +174,7 @@ pub(crate) fn select_profile<Policy: DeserializeOwned, Target>(
         .map_err(ProfileSelectionInvariant::Admission)?
         .flatten();
     let observer = Observer {
-        file,
+        entry,
         profiles: analysis.and_then(StructuralAnalysis::profiles_value),
     };
     let bounds = bound_declarations(evaluation, &observer, declarations.as_ref(), limits)?;
@@ -397,11 +398,11 @@ fn beside(
     Ok(observation)
 }
 
-/// Where Phase 3 observes what it finds: the file Phase 1 read, with the
-/// value of the root's `profiles` member in the materialized document, when
-/// structural admission found one.
+/// Where Phase 3 observes what it finds: the configuration entry Phase 1
+/// read, with the value of the root's `profiles` member in the materialized
+/// document, when structural admission found one.
 struct Observer<'f, 'd> {
-    file: &'f EntryFile<'f>,
+    entry: &'f dyn ConfigurationEntry,
     profiles: Option<(&'d MaterializedDocument, NodeId)>,
 }
 
@@ -433,21 +434,22 @@ impl Observer<'_, '_> {
         )
     }
 
-    /// The selector, `input`, under the capability's bound `limit`, its final
-    /// projection authority (plan 025 interpretation #217); beside the
-    /// declarations when they are `available` (D15:812). A selector Finding
-    /// names no declaration, since a supplied selector naming a declared
-    /// Profile ID within the bound passes every check, so its projection is
-    /// never a safe Profile ID (D15:807).
+    /// The selector, `input`, under the Safe Origin Kind the entry fixes for
+    /// it (D15:804) and the capability's bound `limit`, its final projection
+    /// authority (plan 025 interpretation #217); beside the declarations when
+    /// they are `available` (D15:812). A selector Finding names no
+    /// declaration, since a supplied selector naming a declared Profile ID
+    /// within the bound passes every check, so its projection is never a safe
+    /// Profile ID (D15:807).
     fn selector(
         &self,
         input: &SelectorInput,
         limit: Bound,
         available: bool,
     ) -> Result<Observation, ProfileSelectionInvariant> {
-        let primary =
-            EvidenceProjection::selector(SELECTOR_ORIGIN, input, limit, std::iter::empty())
-                .map_err(ProfileSelectionInvariant::Evidence)?;
+        let origin = self.entry.selector_origin();
+        let primary = EvidenceProjection::selector(origin, input, limit, std::iter::empty())
+            .map_err(ProfileSelectionInvariant::Evidence)?;
         let related = if available {
             vec![self.declarations()?.primary]
         } else {
@@ -463,7 +465,7 @@ impl Observer<'_, '_> {
         locus: Locus,
     ) -> Result<Observation, ProfileSelectionInvariant> {
         let primary = self
-            .file
+            .entry
             .value_evidence(edges, locus)
             .map_err(ProfileSelectionInvariant::Evidence)?;
         Ok(Observation {
@@ -486,7 +488,9 @@ mod tests {
     use crate::materialize_tests::limits as input_limits;
     use crate::model::ProfileId;
     use crate::resolver::capability::CapabilityBound;
-    use crate::resolver::entry::fixtures::FileFixture;
+    use crate::resolver::declaration_observer::fixtures::{materialized, view};
+    use crate::resolver::entry::fixtures::{FileFixture, Relabeled};
+    use crate::resolver::entry::ConfigurationEntry;
     use crate::resolver::evaluation::{
         Actual, Admitted, Check, Code, Details, Evaluation, IssueKey, LimitExceeded, Phase, Status,
         Subject, Unit,
@@ -504,8 +508,8 @@ mod tests {
     use crate::structural::{AuthoringSchema, StructuralLimits};
 
     use super::{
-        capability, select_profile, selector, ProfileSelectionInvariant, SelectionSubject,
-        MAX_PROFILES, MAX_PROFILE_ID_BYTES,
+        capability, select_profile, selector, Observer, ProfileSelectionInvariant,
+        SelectionSubject, MAX_PROFILES, MAX_PROFILE_ID_BYTES,
     };
 
     type Schema = AuthoringSchema<FixturePolicyReference, FixtureTargetReference>;
@@ -1258,6 +1262,38 @@ mod tests {
                 Vec::new()
             };
             assert_eq!(bounds, expected, "{check:?}");
+        }
+    }
+
+    /// The selector is observed under the Safe Origin Kind its entry fixes,
+    /// beside the declarations in that entry (D15:204, 804, 812).
+    #[test]
+    fn the_selector_is_observed_under_the_origin_its_entry_fixes() {
+        let (bytes, document, profiles) = materialized(&declared(&["app", "web"]));
+        let fixture = FileFixture::new(&fixture_limits(100));
+        let file = fixture.file(Arc::clone(&bytes));
+        let relabeled = Relabeled(fixture.file(bytes));
+        let bound = Bound::new(64).unwrap();
+        let input = SelectorInput::absent(bound);
+        for (entry, selector_origin, value_origin) in [
+            (
+                &file as &dyn ConfigurationEntry,
+                "profile-selector-cli",
+                "configuration-file",
+            ),
+            (
+                &relabeled,
+                "profile-selector-programmatic",
+                "configuration-programmatic",
+            ),
+        ] {
+            let observer = Observer {
+                entry,
+                profiles: Some((&document, profiles)),
+            };
+            let observation = observer.selector(&input, bound, true).unwrap();
+            assert_eq!(view(&observation.primary)["origin"], selector_origin);
+            assert_eq!(view(&observation.related[0])["origin"], value_origin);
         }
     }
 

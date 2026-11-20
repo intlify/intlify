@@ -21,7 +21,7 @@ use crate::model::ProfileId;
 use crate::references::PolicyReference;
 use crate::resolver::declaration_observer::DeclarationObserver;
 use crate::resolver::entry::fixtures::FileFixture;
-use crate::resolver::entry::EntryFile;
+use crate::resolver::entry::{ConfigurationEntry, EntryFile};
 use crate::resolver::evaluation::{
     Actual, Admitted, BootstrapLimitExceeded, Causes, Check, Evaluation, IssueKey, LimitExceeded,
     Shortfall, Status, Subject, Unit,
@@ -81,15 +81,15 @@ impl PreparedPolicy {
         self.fixture.file(Arc::clone(&self.source))
     }
 
-    /// Where Phase 4's checks observe the selected declaration: in `file`,
+    /// Where Phase 4's checks observe the selected declaration: in `entry`,
     /// as profile selection hands it on (D15:790), built before the interval.
     /// None when the configuration does not hold the declaration.
     pub(super) fn observer<'a>(
         &'a self,
-        file: &'a EntryFile<'a>,
+        entry: &'a dyn ConfigurationEntry,
     ) -> Option<DeclarationObserver<'a>> {
         let profiles = self.analysis.profiles_value()?;
-        DeclarationObserver::new(file, profiles, self.selected.as_str()).ok()
+        DeclarationObserver::new(entry, profiles, self.selected.as_str()).ok()
     }
 
     /// The selected declaration's references and what the earlier phases

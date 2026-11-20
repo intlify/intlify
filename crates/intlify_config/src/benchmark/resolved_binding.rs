@@ -21,7 +21,7 @@ use crate::artifacts::envelope::ExactTuple;
 use crate::model::ProfileId;
 use crate::resolver::artifact_resolution::{admit_collection, ArtifactSet};
 use crate::resolver::declaration_observer::DeclarationObserver;
-use crate::resolver::entry::EntryFile;
+use crate::resolver::entry::ConfigurationEntry;
 use crate::resolver::evaluation::{
     Admitted, Causes, Check, Evaluation, IssueKey, Status, Subject, Unit,
 };
@@ -63,13 +63,13 @@ pub(super) struct BindingInputs<'a> {
 }
 
 impl PreparedBindings {
-    /// Where the selected declaration's checks observe it in `file`: the
+    /// Where the selected declaration's checks observe it in `entry`: the
     /// phases after Phase 5 observe through what it bound.
     pub(super) fn observer<'a>(
         &'a self,
-        file: &'a EntryFile<'a>,
+        entry: &'a dyn ConfigurationEntry,
     ) -> Option<DeclarationObserver<'a>> {
-        Some(observer(&self.analysis, file, &self.selected)?.with_locales(&*self.canonicalizer))
+        Some(observer(&self.analysis, entry, &self.selected)?.with_locales(&*self.canonicalizer))
     }
 
     /// The inputs, when the configuration is complete and Phase 7 and the

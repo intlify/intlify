@@ -3,28 +3,30 @@
 
 //! Where a check of the selected declaration looks: a value under the
 //! declaration, an array's element there, or a member's key there, as
-//! Materialized Value Evidence at the token in the file Phase 1 read (D15:790,
-//! 802), and the configuration around it, the root, the declarations, a
-//! declared Profile ID's key, every string past a bound, and the selector.
-//! The phases after profile selection observe their Findings through it.
+//! Materialized Value Evidence at the token in the configuration entry Phase 1
+//! read (D15:790, 802), and the configuration around it, the root, the
+//! declarations, a declared Profile ID's key, every string past a bound, and
+//! the selector. The phases after profile selection observe their Findings
+//! through it.
 
 use crate::input_limits::Bound;
 use crate::materialize::{Locus, MaterializedDocument, NodeId, NodeKind, ObjectMember};
 use crate::structural::selection::SelectorInput;
 use crate::structural::Edge;
 
-use super::entry::{EntryFile, SELECTOR_ORIGIN};
+use super::entry::ConfigurationEntry;
 use super::evaluation::{Causes, Observation};
 use super::evidence::{EvidenceInvariant, EvidenceProjection};
 use super::evidence_path::LocaleKeys;
 use super::limits::ConfirmedPolicy;
 
-/// The declaration profile selection selected, in the file Phase 1 read and
-/// the document it materialized, and what `specification-admission` bound to
-/// classify a locale key in a record constructed since, when it has (D15:776).
+/// The declaration profile selection selected, in the configuration entry
+/// Phase 1 read and the document it materialized, and what
+/// `specification-admission` bound to classify a locale key in a record
+/// constructed since, when it has (D15:776).
 #[derive(Clone, Copy)]
 pub(crate) struct DeclarationObserver<'a> {
-    file: &'a EntryFile<'a>,
+    entry: &'a dyn ConfigurationEntry,
     document: &'a MaterializedDocument,
     profiles: NodeId,
     id: &'a str,
@@ -43,19 +45,19 @@ pub(crate) enum ObserverInvariant {
 
 impl<'a> DeclarationObserver<'a> {
     /// The declaration `id` of `profiles`, the root's `profiles` object in
-    /// `document`, which `file` holds.
+    /// `document`, which `entry` holds.
     ///
     /// # Errors
     ///
     /// Returns the resolver bug of a declaration the document lacks.
     pub(crate) fn new(
-        file: &'a EntryFile<'a>,
+        entry: &'a dyn ConfigurationEntry,
         (document, profiles): (&'a MaterializedDocument, NodeId),
         id: &'a str,
     ) -> Result<Self, ObserverInvariant> {
         let declaration = member(document, profiles, id).ok_or(ObserverInvariant::Missing)?;
         Ok(Self {
-            file,
+            entry,
             document,
             profiles,
             id,
@@ -73,7 +75,7 @@ impl<'a> DeclarationObserver<'a> {
         'a: 'b,
     {
         DeclarationObserver {
-            file: self.file,
+            entry: self.entry,
             document: self.document,
             profiles: self.profiles,
             id: self.id,
@@ -332,10 +334,11 @@ impl<'a> DeclarationObserver<'a> {
         Ok(())
     }
 
-    /// The selector `input`, projected under its final authority `authority`,
-    /// beside the declarations when they are `available` (D15:812, 816; plan
-    /// 025 interpretation #215). A selector past the bound names no
-    /// declaration (D15:807).
+    /// The selector `input`, under the Safe Origin Kind the entry fixes for
+    /// it (D15:804), projected under its final authority `authority`, beside
+    /// the declarations when they are `available` (D15:812, 816; plan 025
+    /// interpretation #215). A selector past the bound names no declaration
+    /// (D15:807).
     ///
     /// # Errors
     ///
@@ -347,9 +350,9 @@ impl<'a> DeclarationObserver<'a> {
         authority: Bound,
         available: bool,
     ) -> Result<Observation, ObserverInvariant> {
-        let primary =
-            EvidenceProjection::selector(SELECTOR_ORIGIN, input, authority, std::iter::empty())
-                .map_err(ObserverInvariant::Evidence)?;
+        let origin = self.entry.selector_origin();
+        let primary = EvidenceProjection::selector(origin, input, authority, std::iter::empty())
+            .map_err(ObserverInvariant::Evidence)?;
         let related = if available {
             vec![self.declarations()?]
         } else {
@@ -364,7 +367,7 @@ impl<'a> DeclarationObserver<'a> {
         edges: &[Edge<'_>],
         locus: Locus,
     ) -> Result<EvidenceProjection, ObserverInvariant> {
-        self.file
+        self.entry
             .value_evidence_after(edges, locus, self.locales)
             .map_err(ObserverInvariant::Evidence)
     }
@@ -373,7 +376,7 @@ impl<'a> DeclarationObserver<'a> {
 /// What a bound's unit observes past the confirmed `policy`'s limit: where
 /// `at` looks in the declaration, beside the policy, which supplies the bound
 /// (D15:2249). Nothing is observed without the policy or the declaration's
-/// file.
+/// entry.
 ///
 /// # Errors
 ///
@@ -514,12 +517,12 @@ mod tests {
 
     use crate::fixtures::{complete_config, minimal_config};
     use crate::input_limits::Bound;
-    use crate::resolver::entry::fixtures::FileFixture;
+    use crate::resolver::entry::fixtures::{FileFixture, Relabeled};
     use crate::resolver::limits::fixture_limits;
     use crate::structural::selection::SelectorInput;
 
     use super::fixtures::{materialized, view};
-    use super::{DeclarationObserver, EvidenceProjection, ObserverInvariant};
+    use super::{ConfigurationEntry, DeclarationObserver, EvidenceProjection, ObserverInvariant};
 
     /// The view of the span `value` occupies in `source`, at its first
     /// occurrence.
@@ -813,6 +816,35 @@ mod tests {
                     json!({ "exact-json-pointer": "/profiles" })
                 );
             }
+        }
+    }
+
+    /// The selector is observed under the Safe Origin Kind its entry fixes,
+    /// beside the declarations in that entry (D15:204, 804, 812).
+    #[test]
+    fn the_selector_is_observed_under_the_origin_its_entry_fixes() {
+        let (bytes, document, profiles) = materialized(&minimal_config());
+        let fixture = FileFixture::new(&fixture_limits(10_000));
+        let file = fixture.file(Arc::clone(&bytes));
+        let relabeled = Relabeled(fixture.file(bytes));
+        let bound = Bound::new(20).unwrap();
+        let input = SelectorInput::absent(bound);
+        for (entry, selector_origin, value_origin) in [
+            (
+                &file as &dyn ConfigurationEntry,
+                "profile-selector-cli",
+                "configuration-file",
+            ),
+            (
+                &relabeled,
+                "profile-selector-programmatic",
+                "configuration-programmatic",
+            ),
+        ] {
+            let observer = DeclarationObserver::new(entry, (&document, profiles), "app").unwrap();
+            let observation = observer.selector(&input, bound, true).unwrap();
+            assert_eq!(view(&observation.primary)["origin"], selector_origin);
+            assert_eq!(view(&observation.related[0])["origin"], value_origin);
         }
     }
 
