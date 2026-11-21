@@ -49,6 +49,7 @@ pub(crate) mod profile_resolution;
 pub(crate) mod profile_selection;
 pub(crate) mod profile_view;
 pub(crate) mod record_view;
+pub(crate) mod replay;
 pub(crate) mod reporting;
 pub(crate) mod reporting_plan;
 pub(crate) mod resolution_evidence;

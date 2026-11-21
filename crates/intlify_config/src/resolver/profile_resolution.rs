@@ -44,7 +44,8 @@
 //! value out as the canonical tree of the Materialized Resolution Input Set
 //! after Phase 1 and before Phase 2 consumes the document (D15:2657). The
 //! construction and invocation inputs it takes are assembled outside it, by
-//! [`super::invocation`].
+//! [`super::invocation`]. A replay runs the phases after Phase 1 over the
+//! retained value ([`resolve_materialized`], [`super::replay`]).
 
 use crate::artifacts::collection::FormalCollection;
 use crate::artifacts::vocabulary::FormalVocabulary;
@@ -334,6 +335,9 @@ pub(crate) enum ResolverInvariant {
     /// Resolver Construction Identity, so no outcome could carry one equal to
     /// both the resolver's and the admitted reference (D15:1150).
     OtherConstruction,
+    /// A replayed Materialized Resolution Input Set's value held a marker,
+    /// which no value that entry admitted holds (D15:2657).
+    RetainedMarker,
 }
 
 impl From<ReportingInvariant> for ResolverInvariant {
@@ -826,9 +830,8 @@ impl<Id> Resolved<'_, Id> {
 }
 
 /// The phases after Phase 1 over `document`, the value it admitted, observed
-/// through `entry`: Phases 2 and 3, and the semantic phases over the
-/// configuration Phase 3 selected or over the causes of its absence
-/// (D15:2131), the document's value first copied into `value`.
+/// through `entry` ([`resolve_materialized`]), the document's value first
+/// copied into `value`.
 fn resolve_entered<'s, P, D>(
     evaluation: &mut Evaluation,
     (project_profile, entry, document): (
@@ -849,6 +852,48 @@ where
     // The Materialized Resolution Input Set's value, copied once Phase 1
     // materialized it and before Phase 2 consumes the document (D15:2657).
     *value = Some(document.canonical_value());
+    let (state, declared) = resolve_materialized(
+        evaluation,
+        (project_profile, entry, document),
+        (schema, structural, selector),
+        invocation,
+        data,
+        set,
+    )?;
+    Ok(Resolved {
+        authority: state.policy.authority,
+        declared,
+        state: Ok(state),
+    })
+}
+
+/// Phases 2 to 13 over `document`, a materialized value, observed through
+/// `entry`: Phases 2 and 3, and the semantic phases over the configuration
+/// Phase 3 selected or over the causes of its absence (D15:2131). It leaves
+/// the semantic state and the Profile IDs the root declares. An invocation
+/// runs them over the document Phase 1 admitted, and a replay over the one
+/// of its retained value (D15:2659).
+///
+/// # Errors
+///
+/// Returns the resolver bug that a phase found.
+pub(crate) fn resolve_materialized<'s, P, D>(
+    evaluation: &mut Evaluation,
+    (project_profile, entry, document): (
+        &Admitted<VersionedIdentity<P::Identity>>,
+        &dyn ConfigurationEntry,
+        MaterializedDocument,
+    ),
+    (schema, structural, selector): (&ConfigurationSchema, StructuralLimits, &SelectorInput),
+    invocation: &Invocation<'s, P::Identity>,
+    data: &D,
+    set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
+) -> Result<(SemanticState<'s, P::Identity>, Vec<ProfileId>), ResolverInvariant>
+where
+    P: Provider,
+    P::Identity: AsRef<str>,
+    D: FormalData<Provider = P>,
+{
     let structure = admit_structure(
         evaluation,
         entry,
@@ -890,11 +935,7 @@ where
         data,
         set,
     )?;
-    Ok(Resolved {
-        authority: state.policy.authority,
-        declared: configuration.declared().to_vec(),
-        state: Ok(state),
-    })
+    Ok((state, configuration.declared().to_vec()))
 }
 
 // `handoff`'s tests resolve the same inputs.

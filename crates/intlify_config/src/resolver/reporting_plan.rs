@@ -1136,8 +1136,7 @@ pub(crate) mod tests {
                 &limits,
                 &Sha256,
             );
-            let shared =
-                Reporting::shared(&evaluation, PROFILE, (None, file_entry()), &scope, &Sha256);
+            let shared = Reporting::shared(&evaluation, PROFILE, None, &scope, &Sha256);
             let alone =
                 report_domain(&shared, ReportingDomain::Shared, &limits_with(None), None).unwrap();
             assert!(!alone.slices.is_empty());

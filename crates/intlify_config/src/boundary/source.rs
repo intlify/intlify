@@ -128,6 +128,17 @@ impl ExactIdentity {
     pub(crate) fn payload(&self) -> &str {
         &self.text[self.colon + 1..]
     }
+
+    /// The identity that the entry a replay observes its retained value
+    /// through names, which no boundary admitted: a replay has no entry
+    /// source, and nothing that names this one leaves it (D15:2659).
+    pub(crate) fn replayed() -> Self {
+        let tag = "intlify-materialized-replay.v0";
+        Self {
+            text: format!("{tag}:value"),
+            colon: tag.len(),
+        }
+    }
 }
 
 /// An admitted pair: the identity, and the revision of the bytes it names.

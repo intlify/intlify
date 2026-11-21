@@ -46,6 +46,7 @@
 
 use std::sync::Arc;
 
+use crate::boundary::common::CommonInputs;
 use crate::boundary::invocation::{
     self as boundary, EntryInputs, InvocationFailures, InvocationInputs, SubmittedInvocation,
 };
@@ -64,7 +65,7 @@ use super::evidence_path::KeyFacts;
 use super::materialized::MaterializedInputs;
 use super::outcome::{outcome, Outcome};
 use super::profile_resolution::{
-    invoke_file, invoke_programmatic, Invocation, Invoked, ResolverInvariant,
+    invoke_file, invoke_programmatic, ConfigurationSchema, Invocation, Invoked, ResolverInvariant,
 };
 use super::snapshot_entry::{EntrySnapshot, SnapshotEntryLimits};
 use super::specification::SupportedSpecifications;
@@ -150,18 +151,11 @@ impl<'r> Resolver<'r> {
         }
         let common = &inputs.common;
         let capability = &common.capability;
-        let invocation = Invocation {
-            supported: &self.supported,
-            specifications: &common.specification,
-            capability,
-            verification: &common.verification,
-            collection: &common.collection,
-            vocabulary: &common.vocabulary,
-        };
+        let invocation = self.invocation(common);
         let comparable = capability.policy_comparable();
         let bootstrap = capability.bootstrap_only();
         let configuration = &comparable.configuration_input;
-        let schema = self.constructed.configuration_schema();
+        let schema = self.configuration_schema();
         let classify: &Classify<'_> = &|edges, locales| {
             KeyFacts {
                 comparable,
@@ -248,6 +242,29 @@ impl<'r> Resolver<'r> {
             outcome,
             materialized,
         })
+    }
+
+    /// What every phase after configuration entry reads besides the
+    /// configuration: what the resolver supports, and the six values of
+    /// `common`, an admitted set's or a retained one's.
+    pub(super) fn invocation<'a, D>(
+        &'a self,
+        common: &'a CommonInputs<D>,
+    ) -> Invocation<'a, String> {
+        Invocation {
+            supported: &self.supported,
+            specifications: &common.specification,
+            capability: &common.capability,
+            verification: &common.verification,
+            collection: &common.collection,
+            vocabulary: &common.vocabulary,
+        }
+    }
+
+    /// The configuration schema construction admitted, which structural
+    /// admission reads and a member's class is decided at (D15:776).
+    pub(super) fn configuration_schema(&self) -> &ConfigurationSchema {
+        self.constructed.configuration_schema()
     }
 }
 
