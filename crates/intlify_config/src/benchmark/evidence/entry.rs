@@ -343,6 +343,27 @@ mod tests {
         assert_ne!(observe(&absent).unwrap(), observe(&resolved).unwrap());
     }
 
+    /// Phase 1 projects the duplicate's Logical input path only within the
+    /// path bounds, yet the path is still measured past them: one under
+    /// either size, the largest path the complete invocation counts is the
+    /// same as without the bound (D15:1851; plan 025 decision #299).
+    #[test]
+    fn a_logical_input_path_past_its_bound_is_still_measured() {
+        let work = duplicate(unbounded()).invocation;
+        let largest = (work.path_segments, work.path_bytes);
+        for (bound, counted) in [
+            (MetadataBound::LogicalPathSegments, work.path_segments),
+            (MetadataBound::LogicalPathCanonicalBytes, work.path_bytes),
+        ] {
+            let tight = duplicate(with(bound, counted - 1)).invocation;
+            assert_eq!(
+                (tight.path_segments, tight.path_bytes),
+                largest,
+                "{bound:?}"
+            );
+        }
+    }
+
     /// Each count of the complete invocation is what its bound counts: at
     /// the count nothing is exhausted, and one under it the Entry domain is,
     /// naming the bound, also over what path admission leaves once a path is

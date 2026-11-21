@@ -30,7 +30,10 @@
 //! and a string past the single-string bound at its token. A path is the
 //! fact's internal path with each member classified, so no unsafe name is
 //! retained (D15:768, 776), and a bound is observed beside the capability's
-//! bound it exceeds.
+//! bound it exceeds. A Logical input path is projected only within the path
+//! bounds path admission applies, past which it would be absent, so a
+//! candidate holds no path past them, only its size, which those bounds count
+//! (D15:776, 1834, 1851; plan 025 decision #299).
 
 use std::sync::Arc;
 
@@ -41,7 +44,9 @@ use crate::materialize::{
 };
 use crate::structural::Edge;
 
-use super::capability::{BootstrapBoundId, BootstrapGroup, CapabilityBound};
+use super::capability::{
+    BootstrapBoundId, BootstrapGroup, CapabilityBound, EvidenceMetadataLimits,
+};
 use super::evaluation::{
     and, Actual, Admitted, Blocking, BootstrapLimitExceeded, Check, Code, Evaluation,
     EvaluationInvariant, Found, LimitExceeded, Observation, Phase, Reason, Subject, Unit,
@@ -212,12 +217,14 @@ impl ConfigurationEntry for EntryFile<'_> {
 
 impl EntryFile<'_> {
     /// Entry Source Evidence at the internal path `path` when one was
-    /// established, the root when it has no step, and at `span` (D15:768,
-    /// 780-786).
+    /// established, the root when it has no step, and at `span`, its Logical
+    /// input path projected only within the path bounds of `paths` (D15:768,
+    /// 780-786; plan 025 decision #299).
     fn evidence(
         &self,
         path: Option<&[PathStep]>,
         span: Option<ByteSpan>,
+        paths: &EvidenceMetadataLimits,
     ) -> Result<EvidenceProjection, EntryInvariant> {
         let steps = path.unwrap_or_default();
         let names: Vec<String> = steps
@@ -240,11 +247,12 @@ impl EntryFile<'_> {
         let classified = (self.classify)(&edges, None);
         let span = span
             .and_then(|span| SourceSpan::admit(span.start_byte(), span.end_byte(), &self.bytes));
-        EvidenceProjection::entry_source(
+        EvidenceProjection::entry_source_under(
             SafeOriginKind::ConfigurationFile,
             self.source,
             path.map(|_| classified.as_slice()),
             span,
+            paths,
         )
         .map_err(EntryInvariant::Evidence)
     }
@@ -254,7 +262,10 @@ impl EntryFile<'_> {
 /// Capability gives `bootstrapOnly.rawInput` and
 /// `policyComparable.configurationInput`: the materialized document, or the
 /// causes of its absence, which are the blocking Findings of Phase 1 the
-/// Shared projection is unavailable for (D15:2369).
+/// Shared projection is unavailable for (D15:2369). A candidate's Logical
+/// input path is projected only within the path bounds of `paths`, the
+/// capability's `bootstrapOnly.evidenceMetadata`, under which path admission
+/// would leave it absent (D15:776, 1834, 1851; plan 025 decision #299).
 ///
 /// # Errors
 ///
@@ -263,11 +274,13 @@ pub(crate) fn admit_entry(
     evaluation: &mut Evaluation,
     file: &EntryFile<'_>,
     limits: InputLimits,
+    paths: &EvidenceMetadataLimits,
 ) -> Result<Admitted<MaterializedDocument>, EntryInvariant> {
     // The owner records the entry dependencies, and nothing waits on it.
     let _: Admitted<()> = evaluation.check(OWNER, Ok(()), |()| Ok::<(), Blocking>(()))?;
     let entry = materialize_file(Arc::clone(&file.bytes), limits);
-    let found = Findings::of(file, entry.as_ref().err().map(|error| &error.reason))?;
+    let failure = entry.as_ref().err().map(|error| &error.reason);
+    let found = Findings::of(file, failure, paths)?;
     let file_bytes = evaluation.check_found(input(Check::WithinFileBytes), Ok(()), |()| {
         found.file_bytes.map_or(Ok(()), Err)
     })?;
@@ -314,8 +327,13 @@ struct Findings {
 
 impl Findings {
     /// What the checks find in `file`, from what stopped strict file entry
-    /// or kept its complete value from being materialized.
-    fn of(file: &EntryFile<'_>, failure: Option<&InputFailure>) -> Result<Self, EntryInvariant> {
+    /// or kept its complete value from being materialized, each Logical input
+    /// path projected only within the path bounds of `paths`.
+    fn of(
+        file: &EntryFile<'_>,
+        failure: Option<&InputFailure>,
+        paths: &EvidenceMetadataLimits,
+    ) -> Result<Self, EntryInvariant> {
         let mut found = Self::default();
         match failure {
             None => {}
@@ -324,7 +342,7 @@ impl Findings {
             }
             Some(InputFailure::FileBytes(violation)) => {
                 let observation = Observation {
-                    primary: file.evidence(None, None)?,
+                    primary: file.evidence(None, None, paths)?,
                     related: vec![capability(raw("maxFileBytes"))?],
                 };
                 found.file_bytes = Some(Found::observed(
@@ -334,7 +352,7 @@ impl Findings {
             }
             Some(InputFailure::ParserTokens { violation, span }) => {
                 let observation = Observation {
-                    primary: file.evidence(None, Some(*span))?,
+                    primary: file.evidence(None, Some(*span), paths)?,
                     related: vec![capability(raw("maxParserTokens"))?],
                 };
                 found.tokens = Some(Found::observed(
@@ -344,7 +362,7 @@ impl Findings {
             }
             Some(InputFailure::InvalidUtf8 { span } | InputFailure::Syntax { span }) => {
                 let observation = Observation {
-                    primary: file.evidence(None, Some(*span))?,
+                    primary: file.evidence(None, Some(*span), paths)?,
                     related: Vec::new(),
                 };
                 found.syntax = Some(Found::observed(
@@ -353,15 +371,16 @@ impl Findings {
                 ));
             }
             Some(InputFailure::Inadmissible(facts)) => {
-                found.unique = duplicates(file, facts)?;
-                found.compatible = incompatible(file, facts)?;
+                found.unique = duplicates(file, facts, paths)?;
+                found.compatible = incompatible(file, facts, paths)?;
                 found.bounds = root_value_bounds(
                     &facts.violations,
                     &facts.long_strings,
                     |string| match string {
-                        None => file.evidence(Some(ROOT), None),
+                        None => file.evidence(Some(ROOT), None, paths),
                         Some(string) => {
-                            file.evidence(Some(&facts.paths.steps(string.path)), Some(string.span))
+                            let steps = facts.paths.steps(string.path);
+                            file.evidence(Some(&steps), Some(string.span), paths)
                         }
                     },
                 )?;
@@ -375,17 +394,21 @@ impl Findings {
 /// beside every other member of its name (D15:802, Decision 015-194). The
 /// others are in the same object under the same name, so at the same Logical
 /// input path, and only their keys' spans differ.
-fn duplicates(file: &EntryFile<'_>, facts: &Inadmissible) -> Result<Option<Found>, EntryInvariant> {
+fn duplicates(
+    file: &EntryFile<'_>,
+    facts: &Inadmissible,
+    paths: &EvidenceMetadataLimits,
+) -> Result<Option<Found>, EntryInvariant> {
     let mut candidates = Vec::new();
     for duplicate in &facts.duplicates {
         let path = facts.paths.steps(Some(duplicate.path));
         let related = duplicate
             .others
             .iter()
-            .map(|&other| file.evidence(Some(&path), Some(other)))
+            .map(|&other| file.evidence(Some(&path), Some(other), paths))
             .collect::<Result<_, _>>()?;
         let observation = Observation {
-            primary: file.evidence(Some(&path), Some(duplicate.key))?,
+            primary: file.evidence(Some(&path), Some(duplicate.key), paths)?,
             related,
         };
         candidates.push(Found::observed(
@@ -402,6 +425,7 @@ fn duplicates(file: &EntryFile<'_>, facts: &Inadmissible) -> Result<Option<Found
 fn incompatible(
     file: &EntryFile<'_>,
     facts: &Inadmissible,
+    paths: &EvidenceMetadataLimits,
 ) -> Result<Option<Found>, EntryInvariant> {
     let mut candidates = Vec::new();
     for value in &facts.incompatible {
@@ -409,8 +433,9 @@ fn incompatible(
             Incompatibility::NonPortableNumber => Reason::NonPortableNumber,
             Incompatibility::InvalidUnicode => Reason::InvalidUnicode,
         };
+        let steps = facts.paths.steps(value.path);
         let observation = Observation {
-            primary: file.evidence(Some(&facts.paths.steps(value.path)), Some(value.span))?,
+            primary: file.evidence(Some(&steps), Some(value.span), paths)?,
             related: Vec::new(),
         };
         candidates.push(Found::observed(
@@ -644,10 +669,14 @@ mod tests {
     use serde_json::{json, Value};
 
     use crate::construction::registry::check::RecordKind;
-    use crate::resolver::capability::CapabilityBound;
-    use crate::resolver::evidence::Evidence;
+    use crate::resolver::capability::{CapabilityBound, EvidenceMetadataLimits};
+    use crate::resolver::evidence::{Evidence, EvidenceProjection};
+    use crate::resolver::evidence_metadata::fixtures::{unbounded, with};
+    use crate::resolver::evidence_metadata::MetadataBound;
     use crate::resolver::evidence_token::EvidenceTokens;
-    use crate::resolver::occurrence::{occurrences, redacted, FindingOccurrence};
+    use crate::resolver::occurrence::{
+        occurrences, redacted, FindingOccurrence, OccurrenceCandidate,
+    };
     use crate::resolver::record_view::RecordViews;
     use crate::resolver::token::{Sha256, Specification};
 
@@ -707,9 +736,14 @@ mod tests {
     fn entered(source: &[u8], limits: InputLimits) -> (Evaluation, bool) {
         let fixture = FileFixture::new(&fixture_limits(100));
         let mut evaluation = Evaluation::default();
-        let admitted = admit_entry(&mut evaluation, &fixture.file(Arc::from(source)), limits)
-            .unwrap()
-            .is_ok();
+        let admitted = admit_entry(
+            &mut evaluation,
+            &fixture.file(Arc::from(source)),
+            limits,
+            &unbounded(),
+        )
+        .unwrap()
+        .is_ok();
         (evaluation, admitted)
     }
 
@@ -853,7 +887,7 @@ mod tests {
         {
             let mut evaluation = Evaluation::blocking(input(check));
             let file = fixture.file(Arc::from(&br#"{"a":1}"#[..]));
-            let admitted = admit_entry(&mut evaluation, &file, limits()).unwrap();
+            let admitted = admit_entry(&mut evaluation, &file, limits(), &unbounded()).unwrap();
             assert!(admitted.is_err(), "{check:?}");
         }
     }
@@ -1013,7 +1047,7 @@ mod tests {
         let fixture = FileFixture::new(&fixture_limits(100));
         let file = fixture.file(Arc::from(&br#"{"x":1,"x":1e999}"#[..]));
         let mut evaluation = Evaluation::default();
-        let Ok(Err(causes)) = admit_entry(&mut evaluation, &file, limits()) else {
+        let Ok(Err(causes)) = admit_entry(&mut evaluation, &file, limits(), &unbounded()) else {
             panic!("the file has a duplicate member");
         };
         let causes: Vec<IssueKey> = causes.keys().cloned().collect();
@@ -1226,5 +1260,69 @@ mod tests {
             let checks: Vec<Check> = evaluation.issues().map(|key| key.unit().check).collect();
             assert_eq!(checks, [check], "{name}");
         }
+    }
+
+    /// Every Evidence of each candidate, its primary and then its related.
+    fn evidence(candidates: &[OccurrenceCandidate]) -> Vec<&EvidenceProjection> {
+        candidates
+            .iter()
+            .flat_map(|candidate| std::iter::once(&candidate.primary).chain(&candidate.related))
+            .collect()
+    }
+
+    /// D15:776, 802, 1851: a duplicate's Logical input path is projected
+    /// only within the path bounds, for its primary and every related
+    /// Evidence alike. Past them each keeps only its size, measured as the
+    /// projected path would be, and path admission leaves each candidate as
+    /// it would have left the projected one, while a path within them is
+    /// kept (plan 025 decision #299).
+    #[test]
+    fn a_duplicates_path_past_a_path_bound_is_never_projected() {
+        let source = br#"{"profiles":{"app":{"x":1,"x":2}},"schemaVersion":0,"schemaVersion":0}"#;
+        let fixture = FileFixture::new(&fixture_limits(100));
+        let entered = |paths: &EvidenceMetadataLimits| {
+            let mut evaluation = Evaluation::default();
+            let file = fixture.file(Arc::from(&source[..]));
+            let admitted = admit_entry(&mut evaluation, &file, limits(), paths).unwrap();
+            assert!(admitted.is_err());
+            evaluation
+        };
+        let bound = with(MetadataBound::LogicalPathSegments, 2);
+        let (bounded, whole) = (entered(&bound), entered(&unbounded()));
+        let (bounded, whole) = (
+            bounded.occurrence_candidates(),
+            whole.occurrence_candidates(),
+        );
+        assert_ne!(bounded, whole);
+        let sizes = |candidates| {
+            evidence(candidates)
+                .into_iter()
+                .map(EvidenceProjection::entry_path)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(sizes(bounded), sizes(whole));
+        let admitted = |candidates: &[OccurrenceCandidate]| {
+            candidates
+                .iter()
+                .map(|candidate| candidate.admitted(&bound).unwrap())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(admitted(bounded), admitted(whole));
+        let tokens = EvidenceTokens::assign(PROFILE, redacted(bounded), &Sha256);
+        let paths: Vec<Vec<Value>> = occurrences(bounded, PROFILE, &tokens)
+            .unwrap()
+            .iter()
+            .map(|occurrence| {
+                std::iter::once(occurrence.primary())
+                    .chain(occurrence.related())
+                    .map(|evidence| evidence.view()["path"].clone())
+                    .collect()
+            })
+            .collect();
+        let version = json!([{ "safe-member": "schemaVersion" }]);
+        assert_eq!(
+            paths,
+            [vec![Value::Null; 2], vec![version.clone(), version]]
+        );
     }
 }

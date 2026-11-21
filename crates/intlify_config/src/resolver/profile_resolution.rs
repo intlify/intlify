@@ -690,14 +690,16 @@ pub(crate) struct Invoked<'s, Id> {
 }
 
 /// One file entry's invocation over `evaluation`: Phase 0, then Phase 1 over
-/// `file` under `limits`, Phase 2 over the value Phase 1 admits with `schema`
-/// under `structural`, Phase 3 selecting `selector`'s declaration, and the
-/// semantic phases over the configuration, or, without a declaration Phase 3
-/// selected, over the causes of its absence (D15:2131). Without a value there
-/// is no Shared projection and so no semantic state (D15:2369). The selector's
-/// final projection authority is the one Phase 4 fixed, or the capability's
-/// without a value, and the Profile IDs it may name are those the root's
-/// `profiles` object declares, none without a value (D15:807, 816-817).
+/// `file` under `limits` and under the capability's path bounds, the ones
+/// path admission applies (plan 025 decision #299), Phase 2 over the value
+/// Phase 1 admits with `schema` under `structural`, Phase 3 selecting
+/// `selector`'s declaration, and the semantic phases over the configuration,
+/// or, without a declaration Phase 3 selected, over the causes of its
+/// absence (D15:2131). Without a value there is no Shared projection and so
+/// no semantic state (D15:2369). The selector's final projection authority is
+/// the one Phase 4 fixed, or the capability's without a value, and the
+/// Profile IDs it may name are those the root's `profiles` object declares,
+/// none without a value (D15:807, 816-817).
 ///
 /// # Errors
 ///
@@ -717,7 +719,8 @@ where
 {
     let project_profile =
         admit_project_profile(evaluation, invocation.supported, invocation.specifications)?;
-    let resolved = match admit_entry(evaluation, file, limits)? {
+    let paths = &invocation.capability.bootstrap_only().evidence_metadata;
+    let resolved = match admit_entry(evaluation, file, limits, paths)? {
         Ok(document) => resolve_entered(
             evaluation,
             (&project_profile, file, document),
@@ -759,7 +762,8 @@ where
 {
     let project_profile =
         admit_project_profile(evaluation, invocation.supported, invocation.specifications)?;
-    let resolved = match admit_snapshot_entry(evaluation, entry, limits)? {
+    let paths = &invocation.capability.bootstrap_only().evidence_metadata;
+    let resolved = match admit_snapshot_entry(evaluation, entry, limits, paths)? {
         Ok(document) => {
             // A later phase names a value or a key by its locus in the
             // document, so the entry is built before the document moves.
@@ -917,7 +921,8 @@ pub(super) mod tests {
         Check, Code, IssueKey, Phase, Reason, Status, Subject, Unit,
     };
     use crate::resolver::evidence::Source;
-    use crate::resolver::evidence_metadata::fixtures::unbounded;
+    use crate::resolver::evidence_metadata::fixtures::{unbounded, with};
+    use crate::resolver::evidence_metadata::MetadataBound;
     use crate::resolver::evidence_token::EvidenceTokens;
     use crate::resolver::exact_resolution;
     use crate::resolver::groups::{self, GroupSubject};
@@ -925,6 +930,7 @@ pub(super) mod tests {
     use crate::resolver::limits::{fixture_limits, BoundId, Group, ResolutionLimits, SECTION};
     use crate::resolver::locales::fixtures::canonical;
     use crate::resolver::locales::{self, LocaleKey, LocaleSubject, Location};
+    use crate::resolver::occurrence::OccurrenceCandidate;
     use crate::resolver::outcome::{outcome, Outcome};
     use crate::resolver::profile_selection::{capability, selector, SelectionSubject};
     use crate::resolver::profile_view::{project, ProfileView};
@@ -1921,8 +1927,10 @@ pub(super) mod tests {
         let fixture = FileFixture::new(&inputs.capability);
         let file = fixture.file(bytes);
         let mut evaluation = Evaluation::default();
-        assert!(admit_entry(&mut evaluation, &file, limits).unwrap().is_ok());
-        let Err(twice) = admit_entry(&mut evaluation, &file, limits) else {
+        assert!(admit_entry(&mut evaluation, &file, limits, &unbounded())
+            .unwrap()
+            .is_ok());
+        let Err(twice) = admit_entry(&mut evaluation, &file, limits, &unbounded()) else {
             panic!("Phase 1 records its units once");
         };
         assert_eq!(
@@ -1954,7 +1962,7 @@ pub(super) mod tests {
             )
             .unwrap()
             .unwrap_err();
-            let Ok(Err(causes)) = admit_entry(&mut evaluation, &file, limits) else {
+            let Ok(Err(causes)) = admit_entry(&mut evaluation, &file, limits, &unbounded()) else {
                 panic!("the file is not strict JSON");
             };
             assert_eq!(
@@ -4025,6 +4033,45 @@ pub(super) mod tests {
             ResolverInvariant::from(LocaleInvariant::Evaluation(twice.clone())),
         ] {
             assert_eq!(invariant, ResolverInvariant::Evaluation(twice.clone()));
+        }
+    }
+
+    /// Either entry's Phase 1 reads the path bounds of the capability that
+    /// path admission reads: under a tight `maxLogicalPathSegments`, a string
+    /// past a tight single-string bound too deep for it keeps no projected
+    /// path, and path admission leaves each candidate's primary Evidence as
+    /// it would have left the projected one (D15:1851; plan 025 decision
+    /// #299).
+    #[test]
+    fn phase_1_reads_the_path_bounds_path_admission_applies() {
+        let single = BoundId {
+            group: Group::ConfigurationInput,
+            name: "maxSingleStringBytes",
+        };
+        let tight = with(MetadataBound::LogicalPathSegments, 1);
+        let candidates = |metadata, programmatic| {
+            let mut inputs = Inputs::complete().bounding(&[(single, 2)], &[]);
+            inputs.metadata(metadata);
+            let found = |_: &Invocation<'_, Id>, evaluation: Evaluation, _: Invoked<'_, Id>| {
+                evaluation.occurrence_candidates().to_vec()
+            };
+            if programmatic {
+                inputs.programmatic_under(None, found)
+            } else {
+                inputs.entered_under(None, found)
+            }
+        };
+        let primaries = |candidates: &[OccurrenceCandidate]| {
+            candidates
+                .iter()
+                .map(|candidate| candidate.primary.admitted(&tight).unwrap())
+                .collect::<Vec<_>>()
+        };
+        for programmatic in [false, true] {
+            let bounded = candidates(tight, programmatic);
+            let whole = candidates(unbounded(), programmatic);
+            assert_ne!(bounded, whole, "{programmatic}");
+            assert_eq!(primaries(&bounded), primaries(&whole), "{programmatic}");
         }
     }
 }

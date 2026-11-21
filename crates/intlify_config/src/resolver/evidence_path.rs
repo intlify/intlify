@@ -272,6 +272,23 @@ impl InputPath {
         PathSize::of(self.0.len(), &view(&measured(&self.0)))
     }
 
+    /// What the path bounds count of the path `steps` project to, the
+    /// [`Self::size`] of their projection under any origin, without
+    /// projecting it: a redacted member is measured as a token without a
+    /// collision ordinal whatever its origin (D15:1851; plan 025 decision
+    /// #299).
+    pub(crate) fn measure(steps: &[Step<'_>]) -> PathSize {
+        let segments: Vec<PathSegment> = steps
+            .iter()
+            .map(|step| match *step {
+                Step::Safe(name) => PathSegment::SafeMember(Arc::from(name)),
+                Step::Unsafe => PathSegment::RedactedMember(RedactedToken::measuring()),
+                Step::Index(index) => PathSegment::ArrayIndex(index),
+            })
+            .collect();
+        PathSize::of(segments.len(), &view(&segments))
+    }
+
     /// The Logical input path Evidence retains, `None` when `tokens` was not
     /// assigned a component of the path.
     pub(crate) fn retained(
@@ -926,5 +943,31 @@ mod tests {
                 bytes: bytes(&json!({ "exact-json-pointer": "" }))
             }
         );
+    }
+
+    /// Steps are measured as their projection is under either origin that
+    /// supplies a Logical input path: the root, each kind of segment, a name
+    /// that needs escaping, and a mixed path (plan 025 decision #299).
+    #[test]
+    fn steps_are_measured_as_their_projection_is() {
+        let paths: [&[Step<'_>]; 7] = [
+            &[],
+            &[Step::Safe("profiles")],
+            &[Step::Unsafe],
+            &[Step::Index(u64::MAX)],
+            &[Step::Safe("a\"b\\c/~"), Step::Safe("名前"), Step::Safe("")],
+            &DUPLICATE,
+            &[Step::Unsafe, Step::Unsafe, Step::Index(0), Step::Safe("x")],
+        ];
+        for steps in paths {
+            for origin in [O::ConfigurationFile, O::ConfigurationProgrammatic] {
+                assert_eq!(
+                    InputPath::measure(steps),
+                    input(origin, steps).size(),
+                    "{steps:?}"
+                );
+            }
+        }
+        assert_eq!(InputPath::measure(&DUPLICATE).segments, 4);
     }
 }

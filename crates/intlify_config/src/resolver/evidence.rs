@@ -66,6 +66,11 @@ pub(crate) struct Source<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Location {
     Entry(Option<InputPath>),
+    /// Entry Source Evidence whose Logical input path, of this size, is past
+    /// a path bound path admission applies: never projected, since path
+    /// admission leaves it absent, and kept only as the size the bounds
+    /// count (D15:776, 1851; plan 025 decision #299).
+    Measured(PathSize),
     Value(ValueLocation),
 }
 
@@ -108,6 +113,33 @@ impl EvidenceProjection {
             .transpose()
             .map_err(EvidenceInvariant::Token)?;
         Self::configuration(origin, source, |_| Ok(Location::Entry(path)), span)
+    }
+
+    /// Entry Source Evidence as Phase 1 establishes it under the path bounds
+    /// of `limits`, the ones path admission applies: as [`Self::entry_source`]
+    /// when `path` is within both, and otherwise with `path` only measured,
+    /// never projected, since path admission leaves it absent, so a candidate
+    /// holds no path past them (D15:776, 1834, 1851; plan 025 decision #299).
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug of an origin that supplies no configuration,
+    /// or no Logical input path when `path` was established.
+    pub(crate) fn entry_source_under(
+        origin: SafeOriginKind,
+        source: Source<'_>,
+        path: Option<&[Step<'_>]>,
+        span: Option<SourceSpan>,
+        limits: &EvidenceMetadataLimits,
+    ) -> Result<Self, EvidenceInvariant> {
+        let past = path
+            .map(InputPath::measure)
+            .filter(|&size| path_holds(limits, size).is_err());
+        let Some(size) = past else {
+            return Self::entry_source(origin, source, path, span);
+        };
+        Redacted::input_path_member(origin).map_err(EvidenceInvariant::Token)?;
+        Self::configuration(origin, source, |_| Ok(Location::Measured(size)), span)
     }
 
     /// Materialized Value Evidence: `source`, the required value locator of
@@ -194,7 +226,8 @@ impl EvidenceProjection {
 
     /// The record as path admission leaves it under `limits`, before token
     /// generation: a Logical input path past either path bound is absent, as
-    /// path absence is (D15:724, 776, 1851).
+    /// path absence is, whether projected or only measured (D15:724, 776,
+    /// 1851).
     ///
     /// # Errors
     ///
@@ -211,38 +244,40 @@ impl EvidenceProjection {
             .entry_path()
             .is_some_and(|size| path_holds(limits, size).is_err())
         {
-            if let Parts::Configuration {
-                location: Location::Entry(path),
-                ..
-            } = &mut admitted.parts
-            {
-                *path = None;
+            if let Parts::Configuration { location, .. } = &mut admitted.parts {
+                *location = Location::Entry(None);
             }
         }
         Ok(admitted)
     }
 
-    /// The size of the Logical input path of Entry Source Evidence, which
-    /// path admission leaves absent past either path bound (D15:776, 1851).
+    /// The size of the Logical input path of Entry Source Evidence, projected
+    /// or only measured, which path admission leaves absent past either path
+    /// bound (D15:776, 1851).
     pub(crate) fn entry_path(&self) -> Option<PathSize> {
         match &self.parts {
             Parts::Configuration {
                 location: Location::Entry(Some(path)),
                 ..
             } => Some(path.size()),
+            Parts::Configuration {
+                location: Location::Measured(size),
+                ..
+            } => Some(*size),
             Parts::Configuration { .. } | Parts::Selector(_) | Parts::ResolverInput(_) => None,
         }
     }
 
     /// The metadata work units of the record: one for each source identity,
     /// locator, Logical input path or value locator, selector, and component
-    /// path it carries (D15:1839; plan 025 interpretation #239).
+    /// path it carries, a path only measured being none it carries (D15:1839;
+    /// plan 025 interpretation #239).
     pub(crate) fn work(&self) -> u64 {
         match &self.parts {
             Parts::Configuration {
                 locator, location, ..
             } => {
-                let path = !matches!(location, Location::Entry(None));
+                let path = matches!(location, Location::Entry(Some(_)) | Location::Value(_));
                 1 + u64::from(locator.is_some()) + u64::from(path)
             }
             Parts::Selector(_) | Parts::ResolverInput(_) => 1,
@@ -257,7 +292,7 @@ impl EvidenceProjection {
             } => {
                 let path: Vec<&Redacted> = match location {
                     Location::Entry(Some(path)) => path.redacted().collect(),
-                    Location::Entry(None) => Vec::new(),
+                    Location::Entry(None) | Location::Measured(_) => Vec::new(),
                     Location::Value(value) => value.redacted().collect(),
                 };
                 source.redacted().into_iter().chain(path).collect()
@@ -284,7 +319,9 @@ impl EvidenceProjection {
                 source: source.retained(specification, tokens)?,
                 locator: locator.clone(),
                 location: match location {
-                    Location::Entry(None) => RetainedLocation::Entry(None),
+                    // A path only measured is absent, as path admission
+                    // leaves it (D15:776).
+                    Location::Entry(None) | Location::Measured(_) => RetainedLocation::Entry(None),
                     Location::Entry(Some(path)) => {
                         RetainedLocation::Entry(Some(path.retained(specification, tokens)?))
                     }
@@ -844,6 +881,64 @@ mod tests {
         .unwrap();
         assert_eq!(selector.admitted(&paths(1, 1)), Ok(selector.clone()));
         assert_eq!(selector.required_path(), None);
+    }
+
+    /// Phase 1 projects a Logical input path only within both path bounds,
+    /// as path admission keeps it. One past either, only its size is kept,
+    /// which path admission measures as it would the projected path, and
+    /// leaves absent; meanwhile the record carries, counts, and retains no
+    /// path, as an absent one. Absence stays absence, and an origin that
+    /// supplies no Logical input path is refused either way (D15:776, 1834,
+    /// 1851; plan 025 decision #299).
+    #[test]
+    fn phase_1_projects_a_logical_input_path_only_within_the_path_bounds() {
+        let identity = exact(FILE);
+        let source = Source {
+            identity: &identity,
+            marked: false,
+            locator: None,
+        };
+        let steps = [Step::Safe("profiles"), Step::Unsafe, Step::Index(0)];
+        let under = |path, limits: &EvidenceMetadataLimits| {
+            EvidenceProjection::entry_source_under(O::ConfigurationFile, source, path, None, limits)
+        };
+        let projected =
+            EvidenceProjection::entry_source(O::ConfigurationFile, source, Some(&steps), None)
+                .unwrap();
+        let absent =
+            EvidenceProjection::entry_source(O::ConfigurationFile, source, None, None).unwrap();
+        let size = projected.entry_path().unwrap();
+        let within = paths(size.segments, size.bytes);
+        assert_eq!(under(Some(&steps), &within), Ok(projected.clone()));
+        assert_eq!(under(None, &paths(1, 1)), Ok(absent.clone()));
+        for past in [
+            paths(size.segments - 1, u64::MAX - 1),
+            paths(size.segments, size.bytes - 1),
+        ] {
+            let measured = under(Some(&steps), &past).unwrap();
+            assert_ne!(measured, projected);
+            assert_eq!(measured.entry_path(), Some(size));
+            assert_eq!(measured.admitted(&past), Ok(absent.clone()));
+            assert_eq!(projected.admitted(&past), Ok(absent.clone()));
+            assert_eq!(measured.work(), absent.work());
+            assert_eq!(measured.redacted(), absent.redacted());
+            assert_eq!(views(&[measured]), views(std::slice::from_ref(&absent)));
+        }
+        let selector = Source {
+            identity: &identity,
+            marked: true,
+            locator: None,
+        };
+        assert_eq!(
+            EvidenceProjection::entry_source_under(
+                O::ProfileSelectorCli,
+                selector,
+                Some(&steps),
+                None,
+                &paths(1, 1)
+            ),
+            EvidenceProjection::entry_source(O::ProfileSelectorCli, selector, Some(&steps), None)
+        );
     }
 
     fn entry_work(source: Source<'_>, path: Option<&[Step<'_>]>) -> u64 {
