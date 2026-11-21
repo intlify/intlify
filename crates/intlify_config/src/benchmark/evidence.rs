@@ -185,7 +185,7 @@ impl PreparedEvidence {
             (&file, self.input),
             (&self.schema, self.structural, &self.selector),
             invocation,
-            FixtureProvider::new(),
+            &FixtureProvider::new(),
             set,
         )
         .ok()

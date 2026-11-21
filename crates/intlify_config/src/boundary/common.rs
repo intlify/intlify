@@ -257,7 +257,7 @@ pub(crate) mod tests {
     impl FormalData for Envelope {
         type Provider = FixtureProvider;
 
-        fn admit(self, _: &LocaleDataLimits) -> Result<FixtureProvider, DataNotAdmitted> {
+        fn admit(&self, _: &LocaleDataLimits) -> Result<FixtureProvider, DataNotAdmitted> {
             Ok(FixtureProvider::new())
         }
     }
@@ -679,10 +679,13 @@ pub(crate) mod tests {
     #[cfg(feature = "icu4x")]
     #[test]
     fn the_icu4x_envelope_reader_reads_under_the_capabilitys_bounds() {
+        use std::collections::BTreeMap;
+
         use crate::locale::icu4x::Icu4xData;
 
         const MANIFEST: &[u8] = include_bytes!("../../../intlify_locale_icu4x/data/manifest.json");
-        let data = |bytes, depth| Icu4xData::read(Some(MANIFEST), |_: &str| None, bytes, depth);
+        let payloads = BTreeMap::new();
+        let data = |bytes, depth| Icu4xData::read(Some(MANIFEST), &payloads, bytes, depth);
         let mut inputs = Inputs::new();
         assert!(admit(inputs.submitted(data), &constructed(), &inputs.assertion).is_ok());
         let size = u64::try_from(MANIFEST.len()).unwrap();

@@ -189,12 +189,16 @@ pub(crate) struct LocaleDataLimits {
 /// under the capability's `localeData` bounds, and a failure there, a payload
 /// limit, the integrity, a payload, or the dataset, is
 /// `project-profile-locale-data-not-admitted`, a Resolver Case and not a
-/// boundary failure (D15:3165).
-pub(crate) trait FormalData {
+/// boundary failure (D15:3165). The data is a Common Invocation Input Set
+/// value that invocation staleness compares by value and the Materialized
+/// Resolution Input Set retains (D15:2583, 2589, 2651), so it has a value
+/// equality and its caller keeps it past the invocation.
+pub(crate) trait FormalData: Eq {
     type Provider: Provider;
 
-    /// Read the rest of the artifact into the provider that serves it.
-    fn admit(self, limits: &LocaleDataLimits) -> Result<Self::Provider, DataNotAdmitted>;
+    /// Read the rest of the artifact into the provider that serves it,
+    /// leaving the data as it was.
+    fn admit(&self, limits: &LocaleDataLimits) -> Result<Self::Provider, DataNotAdmitted>;
 }
 
 /// The data behind an admitted envelope was not admitted.
@@ -202,12 +206,12 @@ pub(crate) trait FormalData {
 pub(crate) struct DataNotAdmitted;
 
 /// A provider built before invocation, as tests and the benchmark build one,
-/// has nothing left to read.
-impl<P: Provider> FormalData for P {
+/// has nothing left to read: the invocation binds a copy of it.
+impl<P: Provider + Clone + Eq> FormalData for P {
     type Provider = P;
 
-    fn admit(self, _: &LocaleDataLimits) -> Result<P, DataNotAdmitted> {
-        Ok(self)
+    fn admit(&self, _: &LocaleDataLimits) -> Result<P, DataNotAdmitted> {
+        Ok(self.clone())
     }
 }
 

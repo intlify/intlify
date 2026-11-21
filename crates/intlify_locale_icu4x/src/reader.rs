@@ -146,6 +146,14 @@ impl DecodedManifest {
         manifest::decode(bytes, max_bytes, max_depth).map(|manifest| Self { manifest })
     }
 
+    /// Where the caller finds the payload of `role`, relative to the
+    /// manifest's location, before anything past the boundary is checked: a
+    /// caller that supplies every payload with the manifest selects them by
+    /// these addresses, which verifying leaves as they are.
+    pub fn address(&self, role: Role) -> &LogicalAddress {
+        payload_of(&self.manifest, role).address()
+    }
+
     /// The rest of 017 step 3: the limits the manifest decides and its
     /// integrity. The manifest's own byte and depth limits were the
     /// boundary's, so `limits` is not asked for them again.
@@ -256,15 +264,19 @@ impl VerifiedManifest {
         Ok((blob, payloads))
     }
 
-    /// The payload of `role`. The closed manifest has one per role, in role
-    /// order.
     fn payload(&self, role: Role) -> &Payload {
-        let index = match role {
-            Role::Conformance => 0,
-            Role::Markers => 1,
-        };
-        &self.manifest.payloads()[index]
+        payload_of(&self.manifest, role)
     }
+}
+
+/// The payload of `role`. The closed manifest has one per role, in role
+/// order.
+fn payload_of(manifest: &LocaleCanonicalizationDataArtifact, role: Role) -> &Payload {
+    let index = match role {
+        Role::Conformance => 0,
+        Role::Markers => 1,
+    };
+    &manifest.payloads()[index]
 }
 
 impl AdmittedData {
@@ -467,6 +479,25 @@ pub(crate) mod tests {
             manifest.address(Role::Markers).as_str(),
             "markers-wide.postcard"
         );
+    }
+
+    /// The addresses are known at the boundary, even of a manifest whose
+    /// integrity does not hold.
+    #[test]
+    fn the_decoded_manifest_names_the_addresses_before_it_is_verified() {
+        let mut value: Value = serde_json::from_slice(WIDE).unwrap();
+        value["dataset"]["identity"] = json!("another-dataset");
+        let tampered = serde_json::to_vec(&value).unwrap();
+        let decoded = DecodedManifest::decode(&tampered, u64::MAX, u64::MAX).unwrap();
+        assert_eq!(
+            decoded.address(Role::Conformance).as_str(),
+            "conformance.json"
+        );
+        assert_eq!(
+            decoded.address(Role::Markers).as_str(),
+            "markers-wide.postcard"
+        );
+        assert!(decoded.verify(&GENEROUS).is_err());
     }
 
     #[test]

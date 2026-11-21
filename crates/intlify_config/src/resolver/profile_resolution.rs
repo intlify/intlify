@@ -454,15 +454,16 @@ impl From<LocaleInvariant> for ResolverInvariant {
 /// each semantic group's owner once the phases that establish the group have
 /// run. `project_profile` is what Phase 0 admitted, which the invocation
 /// records before configuration entry. `data` is the canonicalization data past the
-/// pre-invocation boundary, which Phase 5 reads the rest of and binds. The
-/// Profile Resolution Artifact Set Phase 9 admits is kept in `set`, which the
+/// pre-invocation boundary, which Phase 5 reads the rest of and binds, leaving
+/// it to the caller to retain with the invocation's other inputs (D15:2589).
+/// The Profile Resolution Artifact Set Phase 9 admits is kept in `set`, which the
 /// resolved references and the bindings borrow.
 pub(crate) fn resolve_profile<'s, P, D>(
     evaluation: &mut Evaluation,
     project_profile: &Admitted<VersionedIdentity<P::Identity>>,
     configuration: &SelectedConfiguration<'_>,
     invocation: &Invocation<'s, P::Identity>,
-    data: D,
+    data: &D,
     set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
 ) -> Result<SemanticState<'s, P::Identity>, ResolverInvariant>
 where
@@ -709,7 +710,7 @@ pub(crate) fn invoke_file<'s, P, D>(
     (file, limits): (&EntryFile<'_>, InputLimits),
     (schema, structural, selector): (&ConfigurationSchema, StructuralLimits, &SelectorInput),
     invocation: &Invocation<'s, P::Identity>,
-    data: D,
+    data: &D,
     set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
 ) -> Result<Invoked<'s, P::Identity>, ResolverInvariant>
 where
@@ -752,7 +753,7 @@ pub(crate) fn invoke_programmatic<'s, P, D>(
     (entry, limits): (&EntrySnapshot<'_>, SnapshotEntryLimits),
     (schema, structural, selector): (&ConfigurationSchema, StructuralLimits, &SelectorInput),
     invocation: &Invocation<'s, P::Identity>,
-    data: D,
+    data: &D,
     set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
 ) -> Result<Invoked<'s, P::Identity>, ResolverInvariant>
 where
@@ -826,7 +827,7 @@ fn resolve_entered<'s, P, D>(
     ),
     (schema, structural, selector): (&ConfigurationSchema, StructuralLimits, &SelectorInput),
     invocation: &Invocation<'s, P::Identity>,
-    data: D,
+    data: &D,
     set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
 ) -> Result<Resolved<'s, P::Identity>, ResolverInvariant>
 where
@@ -1391,7 +1392,7 @@ pub(super) mod tests {
                         &selector,
                     ),
                     invocation,
-                    FixtureProvider::new(),
+                    &FixtureProvider::new(),
                     &mut set,
                 )
                 .unwrap();
@@ -1454,7 +1455,7 @@ pub(super) mod tests {
                         &selector,
                     ),
                     invocation,
-                    FixtureProvider::new(),
+                    &FixtureProvider::new(),
                     &mut set,
                 )
                 .unwrap();
@@ -1623,7 +1624,7 @@ pub(super) mod tests {
                         &selector,
                     ),
                     invocation,
-                    FixtureProvider::new(),
+                    &FixtureProvider::new(),
                     &mut set,
                 )
                 .map(|invoked| invoked.state.ok());
@@ -1676,7 +1677,7 @@ pub(super) mod tests {
                         &selector,
                     ),
                     invocation,
-                    FixtureProvider::new(),
+                    &FixtureProvider::new(),
                     &mut set,
                 )
                 .unwrap()
@@ -1702,7 +1703,7 @@ pub(super) mod tests {
         evaluation: &mut Evaluation,
         configuration: &SelectedConfiguration<'_>,
         invocation: &Invocation<'s, P::Identity>,
-        data: D,
+        data: &D,
         set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
     ) -> Result<SemanticState<'s, P::Identity>, ResolverInvariant>
     where
@@ -1995,7 +1996,7 @@ pub(super) mod tests {
                     &selector,
                 ),
                 invocation,
-                FixtureProvider::new(),
+                &FixtureProvider::new(),
                 &mut set,
             );
             assert!(matches!(invoked, Ok(Invoked { state: Err(_), .. })));
@@ -3504,7 +3505,7 @@ pub(super) mod tests {
                 &mut evaluation,
                 configuration,
                 &invocation,
-                FixtureProvider::new(),
+                &FixtureProvider::new(),
                 &mut set,
             )
             .unwrap();
@@ -3894,12 +3895,13 @@ pub(super) mod tests {
     /// refusal before invocation (D15:3165).
     #[test]
     fn phase_5_reads_the_data_under_the_capabilitys_locale_data_bounds() {
+        #[derive(PartialEq, Eq)]
         struct Behind(LocaleDataLimits);
 
         impl FormalData for Behind {
             type Provider = FixtureProvider;
 
-            fn admit(self, limits: &LocaleDataLimits) -> Result<FixtureProvider, DataNotAdmitted> {
+            fn admit(&self, limits: &LocaleDataLimits) -> Result<FixtureProvider, DataNotAdmitted> {
                 if *limits == self.0 {
                     Ok(FixtureProvider::new())
                 } else {
@@ -3928,7 +3930,7 @@ pub(super) mod tests {
                 capability: &capability,
                 ..*invocation
             };
-            let resolved = |data: Behind| {
+            let resolved = |data: &Behind| {
                 let mut evaluation = Evaluation::default();
                 let mut set = None;
                 let canonicalized =
@@ -3938,10 +3940,10 @@ pub(super) mod tests {
                         .is_ok();
                 (issues(&evaluation), canonicalized)
             };
-            assert_eq!(resolved(Behind(bounds)), (vec![], true));
+            assert_eq!(resolved(&Behind(bounds)), (vec![], true));
             let mut other = bounds;
             other.max_codes = Bound::new(bounds.max_codes.get() + 1).unwrap();
-            let (found, canonicalized) = resolved(Behind(other));
+            let (found, canonicalized) = resolved(&Behind(other));
             assert_eq!(found, [(DATA, Code::LocaleDataNotAdmitted, None)]);
             assert!(!canonicalized);
         });
@@ -3983,7 +3985,7 @@ pub(super) mod tests {
                 &Ok(ACTIVE),
                 configuration,
                 invocation,
-                FixtureProvider::new(),
+                &FixtureProvider::new(),
                 &mut set,
             )
             .unwrap();
@@ -4001,7 +4003,7 @@ pub(super) mod tests {
                 &mut evaluation,
                 configuration,
                 invocation,
-                FixtureProvider::new(),
+                &FixtureProvider::new(),
                 &mut first
             )
             .is_ok());
@@ -4010,7 +4012,7 @@ pub(super) mod tests {
                     &mut evaluation,
                     configuration,
                     invocation,
-                    FixtureProvider::new(),
+                    &FixtureProvider::new(),
                     &mut second
                 )
                 .unwrap_err(),

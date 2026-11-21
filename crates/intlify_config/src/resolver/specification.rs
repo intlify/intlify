@@ -344,13 +344,14 @@ pub(crate) struct AdmittedSpecifications<Id, P: Provider> {
 /// the vocabulary must be intact and the one its slot asserts, and the rest of
 /// the data is read under the capability's `localeData` bounds, `data_limits`,
 /// and must carry the dataset the admitted specification admits (D15:3165).
+/// The data is read in place, and stays its caller's.
 pub(crate) fn admit_specifications<Id, D>(
     evaluation: &mut Evaluation,
     supported: &SupportedSpecifications<Id>,
     input: &SpecificationInput<Id>,
     policy: Result<&ConfirmedPolicy, &Causes>,
     vocabulary: &FormalVocabulary,
-    data: D,
+    data: &D,
     data_limits: &LocaleDataLimits,
 ) -> Result<AdmittedSpecifications<Id, D::Provider>, SpecificationInvariant>
 where
@@ -710,7 +711,7 @@ mod tests {
             input: &SpecificationInput<Id>,
             policy: Result<&ConfirmedPolicy, &Causes>,
         ) -> Self {
-            Self::run_with(supported, input, policy, FixtureProvider::new())
+            Self::run_with(supported, input, policy, &FixtureProvider::new())
         }
 
         /// The admission with `data` as the data past the boundary, read under
@@ -719,7 +720,7 @@ mod tests {
             supported: &SupportedSpecifications<Id>,
             input: &SpecificationInput<Id>,
             policy: Result<&ConfirmedPolicy, &Causes>,
-            data: impl FormalData<Provider = FixtureProvider>,
+            data: &impl FormalData<Provider = FixtureProvider>,
         ) -> Self {
             let mut evaluation = Evaluation::default();
             let project_profile = admit_project_profile(&mut evaluation, supported, input).unwrap();
@@ -779,6 +780,7 @@ mod tests {
 
     /// Data past the boundary whose rest reads only under `expected`, as an
     /// adapter's data reads only within its bounds.
+    #[derive(PartialEq, Eq)]
     struct Behind {
         expected: LocaleDataLimits,
     }
@@ -786,7 +788,7 @@ mod tests {
     impl FormalData for Behind {
         type Provider = FixtureProvider;
 
-        fn admit(self, limits: &LocaleDataLimits) -> Result<FixtureProvider, DataNotAdmitted> {
+        fn admit(&self, limits: &LocaleDataLimits) -> Result<FixtureProvider, DataNotAdmitted> {
             if *limits == self.expected {
                 Ok(FixtureProvider::new())
             } else {
@@ -796,12 +798,13 @@ mod tests {
     }
 
     /// Data that must not be read at all.
+    #[derive(PartialEq, Eq)]
     struct Untouched;
 
     impl FormalData for Untouched {
         type Provider = FixtureProvider;
 
-        fn admit(self, _: &LocaleDataLimits) -> Result<FixtureProvider, DataNotAdmitted> {
+        fn admit(&self, _: &LocaleDataLimits) -> Result<FixtureProvider, DataNotAdmitted> {
             panic!("the data was read before its slot was admitted")
         }
     }
@@ -1128,7 +1131,7 @@ mod tests {
             &supported(),
             &complete(),
             Ok(&policy()),
-            Behind {
+            &Behind {
                 expected: data_limits(),
             },
         );
@@ -1140,7 +1143,7 @@ mod tests {
             &supported(),
             &complete(),
             Ok(&policy()),
-            Behind { expected: other },
+            &Behind { expected: other },
         );
         assert_eq!(
             unread.issues(),
@@ -1160,7 +1163,7 @@ mod tests {
     fn the_data_is_read_only_once_its_slot_is_admitted() {
         let mut input = complete();
         input.locale_canonicalization = None;
-        let admission = Admission::run_with(&supported(), &input, Ok(&policy()), Untouched);
+        let admission = Admission::run_with(&supported(), &input, Ok(&policy()), &Untouched);
         let causes = only_cause(&admission);
         assert_eq!(admission.not_evaluated(), [(DATA, causes)]);
     }

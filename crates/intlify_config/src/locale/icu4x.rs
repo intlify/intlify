@@ -14,6 +14,7 @@
 //! [`Icu4xProvider::admit`] does both at once, for callers outside an
 //! invocation.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use intlify_locale_icu4x::{
@@ -30,47 +31,66 @@ use super::{
 
 /// One artifact past 015's `locale-canonicalization-data-artifact` boundary:
 /// its manifest within the capability's `inputBoundary` bounds and in 017's
-/// closed shape, and the caller's way to the payloads it acquired. Only
+/// closed shape, and the exact bytes the caller supplied for each payload the
+/// manifest names, `None` for one it supplied none for (D17:1065). That is
+/// its value: a manifest spelled with other bytes but decoding the same is the
+/// same data, and a payload that differs in one byte is other data. Only
 /// [`Icu4xData::read`] makes one.
-pub(crate) struct Icu4xData<A> {
+#[derive(PartialEq, Eq)]
+pub(crate) struct Icu4xData {
     manifest: DecodedManifest,
-    acquire: A,
+    conformance: Option<Arc<[u8]>>,
+    markers: Option<Arc<[u8]>>,
 }
 
-impl<A> Icu4xData<A>
-where
-    A: FnMut(&str) -> Option<Vec<u8>>,
-{
+impl Icu4xData {
     /// The boundary: an absent manifest is `missing-input`, and then its
     /// bytes and depth, under `bytes` and `depth`, before anything is decoded,
-    /// and its closed decoding. `acquire` is kept for specification admission,
-    /// which asks it for the payloads.
+    /// and its closed decoding. Of `payloads`, the bytes the caller supplied
+    /// by address, the data shares those at the addresses the manifest names
+    /// for specification admission to read, and the boundary reads none.
     pub(crate) fn read(
         manifest: Option<&[u8]>,
-        acquire: A,
+        payloads: &BTreeMap<String, Arc<[u8]>>,
         bytes: Bound,
         depth: Bound,
     ) -> Result<Self, EnvelopeReason> {
         let manifest = manifest.ok_or(EnvelopeReason::MissingInput)?;
         let manifest =
             DecodedManifest::decode(manifest, bytes.get(), depth.get()).map_err(envelope_reason)?;
-        Ok(Self { manifest, acquire })
+        let supplied = |role| payloads.get(manifest.address(role).as_str()).cloned();
+        Ok(Self {
+            conformance: supplied(Role::Conformance),
+            markers: supplied(Role::Markers),
+            manifest,
+        })
     }
 }
 
-impl<A> FormalData for Icu4xData<A>
-where
-    A: FnMut(&str) -> Option<Vec<u8>>,
-{
+impl FormalData for Icu4xData {
     type Provider = Icu4xProvider;
 
     /// The rest of 017's steps under the capability's `localeData` bounds: the
     /// limits the manifest decides and its integrity, and then each payload
     /// and the dataset.
-    fn admit(mut self, limits: &LocaleDataLimits) -> Result<Icu4xProvider, DataNotAdmitted> {
+    ///
+    /// Nothing is fetched: each payload is the bytes kept at the address the
+    /// manifest names, where an acquiring closure, asked for the conformance
+    /// payload and then the markers once the manifest was verified, answered
+    /// before. They are read only once the manifest is verified, in the
+    /// reader's order, and a payload kept as `None` is missing as the
+    /// closure's `None` was, so the bounds, the failure, and its Finding stay
+    /// the same. The marker blob owns its bytes, so they are copied only once
+    /// the manifest is verified.
+    fn admit(&self, limits: &LocaleDataLimits) -> Result<Icu4xProvider, DataNotAdmitted> {
         let limits = read_limits(limits);
-        let manifest = self.manifest.verify(&limits).map_err(|_| DataNotAdmitted)?;
-        Icu4xProvider::from_verified(manifest, &mut self.acquire, &limits)
+        let manifest = self
+            .manifest
+            .clone()
+            .verify(&limits)
+            .map_err(|_| DataNotAdmitted)?;
+        let markers = self.markers.as_deref().map(Box::from);
+        Icu4xProvider::from_verified(manifest, (self.conformance.as_deref(), markers), &limits)
             .map_err(|_| DataNotAdmitted)
     }
 }
@@ -114,23 +134,24 @@ impl Icu4xProvider {
         limits: &ReadLimits,
     ) -> Result<Self, Admission> {
         let manifest = VerifiedManifest::read(manifest, limits).map_err(admission)?;
-        Self::from_verified(manifest, &mut acquire, limits).map_err(admission)
-    }
-
-    /// 017 steps 4 to 6 over a verified manifest, with the payloads `acquire`
-    /// returns.
-    fn from_verified(
-        manifest: VerifiedManifest,
-        acquire: &mut impl FnMut(&str) -> Option<Vec<u8>>,
-        limits: &ReadLimits,
-    ) -> Result<Self, ReadFailure> {
         let conformance = acquire(manifest.address(Role::Conformance).as_str());
         let markers = acquire(manifest.address(Role::Markers).as_str());
-        let data = manifest.admit(
-            conformance.as_deref(),
-            markers.map(Vec::into_boxed_slice),
+        Self::from_verified(
+            manifest,
+            (conformance.as_deref(), markers.map(Vec::into_boxed_slice)),
             limits,
-        )?;
+        )
+        .map_err(admission)
+    }
+
+    /// 017 steps 4 to 6 over a verified manifest, with the conformance and
+    /// markers payloads, each `None` when there is none.
+    fn from_verified(
+        manifest: VerifiedManifest,
+        (conformance, markers): (Option<&[u8]>, Option<Box<[u8]>>),
+        limits: &ReadLimits,
+    ) -> Result<Self, ReadFailure> {
+        let data = manifest.admit(conformance, markers, limits)?;
         Ok(Self {
             binding: binding(&data),
             data,
@@ -275,6 +296,14 @@ mod tests {
             "markers.postcard" => Some(MARKERS.to_vec()),
             _ => None,
         }
+    }
+
+    /// The committed artifact's payloads by address, as a caller supplies
+    /// them with the manifest.
+    fn payloads() -> BTreeMap<String, Arc<[u8]>> {
+        ["conformance.json", "markers.postcard"]
+            .map(|address| (address.to_owned(), payload(address).unwrap().into()))
+            .into()
     }
 
     fn committed() -> Icu4xProvider {
@@ -525,20 +554,58 @@ mod tests {
     }
 
     /// The boundary reads the envelope alone, and specification admission
-    /// reads the rest into the provider the one-step admission makes.
+    /// reads the rest into the provider the one-step admission makes, as
+    /// often as it is asked to: the data stays its caller's.
     #[test]
     fn the_boundary_reads_the_envelope_and_specification_admission_the_rest() {
         let (bytes, depth) = envelope();
-        let data = Icu4xData::read(Some(MANIFEST), payload, bytes, depth).unwrap();
-        let provider = data.admit(&locale_data()).unwrap();
-        assert_eq!(provider.binding(), committed().binding());
+        let data = Icu4xData::read(Some(MANIFEST), &payloads(), bytes, depth).unwrap();
+        for _ in 0..2 {
+            let provider = data.admit(&locale_data()).unwrap();
+            assert_eq!(provider.binding(), committed().binding());
+        }
+    }
+
+    /// The data's value is its decoded manifest and the bytes of each
+    /// payload the manifest names, whatever else the caller supplied: what
+    /// invocation staleness compares (D15:2589).
+    #[test]
+    fn the_data_is_its_decoded_manifest_and_the_payloads_it_names() {
+        let (bytes, depth) = envelope();
+        let read = |manifest: &[u8], payloads: &BTreeMap<String, Arc<[u8]>>| {
+            Icu4xData::read(Some(manifest), payloads, bytes, depth).unwrap()
+        };
+        let data = read(MANIFEST, &payloads());
+        let value: Value = serde_json::from_slice(MANIFEST).unwrap();
+        let spaced = serde_json::to_vec_pretty(&value).unwrap();
+        assert_ne!(spaced, MANIFEST);
+        let mut more = payloads();
+        more.insert("unnamed.json".into(), Arc::from(&b"{}"[..]));
+        assert!(read(&spaced, &more) == data);
+        for address in ["conformance.json", "markers.postcard"] {
+            let mut flipped = payloads();
+            let mut changed = payload(address).unwrap();
+            changed[0] ^= 1;
+            flipped.insert(address.into(), changed.into());
+            assert!(read(MANIFEST, &flipped) != data, "{address}");
+            let mut absent = payloads();
+            absent.remove(address);
+            assert!(read(MANIFEST, &absent) != data, "{address}");
+            assert!(
+                read(MANIFEST, &absent) == read(&spaced, &absent),
+                "{address}"
+            );
+        }
+        let mut other = value;
+        other["dataset"]["identity"] = Value::from("another-dataset");
+        assert!(read(&serde_json::to_vec(&other).unwrap(), &payloads()) != data);
     }
 
     #[test]
     fn a_manifest_the_boundary_cannot_read_is_refused_with_its_reason() {
         let (bytes, depth) = envelope();
         let refused = |manifest: Option<&[u8]>, bytes, depth| {
-            Icu4xData::read(manifest, payload, bytes, depth).err()
+            Icu4xData::read(manifest, &payloads(), bytes, depth).err()
         };
         assert_eq!(
             refused(None, bytes, depth),
@@ -566,27 +633,25 @@ mod tests {
     fn what_fails_after_the_envelope_is_data_not_admitted() {
         let (bytes, depth) = envelope();
         let read =
-            |manifest: &[u8], acquire: fn(&str) -> Option<Vec<u8>>, limits: &LocaleDataLimits| {
-                Icu4xData::read(Some(manifest), acquire, bytes, depth)
+            |manifest: &[u8], payloads: &BTreeMap<String, Arc<[u8]>>, limits: &LocaleDataLimits| {
+                Icu4xData::read(Some(manifest), payloads, bytes, depth)
                     .map(|data| data.admit(limits).map(|_| ()))
             };
         // The artifact has two payloads.
         let mut one = locale_data();
         one.max_payloads = Bound::new(1).unwrap();
-        assert_eq!(read(MANIFEST, payload, &one), Ok(Err(DataNotAdmitted)));
+        assert_eq!(read(MANIFEST, &payloads(), &one), Ok(Err(DataNotAdmitted)));
         let mut value: Value = serde_json::from_slice(MANIFEST).unwrap();
         value["dataset"]["identity"] = Value::from("another-dataset");
         let tampered = serde_json::to_vec(&value).unwrap();
         assert_eq!(
-            read(&tampered, payload, &locale_data()),
+            read(&tampered, &payloads(), &locale_data()),
             Ok(Err(DataNotAdmitted))
         );
+        let mut without = payloads();
+        without.remove("markers.postcard");
         assert_eq!(
-            read(
-                MANIFEST,
-                |address| (address != "markers.postcard").then(|| payload(address))?,
-                &locale_data()
-            ),
+            read(MANIFEST, &without, &locale_data()),
             Ok(Err(DataNotAdmitted))
         );
     }
@@ -611,7 +676,7 @@ mod tests {
         for (index, narrow) in narrowed.into_iter().enumerate() {
             let mut limits = locale_data();
             narrow(&mut limits, one);
-            let data = Icu4xData::read(Some(MANIFEST), payload, bytes, depth).unwrap();
+            let data = Icu4xData::read(Some(MANIFEST), &payloads(), bytes, depth).unwrap();
             assert_eq!(
                 data.admit(&limits).err(),
                 Some(DataNotAdmitted),
