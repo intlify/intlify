@@ -290,6 +290,54 @@ impl AdmittedCallSite {
     }
 }
 
+/// Two sidecars are equal by value, as invocation staleness compares them
+/// (D15:2583): the pair, the mark, the locator, the source, and the same
+/// mappings, in canonical order, to the same candidates. A candidate keeps
+/// the numbers the binding read, so its coordinates compare as numbers: `-0`
+/// equals `+0`, as Portable JSON Numbers have it, and NaN equals NaN, so a
+/// sidecar equals itself (plan 025 decision #306). The pattern names every
+/// field, so a part added to the sidecar fails to compile here.
+impl PartialEq for AdmittedCallSite {
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            pair,
+            marked,
+            locator,
+            source,
+            mappings,
+        } = self;
+        *pair == other.pair
+            && *marked == other.marked
+            && *locator == other.locator
+            && *source == other.source
+            && mappings.len() == other.mappings.len()
+            && mappings.iter().zip(&other.mappings).all(|(left, right)| {
+                left.0 == right.0
+                    && same_number(left.1.start, right.1.start)
+                    && same_number(left.1.end, right.1.end)
+            })
+    }
+}
+
+impl Eq for AdmittedCallSite {}
+
+/// Whether two coordinates are the same number: equal once `-0` is read as
+/// `+0` and every NaN as one NaN.
+fn same_number(left: f64, right: f64) -> bool {
+    normalized(left).to_bits() == normalized(right).to_bits()
+}
+
+/// `value` with `-0` as `+0` and every NaN as [`f64::NAN`].
+fn normalized(value: f64) -> f64 {
+    if value.is_nan() {
+        f64::NAN
+    } else if value == 0.0 {
+        0.0
+    } else {
+        value
+    }
+}
+
 /// Admit a report, `None` when no sidecar was submitted, under the
 /// capability's `bootstrapOnly.evidenceMetadata` bounds: the admitted
 /// sidecar, or `None` for its absence.
@@ -388,8 +436,9 @@ fn unsigned(value: f64) -> Option<u64> {
     ((0.0..PAST).contains(&value) && value.fract() == 0.0).then_some(value as u64)
 }
 
+// `resolver::staleness`'s tests build a sidecar no boundary admits.
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use serde_json::{json, Value};
 
     use super::*;
@@ -414,6 +463,15 @@ mod tests {
 
     fn largest() -> Bound {
         Bound::new(u64::MAX - 1).unwrap()
+    }
+
+    /// `sidecar` over `source` but under its own pair, which the boundary
+    /// refuses: what only a revision collision could give.
+    pub(crate) fn resourced(sidecar: AdmittedCallSite, source: &str) -> AdmittedCallSite {
+        AdmittedCallSite {
+            source: source.to_owned(),
+            ..sidecar
+        }
     }
 
     /// Limits no sidecar here is over.

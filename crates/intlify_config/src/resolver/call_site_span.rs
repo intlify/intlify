@@ -234,6 +234,17 @@ pub(crate) mod fixtures {
         label: Option<&str>,
         mappings: Vec<SubmittedMapping>,
     ) -> AdmittedCallSite {
+        identified(CALL_SITE, marked, source, label, mappings)
+    }
+
+    /// The same under the identity `identity`.
+    pub(crate) fn identified(
+        identity: &str,
+        marked: bool,
+        source: &str,
+        label: Option<&str>,
+        mappings: Vec<SubmittedMapping>,
+    ) -> AdmittedCallSite {
         let largest = Bound::new(u64::MAX - 1).unwrap();
         let limits = CallSiteLimits {
             pair: SourceLimits {
@@ -246,7 +257,7 @@ pub(crate) mod fixtures {
         };
         let revision = call_site_source_revision(source.as_bytes());
         let submitted = SubmittedCallSite {
-            identity: Some(CALL_SITE),
+            identity: Some(identity),
             marked,
             revision: Some(&revision),
             locator: label.map(|payload| LocatorCandidate {

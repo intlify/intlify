@@ -69,6 +69,33 @@ pub(crate) struct CommonInputs<D> {
     pub(crate) capability: ImplementationCapability,
 }
 
+/// Two sets are equal by value, as invocation staleness and the Materialized
+/// Resolution Input Set compare them (D15:2583, 2589): the collection as the
+/// multiset of its members' `C(member)` bytes, and every other component by
+/// its admitted value. The origins need no comparison, since every admitted
+/// origin is the one Safe Origin Kind its slot fixes. The pattern names every
+/// field, so a component added to the set fails to compile here.
+impl<D: Eq> PartialEq for CommonInputs<D> {
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            specification,
+            vocabulary,
+            data,
+            collection,
+            verification,
+            capability,
+        } = self;
+        *specification == other.specification
+            && *vocabulary == other.vocabulary
+            && *data == other.data
+            && collection.same_members(&other.collection)
+            && *verification == other.verification
+            && *capability == other.capability
+    }
+}
+
+impl<D: Eq> Eq for CommonInputs<D> {}
+
 /// A refused Common Invocation Input Set: every failure in 015's order, and
 /// the capability its boundary admitted, `None` when it refused the value.
 /// A refused capability origin leaves the value admitted.

@@ -56,6 +56,7 @@ pub(crate) mod resolution_evidence;
 pub(crate) mod resource_policy;
 pub(crate) mod snapshot_entry;
 pub(crate) mod specification;
+pub(crate) mod staleness;
 pub(crate) mod structural_admission;
 pub(crate) mod subject;
 pub(crate) mod tally;
