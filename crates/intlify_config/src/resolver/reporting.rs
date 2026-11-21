@@ -643,8 +643,9 @@ impl<'e, 's> Reporting<'e, 's> {
             )?);
         }
         // The owner requires no check, so it is evaluated whenever
-        // `entry-admission` runs, and a file entry's slots are established
-        // then (D15:2516, 3159; plan 025 interpretation #246).
+        // `entry-admission` runs, and an entry's slots are established then,
+        // three or, beside a sidecar, four (D15:2516, 3159; plan 025
+        // interpretation #246).
         if *unit == ENTRY_OWNER {
             let dependencies = self
                 .entry
@@ -1429,13 +1430,13 @@ mod tests {
             let tokens = EvidenceTokens::assign(PROFILE, entry.redacted(), &Sha256);
             let entries = owned(&ENTRY_OWNER, ReportingDomain::Entry);
             assert!(matches!(entries[0], Record::Status(_)));
-            assert_eq!(
-                entries[1..],
-                entry
-                    .retained(PROFILE, &tokens)
-                    .unwrap()
-                    .map(Record::EntryDependency)
-            );
+            let records: Vec<Record<'_>> = entry
+                .retained(PROFILE, &tokens)
+                .unwrap()
+                .into_iter()
+                .map(Record::EntryDependency)
+                .collect();
+            assert_eq!(entries[1..], records);
         });
     }
 }

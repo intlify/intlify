@@ -23,15 +23,19 @@
 //! evaluated whenever its phase runs. `structural-admission` runs only on a
 //! materialized value, and the Resolver Invocation Input Set exists only after
 //! every required component succeeds, so every common and materialized slot is
-//! established then and its owner names all eight; a file entry's
-//! `entry-source`, `profile-selector`, and `origins` are established whenever
-//! `entry-admission` runs (D15:1174, 2516, 3159; plan 025 interpretation
-//! #246). A file entry's dependencies name its source's identity as Evidence
-//! projects it, the Source-content revision its bytes derive, and its locator
-//! when present; the selector under the final projection authority; and the
-//! Safe Origin Kind each common and entry input's slot fixes (D15:701-712,
-//! 743, 2516). An owner's records take its slots' vocabulary order (D15:2143,
-//! 2507; plan 025 interpretation #244).
+//! established then and its owner names all eight; an entry's `entry-source`,
+//! `profile-selector`, and `origins` are established whenever
+//! `entry-admission` runs, and so is a programmatic entry's `call-site-source`
+//! once a sidecar was admitted beside it (D15:1174, 2516, 3159; plan 025
+//! interpretation #246). A file entry's dependencies name its source's
+//! identity as Evidence projects it, the Source-content revision its bytes
+//! derive, and its locator when present; a programmatic entry's name the
+//! Programmatic Entry's identity, the verified Snapshot digest, and its
+//! locator, and the call-site source's identity, Call-Site Source revision,
+//! and locator. Both name the selector under the final projection authority
+//! and the Safe Origin Kind each common and entry input's slot fixes
+//! (D15:701-712, 743, 2516). An owner's records take its slots' vocabulary
+//! order (D15:2143, 2507; plan 025 interpretation #244).
 
 use std::sync::Arc;
 
@@ -45,16 +49,18 @@ use crate::input_limits::Bound;
 use crate::model::ProfileId;
 use crate::structural::selection::SelectorInput;
 
+use super::call_site_span;
 use super::entry::{ConfigurationEntry, EntryFile};
 use super::evaluation::{
     Admitted, Blocking, Check, Evaluation, EvaluationInvariant, Subject, Unit,
 };
-use super::evidence::EvidenceInvariant;
+use super::evidence::{EvidenceInvariant, Source};
 use super::evidence_selector::{SelectorEvidence, SelectorProjection};
 use super::evidence_source::{PortableSourceIdentity, SourceIdentity};
 use super::evidence_token::{EvidenceTokens, Redacted};
 use super::origin::SafeOriginKind;
 use super::resource_policy::PolicySlot;
+use super::snapshot_entry::EntrySnapshot;
 use super::token::Specification;
 
 /// One semantic group of the profile view, in the order of 015's semantic
@@ -252,16 +258,15 @@ impl EntrySlot {
     }
 }
 
-/// What a file entry's dependency records name besides their slots: its
-/// source's identity as Evidence projects it, the Source-content revision of
-/// its bytes, its locator when present, the selector as the final authority
-/// projects it, and the Safe Origin Kinds the entry fixes (D15:204, 2512,
-/// 2516).
+/// What an entry's dependency records name besides their slots: the entry
+/// source's identity as Evidence projects it, its revision, and its locator
+/// when present, the same of the call-site source beside a programmatic
+/// entry's admitted sidecar, the selector as the final authority projects it,
+/// and the Safe Origin Kinds the entry fixes (D15:204, 2512, 2516).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct EntryInputs {
-    source: SourceIdentity,
-    revision: Arc<str>,
-    locator: Option<Locator>,
+    source: SourceInputs,
+    call_site: Option<SourceInputs>,
     selector: SelectorProjection,
     origins: EntryOrigins,
 }
@@ -281,12 +286,13 @@ impl EntryInputs {
         authority: Bound,
         declared: impl IntoIterator<Item = &'d ProfileId>,
     ) -> Result<Self, EvidenceInvariant> {
-        let source = file.source;
         Ok(Self {
-            source: SourceIdentity::project(file.origin(), source.identity, source.marked)
-                .map_err(EvidenceInvariant::Token)?,
-            revision: Arc::from(file_source_revision(&file.bytes)),
-            locator: source.locator.cloned(),
+            source: SourceInputs::project(
+                file.origin(),
+                file.source,
+                &file_source_revision(&file.bytes),
+            )?,
+            call_site: None,
             selector: SelectorProjection::project(
                 file.selector_origin(),
                 selector,
@@ -298,67 +304,187 @@ impl EntryInputs {
         })
     }
 
-    /// The components that tokens replace: an unmarked source identity and a
-    /// redacted selector.
+    /// The inputs of the programmatic entry `entry`, its selector projected
+    /// as a file's: the Programmatic Entry's source, whose revision is the
+    /// verified Snapshot digest, and, when a sidecar was admitted beside it,
+    /// the call-site source at its Call-Site Source revision, both supplied
+    /// under the `configuration-programmatic` slot (D15:204, 743, 2516).
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug that leaves a source identity or the selector
+    /// without a projection.
+    pub(crate) fn programmatic<'d>(
+        entry: &EntrySnapshot<'_>,
+        selector: &SelectorInput,
+        authority: Bound,
+        declared: impl IntoIterator<Item = &'d ProfileId>,
+    ) -> Result<Self, EvidenceInvariant> {
+        use SafeOriginKind::{ConfigurationProgrammatic, ProfileSelectorProgrammatic};
+
+        let call_site = entry
+            .call_site
+            .map(|call_site| {
+                let revision = call_site.pair().revision();
+                SourceInputs::project(
+                    ConfigurationProgrammatic,
+                    call_site_span::source(call_site),
+                    revision,
+                )
+            })
+            .transpose()?;
+        Ok(Self {
+            source: SourceInputs::project(
+                ConfigurationProgrammatic,
+                entry.source,
+                entry.snapshot.digest(),
+            )?,
+            selector: SelectorProjection::project(
+                ProfileSelectorProgrammatic,
+                selector,
+                authority,
+                declared,
+            )
+            .map_err(EvidenceInvariant::Selector)?,
+            origins: EntryOrigins {
+                entry_source: ConfigurationProgrammatic,
+                call_site_source: call_site.as_ref().map(|_| ConfigurationProgrammatic),
+                profile_selector: ProfileSelectorProgrammatic,
+            },
+            call_site,
+        })
+    }
+
+    /// The components that tokens replace: an unmarked source identity of
+    /// either source and a redacted selector (plan 025 interpretation #245).
     pub(crate) fn redacted(&self) -> impl Iterator<Item = &Redacted> {
-        self.source
-            .redacted()
-            .into_iter()
+        std::iter::once(&self.source)
+            .chain(&self.call_site)
+            .filter_map(|source| source.identity.redacted())
             .chain(self.selector.redacted())
     }
 
-    /// The metadata work units of the records' projections: one for the
-    /// source identity, one for the locator when present, and one for the
-    /// selector (D15:1839, 1851).
+    /// The metadata work units of the records' projections: one for each
+    /// source identity and each locator present, and one for the selector
+    /// (D15:1839, 1851; plan 025 interpretation #245).
     pub(crate) fn work(&self) -> u64 {
-        2 + u64::from(self.locator.is_some())
+        std::iter::once(&self.source)
+            .chain(&self.call_site)
+            .map(|source| 1 + u64::from(source.locator.is_some()))
+            .sum::<u64>()
+            + 1
     }
 
-    /// The entry dependency records, in their slots' order, `None` when
-    /// `tokens` was not assigned one of their components.
+    /// The entry dependency records, three or, beside a sidecar, four, in
+    /// their slots' order, `None` when `tokens` was not assigned one of their
+    /// components (D15:2507; plan 025 interpretation #244).
     pub(crate) fn retained(
         &self,
         specification: Specification<'_>,
         tokens: &EvidenceTokens,
-    ) -> Option<[EntryDependency; 3]> {
-        Some([
-            EntryDependency::Source {
-                source: self.source.retained(specification, tokens)?,
-                revision: Arc::clone(&self.revision),
-                locator: self.locator.clone(),
-            },
-            EntryDependency::Selector(self.selector.retained(specification, tokens)?),
-            EntryDependency::Origins(self.origins),
-        ])
+    ) -> Option<Vec<EntryDependency>> {
+        let mut records = vec![EntryDependency::Source(
+            self.source.retained(specification, tokens)?,
+        )];
+        if let Some(call_site) = &self.call_site {
+            records.push(EntryDependency::CallSite(
+                call_site.retained(specification, tokens)?,
+            ));
+        }
+        records.push(EntryDependency::Selector(
+            self.selector.retained(specification, tokens)?,
+        ));
+        records.push(EntryDependency::Origins(self.origins));
+        Some(records)
     }
 }
 
-/// The Safe Origin Kinds an entry fixes for its `entry-source` and
-/// `profile-selector` slots (D15:204, 2516).
+/// What an `entry-source` or `call-site-source` record names: its source's
+/// identity as Evidence projects it, its revision, and its locator when
+/// present (D15:2516).
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SourceInputs {
+    identity: SourceIdentity,
+    revision: Arc<str>,
+    locator: Option<Locator>,
+}
+
+impl SourceInputs {
+    /// `source`, which an input of `origin` supplied, at `revision`.
+    fn project(
+        origin: SafeOriginKind,
+        source: Source<'_>,
+        revision: &str,
+    ) -> Result<Self, EvidenceInvariant> {
+        Ok(Self {
+            identity: SourceIdentity::project(origin, source.identity, source.marked)
+                .map_err(EvidenceInvariant::Token)?,
+            revision: Arc::from(revision),
+            locator: source.locator.cloned(),
+        })
+    }
+
+    /// The record, `None` when `tokens` was not assigned its identity's
+    /// component.
+    fn retained(
+        &self,
+        specification: Specification<'_>,
+        tokens: &EvidenceTokens,
+    ) -> Option<SourceDependency> {
+        Some(SourceDependency {
+            source: self.identity.retained(specification, tokens)?,
+            revision: Arc::clone(&self.revision),
+            locator: self.locator.clone(),
+        })
+    }
+}
+
+/// The Safe Origin Kinds an entry fixes for its `entry-source`,
+/// `call-site-source`, and `profile-selector` slots, the call-site source's
+/// only beside an admitted sidecar (D15:204, 2516).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct EntryOrigins {
     entry_source: SafeOriginKind,
+    call_site_source: Option<SafeOriginKind>,
     profile_selector: SafeOriginKind,
 }
 
 impl EntryOrigins {
-    /// The Safe Origin Kinds `entry` fixes.
+    /// The Safe Origin Kinds `entry` fixes without a sidecar.
     pub(crate) fn of(entry: &dyn ConfigurationEntry) -> Self {
         Self {
             entry_source: entry.origin(),
+            call_site_source: None,
             profile_selector: entry.selector_origin(),
+        }
+    }
+
+    /// The Safe Origin Kind fixed for `slot`, none for a slot without an
+    /// input.
+    const fn fixed(self, slot: EntrySlot) -> Option<SafeOriginKind> {
+        match slot {
+            EntrySlot::EntrySource => Some(self.entry_source),
+            EntrySlot::CallSiteSource => self.call_site_source,
+            EntrySlot::ProfileSelector => Some(self.profile_selector),
+            EntrySlot::Origins => None,
         }
     }
 }
 
-/// One retained entry dependency record of a file entry.
+/// A retained `entry-source` or `call-site-source` record's source view,
+/// revision, and locator when present (D15:2516).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SourceDependency {
+    source: PortableSourceIdentity,
+    revision: Arc<str>,
+    locator: Option<Locator>,
+}
+
+/// One retained entry dependency record.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum EntryDependency {
-    Source {
-        source: PortableSourceIdentity,
-        revision: Arc<str>,
-        locator: Option<Locator>,
-    },
+    Source(SourceDependency),
+    CallSite(SourceDependency),
     Selector(SelectorEvidence),
     Origins(EntryOrigins),
 }
@@ -367,7 +493,8 @@ impl EntryDependency {
     /// The record's entry slot.
     pub(crate) const fn slot(&self) -> EntrySlot {
         match self {
-            Self::Source { .. } => EntrySlot::EntrySource,
+            Self::Source(_) => EntrySlot::EntrySource,
+            Self::CallSite(_) => EntrySlot::CallSiteSource,
             Self::Selector(_) => EntrySlot::ProfileSelector,
             Self::Origins(_) => EntrySlot::Origins,
         }
@@ -381,14 +508,10 @@ impl EntryDependency {
         let mut view = Map::new();
         view.insert("slot".to_owned(), json!(self.slot().id()));
         match self {
-            Self::Source {
-                source,
-                revision,
-                locator,
-            } => {
-                view.insert("source".to_owned(), source.view());
-                view.insert("revision".to_owned(), json!(revision.as_ref()));
-                if let Some(locator) = locator {
+            Self::Source(record) | Self::CallSite(record) => {
+                view.insert("source".to_owned(), record.source.view());
+                view.insert("revision".to_owned(), json!(record.revision.as_ref()));
+                if let Some(locator) = &record.locator {
                     view.insert("locator".to_owned(), locator.view());
                 }
             }
@@ -396,20 +519,16 @@ impl EntryDependency {
                 view.insert("selector".to_owned(), selector.view());
             }
             Self::Origins(entry) => {
-                let mut origins: Map<String, Value> = MaterializedSlot::ALL
+                let common = MaterializedSlot::ALL
                     .into_iter()
-                    .filter_map(|slot| {
-                        Some((slot.id().to_owned(), json!(slot.common_origin()?.id())))
-                    })
+                    .filter_map(|slot| Some((slot.id(), slot.common_origin()?)));
+                let fixed = EntrySlot::ALL
+                    .into_iter()
+                    .filter_map(|slot| Some((slot.id(), entry.fixed(slot)?)));
+                let origins: Map<String, Value> = common
+                    .chain(fixed)
+                    .map(|(slot, origin)| (slot.to_owned(), json!(origin.id())))
                     .collect();
-                origins.insert(
-                    EntrySlot::EntrySource.id().to_owned(),
-                    json!(entry.entry_source.id()),
-                );
-                origins.insert(
-                    EntrySlot::ProfileSelector.id().to_owned(),
-                    json!(entry.profile_selector.id()),
-                );
                 view.insert("origins".to_owned(), Value::Object(origins));
             }
         }
@@ -536,13 +655,19 @@ mod tests {
 
     use super::fixtures::{authority, declared, inputs, locator, redacted_entry, selector};
     use super::*;
+    use crate::boundary::locator::{read_programmatic_locator, LocatorCandidate, LocatorVariant};
+    use crate::boundary::snapshot::AdmittedSnapshot;
+    use crate::boundary::source::call_site_source_revision;
+    use crate::resolver::call_site_span::fixtures::{marked_as, sidecar, CALL_SITE};
     use crate::resolver::entry::fixtures::{FileFixture, Relabeled, FILE};
     use crate::resolver::evaluation::{Code, Phase, Status};
     use crate::resolver::evidence_source::hex;
     use crate::resolver::limits::fixture_limits;
+    use crate::resolver::snapshot_entry::fixtures::{SnapshotFixture, ENTRY};
     use crate::resolver::subject::SubjectKind;
     use crate::resolver::targets::{self, TargetSubject};
     use crate::resolver::token::Sha256;
+    use crate::snapshot::from_json;
 
     #[test]
     fn groups_and_slots_read_and_write_as_015_spells_them() {
@@ -838,7 +963,7 @@ mod tests {
         assert_eq!(entry.redacted().count(), 0);
         let tokens = EvidenceTokens::assign(PROFILE, entry.redacted(), &Sha256);
         let records = entry.retained(PROFILE, &tokens).unwrap();
-        let slots = records.each_ref().map(EntryDependency::slot);
+        let slots: Vec<EntrySlot> = records.iter().map(EntryDependency::slot).collect();
         assert_eq!(
             slots,
             [
@@ -847,7 +972,7 @@ mod tests {
                 EntrySlot::Origins
             ]
         );
-        let views = records.each_ref().map(EntryDependency::view);
+        let views: Vec<Value> = records.iter().map(EntryDependency::view).collect();
         assert_eq!(
             views,
             [
@@ -904,7 +1029,10 @@ mod tests {
         let none = EvidenceTokens::assign(PROFILE, std::iter::empty(), &Sha256);
         assert_eq!(entry.retained(PROFILE, &none), None);
         let tokens = EvidenceTokens::assign(PROFILE, entry.redacted(), &Sha256);
-        let [source, projected, _] = entry.retained(PROFILE, &tokens).unwrap();
+        let records = entry.retained(PROFILE, &tokens).unwrap();
+        let [source, projected, _] = records.as_slice() else {
+            panic!("a file entry has three records");
+        };
         // The file's source identity and selector, each under the origin its
         // slot fixes.
         let fixture = FileFixture::new(&fixture_limits(100));
@@ -931,5 +1059,135 @@ mod tests {
         .unwrap();
         assert_eq!(projected.view()["selector"], expected.view());
         assert!(expected.view()["redacted-value"]["token"]["token"].is_string());
+    }
+
+    /// The views of `entry`'s records, its redacted components' tokens
+    /// assigned on their own.
+    fn record_views(entry: &EntryInputs) -> Vec<Value> {
+        let tokens = EvidenceTokens::assign(PROFILE, entry.redacted(), &Sha256);
+        let records = entry.retained(PROFILE, &tokens).unwrap();
+        records.iter().map(EntryDependency::view).collect()
+    }
+
+    /// D15:743, 747, 2507, 2516: a programmatic entry's dependencies name the
+    /// Programmatic Entry's identity, the verified Snapshot digest as its
+    /// revision, and its own locator; beside a sidecar, in the slots' order,
+    /// the call-site source's identity, Call-Site Source revision, and own
+    /// locator; the selector under `profile-selector-programmatic`; and
+    /// `configuration-programmatic` for each source's slot.
+    #[test]
+    fn the_dependencies_of_a_programmatic_entry_name_both_of_its_sources() {
+        let root = from_json(&json!({ "profiles": {} }));
+        let snapshot = AdmittedSnapshot::of(root.clone());
+        let fixture = SnapshotFixture::new(&fixture_limits(100));
+        let label = LocatorCandidate {
+            variant: LocatorVariant::SafeLabel,
+            payload: "storefront entry",
+            non_secret: true,
+        };
+        let locator = read_programmatic_locator(Some(label), authority()).unwrap();
+        let mut entry = fixture.entry(&snapshot);
+        entry.source.locator = Some(&locator);
+        let source = "defineConfig({ profiles: {} })";
+        let call_site = sidecar(source, Some("app.ts"), Vec::new());
+        let named = |entry: &EntrySnapshot<'_>| {
+            EntryInputs::programmatic(entry, &selector(Some("app")), authority(), &declared())
+                .unwrap()
+        };
+        let without = named(&entry);
+        entry.call_site = Some(&call_site);
+        let beside = named(&entry);
+        assert_eq!((without.work(), beside.work()), (3, 5));
+        assert_eq!(beside.redacted().count(), 0);
+        let entry_source = json!({
+            "slot": "entry-source",
+            "source": { "safe-opaque": hex(ENTRY.as_bytes()) },
+            "revision": root.digest(),
+            "locator": { "safe-label": "storefront entry" },
+        });
+        let call_site_source = json!({
+            "slot": "call-site-source",
+            "source": { "safe-opaque": hex(CALL_SITE.as_bytes()) },
+            "revision": call_site_source_revision(source.as_bytes()),
+            "locator": { "safe-label": "app.ts" },
+        });
+        let selected =
+            json!({ "slot": "profile-selector", "selector": { "safe-profile-id": "app" } });
+        let origins = |call_site: bool| {
+            let mut origins = json!({
+                "artifact-collection": "profile-resolution-artifact-collection",
+                "entry-source": "configuration-programmatic",
+                "implementation-capability": "implementation-capability",
+                "intent-surface-class-vocabulary": "intent-surface-class-vocabulary",
+                "locale-canonicalization-data": "locale-canonicalization-data",
+                "profile-selector": "profile-selector-programmatic",
+                "specification-input": "profile-resolution-specification-input",
+                "verification-input": "resource-limit-policy-verification",
+            });
+            if call_site {
+                origins["call-site-source"] = json!("configuration-programmatic");
+            }
+            json!({ "slot": "origins", "origins": origins })
+        };
+        assert_eq!(
+            record_views(&without),
+            [entry_source.clone(), selected.clone(), origins(false)]
+        );
+        assert_eq!(
+            record_views(&beside),
+            [entry_source, call_site_source, selected, origins(true)]
+        );
+    }
+
+    /// An unmarked call-site identity is redacted as the Programmatic Entry's
+    /// is, each its own component under `configuration-programmatic`, and an
+    /// undeclared selector under `profile-selector-programmatic`, so the
+    /// records wait on their tokens, and the token inputs count all three
+    /// (D15:734-737, 804, 808, 1851, 2516; plan 025 interpretation #245).
+    #[test]
+    fn an_unmarked_call_site_identity_waits_on_its_own_token() {
+        let snapshot = AdmittedSnapshot::of(from_json(&json!({})));
+        let fixture = SnapshotFixture::new(&fixture_limits(100));
+        let call_site = marked_as(false, "defineConfig({})", None, Vec::new());
+        let mut entry = fixture.entry(&snapshot);
+        entry.source.marked = false;
+        entry.call_site = Some(&call_site);
+        let inputs =
+            EntryInputs::programmatic(&entry, &selector(Some("other")), authority(), &declared())
+                .unwrap();
+        assert_eq!(inputs.redacted().count(), 3);
+        assert_eq!(inputs.work(), 3);
+        let none = EvidenceTokens::assign(PROFILE, std::iter::empty(), &Sha256);
+        assert_eq!(inputs.retained(PROFILE, &none), None);
+        let tokens = EvidenceTokens::assign(PROFILE, inputs.redacted(), &Sha256);
+        let records = inputs.retained(PROFILE, &tokens).unwrap();
+        let [entry_source, call_site_source, projected, _] = records.as_slice() else {
+            panic!("a programmatic entry beside a sidecar has four records");
+        };
+        for (record, identity) in [
+            (entry_source, entry.source.identity),
+            (call_site_source, call_site.pair().identity()),
+        ] {
+            let expected =
+                SourceIdentity::project(SafeOriginKind::ConfigurationProgrammatic, identity, false)
+                    .unwrap()
+                    .retained(PROFILE, &tokens)
+                    .unwrap();
+            assert_eq!(record.view()["source"], expected.view());
+        }
+        assert_ne!(
+            entry_source.view()["source"],
+            call_site_source.view()["source"]
+        );
+        let expected = SelectorProjection::project(
+            SafeOriginKind::ProfileSelectorProgrammatic,
+            &selector(Some("other")),
+            authority(),
+            &declared(),
+        )
+        .unwrap()
+        .retained(PROFILE, &tokens)
+        .unwrap();
+        assert_eq!(projected.view()["selector"], expected.view());
     }
 }
