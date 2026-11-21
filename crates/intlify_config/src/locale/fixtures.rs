@@ -82,7 +82,7 @@ pub(super) const INVALID: &[&str] = &[
     "zz",
 ];
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 enum Answer {
     Canonical(Arc<str>),
     Invalid,
@@ -91,6 +91,8 @@ enum Answer {
 /// Private fields and a fixed constructor prevent arbitrary caller-supplied
 /// rows from posing as the fixture. Canonical strings are interned once and
 /// shared by aliases and retained outputs, with no mutable invocation cache.
+/// A copy shares them, and its value is its binding and rows.
+#[derive(Clone, PartialEq, Eq)]
 pub(crate) struct FixtureProvider {
     binding: ProviderBinding<&'static str>,
     rows: BTreeMap<&'static str, Answer>,

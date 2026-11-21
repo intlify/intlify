@@ -517,6 +517,35 @@ fn retained_results_share_immutable_storage_and_outlive_the_provider() {
     assert_eq!(result.suggested_replacement(), Some("en-US"));
 }
 
+/// A provider built before invocation is its own data: admitting it binds a
+/// copy equal to it that shares its strings, and the caller keeps the data.
+#[test]
+fn a_provider_admitted_as_data_is_copied_and_kept() {
+    let one = Bound::new(1).unwrap();
+    let limits = LocaleDataLimits {
+        max_payloads: one,
+        max_payload_bytes: one,
+        max_marker_bytes: one,
+        max_validity_groups: one,
+        max_codes: one,
+        max_extension_keys: one,
+        max_types: one,
+        max_corrections: one,
+        max_validation_work_units: one,
+    };
+    let data = FixtureProvider::new();
+    let admitted = data.admit(&limits).unwrap();
+    assert!(admitted == data);
+    let en = |provider| {
+        Canonicalizer::bind(&fixture_pins(), Some(provider), Bound::new(128).unwrap())
+            .unwrap()
+            .canonicalize("en")
+            .unwrap()
+            .into_locale()
+    };
+    assert!(Arc::ptr_eq(&en(admitted).0, &en(data).0));
+}
+
 #[test]
 fn fresh_and_reused_providers_preserve_results_after_failures_and_source_changes() {
     fn send_sync<T: Send + Sync>() {}
