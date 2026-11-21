@@ -36,6 +36,13 @@
 //! changes nothing, so nothing of one invocation, checked or blocked, reaches
 //! the next, and no outcome refers to storage that a later invocation resets
 //! (D15:2749, 2751, 3689).
+//!
+//! Beside the outcome of every invocation whose Phase 1 materialized a value,
+//! never on request, [`Resolver::resolve`] returns the invocation's
+//! Materialized Resolution Input Set, and none when Phase 1 blocked before a
+//! value existed (D15:2657, 3440). The set owns its value and shares the
+//! admitted common values, so it outlives the [`OutcomeStorage`] and the
+//! admitted set it came from (D15:2749).
 
 use std::sync::Arc;
 
@@ -54,6 +61,7 @@ use super::entry::{Classify, EntryFile};
 use super::evaluation::{Admitted, Evaluation};
 use super::evidence::Source;
 use super::evidence_path::KeyFacts;
+use super::materialized::MaterializedInputs;
 use super::outcome::{outcome, Outcome};
 use super::profile_resolution::{
     invoke_file, invoke_programmatic, Invocation, Invoked, ResolverInvariant,
@@ -79,6 +87,14 @@ pub(crate) struct OutcomeStorage<'s> {
     evaluation: Evaluation,
     set: Option<Admitted<ArtifactSet<'s>>>,
     invoked: Option<Invoked<'s, String>>,
+}
+
+/// What one invocation returns: its outcome, and beside it the Materialized
+/// Resolution Input Set, `None` when Phase 1 blocked before a value existed
+/// (D15:2657).
+pub(crate) struct Resolution<'s, D> {
+    pub(crate) outcome: Outcome<'s, 's>,
+    pub(crate) materialized: Option<MaterializedInputs<D>>,
 }
 
 impl<'r> Resolver<'r> {
@@ -112,7 +128,9 @@ impl<'r> Resolver<'r> {
         boundary::admit(submitted, &self.identity, &capability, assertion)
     }
 
-    /// Phases 0 to 15 over `inputs`, the outcome borrowing `storage`.
+    /// Phases 0 to 15 over `inputs`, the outcome borrowing `storage`, and
+    /// beside it the Materialized Resolution Input Set once Phase 1
+    /// materialized a value.
     ///
     /// # Errors
     ///
@@ -122,7 +140,7 @@ impl<'r> Resolver<'r> {
         &'s self,
         inputs: &'s InvocationInputs<D>,
         storage: &'s mut OutcomeStorage<'s>,
-    ) -> Result<Outcome<'s, 's>, ResolverInvariant>
+    ) -> Result<Resolution<'s, D>, ResolverInvariant>
     where
         D: FormalData<Provider = P>,
         P: Provider<Identity = String>,
@@ -156,6 +174,8 @@ impl<'r> Resolver<'r> {
             set,
             invoked,
         } = storage;
+        let selector = inputs.entry.selector();
+        let mut value = None;
         let left = match &inputs.entry {
             EntryInputs::File(file) => {
                 let entry = EntryFile {
@@ -171,14 +191,14 @@ impl<'r> Resolver<'r> {
                     raw: bootstrap.raw_input,
                     value: configuration.value,
                 };
-                let structure = (schema, configuration.structural, &file.selector);
+                let structure = (schema, configuration.structural, selector);
                 invoke_file(
                     evaluation,
                     (&entry, limits),
                     structure,
                     &invocation,
                     &common.data,
-                    set,
+                    (set, &mut value),
                 )?
             }
             EntryInputs::Programmatic(programmatic) => {
@@ -196,30 +216,44 @@ impl<'r> Resolver<'r> {
                     snapshot: bootstrap.snapshot,
                     value: configuration.value,
                 };
-                let structure = (schema, configuration.structural, &programmatic.selector);
+                let structure = (schema, configuration.structural, selector);
                 invoke_programmatic(
                     evaluation,
                     (&entry, limits),
                     structure,
                     &invocation,
                     &common.data,
-                    set,
+                    (set, &mut value),
                 )?
             }
         };
         let invoked = invoked.insert(left);
-        outcome(
+        let outcome = outcome(
             evaluation,
             invoked,
             inputs.construction_identity,
             &invocation,
             &Sha256,
-        )
+        )?;
+        let materialized = value.map(|value| {
+            let common = Arc::clone(&inputs.common);
+            MaterializedInputs::new(
+                inputs.construction_identity,
+                value,
+                selector.clone(),
+                common,
+            )
+        });
+        Ok(Resolution {
+            outcome,
+            materialized,
+        })
     }
 }
 
+// `materialized`'s tests resolve the same inputs.
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use serde_json::{json, Value};
 
     use super::*;
@@ -250,13 +284,13 @@ mod tests {
     use crate::resolver::evidence_source::hex;
     use crate::resolver::limits::{BoundId, Group};
     use crate::resolver::origin::SafeOriginKind as Kind;
-    use crate::resolver::outcome::tests::{blocked, entry_views, reporting, shown, Shown};
+    use crate::resolver::outcome::tests::{blocked, entry_views, no_json, reporting, shown, Shown};
     use crate::resolver::profile_resolution::tests::Inputs;
     use crate::resolver::snapshot_entry::fixtures::ENTRY;
-    use crate::snapshot::{from_json, Marker, Node, SnapshotBound};
+    use crate::snapshot::{from_json, Marker, MarkerReason, Node, SnapshotBound};
 
     /// A bound no invocation here reaches.
-    const ROOM: u64 = 1 << 30;
+    pub(crate) const ROOM: u64 = 1 << 30;
 
     /// The finite fixture's rows, bound under the pins the constructed
     /// resolver supports: CLDR 48.2.0's dataset at the semantic digest
@@ -264,9 +298,9 @@ mod tests {
     /// only the fixture's rows, which the examples here spell, so the
     /// constructed resolver's Phase 5 binds it without the ICU4X artifact.
     #[derive(Clone, PartialEq, Eq)]
-    struct PinnedFixture {
+    pub(crate) struct PinnedFixture {
         rows: FixtureProvider,
-        binding: ProviderBinding<String>,
+        pub(crate) binding: ProviderBinding<String>,
     }
 
     impl PinnedFixture {
@@ -305,7 +339,7 @@ mod tests {
     }
 
     /// The committed resolver.
-    fn resolver() -> Resolver<'static> {
+    pub(crate) fn resolver() -> Resolver<'static> {
         Resolver::new(committed(), ConstructionRoot::built_in().unwrap())
     }
 
@@ -328,6 +362,19 @@ mod tests {
             "delivery-placement": slot("intlify-delivery-placement"),
         }))
         .unwrap()
+    }
+
+    /// 018's Verification Input `input`, sealed, and the assertion trusted
+    /// setup pins it with.
+    pub(crate) fn seal(input: Value) -> (Vec<u8>, VerificationAssertion) {
+        let verification = sealed(input).unwrap();
+        let read: VerificationInputArtifact = serde_json::from_value(verification.clone()).unwrap();
+        let assertion = VerificationAssertion {
+            identity: read.identity().clone(),
+            revision: read.revision().clone(),
+            semantic_digest: read.semantic_digest().unwrap(),
+        };
+        (serde_json::to_vec(&verification).unwrap(), assertion)
     }
 
     /// The reference a Verification Input pins `tuple` with.
@@ -357,19 +404,20 @@ mod tests {
     /// values the boundaries read: the capability's every `rawInput`,
     /// `snapshot`, `inputBoundary`, and `evidenceMetadata` bound at [`ROOM`]
     /// unless a test sets it.
-    struct Raw {
-        config: Value,
-        selected: String,
-        specification: Vec<u8>,
-        vocabulary: Vec<u8>,
-        members: Vec<Vec<u8>>,
-        verification: Vec<u8>,
-        assertion: VerificationAssertion,
+    pub(crate) struct Raw {
+        pub(crate) config: Value,
+        pub(crate) selected: String,
+        pub(crate) specification: Vec<u8>,
+        pub(crate) vocabulary: Vec<u8>,
+        pub(crate) provider: PinnedFixture,
+        pub(crate) members: Vec<Vec<u8>>,
+        pub(crate) verification: Vec<u8>,
+        pub(crate) assertion: VerificationAssertion,
         capability: Value,
     }
 
     impl Raw {
-        fn new(inputs: &Inputs) -> Self {
+        pub(crate) fn new(inputs: &Inputs) -> Self {
             let (config, selected, members, surfaces, capability, pinned) = inputs.submitted();
             let vocabulary = IntentSurfaceClassVocabularyArtifact::sealed(
                 vectors::IDENTITY,
@@ -377,9 +425,7 @@ mod tests {
                 surfaces,
             )
             .unwrap();
-            let verification = sealed(unsealed("storefront-pins", "1", &[pin(pinned)])).unwrap();
-            let read: VerificationInputArtifact =
-                serde_json::from_value(verification.clone()).unwrap();
+            let (verification, assertion) = seal(unsealed("storefront-pins", "1", &[pin(pinned)]));
             let mut capability = capability.normalized();
             for group in ["rawInput", "snapshot", "inputBoundary", "evidenceMetadata"] {
                 for (_, bound) in capability["bootstrapOnly"][group].as_object_mut().unwrap() {
@@ -391,23 +437,20 @@ mod tests {
                 selected: selected.to_owned(),
                 specification: specification(),
                 vocabulary: serde_json::to_vec(&vocabulary).unwrap(),
+                provider: PinnedFixture::new(),
                 members: members
                     .iter()
                     .map(|m| serde_json::to_vec(m).unwrap())
                     .collect(),
-                verification: serde_json::to_vec(&verification).unwrap(),
-                assertion: VerificationAssertion {
-                    identity: read.identity().clone(),
-                    revision: read.revision().clone(),
-                    semantic_digest: read.semantic_digest().unwrap(),
-                },
+                verification,
+                assertion,
                 capability,
             }
         }
 
         /// The same, with the capability's `bootstrapOnly` bound `path` at
         /// `limit`.
-        fn bounded(mut self, path: &str, limit: u64) -> Self {
+        pub(crate) fn bounded(mut self, path: &str, limit: u64) -> Self {
             let pointer = format!("/bootstrapOnly/{}", path.replace('.', "/"));
             *self.capability.pointer_mut(&pointer).unwrap() = json!(limit.to_string());
             self
@@ -427,8 +470,22 @@ mod tests {
 
         /// The configuration's file, its identity marked non-secret when
         /// `marked`, admitted on `resolver`.
-        fn file(&self, resolver: &Resolver<'_>, marked: bool) -> InvocationInputs<PinnedFixture> {
-            let bytes = self.bytes();
+        pub(crate) fn file(
+            &self,
+            resolver: &Resolver<'_>,
+            marked: bool,
+        ) -> InvocationInputs<PinnedFixture> {
+            self.file_of(resolver, self.bytes(), marked)
+        }
+
+        /// A file of `bytes` in place of the configuration's, otherwise as
+        /// [`Self::file`].
+        pub(crate) fn file_of(
+            &self,
+            resolver: &Resolver<'_>,
+            bytes: Arc<[u8]>,
+            marked: bool,
+        ) -> InvocationInputs<PinnedFixture> {
             let revision = file_source_revision(&bytes);
             let file = FileValue {
                 bytes,
@@ -452,7 +509,7 @@ mod tests {
         /// A Programmatic Entry Snapshot of `root`, its identity marked
         /// non-secret when `marked`, beside a sidecar that mirrors the
         /// configuration's file when `mirror`, admitted on `resolver`.
-        fn snapshot(
+        pub(crate) fn snapshot(
             &self,
             resolver: &Resolver<'_>,
             root: &Node,
@@ -496,7 +553,7 @@ mod tests {
         }
 
         /// A Snapshot of the configuration's value.
-        fn programmatic(
+        pub(crate) fn programmatic(
             &self,
             resolver: &Resolver<'_>,
             marked: bool,
@@ -514,7 +571,7 @@ mod tests {
         ) -> InvocationInputs<PinnedFixture> {
             let own = |slot: Kind| Some(slot.id());
             let members: Vec<&[u8]> = self.members.iter().map(Vec::as_slice).collect();
-            let provider = PinnedFixture::new();
+            let provider = self.provider.clone();
             let common = Submitted {
                 specification: Component {
                     value: Some(&self.specification),
@@ -554,11 +611,21 @@ mod tests {
     /// What the outcome of `inputs` on `resolver` shows.
     fn resolved(resolver: &Resolver<'_>, inputs: &InvocationInputs<PinnedFixture>) -> Shown {
         let mut storage = OutcomeStorage::default();
-        shown(&resolver.resolve(inputs, &mut storage).unwrap())
+        shown(&resolver.resolve(inputs, &mut storage).unwrap().outcome)
+    }
+
+    /// The Materialized Resolution Input Set `inputs` give on `resolver`,
+    /// which outlives the storage its outcome borrowed.
+    pub(crate) fn materialized(
+        resolver: &Resolver<'_>,
+        inputs: &InvocationInputs<PinnedFixture>,
+    ) -> Option<MaterializedInputs<PinnedFixture>> {
+        let mut storage = OutcomeStorage::default();
+        resolver.resolve(inputs, &mut storage).unwrap().materialized
     }
 
     /// 015's example with `edit` applied, every input it needs.
-    fn example(edit: impl FnOnce(Inputs) -> Inputs) -> Raw {
+    pub(crate) fn example(edit: impl FnOnce(Inputs) -> Inputs) -> Raw {
         Raw::new(&reporting(&edit(Inputs::complete()), &[], &[]))
     }
 
@@ -797,6 +864,69 @@ mod tests {
                 assert_eq!(snapshot.identity, file.identity);
                 assert_eq!(snapshot.checked, file.checked);
                 assert_eq!(snapshot.shared, file.shared);
+            }
+        }
+    }
+
+    /// D15:2657, 3440: Phase 1 blocking before a complete JSON-compatible
+    /// value exists, over a file that is no JSON, one with a duplicate
+    /// member, one past a root-value bound, or a Snapshot with an ordinary or
+    /// a bootstrap-limit marker, returns no Materialized Resolution Input Set
+    /// beside the blocked outcome.
+    #[test]
+    fn no_set_is_returned_without_a_materialized_value() {
+        let resolver = resolver();
+        let raw = example(|inputs| inputs);
+        let duplicate = Arc::from(&br#"{"schemaVersion":"0","schemaVersion":"0"}"#[..]);
+        let bounded = example(|inputs| inputs.bounding(&[(input_bound("maxNodes"), 10)], &[]));
+        let mut entries = vec![
+            raw.file_of(&resolver, no_json(), true),
+            raw.file_of(&resolver, duplicate, true),
+            bounded.file(&resolver, true),
+        ];
+        let terminal = Marker::BootstrapLimitExceeded {
+            bound: SnapshotBound::Nodes,
+            witness: ROOM + 1,
+        };
+        for marker in [Marker::Rejected(MarkerReason::Cycle), terminal] {
+            let mut root = from_json(&raw.config);
+            let Node::Object(members) = &mut root else {
+                panic!("the root is an object");
+            };
+            // Last in canonical order, after every key the example writes.
+            members.insert("~".to_owned(), Node::Marker(marker));
+            entries.push(raw.snapshot(&resolver, &root, true, false));
+        }
+        for inputs in &entries {
+            let mut storage = OutcomeStorage::default();
+            let resolution = resolver.resolve(inputs, &mut storage).unwrap();
+            assert!(shown(&resolution.outcome).shared.is_none());
+            assert!(resolution.materialized.is_none());
+        }
+    }
+
+    /// D15:2657: once Phase 1 materialized the value, either entry returns a
+    /// set beside its outcome, checked or blocked by a later phase.
+    #[test]
+    fn a_set_is_returned_however_a_later_phase_ends() {
+        let resolver = resolver();
+        let units = input_bound("maxStructuralAnalysisUnits");
+        for (raw, checked) in [
+            (example(|inputs| inputs), true),
+            (
+                example(|inputs| inputs.bounding(&[(units, 10)], &[])),
+                false,
+            ),
+            (Raw::new(&blocked()), false),
+        ] {
+            for inputs in [
+                raw.file(&resolver, true),
+                raw.programmatic(&resolver, true, false),
+            ] {
+                let mut storage = OutcomeStorage::default();
+                let resolution = resolver.resolve(&inputs, &mut storage).unwrap();
+                assert_eq!(shown(&resolution.outcome).checked.is_some(), checked);
+                assert!(resolution.materialized.is_some());
             }
         }
     }

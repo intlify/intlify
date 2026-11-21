@@ -5,7 +5,9 @@
 //! of the same JSON value materializes, with the same root-value counts
 //! (D15:1889), each node located at itself in the Snapshot rather than at
 //! bytes. A tree with a marker has none, since a marker is no JSON-compatible
-//! value (D15:861, 2129).
+//! value (D15:861, 2129). Back from a document of either entry, the canonical
+//! tree of its value is what a Materialized Resolution Input Set keeps
+//! (D15:205).
 
 use crate::snapshot::{Node, SnapshotCounts};
 
@@ -28,6 +30,38 @@ impl MaterializedDocument {
             value_counts: SnapshotCounts::of(root).value(),
             file: None,
         })
+    }
+
+    /// The canonical tree of the document's value, without its loci: the
+    /// tree of a marker-free Snapshot of the same value, whichever entry
+    /// materialized it. Both number a document's nodes in preorder, so built
+    /// in reverse, each node is built after what it holds, without recursion
+    /// (plan 025 decision #298).
+    pub(crate) fn canonical_value(&self) -> Node {
+        let mut built: Vec<Option<Node>> = Vec::with_capacity(self.nodes.len());
+        built.resize_with(self.nodes.len(), || None);
+        for (index, node) in self.nodes.iter().enumerate().rev() {
+            let mut take = |id: NodeId| {
+                built[id.0]
+                    .take()
+                    .expect("a node is numbered after the node that holds it")
+            };
+            let value = match &node.kind {
+                NodeKind::Null => Node::Null,
+                NodeKind::Boolean(value) => Node::Boolean(*value),
+                NodeKind::Number(value) => Node::Number(*value),
+                NodeKind::String(text) => Node::String(text.clone()),
+                NodeKind::Array(items) => Node::Array(items.iter().map(|&id| take(id)).collect()),
+                NodeKind::Object(members) => Node::Object(
+                    members
+                        .iter()
+                        .map(|(name, member)| (name.clone(), take(member.value)))
+                        .collect(),
+                ),
+            };
+            built[index] = Some(value);
+        }
+        built[self.root().0].take().expect("the root is built last")
     }
 }
 
@@ -244,6 +278,20 @@ mod tests {
             }
             assert_eq!(id, NodeId(LEVELS));
             assert!(matches!(doc.node(id).kind(), NodeKind::Null));
+            assert!(doc.canonical_value() == tree);
+        }
+    }
+
+    /// D15:205, 3228: a document of either entry gives back the canonical
+    /// tree of its value, with every element in its place and every member.
+    #[test]
+    fn a_document_of_either_entry_gives_back_the_canonical_tree_of_its_value() {
+        let complete = serde_json::to_string(&complete_config()).unwrap();
+        for text in [TEXT, &complete] {
+            let value: Value = serde_json::from_str(text).unwrap();
+            let (file, snapshot) = both(text);
+            assert!(file.canonical_value() == from_json(&value));
+            assert!(snapshot.canonical_value() == from_json(&value));
         }
     }
 

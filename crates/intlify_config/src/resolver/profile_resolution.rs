@@ -40,8 +40,11 @@
 //! (D15:2369). Either way it leaves what the entry dependency records name,
 //! the selector projected under the final projection authority Phase 4 fixed,
 //! or the capability's without a value, beside the Profile IDs the root
-//! declares (D15:807, 816-817, 2516). The construction and invocation inputs
-//! it takes are assembled outside it, by [`super::invocation`].
+//! declares (D15:807, 816-817, 2516). With a value, it also copies that
+//! value out as the canonical tree of the Materialized Resolution Input Set
+//! after Phase 1 and before Phase 2 consumes the document (D15:2657). The
+//! construction and invocation inputs it takes are assembled outside it, by
+//! [`super::invocation`].
 
 use crate::artifacts::collection::FormalCollection;
 use crate::artifacts::vocabulary::FormalVocabulary;
@@ -54,6 +57,7 @@ use crate::locale::{
 use crate::materialize::MaterializedDocument;
 use crate::model::{IntlifyConfig, ProfileDeclaration, ProfileId};
 use crate::references::{PolicyReference, TargetProfileReference};
+use crate::snapshot::Node;
 use crate::structural::selection::{ProvisionalSelection, SelectionInvariant, SelectorInput};
 use crate::structural::{
     AdmissionInvariant, AuthoringSchema, StructuralAnalysis, StructuralLimits,
@@ -705,7 +709,9 @@ pub(crate) struct Invoked<'s, Id> {
 /// no semantic state (D15:2369). The selector's final projection authority is
 /// the one Phase 4 fixed, or the capability's without a value, and the
 /// Profile IDs it may name are those the root's `profiles` object declares,
-/// none without a value (D15:807, 816-817).
+/// none without a value (D15:807, 816-817). `value` receives the canonical
+/// tree of the value Phase 1 admits, and stays as it was without one
+/// (D15:2657).
 ///
 /// # Errors
 ///
@@ -716,7 +722,7 @@ pub(crate) fn invoke_file<'s, P, D>(
     (schema, structural, selector): (&ConfigurationSchema, StructuralLimits, &SelectorInput),
     invocation: &Invocation<'s, P::Identity>,
     data: &D,
-    set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
+    (set, value): (&'s mut Option<Admitted<ArtifactSet<'s>>>, &mut Option<Node>),
 ) -> Result<Invoked<'s, P::Identity>, ResolverInvariant>
 where
     P: Provider,
@@ -733,7 +739,7 @@ where
             (schema, structural, selector),
             invocation,
             data,
-            set,
+            (set, value),
         )?,
         Err(causes) => Resolved::unentered(causes, invocation),
     };
@@ -759,7 +765,7 @@ pub(crate) fn invoke_programmatic<'s, P, D>(
     (schema, structural, selector): (&ConfigurationSchema, StructuralLimits, &SelectorInput),
     invocation: &Invocation<'s, P::Identity>,
     data: &D,
-    set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
+    (set, value): (&'s mut Option<Admitted<ArtifactSet<'s>>>, &mut Option<Node>),
 ) -> Result<Invoked<'s, P::Identity>, ResolverInvariant>
 where
     P: Provider,
@@ -780,7 +786,7 @@ where
                 (schema, structural, selector),
                 invocation,
                 data,
-                set,
+                (set, value),
             )?
         }
         Err(causes) => Resolved::unentered(causes, invocation),
@@ -822,7 +828,7 @@ impl<Id> Resolved<'_, Id> {
 /// The phases after Phase 1 over `document`, the value it admitted, observed
 /// through `entry`: Phases 2 and 3, and the semantic phases over the
 /// configuration Phase 3 selected or over the causes of its absence
-/// (D15:2131).
+/// (D15:2131), the document's value first copied into `value`.
 fn resolve_entered<'s, P, D>(
     evaluation: &mut Evaluation,
     (project_profile, entry, document): (
@@ -833,13 +839,16 @@ fn resolve_entered<'s, P, D>(
     (schema, structural, selector): (&ConfigurationSchema, StructuralLimits, &SelectorInput),
     invocation: &Invocation<'s, P::Identity>,
     data: &D,
-    set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
+    (set, value): (&'s mut Option<Admitted<ArtifactSet<'s>>>, &mut Option<Node>),
 ) -> Result<Resolved<'s, P::Identity>, ResolverInvariant>
 where
     P: Provider,
     P::Identity: AsRef<str>,
     D: FormalData<Provider = P>,
 {
+    // The Materialized Resolution Input Set's value, copied once Phase 1
+    // materialized it and before Phase 2 consumes the document (D15:2657).
+    *value = Some(document.canonical_value());
     let structure = admit_structure(
         evaluation,
         entry,
@@ -1425,7 +1434,7 @@ pub(super) mod tests {
                     ),
                     invocation,
                     &FixtureProvider::new(),
-                    &mut set,
+                    (&mut set, &mut None),
                 )
                 .unwrap();
                 inspect(invocation, evaluation, invoked)
@@ -1488,7 +1497,7 @@ pub(super) mod tests {
                     ),
                     invocation,
                     &FixtureProvider::new(),
-                    &mut set,
+                    (&mut set, &mut None),
                 )
                 .unwrap();
                 inspect(invocation, evaluation, invoked)
@@ -1657,7 +1666,7 @@ pub(super) mod tests {
                     ),
                     invocation,
                     &FixtureProvider::new(),
-                    &mut set,
+                    (&mut set, &mut None),
                 )
                 .map(|invoked| invoked.state.ok());
                 let registry = CheckRegistry::revision_zero();
@@ -1710,7 +1719,7 @@ pub(super) mod tests {
                     ),
                     invocation,
                     &FixtureProvider::new(),
-                    &mut set,
+                    (&mut set, &mut None),
                 )
                 .unwrap()
                 .state
@@ -2029,7 +2038,7 @@ pub(super) mod tests {
                 ),
                 invocation,
                 &FixtureProvider::new(),
-                &mut set,
+                (&mut set, &mut None),
             );
             assert!(matches!(invoked, Ok(Invoked { state: Err(_), .. })));
             let phases: BTreeSet<Phase> =
