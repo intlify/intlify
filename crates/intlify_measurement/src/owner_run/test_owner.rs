@@ -132,6 +132,7 @@ pub(super) struct Projection {
     cost: String,
     category: Category,
     operation_class: OperationClass,
+    surface: Surface,
     memory_domain: Option<MemoryObservationDomain>,
     fixture: String,
     path: Expected,
@@ -151,7 +152,7 @@ impl CaseProjection for Projection {
         CommonDimensions {
             category: self.category,
             operation_class: self.operation_class,
-            surface: Surface::Value,
+            surface: self.surface,
             memory_domain: self.memory_domain.as_ref(),
             metric: self.metric,
             aggregation: self.aggregation,
@@ -247,6 +248,8 @@ pub(super) const OUTSIDE_MATRIX: u8 = 7;
 pub(super) const NO_MEMORY_DOMAIN: u8 = 8;
 /// Every case is a memory case, and the run has no allocator observer.
 pub(super) const UNSUPPORTED: u8 = 9;
+/// Every case is a workflow duration on the product workflow surface.
+pub(super) const WORKFLOW: u8 = 10;
 
 /// The domain the memory modes declare.
 fn memory_domain() -> MemoryObservationDomain {
@@ -316,22 +319,32 @@ impl<const MODE: u8> Owner for TestOwner<MODE> {
     }
 
     fn project(prepared: &Prepared) -> Projection {
-        let (category, operation_class, metric, aggregation) = match MODE {
+        let (category, operation_class, surface, metric, aggregation) = match MODE {
             MEMORY | NO_MEMORY_DOMAIN | UNSUPPORTED => (
                 Category::Memory,
                 OperationClass::PeakLive,
+                Surface::Core,
                 Metric::PeakLiveBytes,
                 Aggregation::PeakOverBatch,
             ),
             OUTSIDE_MATRIX => (
                 Category::Memory,
                 OperationClass::PeakLive,
+                Surface::Core,
                 Metric::PeakLiveBytes,
+                Aggregation::BatchTotal,
+            ),
+            WORKFLOW => (
+                Category::Toolchain,
+                OperationClass::Workflow,
+                Surface::ProductWorkflow,
+                Metric::WallDuration,
                 Aggregation::BatchTotal,
             ),
             _ => (
                 Category::Toolchain,
                 OperationClass::Component,
+                Surface::Core,
                 Metric::WallDuration,
                 Aggregation::BatchTotal,
             ),
@@ -342,6 +355,7 @@ impl<const MODE: u8> Owner for TestOwner<MODE> {
             cost: "character_count".into(),
             category,
             operation_class,
+            surface,
             memory_domain: matches!(MODE, MEMORY | OUTSIDE_MATRIX | UNSUPPORTED)
                 .then(memory_domain),
             fixture: prepared.fixture.name.into(),
@@ -733,6 +747,32 @@ mod tests {
             assert_eq!(row["metric"], "peak_live_bytes");
             assert_eq!(row["unit"], "octet");
             assert_eq!(row["sampleAggregation"], "peak_over_batch");
+        }
+    }
+
+    #[test]
+    fn a_workflow_case_is_recorded_on_the_product_workflow_surface_throughout() {
+        let observation = observe_smoke::<TestOwner<WORKFLOW>>().unwrap();
+        // The records re-admit from their own bytes, so each spelling decodes.
+        let summary = observation.verify_saved(&saved(&observation)).unwrap();
+        assert_eq!(summary.outcome, ObservationOutcome::Complete);
+        assert_eq!(summary.measured_cases, FIXTURES.len());
+        let evidence = record(&observation, "measurement-evidence.json").unwrap();
+        let cases = evidence["body"]["cases"].as_array().unwrap();
+        assert_eq!(cases.len(), FIXTURES.len());
+        for case in cases {
+            assert_eq!(case["identityProjection"]["operationClass"], "workflow");
+            assert_eq!(case["identityProjection"]["surface"], "product_workflow");
+        }
+        let report = record(&observation, "report.json").unwrap();
+        let rows = report["body"]["sections"][0]["rows"].as_array().unwrap();
+        assert_eq!(rows.len(), FIXTURES.len());
+        for row in rows {
+            assert_eq!(row["category"], "toolchain");
+            assert_eq!(row["operationClass"], "workflow");
+            // The row presents the surface its case declared.
+            assert_eq!(row["performanceSurface"], "product_workflow");
+            assert_eq!(row["metric"], "wall_duration");
         }
     }
 

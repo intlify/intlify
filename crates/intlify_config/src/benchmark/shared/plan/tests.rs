@@ -337,6 +337,10 @@ fn every_projection_declares_the_common_dimensions_it_serializes() {
     for projection in plan.projections() {
         let common = CommonProjection::common(projection);
         assert_eq!(common.eligibility(), Ok(()));
+        assert_eq!(
+            (common.category, common.operation_class, common.surface),
+            grouping(&projection.owner_phase)
+        );
         let value = serde_json::to_value(projection).unwrap();
         for (field, declared) in [
             ("category", serde_json::to_value(common.category)),
@@ -515,4 +519,124 @@ fn a_memory_run_projects_each_construction_case_as_its_peak() {
             validator.iter_errors(&input).collect::<Vec<_>>()
         );
     }
+}
+
+type Grouping = (Category, OperationClass, Surface);
+const COMPONENT: Grouping = (
+    Category::Toolchain,
+    OperationClass::Component,
+    Surface::Core,
+);
+const WORKFLOW: Grouping = (
+    Category::Toolchain,
+    OperationClass::Workflow,
+    Surface::ProductWorkflow,
+);
+const PEAK_LIVE: Grouping = (Category::Memory, OperationClass::PeakLive, Surface::Core);
+
+/// Design 026's minimum projection mappings of design 015's phases, row by
+/// row (D26:2804-2813).
+const MAPPINGS: [(&str, Grouping); 10] = [
+    ("profile_resolver_construct", COMPONENT),
+    ("profile_entry_materialize", COMPONENT),
+    ("profile_structural_admit", COMPONENT),
+    ("profile_select", COMPONENT),
+    ("profile_locale_resolve", COMPONENT),
+    ("profile_artifact_admit", COMPONENT),
+    ("profile_target_group_resolve", COMPONENT),
+    ("profile_evidence_materialize", COMPONENT),
+    ("profile_resolve_e2e", WORKFLOW),
+    ("profile_resolve_peak_memory", PEAK_LIVE),
+];
+
+#[test]
+fn each_phase_is_grouped_as_026_maps_it() {
+    use crate::benchmark::operation::Operation;
+    for (phase, grouped) in MAPPINGS {
+        assert_eq!(grouping(phase), grouped, "{phase}");
+    }
+    // Every phase this owner measures, by duration or by memory, is one of
+    // the table's.
+    let listed = |phase: &str| MAPPINGS.iter().any(|row| row.0 == phase);
+    for operation in Operation::ALL {
+        assert!(listed(operation.phase()), "{operation:?}");
+        if let Some(memory) = operation.peak_memory() {
+            assert!(listed(memory.phase), "{operation:?}");
+        }
+    }
+}
+
+/// One actual projection, grouped as a complete invocation's cost.
+fn workflow_case(mut projection: CaseProjection) -> CaseProjection {
+    (
+        projection.category,
+        projection.operation_class,
+        projection.performance_surface,
+    ) = grouping("profile_resolve_e2e");
+    projection
+}
+
+#[test]
+fn a_workflow_case_on_the_product_workflow_surface_is_admitted() {
+    let plan = issue();
+    let component = plan.projections()[0].clone();
+    let workflow = workflow_case(component.clone());
+    assert_eq!(CommonProjection::common(&workflow).eligibility(), Ok(()));
+    let value = serde_json::to_value(&workflow).unwrap();
+    assert_eq!(value["category"], "toolchain");
+    assert_eq!(value["operationClass"], "workflow");
+    assert_eq!(value["performanceSurface"], "product_workflow");
+    assert_eq!(
+        serde_json::from_value::<CaseProjection>(value).unwrap(),
+        workflow
+    );
+    // The committed case schema admits it, and it is another case than the
+    // component it was made from.
+    let case_text = include_str!("../../../../schema/measurement-case-identity-v0.schema.json");
+    let schema: Value = serde_json::from_str(case_text).unwrap();
+    let validator = jsonschema::draft7::new(&schema).unwrap();
+    let input = case_identity_input(&workflow).unwrap();
+    assert!(
+        validator.is_valid(&input),
+        "{:?}",
+        validator.iter_errors(&input).collect::<Vec<_>>()
+    );
+    assert_ne!(workflow.identity().unwrap(), component.identity().unwrap());
+    // Each committed schema that carries the dimensions lists exactly the
+    // classes and surfaces revision "0" admits.
+    for text in [
+        case_text,
+        include_str!("../../../../schema/measurement-evidence-set-v0.schema.json"),
+        include_str!("../../../../schema/measurement-structured-report-v0.schema.json"),
+    ] {
+        let schema: Value = serde_json::from_str(text).unwrap();
+        assert_eq!(
+            schema["definitions"]["OperationClass"]["enum"],
+            json!(["component", "workflow", "peak_live"])
+        );
+        assert_eq!(
+            schema["definitions"]["Surface"]["enum"],
+            json!(["core", "product_workflow"])
+        );
+    }
+}
+
+#[test]
+fn a_memory_case_is_on_the_surface_of_its_pair_not_of_its_duration() {
+    use crate::benchmark::instrument::tests::DESCRIPTION;
+    use crate::benchmark::operation::Operation;
+    let operation = Operation::ConstructionAuthorityAdmission;
+    let memory = CaseProjection::memory(
+        workflow_case(issue().projections()[0].clone()),
+        operation.peak_memory().unwrap(),
+        Boundary::for_memory(operation).unwrap(),
+        Method::observed_peak(DESCRIPTION),
+    );
+    // Memory is not a surface: the case keeps the one 026 maps its pair to.
+    let common = CommonProjection::common(&memory);
+    assert_eq!(
+        (common.category, common.operation_class, common.surface),
+        PEAK_LIVE
+    );
+    assert_eq!(common.eligibility(), Ok(()));
 }
