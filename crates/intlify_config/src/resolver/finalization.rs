@@ -24,7 +24,9 @@
 //! Decision Evidence covers each Basis exactly: one record for a `default`
 //! Basis and one for each matched rule domain of a `rule` one, in Basis cell
 //! order and then matched-domain order, and no other (D15:1611). A check that
-//! fails is a resolver bug, not an outcome.
+//! fails is a resolver bug, not an outcome. A replay, which has no entry,
+//! verifies within the Shared domain what those checks verify of it
+//! (D15:2659).
 //!
 //! The mandatory reserve holds what no ordinary bound counts: the outcome
 //! envelope `{ outcome, constructionIdentity, complete }`, each exhausted
@@ -99,6 +101,26 @@ pub(crate) fn verify(
     Ok(())
 }
 
+/// Verifies, within the Shared domain alone, what `evaluation` recorded of
+/// every Finding candidate and what the slices of a replay's `shared`
+/// projection committed: each record's domain and owner, and every Finding
+/// Key and Evidence a record refers to of that domain (D15:2659). A Finding
+/// Key of the Entry domain, the Phase 0 Finding a status may name, is the
+/// complete bundle's to resolve, as are the occurrence ordinals and the
+/// exact cover, which are Entry records (D15:1185, 2143).
+///
+/// # Errors
+///
+/// Returns the first resolver bug a check finds.
+pub(crate) fn verify_shared(
+    evaluation: &Evaluation,
+    shared: &Projection<'_>,
+) -> Result<(), FinalizationInvariant> {
+    observed(evaluation)?;
+    owners(shared)?;
+    resolved(&[shared], &[ReportingDomain::Shared])
+}
+
 /// Whether every Finding candidate carried what it observed (D15:2385).
 fn observed(evaluation: &Evaluation) -> Result<(), FinalizationInvariant> {
     evaluation.unobserved().first().map_or(Ok(()), |key| {
@@ -167,11 +189,27 @@ fn ordinals(entry: &Projection<'_>) -> Result<(), FinalizationInvariant> {
     Ok(())
 }
 
-/// Whether every Finding Key a record names has its Finding, retained or in
-/// the omitted suffix of its exhausted domain, and every Evidence a record
-/// refers to its evidence-index record (D15:1182, 1185).
+/// Whether every reference a record of the bundle `evidence` holds resolves,
+/// whichever domain it names ([`resolved`]).
 fn references(evidence: &ResolutionEvidence<'_>) -> Result<(), FinalizationInvariant> {
-    let projections = || std::iter::once(&evidence.entry).chain(&evidence.shared);
+    let projections: Vec<&Projection<'_>> = std::iter::once(&evidence.entry)
+        .chain(&evidence.shared)
+        .collect();
+    resolved(
+        &projections,
+        &[ReportingDomain::Entry, ReportingDomain::Shared],
+    )
+}
+
+/// Whether every Finding Key of `domains` that a record of `projections`
+/// names has its Finding, retained or in the omitted suffix of its exhausted
+/// domain, and every Evidence a record refers to its evidence-index record
+/// (D15:1182, 1185).
+fn resolved(
+    projections: &[&Projection<'_>],
+    domains: &[ReportingDomain],
+) -> Result<(), FinalizationInvariant> {
+    let projections = || projections.iter().copied();
     let mut findings: BTreeSet<&IssueKey> = BTreeSet::new();
     let mut indexed: BTreeSet<&Evidence> = BTreeSet::new();
     for (_, retained) in projections().flat_map(|projection| &projection.records) {
@@ -188,18 +226,19 @@ fn references(evidence: &ResolutionEvidence<'_>) -> Result<(), FinalizationInvar
     // A Finding past its exhausted domain's terminal cursor is omitted with
     // that domain's suffix (D15:2408).
     let omitted = |key: &IssueKey| {
-        let projection = match ReportingDomain::of(key.unit().phase) {
-            ReportingDomain::Entry => Some(&evidence.entry),
-            ReportingDomain::Shared => evidence.shared.as_ref(),
-        };
-        projection
+        let domain = ReportingDomain::of(key.unit().phase);
+        projections()
+            .find(|projection| projection.domain == domain)
             .and_then(|projection| projection.terminal.as_ref())
             .is_some_and(|terminal| key.unit() >= terminal.exhausted.cursor)
     };
+    let unresolved = |key: &&IssueKey| {
+        domains.contains(&ReportingDomain::of(key.unit().phase))
+            && !findings.contains(key)
+            && !omitted(key)
+    };
     for (owner, retained) in projections().flat_map(|projection| &projection.records) {
-        if let Some(key) =
-            named_findings(&retained.record).find(|key| !findings.contains(key) && !omitted(key))
-        {
+        if let Some(key) = named_findings(&retained.record).find(unresolved) {
             return Err(FinalizationInvariant::UnresolvedFinding(key.clone()));
         }
         if referred_evidence(&retained.record).any(|(_, evidence)| !indexed.contains(evidence)) {
@@ -324,10 +363,10 @@ mod tests {
     use crate::resolver::evaluation::{Blocking, Check, Code, Evaluation, Notice, Phase};
     use crate::resolver::locales::fixtures::canonical;
     use crate::resolver::outcome::tests::{blocked, entry, identity, no_json, reporting};
-    use crate::resolver::outcome::{outcome, ResolutionEvidence};
+    use crate::resolver::outcome::{outcome, replayed, ResolutionEvidence};
     use crate::resolver::profile_resolution::tests::Inputs;
     use crate::resolver::profile_resolution::{Invocation, ResolverInvariant};
-    use crate::resolver::reporting::Record;
+    use crate::resolver::reporting::{Record, ReportingDomain};
     use crate::resolver::resolution_evidence::Projection;
     use crate::resolver::resource_policy::{self, PolicySubject};
     use crate::resolver::token::Sha256;
@@ -338,8 +377,8 @@ mod tests {
     use crate::resolver::evidence::Evidence;
 
     use super::{
-        cover, observed, ordinals, owners, references, referred_evidence, reserve,
-        FinalizationInvariant as F,
+        cover, observed, ordinals, owners, references, referred_evidence, reserve, resolved,
+        verify_shared, FinalizationInvariant as F,
     };
 
     /// The position of the first record of `kind` in `projection`.
@@ -516,6 +555,63 @@ mod tests {
                 Err(F::Unobserved(key.unwrap().clone()))
             );
         }
+    }
+
+    /// Within the Shared domain alone, a record of the Entry domain, a
+    /// Shared Finding Key without its Finding, and a candidate observed
+    /// through nothing are resolver bugs, while the Phase 0 Finding a Shared
+    /// status names is the complete bundle's to resolve (D15:1185, 2659).
+    #[test]
+    fn a_replay_verifies_the_shared_domain_alone() {
+        blocked().outcome(None, identity(), |evaluation, _, outcome| {
+            let evidence = &outcome.evidence;
+            let shared = evidence.shared.as_ref().unwrap();
+            assert_eq!(verify_shared(evaluation, shared), Ok(()));
+            let status =
+                &evidence.entry.records[first(&evidence.entry, RecordKind::EntryEvaluationStatus)];
+            let mut misplaced = shared.clone();
+            misplaced.records.push(status.clone());
+            assert!(matches!(
+                verify_shared(evaluation, &misplaced),
+                Err(F::Owner { .. })
+            ));
+            let mut without = shared.clone();
+            let (_, removed) = without
+                .records
+                .remove(first(&without, RecordKind::SharedFinding));
+            let Record::Finding(finding) = removed.record else {
+                panic!("a Finding record holds a Finding");
+            };
+            assert_eq!(
+                verify_shared(evaluation, &without),
+                Err(F::UnresolvedFinding(finding.key.clone()))
+            );
+            let unit =
+                resource_policy::unit(PolicySubject::ResourceLimits, Check::CompatiblePolicy);
+            let mut notice = Evaluation::fabricated();
+            notice
+                .check(unit.clone(), Ok(()), |()| Ok::<(), Blocking>(()))
+                .unwrap()
+                .unwrap();
+            notice
+                .notice(unit, Notice::made_up(Code::LocaleNonCanonical), None)
+                .unwrap();
+            assert!(matches!(
+                verify_shared(&notice, shared),
+                Err(F::Unobserved(_))
+            ));
+        });
+        let mut unasserted = Inputs::complete();
+        unasserted.unasserted();
+        reporting(&unasserted, &[], &[]).outcome(None, identity(), |evaluation, _, outcome| {
+            let shared = outcome.evidence.shared.as_ref().unwrap();
+            assert_eq!(verify_shared(evaluation, shared), Ok(()));
+            let both = [ReportingDomain::Entry, ReportingDomain::Shared];
+            assert!(matches!(
+                resolved(&[shared], &both),
+                Err(F::UnresolvedFinding(key)) if key.unit().phase == Phase::ResolverBootstrapAdmission
+            ));
+        });
     }
 
     /// Occurrences of one Finding and primary Evidence whose ordinals are not
@@ -735,8 +831,9 @@ mod tests {
 
     /// An outcome runs reporting finalization's checks before it is
     /// returned: a candidate that observed nothing, or a reserve past the
-    /// capability's, leaves the invocation without an outcome (D15:2143,
-    /// 2385, 2518).
+    /// capability's, leaves the invocation without an outcome, and the
+    /// candidate leaves a replay without a result (D15:2143, 2385, 2518,
+    /// 2659).
     #[test]
     fn an_invocation_without_finalizations_checks_has_no_outcome() {
         reporting(&Inputs::complete(), &[], &[]).entered_under(
@@ -762,11 +859,15 @@ mod tests {
                     .notice(unit, Notice::non_canonical(canonical("en")), None)
                     .unwrap();
                 let key = evaluation.notices().next().unwrap().clone();
+                let unobserved = ResolverInvariant::Finalization(Box::new(F::Unobserved(key)));
                 assert_eq!(
                     outcome(&evaluation, &invoked, identity(), invocation, &Sha256),
-                    Err(ResolverInvariant::Finalization(Box::new(F::Unobserved(
-                        key
-                    ))))
+                    Err(unobserved.clone())
+                );
+                let state = invoked.state.as_ref().unwrap();
+                assert_eq!(
+                    replayed(&evaluation, state, invocation, &Sha256).err(),
+                    Some(unobserved)
                 );
             },
         );

@@ -31,11 +31,14 @@
 //! projection, which then admits the paths of every candidate's Evidence,
 //! counts the complete invocation's work, and plans the Entry domain's; and
 //! outcome finalization, which orders each domain's records, verifies them,
-//! and projects the profile (D15:1851, 2143; plan 025 decision #253).
+//! and projects the profile (D15:1851, 2143; plan 025 decision #253). The
+//! Shared projection stage reads no entry input, so a replay of a
+//! Materialized Resolution Input Set runs it as an invocation does and then
+//! finalizes the Shared domain alone ([`replayed`], D15:2659).
 
 use crate::construction::identity::ConstructionIdentity;
 
-use super::evaluation::{Evaluation, IssueKey};
+use super::evaluation::{Causes, Evaluation, IssueKey};
 use super::evidence_metadata::{self, SharedScope};
 use super::exact_resolution::ArtifactBindings;
 use super::finalization;
@@ -101,7 +104,8 @@ impl<'e> ResolutionEvidence<'e> {
 
 /// A checked outcome's profile: its view, which profile equality compares
 /// and the profile semantic digest covers, and its Resolved Profile Artifact
-/// Bindings (D15:1152, 2142).
+/// Bindings (D15:1152, 2142). A replay carries one too when the shared
+/// result admits it, though a replay is no outcome (D15:2659).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Checked<'e, 's> {
     pub(crate) profile: ProfileView,
@@ -199,6 +203,17 @@ pub(crate) fn shared_projection<'e, 'a, Id: AsRef<str>>(
     invocation: &Invocation<'a, Id>,
     digest: &impl Digest,
 ) -> Result<SharedStage<'e, 'a>, ResolverInvariant> {
+    shared_stage(evaluation, invoked.state.as_ref(), invocation, digest)
+}
+
+/// The Shared projection stage over `state`, the semantic state or the
+/// causes of its absence, which reads no entry input (D15:1851, 2659).
+fn shared_stage<'e, 'a, Id: AsRef<str>>(
+    evaluation: &'e Evaluation,
+    state: Result<&'e SemanticState<'_, Id>, &'e Causes>,
+    invocation: &Invocation<'a, Id>,
+    digest: &impl Digest,
+) -> Result<SharedStage<'e, 'a>, ResolverInvariant> {
     let specification = specification(invocation);
     let capability = invocation.capability;
     let scope = evidence_metadata::shared_scope(
@@ -207,18 +222,12 @@ pub(crate) fn shared_projection<'e, 'a, Id: AsRef<str>>(
         &capability.bootstrap_only().evidence_metadata,
         digest,
     );
-    let reporting = Reporting::shared(
-        evaluation,
-        specification,
-        (invoked.state.as_ref().err(), &invoked.entry),
-        &scope,
-        digest,
-    );
+    let reporting = Reporting::shared(evaluation, specification, state.err(), &scope, digest);
     let shared = report_domain(
         &reporting,
         ReportingDomain::Shared,
         &capability.policy_comparable().diagnostics,
-        policy(invoked),
+        policy(state.ok()),
     )?;
     Ok(SharedStage {
         reporting,
@@ -258,12 +267,12 @@ pub(crate) fn entry_projection<'e, 'a, Id: AsRef<str>>(
         digest,
         scope,
     );
-    let reporting = reporting.complete(admission, digest);
+    let reporting = reporting.complete(&invoked.entry, admission, digest);
     let entry = report_domain(
         &reporting,
         ReportingDomain::Entry,
         &capability.policy_comparable().diagnostics,
-        policy(invoked),
+        policy(invoked.state.as_ref().ok()),
     )?;
     Ok(EntryStage {
         reporting,
@@ -321,6 +330,40 @@ pub(crate) fn finalize<'e, 's, Id: AsRef<str>>(
     Ok(outcome)
 }
 
+/// What a replay of a Materialized Resolution Input Set reports of the
+/// semantic state `state` that `evaluation` recorded under `invocation`
+/// (D15:2659): the Shared projection stage as an invocation's, then the
+/// Shared projection in canonical order, verified by reporting finalization
+/// within the Shared domain, and the profile Phase 14 projects only when the
+/// Shared domain is complete and the replayed phases found no blocking
+/// Finding. Every check is then evaluated, since each one held back waits on
+/// a blocking Finding (D15:2142, 2369). Without an entry there is no Entry
+/// projection and no outcome, so neither the bundle's checks nor the
+/// mandatory reserve, which holds the outcome envelope, apply (D15:2143,
+/// 2518).
+///
+/// # Errors
+///
+/// Returns the resolver bug that leaves a record without its view, that
+/// reporting finalization finds in the Shared projection, or that leaves the
+/// profile without a result no blocking Finding holds back.
+pub(crate) fn replayed<'e, 's, Id: AsRef<str>>(
+    evaluation: &'e Evaluation,
+    state: &'e SemanticState<'s, Id>,
+    invocation: &Invocation<'_, Id>,
+    digest: &impl Digest,
+) -> Result<(Projection<'e>, Option<Checked<'e, 's>>), ResolverInvariant> {
+    let stage = shared_stage(evaluation, Ok(state), invocation, digest)?;
+    let reporting = stage.reporting.alone(digest);
+    let shared = Projection::finalized(&reporting, ReportingDomain::Shared, stage.shared)?;
+    finalization::verify_shared(evaluation, &shared)?;
+    let admitted = shared.terminal.is_none() && evaluation.issues().next().is_none();
+    let profile = admitted
+        .then(|| checked(state, invocation.supported))
+        .transpose()?;
+    Ok((shared, profile))
+}
+
 /// The Profile Specification whose tokens `invocation`'s records carry: the
 /// Active Project Profile Specification's.
 fn specification<'a, Id: AsRef<str>>(invocation: &Invocation<'a, Id>) -> Specification<'a> {
@@ -332,13 +375,9 @@ fn specification<'a, Id: AsRef<str>>(invocation: &Invocation<'a, Id>) -> Specifi
 }
 
 /// The diagnostic bounds of the Resource Limit Policy that Phase 4 admitted
-/// in `invoked`, if it admitted one.
-fn policy<'e, Id>(invoked: &'e Invoked<'_, Id>) -> Option<&'e DiagnosticsLimits> {
-    invoked
-        .state
-        .as_ref()
-        .ok()
-        .and_then(|state| state.policy.diagnostics.as_ref())
+/// in `state`, if it admitted one.
+fn policy<'e, Id>(state: Option<&'e SemanticState<'_, Id>>) -> Option<&'e DiagnosticsLimits> {
+    state.and_then(|state| state.policy.diagnostics.as_ref())
 }
 
 /// The profile of `state` when no blocking Finding holds a result back: its
@@ -392,7 +431,7 @@ pub(crate) mod tests {
     use crate::resolver::snapshot_entry::fixtures::ENTRY;
     use crate::resolver::subject::{EntryPath, SubjectKind};
 
-    use super::Outcome;
+    use super::{Checked, Outcome};
 
     /// The Resolver Construction Identity of the committed construction input
     /// under the built-in root.
@@ -897,22 +936,32 @@ pub(crate) mod tests {
         let evidence = &outcome.evidence;
         Shown {
             identity: outcome.identity,
-            checked: outcome.checked.as_ref().map(|checked| {
-                let bindings = checked
-                    .bindings
-                    .iter()
-                    .map(|(tuple, artifact)| (tuple.clone(), artifact.member.clone()))
-                    .collect();
-                (checked.profile.clone(), bindings)
-            }),
-            shared: evidence.shared.as_ref().map(|shared| {
-                let terminal = shared.terminal.as_ref();
-                let terminal = terminal.map(|end| (end.finding.clone(), end.state.clone()));
-                (owned(shared), terminal)
-            }),
+            checked: outcome.checked.as_ref().map(profile),
+            shared: evidence.shared.as_ref().map(projected),
             entry: owned(&evidence.entry),
             unavailable: evidence.unavailable(),
         }
+    }
+
+    /// What `checked` shows, outliving it: its view, and its bindings'
+    /// tuples and members.
+    pub(crate) fn profile(
+        checked: &Checked<'_, '_>,
+    ) -> (ProfileView, Vec<(ExactTuple, FormalMember)>) {
+        let bindings = checked
+            .bindings
+            .iter()
+            .map(|(tuple, artifact)| (tuple.clone(), artifact.member.clone()))
+            .collect();
+        (checked.profile.clone(), bindings)
+    }
+
+    /// What `projection` shows, outliving it: its records, and its terminal
+    /// Finding and state when a bound exhausted it.
+    pub(crate) fn projected(projection: &Projection<'_>) -> (Owned, Option<(Value, Value)>) {
+        let terminal = projection.terminal.as_ref();
+        let terminal = terminal.map(|end| (end.finding.clone(), end.state.clone()));
+        (owned(projection), terminal)
     }
 
     /// The views of `shown`'s Entry records of `kind`, in order.

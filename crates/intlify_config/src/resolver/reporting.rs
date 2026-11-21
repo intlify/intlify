@@ -195,6 +195,9 @@ pub(crate) enum ReportingInvariant {
     Decision(Box<DecisionInvariant>),
     /// The evidence tokens leave out a component of an entry dependency.
     EntryToken,
+    /// The entry dependencies' owner reported before the Entry projection
+    /// stage supplied what they name.
+    Unentered,
 }
 
 impl From<ViewInvariant> for ReportingInvariant {
@@ -225,8 +228,9 @@ pub(crate) struct Reporting<'e, 's> {
     tokens: EvidenceTokens,
     /// Why the Shared projection is unavailable, when it is (D15:2369).
     unavailable: Option<&'e Causes>,
-    /// What the entry dependency records name.
-    entry: &'e EntryInputs,
+    /// What the entry dependency records name, which only the Entry
+    /// projection stage supplies.
+    entry: Option<&'e EntryInputs>,
     /// The statuses of each unit's raw candidates (D15:2203).
     statuses: BTreeMap<Unit, Vec<&'e Status>>,
     /// How many occurrence candidates each unit that found something has: a
@@ -258,14 +262,15 @@ impl<'e, 's> Reporting<'e, 's> {
     /// domain's first, so the views also hold the tokens that the Entry
     /// domain's reserved terminal records name, which every outcome assigns
     /// (plan 025 interpretations #237 and #257). The Entry projection stage
-    /// completes it ([`Self::complete`]); until then it reports the Shared
-    /// domain alone. `unavailable` names the causes of the Shared
-    /// projection's absence when it is absent, and `entry` what the entry
-    /// dependency records name, both Entry records.
+    /// completes it ([`Self::complete`]), and a replay, which has no entry,
+    /// finalizes the Shared domain alone ([`Self::alone`]); until then it
+    /// reports the Shared domain alone, which no entry input reaches.
+    /// `unavailable` names the causes of the Shared projection's absence when
+    /// it is absent, an Entry record.
     pub(crate) fn shared(
         evaluation: &'e Evaluation,
         specification: Specification<'s>,
-        (unavailable, entry): (Option<&'e Causes>, &'e EntryInputs),
+        unavailable: Option<&'e Causes>,
         scope: &SharedScope,
         digest: &impl Digest,
     ) -> Self {
@@ -302,7 +307,7 @@ impl<'e, 's> Reporting<'e, 's> {
             views: RecordViews::new(specification, subjects, digest),
             tokens: EvidenceTokens::assign(specification, std::iter::empty(), digest),
             unavailable,
-            entry,
+            entry: None,
             statuses,
             found,
             occurrences: BTreeMap::new(),
@@ -316,9 +321,10 @@ impl<'e, 's> Reporting<'e, 's> {
     }
 
     /// The reporting of both domains, which the Entry projection stage
-    /// completes from the Shared projection stage's, `self`, with
-    /// `admission`, what path admission and the Evidence metadata work of the
-    /// complete invocation leave (D15:1851, 2775). Within every bound,
+    /// completes from the Shared projection stage's, `self`, with `entry`,
+    /// what the entry dependency records name, and `admission`, what path
+    /// admission and the Evidence metadata work of the complete invocation
+    /// leave (D15:1851, 2775). Within every bound,
     /// `digest` assigned the subject tokens of every unit the evaluation
     /// recorded and the evidence tokens of every Evidence its records may
     /// carry (D15:2194). When only the complete invocation exceeds a bound,
@@ -328,7 +334,13 @@ impl<'e, 's> Reporting<'e, 's> {
     /// unit, whose subject kind's colliding sets are its own, so `digest`
     /// assigns the tokens of that kind's subjects alone (plan 025
     /// interpretation #237).
-    pub(crate) fn complete(mut self, admission: Admission, digest: &impl Digest) -> Self {
+    pub(crate) fn complete(
+        mut self,
+        entry: &'e EntryInputs,
+        admission: Admission,
+        digest: &impl Digest,
+    ) -> Self {
+        self.entry = Some(entry);
         let (evaluation, specification) = (self.evaluation, self.specification);
         let exceeded = admission.exceeded();
         let no_evidence = || EvidenceTokens::assign(specification, std::iter::empty(), digest);
@@ -362,6 +374,29 @@ impl<'e, 's> Reporting<'e, 's> {
         self.tokens = tokens;
         self.decisions = decisions;
         self.exceeded = exceeded;
+        self
+    }
+
+    /// The reporting of the Shared domain alone, which a replay finalizes
+    /// from the Shared projection stage's, `self`, with no Entry projection
+    /// stage, since it has no entry (D15:2659). Within the Shared scope's
+    /// bounds its views already name what the Shared domain retains. Past
+    /// one, the domain retains only its reserved terminal records, which name
+    /// its first unit's subject, so `digest` assigns that subject kind's
+    /// tokens, as the Entry projection stage then does (plan 025
+    /// interpretation #237).
+    pub(crate) fn alone(mut self, digest: &impl Digest) -> Self {
+        if self.exceeded.shared.is_some() {
+            let shared = &[ReportingDomain::Shared];
+            let subjects = reserved(
+                self.evaluation,
+                &self.found,
+                self.specification,
+                digest,
+                shared,
+            );
+            self.views = RecordViews::new(self.specification, subjects, digest);
+        }
         self
     }
 
@@ -649,6 +684,7 @@ impl<'e, 's> Reporting<'e, 's> {
         if *unit == ENTRY_OWNER {
             let dependencies = self
                 .entry
+                .ok_or(ReportingInvariant::Unentered)?
                 .retained(self.specification, &self.tokens)
                 .ok_or(ReportingInvariant::EntryToken)?;
             for dependency in dependencies {
@@ -794,13 +830,7 @@ impl<'e, 's> Reporting<'e, 's> {
     ) -> Self {
         let scope =
             super::evidence_metadata::shared_scope(evaluation, specification, limits, digest);
-        let shared = Self::shared(
-            evaluation,
-            specification,
-            (unavailable, entry),
-            &scope,
-            digest,
-        );
+        let shared = Self::shared(evaluation, specification, unavailable, &scope, digest);
         let admission = super::evidence_metadata::invocation(
             evaluation,
             entry,
@@ -809,7 +839,7 @@ impl<'e, 's> Reporting<'e, 's> {
             digest,
             scope,
         );
-        shared.complete(admission, digest)
+        shared.complete(entry, admission, digest)
     }
 }
 
