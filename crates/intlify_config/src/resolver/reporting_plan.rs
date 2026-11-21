@@ -726,7 +726,7 @@ pub(crate) mod tests {
         let fixture = FileFixture::new(&fixture_limits(100));
         let mut evaluation = Evaluation::default();
         let file = fixture.file(Arc::from(&br#"{"a":1,"a":2,"a":3,"b":1e400}"#[..]));
-        let Ok(Err(causes)) = admit_entry(&mut evaluation, &file, limits()) else {
+        let Ok(Err(causes)) = admit_entry(&mut evaluation, &file, limits(), &unbounded()) else {
             panic!("the file is not admitted");
         };
         (evaluation, causes)

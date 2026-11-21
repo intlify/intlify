@@ -27,7 +27,13 @@
 //! Every candidate is observed through the programmatic entry's Entry Source
 //! Evidence, at the Logical input path the resolver projects from the
 //! position's Snapshot Structural Path, each member classified as for a file,
-//! so no raw key is retained (D15:792-798, 802, 895, 897). A marker and a
+//! so no raw key is retained (D15:792-798, 802, 895, 897). As for a file, the
+//! path is projected only within the path bounds path admission applies, past
+//! which it would be absent, while the position is kept, since the sidecar
+//! maps a span by it. Positions share their prefixes, as a file's facts'
+//! paths do, so the edges Phase 1 holds grow with the nodes on the
+//! candidates' paths, never with the candidates times their depth (D15:776,
+//! 1834, 1851; plan 025 decision #299). A marker and a
 //! string are the values at their positions, a key past the single-string
 //! bound is its member's key, and a total is the root's value. The Evidence
 //! names the call-site source and the span the admitted sidecar maps for the
@@ -50,7 +56,7 @@ use crate::snapshot::{Marker, MarkerReason, Node, SnapshotBound, SnapshotCounts}
 use crate::structural::Edge;
 
 use super::call_site_span::{mapped, named, CallSiteSpans, Located};
-use super::capability::{CapabilityBound, SnapshotLimits};
+use super::capability::{CapabilityBound, EvidenceMetadataLimits, SnapshotLimits};
 use super::entry::{
     capability, input, root_value_bounds, Classify, ConfigurationEntry, EntryInvariant, OWNER,
     ROOT_VALUE_BOUNDS,
@@ -118,26 +124,36 @@ pub(crate) struct SnapshotEntryLimits {
     pub(crate) value: ValueLimits,
 }
 
-impl EntrySnapshot<'_> {
+/// What Phase 1 observes a Snapshot's candidates through: `entry` and the
+/// path bounds `paths` path admission applies (plan 025 decision #299).
+struct Observer<'e, 'a> {
+    entry: &'e EntrySnapshot<'a>,
+    paths: &'e EvidenceMetadataLimits,
+}
+
+impl Observer<'_, '_> {
     /// Entry Source Evidence of `located` at the position the edges `path`
-    /// lead to from the root, each member classified: in the call-site source
-    /// at the span the sidecar maps for the role there, or without one in the
+    /// lead to from the root, each member classified, its Logical input path
+    /// projected only within the path bounds: in the call-site source at the
+    /// span the sidecar maps for the role there, or without one in the
     /// Programmatic Entry (D15:747, 792-798, 802, 897).
     fn evidence(
         &self,
         path: &[Edge<'_>],
         located: Located,
     ) -> Result<EvidenceProjection, EntryInvariant> {
-        let steps = (self.classify)(path, None);
+        let steps = (self.entry.classify)(path, None);
         let mapped = self
+            .entry
             .call_site
             .and_then(|call_site| mapped(call_site, path, located));
-        let (source, span) = named(self.source, mapped);
-        EvidenceProjection::entry_source(
+        let (source, span) = named(self.entry.source, mapped);
+        EvidenceProjection::entry_source_under(
             SafeOriginKind::ConfigurationProgrammatic,
             source,
             Some(&steps),
             span,
+            self.paths,
         )
         .map_err(EntryInvariant::Evidence)
     }
@@ -192,7 +208,10 @@ impl ConfigurationEntry for ProgrammaticEntry<'_> {
 
 /// Phase 1 over `entry` under `limits`: the materialized document, or the
 /// causes of its absence, which are the blocking Findings of Phase 1 the
-/// Shared projection is unavailable for (D15:2369).
+/// Shared projection is unavailable for (D15:2369). A candidate's Logical
+/// input path is projected only within the path bounds of `paths`, the
+/// capability's `bootstrapOnly.evidenceMetadata`, under which path admission
+/// would leave it absent (D15:776, 1834, 1851; plan 025 decision #299).
 ///
 /// # Errors
 ///
@@ -202,6 +221,7 @@ pub(crate) fn admit_snapshot_entry(
     evaluation: &mut Evaluation,
     entry: &EntrySnapshot<'_>,
     limits: SnapshotEntryLimits,
+    paths: &EvidenceMetadataLimits,
 ) -> Result<Admitted<MaterializedDocument>, EntryInvariant> {
     // The owner records the entry dependencies, and nothing waits on it.
     let _: Admitted<()> = evaluation.check(OWNER, Ok(()), |()| Ok::<(), Blocking>(()))?;
@@ -209,7 +229,7 @@ pub(crate) fn admit_snapshot_entry(
         mut overrun,
         compatible,
         bounds,
-    } = Findings::of(entry, limits)?;
+    } = Findings::of(&Observer { entry, paths }, limits)?;
     let mut within = Ok(());
     for (check, bound) in SNAPSHOT_BOUNDS {
         let named = overrun.take_if(|(named, _)| *named == bound);
@@ -242,49 +262,62 @@ struct Findings {
     overrun: Option<(SnapshotBound, Found)>,
     /// The JSON-compatible domain's: a candidate for each ordinary marker.
     compatible: Option<Found>,
-    /// The root-value bounds', in check-rank order, which no check
-    /// evaluates while a marker remains, as for a file's facts.
+    /// The root-value bounds', in check-rank order, found only without a
+    /// marker: a marker holds back every root-value bound, as a file's facts
+    /// do, so none of their candidates would be evaluated (plan 025 decision
+    /// #299).
     bounds: [Option<Found>; 5],
 }
 
 impl Findings {
-    /// What the checks find in `entry`'s Snapshot under `limits`.
-    fn of(entry: &EntrySnapshot<'_>, limits: SnapshotEntryLimits) -> Result<Self, EntryInvariant> {
-        let root = entry.snapshot.root();
+    /// What the checks find in the Snapshot `observer` observes, under
+    /// `limits`.
+    fn of(
+        observer: &Observer<'_, '_>,
+        limits: SnapshotEntryLimits,
+    ) -> Result<Self, EntryInvariant> {
+        let root = observer.entry.snapshot.root();
         let scan = Scan::of(root, limits.value.max_single_string_bytes)?;
+        let at = |position: Option<Position>, located| {
+            observer.evidence(&scan.positions.edges(position), located)
+        };
         let mut found = Self::default();
-        if let Some((bound, witness, path)) = &scan.terminal {
-            let overrun = overrun(entry, *bound, *witness, path, &limits.snapshot)?;
-            found.overrun = Some((*bound, overrun));
+        if let Some((bound, witness, position)) = scan.terminal {
+            let overrun = overrun(bound, witness, &limits.snapshot, || {
+                at(position, Located::Value)
+            })?;
+            found.overrun = Some((bound, overrun));
         }
         let mut candidates = Vec::new();
-        for (reason, path) in &scan.ordinary {
+        for &(reason, position) in &scan.ordinary {
             let observation = Observation {
-                primary: entry.evidence(path, Located::Value)?,
+                primary: at(position, Located::Value)?,
                 related: Vec::new(),
             };
-            candidates.push(Found::observed(incompatible(*reason), observation));
+            candidates.push(Found::observed(incompatible(reason), observation));
         }
         found.compatible = candidates.into_iter().reduce(Found::and);
-        let violations = limits.value.violations(SnapshotCounts::of(root).value());
-        // A total is observed at the root's value (D15:768).
-        found.bounds = root_value_bounds(&violations, &scan.long, |string| match string {
-            None => entry.evidence(&[], Located::Value),
-            Some((path, located)) => entry.evidence(path, *located),
-        })?;
+        if !scan.marked() {
+            let violations = limits.value.violations(SnapshotCounts::of(root).value());
+            // A total is observed at the root's value (D15:768).
+            found.bounds = root_value_bounds(&violations, &scan.long, |string| match string {
+                None => at(None, Located::Value),
+                Some(&(position, located)) => at(position, located),
+            })?;
+        }
         Ok(found)
     }
 }
 
 /// The terminal marker's Finding under `bound`, which it names: the bound,
 /// its limit, and `witness` as an at-least total, observed at the marker's
-/// position `path` beside the capability's bound (D15:2006, 2356).
+/// position, whose Evidence `at` gives, beside the capability's bound
+/// (D15:2006, 2356).
 fn overrun(
-    entry: &EntrySnapshot<'_>,
     bound: SnapshotBound,
     witness: u64,
-    path: &[Edge<'_>],
     limits: &SnapshotLimits,
+    at: impl FnOnce() -> Result<EvidenceProjection, EntryInvariant>,
 ) -> Result<Found, EntryInvariant> {
     let limit = bound.limit(limits);
     // `Bound` excludes `u64::MAX`, so the witness the boundary admits is
@@ -293,7 +326,7 @@ fn overrun(
         return Err(EntryInvariant::UnadmittedMarker);
     }
     let observation = Observation {
-        primary: entry.evidence(path, Located::Value)?,
+        primary: at()?,
         related: vec![capability(CapabilityBound::BootstrapOnly(bound.id()))?],
     };
     let exceeded = Blocking::bootstrap_limit(BootstrapLimitExceeded {
@@ -325,9 +358,39 @@ const fn incompatible(reason: MarkerReason) -> Blocking {
     }
 }
 
-/// The edges from the root to a position in the Snapshot, the actual keys
-/// among them, which only the classification reads (D15:895).
-type Edges<'s> = Vec<Edge<'s>>;
+/// A position below the root of a Snapshot, in its [`Positions`]. The root,
+/// which no edge reaches, is the absence of one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Position(usize);
+
+/// The positions a Snapshot's candidates stand at, and those that lead to
+/// them, each entered once after the position that holds it, so candidates
+/// share their common prefixes as a file's facts' paths do (plan 025 decision
+/// #299). An edge holds an actual key, which only the classification and the
+/// sidecar lookup read (D15:895).
+#[derive(Debug, Default)]
+struct Positions<'s>(Vec<(Option<Position>, Edge<'s>)>);
+
+impl<'s> Positions<'s> {
+    /// The edges from the root to `position`, none for the root.
+    fn edges(&self, position: Option<Position>) -> Vec<Edge<'s>> {
+        let mut edges = Vec::new();
+        let mut next = position;
+        while let Some(Position(index)) = next {
+            let (parent, edge) = self.0[index];
+            edges.push(edge);
+            next = parent;
+        }
+        edges.reverse();
+        edges
+    }
+
+    /// Enters `edge` after `parent`.
+    fn push(&mut self, parent: Option<Position>, edge: Edge<'s>) -> Position {
+        self.0.push((parent, edge));
+        Position(self.0.len() - 1)
+    }
+}
 
 /// What a canonical traversal of a Snapshot finds, each at its position:
 /// array elements in index order, object members in key-byte order, each
@@ -335,12 +398,19 @@ type Edges<'s> = Vec<Edge<'s>>;
 struct Scan<'s> {
     /// The single-string bound the root-value check applies.
     limit: Bound,
+    /// The edges from the root to the node being visited, each with its
+    /// position once a candidate needed it.
+    path: Vec<(Edge<'s>, Option<Position>)>,
+    /// The positions of the candidates and of what leads to them.
+    positions: Positions<'s>,
     /// Each ordinary marker, with its reason.
-    ordinary: Vec<(MarkerReason, Edges<'s>)>,
+    ordinary: Vec<(MarkerReason, Option<Position>)>,
     /// The terminal marker, with the bound it names and its witness.
-    terminal: Option<(SnapshotBound, u64, Edges<'s>)>,
-    /// Each string and key longer than `limit`, a key at its member.
-    long: Vec<(Edges<'s>, Located)>,
+    terminal: Option<(SnapshotBound, u64, Option<Position>)>,
+    /// Each string and key longer than `limit`, a key at its member, until a
+    /// marker is found: a marker holds back every root-value bound, so none
+    /// of them would be observed (plan 025 decision #299).
+    long: Vec<(Option<Position>, Located)>,
 }
 
 /// One step of a traversal below the root: entering the edge to a node, or
@@ -357,46 +427,42 @@ impl<'s> Scan<'s> {
     fn of(root: &'s Node, limit: Bound) -> Result<Self, EntryInvariant> {
         let mut scan = Self {
             limit,
+            path: Vec::new(),
+            positions: Positions::default(),
             ordinary: Vec::new(),
             terminal: None,
             long: Vec::new(),
         };
-        let mut path: Edges<'s> = Vec::new();
         let mut pending: Vec<Step<'s>> = Vec::new();
-        scan.visit(root, &path, &mut pending)?;
+        scan.visit(root, &mut pending)?;
         while let Some(step) = pending.pop() {
             match step {
                 Step::Enter(edge, node) => {
-                    path.push(edge);
+                    scan.path.push((edge, None));
                     if let Edge::Member(key) = edge {
-                        scan.string(key, &path, Located::Key);
+                        scan.string(key, Located::Key);
                     }
                     pending.push(Step::Leave);
-                    scan.visit(node, &path, &mut pending)?;
+                    scan.visit(node, &mut pending)?;
                 }
                 Step::Leave => {
-                    path.pop();
+                    scan.path.pop();
                 }
             }
         }
         Ok(scan)
     }
 
-    /// Visits `node` at `path`, and puts the edges to what it holds on
-    /// `pending`, the first on top.
-    fn visit(
-        &mut self,
-        node: &'s Node,
-        path: &[Edge<'s>],
-        pending: &mut Vec<Step<'s>>,
-    ) -> Result<(), EntryInvariant> {
+    /// Visits `node` at the current path, and puts the edges to what it
+    /// holds on `pending`, the first on top.
+    fn visit(&mut self, node: &'s Node, pending: &mut Vec<Step<'s>>) -> Result<(), EntryInvariant> {
         // The boundary admits no node after a bootstrap marker (D15:867).
         if self.terminal.is_some() {
             return Err(EntryInvariant::UnadmittedMarker);
         }
         match node {
             Node::Null | Node::Boolean(_) | Node::Number(_) => {}
-            Node::String(text) => self.string(text, path, Located::Value),
+            Node::String(text) => self.string(text, Located::Value),
             Node::Array(elements) => pending.extend(
                 elements
                     .iter()
@@ -410,20 +476,48 @@ impl<'s> Scan<'s> {
                     .rev()
                     .map(|(key, value)| Step::Enter(Edge::Member(key), value)),
             ),
-            Node::Marker(Marker::Rejected(reason)) => self.ordinary.push((*reason, path.to_vec())),
+            Node::Marker(Marker::Rejected(reason)) => {
+                let position = self.marker();
+                self.ordinary.push((*reason, position));
+            }
             Node::Marker(Marker::BootstrapLimitExceeded { bound, witness }) => {
-                self.terminal = Some((*bound, *witness, path.to_vec()));
+                self.terminal = Some((*bound, *witness, self.marker()));
             }
         }
         Ok(())
     }
 
-    /// Notes the string or key `text` at `path`, which Evidence of it
-    /// locates as `located`, when it is past the bound.
-    fn string(&mut self, text: &str, path: &[Edge<'s>], located: Located) {
-        if count(text.len()) > self.limit.get() {
-            self.long.push((path.to_vec(), located));
+    /// Notes the string or key `text` at the current path, which Evidence of
+    /// it locates as `located`, when it is past the bound and no marker was
+    /// found.
+    fn string(&mut self, text: &str, located: Located) {
+        if !self.marked() && count(text.len()) > self.limit.get() {
+            let position = self.place();
+            self.long.push((position, located));
         }
+    }
+
+    /// The position of a marker at the current path. A marker holds back
+    /// every root-value bound, so the strings past the bound found before it
+    /// are dropped.
+    fn marker(&mut self) -> Option<Position> {
+        self.long = Vec::new();
+        self.place()
+    }
+
+    /// Whether a marker was found.
+    fn marked(&self) -> bool {
+        self.terminal.is_some() || !self.ordinary.is_empty()
+    }
+
+    /// The position the current path leads to, entered into `positions` with
+    /// each of its prefixes not entered yet.
+    fn place(&mut self) -> Option<Position> {
+        let mut parent = None;
+        for (edge, position) in &mut self.path {
+            parent = Some(*position.get_or_insert_with(|| self.positions.push(parent, *edge)));
+        }
+        parent
     }
 }
 
@@ -492,6 +586,7 @@ mod tests {
 
     use serde_json::{json, Value};
 
+    use crate::artifacts::count;
     use crate::boundary::call_site::{AdmittedCallSite, SubmittedMapping};
     use crate::boundary::locator::{
         read_programmatic_locator, Locator, LocatorCandidate, LocatorVariant,
@@ -507,7 +602,7 @@ mod tests {
     use crate::materialize_tests::limits as file_limits;
     use crate::resolver::call_site_span::fixtures::{mapping, mirrored, sidecar, CALL_SITE};
     use crate::resolver::call_site_span::Located;
-    use crate::resolver::capability::{CapabilityBound, SnapshotLimits};
+    use crate::resolver::capability::{CapabilityBound, EvidenceMetadataLimits, SnapshotLimits};
     use crate::resolver::entry::fixtures::FileFixture;
     use crate::resolver::entry::{
         admit_entry, capability, input, ConfigurationEntry, EntryInvariant, OWNER,
@@ -518,10 +613,15 @@ mod tests {
         Status, Unit,
     };
     use crate::resolver::evidence::Evidence;
+    use crate::resolver::evidence_metadata::fixtures::{unbounded, with};
+    use crate::resolver::evidence_metadata::MetadataBound;
+    use crate::resolver::evidence_path::PathSize;
     use crate::resolver::evidence_source::hex;
     use crate::resolver::evidence_token::EvidenceTokens;
     use crate::resolver::limits::{fixture_limits, ResolutionLimits};
-    use crate::resolver::occurrence::{occurrences, redacted, FindingOccurrence};
+    use crate::resolver::occurrence::{
+        occurrences, redacted, FindingOccurrence, OccurrenceCandidate,
+    };
     use crate::resolver::origin::SafeOriginKind;
     use crate::resolver::profile_selection::select_profile;
     use crate::resolver::record_view::RecordViews;
@@ -616,7 +716,12 @@ mod tests {
     ) -> Result<(Evaluation, Admitted<MaterializedDocument>), EntryInvariant> {
         let fixture = SnapshotFixture::new(&fixture_limits(100));
         let mut evaluation = Evaluation::default();
-        let admitted = admit_snapshot_entry(&mut evaluation, &fixture.entry(snapshot), limits)?;
+        let admitted = admit_snapshot_entry(
+            &mut evaluation,
+            &fixture.entry(snapshot),
+            limits,
+            &unbounded(),
+        )?;
         Ok((evaluation, admitted))
     }
 
@@ -633,7 +738,7 @@ mod tests {
         let fixture = FileFixture::new(&fixture_limits(100));
         let file = fixture.file(Arc::from(serde_json::to_vec(value).unwrap()));
         let mut evaluation = Evaluation::default();
-        let admitted = admit_entry(&mut evaluation, &file, limits).unwrap();
+        let admitted = admit_entry(&mut evaluation, &file, limits, &unbounded()).unwrap();
         (evaluation, admitted)
     }
 
@@ -1079,8 +1184,13 @@ mod tests {
         let mut waits = BTreeSet::new();
         for blocked in &units {
             let mut evaluation = Evaluation::blocking(blocked.clone());
-            let admitted =
-                admit_snapshot_entry(&mut evaluation, &fixture.entry(&snapshot), limits).unwrap();
+            let admitted = admit_snapshot_entry(
+                &mut evaluation,
+                &fixture.entry(&snapshot),
+                limits,
+                &unbounded(),
+            )
+            .unwrap();
             assert_eq!(admitted.is_ok(), *blocked == OWNER, "{blocked:?}");
             for (unit, status) in evaluation.statuses() {
                 if let Status::NotEvaluated(causes) = status {
@@ -1129,8 +1239,13 @@ mod tests {
             .filter(|check| check.recorded_for(EntryPath::Programmatic))
         {
             let mut evaluation = Evaluation::blocking(input(check));
-            let admitted =
-                admit_snapshot_entry(&mut evaluation, &fixture.entry(&snapshot), limits).unwrap();
+            let admitted = admit_snapshot_entry(
+                &mut evaluation,
+                &fixture.entry(&snapshot),
+                limits,
+                &unbounded(),
+            )
+            .unwrap();
             assert!(admitted.is_err(), "{check:?}");
         }
     }
@@ -1172,10 +1287,20 @@ mod tests {
         assert_eq!(refused(nodes(4102), limits), None);
     }
 
+    /// What `scan` found past the single-string bound, each at the edges
+    /// from the root to its position.
+    fn long_at<'s>(scan: &Scan<'s>) -> Vec<(Vec<Edge<'s>>, Located)> {
+        scan.long
+            .iter()
+            .map(|&(position, located)| (scan.positions.edges(position), located))
+            .collect()
+    }
+
     /// A tree far deeper than a stack holds is scanned without recursion,
-    /// each candidate at its full path: a long string and an ordinary marker
-    /// below arrays, and a long key holding the terminal marker below objects
-    /// (plan 025 decision #298).
+    /// each candidate at its full path: a long string, and an ordinary marker
+    /// after one, below arrays, and a long key holding the terminal marker
+    /// below objects (plan 025 decision #298). A marker drops the long
+    /// strings found before it (plan 025 decision #299).
     #[test]
     fn a_deep_snapshot_is_scanned_without_recursion() {
         const LEVELS: usize = 100_000;
@@ -1184,31 +1309,273 @@ mod tests {
             bound: SnapshotBound::Nodes,
             witness: 2,
         });
+        let mut strings = Node::Array(vec![Node::String(long.clone())]);
         let mut array = Node::Array(vec![
             Node::String(long.clone()),
             Node::Marker(Marker::Rejected(MarkerReason::Cycle)),
         ]);
         let mut object = Node::Object(BTreeMap::from([(long.clone(), terminal)]));
         for _ in 0..LEVELS {
+            strings = Node::Array(vec![strings]);
             array = Node::Array(vec![array]);
             object = Node::Object(BTreeMap::from([("a".to_owned(), object)]));
         }
         let limit = Bound::new(4).unwrap();
-        let scan = Scan::of(&array, limit).unwrap();
         let below = |last| {
             let mut path = vec![Edge::Index(0); LEVELS];
             path.push(Edge::Index(last));
             path
         };
-        assert_eq!(scan.long, [(below(0), Located::Value)]);
-        assert_eq!(scan.ordinary, [(MarkerReason::Cycle, below(1))]);
+        let scan = Scan::of(&strings, limit).unwrap();
+        assert_eq!(long_at(&scan), [(below(0), Located::Value)]);
+        assert!(scan.ordinary.is_empty());
+        let scan = Scan::of(&array, limit).unwrap();
+        assert!(scan.long.is_empty());
+        let [(MarkerReason::Cycle, position)] = scan.ordinary[..] else {
+            panic!("one cycle marker");
+        };
+        assert_eq!(scan.positions.edges(position), below(1));
         assert_eq!(scan.terminal, None);
         let scan = Scan::of(&object, limit).unwrap();
         let mut path = vec![Edge::Member("a"); LEVELS];
         path.push(Edge::Member(&long));
-        assert_eq!(scan.long, [(path.clone(), Located::Key)]);
+        assert!(scan.long.is_empty());
         assert!(scan.ordinary.is_empty());
-        assert_eq!(scan.terminal, Some((SnapshotBound::Nodes, 2, path)));
+        let Some((SnapshotBound::Nodes, 2, position)) = scan.terminal else {
+            panic!("the terminal marker");
+        };
+        assert_eq!(scan.positions.edges(position), path);
+    }
+
+    /// Many candidates under a deep shared prefix hold each edge once: the
+    /// positions grow with the nodes on the candidates' paths, never with
+    /// the candidates times their depth, and each candidate still stands at
+    /// its full path (plan 025 decision #299).
+    #[test]
+    fn candidates_under_a_deep_shared_prefix_hold_each_edge_once() {
+        const DEPTH: usize = 1_000;
+        const CANDIDATES: usize = 1_000;
+        let marker = Node::Marker(Marker::Rejected(MarkerReason::Cycle));
+        let mut marked = Node::Array(vec![marker; CANDIDATES]);
+        let mut long = Node::Array(vec![Node::String("x".repeat(5)); CANDIDATES]);
+        for _ in 0..DEPTH {
+            marked = Node::Array(vec![marked]);
+            long = Node::Object(BTreeMap::from([("a".to_owned(), long)]));
+        }
+        let limit = Bound::new(4).unwrap();
+        let scan = Scan::of(&marked, limit).unwrap();
+        assert_eq!(scan.ordinary.len(), CANDIDATES);
+        assert_eq!(scan.positions.0.len(), DEPTH + CANDIDATES);
+        for (index, &(_, position)) in scan.ordinary.iter().enumerate() {
+            let mut path = vec![Edge::Index(0); DEPTH];
+            path.push(Edge::Index(count(index)));
+            assert_eq!(scan.positions.edges(position), path);
+        }
+        let scan = Scan::of(&long, limit).unwrap();
+        assert_eq!(scan.positions.0.len(), DEPTH + CANDIDATES);
+        let at = long_at(&scan);
+        assert_eq!(at.len(), CANDIDATES);
+        for (index, (path, located)) in at.into_iter().enumerate() {
+            assert_eq!(located, Located::Value);
+            assert_eq!(path.len(), DEPTH + 1);
+            assert_eq!(
+                path[DEPTH - 1..],
+                [Edge::Member("a"), Edge::Index(count(index))]
+            );
+        }
+    }
+
+    /// A marker holds back every root-value bound, so once the scan finds
+    /// one it keeps no string past the bound, those found before it dropped,
+    /// and Phase 1 builds no root-value candidate: only the markers' Findings
+    /// are reported, an ordinary marker's or the terminal one's (plan 025
+    /// decision #299).
+    #[test]
+    fn a_marker_leaves_no_root_value_candidate() {
+        let long = "x".repeat(5);
+        let limit = Bound::new(4).unwrap();
+        let (unmarked, marked) = (
+            tree(&json!([long, long])),
+            tree(&json!([long, "!cycle", long])),
+        );
+        assert_eq!(Scan::of(&unmarked, limit).unwrap().long.len(), 2);
+        let scan = Scan::of(&marked, limit).unwrap();
+        assert!(scan.long.is_empty());
+        assert_eq!(scan.ordinary.len(), 1);
+        let mut narrow = limits();
+        narrow.value.max_single_string_bytes = limit;
+        for (value, check) in [
+            (json!([long, "!cycle", long]), Check::JsonCompatible),
+            (
+                json!({ "a": long, "b": "!maxNodes" }),
+                Check::WithinSnapshotNodes,
+            ),
+        ] {
+            let (evaluation, _) = entered(&tree(&value), narrow);
+            let checks: Vec<Check> = found(&evaluation)
+                .into_iter()
+                .map(|(check, _, _)| check)
+                .collect();
+            assert_eq!(checks, [check]);
+            let statuses = statuses(&evaluation);
+            for (check, _, _) in ROOT_VALUE_BOUNDS {
+                assert!(statuses[&check].is_some(), "{check:?}");
+            }
+        }
+    }
+
+    /// Phase 1 over `root` as the boundary admits it under [`limits`] beside
+    /// `call_site`, if any, each Logical input path projected only within the
+    /// path bounds of `paths`: the evaluation, and the document or the causes
+    /// of its absence.
+    fn entered_under(
+        root: &Node,
+        call_site: Option<&AdmittedCallSite>,
+        paths: &EvidenceMetadataLimits,
+    ) -> (Evaluation, Admitted<MaterializedDocument>) {
+        let limits = limits();
+        let snapshot = admitted(root, &limits.snapshot);
+        let fixture = SnapshotFixture::new(&fixture_limits(100));
+        let mut entry = fixture.entry(&snapshot);
+        entry.call_site = call_site;
+        let mut evaluation = Evaluation::default();
+        let admitted = admit_snapshot_entry(&mut evaluation, &entry, limits, paths).unwrap();
+        (evaluation, admitted)
+    }
+
+    /// The size of the Logical input path of each candidate's primary
+    /// Evidence, projected or only measured.
+    fn sizes(evaluation: &Evaluation) -> Vec<Option<PathSize>> {
+        evaluation
+            .occurrence_candidates()
+            .iter()
+            .map(|candidate| candidate.primary.entry_path())
+            .collect()
+    }
+
+    /// Each candidate as path admission leaves it under `paths`.
+    fn admitted_under(
+        evaluation: &Evaluation,
+        paths: &EvidenceMetadataLimits,
+    ) -> Vec<OccurrenceCandidate> {
+        evaluation
+            .occurrence_candidates()
+            .iter()
+            .map(|candidate| candidate.admitted(paths).unwrap())
+            .collect()
+    }
+
+    /// D15:776, 1851: Phase 1 projects a marker's Logical input path only
+    /// within the path bounds. Past them only its size is kept, measured as
+    /// the projected path would be, and path admission leaves each candidate
+    /// as it would have left the projected one, while a path within them is
+    /// kept (plan 025 decision #299).
+    #[test]
+    fn a_logical_input_path_past_a_path_bound_is_never_projected() {
+        let value = json!({
+            "$schema": "!cycle",
+            "profiles": { "app": { "requestedLocales": ["en", "!cycle"] } },
+        });
+        let root = tree(&value);
+        let bound = with(MetadataBound::LogicalPathSegments, 3);
+        let (bounded, _) = entered_under(&root, None, &bound);
+        let (whole, _) = entered_under(&root, None, &unbounded());
+        assert_ne!(
+            bounded.occurrence_candidates(),
+            whole.occurrence_candidates()
+        );
+        assert_eq!(sizes(&bounded), sizes(&whole));
+        assert_eq!(
+            admitted_under(&bounded, &bound),
+            admitted_under(&whole, &bound)
+        );
+        let mut seen: Vec<Value> = observed(&bounded)
+            .iter()
+            .map(|occurrence| occurrence.primary().view()["path"].clone())
+            .collect();
+        seen.sort_by_key(Value::to_string);
+        // An array's text sorts before `null`'s.
+        assert_eq!(seen, [json!([{ "safe-member": "$schema" }]), Value::Null]);
+    }
+
+    /// D15:747, 802: a marker whose Logical input path Phase 1 leaves
+    /// unprojected still takes the span the sidecar maps at its position,
+    /// which Phase 1 keeps (plan 025 decision #299).
+    #[test]
+    fn a_span_is_mapped_at_a_position_whose_path_is_not_projected() {
+        let text =
+            r#"{"$schema":"!cycle","profiles":{"app":{"requestedLocales":["en","!cycle"]}}}"#;
+        let value: Value = serde_json::from_str(text).unwrap();
+        let deep = spot(text, r#""!cycle""#, 1);
+        let call_site = sidecar(
+            text,
+            None,
+            vec![
+                spanning(
+                    &json!(["$schema"]),
+                    "member-value",
+                    spot(text, r#""!cycle""#, 0),
+                ),
+                spanning(
+                    &json!(["profiles", "app", "requestedLocales", 1]),
+                    "node",
+                    deep,
+                ),
+            ],
+        );
+        let bound = with(MetadataBound::LogicalPathSegments, 3);
+        let (evaluation, _) = entered_under(&tree(&value), Some(&call_site), &bound);
+        let deepest: Vec<Value> = observed(&evaluation)
+            .iter()
+            .map(|occurrence| occurrence.primary().view())
+            .filter(|view| view.get("path").is_none())
+            .collect();
+        assert_eq!(deepest.len(), 1);
+        assert_eq!(deepest[0]["source"], call_site_source());
+        assert_eq!(deepest[0]["span"], span_view(deep));
+    }
+
+    /// D15:1889, 3228: under a path bound either entry leaves the same
+    /// Logical input paths: the root's and the long key's within it are
+    /// projected, the long string's past it only measured, and each measures
+    /// as the other entry's does (plan 025 decision #299).
+    #[test]
+    fn either_entry_projects_the_same_logical_input_paths_under_a_path_bound() {
+        let value: Value = serde_json::from_str(BOUNDED).unwrap();
+        let mut input = file_limits();
+        input.value = tight(1);
+        let paths = with(MetadataBound::LogicalPathSegments, 1);
+        let fixture = FileFixture::new(&fixture_limits(100));
+        let file = fixture.file(Arc::from(serde_json::to_vec(&value).unwrap()));
+        let mut filed = Evaluation::default();
+        let admitted_file = admit_entry(&mut filed, &file, input, &paths).unwrap();
+        let snapshot_limits = SnapshotEntryLimits {
+            value: input.value,
+            ..limits()
+        };
+        let snapshot = admitted(&from_json(&value), &snapshot_limits.snapshot);
+        let fixture = SnapshotFixture::new(&fixture_limits(100));
+        let mut entered = Evaluation::default();
+        let admitted_snapshot = admit_snapshot_entry(
+            &mut entered,
+            &fixture.entry(&snapshot),
+            snapshot_limits,
+            &paths,
+        )
+        .unwrap();
+        assert!(admitted_file.is_err() && admitted_snapshot.is_err());
+        assert_eq!(sizes(&entered), sizes(&filed));
+        let (filed, entered) = (observed(&filed), observed(&entered));
+        assert_eq!(entered.len(), 6);
+        let path = |occurrence: &FindingOccurrence| occurrence.primary().view()["path"].clone();
+        let projected = entered
+            .iter()
+            .filter(|occurrence| !path(occurrence).is_null());
+        assert_eq!(projected.count(), 5);
+        for (file, snapshot) in filed.iter().zip(&entered) {
+            assert_eq!(snapshot.finding(), file.finding());
+            assert_eq!(path(snapshot), path(file));
+        }
     }
 
     /// D15:792-798: without a call-site sidecar, a Snapshot's Entry Source
@@ -1228,7 +1595,7 @@ mod tests {
         let mut entry = fixture.entry(&snapshot);
         entry.source.locator = Some(&locator);
         let mut evaluation = Evaluation::default();
-        let admitted = admit_snapshot_entry(&mut evaluation, &entry, limits).unwrap();
+        let admitted = admit_snapshot_entry(&mut evaluation, &entry, limits, &unbounded()).unwrap();
         assert!(admitted.is_err());
         // The fixture identity's bytes in hexadecimal, computed outside this
         // crate.
@@ -1287,7 +1654,7 @@ mod tests {
         let mut entry = fixture.entry(&snapshot);
         entry.call_site = Some(call_site);
         let mut evaluation = Evaluation::default();
-        let admitted = admit_snapshot_entry(&mut evaluation, &entry, limits).unwrap();
+        let admitted = admit_snapshot_entry(&mut evaluation, &entry, limits, &unbounded()).unwrap();
         (evaluation, admitted)
     }
 
@@ -1452,7 +1819,9 @@ mod tests {
         entry.source.locator = locator;
         entry.call_site = call_site;
         let mut evaluation = Evaluation::default();
-        let Ok(document) = admit_snapshot_entry(&mut evaluation, &entry, limits).unwrap() else {
+        let Ok(document) =
+            admit_snapshot_entry(&mut evaluation, &entry, limits, &unbounded()).unwrap()
+        else {
             panic!("Phase 1 admits the document");
         };
         let programmatic = ProgrammaticEntry::new(&entry, &document);
