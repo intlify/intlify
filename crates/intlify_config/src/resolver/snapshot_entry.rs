@@ -112,7 +112,7 @@ pub(crate) struct EntrySnapshot<'a> {
     pub(crate) snapshot: &'a AdmittedSnapshot,
     pub(crate) source: Source<'a>,
     pub(crate) call_site: Option<&'a AdmittedCallSite>,
-    pub(crate) classify: &'a Classify,
+    pub(crate) classify: &'a Classify<'a>,
 }
 
 /// The bounds Phase 1 reads a Snapshot under: those the Admitted
@@ -165,7 +165,7 @@ impl Observer<'_, '_> {
 /// document Phase 1 materialized (D15:776, 792-800).
 pub(crate) struct ProgrammaticEntry<'a> {
     source: Source<'a>,
-    classify: &'a Classify,
+    classify: &'a Classify<'a>,
     spans: Option<CallSiteSpans<'a>>,
 }
 
@@ -196,7 +196,7 @@ impl ConfigurationEntry for ProgrammaticEntry<'_> {
         SafeOriginKind::ProfileSelectorProgrammatic
     }
 
-    fn classify(&self) -> &Classify {
+    fn classify(&self) -> &Classify<'_> {
         self.classify
     }
 
@@ -542,7 +542,7 @@ pub(crate) mod fixtures {
     /// have.
     pub(crate) struct SnapshotFixture {
         identity: ExactIdentity,
-        classify: Box<Classify>,
+        classify: Box<Classify<'static>>,
     }
 
     impl SnapshotFixture {

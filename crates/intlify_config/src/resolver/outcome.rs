@@ -878,22 +878,22 @@ pub(crate) mod tests {
 
     /// A projection's records with their owners and kinds, as `owned` gives
     /// them.
-    type Owned = Vec<(Unit, RecordKind, Value)>;
+    pub(crate) type Owned = Vec<(Unit, RecordKind, Value)>;
 
     /// What an outcome shows of its invocation, outliving it: its identity,
     /// its checked profile view with its bindings' tuples and members, each
     /// projection's records, the Shared one's terminal Finding and state when
     /// a bound exhausted it, and the shared-unavailability causes.
     #[derive(Debug, PartialEq)]
-    struct Shown {
-        identity: ConstructionIdentity,
-        checked: Option<(ProfileView, Vec<(ExactTuple, FormalMember)>)>,
-        shared: Option<(Owned, Option<(Value, Value)>)>,
-        entry: Owned,
-        unavailable: Vec<IssueKey>,
+    pub(crate) struct Shown {
+        pub(crate) identity: ConstructionIdentity,
+        pub(crate) checked: Option<(ProfileView, Vec<(ExactTuple, FormalMember)>)>,
+        pub(crate) shared: Option<(Owned, Option<(Value, Value)>)>,
+        pub(crate) entry: Owned,
+        pub(crate) unavailable: Vec<IssueKey>,
     }
 
-    fn shown(outcome: &Outcome<'_, '_>) -> Shown {
+    pub(crate) fn shown(outcome: &Outcome<'_, '_>) -> Shown {
         let evidence = &outcome.evidence;
         Shown {
             identity: outcome.identity,
@@ -916,7 +916,7 @@ pub(crate) mod tests {
     }
 
     /// The views of `shown`'s Entry records of `kind`, in order.
-    fn entry_views(shown: &Shown, kind: RecordKind) -> Vec<&Value> {
+    pub(crate) fn entry_views(shown: &Shown, kind: RecordKind) -> Vec<&Value> {
         shown
             .entry
             .iter()

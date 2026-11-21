@@ -127,7 +127,9 @@ impl From<EvaluationInvariant> for EntryInvariant {
 /// The classification of the members of an internal path from the
 /// configuration root, by what `specification-admission` bound to tell a
 /// locale key once it has, `None` in a record constructed before (D15:776).
-pub(crate) type Classify = dyn for<'e> Fn(&[Edge<'e>], Option<&dyn LocaleKeys>) -> Vec<Step<'e>>;
+/// It may borrow what fixes it, such as the resolver's configuration schema.
+pub(crate) type Classify<'a> =
+    dyn for<'e> Fn(&[Edge<'e>], Option<&dyn LocaleKeys>) -> Vec<Step<'e>> + 'a;
 
 /// The file Phase 1 reads, and what its Evidence names: the file's bytes, the
 /// source the entry admitted them under, and the classification of the
@@ -138,7 +140,7 @@ pub(crate) type Classify = dyn for<'e> Fn(&[Edge<'e>], Option<&dyn LocaleKeys>) 
 pub(crate) struct EntryFile<'a> {
     pub(crate) bytes: Arc<[u8]>,
     pub(crate) source: Source<'a>,
-    pub(crate) classify: &'a Classify,
+    pub(crate) classify: &'a Classify<'a>,
 }
 
 /// An entry as the phases after `entry-admission` observe it: the Safe
@@ -154,7 +156,7 @@ pub(crate) trait ConfigurationEntry {
     fn selector_origin(&self) -> SafeOriginKind;
 
     /// The classification of the members on an internal path (D15:776).
-    fn classify(&self) -> &Classify;
+    fn classify(&self) -> &Classify<'_>;
 
     /// The source that names the value at `locus`, and the value's span in
     /// that source when one applies (D15:790, 800).
@@ -203,7 +205,7 @@ impl ConfigurationEntry for EntryFile<'_> {
         SafeOriginKind::ProfileSelectorCli
     }
 
-    fn classify(&self) -> &Classify {
+    fn classify(&self) -> &Classify<'_> {
         self.classify
     }
 
@@ -568,7 +570,7 @@ pub(crate) mod fixtures {
     /// The classification of the members on a fact's path in the model's
     /// configuration schema under the capability's `comparable` bounds,
     /// which either entry's tests read.
-    pub(crate) fn classify(comparable: &ResolutionLimits) -> Box<Classify> {
+    pub(crate) fn classify(comparable: &ResolutionLimits) -> Box<Classify<'static>> {
         let comparable = comparable.clone();
         // The configuration schema the committed construction admits.
         let schema = committed().configuration_schema();
@@ -590,7 +592,7 @@ pub(crate) mod fixtures {
     /// bounds.
     pub(crate) struct FileFixture {
         identity: ExactIdentity,
-        classify: Box<Classify>,
+        classify: Box<Classify<'static>>,
     }
 
     impl FileFixture {
@@ -639,7 +641,7 @@ pub(crate) mod fixtures {
             SafeOriginKind::ProfileSelectorProgrammatic
         }
 
-        fn classify(&self) -> &Classify {
+        fn classify(&self) -> &Classify<'_> {
             self.0.classify()
         }
 
