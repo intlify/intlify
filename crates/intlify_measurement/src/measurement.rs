@@ -42,7 +42,8 @@ macro_rules! literal {
 }
 
 // Only the values the owners measure are admitted: durations of toolchain
-// components, and peak live bytes for design 015's memory cases. 026's wider
+// components and workflows, peak live bytes for design 015's memory cases,
+// and the core and product workflow surfaces they enclose. 026's wider
 // vocabularies are not implemented here, and an unlisted value is rejected
 // rather than silently carried. The variants have no doc comments, so each
 // vocabulary stays one string enumeration in the generated schema.
@@ -115,7 +116,10 @@ impl Category {
     pub const fn admits(self, class: OperationClass) -> bool {
         matches!(
             (self, class),
-            (Self::Toolchain, OperationClass::Component) | (Self::Memory, OperationClass::PeakLive)
+            (
+                Self::Toolchain,
+                OperationClass::Component | OperationClass::Workflow
+            ) | (Self::Memory, OperationClass::PeakLive)
         )
     }
 }
@@ -125,11 +129,21 @@ impl Category {
 #[serde(rename_all = "snake_case")]
 pub enum OperationClass {
     Component,
+    // A complete workflow, whose interval may enclose component intervals
+    // that are reported as cases of their own.
+    Workflow,
     PeakLive,
 }
 
+/// The measured performance surface.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Surface {
+    Core,
+    ProductWorkflow,
+}
+
 literal!(NoCalibration, "none", "No calibration was applied.");
-literal!(Surface, "core", "The measured performance surface.");
 literal!(Requirement, "required", "A case the inventory cannot omit.");
 literal!(
     ObservationalOnly,
@@ -405,6 +419,10 @@ pub enum Ineligibility {
 
 impl CommonDimensions<'_> {
     /// Check the combinations revision `"0"` admits.
+    ///
+    /// The surface is not one of them: it is the physical inclusion boundary,
+    /// independent of the category, so every surface is admitted with every
+    /// category.
     ///
     /// # Errors
     ///
@@ -810,6 +828,7 @@ mod tests {
     struct Declared {
         category: Category,
         operation_class: OperationClass,
+        surface: Surface,
         memory_domain: Option<MemoryObservationDomain>,
         metric: Metric,
         aggregation: Aggregation,
@@ -826,7 +845,7 @@ mod tests {
             CommonDimensions {
                 category: self.category,
                 operation_class: self.operation_class,
-                surface: Surface::Value,
+                surface: self.surface,
                 memory_domain: self.memory_domain.as_ref(),
                 metric: self.metric,
                 aggregation: self.aggregation,
@@ -866,6 +885,7 @@ mod tests {
         Declared {
             category: Category::Toolchain,
             operation_class: OperationClass::Component,
+            surface: Surface::Core,
             memory_domain: None,
             metric: Metric::WallDuration,
             aggregation: Aggregation::BatchTotal,
@@ -876,6 +896,7 @@ mod tests {
         Declared {
             category: Category::Memory,
             operation_class: OperationClass::PeakLive,
+            surface: Surface::Core,
             memory_domain: Some(domain()),
             metric: Metric::PeakLiveBytes,
             aggregation: Aggregation::PeakOverBatch,
@@ -904,10 +925,32 @@ mod tests {
             serde_json::to_value([Category::Toolchain, Category::Memory]).unwrap(),
             json!(["toolchain", "memory"])
         );
+        let classes = [
+            OperationClass::Component,
+            OperationClass::Workflow,
+            OperationClass::PeakLive,
+        ];
         assert_eq!(
-            serde_json::to_value([OperationClass::Component, OperationClass::PeakLive]).unwrap(),
-            json!(["component", "peak_live"])
+            serde_json::to_value(classes).unwrap(),
+            json!(["component", "workflow", "peak_live"])
         );
+        let surfaces = [Surface::Core, Surface::ProductWorkflow];
+        assert_eq!(
+            serde_json::to_value(surfaces).unwrap(),
+            json!(["core", "product_workflow"])
+        );
+        // Each spelling decodes to the value it was written from.
+        for class in classes {
+            let value = serde_json::to_value(class).unwrap();
+            assert_eq!(
+                serde_json::from_value::<OperationClass>(value).unwrap(),
+                class
+            );
+        }
+        for surface in surfaces {
+            let value = serde_json::to_value(surface).unwrap();
+            assert_eq!(serde_json::from_value::<Surface>(value).unwrap(), surface);
+        }
     }
 
     #[test]
@@ -919,11 +962,17 @@ mod tests {
         assert!(rejects::<Unit>("count"));
         assert!(rejects::<Unit>("millisecond"));
         assert!(rejects::<Category>("artifact_size"));
-        assert!(rejects::<OperationClass>("workflow"));
+        assert!(rejects::<OperationClass>("startup"));
+        assert!(rejects::<OperationClass>("io"));
         assert!(rejects::<OperationClass>("allocation"));
+        assert!(rejects::<Surface>("host_boundary"));
+        assert!(rejects::<Surface>("generated_output"));
         // Spellings are exact: no case folding and no other separator.
         assert!(rejects::<Metric>("peak-live-bytes"));
         assert!(rejects::<OperationClass>("peakLive"));
+        assert!(rejects::<OperationClass>("Workflow"));
+        assert!(rejects::<Surface>("product-workflow"));
+        assert!(rejects::<Surface>("productWorkflow"));
     }
 
     #[test]
@@ -945,15 +994,36 @@ mod tests {
     #[test]
     fn a_category_admits_only_its_own_operation_classes() {
         assert!(Category::Toolchain.admits(OperationClass::Component));
+        assert!(Category::Toolchain.admits(OperationClass::Workflow));
         assert!(!Category::Toolchain.admits(OperationClass::PeakLive));
         assert!(!Category::Memory.admits(OperationClass::Component));
+        assert!(!Category::Memory.admits(OperationClass::Workflow));
         assert!(Category::Memory.admits(OperationClass::PeakLive));
+    }
+
+    fn workflow() -> Declared {
+        Declared {
+            operation_class: OperationClass::Workflow,
+            surface: Surface::ProductWorkflow,
+            ..duration()
+        }
     }
 
     #[test]
     fn a_duration_case_and_a_memory_case_with_its_domain_are_eligible() {
         assert_eq!(duration().common().eligibility(), Ok(()));
+        assert_eq!(workflow().common().eligibility(), Ok(()));
         assert_eq!(memory().common().eligibility(), Ok(()));
+    }
+
+    #[test]
+    fn the_surface_is_independent_of_the_category_and_the_class() {
+        for base in [duration, workflow, memory] {
+            for surface in [Surface::Core, Surface::ProductWorkflow] {
+                let declared = Declared { surface, ..base() };
+                assert_eq!(declared.common().eligibility(), Ok(()), "{declared:?}");
+            }
+        }
     }
 
     #[test]
@@ -973,6 +1043,11 @@ mod tests {
             (
                 memory,
                 |declared| declared.operation_class = OperationClass::Component,
+                Ineligibility::OperationClass,
+            ),
+            (
+                memory,
+                |declared| declared.operation_class = OperationClass::Workflow,
                 Ineligibility::OperationClass,
             ),
             (

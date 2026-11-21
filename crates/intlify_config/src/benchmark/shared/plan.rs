@@ -60,6 +60,30 @@ literal_type!(Scale, "fixed-owner-recipe");
 literal_type!(ExecutionModel, "same-process-synchronous-ordinary-core");
 literal_type!(Concurrency, "sequential-cases-calling-thread-no-workers");
 
+/// Design 026's common grouping of the costs of one of design 015's phases:
+/// their category, operation class, and Performance Surface (D26:2804-2813).
+/// The complete invocation's costs are workflows on the product workflow
+/// surface, and the peak memory's are on the core surface whatever interval
+/// they observe; every other phase of 015's is a component on the core
+/// surface.
+fn grouping(phase: &str) -> (Category, OperationClass, Surface) {
+    match phase {
+        "profile_resolve_e2e" => (
+            Category::Toolchain,
+            OperationClass::Workflow,
+            Surface::ProductWorkflow,
+        ),
+        "profile_resolve_peak_memory" => {
+            (Category::Memory, OperationClass::PeakLive, Surface::Core)
+        }
+        _ => (
+            Category::Toolchain,
+            OperationClass::Component,
+            Surface::Core,
+        ),
+    }
+}
+
 fn subject() -> Subject {
     Subject {
         kind: SubjectKind::Value,
@@ -187,13 +211,11 @@ impl CaseProjection {
                     let operation = expected.declaration().operation;
                     let memory = operation.peak_memory()?;
                     let boundary = Boundary::for_memory(operation)?;
-                    Some(Self::memory(
-                        expected,
-                        profile_revision,
-                        memory,
-                        boundary,
-                        Method::observed_peak(observer),
-                    ))
+                    let method = Method::observed_peak(observer);
+                    Some(
+                        Self::duration(expected, profile_revision)
+                            .map(|duration| Self::memory(duration, memory, boundary, method)),
+                    )
                 }
             })
             .collect()
@@ -205,15 +227,16 @@ impl CaseProjection {
     ) -> Result<Self, PlanFailure> {
         let declaration = expected.declaration();
         let operation = declaration.operation;
+        let (category, operation_class, performance_surface) = grouping(operation.phase());
         Ok(Self {
             owner_identity: Token::literal("intlify-config"),
             owner_result_schema_revision: Token::literal("0"),
             owner_benchmark_profile_revision: Token::new(profile_revision)?,
             owner_phase: operation.phase().into(),
             owner_cost: operation.cost().into(),
-            category: Category::Toolchain,
-            operation_class: OperationClass::Component,
-            performance_surface: Surface::Value,
+            category,
+            operation_class,
+            performance_surface,
             memory_observation_domain: None,
             interval_boundary: Boundary::for_operation(operation),
             fixture: VersionedIdentity::new(
@@ -241,27 +264,24 @@ impl CaseProjection {
     }
 
     /// The peak live memory of a case's interval: the same fixture, variant,
-    /// workload, and execution state as its duration, under the memory pair,
-    /// the construction domain (D15:2805), and the observer's method.
-    fn memory(
-        expected: &FixtureExpectation,
-        profile_revision: &str,
-        memory: PeakMemory,
-        boundary: Boundary,
-        method: Method,
-    ) -> Result<Self, PlanFailure> {
-        Ok(Self {
+    /// workload, and execution state as its duration, under the memory pair
+    /// and its grouping, the construction domain (D15:2805), and the
+    /// observer's method.
+    fn memory(duration: Self, memory: PeakMemory, boundary: Boundary, method: Method) -> Self {
+        let (category, operation_class, performance_surface) = grouping(memory.phase);
+        Self {
             owner_phase: memory.phase.into(),
             owner_cost: memory.cost.into(),
-            category: Category::Memory,
-            operation_class: OperationClass::PeakLive,
+            category,
+            operation_class,
+            performance_surface,
             memory_observation_domain: Some(memory_domain::construction()),
             interval_boundary: boundary,
             metric: Metric::PeakLiveBytes,
             measurement_method: method,
             sample_aggregation: Aggregation::PeakOverBatch,
-            ..Self::duration(expected, profile_revision)?
-        })
+            ..duration
+        }
     }
 }
 

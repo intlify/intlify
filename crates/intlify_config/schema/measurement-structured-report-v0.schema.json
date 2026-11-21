@@ -545,7 +545,7 @@
     },
     "OperationClass": {
       "description": "The measured operation class.",
-      "enum": ["component", "peak_live"],
+      "enum": ["component", "workflow", "peak_live"],
       "type": "string"
     },
     "Outcome": {
@@ -964,7 +964,7 @@
     },
     "Surface": {
       "description": "The measured performance surface.",
-      "enum": ["core"],
+      "enum": ["core", "product_workflow"],
       "type": "string"
     },
     "Token": {

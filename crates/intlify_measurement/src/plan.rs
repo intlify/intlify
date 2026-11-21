@@ -304,7 +304,7 @@ mod tests {
             CommonDimensions {
                 category: Category::Toolchain,
                 operation_class: OperationClass::Component,
-                surface: Surface::Value,
+                surface: Surface::Core,
                 memory_domain: None,
                 metric: Metric::WallDuration,
                 aggregation: Aggregation::BatchTotal,
