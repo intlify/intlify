@@ -41,7 +41,7 @@
 //! the selector projected under the final projection authority Phase 4 fixed,
 //! or the capability's without a value, beside the Profile IDs the root
 //! declares (D15:807, 816-817, 2516). The construction and invocation inputs
-//! it takes are assembled outside it (plan 025 PR 4g).
+//! it takes are assembled outside it, by [`super::invocation`].
 
 use crate::artifacts::collection::FormalCollection;
 use crate::artifacts::vocabulary::FormalVocabulary;
@@ -238,8 +238,9 @@ fn admission(invariant: AdmissionInvariant) -> ResolverInvariant {
 /// construction and 015's pre-invocation boundary admitted them: what the
 /// resolver supports, the Profile Resolution Specification Input, the Admitted
 /// Implementation Capability, 018's Resource Limit Policy Verification Input,
-/// and the formally admitted collection and vocabulary. Until 015's
-/// Implementation Phase 5 constructs them, only tests do.
+/// and the formally admitted collection and vocabulary. [`super::invocation`]
+/// takes them from a constructed resolver and an admitted Resolver Invocation
+/// Input Set; tests and the benchmark also build them.
 pub(crate) struct Invocation<'a, Id> {
     pub(crate) supported: &'a SupportedSpecifications<Id>,
     pub(crate) specifications: &'a SpecificationInput<Id>,
@@ -325,6 +326,10 @@ pub(crate) enum ResolverInvariant {
     /// Profile projection lacked a result, for these causes, although the
     /// invocation found no blocking Finding.
     Unprojected(Causes),
+    /// The invocation's inputs were admitted against another resolver's
+    /// Resolver Construction Identity, so no outcome could carry one equal to
+    /// both the resolver's and the admitted reference (D15:1150).
+    OtherConstruction,
 }
 
 impl From<ReportingInvariant> for ResolverInvariant {
@@ -1288,6 +1293,33 @@ pub(super) mod tests {
 
         pub(crate) fn declaration(&mut self) -> &mut Value {
             &mut self.config["profiles"][self.selected]
+        }
+
+        /// What a binding submits for these inputs besides the specification
+        /// input: the configuration, the Profile ID the selector names, the
+        /// collection's members, the vocabulary's members, the capability, and
+        /// the policy the Verification Input pins.
+        pub(crate) fn submitted(
+            &self,
+        ) -> (
+            &Value,
+            &str,
+            &[Value],
+            &[&str],
+            ImplementationCapability,
+            &ExactTuple,
+        ) {
+            let capability = ImplementationCapability::fixture_owned(self.capability.clone())
+                .with_evidence_metadata(self.metadata);
+            let config = &self.config;
+            (
+                config,
+                self.selected,
+                &self.members,
+                self.surfaces,
+                capability,
+                &self.pinned,
+            )
         }
 
         /// The capability's `evidenceMetadata` bounds `limits` in place of
