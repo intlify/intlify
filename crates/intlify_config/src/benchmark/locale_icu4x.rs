@@ -6,7 +6,11 @@
 //! as its fixture and admits them in 017's six steps, as a host admits bytes it
 //! acquired; the measured call is the same boundary the finite cases measure.
 //! A case reuses one admitted engine for every invocation, or admits a fresh
-//! one before each, outside the interval.
+//! one before each, outside the interval. A complete invocation instead
+//! submits the same bytes in its data slot, for its Phase 5 to admit.
+
+use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
@@ -52,6 +56,19 @@ fn acquire(address: &str) -> Option<Vec<u8>> {
         "markers.postcard" => Some(MARKERS.to_vec()),
         _ => None,
     }
+}
+
+/// The committed artifact as a host submits it in an invocation's
+/// `locale-canonicalization-data` slot: the manifest, and the payloads it
+/// acquired, kept at the addresses the manifest names for the slot's reader to
+/// share.
+pub(super) fn submitted() -> (&'static [u8], BTreeMap<String, Arc<[u8]>>) {
+    let payloads = [
+        ("conformance.json", CONFORMANCE),
+        ("markers.postcard", MARKERS),
+    ]
+    .map(|(address, bytes)| (address.to_owned(), Arc::from(bytes)));
+    (MANIFEST, BTreeMap::from(payloads))
 }
 
 /// The committed artifact was not admitted, or did not bind what revision "0"

@@ -82,11 +82,16 @@ const ROOM: VocabularyLimits = VocabularyLimits {
     total_member_bytes: u64::MAX,
 };
 
-/// The sealed vocabulary past 015's pre-invocation boundary.
-pub(super) fn vocabulary() -> Option<FormalVocabulary> {
+/// The sealed vocabulary's bytes, as an invocation submits them.
+pub(super) fn vocabulary_bytes() -> Option<Vec<u8>> {
     let artifact =
         IntentSurfaceClassVocabularyArtifact::sealed(VOCABULARY.0, VOCABULARY.1, &SURFACES).ok()?;
-    vocabulary::read(Some(&serde_json::to_vec(&artifact).ok()?), &ROOM).ok()
+    serde_json::to_vec(&artifact).ok()
+}
+
+/// The sealed vocabulary past 015's pre-invocation boundary.
+pub(super) fn vocabulary() -> Option<FormalVocabulary> {
+    vocabulary::read(Some(&vocabulary_bytes()?), &ROOM).ok()
 }
 
 /// All eight slots, each asserting what the resolver supports for the

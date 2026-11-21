@@ -65,6 +65,8 @@ mod shared;
 mod target_group;
 #[cfg(feature = "benchmark")]
 mod work;
+#[cfg(feature = "benchmark")]
+mod workflow;
 
 #[cfg(feature = "benchmark")]
 pub(crate) fn run_plan_schema() -> Result<serde_json::Value, serde_json::Error> {
