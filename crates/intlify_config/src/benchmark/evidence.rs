@@ -32,6 +32,7 @@ use crate::locale::{Supported, VersionedIdentity};
 use crate::resolver::artifact_resolution::ArtifactSet;
 use crate::resolver::entry::fixtures::FileFixture;
 use crate::resolver::evaluation::{Admitted, Evaluation, ExhaustedBound, Status, Unit};
+use crate::resolver::evidence_metadata::fixtures::unbounded;
 use crate::resolver::outcome::{shared_projection, SharedStage};
 use crate::resolver::profile_resolution::{invoke_file, Invocation, Invoked, ResolverInvariant};
 use crate::resolver::reporting::{Candidates, Record, ReportingDomain};
@@ -43,6 +44,7 @@ use crate::resolver::token::{self, Sha256, Specification, Tokens};
 use crate::structural::selection::SelectorInput;
 use crate::structural::StructuralLimits;
 
+use super::cases::evidence_limits;
 use super::observation::{Frame, Observation};
 use super::operation::{OutputFailure, Schema};
 use super::quantity::Quantity;
@@ -121,12 +123,12 @@ pub(super) fn supported() -> Option<SupportedSpecifications<Id>> {
 
 /// A case's configuration file and the bounds strict file entry reads it
 /// under, the structural stage's bounds and schema, the selector, and the
-/// invocation's other inputs past 015's pre-invocation boundary.
+/// invocation's other inputs past 015's pre-invocation boundary. No classifier
+/// of the file's keys is kept: each invocation derives it from the capability.
 pub(super) struct PreparedEvidence {
     pub(super) source: Arc<[u8]>,
     pub(super) input: InputLimits,
     pub(super) structural: StructuralLimits,
-    pub(super) file: FileFixture,
     pub(super) schema: Schema,
     pub(super) selector: SelectorInput,
     pub(super) supported: SupportedSpecifications<Id>,
@@ -150,6 +152,22 @@ impl PreparedEvidence {
         }
     }
 
+    /// What the configuration file is admitted under: its keys are classified
+    /// under the capability's `policyComparable` bounds (D15:776), the ones
+    /// the input context binds.
+    fn fixture(&self) -> FileFixture {
+        FileFixture::new(self.capability.policy_comparable())
+    }
+
+    /// Whether every count the stages make has room under the capability:
+    /// its bounds are the ones every recipe but `Truncated` is prepared under.
+    /// `Truncated`, or a case at the edge of a bound, has a bound at or below
+    /// the count it limits.
+    fn has_room(&self) -> bool {
+        *self.capability.policy_comparable() == evidence_limits()
+            && self.capability.bootstrap_only().evidence_metadata == unbounded()
+    }
+
     /// The invocation's evaluation phases over the configuration file,
     /// recording into `evaluation`: what they leave for the Evidence stages,
     /// or `None` on a resolver defect. The Set Phase 9 admits is kept in
@@ -160,7 +178,8 @@ impl PreparedEvidence {
         invocation: &Invocation<'s, Id>,
         set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
     ) -> Option<Invoked<'s, Id>> {
-        let file = self.file.file(Arc::clone(&self.source));
+        let fixture = self.fixture();
+        let file = fixture.file(Arc::clone(&self.source));
         invoke_file(
             evaluation,
             (&file, self.input),
@@ -423,9 +442,12 @@ impl InputFacts {
             specifications:
                 "fixture-active-profile-specification-and-every-slot-asserting-what-it-supports"
                     .into(),
-            capability:
+            capability: if prepared.has_room() {
                 "fixture-owned-capability-with-room-for-every-diagnostic-and-evidence-metadata-count"
-                    .into(),
+            } else {
+                "fixture-owned-capability-with-a-bound-at-or-below-its-count"
+            }
+            .into(),
             verification: "fixture-owned-verification-input-pinning-the-selected-policy".into(),
             canonicalization: "finite-fixture-provider-under-its-own-pins".into(),
             submitted_members: Quantity::new(count(prepared.collection.members().len())),
@@ -525,13 +547,12 @@ fn domain(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::benchmark::cases::evidence_limits;
     use crate::benchmark::cases::prepare::prepare;
     use crate::benchmark::cases::{declarations, EvidenceRecipe as R, Recipe};
     use crate::benchmark::operation::{Operation, Prepared};
     use crate::input_limits::Bound;
     use crate::resolver::capability::EvidenceMetadataLimits;
-    use crate::resolver::evidence_metadata::fixtures::{unbounded, with};
+    use crate::resolver::evidence_metadata::fixtures::with;
     use crate::resolver::evidence_metadata::MetadataBound;
     use crate::resolver::limits::{BoundId, Group, ResolutionLimits};
     use crate::resolver::outcome::outcome;
@@ -659,6 +680,36 @@ mod tests {
         ImplementationCapability::fixture_owned(limits).with_evidence_metadata(metadata)
     }
 
+    /// Only the bounds every recipe but `Truncated` is prepared under are
+    /// described as room for every count: `Truncated`'s Shared `maxRecords`,
+    /// a diagnostic bound at a count, and an `evidenceMetadata` bound at one
+    /// are each a bound at or below its count.
+    #[test]
+    fn only_the_default_bounds_are_described_as_room_for_every_count() {
+        let records = BoundId {
+            group: Group::DiagnosticsShared,
+            name: "maxRecords",
+        };
+        let described = |prepared: &PreparedEvidence| InputFacts::observe(prepared).capability;
+        assert_eq!(
+            described(&prepared(R::Storefront)),
+            "fixture-owned-capability-with-room-for-every-diagnostic-and-evidence-metadata-count"
+        );
+        for capability in [
+            ImplementationCapability::fixture_owned(R::Truncated.limits())
+                .with_evidence_metadata(unbounded()),
+            capability(Some((records, 1)), unbounded()),
+            capability(None, with(MetadataBound::SubjectOccurrences, 1)),
+        ] {
+            let mut prepared = prepared(R::Storefront);
+            prepared.capability = capability;
+            assert_eq!(
+                described(&prepared),
+                "fixture-owned-capability-with-a-bound-at-or-below-its-count"
+            );
+        }
+    }
+
     /// A Shared domain a bound exhausts is retained with its terminal cursor
     /// and the bound its terminal Finding names, and observed apart from the
     /// one committed whole: a diagnostic bound of the domain, and a count of
@@ -782,6 +833,33 @@ mod tests {
             assert!(!seen.contains(&observation.shared), "{recipe:?}");
             seen.push(observation.shared);
         }
+    }
+
+    /// The file's keys are classified under the capability the input context
+    /// binds, never under limits of their own: a Profile ID past the
+    /// capability's `maxProfileIdBytes` is unsafe (D15:776).
+    #[test]
+    fn the_file_is_classified_under_the_capabilitys_bounds() {
+        use crate::resolver::evidence_path::Step;
+        use crate::structural::Edge;
+
+        let path = [Edge::Member("profiles"), Edge::Member("app")];
+        let steps = |prepared: &PreparedEvidence| {
+            let fixture = prepared.fixture();
+            let file = fixture.file(Arc::clone(&prepared.source));
+            (file.classify)(&path, None)
+        };
+        let mut prepared = prepared(R::Storefront);
+        assert_eq!(
+            steps(&prepared),
+            [Step::Safe("profiles"), Step::Safe("app")]
+        );
+        let bytes = BoundId {
+            group: Group::ConfigurationInput,
+            name: "maxProfileIdBytes",
+        };
+        prepared.capability = capability(Some((bytes, 2)), unbounded());
+        assert_eq!(steps(&prepared), [Step::Safe("profiles"), Step::Unsafe]);
     }
 
     /// The digest the vocabulary slot asserts is the sealed vocabulary's.

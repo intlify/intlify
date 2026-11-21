@@ -143,6 +143,35 @@ impl<Id> SupportedSpecifications<Id> {
     }
 }
 
+/// Each other slot's supported value, which the benchmark's input context
+/// binds beside the assertions.
+#[cfg(feature = "benchmark")]
+impl<Id> SupportedSpecifications<Id> {
+    pub(crate) const fn locale_canonicalization(&self) -> &Supported<Id> {
+        &self.locale_canonicalization
+    }
+
+    pub(crate) const fn locale_negotiation(&self) -> &VersionedIdentity<Id> {
+        &self.locale_negotiation
+    }
+
+    pub(crate) const fn message_locale_fallback(&self) -> &VersionedIdentity<Id> {
+        &self.message_locale_fallback
+    }
+
+    pub(crate) const fn coverage(&self) -> &VersionedIdentity<Id> {
+        &self.coverage
+    }
+
+    pub(crate) const fn delivery_graph(&self) -> &VersionedIdentity<Id> {
+        &self.delivery_graph
+    }
+
+    pub(crate) const fn delivery_placement(&self) -> &VersionedIdentity<Id> {
+        &self.delivery_placement
+    }
+}
+
 const fn unit(phase: Phase, slot: Slot) -> Unit {
     Unit {
         phase,

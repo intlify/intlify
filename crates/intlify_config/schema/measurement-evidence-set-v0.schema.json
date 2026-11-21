@@ -5157,6 +5157,7 @@
         "finding-candidate",
         "finding-key",
         "causal-finding-key",
+        "causal-finding-key-occurrence",
         "subject-occurrence",
         "token-input",
         "collision-comparison",

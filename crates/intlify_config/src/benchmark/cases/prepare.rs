@@ -1477,7 +1477,6 @@ fn evidence_inputs(
         source: Arc::from(recipe.source(&limits)),
         input,
         structural,
-        file: FileFixture::new(&limits),
         schema: configuration_schema().clone(),
         selector: selector_input(selector, structural.max_profile_id_bytes),
         supported: evidence::supported().ok_or(PreparationFailure::CoreInvariant)?,
