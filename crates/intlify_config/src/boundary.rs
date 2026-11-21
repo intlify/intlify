@@ -29,11 +29,14 @@
 //! Call-Site Source pair checked against the sidecar's source bytes. A file
 //! or programmatic Entry Admission Input Set is admitted in a step of its own
 //! that works like the common one (015-172, 015-201); the steps share the
-//! parts in `step`.
+//! parts in `step`. The reference to the Resolver Construction Identity is
+//! admitted at a boundary of its own, against the identity of the resolver the
+//! invocation runs on (D15:3151).
 
 pub(crate) mod call_site;
 pub(crate) mod capability;
 pub(crate) mod common;
+pub(crate) mod construction_identity;
 pub(crate) mod entry;
 pub(crate) mod locator;
 pub(crate) mod origin;
