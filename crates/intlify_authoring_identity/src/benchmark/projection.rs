@@ -189,7 +189,7 @@ impl CaseProjection {
             owner_cost: operation.cost().into(),
             category: Category::Toolchain,
             operation_class: OperationClass::Component,
-            performance_surface: Surface::Value,
+            performance_surface: Surface::Core,
             interval_boundary: Boundary::for_operation(operation),
             fixture: VersionedIdentity::literal("intlify-authoring-identity-minimum-fixtures", "0"),
             variant: Variant {
