@@ -27,7 +27,6 @@ pub(super) use hydration_inputs::HydrationRecipe;
 mod construction_inputs;
 pub(super) use construction_inputs::ConstructionRecipe;
 mod evidence_inputs;
-#[cfg(test)]
 pub(super) use evidence_inputs::limits as evidence_limits;
 pub(super) use evidence_inputs::EvidenceRecipe;
 #[cfg(test)]

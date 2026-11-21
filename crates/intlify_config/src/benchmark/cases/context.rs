@@ -396,9 +396,11 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
 /// One file entry's complete invocation: the recipe's configuration file
 /// under the App selector, the bounds it is read and analyzed under and the
 /// schema, every member in submission order and the limits the collection
-/// was read under, every bound of the capability, the Verification Input's
-/// pins, every specification asserted and the active one supported with the
-/// fixture provider's pins, the vocabulary, and the stage's `facts`.
+/// was read under, every bound of the capability, whose `policyComparable`
+/// bounds also classify the file's keys, the Verification Input's pins,
+/// every specification asserted and what the resolver supports in each slot
+/// it compares, the fixture provider's pins, the vocabulary, and the stage's
+/// `facts`.
 fn evidence_input(
     frame: &mut Frame,
     candidate: &Candidate,
@@ -475,10 +477,31 @@ fn evidence_input(
     frame.text(vocabulary.identity);
     frame.text(vocabulary.revision);
     frame.text(vocabulary.semantic_digest);
-    let active = prepared.supported.project_profile();
+    // What the resolver supports in each slot, which it compares the
+    // assertion with; the vocabulary slot has no supported value.
+    let supported = &prepared.supported;
+    let active = supported.project_profile();
     frame.text(active.specification.identity);
     frame.text(active.specification.revision);
     frame.text(active.semantic_digest);
+    let canonicalization = supported.locale_canonicalization().entries();
+    frame.uint(u64::try_from(canonicalization.len()).map_err(|_| ContextFailure::Encoding)?);
+    for pins in canonicalization {
+        frame.text(pins.specification.identity);
+        frame.text(pins.specification.revision);
+        frame.text(pins.dataset.identity);
+        frame.text(pins.dataset.semantic_digest);
+    }
+    for specification in [
+        supported.locale_negotiation(),
+        supported.message_locale_fallback(),
+        supported.coverage(),
+        supported.delivery_graph(),
+        supported.delivery_placement(),
+    ] {
+        frame.text(specification.identity);
+        frame.text(specification.revision);
+    }
     let pins = fixture_pins();
     frame.text(pins.specification.identity);
     frame.text(pins.specification.revision);

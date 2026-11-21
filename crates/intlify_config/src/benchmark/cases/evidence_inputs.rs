@@ -658,6 +658,104 @@ mod tests {
         }
     }
 
+    /// The input context of each stage binds what the resolver supports in
+    /// every slot it compares an assertion with: another identity, revision,
+    /// canonicalization dataset, or active digest in any slot changes it.
+    #[test]
+    fn the_input_context_binds_every_supported_specification() {
+        use crate::benchmark::cases::context::observe;
+        use crate::benchmark::cases::prepare::{prepare, Candidate};
+        use crate::benchmark::cases::{declarations, Recipe};
+        use crate::benchmark::evidence::{supported, PreparedEvidence, ACTIVE};
+        use crate::benchmark::operation::{Operation, Prepared};
+        use crate::locale::fixtures::fixture_pins;
+        use crate::locale::{DatasetPin, SemanticPins, Supported, VersionedIdentity};
+        use crate::resolver::specification::{
+            ActiveProfileSpecification, SupportedSpecifications, FIXTURE_PROFILE_DIGEST,
+        };
+
+        fn evidence(candidate: &mut Candidate) -> &mut PreparedEvidence {
+            match &mut candidate.prepared {
+                Prepared::SharedEvidence(prepared) | Prepared::EntryEvidence(prepared) => prepared,
+                Prepared::OutcomeFinalization(prepared) => &mut prepared.evidence,
+                _ => unreachable!(),
+            }
+        }
+
+        // Every supported value in slot order: the active specification and
+        // its digest, the canonicalization specification and its dataset,
+        // and the five others.
+        let pins = fixture_pins();
+        let baseline = [
+            ACTIVE.identity,
+            ACTIVE.revision,
+            FIXTURE_PROFILE_DIGEST,
+            pins.specification.identity,
+            pins.specification.revision,
+            pins.dataset.identity,
+            pins.dataset.semantic_digest,
+            "intlify-locale-negotiation",
+            "0",
+            "intlify-message-locale-fallback",
+            "0",
+            "intlify-localization-coverage",
+            "0",
+            "intlify-delivery-graph",
+            "0",
+            "intlify-delivery-placement",
+            "0",
+        ];
+        let built = |values: &[&'static str; 17]| {
+            let versioned = |at: usize| VersionedIdentity {
+                identity: values[at],
+                revision: values[at + 1],
+            };
+            let canonicalization = SemanticPins {
+                specification: versioned(3),
+                dataset: DatasetPin {
+                    identity: values[5],
+                    semantic_digest: values[6],
+                },
+            };
+            SupportedSpecifications::new(
+                ActiveProfileSpecification {
+                    specification: versioned(0),
+                    semantic_digest: values[2],
+                },
+                Supported::new(vec![canonicalization]).unwrap(),
+                versioned(7),
+                versioned(9),
+                versioned(11),
+                versioned(13),
+                versioned(15),
+            )
+        };
+        assert_eq!(built(&baseline), supported().unwrap());
+        for operation in [
+            Operation::SharedEvidence,
+            Operation::EntryEvidence,
+            Operation::OutcomeFinalization,
+        ] {
+            let declaration = declarations()
+                .into_iter()
+                .find(|case| {
+                    case.operation == operation
+                        && case.fixture == Recipe::Evidence(EvidenceRecipe::Storefront)
+                })
+                .unwrap();
+            let mut candidate = prepare(&declaration).unwrap();
+            let mut seen = vec![observe(&candidate).unwrap()];
+            for index in 0..baseline.len() {
+                let mut values = baseline;
+                values[index] = "another";
+                evidence(&mut candidate).supported = built(&values);
+                let observed = observe(&candidate).unwrap();
+                assert!(!seen.contains(&observed), "{operation:?} value {index}");
+                seen.push(observed);
+            }
+        }
+    }
+
     /// Each file is its configuration's JSON, but the malformed one, which is
     /// the example's without its last byte and so no JSON, and the
     /// inadmissible one, which no JSON-compatible value holds.
@@ -708,11 +806,157 @@ mod tests {
         }
     }
 
+    /// What counts each edge's bound, and the bound by its group's path and
+    /// its name, written apart from [`EvidenceBound::of`], which the edges'
+    /// preparation reads, so that two bounds counting alike cannot trade
+    /// places unseen (plan 025 decision #295).
+    const COUNTED: [(LimitKind, WorkKind, &str); 26] = [
+        (
+            LimitKind::SharedFindingOccurrences,
+            WorkKind::SharedEvidenceFindingCandidates,
+            "diagnostics.shared.maxFindingOccurrences",
+        ),
+        (
+            LimitKind::SharedFindings,
+            WorkKind::SharedEvidenceFindings,
+            "diagnostics.shared.maxFindings",
+        ),
+        (
+            LimitKind::SharedEvaluationStatusEntries,
+            WorkKind::SharedEvidenceEvaluationStatuses,
+            "diagnostics.shared.maxEvaluationStatusEntries",
+        ),
+        (
+            LimitKind::SharedSuppressionCausesPerStatus,
+            WorkKind::SharedEvidenceMaximumCausesPerStatus,
+            "diagnostics.shared.maxSuppressionCausesPerStatus",
+        ),
+        (
+            LimitKind::SharedSuppressionCauseOccurrences,
+            WorkKind::SharedEvidenceCauseOccurrences,
+            "diagnostics.shared.maxSuppressionCauseOccurrences",
+        ),
+        (
+            LimitKind::SharedRecords,
+            WorkKind::SharedEvidenceRecords,
+            "diagnostics.shared.maxRecords",
+        ),
+        (
+            LimitKind::SharedTotalCanonicalBytes,
+            WorkKind::SharedEvidenceCanonicalBytes,
+            "diagnostics.shared.maxTotalCanonicalBytes",
+        ),
+        (
+            LimitKind::SharedScopeSubjectOccurrences,
+            WorkKind::SharedEvidenceSubjectOccurrences,
+            "evidenceMetadata.maxSubjectOccurrences",
+        ),
+        (
+            LimitKind::SharedScopeTokenInputs,
+            WorkKind::SharedEvidenceTokenInputs,
+            "evidenceMetadata.maxTokenInputs",
+        ),
+        (
+            LimitKind::SharedScopeMetadataWorkUnits,
+            WorkKind::SharedEvidenceMetadataWorkUnits,
+            "evidenceMetadata.maxMetadataWorkUnits",
+        ),
+        (
+            LimitKind::EntryFindingOccurrences,
+            WorkKind::EntryEvidenceFindingCandidates,
+            "diagnostics.entry.maxFindingOccurrences",
+        ),
+        (
+            LimitKind::EntryFindings,
+            WorkKind::EntryEvidenceFindings,
+            "diagnostics.entry.maxFindings",
+        ),
+        (
+            LimitKind::EntryRelatedEvidencePerOccurrenceGroup,
+            WorkKind::EntryEvidenceMaximumRelatedEvidencePerOccurrenceGroup,
+            "diagnostics.entry.maxRelatedEvidencePerOccurrenceGroup",
+        ),
+        (
+            LimitKind::EntryRelatedEvidenceOccurrences,
+            WorkKind::EntryEvidenceRelatedEvidenceOccurrences,
+            "diagnostics.entry.maxRelatedEvidenceOccurrences",
+        ),
+        (
+            LimitKind::EntrySingleEvidenceBytes,
+            WorkKind::EntryEvidenceMaximumSingleEvidenceBytes,
+            "diagnostics.entry.maxSingleEvidenceBytes",
+        ),
+        (
+            LimitKind::EntryTotalEvidenceBytes,
+            WorkKind::EntryEvidenceTotalEvidenceBytes,
+            "diagnostics.entry.maxTotalEvidenceBytes",
+        ),
+        (
+            LimitKind::EntryEvaluationStatusEntries,
+            WorkKind::EntryEvidenceEvaluationStatuses,
+            "diagnostics.entry.maxEvaluationStatusEntries",
+        ),
+        (
+            LimitKind::EntrySuppressionCausesPerStatus,
+            WorkKind::EntryEvidenceMaximumCausesPerStatus,
+            "diagnostics.entry.maxSuppressionCausesPerStatus",
+        ),
+        (
+            LimitKind::EntrySuppressionCauseOccurrences,
+            WorkKind::EntryEvidenceCauseOccurrences,
+            "diagnostics.entry.maxSuppressionCauseOccurrences",
+        ),
+        (
+            LimitKind::EntryRecords,
+            WorkKind::EntryEvidenceRecords,
+            "diagnostics.entry.maxRecords",
+        ),
+        (
+            LimitKind::EntryTotalCanonicalBytes,
+            WorkKind::EntryEvidenceCanonicalBytes,
+            "diagnostics.entry.maxTotalCanonicalBytes",
+        ),
+        (
+            LimitKind::InvocationLogicalPathSegments,
+            WorkKind::EntryEvidenceMaximumLogicalPathSegments,
+            "evidenceMetadata.maxLogicalPathSegments",
+        ),
+        (
+            LimitKind::InvocationLogicalPathCanonicalBytes,
+            WorkKind::EntryEvidenceMaximumLogicalPathCanonicalBytes,
+            "evidenceMetadata.maxLogicalPathCanonicalBytes",
+        ),
+        (
+            LimitKind::InvocationSubjectOccurrences,
+            WorkKind::EntryEvidenceSubjectOccurrences,
+            "evidenceMetadata.maxSubjectOccurrences",
+        ),
+        (
+            LimitKind::InvocationTokenInputs,
+            WorkKind::EntryEvidenceTokenInputs,
+            "evidenceMetadata.maxTokenInputs",
+        ),
+        (
+            LimitKind::InvocationMetadataWorkUnits,
+            WorkKind::EntryEvidenceMetadataWorkUnits,
+            "evidenceMetadata.maxMetadataWorkUnits",
+        ),
+    ];
+
+    /// The group's path and the name of the bound that exhausted a domain.
+    fn path(bound: ExhaustedBound) -> String {
+        match bound {
+            ExhaustedBound::Domain(id) => format!("{}.{}", id.group.path(), id.name),
+            ExhaustedBound::Capability(id) => format!("{}.{}", id.group.path(), id.name),
+        }
+    }
+
     /// Each edge of `edges` on `operation` sits on its recipe at the count
     /// the recipe's unbounded case reports in its logical work, and one
     /// under it: the capability sets the bound to that limit, and only the
     /// first-over edge's domain is exhausted, naming the bound, as `exhausted`
-    /// reads it from the output.
+    /// reads it from the output. What counts the bound and the bound itself
+    /// are the ones [`COUNTED`] writes.
     fn each_edge_sits_at_its_count_and_one_under(
         operation: crate::benchmark::operation::Operation,
         edges: &[(LimitKind, EvidenceRecipe)],
@@ -734,6 +978,12 @@ mod tests {
         };
         for &(kind, recipe) in edges {
             let (bound, work) = EvidenceBound::of(kind).unwrap();
+            let &(_, counts, named) = COUNTED
+                .iter()
+                .find(|(written, ..)| *written == kind)
+                .unwrap_or_else(|| panic!("{kind:?} is not written"));
+            assert_eq!(work, counts, "{kind:?}");
+            assert_eq!(path(bound.exhausted()), named, "{kind:?}");
             let counted = prepare(&case(recipe, None))
                 .unwrap()
                 .logical_work

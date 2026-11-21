@@ -1016,6 +1016,38 @@ fn the_shared_evidence_work_counts_what_the_stage_committed() {
     }
 }
 
+/// The causes of one not-evaluated status count as distinct causal Finding
+/// Keys, after cause-set deduplication, and every cause as a causal Finding
+/// Key occurrence, before it, in either domain (D15:1953, 1954, 1965, 1966).
+#[test]
+fn the_cause_counts_are_in_their_bounds_units() {
+    for (kind, unit, spelling) in [
+        (
+            WorkKind::SharedEvidenceMaximumCausesPerStatus,
+            WorkUnit::CausalFindingKey,
+            "causal-finding-key",
+        ),
+        (
+            WorkKind::SharedEvidenceCauseOccurrences,
+            WorkUnit::CausalFindingKeyOccurrence,
+            "causal-finding-key-occurrence",
+        ),
+        (
+            WorkKind::EntryEvidenceMaximumCausesPerStatus,
+            WorkUnit::CausalFindingKey,
+            "causal-finding-key",
+        ),
+        (
+            WorkKind::EntryEvidenceCauseOccurrences,
+            WorkUnit::CausalFindingKeyOccurrence,
+            "causal-finding-key-occurrence",
+        ),
+    ] {
+        assert_eq!(kind.unit(), unit, "{kind:?}");
+        assert_eq!(serde_json::to_value(unit).unwrap(), json!(spelling));
+    }
+}
+
 /// An Entry projection stage case's declaration and its prepared candidate.
 fn entry_candidate(
     recipe: crate::benchmark::cases::EvidenceRecipe,
@@ -1032,6 +1064,107 @@ fn entry_candidate(
     prepare(&declaration).unwrap()
 }
 
+/// Each fact of the Entry projection stage's work, counted again from what
+/// `output`'s Entry domain committed and what the complete invocation
+/// counted, each in its bound's unit (D15:1851, 1946-1956, 2796): `None` for
+/// the four counts over what path admission leaves when a path past its bound
+/// ended the count before them (plan 025 decisions #232 and #265).
+fn recounted(output: &Output) -> Vec<(WorkKind, Option<u64>)> {
+    use crate::construction::registry::check::RecordKind;
+
+    let Output::EntryEvidence(resolved) = output else {
+        unreachable!()
+    };
+    let slices = &resolved.result.as_ref().unwrap().slices;
+    let invocation = resolved.invocation;
+    let admitted = invocation.admitted;
+    let records: Vec<_> = slices.iter().flat_map(|slice| &slice.records).collect();
+    let evidence: Vec<u64> = slices
+        .iter()
+        .flat_map(|slice| slice.candidates.evidence.iter().copied())
+        .collect();
+    let of = |kind| records.iter().filter(|record| record.kind == kind).count() as u64;
+    vec![
+        (
+            WorkKind::EntryEvidenceFindingCandidates,
+            Some(slices.iter().map(|slice| slice.candidates.findings).sum()),
+        ),
+        (
+            WorkKind::EntryEvidenceFindings,
+            Some(of(RecordKind::EntryFinding)),
+        ),
+        (
+            WorkKind::EntryEvidenceMaximumRelatedEvidencePerOccurrenceGroup,
+            Some(
+                records
+                    .iter()
+                    .map(|record| record.related)
+                    .max()
+                    .unwrap_or(0),
+            ),
+        ),
+        (
+            WorkKind::EntryEvidenceRelatedEvidenceOccurrences,
+            Some(slices.iter().map(|slice| slice.candidates.related).sum()),
+        ),
+        (
+            WorkKind::EntryEvidenceMaximumSingleEvidenceBytes,
+            Some(evidence.iter().copied().max().unwrap_or(0)),
+        ),
+        (
+            WorkKind::EntryEvidenceTotalEvidenceBytes,
+            Some(evidence.iter().sum()),
+        ),
+        (
+            WorkKind::EntryEvidenceEvaluationStatuses,
+            Some(of(RecordKind::EntryEvaluationStatus)),
+        ),
+        (
+            WorkKind::EntryEvidenceMaximumCausesPerStatus,
+            Some(
+                records
+                    .iter()
+                    .map(|record| record.causes)
+                    .max()
+                    .unwrap_or(0),
+            ),
+        ),
+        (
+            WorkKind::EntryEvidenceCauseOccurrences,
+            Some(slices.iter().map(|slice| slice.candidates.causes).sum()),
+        ),
+        (WorkKind::EntryEvidenceRecords, Some(records.len() as u64)),
+        (
+            WorkKind::EntryEvidenceCanonicalBytes,
+            Some(records.iter().map(|record| record.bytes).sum()),
+        ),
+        (
+            WorkKind::EntryEvidenceMaximumLogicalPathSegments,
+            Some(invocation.path_segments),
+        ),
+        (
+            WorkKind::EntryEvidenceMaximumLogicalPathCanonicalBytes,
+            Some(invocation.path_bytes),
+        ),
+        (
+            WorkKind::EntryEvidenceSubjectOccurrences,
+            admitted.map(|work| work.subject_occurrences),
+        ),
+        (
+            WorkKind::EntryEvidenceTokenInputs,
+            admitted.map(|work| work.token_inputs),
+        ),
+        (
+            WorkKind::EntryEvidenceCollisionComparisons,
+            admitted.map(|work| work.collision_comparisons),
+        ),
+        (
+            WorkKind::EntryEvidenceMetadataWorkUnits,
+            admitted.map(|work| work.metadata_work_units),
+        ),
+    ]
+}
+
 /// The Entry projection stage's work is what its Entry domain committed and
 /// the complete invocation counted, each in its bound's unit: the example
 /// commits no Finding Occurrence, the dense recipe one with a related
@@ -1041,7 +1174,6 @@ fn entry_candidate(
 #[test]
 fn the_entry_evidence_work_counts_what_the_stage_committed() {
     use crate::benchmark::cases::{EvidenceRecipe as R, DENSE};
-    use crate::construction::registry::check::RecordKind;
 
     let exact = |work: &LogicalWork, kind| match fact(work, kind).observation {
         WorkValue::Exact { value } => value.get(),
@@ -1050,92 +1182,8 @@ fn the_entry_evidence_work_counts_what_the_stage_committed() {
     for recipe in R::ENTRY {
         let candidate = entry_candidate(recipe);
         let work = &candidate.logical_work;
-        let Output::EntryEvidence(resolved) = &candidate.output else {
-            unreachable!()
-        };
-        let retained = resolved.result.as_ref().unwrap();
-        let invocation = resolved.invocation;
-        let admitted = invocation.admitted.unwrap();
-        let slices = &retained.slices;
-        let records: Vec<_> = slices.iter().flat_map(|slice| &slice.records).collect();
-        let evidence: Vec<u64> = slices
-            .iter()
-            .flat_map(|slice| slice.candidates.evidence.iter().copied())
-            .collect();
-        let of = |kind| records.iter().filter(|record| record.kind == kind).count() as u64;
-        for (kind, value) in [
-            (
-                WorkKind::EntryEvidenceFindingCandidates,
-                slices.iter().map(|slice| slice.candidates.findings).sum(),
-            ),
-            (
-                WorkKind::EntryEvidenceFindings,
-                of(RecordKind::EntryFinding),
-            ),
-            (
-                WorkKind::EntryEvidenceMaximumRelatedEvidencePerOccurrenceGroup,
-                records
-                    .iter()
-                    .map(|record| record.related)
-                    .max()
-                    .unwrap_or(0),
-            ),
-            (
-                WorkKind::EntryEvidenceRelatedEvidenceOccurrences,
-                slices.iter().map(|slice| slice.candidates.related).sum(),
-            ),
-            (
-                WorkKind::EntryEvidenceMaximumSingleEvidenceBytes,
-                evidence.iter().copied().max().unwrap_or(0),
-            ),
-            (
-                WorkKind::EntryEvidenceTotalEvidenceBytes,
-                evidence.iter().sum(),
-            ),
-            (
-                WorkKind::EntryEvidenceEvaluationStatuses,
-                of(RecordKind::EntryEvaluationStatus),
-            ),
-            (
-                WorkKind::EntryEvidenceMaximumCausesPerStatus,
-                records
-                    .iter()
-                    .map(|record| record.causes)
-                    .max()
-                    .unwrap_or(0),
-            ),
-            (
-                WorkKind::EntryEvidenceCauseOccurrences,
-                slices.iter().map(|slice| slice.candidates.causes).sum(),
-            ),
-            (WorkKind::EntryEvidenceRecords, records.len() as u64),
-            (
-                WorkKind::EntryEvidenceCanonicalBytes,
-                records.iter().map(|record| record.bytes).sum(),
-            ),
-            (
-                WorkKind::EntryEvidenceMaximumLogicalPathSegments,
-                invocation.path_segments,
-            ),
-            (
-                WorkKind::EntryEvidenceMaximumLogicalPathCanonicalBytes,
-                invocation.path_bytes,
-            ),
-            (
-                WorkKind::EntryEvidenceSubjectOccurrences,
-                admitted.subject_occurrences,
-            ),
-            (WorkKind::EntryEvidenceTokenInputs, admitted.token_inputs),
-            (
-                WorkKind::EntryEvidenceCollisionComparisons,
-                admitted.collision_comparisons,
-            ),
-            (
-                WorkKind::EntryEvidenceMetadataWorkUnits,
-                admitted.metadata_work_units,
-            ),
-        ] {
-            assert_eq!(exact(work, kind), value, "{recipe:?} {kind:?}");
+        for (kind, value) in recounted(&candidate.output) {
+            assert_eq!(Some(exact(work, kind)), value, "{recipe:?} {kind:?}");
         }
         let occurrences = exact(work, WorkKind::EntryEvidenceFindingCandidates);
         match recipe {
@@ -1177,40 +1225,81 @@ fn the_entry_evidence_work_counts_what_the_stage_committed() {
     }
 }
 
-/// A path past its bound ends the complete invocation's count before what
-/// path admission leaves: those four counts are unavailable for that reason,
-/// and the largest path and the Entry domain's counts stay exact (plan 025
-/// decisions #232 and #265).
+/// Only a path a record cannot do without ends the complete invocation's
+/// count before what path admission leaves; a path a record can do without
+/// is left absent instead (D15:776; plan 025 decisions #232, #265, and #296).
+/// In each path bound's first-over case the four counts over what path
+/// admission leaves are unavailable for that reason, the largest path is
+/// still the input's, and the Entry domain's counts are what the run
+/// committed: nothing, as the domain exhausts at its first unit. The file
+/// without a value carries only Logical input paths, so one under its largest
+/// leaves its Entry domain whole and all four counts exact.
 #[test]
-fn a_path_past_its_bound_leaves_the_admitted_counts_unavailable() {
-    let candidate = entry_candidate(crate::benchmark::cases::EvidenceRecipe::Storefront);
-    let complete = LogicalWork::observe(&candidate.prepared, &candidate.output).unwrap();
-    let Output::EntryEvidence(mut resolved) = candidate.output else {
-        unreachable!()
-    };
-    resolved.invocation.admitted = None;
-    let ended =
-        LogicalWork::observe(&candidate.prepared, &Output::EntryEvidence(resolved)).unwrap();
-    let unavailable = [
-        WorkKind::EntryEvidenceSubjectOccurrences,
-        WorkKind::EntryEvidenceTokenInputs,
-        WorkKind::EntryEvidenceCollisionComparisons,
-        WorkKind::EntryEvidenceMetadataWorkUnits,
-    ];
-    assert_eq!(complete.facts.len(), ended.facts.len());
-    for (complete, ended) in complete.facts.iter().zip(&ended.facts) {
-        assert_eq!(complete.kind, ended.kind);
-        if unavailable.contains(&ended.kind) {
-            assert_eq!(
-                ended.observation,
+fn only_a_required_path_past_its_bound_leaves_the_admitted_counts_unavailable() {
+    use crate::benchmark::cases::prepare::prepare;
+    use crate::benchmark::cases::{declarations, EvidenceRecipe as R, LimitEdge, LimitKind};
+    use crate::resolver::evidence_metadata::fixtures::with;
+    use crate::resolver::evidence_metadata::MetadataBound;
+
+    // Each fact is what the run committed and counted, and the four counts
+    // over what path admission leaves are unavailable when not counted.
+    let as_recounted = |work: &LogicalWork, output: &Output, label: &str| {
+        for (kind, value) in recounted(output) {
+            let expected = value.map_or(
                 WorkValue::Unavailable {
-                    reason: UnavailableWork::EvidencePathsNotAdmitted
-                }
+                    reason: UnavailableWork::EvidencePathsNotAdmitted,
+                },
+                WorkValue::exact,
             );
-        } else {
-            assert_eq!(complete, ended);
+            assert_eq!(fact(work, kind).observation, expected, "{label} {kind:?}");
+        }
+    };
+    let storefront = entry_candidate(R::Storefront).logical_work;
+    for kind in [
+        LimitKind::InvocationLogicalPathSegments,
+        LimitKind::InvocationLogicalPathCanonicalBytes,
+    ] {
+        let declaration = declarations()
+            .into_iter()
+            .find(|case| case.limit == Some((kind, LimitEdge::FirstOver)))
+            .unwrap();
+        let candidate = prepare(&declaration).unwrap();
+        let Output::EntryEvidence(resolved) = &candidate.output else {
+            unreachable!()
+        };
+        assert_eq!(resolved.invocation.admitted, None, "{kind:?}");
+        let work = &candidate.logical_work;
+        as_recounted(work, &candidate.output, &format!("{kind:?}"));
+        assert_eq!(
+            fact(work, WorkKind::EntryEvidenceRecords).observation,
+            WorkValue::exact(0),
+            "{kind:?}"
+        );
+        for path in [
+            WorkKind::EntryEvidenceMaximumLogicalPathSegments,
+            WorkKind::EntryEvidenceMaximumLogicalPathCanonicalBytes,
+        ] {
+            assert_eq!(fact(work, path), fact(&storefront, path), "{kind:?}");
         }
     }
+    let inadmissible = entry_candidate(R::Inadmissible).logical_work;
+    let segments = inadmissible
+        .exact(WorkKind::EntryEvidenceMaximumLogicalPathSegments)
+        .unwrap();
+    let Prepared::EntryEvidence(mut prepared) = entry_candidate(R::Inadmissible).prepared else {
+        unreachable!()
+    };
+    prepared.capability = prepared
+        .capability
+        .with_evidence_metadata(with(MetadataBound::LogicalPathSegments, segments - 1));
+    let resolved = prepared.resolve_entry().unwrap();
+    assert!(resolved.result.as_ref().unwrap().exhausted.is_none());
+    assert!(resolved.invocation.admitted.is_some());
+    let output = Output::EntryEvidence(resolved);
+    let prepared = Prepared::EntryEvidence(prepared);
+    let work = LogicalWork::observe(&prepared, &output).unwrap();
+    as_recounted(&work, &output, "absent");
+    assert_ne!(work.facts, inadmissible.facts);
 }
 
 /// Outcome finalization's work is the records each projection orders and the
@@ -1222,12 +1311,12 @@ fn a_path_past_its_bound_leaves_the_admitted_counts_unavailable() {
 fn the_outcome_finalization_work_counts_the_records_and_the_reserve() {
     use crate::benchmark::cases::prepare::prepare;
     use crate::benchmark::cases::{declarations, EvidenceRecipe as R, Recipe};
+    use intlify_shared_json::encoding::encoded_length;
 
     let exact = |work: &LogicalWork, kind| match fact(work, kind).observation {
         WorkValue::Exact { value } => value.get(),
         _ => panic!("{kind:?}"),
     };
-    let mut envelope = None;
     for recipe in R::ALL {
         let declaration = declarations()
             .into_iter()
@@ -1256,15 +1345,39 @@ fn the_outcome_finalization_work_counts_the_records_and_the_reserve() {
                 .map_or(0, |projection| projection.records.len() as u64)
         );
         assert_eq!(reserve, outcome.reserve);
+        // The envelope and each exhausted domain's terminal Finding, state,
+        // and cause, by their canonical lengths, summed for this recipe alone.
+        let terminals = [Some(&outcome.entry), outcome.shared.as_ref()]
+            .into_iter()
+            .flatten()
+            .filter_map(|projection| projection.terminal.as_ref())
+            .collect::<Vec<_>>();
+        let envelope = json!({
+            "outcome": if outcome.profile.is_some() { "checked" } else { "blocked" },
+            "constructionIdentity": outcome.identity.text(),
+            "complete": terminals.is_empty(),
+        });
+        let views = terminals
+            .iter()
+            .flat_map(|(finding, state, cause)| [finding, state].into_iter().chain(cause));
+        assert_eq!(
+            reserve,
+            std::iter::once(&envelope)
+                .chain(views)
+                .map(|view| encoded_length(view).unwrap())
+                .sum::<u64>(),
+            "{recipe:?}"
+        );
         match recipe {
             R::Malformed | R::Inadmissible => assert_eq!(shared, 0),
             R::Truncated => {
                 assert_eq!(shared, 100);
-                assert!(reserve > envelope.unwrap());
+                assert!(outcome.entry.terminal.is_none());
+                assert!(outcome.shared.as_ref().unwrap().terminal.is_some());
             }
             R::Storefront | R::Blocked | R::Dense => {
                 assert!(shared > 100);
-                assert_eq!(*envelope.get_or_insert(reserve), reserve, "{recipe:?}");
+                assert!(terminals.is_empty(), "{recipe:?}");
             }
         }
     }

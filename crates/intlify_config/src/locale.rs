@@ -123,6 +123,14 @@ impl<Id: Eq> Supported<Id> {
     }
 }
 
+#[cfg(feature = "benchmark")]
+impl<Id> Supported<Id> {
+    /// Every supported specification with the dataset it admits, in order.
+    pub(crate) fn entries(&self) -> &[SemanticPins<Id>] {
+        &self.entries
+    }
+}
+
 #[cfg(test)]
 impl<Id: Eq + From<&'static str>> Supported<Id> {
     /// Revision "0" of 015's Locale Canonicalization Specification, which

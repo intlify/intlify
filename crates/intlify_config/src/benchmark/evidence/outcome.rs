@@ -310,11 +310,12 @@ mod tests {
     /// terminal state in the entry domain.
     #[test]
     fn every_part_of_the_outcome_is_observed() {
-        let base = retained(R::Storefront);
+        let resolved = prepared(R::Storefront).resolve().unwrap();
+        let base = resolved.result.as_ref().unwrap().clone();
         let observed = |outcome: &RetainedOutcome| {
             observe(&Resolved {
                 result: Ok(outcome.clone()),
-                specification: prepared(R::Storefront).resolve().unwrap().specification,
+                specification: resolved.specification,
             })
             .unwrap()
         };
