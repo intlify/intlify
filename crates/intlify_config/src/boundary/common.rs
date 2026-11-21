@@ -19,7 +19,10 @@
 //! no bound, and every value is admitted whatever happens to its origin. The
 //! step yields the complete admitted set, or every failure, each the typed
 //! result of one boundary: in the rank of the Safe Origin Kind its slot fixes,
-//! and within one slot an origin failure before a value failure. The
+//! and within one slot an origin failure before a value failure. A refused
+//! set still yields the capability when its own boundary admitted it, since
+//! the entry step's bound-reading boundaries go unevaluated only when the
+//! capability is refused (D15:3159, plan 025 decision #304). The
 //! construction-identity reference and the Entry Admission Input Set are
 //! admitted outside this step, and the Verification Input assertion is the
 //! trusted setup path's parameter beside the set, not one of its components.
@@ -66,14 +69,25 @@ pub(crate) struct CommonInputs<D> {
     pub(crate) capability: ImplementationCapability,
 }
 
+/// A refused Common Invocation Input Set: every failure in 015's order, and
+/// the capability its boundary admitted, `None` when it refused the value.
+/// A refused capability origin leaves the value admitted.
+#[derive(Debug)]
+pub(crate) struct CommonFailures {
+    pub(crate) failures: Vec<InputFailure>,
+    /// Boxed, so that a refusal stays small.
+    pub(crate) capability: Option<Box<ImplementationCapability>>,
+}
+
 /// Admit `submitted` against the constructed Capability Specification
 /// `constructed`, with the trusted setup path's Verification Input
-/// `assertion`: the admitted set, or every failure in 015's order.
+/// `assertion`: the admitted set, or every failure in 015's order beside the
+/// admitted capability.
 pub(crate) fn admit<R, D, Id>(
     submitted: Submitted<'_, R>,
     constructed: &VersionedIdentity<Id>,
     assertion: &VerificationAssertion,
-) -> Result<CommonInputs<D>, Vec<InputFailure>>
+) -> Result<CommonInputs<D>, CommonFailures>
 where
     R: FnOnce(Bound, Bound) -> Result<D, EnvelopeReason>,
     D: FormalData,
@@ -161,7 +175,10 @@ where
             verification,
             capability,
         }),
-        _ => Err(failures),
+        (_, _, _, _, _, capability) => Err(CommonFailures {
+            failures,
+            capability: capability.map(Box::new),
+        }),
     }
 }
 
@@ -187,8 +204,9 @@ const fn collection_limits(bounds: &InputBoundaryLimits) -> CollectionLimits {
     }
 }
 
+// `invocation`'s tests submit the same common inputs.
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::cell::Cell;
 
     use serde_json::json;
@@ -231,7 +249,7 @@ mod tests {
     /// Canonicalization data past a test's envelope: the two bounds the
     /// envelope was read under.
     #[derive(Debug, PartialEq, Eq)]
-    struct Envelope {
+    pub(crate) struct Envelope {
         bytes: Bound,
         depth: Bound,
     }
@@ -249,11 +267,11 @@ mod tests {
         clippy::unnecessary_wraps,
         reason = "the step takes an envelope reader"
     )]
-    fn read(bytes: Bound, depth: Bound) -> Result<Envelope, EnvelopeReason> {
+    pub(crate) fn read(bytes: Bound, depth: Bound) -> Result<Envelope, EnvelopeReason> {
         Ok(Envelope { bytes, depth })
     }
 
-    fn constructed() -> VersionedIdentity<&'static str> {
+    pub(crate) fn constructed() -> VersionedIdentity<&'static str> {
         VersionedIdentity {
             identity: CAPABILITY,
             revision: CAPABILITY_REVISION,
@@ -279,15 +297,15 @@ mod tests {
 
     /// Raw values every boundary admits, and the assertion the Verification
     /// Input makes about itself.
-    struct Inputs {
+    pub(crate) struct Inputs {
         vocabulary: Vec<u8>,
         verification: Vec<u8>,
-        assertion: VerificationAssertion,
-        capability: Value,
+        pub(crate) assertion: VerificationAssertion,
+        pub(crate) capability: Value,
     }
 
     impl Inputs {
-        fn new() -> Self {
+        pub(crate) fn new() -> Self {
             let vocabulary = IntentSurfaceClassVocabularyArtifact::sealed(
                 "storefront-surfaces",
                 "1",
@@ -318,7 +336,7 @@ mod tests {
 
         /// These values with `data` for the envelope, each beside its slot's
         /// own Safe Origin Kind.
-        fn submitted<R>(&self, data: R) -> Submitted<'_, R> {
+        pub(crate) fn submitted<R>(&self, data: R) -> Submitted<'_, R> {
             let own = |slot: Kind| Some(slot.id());
             Submitted {
                 specification: Component {
@@ -348,14 +366,15 @@ mod tests {
             }
         }
 
-        fn admit<R>(
+        /// Admit `submitted`: the admitted set, or every failure.
+        pub(crate) fn admit<R>(
             &self,
             submitted: Submitted<'_, R>,
         ) -> Result<CommonInputs<Envelope>, Vec<InputFailure>>
         where
             R: FnOnce(Bound, Bound) -> Result<Envelope, EnvelopeReason>,
         {
-            admit(submitted, &constructed(), &self.assertion)
+            admit(submitted, &constructed(), &self.assertion).map_err(|refused| refused.failures)
         }
     }
 
@@ -510,6 +529,23 @@ mod tests {
         assert!(!called.get());
     }
 
+    /// A refused set yields the capability its boundary admitted, whether
+    /// another component or the capability's own origin was refused, and
+    /// none when the boundary refused the value.
+    #[test]
+    fn a_refused_set_yields_the_capability_its_boundary_admitted() {
+        let inputs = Inputs::new();
+        let capability = capability::admit(Some(&inputs.capability), &constructed()).unwrap();
+        let refused = |submitted| admit(submitted, &constructed(), &inputs.assertion).unwrap_err();
+        let mut submitted = inputs.submitted(read);
+        submitted.vocabulary.value = None;
+        submitted.capability.origin = None;
+        assert_eq!(refused(submitted).capability.as_deref(), Some(&capability));
+        let mut submitted = inputs.submitted(read);
+        submitted.capability.value = None;
+        assert_eq!(refused(submitted).capability.as_deref(), None);
+    }
+
     /// One refused origin refuses the set, whose values were all admitted.
     #[test]
     fn a_refused_origin_alone_refuses_the_set() {
@@ -658,7 +694,9 @@ mod tests {
             }
         });
         assert_eq!(
-            admit(inputs.submitted(data), &constructed(), &inputs.assertion).err(),
+            admit(inputs.submitted(data), &constructed(), &inputs.assertion)
+                .err()
+                .map(|refused| refused.failures),
             Some(vec![failure(
                 Kind::LocaleCanonicalizationData,
                 Refusal::Data(EnvelopeReason::OverBoundEnvelope)

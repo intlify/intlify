@@ -223,8 +223,9 @@ pub(crate) fn admit_programmatic(
     }
 }
 
+// `invocation`'s tests submit the same entries.
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use serde_json::{json, Value};
 
     use super::*;
@@ -244,15 +245,14 @@ mod tests {
     use crate::resolver::origin::SafeOriginKind as Kind;
     use crate::snapshot::{from_json, Node};
 
-    const BYTES: &[u8] = b"{\"schemaVersion\":\"0\"}\n";
-    const IDENTITY: &str = "intlify-file-source.v0:storefront/intlify.config.json";
+    pub(crate) const BYTES: &[u8] = b"{\"schemaVersion\":\"0\"}\n";
+    pub(crate) const IDENTITY: &str = "intlify-file-source.v0:storefront/intlify.config.json";
     const LOCATOR: &str = "storefront/intlify.config.json";
 
-    /// A capability value whose bounds `edit` sets, every `evidenceMetadata`
-    /// and `snapshot` bound and `maxProfileIdBytes` first as large as a bound
-    /// can be.
-    fn capability_with(edit: impl FnOnce(&mut Value)) -> ImplementationCapability {
-        let mut value = ImplementationCapability::fixture_owned(fixture_limits(1)).normalized();
+    /// Set every `evidenceMetadata` and `snapshot` bound and
+    /// `maxProfileIdBytes` of the capability `value` as large as a bound can
+    /// be, so every entry here is within them.
+    pub(crate) fn widen_entry_bounds(value: &mut Value) {
         let largest = json!((u64::MAX - 1).to_string());
         for group in ["evidenceMetadata", "snapshot"] {
             for (_, bound) in value["bootstrapOnly"][group].as_object_mut().unwrap() {
@@ -260,6 +260,13 @@ mod tests {
             }
         }
         value["policyComparable"]["configurationInput"]["maxProfileIdBytes"] = largest;
+    }
+
+    /// A capability value whose bounds `edit` sets, after
+    /// [`widen_entry_bounds`].
+    fn capability_with(edit: impl FnOnce(&mut Value)) -> ImplementationCapability {
+        let mut value = ImplementationCapability::fixture_owned(fixture_limits(1)).normalized();
+        widen_entry_bounds(&mut value);
         edit(&mut value);
         let constructed = VersionedIdentity {
             identity: CAPABILITY,
@@ -286,7 +293,7 @@ mod tests {
 
     /// A file entry every boundary admits, each value beside its slot's own
     /// Safe Origin Kind.
-    fn submitted<'a>(revision: &'a str, selector: &str) -> SubmittedFileEntry<'a> {
+    pub(crate) fn submitted<'a>(revision: &'a str, selector: &str) -> SubmittedFileEntry<'a> {
         SubmittedFileEntry {
             file: Component {
                 value: FileValue {
@@ -493,7 +500,7 @@ mod tests {
         assert_eq!(admitted.locator, None);
     }
 
-    const ENTRY: &str = "intlify-programmatic-entry.v0:storefront";
+    pub(crate) const ENTRY: &str = "intlify-programmatic-entry.v0:storefront";
     const ENTRY_LABEL: &str = "storefront";
     const CALL_SITE: &str = "intlify-call-site.v0:storefront/app.ts";
     const CALL_SITE_LABEL: &str = "app.ts";
@@ -503,14 +510,14 @@ mod tests {
 
     /// The Snapshot every programmatic entry here submits, its digest, and
     /// the revision of the sidecar's source.
-    struct Programmatic {
+    pub(crate) struct Programmatic {
         tree: Node,
-        digest: String,
+        pub(crate) digest: String,
         revision: String,
     }
 
     impl Programmatic {
-        fn new() -> Self {
+        pub(crate) fn new() -> Self {
             let tree = from_json(&json!({ "schemaVersion": "0" }));
             let digest = tree.digest();
             Self {
@@ -522,7 +529,7 @@ mod tests {
 
         /// A programmatic entry every boundary admits, each value beside its
         /// slot's own Safe Origin Kind.
-        fn entry(&self, selector: &str) -> SubmittedProgrammaticEntry<'_> {
+        pub(crate) fn entry(&self, selector: &str) -> SubmittedProgrammaticEntry<'_> {
             SubmittedProgrammaticEntry {
                 programmatic: Component {
                     value: ProgrammaticValue {

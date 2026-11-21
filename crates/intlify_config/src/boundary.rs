@@ -31,13 +31,18 @@
 //! that works like the common one (015-172, 015-201); the steps share the
 //! parts in `step`. The reference to the Resolver Construction Identity is
 //! admitted at a boundary of its own, against the identity of the resolver the
-//! invocation runs on (D15:3151).
+//! invocation runs on (D15:3151). The Resolver Invocation Input Set is
+//! admitted as these three stages, each evaluated and kept as its own typed
+//! result, the entry step reading the capability the common step admitted
+//! even when another common component is refused (D15:3159, plan 025
+//! decision #304).
 
 pub(crate) mod call_site;
 pub(crate) mod capability;
 pub(crate) mod common;
 pub(crate) mod construction_identity;
 pub(crate) mod entry;
+pub(crate) mod invocation;
 pub(crate) mod locator;
 pub(crate) mod origin;
 pub(crate) mod selector;
