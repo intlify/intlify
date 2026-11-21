@@ -31,8 +31,6 @@
 
 use std::sync::Arc;
 
-use crate::artifacts::collection::FormalCollection;
-use crate::artifacts::envelope::FormalMember;
 use crate::boundary::common::CommonInputs;
 use crate::construction::identity::ConstructionIdentity;
 use crate::snapshot::Node;
@@ -84,46 +82,25 @@ impl<D> MaterializedInputs<D> {
     }
 }
 
+/// The common values compare as the Common Invocation Input Set does, the
+/// collection as a multiset.
 impl<D: Eq> PartialEq for MaterializedInputs<D> {
     fn eq(&self, other: &Self) -> bool {
-        let (left, right) = (&*self.common, &*other.common);
         self.construction_identity == other.construction_identity
             && self.selector == other.selector
-            && left.specification == right.specification
-            && left.vocabulary == right.vocabulary
-            && left.data == right.data
-            && same_members(&left.collection, &right.collection)
-            && left.verification == right.verification
-            && left.capability == right.capability
+            && *self.common == *other.common
             && self.value == other.value
     }
 }
 
 impl<D: Eq> Eq for MaterializedInputs<D> {}
 
-/// Whether two collections hold the same members, each as many times: the
-/// multisets of their members' `C(member)` bytes (D15:2589).
-fn same_members(left: &FormalCollection, right: &FormalCollection) -> bool {
-    sorted_bodies(left) == sorted_bodies(right)
-}
-
-/// The `C(member)` bytes of a collection's members, borrowed and sorted, so
-/// no member is hashed or copied.
-fn sorted_bodies(collection: &FormalCollection) -> Vec<&[u8]> {
-    let mut bodies: Vec<&[u8]> = collection
-        .members()
-        .iter()
-        .map(FormalMember::canonical_body)
-        .collect();
-    bodies.sort_unstable();
-    bodies
-}
-
 #[cfg(test)]
 mod tests {
     use serde_json::{json, Value};
 
     use super::*;
+    use crate::artifacts::collection::FormalCollection;
     use crate::artifacts::vectors::vocabulary as vectors;
     use crate::artifacts::vocabulary::{FormalVocabulary, IntentSurfaceClassVocabularyArtifact};
     use crate::boundary::capability::ImplementationCapability;

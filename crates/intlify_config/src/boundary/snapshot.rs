@@ -118,7 +118,10 @@ impl SnapshotRefusal {
 }
 
 /// An admitted Snapshot: its canonical tree and the verified digest, which is
-/// also the Programmatic Entry revision (D15:743, 889). No `Debug`.
+/// also the Programmatic Entry revision (D15:743, 889). No `Debug`. Two are
+/// equal when their trees are equal node for node and their digests are,
+/// as invocation staleness compares them (D15:2583).
+#[derive(PartialEq)]
 pub(crate) struct AdmittedSnapshot {
     root: Node,
     digest: String,
