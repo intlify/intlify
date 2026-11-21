@@ -64,6 +64,19 @@ impl EntryInputs {
     }
 }
 
+/// Two entries are equal when they are of one kind and equal by value. A
+/// file and a programmatic entry differ at least in their fixed Safe Origin
+/// Kinds (D15:2583).
+impl PartialEq for EntryInputs {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::File(left), Self::File(right)) => left == right,
+            (Self::Programmatic(left), Self::Programmatic(right)) => left == right,
+            _ => false,
+        }
+    }
+}
+
 /// An admitted Resolver Invocation Input Set. No `Debug`: an entry can carry
 /// configuration and an arbitrary selector. The common set is shared, so a
 /// Materialized Resolution Input Set holds it without copying it and without
@@ -72,6 +85,21 @@ pub(crate) struct InvocationInputs<D> {
     pub(crate) construction_identity: ConstructionIdentity,
     pub(crate) common: Arc<CommonInputs<D>>,
     pub(crate) entry: EntryInputs,
+}
+
+/// Two sets are equal when every logical field and occurrence is: the
+/// reference, the common set, and the entry, each by value (D15:2583, 2589).
+impl<D: Eq> PartialEq for InvocationInputs<D> {
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            construction_identity,
+            common,
+            entry,
+        } = self;
+        *construction_identity == other.construction_identity
+            && **common == *other.common
+            && *entry == other.entry
+    }
 }
 
 /// A refused Resolver Invocation Input Set: each stage's own failures, `None`

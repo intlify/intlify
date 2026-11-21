@@ -76,6 +76,27 @@ pub(crate) struct FileEntryInputs {
     pub(crate) selector: SelectorInput,
 }
 
+/// Two sets are equal by value, as invocation staleness compares them
+/// (D15:2583): the raw bytes, the pair, the mark, the locator, and the
+/// selector. The pattern names every field, so a part added to the set fails
+/// to compile here.
+impl PartialEq for FileEntryInputs {
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            bytes,
+            source,
+            marked,
+            locator,
+            selector,
+        } = self;
+        *bytes == other.bytes
+            && *source == other.source
+            && *marked == other.marked
+            && *locator == other.locator
+            && *selector == other.selector
+    }
+}
+
 /// Admit `submitted` under the admitted capability, `None` when it was
 /// refused: the admitted set, or every failure in 015's order.
 pub(crate) fn admit(
@@ -152,6 +173,30 @@ pub(crate) struct ProgrammaticEntryInputs {
     pub(crate) locator: Option<Locator>,
     pub(crate) call_site: Option<AdmittedCallSite>,
     pub(crate) selector: SelectorInput,
+}
+
+/// Two sets are equal by value, as invocation staleness compares them
+/// (D15:2583): the Snapshot and its verified digest, the pair, the mark, the
+/// locator, the call-site sidecar or its absence, and the selector. The
+/// pattern names every field, so a part added to the set fails to compile
+/// here.
+impl PartialEq for ProgrammaticEntryInputs {
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            snapshot,
+            source,
+            marked,
+            locator,
+            call_site,
+            selector,
+        } = self;
+        *snapshot == other.snapshot
+            && *source == other.source
+            && *marked == other.marked
+            && *locator == other.locator
+            && *call_site == other.call_site
+            && *selector == other.selector
+    }
 }
 
 /// Admit a programmatic entry under the admitted capability, `None` when it

@@ -626,7 +626,10 @@ pub(crate) mod tests {
     }
 
     /// What the outcome of `inputs` on `resolver` shows.
-    fn resolved(resolver: &Resolver<'_>, inputs: &InvocationInputs<PinnedFixture>) -> Shown {
+    pub(crate) fn resolved(
+        resolver: &Resolver<'_>,
+        inputs: &InvocationInputs<PinnedFixture>,
+    ) -> Shown {
         let mut storage = OutcomeStorage::default();
         shown(&resolver.resolve(inputs, &mut storage).unwrap().outcome)
     }

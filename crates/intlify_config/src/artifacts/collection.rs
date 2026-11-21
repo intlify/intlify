@@ -79,6 +79,23 @@ impl FormalCollection {
     pub(crate) fn members(&self) -> &[FormalMember] {
         &self.0
     }
+
+    /// Whether `other` holds the same members, each as many times: the
+    /// multisets of their members' `C(member)` bytes, as invocation staleness
+    /// and the Materialized Resolution Input Set compare a collection
+    /// (D15:2589). The submission order is not compared, while multiplicity
+    /// is (D15:2585).
+    pub(crate) fn same_members(&self, other: &Self) -> bool {
+        self.sorted_bodies() == other.sorted_bodies()
+    }
+
+    /// The `C(member)` bytes of the members, borrowed and sorted, so no
+    /// member is hashed or copied.
+    fn sorted_bodies(&self) -> Vec<&[u8]> {
+        let mut bodies: Vec<&[u8]> = self.0.iter().map(FormalMember::canonical_body).collect();
+        bodies.sort_unstable();
+        bodies
+    }
 }
 
 /// Read a collection at the pre-invocation boundary. Each member's bytes, the
