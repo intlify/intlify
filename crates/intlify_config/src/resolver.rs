@@ -40,6 +40,7 @@ pub(crate) mod identity;
 pub(crate) mod invocation;
 pub(crate) mod limits;
 pub(crate) mod locales;
+pub(crate) mod materialized;
 pub(crate) mod negotiation;
 pub(crate) mod occurrence;
 pub(crate) mod origin;

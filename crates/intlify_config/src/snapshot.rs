@@ -38,7 +38,7 @@ const NUMBER: u8 = 0x07;
 const MARKER: u8 = 0x08;
 
 /// One node of a canonical Snapshot (D15:871).
-#[derive(Clone, PartialEq)]
+#[derive(Clone)]
 pub(crate) enum Node {
     Null,
     Boolean(bool),
@@ -294,6 +294,38 @@ impl Drop for Node {
         while let Some(mut node) = pending.pop() {
             node.release(&mut pending);
         }
+    }
+}
+
+/// Two trees are equal node for node: the same variant and value, arrays
+/// element for element, and objects key for key (D15:871). Compared without
+/// recursion, so comparing deep trees cannot exhaust the stack (plan 025
+/// decision #298).
+impl PartialEq for Node {
+    fn eq(&self, other: &Self) -> bool {
+        let mut pending = vec![(self, other)];
+        while let Some(pair) = pending.pop() {
+            match pair {
+                (Self::Array(left), Self::Array(right)) if left.len() == right.len() => {
+                    pending.extend(left.iter().zip(right));
+                }
+                (Self::Object(left), Self::Object(right)) if left.len() == right.len() => {
+                    for ((left_key, left), (right_key, right)) in left.iter().zip(right) {
+                        if left_key != right_key {
+                            return false;
+                        }
+                        pending.push((left, right));
+                    }
+                }
+                (Self::Null, Self::Null) => {}
+                (Self::Boolean(left), Self::Boolean(right)) if left == right => {}
+                (Self::Number(left), Self::Number(right)) if left == right => {}
+                (Self::String(left), Self::String(right)) if left == right => {}
+                (Self::Marker(left), Self::Marker(right)) if left == right => {}
+                _ => return false,
+            }
+        }
+        true
     }
 }
 
@@ -688,6 +720,42 @@ mod tests {
         }
         // Each level adds a frame header, a count, and the key's frame.
         assert_eq!(wide(members.framed().len()), 27 * LEVELS + 9);
+    }
+
+    /// Two trees are equal only node for node, whichever is compared with
+    /// which, and deep ones are compared without recursion (plan 025
+    /// decision #298).
+    #[test]
+    fn trees_are_equal_node_for_node_without_recursion() {
+        const LEVELS: u64 = 100_000;
+        let base = json!({ "a": [null, true, 1.5, "x"], "b": {} });
+        assert!(from_json(&base) == from_json(&base) && tree() == tree());
+        let differing = [
+            json!({ "a": [null, true, 1.5, "x"] }),
+            json!({ "a": [null, true, 1.5, "x"], "c": {} }),
+            json!({ "a": [null, true, 1.5], "b": {} }),
+            json!({ "a": [false, true, 1.5, "x"], "b": {} }),
+            json!({ "a": [null, false, 1.5, "x"], "b": {} }),
+            json!({ "a": [null, true, 2.5, "x"], "b": {} }),
+            json!({ "a": [null, true, 1.5, "y"], "b": {} }),
+            json!({ "a": [null, true, 1.5, "x"], "b": [] }),
+        ];
+        for value in &differing {
+            assert!(from_json(value) != from_json(&base), "{value}");
+            assert!(from_json(&base) != from_json(value), "{value}");
+        }
+        let mut other = tree();
+        let Node::Object(map) = &mut other else {
+            unreachable!()
+        };
+        map.insert(
+            "b".to_owned(),
+            Node::Marker(Marker::Rejected(MarkerReason::SparseArray)),
+        );
+        assert!(other != tree());
+        let deep = |leaf: Node| (0..LEVELS).fold(leaf, |tree, _| Node::Array(vec![tree]));
+        assert!(deep(Node::Null) == deep(Node::Null));
+        assert!(deep(Node::Null) != deep(Node::Boolean(false)));
     }
 
     /// Without a marker, the five counts the root-value bounds share are

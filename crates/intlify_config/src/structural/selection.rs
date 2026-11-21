@@ -28,6 +28,7 @@ pub(crate) enum InvalidSelectorType {
     Object,
 }
 
+#[derive(Clone, PartialEq, Eq)]
 enum SelectorKind {
     Absent,
     String(String),
@@ -45,6 +46,9 @@ pub(crate) enum SelectorByteObservation {
 
 /// No Debug/Serialize: a bounded string can still contain an arbitrary secret.
 /// The explicit bound belongs to the same bootstrap context as structural input.
+/// Two inputs are equal by value, as invocation staleness and the
+/// Materialized Resolution Input Set compare them (D15:205, 2583, 2589).
+#[derive(Clone, PartialEq, Eq)]
 pub(crate) struct SelectorInput {
     bound: Bound,
     kind: SelectorKind,
@@ -56,16 +60,7 @@ impl SelectorInput {
     /// and tests only.
     #[cfg(any(test, feature = "benchmark"))]
     pub(crate) fn benchmark_matches_fixture(&self, expected: &Self) -> bool {
-        self.bound == expected.bound
-            && match (&self.kind, &expected.kind) {
-                (SelectorKind::Absent, SelectorKind::Absent)
-                | (SelectorKind::OverLimitString, SelectorKind::OverLimitString) => true,
-                (SelectorKind::String(left), SelectorKind::String(right)) => left == right,
-                (SelectorKind::InvalidType(left), SelectorKind::InvalidType(right)) => {
-                    left == right
-                }
-                _ => false,
-            }
+        self == expected
     }
 
     #[cfg(feature = "benchmark")]

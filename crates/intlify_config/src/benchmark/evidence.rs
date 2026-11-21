@@ -186,7 +186,7 @@ impl PreparedEvidence {
             (&self.schema, self.structural, &self.selector),
             invocation,
             &FixtureProvider::new(),
-            set,
+            (set, &mut None),
         )
         .ok()
     }

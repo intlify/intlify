@@ -19,9 +19,12 @@
 //! (D15:1106). The set exists only when every stage admits its part
 //! (D15:3159).
 
+use std::sync::Arc;
+
 use crate::construction::identity::ConstructionIdentity;
 use crate::input_limits::Bound;
 use crate::locale::{EnvelopeReason, FormalData, VersionedIdentity};
+use crate::structural::selection::SelectorInput;
 
 use super::common::{self, CommonInputs};
 use super::construction_identity::{self, IdentityRefusal};
@@ -51,11 +54,23 @@ pub(crate) enum EntryInputs {
     Programmatic(ProgrammaticEntryInputs),
 }
 
+impl EntryInputs {
+    /// The normalized External Profile Selector Input the entry submitted.
+    pub(crate) const fn selector(&self) -> &SelectorInput {
+        match self {
+            Self::File(file) => &file.selector,
+            Self::Programmatic(programmatic) => &programmatic.selector,
+        }
+    }
+}
+
 /// An admitted Resolver Invocation Input Set. No `Debug`: an entry can carry
-/// configuration and an arbitrary selector.
+/// configuration and an arbitrary selector. The common set is shared, so a
+/// Materialized Resolution Input Set holds it without copying it and without
+/// borrowing this set (D15:2749).
 pub(crate) struct InvocationInputs<D> {
     pub(crate) construction_identity: ConstructionIdentity,
-    pub(crate) common: CommonInputs<D>,
+    pub(crate) common: Arc<CommonInputs<D>>,
     pub(crate) entry: EntryInputs,
 }
 
@@ -103,7 +118,7 @@ where
     match (construction_identity, common, entry) {
         (Ok(construction_identity), Ok(common), Ok(entry)) => Ok(InvocationInputs {
             construction_identity,
-            common,
+            common: Arc::new(common),
             entry,
         }),
         (construction_identity, common, entry) => Err(InvocationFailures {
