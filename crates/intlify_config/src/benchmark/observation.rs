@@ -206,13 +206,17 @@ pub(crate) fn document_order(doc: &MaterializedDocument) -> BTreeMap<NodeId, u64
     order
 }
 
-pub(crate) fn document(doc: &MaterializedDocument) -> Observation {
+/// The value a document materialized, each node in complete value preorder,
+/// and its root-value counts: the Shared domain a file and a Snapshot of one
+/// value frame alike, whichever entry materialized it (D15:2788, 2794).
+/// `locate` is handed each node's locus, then each of an object's member
+/// keys' loci, in that order.
+pub(crate) fn value(doc: &MaterializedDocument, mut locate: impl FnMut(Locus)) -> Digest {
     let mut shared = Frame::new("materialized-value");
-    let mut entry = Frame::new("materialized-source-map");
     let mut pending = vec![doc.root()];
     while let Some(id) = pending.pop() {
         let node = doc.node(id);
-        entry.locus(node.locus());
+        locate(node.locus());
         match node.kind() {
             NodeKind::Null => shared.uint(0),
             NodeKind::Boolean(value) => {
@@ -237,13 +241,21 @@ pub(crate) fn document(doc: &MaterializedDocument) -> Observation {
                 shared.uint(u64::try_from(items.len()).expect("bounded map"));
                 for (name, member) in items {
                     shared.text(name);
-                    entry.locus(member.key());
+                    locate(member.key());
                 }
                 pending.extend(items.values().rev().map(ObjectMember::value));
             }
         }
     }
     shared.value_counts(doc.value_counts());
+    shared.finish()
+}
+
+/// A file document: its value, and its source map with the file's counts
+/// and unchanged bytes.
+pub(crate) fn document(doc: &MaterializedDocument) -> Observation {
+    let mut entry = Frame::new("materialized-source-map");
+    let shared = value(doc, |at| entry.locus(at));
     let counts = doc.counts().expect("the benchmark observes file documents");
     entry.uint(counts.file_bytes);
     entry.uint(counts.parser_tokens);
@@ -252,7 +264,7 @@ pub(crate) fn document(doc: &MaterializedDocument) -> Observation {
     let source = doc.raw_span(ByteSpan::new(0, counts.file_bytes));
     entry.bytes(source.expect("a file document keeps its file"));
     Observation {
-        shared: shared.finish(),
+        shared,
         entry: Some(entry.finish()),
     }
 }
