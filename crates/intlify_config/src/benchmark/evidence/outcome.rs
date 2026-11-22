@@ -78,7 +78,7 @@ pub(in crate::benchmark) struct RetainedProjection {
 }
 
 impl RetainedProjection {
-    fn of(projection: &Projection<'_>) -> Self {
+    pub(in crate::benchmark) fn of(projection: &Projection<'_>) -> Self {
         Self {
             records: projection
                 .records
@@ -200,7 +200,7 @@ pub(in crate::benchmark) fn observe(resolved: &Resolved) -> Result<Observation, 
 
 /// One domain's projection: each record's owner, record kind, view, and
 /// accounting bytes in order, and its terminal Finding, state, and cause.
-fn project(
+pub(in crate::benchmark) fn project(
     frame: &mut Frame,
     specification: Specification<'_>,
     projection: &RetainedProjection,

@@ -14,27 +14,49 @@
 //! and Phases 0 to 15 over what it admitted, through the outcome (D15:2775).
 //! A checked or a blocked outcome is an expected result; a refused set or a
 //! resolver defect is a benchmark failure (D15:2826).
+//!
+//! `file_entry_complete_workflow` measures that path on the resolver its
+//! preparation constructed once and every interval reuses, whose identity is
+//! derived before the start mark. The submission, the slot for the admitted
+//! set, and the storage the outcome borrows are made before it; the outcome
+//! and the Materialized Resolution Input Set beside it are copied out after
+//! the end mark, and what the interval admitted is counted then (D15:2824).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use serde_json::Value;
 
+use crate::artifacts::envelope::ExactTuple;
 use crate::boundary::common::Submitted;
 use crate::boundary::entry::{FileValue, SubmittedFileEntry};
 use crate::boundary::invocation::{
-    InvocationFailures, InvocationInputs, SubmittedEntry, SubmittedInvocation,
+    EntryInputs, InvocationFailures, InvocationInputs, SubmittedEntry, SubmittedInvocation,
 };
 use crate::boundary::selector::SelectorReport;
 use crate::boundary::step::Component;
 use crate::boundary::verification::VerificationAssertion;
-use crate::input_limits::Bound;
+use crate::construction::identity::ConstructionIdentity;
+use crate::construction::resolver::ConstructedResolver;
+use crate::construction::root::ConstructionRoot;
+use crate::input_limits::{Bound, InputLimits, ValueCounts};
 use crate::locale::icu4x::Icu4xData;
-use crate::locale::EnvelopeReason;
+use crate::locale::{EnvelopeReason, VersionedIdentity};
+use crate::materialize::materialize_file;
+use crate::resolver::artifact_resolution::AdmittedArtifact;
 use crate::resolver::entry::fixtures::FILE;
+use crate::resolver::exact_resolution::ArtifactBindings;
+use crate::resolver::finalization::reserved_bytes;
 use crate::resolver::invocation::{OutcomeStorage, Resolution, Resolver};
 use crate::resolver::origin::SafeOriginKind as Kind;
 use crate::resolver::profile_resolution::ResolverInvariant;
+use crate::resolver::profile_view::ProfileView;
+use crate::resolver::token::Specification;
+
+use super::evidence::outcome::{project, RetainedProjection};
+use super::instrument::{Instrument, Interval};
+use super::observation::{Frame, Observation};
+use super::operation::OutputFailure;
 
 /// What a binding submits for one file entry's invocation, as the raw values
 /// the pre-invocation boundaries read, each in its typed slot. The file is
@@ -164,4 +186,500 @@ where
     resolver
         .resolve(slot.insert(inputs), storage)
         .map_err(|invariant| WorkflowFailure::Invariant(Box::new(invariant)))
+}
+
+/// A complete invocation case's inputs: the resolver its preparation
+/// constructed once from the committed input under `root`, and what a
+/// binding submits for the case's recipe on that resolver.
+pub(in crate::benchmark) struct PreparedWorkflow {
+    pub(in crate::benchmark) root: &'static ConstructionRoot,
+    pub(in crate::benchmark) constructed: ConstructedResolver,
+    pub(in crate::benchmark) raw: RawInvocation,
+}
+
+impl PreparedWorkflow {
+    /// One invocation measured by `instrument`. The resolver with its
+    /// identity, the submission, the slot, and the storage are made before
+    /// the start mark; the outcome is copied out after the end mark, before
+    /// the storage it borrows is released, and then what the slot holds is
+    /// counted.
+    pub(in crate::benchmark) fn interval<I: Instrument>(
+        &self,
+        instrument: &I,
+    ) -> Result<Interval<Resolved>, I::Failure> {
+        let resolver = Resolver::new(&self.constructed, self.root);
+        let members = self.raw.members();
+        let mut slot = None;
+        let (quantity, result) = {
+            let mut storage = OutcomeStorage::default();
+            let submitted = self.raw.submitted(&members);
+            let input = (
+                &resolver,
+                submitted,
+                &self.raw.assertion,
+                &mut slot,
+                &mut storage,
+            );
+            let measured = instrument.interval(input, complete)?;
+            let retained = measured
+                .output
+                .map(|resolution| RetainedWorkflow::of(&resolution));
+            (measured.quantity, retained)
+        };
+        Ok(Interval {
+            quantity,
+            output: self.retain(result, slot.as_ref()),
+        })
+    }
+
+    /// One untimed invocation, retained as a timed one is.
+    pub(in crate::benchmark) fn resolve(&self) -> Resolved {
+        let resolver = Resolver::new(&self.constructed, self.root);
+        let members = self.raw.members();
+        let mut slot = None;
+        let result = {
+            let mut storage = OutcomeStorage::default();
+            let submitted = self.raw.submitted(&members);
+            let assertion = &self.raw.assertion;
+            complete((&resolver, submitted, assertion, &mut slot, &mut storage))
+                .map(|resolution| RetainedWorkflow::of(&resolution))
+        };
+        self.retain(result, slot.as_ref())
+    }
+
+    fn retain(
+        &self,
+        result: Result<RetainedWorkflow, WorkflowFailure>,
+        admitted: Option<&InvocationInputs<Icu4xData>>,
+    ) -> Resolved {
+        let supported = self.constructed.supported();
+        Resolved {
+            result,
+            admitted: admitted.and_then(AdmittedCounts::of),
+            specification: supported.project_profile().specification.clone(),
+        }
+    }
+}
+
+/// What the interval admitted, counted after its end mark in the units of
+/// the bounds that count it: the file's bytes, the tokens its parser visits,
+/// and its value's counts once one is complete, as strict file entry counts
+/// them under the admitted capability's bounds, and the collection's members
+/// and their `C(member)` bytes (D15:2129, 2796).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::benchmark) struct AdmittedCounts {
+    pub(in crate::benchmark) file_bytes: u64,
+    pub(in crate::benchmark) parser_tokens: u64,
+    pub(in crate::benchmark) value: Option<ValueCounts>,
+    pub(in crate::benchmark) members: u64,
+    pub(in crate::benchmark) member_bytes: u64,
+}
+
+impl AdmittedCounts {
+    fn of(inputs: &InvocationInputs<Icu4xData>) -> Option<Self> {
+        let EntryInputs::File(file) = &inputs.entry else {
+            return None;
+        };
+        let capability = &inputs.common.capability;
+        let limits = InputLimits {
+            raw: capability.bootstrap_only().raw_input,
+            value: capability.policy_comparable().configuration_input.value,
+        };
+        let (file_bytes, parser_tokens, value) =
+            match materialize_file(Arc::clone(&file.bytes), limits) {
+                Ok(document) => {
+                    let counts = document.counts()?;
+                    (counts.file_bytes, counts.parser_tokens, Some(counts.value))
+                }
+                Err(error) => {
+                    let progress = error.progress;
+                    let value = progress.complete_value.as_deref().copied();
+                    (progress.file_bytes, progress.parser_tokens_visited, value)
+                }
+            };
+        let members = inputs.common.collection.members();
+        let member_bytes = members.iter().try_fold(0_u64, |total, member| {
+            total.checked_add(u64::try_from(member.canonical_body().len()).ok()?)
+        })?;
+        Some(Self {
+            file_bytes,
+            parser_tokens,
+            value,
+            members: u64::try_from(members.len()).ok()?,
+            member_bytes,
+        })
+    }
+}
+
+/// A binding as the output retains it: its tuple, and `C(member)` of its
+/// member.
+pub(in crate::benchmark) type Binding = (ExactTuple, Vec<u8>);
+
+/// The outcome and the set beside it as the output retains them: the
+/// outcome's Resolver Construction Identity, both projections, a checked
+/// outcome's profile view and its bindings, each tuple with `C(member)` of
+/// its member, and the mandatory reserve; and the snapshot-content digest of
+/// the Materialized Resolution Input Set's value, when Phase 1 materialized
+/// one (D15:1150-1166, 1847, 2657).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(in crate::benchmark) struct RetainedWorkflow {
+    pub(in crate::benchmark) identity: ConstructionIdentity,
+    pub(in crate::benchmark) entry: RetainedProjection,
+    pub(in crate::benchmark) shared: Option<RetainedProjection>,
+    pub(in crate::benchmark) profile: Option<(ProfileView, Vec<Binding>)>,
+    pub(in crate::benchmark) reserve: u64,
+    pub(in crate::benchmark) materialized: Option<String>,
+}
+
+impl RetainedWorkflow {
+    fn of(resolution: &Resolution<'_, Icu4xData>) -> Self {
+        let outcome = &resolution.outcome;
+        let bindings = |bindings: &ArtifactBindings<'_>| {
+            let body = |artifact: &AdmittedArtifact<'_>| artifact.member.canonical_body().to_vec();
+            bindings
+                .iter()
+                .map(|(tuple, artifact)| (tuple.clone(), body(artifact)))
+                .collect()
+        };
+        Self {
+            identity: outcome.identity,
+            entry: RetainedProjection::of(&outcome.evidence.entry),
+            shared: outcome.evidence.shared.as_ref().map(RetainedProjection::of),
+            profile: outcome
+                .checked
+                .as_ref()
+                .map(|checked| (checked.profile.clone(), bindings(checked.bindings))),
+            reserve: reserved_bytes(outcome),
+            materialized: resolution
+                .materialized
+                .as_ref()
+                .map(|set| set.value().digest()),
+        }
+    }
+}
+
+/// A complete invocation's output, retained past the end mark: the outcome
+/// and the set beside it, or the benchmark failure; what the interval
+/// admitted; and the Profile Specification the subjects' records belong to.
+pub(in crate::benchmark) struct Resolved {
+    pub(in crate::benchmark) result: Result<RetainedWorkflow, WorkflowFailure>,
+    pub(in crate::benchmark) admitted: Option<AdmittedCounts>,
+    pub(in crate::benchmark) specification: VersionedIdentity<String>,
+}
+
+/// A refused set or a resolver defect is no outcome: the case fails rather
+/// than completing as an expected result (D15:2826). Logical work uses this
+/// screen.
+pub(in crate::benchmark) fn require_observable(
+    resolved: &Resolved,
+) -> Result<&RetainedWorkflow, OutputFailure> {
+    resolved
+        .result
+        .as_ref()
+        .map_err(|_| OutputFailure::CompleteInvocationFailure)
+}
+
+/// The outcome's Shared semantic output and its entry-specific Evidence in
+/// separate checksum domains (plan 025 decision #316): the Resolver
+/// Construction Identity, the Shared projection or its absence, a checked
+/// outcome's profile view and bindings with `C(member)` of each, and whether
+/// a Materialized Resolution Input Set came beside the outcome with the digest
+/// of its value in the shared domain, and the Entry projection in the entry
+/// domain. Neither domain names the entry kind, so either entry of one value
+/// can share the shared one (D15:2659, 2775, 2788, 2794).
+pub(in crate::benchmark) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure> {
+    let retained = require_observable(resolved)?;
+    let specification = Specification {
+        identity: &resolved.specification.identity,
+        revision: &resolved.specification.revision,
+    };
+    let mut shared = Frame::new("complete-workflow");
+    shared.text(&retained.identity.text());
+    shared.flag(retained.shared.is_some());
+    if let Some(projection) = &retained.shared {
+        project(&mut shared, specification, projection)?;
+    }
+    shared.flag(retained.profile.is_some());
+    if let Some((view, bindings)) = &retained.profile {
+        shared.json(&serde_json::to_value(view).map_err(|_| OutputFailure::ObservationEncoding)?);
+        shared.uint(u64::try_from(bindings.len()).unwrap_or(u64::MAX));
+        for (tuple, body) in bindings {
+            shared.text(tuple.kind.spelling());
+            shared.text(tuple.identity.as_str());
+            shared.text(tuple.revision.as_str());
+            shared.text(tuple.specification_revision.as_str());
+            shared.text(tuple.semantic_digest.as_str());
+            shared.bytes(body);
+        }
+    }
+    shared.flag(retained.materialized.is_some());
+    if let Some(digest) = &retained.materialized {
+        shared.text(digest);
+    }
+    let mut entry = Frame::new("complete-workflow-entry");
+    project(&mut entry, specification, &retained.entry)?;
+    Ok(Observation {
+        shared: shared.finish(),
+        entry: Some(entry.finish()),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::RefCell;
+
+    use intlify_measurement::measurement::Aggregation;
+
+    use super::*;
+    use crate::artifacts::envelope::FormalMember;
+    use crate::benchmark::cases::workflow_inputs::submission;
+    use crate::benchmark::cases::EvidenceRecipe as R;
+    use crate::benchmark::clock::tests::ScriptedClock;
+    use crate::benchmark::instrument::Timed;
+    use crate::benchmark::quantity::Quantity;
+    use crate::construction::resolver::build;
+    use crate::construction::{committed, flow, identity};
+    use crate::snapshot::from_json;
+
+    fn root() -> &'static ConstructionRoot {
+        ConstructionRoot::built_in().unwrap()
+    }
+
+    /// The inputs of `recipe`'s invocation: a resolver constructed once from
+    /// the committed input, and what a binding submits for the recipe on it.
+    fn prepared(recipe: R) -> PreparedWorkflow {
+        let constructed = build(root(), committed::input()).unwrap();
+        let raw = submission(recipe, &constructed, root()).unwrap();
+        PreparedWorkflow {
+            root: root(),
+            constructed,
+            raw,
+        }
+    }
+
+    fn specification(resolved: &Resolved) -> Specification<'_> {
+        Specification {
+            identity: &resolved.specification.identity,
+            revision: &resolved.specification.revision,
+        }
+    }
+
+    /// D15:2657, 2659, 2775, 2826: each recipe's timed invocation retains
+    /// what an untimed one does. Only the example's outcome is checked, and a
+    /// Shared projection and a Materialized Resolution Input Set come with an
+    /// outcome exactly when Phase 1 materialized a value, the set with the
+    /// digest of the canonical tree a Snapshot of the recipe's configuration
+    /// has.
+    #[test]
+    fn each_recipe_completes_and_its_interval_retains_what_an_untimed_run_does() {
+        for recipe in R::ALL {
+            let prepared = prepared(recipe);
+            let untimed = prepared.resolve();
+            let clock = ScriptedClock::nanos([0, 1]);
+            let timed = prepared.interval(&Timed(&clock)).unwrap().output;
+            assert_eq!(observe(&timed), observe(&untimed), "{recipe:?}");
+            assert_eq!(timed.admitted, untimed.admitted, "{recipe:?}");
+            let retained = require_observable(&untimed).unwrap();
+            assert_eq!(retained.profile.is_some(), recipe.checked(), "{recipe:?}");
+            let valued = !matches!(recipe, R::Malformed | R::Inadmissible);
+            assert_eq!(retained.shared.is_some(), valued, "{recipe:?}");
+            let config = recipe.fixture(&recipe.limits()).config;
+            let tree = valued.then(|| from_json(&config).digest());
+            assert_eq!(retained.materialized, tree, "{recipe:?}");
+        }
+    }
+
+    /// D15:1847, 2129, 2796: what the interval admitted is counted as strict
+    /// file entry counts it, a value's counts only when the raw parse
+    /// completed, with each submitted member's `C(member)` bytes; a checked
+    /// outcome's bindings keep those bodies, the mandatory reserve grows only
+    /// when a bound exhausted a domain, and the records are read under the
+    /// Active Project Profile Specification the submission asserts.
+    #[test]
+    fn the_admitted_set_is_counted_and_the_bindings_keep_their_bodies() {
+        let count = |len: usize| u64::try_from(len).unwrap();
+        let mut reserves = Vec::new();
+        for recipe in R::ALL {
+            let prepared = prepared(recipe);
+            let (raw, resolved) = (&prepared.raw, prepared.resolve());
+            let mut bodies: Vec<Vec<u8>> = raw
+                .members
+                .iter()
+                .map(|member| serde_json::from_slice(member).unwrap())
+                .map(|value| FormalMember::new(value).unwrap().canonical_body().to_vec())
+                .collect();
+            let bytes = bodies.iter().map(Vec::len).sum();
+            let admitted = resolved.admitted.unwrap();
+            assert_eq!(admitted.file_bytes, count(raw.file.len()), "{recipe:?}");
+            let members = (admitted.members, admitted.member_bytes);
+            assert_eq!(members, (count(raw.members.len()), count(bytes)));
+            let limits = crate::materialize_tests::limits();
+            let parsed = match materialize_file(Arc::clone(&raw.file), limits) {
+                Ok(document) => {
+                    let counts = document.counts().unwrap();
+                    (counts.parser_tokens, Some(counts.value))
+                }
+                Err(error) => {
+                    let value = error.progress.complete_value.as_deref().copied();
+                    (error.progress.parser_tokens_visited, value)
+                }
+            };
+            assert_eq!((admitted.parser_tokens, admitted.value), parsed);
+            assert_eq!(admitted.value.is_some(), recipe != R::Malformed);
+            let asserted: Value = serde_json::from_slice(&raw.specification).unwrap();
+            let profile = &asserted["project-profile"];
+            assert_eq!(
+                profile["identity"],
+                resolved.specification.identity.as_str()
+            );
+            assert_eq!(
+                profile["revision"],
+                resolved.specification.revision.as_str()
+            );
+            let retained = require_observable(&resolved).unwrap();
+            if let Some((_, bindings)) = &retained.profile {
+                let mut kept: Vec<_> = bindings.iter().map(|(_, body)| body.clone()).collect();
+                kept.sort();
+                bodies.sort();
+                assert_eq!(kept, bodies, "{recipe:?}");
+            }
+            reserves.push((recipe, retained.reserve));
+        }
+        let whole = reserves[0].1;
+        for (recipe, reserve) in reserves {
+            assert!(reserve > 0, "{recipe:?}");
+            assert_eq!(reserve > whole, recipe == R::Truncated, "{recipe:?}");
+        }
+    }
+
+    /// D15:2777, 2788, 2794: the codec frames, in order, the shared domain
+    /// under a name that does not say which entry the invocation had: the
+    /// identity, the Shared projection behind its flag, the profile view and
+    /// each binding's tuple and body behind theirs, and the set's value
+    /// digest behind its own; and the Entry projection under its own name.
+    #[test]
+    fn a_checked_outcome_is_framed_as_the_codec_spells_it() {
+        let resolved = prepared(R::Storefront).resolve();
+        let retained = require_observable(&resolved).unwrap();
+        let (Some(projection), Some((view, bindings)), Some(digest)) =
+            (&retained.shared, &retained.profile, &retained.materialized)
+        else {
+            panic!("the example's outcome is checked beside a set")
+        };
+        let specification = specification(&resolved);
+        let mut shared = Frame::new("complete-workflow");
+        shared.text(&retained.identity.text());
+        shared.flag(true);
+        project(&mut shared, specification, projection).unwrap();
+        shared.flag(true);
+        shared.json(&serde_json::to_value(view).unwrap());
+        shared.uint(u64::try_from(bindings.len()).unwrap());
+        for (tuple, body) in bindings {
+            shared.text(tuple.kind.spelling());
+            shared.text(tuple.identity.as_str());
+            shared.text(tuple.revision.as_str());
+            shared.text(tuple.specification_revision.as_str());
+            shared.text(tuple.semantic_digest.as_str());
+            shared.bytes(body);
+        }
+        shared.flag(true);
+        shared.text(digest);
+        let mut entry = Frame::new("complete-workflow-entry");
+        project(&mut entry, specification, &retained.entry).unwrap();
+        let framed = Observation {
+            shared: shared.finish(),
+            entry: Some(entry.finish()),
+        };
+        assert_eq!(observe(&resolved).unwrap(), framed);
+    }
+
+    /// Plan 025 decision #316: the shared domain tells apart the identity,
+    /// the Shared projection and its terminal state, the profile, each
+    /// binding and its body, and the set and its value, and the entry domain
+    /// the Entry projection; neither tells apart what the other does.
+    #[test]
+    fn every_part_of_the_outcome_and_the_set_is_observed_in_its_domain() {
+        let resolved = prepared(R::Storefront).resolve();
+        let observed = |edit: &dyn Fn(&mut RetainedWorkflow)| {
+            let mut retained = resolved.result.as_ref().unwrap().clone();
+            edit(&mut retained);
+            observe(&Resolved {
+                result: Ok(retained),
+                admitted: resolved.admitted,
+                specification: resolved.specification.clone(),
+            })
+            .unwrap()
+        };
+        let whole = observed(&|_| {});
+        let truncated = prepared(R::Truncated).resolve();
+        let shared = require_observable(&truncated).unwrap().shared.clone();
+        let terminal = shared.unwrap().terminal;
+        let mut admitted = flow::construct(root(), &committed::input()).unwrap();
+        admitted.registry_package.declared.revision = "1".to_owned();
+        let other = identity::derive(root(), &admitted);
+        let shared: [&dyn Fn(&mut RetainedWorkflow); 8] = [
+            &|retained| retained.identity = other,
+            &|retained| retained.shared = None,
+            &|retained| retained.shared.as_mut().unwrap().terminal = terminal.clone(),
+            &|retained| retained.profile = None,
+            &|retained| _ = retained.profile.as_mut().unwrap().1.pop(),
+            &|retained| retained.profile.as_mut().unwrap().1[0].1.push(0),
+            &|retained| retained.materialized = None,
+            &|retained| retained.materialized.as_mut().unwrap().push('0'),
+        ];
+        let entry: [&dyn Fn(&mut RetainedWorkflow); 2] =
+            [&|retained| _ = retained.entry.records.pop(), &|retained| {
+                retained.entry.terminal = terminal.clone();
+            }];
+        for (index, edit) in shared.into_iter().enumerate() {
+            let changed = observed(edit);
+            assert_ne!(changed.shared, whole.shared, "shared {index}");
+            assert_eq!(changed.entry, whole.entry, "shared {index}");
+        }
+        for (index, edit) in entry.into_iter().enumerate() {
+            let changed = observed(edit);
+            assert_eq!(changed.shared, whole.shared, "entry {index}");
+            assert_ne!(changed.entry, whole.entry, "entry {index}");
+        }
+    }
+
+    /// D15:2775: the interval begins with the pre-invocation admission, so
+    /// what it is handed is the submission beside an empty slot for the set
+    /// it admits and the storage the outcome borrows, never an admitted set.
+    #[test]
+    fn the_interval_is_handed_the_submission_not_an_admitted_set() {
+        struct Recording(RefCell<Vec<&'static str>>);
+        impl Instrument for Recording {
+            type Failure = ();
+            const AGGREGATION: Aggregation = Aggregation::BatchTotal;
+            fn interval<Input, Output>(
+                &self,
+                input: Input,
+                invoke: fn(Input) -> Output,
+            ) -> Result<Interval<Output>, ()> {
+                self.0.borrow_mut().push(std::any::type_name::<Input>());
+                let output = invoke(input);
+                Ok(Interval {
+                    quantity: Quantity::new(0),
+                    output,
+                })
+            }
+            fn unavailable() {}
+        }
+        let prepared = prepared(R::Storefront);
+        let recording = Recording(RefCell::new(Vec::new()));
+        let measured = prepared.interval(&recording).unwrap();
+        assert_eq!(observe(&measured.output), observe(&prepared.resolve()));
+        let handed = recording.0.into_inner();
+        let [input] = handed.as_slice() else {
+            panic!("one interval: {handed:?}")
+        };
+        for part in [
+            "boundary::invocation::SubmittedInvocation<",
+            "&mut core::option::Option<intlify_config::boundary::invocation::InvocationInputs<",
+            "&mut intlify_config::resolver::invocation::OutcomeStorage",
+        ] {
+            assert!(input.contains(part), "{input}");
+        }
+    }
 }

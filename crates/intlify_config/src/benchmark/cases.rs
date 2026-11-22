@@ -34,7 +34,7 @@ pub(super) use evidence_inputs::DENSE;
 mod context;
 pub(super) mod prepare;
 pub(super) mod registry;
-mod workflow_inputs;
+pub(super) mod workflow_inputs;
 
 // The fixed inventory uses the formal 015/017 configuration references. Until
 // Intlify is released, a changed recipe rewrites its expectations in place at

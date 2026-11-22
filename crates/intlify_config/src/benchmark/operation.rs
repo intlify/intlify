@@ -275,6 +275,7 @@ pub(super) enum OutputFailure {
     TargetAndGroupResolutionInvariant,
     HydrationRelationValidationInvariant,
     EvidenceMaterializationInvariant,
+    CompleteInvocationFailure,
 }
 
 impl Prepared {
