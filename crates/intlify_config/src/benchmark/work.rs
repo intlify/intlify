@@ -6,8 +6,8 @@
 //! 015 Phase 4 resource policy admission, and 015 Phase 9 collection admission
 //! and exact resolution, 015 Phases 11 to 13 target, group, and hydration
 //! resolution, 015's resolver construction and its identity, its Evidence
-//! stages, and its complete invocation. These are not physical metrics or
-//! formal Resource Policy observations.
+//! stages, its complete invocation, and a Snapshot's admission. These are not
+//! physical metrics or formal Resource Policy observations.
 
 use serde::{Deserialize, Serialize};
 
@@ -26,6 +26,7 @@ mod evidence;
 mod hydration;
 mod policy;
 mod resolution;
+mod snapshot;
 mod target_group;
 mod workflow;
 
@@ -170,6 +171,15 @@ pub(super) enum WorkKind {
     WorkflowEntryRecords,
     WorkflowEntryCanonicalBytes,
     WorkflowReserveCanonicalBytes,
+    SnapshotNodes,
+    SnapshotMaximumDepth,
+    SnapshotCollectionEntries,
+    SnapshotTotalStringBytes,
+    SnapshotMaximumStringBytes,
+    SnapshotRejectedMarkers,
+    SnapshotEnvelopeCanonicalBytes,
+    SnapshotMaximumMarkerCanonicalBytes,
+    SnapshotTraversalUnits,
 }
 
 impl WorkKind {
@@ -364,6 +374,26 @@ impl WorkKind {
         Self::WorkflowReserveCanonicalBytes,
     ];
 
+    /// What the Snapshot boundary counts under each of the nine
+    /// `bootstrapOnly.snapshot` bounds, in the bounds' order, then the
+    /// root-value counts of the document.
+    const SNAPSHOT: [Self; 14] = [
+        Self::SnapshotNodes,
+        Self::SnapshotMaximumDepth,
+        Self::SnapshotCollectionEntries,
+        Self::SnapshotTotalStringBytes,
+        Self::SnapshotMaximumStringBytes,
+        Self::SnapshotRejectedMarkers,
+        Self::SnapshotEnvelopeCanonicalBytes,
+        Self::SnapshotMaximumMarkerCanonicalBytes,
+        Self::SnapshotTraversalUnits,
+        Self::LogicalValueNodes,
+        Self::MaximumValueDepth,
+        Self::CollectionEntries,
+        Self::TotalDecodedStringBytes,
+        Self::MaximumDecodedStringBytes,
+    ];
+
     pub(super) fn for_operation(operation: Operation) -> &'static [Self] {
         match operation {
             Operation::LocaleCanonicalization => &Self::LOCALE,
@@ -379,6 +409,7 @@ impl WorkKind {
             Operation::EntryEvidence => &Self::ENTRY_EVIDENCE,
             Operation::OutcomeFinalization => &Self::OUTCOME_FINALIZATION,
             Operation::FileEntryCompleteWorkflow => &Self::WORKFLOW,
+            Operation::ProgrammaticSnapshotAdmission => &Self::SNAPSHOT,
             _ => &Self::INPUT,
         }
     }
@@ -430,6 +461,8 @@ impl WorkKind {
             Self::ConstructionCrossAuthorityChecks => WorkUnit::CrossAuthorityCheck,
             Self::TotalDecodedStringBytes
             | Self::MaximumDecodedStringBytes
+            | Self::SnapshotTotalStringBytes
+            | Self::SnapshotMaximumStringBytes
             | Self::MaximumDeclaredProfileIdBytes
             | Self::SelectorIdBytes
             | Self::RawLocaleIdentifierBytes
@@ -442,10 +475,15 @@ impl WorkKind {
             | Self::ConstructionMaximumStringBytes => WorkUnit::Utf8Octet,
             Self::ParserTokensVisited => WorkUnit::ParserToken,
             Self::LogicalValueNodes | Self::ConstructionNodes => WorkUnit::LogicalValue,
-            Self::MaximumValueDepth | Self::ConstructionMaximumDepth => WorkUnit::ValueLevel,
-            Self::CollectionEntries | Self::ConstructionCollectionEntries => {
-                WorkUnit::CollectionEntry
-            }
+            Self::MaximumValueDepth
+            | Self::ConstructionMaximumDepth
+            | Self::SnapshotMaximumDepth => WorkUnit::ValueLevel,
+            Self::CollectionEntries
+            | Self::ConstructionCollectionEntries
+            | Self::SnapshotCollectionEntries => WorkUnit::CollectionEntry,
+            Self::SnapshotNodes => WorkUnit::SnapshotNode,
+            Self::SnapshotRejectedMarkers => WorkUnit::RejectedMarker,
+            Self::SnapshotTraversalUnits => WorkUnit::TraversalUnit,
             Self::ProfileDeclarations => WorkUnit::ProfileDeclaration,
             Self::StructuralAnalysisUnits => WorkUnit::ApplicableKeywordSubject,
             Self::RetainedAdmissionIssues
@@ -517,7 +555,9 @@ impl WorkKind {
             | Self::WorkflowSubmittedCanonicalBytes
             | Self::WorkflowSharedCanonicalBytes
             | Self::WorkflowEntryCanonicalBytes
-            | Self::WorkflowReserveCanonicalBytes => WorkUnit::CanonicalOctet,
+            | Self::WorkflowReserveCanonicalBytes
+            | Self::SnapshotEnvelopeCanonicalBytes
+            | Self::SnapshotMaximumMarkerCanonicalBytes => WorkUnit::CanonicalOctet,
             Self::ResourcePolicyReferences
             | Self::ResolvedBindingReferences
             | Self::ResolvedBindingDistinctReferences
@@ -590,6 +630,9 @@ enum WorkUnit {
     RelatedEvidence,
     RelatedEvidenceOccurrence,
     PathSegment,
+    SnapshotNode,
+    RejectedMarker,
+    TraversalUnit,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -611,6 +654,7 @@ enum UnavailableWork {
     ArtifactCollectionNotAdmitted,
     ArtifactReferencesNotResolved,
     EvidencePathsNotAdmitted,
+    SnapshotHoldsMarkers,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -701,6 +745,9 @@ impl LogicalWork {
                 Operation::OutcomeFinalization => "intlify-config-outcome-finalization-work",
                 Operation::FileEntryCompleteWorkflow => {
                     "intlify-config-file-entry-complete-workflow-work"
+                }
+                Operation::ProgrammaticSnapshotAdmission => {
+                    "intlify-config-programmatic-snapshot-admission-work"
                 }
                 _ => "intlify-config-minimum-input-work",
             }
@@ -797,6 +844,7 @@ impl LogicalWork {
                 work.outcome_finalization(resolved)?;
             }
             (Prepared::Workflow(_), Output::Workflow(resolved)) => work.workflow(resolved)?,
+            (Prepared::Snapshot(_), Output::Snapshot(resolved)) => work.snapshot(resolved)?,
             _ => return Err(WorkFailure::OperationMismatch),
         }
         Ok(work)

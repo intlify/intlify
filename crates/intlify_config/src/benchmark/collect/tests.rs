@@ -148,6 +148,12 @@ fn fixture_observation(prepared: &Prepared) -> (Observation, LogicalWork) {
         Output::Workflow(resolved) => {
             assert!(resolved.result.is_ok());
         }
+        Output::Snapshot(resolved) => {
+            assert!(resolved
+                .as_ref()
+                .as_ref()
+                .is_ok_and(|admitted| admitted.document.is_some()));
+        }
         _ => panic!("fixture preparation did not produce its known result"),
     }
     (

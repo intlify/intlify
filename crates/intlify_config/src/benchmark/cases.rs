@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Finite owner case declarations for the seventeen active boundaries.
+//! Finite owner case declarations for the eighteen active boundaries.
 //! This is not a common Run Plan, case-identity codec, or a complete 015 suite.
 //! Preparation yields an unadmitted candidate; the separate fixture registry
 //! binds its exact input/result/work before method-bound collection can use it.
@@ -35,6 +35,7 @@ mod context;
 pub(super) mod prepare;
 pub(super) mod registry;
 pub(super) mod snapshot_inputs;
+pub(super) use snapshot_inputs::SnapshotRecipe;
 pub(super) mod workflow_inputs;
 
 // The fixed inventory uses the formal 015/017 configuration references. Until
@@ -193,6 +194,8 @@ pub(super) enum ExpectedKind {
     OutcomeFinalizationBlocked,
     WorkflowChecked,
     WorkflowBlocked,
+    SnapshotMaterialized,
+    SnapshotMarked,
 }
 
 #[derive(
@@ -440,7 +443,8 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 | Operation::SharedEvidence
                 | Operation::EntryEvidence
                 | Operation::OutcomeFinalization
-                | Operation::FileEntryCompleteWorkflow => unreachable!(),
+                | Operation::FileEntryCompleteWorkflow
+                | Operation::ProgrammaticSnapshotAdmission => unreachable!(),
             };
             let selector = if operation == Operation::ProfileSelection {
                 Selector::App
@@ -1032,6 +1036,24 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 },
             ));
         }
+    }
+    // Append the admission of an already constructed Snapshot through its
+    // document without changing any of the 431 rows: the value of each
+    // recipe a file materialization case materializes but the padded one,
+    // whose file case it pairs with, and Minimal's value holding rejected
+    // markers, admitted with no document (D15:140, 2765, 2788; plan 025
+    // decision #316).
+    for recipe in SnapshotRecipe::ALL {
+        cases.push(declaration(
+            Operation::ProgrammaticSnapshotAdmission,
+            Recipe::Snapshot(recipe),
+            Selector::Absent,
+            if recipe.materializes() {
+                ExpectedKind::SnapshotMaterialized
+            } else {
+                ExpectedKind::SnapshotMarked
+            },
+        ));
     }
     cases
 }

@@ -9,9 +9,12 @@ use crate::benchmark::locale_icu4x::PreparedEngine;
 use crate::benchmark::locale_resolution::Canonicalizers;
 use crate::benchmark::observation::{document, Digest, Frame};
 use crate::benchmark::operation::Prepared;
+use crate::boundary::snapshot::{SnapshotReport, SubmittedNode};
 use crate::construction::component::Submitted;
 use crate::construction::flow::ConstructionInput;
 use crate::input_limits::InputLimits;
+use crate::resolver::capability::SnapshotLimits;
+use crate::snapshot::SnapshotBound;
 use crate::structural::StructuralLimits;
 
 use super::prepare::{selector_input, Candidate};
@@ -33,6 +36,7 @@ pub(in crate::benchmark) enum ContextFailure {
     ConstructionInputMismatch,
     EvidenceInputMismatch,
     WorkflowInputMismatch,
+    SnapshotInputMismatch,
 }
 
 pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
@@ -393,8 +397,75 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
             frame.text(&prepared.identity.text());
         }
         Prepared::Workflow(prepared) => workflow_input(&mut frame, candidate, prepared)?,
+        Prepared::Snapshot(prepared) => {
+            snapshot_input(&mut frame, &prepared.report, prepared.limits)?;
+        }
     }
     Ok(frame.finish())
+}
+
+/// A Snapshot's admission: the formal Snapshot as submitted, its supplied
+/// digest, then its tree node by node in submission preorder, an object's
+/// keys before its values and a number by its bits, so member order and
+/// negative zero are bound as submitted; then each bound it is admitted
+/// under. Read without recursion (plan 025 decision #298).
+fn snapshot_input(
+    frame: &mut Frame,
+    report: &SnapshotReport,
+    limits: SnapshotLimits,
+) -> Result<(), ContextFailure> {
+    let SnapshotReport::Formal { root, digest } = report else {
+        return Err(ContextFailure::SnapshotInputMismatch);
+    };
+    let count = |len: usize| u64::try_from(len).map_err(|_| ContextFailure::Encoding);
+    frame.text(digest);
+    let mut pending = vec![root];
+    while let Some(node) = pending.pop() {
+        match node {
+            SubmittedNode::Null => frame.uint(0),
+            SubmittedNode::Boolean(value) => {
+                frame.uint(1);
+                frame.flag(*value);
+            }
+            SubmittedNode::Number(value) => {
+                frame.uint(2);
+                frame.uint(value.to_bits());
+            }
+            SubmittedNode::String(bytes) => {
+                frame.uint(3);
+                frame.bytes(bytes);
+            }
+            SubmittedNode::Array(elements) => {
+                frame.uint(4);
+                frame.uint(count(elements.len())?);
+                pending.extend(elements.iter().rev());
+            }
+            SubmittedNode::Object(members) => {
+                frame.uint(5);
+                frame.uint(count(members.len())?);
+                for (key, _) in members {
+                    frame.bytes(key);
+                }
+                pending.extend(members.iter().rev().map(|(_, value)| value));
+            }
+            SubmittedNode::Marker(marker) => {
+                frame.uint(6);
+                frame.text(&marker.reason);
+                frame.flag(marker.bound.is_some());
+                if let Some(bound) = &marker.bound {
+                    frame.text(bound);
+                }
+                frame.flag(marker.witness.is_some());
+                if let Some(witness) = marker.witness {
+                    frame.uint(witness);
+                }
+            }
+        }
+    }
+    for bound in SnapshotBound::ALL {
+        frame.uint(bound.limit(&limits).get());
+    }
+    Ok(())
 }
 
 /// One file entry's complete invocation on a resolver its preparation
@@ -677,6 +748,7 @@ mod tests {
     use crate::benchmark::cases::{EvidenceRecipe, ResolverState, Selector};
     use crate::benchmark::workflow::tests::{candidate, candidate_in};
     use crate::benchmark::workflow::{Before, PreparedWorkflow, RawInvocation};
+    use crate::boundary::snapshot::SubmittedMarker;
 
     type Edit = (&'static str, fn(&mut RawInvocation));
 
@@ -794,5 +866,80 @@ mod tests {
         assert_eq!(observe(&candidate), refused);
         workflow(&mut candidate).before = kept;
         assert_eq!(observe(&candidate), context);
+    }
+
+    /// The members of a formal Snapshot's root object.
+    fn members(report: &mut SnapshotReport) -> &mut Vec<(Vec<u8>, SubmittedNode)> {
+        let SnapshotReport::Formal {
+            root: SubmittedNode::Object(members),
+            ..
+        } = report
+        else {
+            unreachable!()
+        };
+        members
+    }
+
+    /// The marker a marked recipe's last root member holds.
+    fn marker(report: &mut SnapshotReport) -> &mut SubmittedMarker {
+        let Some((_, SubmittedNode::Marker(marker))) = members(report).last_mut() else {
+            unreachable!()
+        };
+        marker
+    }
+
+    /// A Snapshot admission's context binds the tree as submitted, its
+    /// digest, and its bounds: reordered members, a renamed key, a number's
+    /// sign, any field of a marker, the digest, or one bound each changes it,
+    /// and a report with no Snapshot is refused.
+    #[test]
+    fn a_snapshot_context_binds_the_tree_as_submitted_and_its_bounds() {
+        use crate::benchmark::cases::SnapshotRecipe as S;
+        use crate::benchmark::snapshot_admission::tests::candidate as snapshot;
+        use crate::input_limits::Bound;
+
+        type Change = (S, fn(&mut SnapshotReport, &mut SnapshotLimits));
+        let changes: [Change; 8] = [
+            (S::Minimal, |report, _| members(report).reverse()),
+            (S::Minimal, |report, _| members(report)[0].0.push(b'x')),
+            (S::NegativeZero, |report, _| {
+                let SnapshotReport::Formal { root, .. } = report else {
+                    unreachable!()
+                };
+                *root = SubmittedNode::Number(0.0);
+            }),
+            (S::Cycle, |report, _| {
+                marker(report).reason = "unsupported-type".to_owned();
+            }),
+            (S::Cycle, |report, _| {
+                marker(report).bound = Some("bootstrapOnly.snapshot.maxNodes".to_owned());
+            }),
+            (S::Cycle, |report, _| marker(report).witness = Some(1)),
+            (S::Minimal, |report, _| {
+                let SnapshotReport::Formal { digest, .. } = report else {
+                    unreachable!()
+                };
+                digest.push('0');
+            }),
+            (S::Minimal, |_, limits| {
+                limits.max_traversal_units = Bound::new(1).unwrap();
+            }),
+        ];
+        for (index, (recipe, change)) in changes.into_iter().enumerate() {
+            let mut candidate = snapshot(recipe);
+            let context = observe(&candidate).unwrap();
+            let Prepared::Snapshot(prepared) = &mut candidate.prepared else {
+                unreachable!()
+            };
+            change(&mut prepared.report, &mut prepared.limits);
+            assert_ne!(observe(&candidate).unwrap(), context, "{index}");
+        }
+        let mut candidate = snapshot(S::Minimal);
+        let Prepared::Snapshot(prepared) = &mut candidate.prepared else {
+            unreachable!()
+        };
+        prepared.report = SnapshotReport::Unsafe;
+        let refused = Err(ContextFailure::SnapshotInputMismatch);
+        assert_eq!(observe(&candidate), refused);
     }
 }

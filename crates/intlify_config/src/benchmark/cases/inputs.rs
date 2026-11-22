@@ -63,6 +63,7 @@ pub(in crate::benchmark) enum Recipe {
         input: super::EvidenceRecipe,
         resolver: super::ResolverState,
     },
+    Snapshot(super::SnapshotRecipe),
 }
 
 impl Recipe {
@@ -100,6 +101,11 @@ impl Recipe {
     /// No file reads, ambient config, arbitrary payloads, or network acquisition.
     /// All allocation scales are finite owner fixture constants outside intervals.
     pub(in crate::benchmark) fn source(self) -> Arc<[u8]> {
+        if let Self::Snapshot(recipe) = self {
+            // The file whose value the Snapshot submits; the input context
+            // binds the tree as submitted.
+            return recipe.file().source();
+        }
         if let Self::Locale(recipe) = self {
             return Arc::from(recipe.spelling().as_bytes());
         }

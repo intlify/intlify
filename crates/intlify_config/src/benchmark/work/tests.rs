@@ -184,6 +184,13 @@ fn every_active_operation_retains_the_complete_ordered_vocabulary_and_its_stages
                 .facts
                 .iter()
                 .all(|item| item.stage == WorkStage::OperationResult));
+        } else if prepared.operation() == Operation::ProgrammaticSnapshotAdmission {
+            // The admitted tree's nine counts and its document's five.
+            assert_eq!(work.facts.len(), 14);
+            assert!(work
+                .facts
+                .iter()
+                .all(|item| item.stage == WorkStage::OperationResult));
         } else {
             assert_eq!(work.facts.len(), 14);
             assert_eq!(fact(&work, WorkKind::LogicalValueNodes).stage, input_stage);

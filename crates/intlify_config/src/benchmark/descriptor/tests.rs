@@ -62,8 +62,8 @@ fn all_active_pairs_keep_distinct_owner_boundaries_and_exact_method_meaning() {
         assert_eq!(method.numeric_decision_eligibility, "qualified-runner");
         assert!(!method.estimated_overhead_subtraction);
     }
-    assert_eq!(pairs.len(), 17);
-    assert_eq!(identities.len(), 17);
+    assert_eq!(pairs.len(), 18);
+    assert_eq!(identities.len(), 18);
 }
 
 /// D15:2777, 2824; plan 025 decision #316: only an end-to-end boundary
@@ -71,10 +71,13 @@ fn all_active_pairs_keep_distinct_owner_boundaries_and_exact_method_meaning() {
 /// and no boundary names a parent, so each component keeps its boundary.
 #[test]
 fn an_end_to_end_boundary_names_the_component_boundaries_it_includes() {
+    // A file entry's invocation builds no authoring model, constructs no
+    // resolver, and admits no Snapshot.
     let excluded = [
         Operation::AuthoringConstruction,
         Operation::ConstructionAuthorityAdmission,
         Operation::ConstructionIdentity,
+        Operation::ProgrammaticSnapshotAdmission,
     ];
     let components = Operation::ALL
         .into_iter()
