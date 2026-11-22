@@ -936,6 +936,11 @@ impl LogicalWork {
     }
 
     fn values(&mut self, value: Option<ValueCounts>, stage: WorkStage) {
+        self.values_or(value, stage, UnavailableWork::RawInputNotComplete);
+    }
+
+    /// The five value counts, each unavailable for `reason` without a value.
+    fn values_or(&mut self, value: Option<ValueCounts>, stage: WorkStage, reason: UnavailableWork) {
         let kinds = [
             WorkKind::LogicalValueNodes,
             WorkKind::MaximumValueDepth,
@@ -956,12 +961,9 @@ impl LogicalWork {
             self.set(
                 kind,
                 stage,
-                observations.map_or(
-                    WorkValue::Unavailable {
-                        reason: UnavailableWork::RawInputNotComplete,
-                    },
-                    |values| WorkValue::exact(values[index]),
-                ),
+                observations.map_or(WorkValue::Unavailable { reason }, |values| {
+                    WorkValue::exact(values[index])
+                }),
             );
         }
     }

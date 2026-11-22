@@ -9,6 +9,7 @@ use crate::benchmark::locale_icu4x::PreparedEngine;
 use crate::benchmark::locale_resolution::Canonicalizers;
 use crate::benchmark::observation::{document, Digest, Frame};
 use crate::benchmark::operation::Prepared;
+use crate::benchmark::workflow::{RawEntry, RawInvocation};
 use crate::boundary::snapshot::{SnapshotReport, SubmittedNode};
 use crate::construction::component::Submitted;
 use crate::construction::flow::ConstructionInput;
@@ -417,8 +418,19 @@ fn snapshot_input(
     let SnapshotReport::Formal { root, digest } = report else {
         return Err(ContextFailure::SnapshotInputMismatch);
     };
-    let count = |len: usize| u64::try_from(len).map_err(|_| ContextFailure::Encoding);
     frame.text(digest);
+    submitted_tree(frame, root)?;
+    for bound in SnapshotBound::ALL {
+        frame.uint(bound.limit(&limits).get());
+    }
+    Ok(())
+}
+
+/// A submitted tree node by node in submission preorder, an object's keys
+/// before its values and a number by its bits, read without recursion (plan
+/// 025 decision #298).
+fn submitted_tree(frame: &mut Frame, root: &SubmittedNode) -> Result<(), ContextFailure> {
+    let count = |len: usize| u64::try_from(len).map_err(|_| ContextFailure::Encoding);
     let mut pending = vec![root];
     while let Some(node) = pending.pop() {
         match node {
@@ -462,13 +474,10 @@ fn snapshot_input(
             }
         }
     }
-    for bound in SnapshotBound::ALL {
-        frame.uint(bound.limit(&limits).get());
-    }
     Ok(())
 }
 
-/// One file entry's complete invocation on a resolver its preparation
+/// One entry's complete invocation on a resolver its preparation
 /// constructed from the committed input, in the declared state: the
 /// resolver, by the identity the submission names, every raw value a binding
 /// submits, and the case's facts, which state what each repetition runs
@@ -482,15 +491,11 @@ fn workflow_input(
 ) -> Result<(), ContextFailure> {
     use crate::benchmark::workflow::{Before, InputFacts};
 
-    let Recipe::Workflow { input, resolver } = candidate.declaration.fixture else {
-        return Err(ContextFailure::WorkflowInputMismatch);
-    };
     let (root, raw) = (prepared.root, &prepared.raw);
-    let rebuilt = super::workflow_inputs::submission(input, &prepared.constructed, root);
-    let before = super::workflow_inputs::before(resolver, &prepared.constructed, root);
+    let fixture = candidate.declaration.fixture;
+    let rebuilt = super::workflow_inputs::rebuilt(fixture, &prepared.constructed, root);
     if candidate.declaration.selector != super::Selector::App
-        || rebuilt.as_ref() != Some(raw)
-        || before.as_ref() != Some(&prepared.before)
+        || !rebuilt.is_some_and(|(rebuilt, before)| rebuilt == *raw && before == prepared.before)
     {
         return Err(ContextFailure::WorkflowInputMismatch);
     }
@@ -503,15 +508,13 @@ fn workflow_input(
     Ok(())
 }
 
-/// What a binding submits for one file entry's invocation: the
-/// Specification Input, the vocabulary, the canonicalization data's manifest
-/// and payloads, every member in submission order, the Verification Input
-/// and the assertion beside it, the capability, the file and its revision,
-/// and the selector, under the identity the set names.
-fn submitted_input(
-    frame: &mut Frame,
-    raw: &crate::benchmark::workflow::RawInvocation,
-) -> Result<(), ContextFailure> {
+/// What a binding submits for one entry's invocation: the Specification
+/// Input, the vocabulary, the canonicalization data's manifest and payloads,
+/// every member in submission order, the Verification Input and the
+/// assertion beside it, the capability, the file or the Snapshot as
+/// submitted and its revision, and the selector, under the identity the set
+/// names.
+fn submitted_input(frame: &mut Frame, raw: &RawInvocation) -> Result<(), ContextFailure> {
     let count = |len: usize| u64::try_from(len).map_err(|_| ContextFailure::Encoding);
     frame.text(&raw.reference);
     frame.bytes(&raw.specification);
@@ -531,8 +534,21 @@ fn submitted_input(
     frame.text(raw.assertion.revision.as_str());
     frame.text(raw.assertion.semantic_digest.as_str());
     frame.json(&raw.capability);
-    frame.bytes(&raw.file);
-    frame.text(&raw.revision);
+    match &raw.entry {
+        RawEntry::File { bytes, revision } => {
+            frame.bytes(bytes);
+            frame.text(revision);
+        }
+        RawEntry::Programmatic { snapshot, revision } => {
+            let SnapshotReport::Formal { root, digest } = snapshot else {
+                return Err(ContextFailure::WorkflowInputMismatch);
+            };
+            frame.text("programmatic");
+            frame.text(digest);
+            submitted_tree(frame, root)?;
+            frame.text(revision);
+        }
+    }
     frame.text(&raw.selector);
     Ok(())
 }
@@ -747,7 +763,7 @@ mod tests {
     use super::*;
     use crate::benchmark::cases::{EvidenceRecipe, ResolverState, Selector};
     use crate::benchmark::workflow::tests::{candidate, candidate_in};
-    use crate::benchmark::workflow::{Before, PreparedWorkflow, RawInvocation};
+    use crate::benchmark::workflow::{Before, PreparedWorkflow};
     use crate::boundary::snapshot::SubmittedMarker;
 
     type Edit = (&'static str, fn(&mut RawInvocation));
@@ -757,6 +773,14 @@ mod tests {
             unreachable!()
         };
         prepared
+    }
+
+    /// A file entry's bytes and their revision.
+    fn file(raw: &mut RawInvocation) -> (&mut Arc<[u8]>, &mut String) {
+        let RawEntry::File { bytes, revision } = &mut raw.entry else {
+            unreachable!()
+        };
+        (bytes, revision)
     }
 
     fn raw(candidate: &mut Candidate) -> &mut RawInvocation {
@@ -794,8 +818,8 @@ mod tests {
             ("capability", |raw| {
                 raw.capability["bootstrapOnly"] = json!({});
             }),
-            ("file", |raw| raw.file = Arc::from(&b"{}"[..])),
-            ("revision", |raw| raw.revision.push('0')),
+            ("file", |raw| *file(raw).0 = Arc::from(&b"{}"[..])),
+            ("revision", |raw| file(raw).1.push('0')),
             ("selector", |raw| raw.selector.push('0')),
         ];
         for (name, edit) in edits {
@@ -841,7 +865,7 @@ mod tests {
         let original = blocked(&mut candidate).clone();
         let refused = Err(ContextFailure::WorkflowInputMismatch);
         let edits: [Edit; 3] = [
-            ("file", |raw| raw.file = Arc::from(&b"{}"[..])),
+            ("file", |raw| *file(raw).0 = Arc::from(&b"{}"[..])),
             ("members", |raw| raw.members.reverse()),
             ("selector", |raw| raw.selector.push('0')),
         ];
