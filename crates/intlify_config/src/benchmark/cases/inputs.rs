@@ -59,6 +59,10 @@ pub(in crate::benchmark) enum Recipe {
     Hydration(super::HydrationRecipe),
     Construction(super::ConstructionRecipe),
     Evidence(super::EvidenceRecipe),
+    Workflow {
+        input: super::EvidenceRecipe,
+        resolver: super::ResolverState,
+    },
 }
 
 impl Recipe {
@@ -144,7 +148,7 @@ impl Recipe {
                     .expect("finite owner hydration fixture"),
             );
         }
-        if let Self::Evidence(recipe) = self {
+        if let Self::Evidence(recipe) | Self::Workflow { input: recipe, .. } = self {
             // The configuration file the invocation reads; the input context
             // binds the members and the invocation's other inputs.
             return Arc::from(recipe.source(&recipe.limits()));

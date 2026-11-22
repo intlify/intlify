@@ -1420,6 +1420,16 @@
               "type": "null"
             }
           ]
+        },
+        "workflowInput": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/InputFacts10"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -1437,7 +1447,8 @@
         "resolvedBindingInput",
         "resourcePolicyInput",
         "sharedEvidenceInput",
-        "targetAndGroupInput"
+        "targetAndGroupInput",
+        "workflowInput"
       ],
       "type": "object"
     },
@@ -2623,6 +2634,63 @@
         "identifierByteUnit",
         "providerReuse",
         "canonicalValueStorage"
+      ],
+      "type": "object"
+    },
+    "InputFacts10": {
+      "additionalProperties": false,
+      "description": "What a complete invocation case runs on and submits, which its\ndescriptor states.",
+      "properties": {
+        "canonicalization": {
+          "type": "string"
+        },
+        "capability": {
+          "type": "string"
+        },
+        "entryKind": {
+          "type": "string"
+        },
+        "inputStorage": {
+          "type": "string"
+        },
+        "ordinaryOutput": {
+          "type": "string"
+        },
+        "prerequisites": {
+          "type": "string"
+        },
+        "resolver": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "specifications": {
+          "type": "string"
+        },
+        "structuralPreparation": {
+          "type": "string"
+        },
+        "submittedMembers": {
+          "$ref": "#/definitions/UInt64"
+        },
+        "verification": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "scope",
+        "entryKind",
+        "resolver",
+        "specifications",
+        "capability",
+        "verification",
+        "canonicalization",
+        "submittedMembers",
+        "prerequisites",
+        "inputStorage",
+        "structuralPreparation",
+        "ordinaryOutput"
       ],
       "type": "object"
     },
@@ -3937,7 +4005,8 @@
         "construction-identity",
         "shared-evidence",
         "entry-evidence",
-        "outcome-finalization"
+        "outcome-finalization",
+        "file-entry-complete-workflow"
       ],
       "type": "string"
     },
@@ -4291,6 +4360,26 @@
             }
           },
           "required": ["evidence"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "workflow": {
+              "additionalProperties": false,
+              "properties": {
+                "input": {
+                  "$ref": "#/definitions/EvidenceRecipe"
+                },
+                "resolver": {
+                  "$ref": "#/definitions/ResolverState"
+                }
+              },
+              "required": ["input", "resolver"],
+              "type": "object"
+            }
+          },
+          "required": ["workflow"],
           "type": "object"
         }
       ]
@@ -5109,7 +5198,14 @@
         "entry-evidence-metadata-work-units",
         "outcome-finalization-entry-records",
         "outcome-finalization-shared-records",
-        "outcome-finalization-reserve-canonical-bytes"
+        "outcome-finalization-reserve-canonical-bytes",
+        "workflow-submitted-members",
+        "workflow-submitted-canonical-bytes",
+        "workflow-shared-records",
+        "workflow-shared-canonical-bytes",
+        "workflow-entry-records",
+        "workflow-entry-canonical-bytes",
+        "workflow-reserve-canonical-bytes"
       ],
       "type": "string"
     },

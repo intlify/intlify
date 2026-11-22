@@ -53,7 +53,6 @@ fn all_active_pairs_keep_distinct_owner_boundaries_and_exact_method_meaning() {
             Some(&boundary.final_included_marker)
         );
         assert!(boundary.direct_parents.is_empty());
-        assert!(boundary.direct_children.is_empty());
         let Method::Duration(method) = &decoded.method else {
             panic!("a duration case is timed");
         };
@@ -63,8 +62,32 @@ fn all_active_pairs_keep_distinct_owner_boundaries_and_exact_method_meaning() {
         assert_eq!(method.numeric_decision_eligibility, "qualified-runner");
         assert!(!method.estimated_overhead_subtraction);
     }
-    assert_eq!(pairs.len(), 16);
-    assert_eq!(identities.len(), 16);
+    assert_eq!(pairs.len(), 17);
+    assert_eq!(identities.len(), 17);
+}
+
+/// D15:2777, 2824; plan 025 decision #316: only an end-to-end boundary
+/// names children, the component boundary of each phase its invocation runs,
+/// and no boundary names a parent, so each component keeps its boundary.
+#[test]
+fn an_end_to_end_boundary_names_the_component_boundaries_it_includes() {
+    let excluded = [
+        Operation::AuthoringConstruction,
+        Operation::ConstructionAuthorityAdmission,
+        Operation::ConstructionIdentity,
+    ];
+    let components = Operation::ALL
+        .into_iter()
+        .filter(|operation| operation.phase() != "profile_resolve_e2e")
+        .filter(|operation| !excluded.contains(operation));
+    let children: Vec<String> = components.map(|child| child.boundary().into()).collect();
+    for operation in Operation::ALL {
+        let boundary = Boundary::for_operation(operation);
+        assert!(boundary.direct_parents.is_empty(), "{operation:?}");
+        let e2e = operation.phase() == "profile_resolve_e2e";
+        let expected = if e2e { &children[..] } else { &[] };
+        assert_eq!(boundary.direct_children, expected, "{operation:?}");
+    }
 }
 
 /// A construction case builds a fresh resolver in every interval; the

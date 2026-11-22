@@ -1,8 +1,9 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! One-shot owner-run assembly around the sixteen ordinary component operations,
-//! timed by a duration run or observed by a memory run.
+//! One-shot owner-run assembly around the seventeen ordinary operations, the
+//! components and one complete invocation, timed by a duration run or observed
+//! by a memory run.
 //!
 //! All fixtures, expectations, context, and ordering are fixed before capture.
 //! Failed cases remain in the result; their prefixes never become measured rows.

@@ -37,7 +37,7 @@ fn analysis(value: &Value) -> Analysis {
         .unwrap()
 }
 
-pub(crate) fn operations() -> [Prepared; 16] {
+pub(crate) fn operations() -> [Prepared; 17] {
     let source: Arc<[u8]> = Arc::from(serde_json::to_vec(&minimal_config()).unwrap());
     let doc = Arc::new(
         materialize_file(Arc::clone(&source), crate::materialize_tests::limits()).unwrap(),
@@ -79,7 +79,26 @@ pub(crate) fn operations() -> [Prepared; 16] {
         evidence_operation(Operation::SharedEvidence),
         evidence_operation(Operation::EntryEvidence),
         evidence_operation(Operation::OutcomeFinalization),
+        workflow_operation(),
     ]
+}
+
+/// One file entry's complete invocation of 015's example, as its case
+/// prepares it.
+pub(crate) fn workflow_operation() -> Prepared {
+    use crate::benchmark::cases::{declarations, EvidenceRecipe, Recipe, ResolverState};
+
+    let recipe = Recipe::Workflow {
+        input: EvidenceRecipe::Storefront,
+        resolver: ResolverState::Reused,
+    };
+    let declaration = declarations()
+        .into_iter()
+        .find(|case| case.fixture == recipe)
+        .unwrap();
+    crate::benchmark::cases::prepare::prepare(&declaration)
+        .unwrap()
+        .prepared
 }
 
 /// An Evidence stage, `operation`, over 015's example.
@@ -320,6 +339,10 @@ fn every_active_pair_calls_its_real_core_operation_between_exact_markers() {
                 let outcome = resolved.result.as_ref().unwrap();
                 assert!(outcome.profile.is_some());
                 assert!(outcome.shared.is_some());
+            }
+            Output::Workflow(resolved) => {
+                let retained = resolved.result.as_ref().unwrap();
+                assert!(retained.profile.is_some() && retained.materialized.is_some());
             }
             _ => panic!("unexpected owner operation result"),
         }
