@@ -299,6 +299,7 @@ pub(super) enum OutputFailure {
     EvidenceMaterializationInvariant,
     CompleteInvocationFailure,
     SnapshotAdmissionRefused,
+    ReplayFailure,
 }
 
 impl Prepared {
