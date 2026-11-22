@@ -95,26 +95,42 @@ fn complete_schemas_are_fresh_closed_and_accept_actual_issued_plan_and_case_inpu
 fn each_case_projection_carries_the_execution_state_its_prepared_case_runs_in() {
     let registry = Registry::load().unwrap();
     let plan = issue();
-    let mut engines = Vec::new();
+    let (mut engines, mut resolvers) = (Vec::new(), Vec::new());
     for (projection, declaration) in plan.projections().iter().zip(registry.declarations()) {
         let fixture = registry.prepare(declaration).unwrap();
         let prepared = fixture.prepared();
         assert_eq!(
             projection.execution_state,
-            prepared_core(prepared.operation(), prepared.icu4x_engine())
+            prepared_core(
+                prepared.operation(),
+                prepared.icu4x_engine(),
+                prepared.resolver_state()
+            )
         );
         if prepared.icu4x_engine().is_some() {
             engines.push(projection.execution_state.engine_state.as_str());
         }
+        // A complete invocation's variant names the state of the resolver
+        // its preparation invokes, which sets its engine state.
+        assert_eq!(projection.variant.resolver, prepared.resolver_state());
+        if let Some(state) = projection.variant.resolver {
+            resolvers.push((state, projection.execution_state.engine_state.as_str()));
+        }
     }
     assert_eq!(engines, ["reused", "fresh"].repeat(16));
+    let states = [
+        (ResolverState::Reused, "reused"),
+        (ResolverState::Fresh, "fresh"),
+        (ResolverState::ReusedAfterBlocked, "reused"),
+    ];
+    assert_eq!(resolvers, states.map(|state| [state; 6]).concat());
 }
 
 #[test]
 fn issuance_freezes_unique_case_inventory_but_fresh_instances_do_not_change_case_identity() {
     let first = issue();
     let second = issue();
-    assert_eq!(first.document().body.case_inventory.len(), 419);
+    assert_eq!(first.document().body.case_inventory.len(), 431);
     assert_eq!(
         first.document().body.case_inventory,
         second.document().body.case_inventory
@@ -185,7 +201,7 @@ fn native_capture_uses_the_plan_already_issued_before_collection_and_retains_it_
         value["result"]["plan"]["commonRunPlan"],
         serde_json::to_value(identity).unwrap()
     );
-    assert_eq!(value["result"]["attempts"].as_array().unwrap().len(), 419);
+    assert_eq!(value["result"]["attempts"].as_array().unwrap().len(), 431);
 }
 
 #[test]
@@ -367,7 +383,18 @@ fn every_projection_declares_the_common_dimensions_it_serializes() {
             value["variant"].get("entryKind"),
             evidence.then(|| json!("file")).as_ref()
         );
-        assert!(value["variant"].get("resolver").is_none());
+        // Only a complete invocation's case, which runs on a resolver in a
+        // declared state, names that state, as its recipe does (plan 025
+        // decision #33).
+        let e2e = projection.owner_phase == "profile_resolve_e2e";
+        let resolver = value["variant"].get("resolver");
+        assert_eq!(resolver.is_some(), e2e);
+        if let Some(resolver) = resolver {
+            assert_eq!(
+                resolver,
+                &value["variant"]["recipe"]["workflow"]["resolver"]
+            );
+        }
     }
 }
 

@@ -94,7 +94,7 @@ fn an_end_to_end_boundary_names_the_component_boundaries_it_includes() {
 /// identity reuses the resolver its preparation built.
 #[test]
 fn construction_builds_a_fresh_resolver_and_the_identity_reuses_one() {
-    let state = |operation| prepared_core(operation, None).engine_state;
+    let state = |operation| prepared_core(operation, None, None).engine_state;
     assert_eq!(state(Operation::ConstructionAuthorityAdmission), "fresh");
     assert_eq!(state(Operation::ConstructionIdentity), "reused");
     assert_eq!(state(Operation::HydrationRelationValidation), "reused");

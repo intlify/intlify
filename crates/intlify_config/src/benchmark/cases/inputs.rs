@@ -77,6 +77,15 @@ impl Recipe {
         }
     }
 
+    /// The state of the resolver a complete invocation case invokes; `None`
+    /// for every other case.
+    pub(in crate::benchmark) const fn resolver_state(self) -> Option<super::ResolverState> {
+        match self {
+            Self::Workflow { resolver, .. } => Some(resolver),
+            _ => None,
+        }
+    }
+
     /// The engine state of a case canonicalizing through the ICU4X provider;
     /// `None` for every other case.
     pub(in crate::benchmark) const fn icu4x_engine(self) -> Option<super::Engine> {

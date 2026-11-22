@@ -123,7 +123,7 @@ mod tests {
     fn execution(engine_state: &str) -> Execution {
         Execution {
             engine_state: engine_state.into(),
-            ..prepared_core(Operation::StructuralAnalysis, None)
+            ..prepared_core(Operation::StructuralAnalysis, None, None)
         }
     }
 

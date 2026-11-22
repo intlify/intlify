@@ -15,14 +15,19 @@
 //! A checked or a blocked outcome is an expected result; a refused set or a
 //! resolver defect is a benchmark failure (D15:2826).
 //!
-//! `file_entry_complete_workflow` measures that path on the resolver its
-//! preparation constructed once and every interval reuses, whose identity is
-//! derived before the start mark. The submission, the slot for the admitted
-//! set, and the storage the outcome borrows are made before it; the outcome
-//! and the Materialized Resolution Input Set beside it are copied out after
-//! the end mark, and what the interval admitted is counted then (D15:2824).
+//! `file_entry_complete_workflow` measures that path on a resolver in one of
+//! three states (D15:2789; plan 025 decision #33): constructed before each
+//! start mark from the input its preparation constructed from, the one its
+//! preparation constructed and every interval reuses, or that one right after
+//! it resolved the Blocked recipe's file entry before each start mark, which
+//! shows the invocation reset (D15:2751, 3689). Its identity is derived
+//! before the start mark. The submission, the slot for the admitted set, and
+//! the storage the outcome borrows are made before it; the outcome and the
+//! Materialized Resolution Input Set beside it are copied out after the end
+//! mark, and what the interval admitted is counted then (D15:2824).
 
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -38,7 +43,7 @@ use crate::boundary::selector::SelectorReport;
 use crate::boundary::step::Component;
 use crate::boundary::verification::VerificationAssertion;
 use crate::construction::identity::ConstructionIdentity;
-use crate::construction::resolver::ConstructedResolver;
+use crate::construction::resolver::{build, ConstructedResolver};
 use crate::construction::root::ConstructionRoot;
 use crate::input_limits::{Bound, InputLimits, ValueCounts};
 use crate::locale::icu4x::Icu4xData;
@@ -54,6 +59,7 @@ use crate::resolver::profile_resolution::ResolverInvariant;
 use crate::resolver::profile_view::ProfileView;
 use crate::resolver::token::Specification;
 
+use super::cases::ResolverState;
 use super::evidence::outcome::{project, RetainedProjection};
 use super::instrument::{Instrument, Interval};
 use super::observation::{Frame, Observation};
@@ -191,63 +197,158 @@ where
         .map_err(|invariant| WorkflowFailure::Invariant(Box::new(invariant)))
 }
 
+/// What each repetition of a complete invocation case runs before its start
+/// mark, by the state of the resolver it invokes (D15:2789, 2824; plan 025
+/// decision #33).
+#[derive(PartialEq)]
+pub(in crate::benchmark) enum Before {
+    /// Nothing: the resolver preparation constructed is invoked again.
+    Reused,
+    /// A resolver is constructed from the input preparation constructed
+    /// from, and invoked once.
+    Fresh,
+    /// The resolver preparation constructed resolves this submission, of the
+    /// same entry's Blocked recipe, whose outcome must be blocked (plan 025
+    /// decision #316).
+    AfterBlocked(Box<RawInvocation>),
+}
+
+impl Before {
+    pub(in crate::benchmark) const fn state(&self) -> ResolverState {
+        match self {
+            Self::Reused => ResolverState::Reused,
+            Self::Fresh => ResolverState::Fresh,
+            Self::AfterBlocked(_) => ResolverState::ReusedAfterBlocked,
+        }
+    }
+}
+
+/// How often the repetitions ran what [`Before`] states: the resolvers they
+/// constructed, the times they invoked the one preparation constructed, and
+/// the blocked outcomes they resolved first. Each is counted outside the
+/// interval, so that a test can hold each state to its own work once per
+/// repetition.
+#[derive(Debug, Default)]
+struct Counts {
+    constructed: AtomicU64,
+    prepared: AtomicU64,
+    blocked: AtomicU64,
+}
+
 /// A complete invocation case's inputs: the resolver its preparation
-/// constructed once from the committed input under `root`, and what a
-/// binding submits for the case's recipe on that resolver.
+/// constructed once from the committed input under `root`, what a binding
+/// submits for the case's recipe on that resolver, and what each repetition
+/// runs before its start mark.
 pub(in crate::benchmark) struct PreparedWorkflow {
     pub(in crate::benchmark) root: &'static ConstructionRoot,
     pub(in crate::benchmark) constructed: ConstructedResolver,
     pub(in crate::benchmark) raw: RawInvocation,
+    pub(in crate::benchmark) before: Before,
+    counts: Counts,
 }
 
 impl PreparedWorkflow {
-    /// One invocation measured by `instrument`. The resolver with its
-    /// identity, the submission, the slot, and the storage are made before
-    /// the start mark; the outcome is copied out after the end mark, before
-    /// the storage it borrows is released, and then what the slot holds is
-    /// counted.
+    pub(in crate::benchmark) fn new(
+        root: &'static ConstructionRoot,
+        constructed: ConstructedResolver,
+        raw: RawInvocation,
+        before: Before,
+    ) -> Self {
+        Self {
+            root,
+            constructed,
+            raw,
+            before,
+            counts: Counts::default(),
+        }
+    }
+
+    pub(in crate::benchmark) const fn state(&self) -> ResolverState {
+        self.before.state()
+    }
+
+    /// One invocation measured by `instrument`. What the case's state runs
+    /// first, the resolver's identity, the submission, the slot, and the
+    /// storage are made before the start mark; the outcome is copied out
+    /// after the end mark, before the storage it borrows is released, and
+    /// then what the slot holds is counted.
     pub(in crate::benchmark) fn interval<I: Instrument>(
         &self,
         instrument: &I,
     ) -> Result<Interval<Resolved>, I::Failure> {
-        let resolver = Resolver::new(&self.constructed, self.root);
-        let members = self.raw.members();
-        let mut slot = None;
-        let (quantity, result) = {
-            let mut storage = OutcomeStorage::default();
-            let submitted = self.raw.submitted(&members);
-            let input = (
-                &resolver,
-                submitted,
-                &self.raw.assertion,
-                &mut slot,
-                &mut storage,
-            );
-            let measured = instrument.interval(input, complete)?;
-            let retained = measured
-                .output
-                .map(|resolution| RetainedWorkflow::of(&resolution));
-            (measured.quantity, retained)
-        };
-        Ok(Interval {
-            quantity,
-            output: self.retain(result, slot.as_ref()),
+        self.with_resolver(|resolver| {
+            let members = self.raw.members();
+            let mut slot = None;
+            let (quantity, result) = {
+                let mut storage = OutcomeStorage::default();
+                let submitted = self.raw.submitted(&members);
+                let input = (
+                    resolver,
+                    submitted,
+                    &self.raw.assertion,
+                    &mut slot,
+                    &mut storage,
+                );
+                let measured = instrument.interval(input, complete)?;
+                let retained = measured
+                    .output
+                    .map(|resolution| RetainedWorkflow::of(&resolution));
+                (measured.quantity, retained)
+            };
+            Ok(Interval {
+                quantity,
+                output: self.retain(result, slot.as_ref()),
+            })
+        })
+        .ok_or_else(I::unavailable)?
+    }
+
+    /// One untimed invocation in the case's state, retained as a timed one
+    /// is; `None` when what the state runs first fails.
+    pub(in crate::benchmark) fn resolve(&self) -> Option<Resolved> {
+        self.with_resolver(|resolver| {
+            let members = self.raw.members();
+            let mut slot = None;
+            let result = {
+                let mut storage = OutcomeStorage::default();
+                let submitted = self.raw.submitted(&members);
+                let assertion = &self.raw.assertion;
+                complete((resolver, submitted, assertion, &mut slot, &mut storage))
+                    .map(|resolution| RetainedWorkflow::of(&resolution))
+            };
+            self.retain(result, slot.as_ref())
         })
     }
 
-    /// One untimed invocation, retained as a timed one is.
-    pub(in crate::benchmark) fn resolve(&self) -> Resolved {
-        let resolver = Resolver::new(&self.constructed, self.root);
-        let members = self.raw.members();
-        let mut slot = None;
-        let result = {
-            let mut storage = OutcomeStorage::default();
-            let submitted = self.raw.submitted(&members);
-            let assertion = &self.raw.assertion;
-            complete((&resolver, submitted, assertion, &mut slot, &mut storage))
-                .map(|resolution| RetainedWorkflow::of(&resolution))
-        };
-        self.retain(result, slot.as_ref())
+    /// Runs `invoke` on the resolver this repetition invokes, once what the
+    /// case's state runs first has run: a fresh case constructs a resolver
+    /// from the input preparation constructed from, and a case reused after
+    /// a blocked outcome resolves the Blocked recipe's submission on the
+    /// prepared resolver and releases that outcome (D15:2751, 2824). `None`
+    /// when that construction is refused, or that outcome is not blocked.
+    fn with_resolver<T>(&self, invoke: impl FnOnce(&Resolver<'_>) -> T) -> Option<T> {
+        match &self.before {
+            Before::Reused => Some(invoke(&self.prepared())),
+            Before::Fresh => {
+                let constructed = build(self.root, self.constructed.input().clone()).ok()?;
+                self.counts.constructed.fetch_add(1, Ordering::Relaxed);
+                Some(invoke(&Resolver::new(&constructed, self.root)))
+            }
+            Before::AfterBlocked(blocked) => {
+                let resolver = self.prepared();
+                if !blocks(&resolver, blocked) {
+                    return None;
+                }
+                self.counts.blocked.fetch_add(1, Ordering::Relaxed);
+                Some(invoke(&resolver))
+            }
+        }
+    }
+
+    /// The resolver preparation constructed, counted as invoked once more.
+    fn prepared(&self) -> Resolver<'_> {
+        self.counts.prepared.fetch_add(1, Ordering::Relaxed);
+        Resolver::new(&self.constructed, self.root)
     }
 
     fn retain(
@@ -262,6 +363,18 @@ impl PreparedWorkflow {
             specification: supported.project_profile().specification.clone(),
         }
     }
+}
+
+/// Whether `raw`'s complete invocation on `resolver` ends in a blocked
+/// outcome. The outcome, the set it admitted, and the storage it borrowed are
+/// released before this returns.
+fn blocks(resolver: &Resolver<'_>, raw: &RawInvocation) -> bool {
+    let members = raw.members();
+    let mut slot = None;
+    let mut storage = OutcomeStorage::default();
+    let submitted = raw.submitted(&members);
+    complete((resolver, submitted, &raw.assertion, &mut slot, &mut storage))
+        .is_ok_and(|resolution| resolution.outcome.checked.is_none())
 }
 
 /// What the interval admitted, counted after its end mark in the units of
@@ -453,8 +566,16 @@ impl InputFacts {
             scope: "one-file-entry-invocation-from-pre-invocation-admission-through-the-outcome"
                 .into(),
             entry_kind: "file".into(),
-            resolver: "committed-input-constructed-once-before-the-first-interval-and-reused"
-                .into(),
+            resolver: match prepared.state() {
+                ResolverState::Fresh => "committed-input-constructed-before-each-start-mark",
+                ResolverState::Reused => {
+                    "committed-input-constructed-once-before-the-first-interval-and-reused"
+                }
+                ResolverState::ReusedAfterBlocked => {
+                    "committed-input-constructed-once-and-reused-right-after-it-resolves-the-blocked-recipe-before-each-start-mark"
+                }
+            }
+            .into(),
             specifications: "every-slot-asserting-what-the-constructed-resolver-supports".into(),
             capability:
                 "owner-capability-for-the-recipe-bounds-with-the-bootstrap-groups-read-widened"
@@ -477,19 +598,30 @@ impl InputFacts {
 #[cfg(test)]
 pub(in crate::benchmark) mod tests {
     use std::cell::RefCell;
+    use std::collections::BTreeSet;
 
+    use intlify_measurement::acquisition::{ClockDescription, PROVIDER_REVISION};
     use intlify_measurement::measurement::Aggregation;
 
     use super::*;
     use crate::artifacts::envelope::FormalMember;
     use crate::benchmark::cases::prepare::{prepare, Candidate};
-    use crate::benchmark::cases::workflow_inputs::submission;
-    use crate::benchmark::cases::{declarations, EvidenceRecipe as R, Recipe, ResolverState};
+    use crate::benchmark::cases::workflow_inputs::{before, submission};
+    use crate::benchmark::cases::{declarations, EvidenceRecipe as R, Recipe};
     use crate::benchmark::clock::tests::ScriptedClock;
+    use crate::benchmark::descriptor::{prepared_core, DescriptorIssue, Descriptors};
     use crate::benchmark::instrument::Timed;
-    use crate::construction::resolver::build;
+    use crate::benchmark::measure::MeasurementFailure;
+    use crate::benchmark::memory_domain::{agrees, invocation};
+    use crate::benchmark::operation::Operation;
     use crate::construction::{committed, flow, identity};
     use crate::snapshot::from_json;
+
+    const STATES: [ResolverState; 3] = [
+        ResolverState::Fresh,
+        ResolverState::Reused,
+        ResolverState::ReusedAfterBlocked,
+    ];
 
     fn root() -> &'static ConstructionRoot {
         ConstructionRoot::built_in().unwrap()
@@ -497,9 +629,15 @@ pub(in crate::benchmark) mod tests {
 
     /// `input`'s declared case on a reused resolver, as preparation makes it.
     pub(in crate::benchmark) fn candidate(input: R) -> Candidate {
+        candidate_in(input, ResolverState::Reused)
+    }
+
+    /// `input`'s declared case on a resolver in `state`, as preparation makes
+    /// it.
+    pub(in crate::benchmark) fn candidate_in(input: R, state: ResolverState) -> Candidate {
         let recipe = Recipe::Workflow {
             input,
-            resolver: ResolverState::Reused,
+            resolver: state,
         };
         let declaration = declarations()
             .into_iter()
@@ -507,16 +645,27 @@ pub(in crate::benchmark) mod tests {
         prepare(&declaration.unwrap()).unwrap()
     }
 
-    /// The inputs of `recipe`'s invocation: a resolver constructed once from
-    /// the committed input, and what a binding submits for the recipe on it.
+    /// The inputs of `recipe`'s invocation on a reused resolver.
     fn prepared(recipe: R) -> PreparedWorkflow {
+        prepared_in(recipe, ResolverState::Reused)
+    }
+
+    /// The inputs of `recipe`'s invocation on a resolver in `state`: one
+    /// constructed once from the committed input, what a binding submits for
+    /// the recipe on it, and what the state runs before each start mark.
+    fn prepared_in(recipe: R, state: ResolverState) -> PreparedWorkflow {
         let constructed = build(root(), committed::input()).unwrap();
         let raw = submission(recipe, &constructed, root()).unwrap();
-        PreparedWorkflow {
-            root: root(),
-            constructed,
-            raw,
-        }
+        let before = before(state, &constructed, root()).unwrap();
+        PreparedWorkflow::new(root(), constructed, raw, before)
+    }
+
+    /// How often `prepared`'s repetitions constructed a resolver, invoked the
+    /// prepared one, and resolved a blocked outcome first.
+    fn counts(prepared: &PreparedWorkflow) -> [u64; 3] {
+        let counts = &prepared.counts;
+        [&counts.constructed, &counts.prepared, &counts.blocked]
+            .map(|count| count.load(Ordering::Relaxed))
     }
 
     fn specification(resolved: &Resolved) -> Specification<'_> {
@@ -536,7 +685,7 @@ pub(in crate::benchmark) mod tests {
     fn each_recipe_completes_and_its_interval_retains_what_an_untimed_run_does() {
         for recipe in R::ALL {
             let prepared = prepared(recipe);
-            let untimed = prepared.resolve();
+            let untimed = prepared.resolve().unwrap();
             let clock = ScriptedClock::nanos([0, 1]);
             let timed = prepared.interval(&Timed(&clock)).unwrap().output;
             assert_eq!(observe(&timed), observe(&untimed), "{recipe:?}");
@@ -563,7 +712,7 @@ pub(in crate::benchmark) mod tests {
         let mut reserves = Vec::new();
         for recipe in R::ALL {
             let prepared = prepared(recipe);
-            let (raw, resolved) = (&prepared.raw, prepared.resolve());
+            let (raw, resolved) = (&prepared.raw, prepared.resolve().unwrap());
             let mut bodies: Vec<Vec<u8>> = raw
                 .members
                 .iter()
@@ -621,7 +770,7 @@ pub(in crate::benchmark) mod tests {
     /// digest behind its own; and the Entry projection under its own name.
     #[test]
     fn a_checked_outcome_is_framed_as_the_codec_spells_it() {
-        let resolved = prepared(R::Storefront).resolve();
+        let resolved = prepared(R::Storefront).resolve().unwrap();
         let retained = require_observable(&resolved).unwrap();
         let (Some(projection), Some((view, bindings)), Some(digest)) =
             (&retained.shared, &retained.profile, &retained.materialized)
@@ -661,7 +810,7 @@ pub(in crate::benchmark) mod tests {
     /// the Entry projection; neither tells apart what the other does.
     #[test]
     fn every_part_of_the_outcome_and_the_set_is_observed_in_its_domain() {
-        let resolved = prepared(R::Storefront).resolve();
+        let resolved = prepared(R::Storefront).resolve().unwrap();
         let observed = |edit: &dyn Fn(&mut RetainedWorkflow)| {
             let mut retained = resolved.result.as_ref().unwrap().clone();
             edit(&mut retained);
@@ -673,7 +822,7 @@ pub(in crate::benchmark) mod tests {
             .unwrap()
         };
         let whole = observed(&|_| {});
-        let truncated = prepared(R::Truncated).resolve();
+        let truncated = prepared(R::Truncated).resolve().unwrap();
         let shared = require_observable(&truncated).unwrap().shared.clone();
         let terminal = shared.unwrap().terminal;
         let mut admitted = flow::construct(root(), &committed::input()).unwrap();
@@ -705,9 +854,144 @@ pub(in crate::benchmark) mod tests {
         }
     }
 
-    /// D15:2775: the interval begins with the pre-invocation admission, so
-    /// what it is handed is the submission beside an empty slot for the set
-    /// it admits and the storage the outcome borrows, never an admitted set.
+    /// D15:2789, 2824, 3689: before every start mark, and before an untimed
+    /// run too, a fresh case constructs a resolver of its own and never
+    /// invokes the prepared one, a reused case invokes the prepared one, and
+    /// a case reused after a blocked outcome invokes it once it resolved the
+    /// Blocked recipe on it. Every repetition retains what a reused
+    /// resolver's does.
+    #[test]
+    fn each_state_runs_its_own_work_once_before_every_start_mark() {
+        let reused = observe(&prepared(R::Storefront).resolve().unwrap());
+        for state in STATES {
+            let prepared = prepared_in(R::Storefront, state);
+            let clock = ScriptedClock::nanos([0, 1, 2, 3, 4, 5]);
+            for _ in 0..3 {
+                let measured = prepared.interval(&Timed(&clock)).unwrap();
+                assert_eq!(observe(&measured.output), reused, "{state:?}");
+            }
+            assert_eq!(observe(&prepared.resolve().unwrap()), reused, "{state:?}");
+            let expected = match state {
+                ResolverState::Fresh => [4, 0, 0],
+                ResolverState::Reused => [0, 4, 0],
+                ResolverState::ReusedAfterBlocked => [0, 4, 4],
+            };
+            assert_eq!(counts(&prepared), expected, "{state:?}");
+        }
+    }
+
+    /// D15:2751, 2826: a case reused after a blocked outcome measures nothing
+    /// unless what it resolves first is admitted and blocked. A checked
+    /// outcome or a refused set first leaves a repetition, timed or not,
+    /// unavailable before its start mark.
+    #[test]
+    fn a_case_reused_after_a_blocked_outcome_needs_that_outcome_first() {
+        let mut prepared = prepared_in(R::Storefront, ResolverState::ReusedAfterBlocked);
+        let checked = prepared.raw.clone();
+        let mut refused = checked.clone();
+        refused.reference = crate::base64url::construction_identity(&[0; 32]);
+        for first in [checked, refused] {
+            prepared.before = Before::AfterBlocked(Box::new(first));
+            let clock = ScriptedClock::nanos([]);
+            let measured = prepared.interval(&Timed(&clock));
+            let unavailable = MeasurementFailure::PrerequisiteUnavailable;
+            assert!(matches!(measured, Err(failure) if failure == unavailable));
+            assert!(prepared.resolve().is_none());
+        }
+        assert_eq!(counts(&prepared), [0, 4, 0]);
+    }
+
+    /// D15:2751, 2789, 3689; D26:1739, 1815: the expectations pin each
+    /// recipe's three cases to one result and one logical work, so a fresh
+    /// resolver and one reused right after a blocked outcome resolve it as
+    /// the reused one does, while each case's input context, which binds
+    /// what runs before its start marks, is its own.
+    #[test]
+    fn every_state_is_expected_to_resolve_each_recipe_as_the_reused_resolver_does() {
+        let expectations: Value =
+            serde_json::from_str(include_str!("cases/expectations-v0.json")).unwrap();
+        let mut cases: BTreeMap<&str, Vec<(&str, &Value)>> = BTreeMap::new();
+        for row in expectations["rows"].as_array().unwrap() {
+            let fixture = &row["declaration"]["fixture"]["workflow"];
+            let (input, state) = (fixture["input"].as_str(), fixture["resolver"].as_str());
+            if let (Some(input), Some(state)) = (input, state) {
+                cases.entry(input).or_default().push((state, row));
+            }
+        }
+        assert_eq!(cases.len(), R::ALL.len());
+        for (input, rows) in &cases {
+            let states: Vec<&str> = rows.iter().map(|(state, _)| *state).collect();
+            assert_eq!(
+                states,
+                ["reused", "fresh", "reused-after-blocked"],
+                "{input}"
+            );
+            let contexts: BTreeSet<_> = rows
+                .iter()
+                .map(|(_, row)| row["inputContext"].as_str())
+                .collect();
+            assert_eq!(contexts.len(), STATES.len(), "{input}");
+            let (_, reused) = rows[0];
+            for (state, row) in &rows[1..] {
+                for key in ["result", "logicalWork", "work"] {
+                    assert_eq!(row[key], reused[key], "{input} {state} {key}");
+                }
+            }
+        }
+    }
+
+    /// D15:2805; D26:1667: each state's case is described as running in the
+    /// engine state its resolver is in, fresh only for a fresh resolver,
+    /// which the invocation Memory Observation Domain of that state agrees
+    /// with and the other engine state's does not. Its facts say what runs
+    /// before each start mark, and a descriptor stating the other engine
+    /// state is refused.
+    #[test]
+    fn each_state_is_described_in_the_engine_state_its_memory_domain_agrees_with() {
+        let clock = ClockDescription {
+            provider: "rustix",
+            provider_revision: PROVIDER_REVISION,
+            clock: "posix-clock-monotonic",
+            resolution_nanoseconds: Quantity::new(100),
+            resolution_source: "clock-getres-reported-granularity",
+            conversion: "exact-integer-nanoseconds",
+        };
+        let mut resolvers = BTreeSet::new();
+        for state in STATES {
+            let candidate = candidate_in(R::Storefront, state);
+            let prepared = &candidate.prepared;
+            assert_eq!(prepared.resolver_state(), Some(state));
+            let descriptors = Descriptors::for_acquisition(prepared, clock);
+            assert!(
+                descriptors.validate(prepared, clock).is_empty(),
+                "{state:?}"
+            );
+            let execution = &descriptors.execution;
+            let fresh = state == ResolverState::Fresh;
+            let engine = if fresh { "fresh" } else { "reused" };
+            assert_eq!(execution.engine_state, engine, "{state:?}");
+            assert!(agrees(&invocation(state), execution), "{state:?}");
+            let other = if fresh {
+                ResolverState::Reused
+            } else {
+                ResolverState::Fresh
+            };
+            assert!(!agrees(&invocation(other), execution), "{state:?}");
+            let operation = Operation::FileEntryCompleteWorkflow;
+            let mut stated = descriptors.clone();
+            stated.execution = prepared_core(operation, None, Some(other));
+            let issues = stated.validate(prepared, clock);
+            assert_eq!(issues, [DescriptorIssue::ExecutionMismatch], "{state:?}");
+            resolvers.insert(descriptors.workflow_input.unwrap().resolver);
+        }
+        assert_eq!(resolvers.len(), STATES.len());
+    }
+
+    /// D15:2775, 2824: the interval begins with the pre-invocation admission
+    /// of a resolver every state made beforehand, so what it is handed is
+    /// that resolver and the submission beside an empty slot for the set it
+    /// admits and the storage the outcome borrows, never an admitted set,
+    /// and a repetition runs no other interval.
     #[test]
     fn the_interval_is_handed_the_submission_not_an_admitted_set() {
         struct Recording(RefCell<Vec<&'static str>>);
@@ -728,20 +1012,26 @@ pub(in crate::benchmark) mod tests {
             }
             fn unavailable() {}
         }
-        let prepared = prepared(R::Storefront);
-        let recording = Recording(RefCell::new(Vec::new()));
-        let measured = prepared.interval(&recording).unwrap();
-        assert_eq!(observe(&measured.output), observe(&prepared.resolve()));
-        let handed = recording.0.into_inner();
-        let [input] = handed.as_slice() else {
-            panic!("one interval: {handed:?}")
-        };
-        for part in [
-            "boundary::invocation::SubmittedInvocation<",
-            "&mut core::option::Option<intlify_config::boundary::invocation::InvocationInputs<",
-            "&mut intlify_config::resolver::invocation::OutcomeStorage",
-        ] {
-            assert!(input.contains(part), "{input}");
+        for state in STATES {
+            let prepared = prepared_in(R::Storefront, state);
+            let recording = Recording(RefCell::new(Vec::new()));
+            let measured = prepared.interval(&recording).unwrap();
+            assert_eq!(
+                observe(&measured.output),
+                observe(&prepared.resolve().unwrap())
+            );
+            let handed = recording.0.into_inner();
+            let [input] = handed.as_slice() else {
+                panic!("one interval: {handed:?}")
+            };
+            for part in [
+                "(&intlify_config::resolver::invocation::Resolver<",
+                "boundary::invocation::SubmittedInvocation<",
+                "&mut core::option::Option<intlify_config::boundary::invocation::InvocationInputs<",
+                "&mut intlify_config::resolver::invocation::OutcomeStorage",
+            ] {
+                assert!(input.contains(part), "{state:?} {input}");
+            }
         }
     }
 }

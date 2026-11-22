@@ -15,14 +15,16 @@
 //! Input pins the policy the declaration selects. The capability is the
 //! owner's for the recipe's bounds, with the `bootstrapOnly` groups the
 //! invocation reads above their minima, which neither the file nor the data
-//! is within. Everything is built before any interval (D15:2824).
+//! is within. A case reused after a blocked outcome also holds the Blocked
+//! recipe's submission, which it resolves before each start mark. Everything
+//! is built before any interval (D15:2824).
 
 use std::sync::Arc;
 
 use serde_json::{json, Value};
 
 use crate::artifacts::verification::{sealed, unsealed, VerificationInputArtifact};
-use crate::benchmark::workflow::RawInvocation;
+use crate::benchmark::workflow::{Before, RawInvocation};
 use crate::benchmark::{evidence, locale_icu4x};
 use crate::boundary::capability::ImplementationCapability;
 use crate::boundary::source::file_source_revision;
@@ -35,7 +37,7 @@ use crate::resolver::limits::ResolutionLimits;
 use crate::resolver::specification::SupportedSpecifications;
 
 use super::policy_inputs::{reference_value, tuple_of};
-use super::EvidenceRecipe;
+use super::{EvidenceRecipe, ResolverState};
 
 /// The `bootstrapOnly` groups the invocation reads that the owner's capability
 /// leaves at their minima: strict file entry's, a Snapshot's, which a
@@ -86,6 +88,26 @@ pub(in crate::benchmark) fn submission(
         revision: file_source_revision(&file),
         file,
         selector: SELECTED.to_owned(),
+    })
+}
+
+/// What each repetition of a case invoking a resolver in `state` runs before
+/// its start mark, on `constructed`: for a resolver reused after a blocked
+/// outcome, the submission of the same entry's Blocked recipe, the semantic
+/// blocked one, on that resolver (plan 025 decision #316). `None` when that
+/// fixture does not encode.
+pub(in crate::benchmark) fn before(
+    state: ResolverState,
+    constructed: &ConstructedResolver,
+    root: &ConstructionRoot,
+) -> Option<Before> {
+    Some(match state {
+        ResolverState::Fresh => Before::Fresh,
+        ResolverState::Reused => Before::Reused,
+        ResolverState::ReusedAfterBlocked => {
+            let blocked = submission(EvidenceRecipe::Blocked, constructed, root)?;
+            Before::AfterBlocked(Box::new(blocked))
+        }
     })
 }
 
