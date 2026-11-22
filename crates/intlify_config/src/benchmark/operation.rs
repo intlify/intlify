@@ -283,6 +283,7 @@ pub(super) enum OutputFailure {
     HydrationRelationValidationInvariant,
     EvidenceMaterializationInvariant,
     CompleteInvocationFailure,
+    SnapshotAdmissionRefused,
 }
 
 impl Prepared {

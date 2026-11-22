@@ -34,6 +34,7 @@ pub(super) use evidence_inputs::DENSE;
 mod context;
 pub(super) mod prepare;
 pub(super) mod registry;
+pub(super) mod snapshot_inputs;
 pub(super) mod workflow_inputs;
 
 // The fixed inventory uses the formal 015/017 configuration references. Until

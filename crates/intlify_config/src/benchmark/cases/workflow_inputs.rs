@@ -54,7 +54,7 @@ const WIDENED: [BootstrapGroup; 5] = [
 ];
 
 /// A bound no count of these invocations reaches.
-const ROOM: u64 = 1 << 30;
+pub(super) const ROOM: u64 = 1 << 30;
 
 /// The Verification Input trusted setup supplies, by identity and revision.
 const VERIFICATION: (&str, &str) = ("intlify-benchmark-verification-input", "0");
