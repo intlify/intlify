@@ -60,7 +60,8 @@ const FRAME: u64 = 9;
 const EIGHT: u64 = 8;
 
 /// The binding's report about the host value. No `Debug`: a Snapshot carries
-/// configuration.
+/// configuration. A benchmark holds and compares what a binding submits.
+#[cfg_attr(any(test, feature = "benchmark"), derive(Clone, PartialEq))]
 pub(crate) enum SnapshotReport {
     /// The binding could not inspect the host value without running its
     /// behavior, or could not construct the reserved marker (D15:865, 869).
@@ -89,6 +90,7 @@ pub(crate) enum SubmittedNode {
 /// A marker as submitted: its reason ID, and the bound path and witness a
 /// `bootstrap-limit-exceeded` marker carries, each `None` when absent.
 #[derive(Clone)]
+#[cfg_attr(any(test, feature = "benchmark"), derive(PartialEq))]
 pub(crate) struct SubmittedMarker {
     pub(crate) reason: String,
     pub(crate) bound: Option<String>,
@@ -460,6 +462,39 @@ impl SubmittedNode {
             Self::Null | Self::Boolean(_) | Self::Number(_) | Self::String(_) | Self::Marker(_) => {
             }
         }
+    }
+}
+
+/// Two submitted trees are equal as submitted: the same variant node for
+/// node, members in the same order under the same key bytes, and a number by
+/// its bits, so negative zero is not zero. Compared without recursion (plan
+/// 025 decision #298).
+#[cfg(any(test, feature = "benchmark"))]
+impl PartialEq for SubmittedNode {
+    fn eq(&self, other: &Self) -> bool {
+        let mut pending = vec![(self, other)];
+        while let Some(pair) = pending.pop() {
+            match pair {
+                (Self::Array(left), Self::Array(right)) if left.len() == right.len() => {
+                    pending.extend(left.iter().zip(right));
+                }
+                (Self::Object(left), Self::Object(right)) if left.len() == right.len() => {
+                    for ((left_key, left), (right_key, right)) in left.iter().zip(right) {
+                        if left_key != right_key {
+                            return false;
+                        }
+                        pending.push((left, right));
+                    }
+                }
+                (Self::Null, Self::Null) => {}
+                (Self::Boolean(left), Self::Boolean(right)) if left == right => {}
+                (Self::Number(left), Self::Number(right)) if left.to_bits() == right.to_bits() => {}
+                (Self::String(left), Self::String(right)) if left == right => {}
+                (Self::Marker(left), Self::Marker(right)) if left == right => {}
+                _ => return false,
+            }
+        }
+        true
     }
 }
 
@@ -1131,6 +1166,58 @@ mod tests {
         };
         assert_eq!(read("3"), None);
         assert_eq!(read("2"), Some(EnvelopeOverBound));
+    }
+
+    /// Two reports are equal exactly as submitted: member order, a number's
+    /// sign, and a marker's fields tell them apart, and deep trees compare
+    /// without recursion (plan 025 decision #298).
+    #[test]
+    fn reports_are_equal_as_submitted() {
+        let report = |root| formal(root, DIGEST);
+        let tree = || submitted(&rich());
+        assert!(report(tree()) == report(tree()));
+        assert!(report(tree()) != formal(tree(), OTHER));
+        assert!(SnapshotReport::Unsafe == SnapshotReport::Unsafe);
+        assert!(SnapshotReport::Unsafe != report(tree()));
+        let mut reversed = tree();
+        let SubmittedNode::Object(members) = &mut reversed else {
+            unreachable!()
+        };
+        members.reverse();
+        let changed = [
+            reversed,
+            SubmittedNode::Number(-0.0),
+            object(vec![("a", SubmittedNode::Boolean(true))]),
+            object(vec![("b", SubmittedNode::Null)]),
+            SubmittedNode::Array(vec![SubmittedNode::Null]),
+            SubmittedNode::String(b"x".to_vec()),
+            marker("cycle", None, None),
+            object(vec![("a", SubmittedNode::Null)]),
+            SubmittedNode::Array(vec![SubmittedNode::Null]),
+        ];
+        let originals = [
+            tree(),
+            SubmittedNode::Number(0.0),
+            object(vec![("a", SubmittedNode::Boolean(false))]),
+            object(vec![("a", SubmittedNode::Null)]),
+            SubmittedNode::Array(Vec::new()),
+            SubmittedNode::String(b"y".to_vec()),
+            marker("cycle", None, Some(1)),
+            object(vec![("a", SubmittedNode::Null), ("b", SubmittedNode::Null)]),
+            SubmittedNode::Array(vec![SubmittedNode::Boolean(true)]),
+        ];
+        for (index, (left, right)) in changed.iter().zip(&originals).enumerate() {
+            assert!(left != right, "{index}");
+            assert!(left == left, "{index}");
+        }
+        let chain = || {
+            let mut node = SubmittedNode::Null;
+            for _ in 0..100_000 {
+                node = SubmittedNode::Array(vec![node]);
+            }
+            node
+        };
+        assert!(chain() == chain());
     }
 
     #[test]

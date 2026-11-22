@@ -23,6 +23,7 @@
 //! marker at the first overrun (D15:867, 2786; 015-199).
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
@@ -265,12 +266,35 @@ pub(in crate::benchmark) fn first_over(
     })
 }
 
+/// The formal Snapshot a binding submits of the value `source` spells, with
+/// the root member `beside` adds, as a programmatic entry's complete
+/// invocation submits it.
+pub(in crate::benchmark) fn spelled(
+    source: Arc<[u8]>,
+    beside: Option<SnapshotRecipe>,
+) -> Option<SnapshotReport> {
+    let (root, canonical) = tree_of(source, beside.and_then(SnapshotRecipe::member))?;
+    Some(SnapshotReport::Formal {
+        digest: canonical.digest(),
+        root,
+    })
+}
+
 /// The tree a binding submits for `recipe` and its canonical tree.
 fn trees(recipe: SnapshotRecipe) -> Option<(SubmittedNode, Node)> {
-    let doc = materialize_file(recipe.file().source(), fixture_capacity().0).ok()?;
+    tree_of(recipe.file().source(), recipe.member())
+}
+
+/// The tree a binding submits of the value `source` spells, with `member` at
+/// its root, and its canonical tree.
+fn tree_of(
+    source: Arc<[u8]>,
+    member: Option<(&'static str, SubmittedNode, Node)>,
+) -> Option<(SubmittedNode, Node)> {
+    let doc = materialize_file(source, fixture_capacity().0).ok()?;
     let mut root = submitted(&doc)?;
     let mut canonical = doc.canonical_value();
-    if let Some((key, value, node)) = recipe.member() {
+    if let Some((key, value, node)) = member {
         let (SubmittedNode::Object(members), Node::Object(tree)) = (&mut root, &mut canonical)
         else {
             return None;

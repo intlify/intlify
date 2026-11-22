@@ -18,15 +18,22 @@
 //! is within. A case reused after a blocked outcome also holds the Blocked
 //! recipe's submission, which it resolves before each start mark. Everything
 //! is built before any interval (D15:2824).
+//!
+//! A programmatic entry submits, in place of the file, the formal Snapshot
+//! of the value the file's bytes spell, so a programmatic case pairs with
+//! the file case of its recipe (D15:2788), or, for the recipe no file has,
+//! that value of the example holding an ordinary marker.
 
 use std::sync::Arc;
 
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::artifacts::verification::{sealed, unsealed, VerificationInputArtifact};
-use crate::benchmark::workflow::{Before, RawInvocation};
+use crate::benchmark::workflow::{Before, RawEntry, RawInvocation};
 use crate::benchmark::{evidence, locale_icu4x};
 use crate::boundary::capability::ImplementationCapability;
+use crate::boundary::snapshot::SnapshotReport;
 use crate::boundary::source::file_source_revision;
 use crate::boundary::verification::VerificationAssertion;
 use crate::construction::resolver::ConstructedResolver;
@@ -37,7 +44,54 @@ use crate::resolver::limits::ResolutionLimits;
 use crate::resolver::specification::SupportedSpecifications;
 
 use super::policy_inputs::{reference_value, tuple_of};
-use super::{EvidenceRecipe, ResolverState};
+use super::snapshot_inputs::{spelled, SnapshotRecipe};
+use super::{EntryKind, EvidenceRecipe, Recipe, ResolverState};
+
+/// A programmatic entry's recipes: each Evidence recipe whose value a
+/// Snapshot represents, submitting the value its file spells, and the
+/// example's value holding the ordinary marker of an unsupported host value,
+/// which Phase 1 blocks with no value (D15:861, 2129). The malformed file has
+/// no value, and the inadmissible one's repeated member and lone surrogate
+/// are no host value's.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub(in crate::benchmark) enum ProgrammaticRecipe {
+    Storefront,
+    Blocked,
+    Dense,
+    Truncated,
+    RejectedMarker,
+}
+
+impl ProgrammaticRecipe {
+    pub(in crate::benchmark) const ALL: [Self; 5] = [
+        Self::Storefront,
+        Self::Blocked,
+        Self::Dense,
+        Self::Truncated,
+        Self::RejectedMarker,
+    ];
+
+    /// The file recipe whose value the Snapshot submits.
+    pub(in crate::benchmark) const fn file(self) -> EvidenceRecipe {
+        match self {
+            Self::Storefront | Self::RejectedMarker => EvidenceRecipe::Storefront,
+            Self::Blocked => EvidenceRecipe::Blocked,
+            Self::Dense => EvidenceRecipe::Dense,
+            Self::Truncated => EvidenceRecipe::Truncated,
+        }
+    }
+
+    /// The Snapshot recipe whose root member the value holds beside it.
+    const fn beside(self) -> Option<SnapshotRecipe> {
+        match self {
+            Self::RejectedMarker => Some(SnapshotRecipe::UnsupportedType),
+            _ => None,
+        }
+    }
+}
 
 /// The `bootstrapOnly` groups the invocation reads that the owner's capability
 /// leaves at their minima: strict file entry's, a Snapshot's, which a
@@ -85,10 +139,34 @@ pub(in crate::benchmark) fn submission(
         verification,
         capability: capability(limits),
         assertion,
-        revision: file_source_revision(&file),
-        file,
+        entry: RawEntry::File {
+            revision: file_source_revision(&file),
+            bytes: file,
+        },
         selector: SELECTED.to_owned(),
     })
+}
+
+/// What a binding submits for `recipe`'s invocation through a programmatic
+/// entry on `constructed`: its file recipe's submission with the formal
+/// Snapshot of the value the file spells in place of the file, its revision
+/// the Snapshot's digest (D15:889).
+pub(in crate::benchmark) fn programmatic(
+    recipe: ProgrammaticRecipe,
+    constructed: &ConstructedResolver,
+    root: &ConstructionRoot,
+) -> Option<RawInvocation> {
+    let mut raw = submission(recipe.file(), constructed, root)?;
+    let RawEntry::File { bytes, .. } = &raw.entry else {
+        return None;
+    };
+    let snapshot = spelled(Arc::clone(bytes), recipe.beside())?;
+    let SnapshotReport::Formal { digest, .. } = &snapshot else {
+        return None;
+    };
+    let revision = digest.clone();
+    raw.entry = RawEntry::Programmatic { snapshot, revision };
+    Some(raw)
 }
 
 /// What each repetition of a case invoking a resolver in `state` runs before
@@ -98,6 +176,7 @@ pub(in crate::benchmark) fn submission(
 /// fixture does not encode.
 pub(in crate::benchmark) fn before(
     state: ResolverState,
+    entry: EntryKind,
     constructed: &ConstructedResolver,
     root: &ConstructionRoot,
 ) -> Option<Before> {
@@ -105,10 +184,35 @@ pub(in crate::benchmark) fn before(
         ResolverState::Fresh => Before::Fresh,
         ResolverState::Reused => Before::Reused,
         ResolverState::ReusedAfterBlocked => {
-            let blocked = submission(EvidenceRecipe::Blocked, constructed, root)?;
+            let blocked = match entry {
+                EntryKind::File => submission(EvidenceRecipe::Blocked, constructed, root),
+                EntryKind::Programmatic => {
+                    programmatic(ProgrammaticRecipe::Blocked, constructed, root)
+                }
+            }?;
             Before::AfterBlocked(Box::new(blocked))
         }
     })
+}
+
+/// What a binding submits for a complete invocation case's `fixture` on
+/// `constructed`, through the entry it names, and what each of its
+/// repetitions runs first. `None` for any other recipe, or when a fixture
+/// does not encode.
+pub(in crate::benchmark) fn rebuilt(
+    fixture: Recipe,
+    constructed: &ConstructedResolver,
+    root: &ConstructionRoot,
+) -> Option<(RawInvocation, Before)> {
+    let (raw, resolver, entry) = match fixture {
+        Recipe::Workflow { input, resolver } => (
+            submission(input, constructed, root)?,
+            resolver,
+            EntryKind::File,
+        ),
+        _ => return None,
+    };
+    Some((raw, before(resolver, entry, constructed, root)?))
 }
 
 /// The Profile Resolution Specification Input in the raw form 015-165 fixes:
@@ -302,6 +406,20 @@ mod tests {
         let rows = FixtureProvider::new();
         for locale in ["ja", "en", "de", "fr"] {
             assert_eq!(provider.canonicalize(locale), rows.canonicalize(locale));
+        }
+    }
+
+    /// D15:2788: each programmatic recipe submits the value of the file
+    /// recipe of its own name, and the marked one the example's.
+    #[test]
+    fn each_programmatic_recipe_submits_the_value_of_the_file_it_names() {
+        for recipe in ProgrammaticRecipe::ALL {
+            let named = if recipe == ProgrammaticRecipe::RejectedMarker {
+                json!("storefront")
+            } else {
+                serde_json::to_value(recipe).unwrap()
+            };
+            assert_eq!(serde_json::to_value(recipe.file()).unwrap(), named);
         }
     }
 }

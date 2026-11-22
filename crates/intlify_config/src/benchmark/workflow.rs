@@ -9,9 +9,11 @@
 //! the pre-invocation boundaries read: the Resolver Construction Identity
 //! reference, the Common Invocation Input Set with the committed ICU4X Locale
 //! Canonicalization Data Artifact, and one file Entry Admission Input Set
-//! (D15:2824). [`complete`] is the production path an end-to-end interval
-//! runs on a constructed resolver: the pre-invocation admission of that set,
-//! and Phases 0 to 15 over what it admitted, through the outcome (D15:2775).
+//! (D15:2824), or one programmatic entry's, whose formal Snapshot is the
+//! value the file's bytes spell (D15:2788). [`complete`] is the production
+//! path an end-to-end interval runs on a constructed resolver: the
+//! pre-invocation admission of that set, and Phases 0 to 15 over what it
+//! admitted, through the outcome (D15:2775).
 //! A checked or a blocked outcome is an expected result; a refused set or a
 //! resolver defect is a benchmark failure (D15:2826).
 //!
@@ -19,7 +21,7 @@
 //! three states (D15:2789; plan 025 decision #33): constructed before each
 //! start mark from the input its preparation constructed from, the one its
 //! preparation constructed and every interval reuses, or that one right after
-//! it resolved the Blocked recipe's file entry before each start mark, which
+//! it resolved the Blocked recipe's same entry before each start mark, which
 //! shows the invocation reset (D15:2751, 3689). Its identity is derived
 //! before the start mark. The submission, the slot for the admitted set, and
 //! the storage the outcome borrows are made before it; the outcome and the
@@ -35,11 +37,15 @@ use serde_json::Value;
 
 use crate::artifacts::envelope::ExactTuple;
 use crate::boundary::common::Submitted;
-use crate::boundary::entry::{FileValue, SubmittedFileEntry};
+use crate::boundary::entry::{
+    FileValue, ProgrammaticValue, SubmittedFileEntry, SubmittedProgrammaticEntry,
+};
 use crate::boundary::invocation::{
     EntryInputs, InvocationFailures, InvocationInputs, SubmittedEntry, SubmittedInvocation,
 };
+use crate::boundary::locator::{LocatorCandidate, LocatorVariant};
 use crate::boundary::selector::SelectorReport;
+use crate::boundary::snapshot::SnapshotReport;
 use crate::boundary::step::Component;
 use crate::boundary::verification::VerificationAssertion;
 use crate::construction::identity::ConstructionIdentity;
@@ -58,6 +64,7 @@ use crate::resolver::origin::SafeOriginKind as Kind;
 use crate::resolver::profile_resolution::ResolverInvariant;
 use crate::resolver::profile_view::ProfileView;
 use crate::resolver::token::Specification;
+use crate::snapshot::SnapshotCounts;
 
 use super::cases::ResolverState;
 use super::evidence::outcome::{project, RetainedProjection};
@@ -66,10 +73,31 @@ use super::observation::{Frame, Observation};
 use super::operation::OutputFailure;
 use super::quantity::Quantity;
 
-/// What a binding submits for one file entry's invocation, as the raw values
-/// the pre-invocation boundaries read, each in its typed slot. The file is
-/// named by [`FILE`], which its owner marks non-secret, with the revision of
-/// its bytes and no locator, as the Evidence stages' file is.
+/// The Programmatic Entry identity every programmatic case submits, which its
+/// frontend marks non-secret, and its locator, a safe label (D15:204, 728, 743).
+const ENTRY: &str = "intlify-programmatic-entry.v0:storefront";
+const LOCATOR: &str = "storefront-app";
+
+/// The entry a binding submits. The file is named by [`FILE`], which its
+/// owner marks non-secret, with the revision of its bytes and no locator, as
+/// the Evidence stages' file is; the programmatic entry by [`ENTRY`] at
+/// [`LOCATOR`], its revision the Snapshot's digest, with no call-site
+/// sidecar (D15:743, 889; plan 025 decision #316).
+#[derive(Clone, PartialEq)]
+pub(super) enum RawEntry {
+    File {
+        bytes: Arc<[u8]>,
+        /// The Source-content revision of the bytes.
+        revision: String,
+    },
+    Programmatic {
+        snapshot: SnapshotReport,
+        revision: String,
+    },
+}
+
+/// What a binding submits for one entry's invocation, as the raw values the
+/// pre-invocation boundaries read, each in its typed slot.
 #[derive(Clone, PartialEq)]
 pub(super) struct RawInvocation {
     /// The text of the Resolver Construction Identity the set names.
@@ -87,9 +115,7 @@ pub(super) struct RawInvocation {
     /// What trusted setup asserts about the Verification Input, beside the
     /// set.
     pub(super) assertion: VerificationAssertion,
-    pub(super) file: Arc<[u8]>,
-    /// The Source-content revision of the file's bytes.
-    pub(super) revision: String,
+    pub(super) entry: RawEntry,
     /// The Profile ID the selector names.
     pub(super) selector: String,
 }
@@ -137,23 +163,49 @@ impl RawInvocation {
                 origin: own(Kind::ImplementationCapability),
             },
         };
-        let file = FileValue {
-            bytes: Arc::clone(&self.file),
-            identity: Some(FILE),
-            marked: true,
-            revision: Some(&self.revision),
-            locator: None,
+        let selector = |slot| Component {
+            value: SelectorReport::String(&self.selector),
+            origin: own(slot),
         };
-        let entry = SubmittedEntry::File(SubmittedFileEntry {
-            file: Component {
-                value: file,
-                origin: own(Kind::ConfigurationFile),
-            },
-            selector: Component {
-                value: SelectorReport::String(&self.selector),
-                origin: own(Kind::ProfileSelectorCli),
-            },
-        });
+        let entry = match &self.entry {
+            RawEntry::File { bytes, revision } => {
+                let file = FileValue {
+                    bytes: Arc::clone(bytes),
+                    identity: Some(FILE),
+                    marked: true,
+                    revision: Some(revision),
+                    locator: None,
+                };
+                SubmittedEntry::File(SubmittedFileEntry {
+                    file: Component {
+                        value: file,
+                        origin: own(Kind::ConfigurationFile),
+                    },
+                    selector: selector(Kind::ProfileSelectorCli),
+                })
+            }
+            RawEntry::Programmatic { snapshot, revision } => {
+                let programmatic = ProgrammaticValue {
+                    snapshot: Some(snapshot),
+                    identity: Some(ENTRY),
+                    marked: true,
+                    revision: Some(revision),
+                    locator: Some(LocatorCandidate {
+                        variant: LocatorVariant::SafeLabel,
+                        payload: LOCATOR,
+                        non_secret: true,
+                    }),
+                    call_site: None,
+                };
+                SubmittedEntry::Programmatic(SubmittedProgrammaticEntry {
+                    programmatic: Component {
+                        value: programmatic,
+                        origin: own(Kind::ConfigurationProgrammatic),
+                    },
+                    selector: selector(Kind::ProfileSelectorProgrammatic),
+                })
+            }
+        };
         SubmittedInvocation {
             construction_identity: Some(&self.reference),
             common,
@@ -377,15 +429,24 @@ fn blocks(resolver: &Resolver<'_>, raw: &RawInvocation) -> bool {
         .is_ok_and(|resolution| resolution.outcome.checked.is_none())
 }
 
+/// The entry's two counts in its bounds' units: a file's bytes and the
+/// tokens its parser visits, or a Snapshot's canonical envelope bytes and the
+/// nodes and edges a traversal visits (D15:1794, 1795, 1802, 1804).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::benchmark) enum EntryCounts {
+    File { bytes: u64, tokens: u64 },
+    Snapshot { envelope: u64, traversal: u64 },
+}
+
 /// What the interval admitted, counted after its end mark in the units of
-/// the bounds that count it: the file's bytes, the tokens its parser visits,
-/// and its value's counts once one is complete, as strict file entry counts
-/// them under the admitted capability's bounds, and the collection's members
-/// and their `C(member)` bytes (D15:2129, 2796).
+/// the bounds that count it: the entry's counts and its value's once one is
+/// complete, as strict file entry counts them under the admitted
+/// capability's bounds, or as the admitted Snapshot's marker-free tree
+/// counts them, and the collection's members and their `C(member)` bytes
+/// (D15:1889, 2129, 2796).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::benchmark) struct AdmittedCounts {
-    pub(in crate::benchmark) file_bytes: u64,
-    pub(in crate::benchmark) parser_tokens: u64,
+    pub(in crate::benchmark) entry: EntryCounts,
     pub(in crate::benchmark) value: Option<ValueCounts>,
     pub(in crate::benchmark) members: u64,
     pub(in crate::benchmark) member_bytes: u64,
@@ -393,33 +454,45 @@ pub(in crate::benchmark) struct AdmittedCounts {
 
 impl AdmittedCounts {
     fn of(inputs: &InvocationInputs<Icu4xData>) -> Option<Self> {
-        let EntryInputs::File(file) = &inputs.entry else {
-            return None;
+        let (entry, value) = match &inputs.entry {
+            EntryInputs::File(file) => {
+                let capability = &inputs.common.capability;
+                let limits = InputLimits {
+                    raw: capability.bootstrap_only().raw_input,
+                    value: capability.policy_comparable().configuration_input.value,
+                };
+                let (bytes, tokens, value) = match materialize_file(Arc::clone(&file.bytes), limits)
+                {
+                    Ok(document) => {
+                        let counts = document.counts()?;
+                        (counts.file_bytes, counts.parser_tokens, Some(counts.value))
+                    }
+                    Err(error) => {
+                        let progress = error.progress;
+                        let value = progress.complete_value.as_deref().copied();
+                        (progress.file_bytes, progress.parser_tokens_visited, value)
+                    }
+                };
+                (EntryCounts::File { bytes, tokens }, value)
+            }
+            EntryInputs::Programmatic(programmatic) => {
+                let counts = SnapshotCounts::of(programmatic.snapshot.root());
+                let entry = EntryCounts::Snapshot {
+                    envelope: counts.envelope_canonical_bytes,
+                    traversal: counts.traversal_units,
+                };
+                (
+                    entry,
+                    (counts.rejected_markers == 0).then(|| counts.value()),
+                )
+            }
         };
-        let capability = &inputs.common.capability;
-        let limits = InputLimits {
-            raw: capability.bootstrap_only().raw_input,
-            value: capability.policy_comparable().configuration_input.value,
-        };
-        let (file_bytes, parser_tokens, value) =
-            match materialize_file(Arc::clone(&file.bytes), limits) {
-                Ok(document) => {
-                    let counts = document.counts()?;
-                    (counts.file_bytes, counts.parser_tokens, Some(counts.value))
-                }
-                Err(error) => {
-                    let progress = error.progress;
-                    let value = progress.complete_value.as_deref().copied();
-                    (progress.file_bytes, progress.parser_tokens_visited, value)
-                }
-            };
         let members = inputs.common.collection.members();
         let member_bytes = members.iter().try_fold(0_u64, |total, member| {
             total.checked_add(u64::try_from(member.canonical_body().len()).ok()?)
         })?;
         Some(Self {
-            file_bytes,
-            parser_tokens,
+            entry,
             value,
             members: u64::try_from(members.len()).ok()?,
             member_bytes,
@@ -596,6 +669,17 @@ impl InputFacts {
 }
 
 #[cfg(test)]
+impl RawInvocation {
+    /// The bytes a file entry's submission holds.
+    pub(super) fn file(&self) -> &Arc<[u8]> {
+        let RawEntry::File { bytes, .. } = &self.entry else {
+            panic!("a file entry's submission");
+        };
+        bytes
+    }
+}
+
+#[cfg(test)]
 pub(in crate::benchmark) mod tests {
     use std::cell::RefCell;
     use std::collections::BTreeSet;
@@ -606,8 +690,9 @@ pub(in crate::benchmark) mod tests {
     use super::*;
     use crate::artifacts::envelope::FormalMember;
     use crate::benchmark::cases::prepare::{prepare, Candidate};
+    use crate::benchmark::cases::workflow_inputs::ProgrammaticRecipe as P;
     use crate::benchmark::cases::workflow_inputs::{before, submission};
-    use crate::benchmark::cases::{declarations, EvidenceRecipe as R, Recipe};
+    use crate::benchmark::cases::{declarations, EntryKind, EvidenceRecipe as R, Recipe};
     use crate::benchmark::clock::tests::ScriptedClock;
     use crate::benchmark::descriptor::{prepared_core, DescriptorIssue, Descriptors};
     use crate::benchmark::instrument::Timed;
@@ -615,7 +700,7 @@ pub(in crate::benchmark) mod tests {
     use crate::benchmark::memory_domain::{agrees, invocation};
     use crate::benchmark::operation::Operation;
     use crate::construction::{committed, flow, identity};
-    use crate::snapshot::from_json;
+    use crate::snapshot::{from_json, Marker, MarkerReason, Node};
 
     const STATES: [ResolverState; 3] = [
         ResolverState::Fresh,
@@ -645,6 +730,95 @@ pub(in crate::benchmark) mod tests {
         prepare(&declaration.unwrap()).unwrap()
     }
 
+    /// D15:204, 728, 743, 889: a programmatic entry submits its Snapshot in
+    /// the programmatic slots, under the Programmatic Entry identity its
+    /// frontend marks non-secret, at a non-secret safe-label locator, its
+    /// revision the Snapshot's digest, with no call-site sidecar.
+    #[test]
+    fn a_programmatic_entry_is_submitted_in_its_own_slots() {
+        use crate::benchmark::cases::workflow_inputs::programmatic;
+
+        let constructed = build(root(), committed::input()).unwrap();
+        let raw = programmatic(P::Storefront, &constructed, root()).unwrap();
+        let members = raw.members();
+        let SubmittedEntry::Programmatic(entry) = raw.submitted(&members).entry else {
+            panic!("a programmatic entry");
+        };
+        let RawEntry::Programmatic { snapshot, revision } = &raw.entry else {
+            unreachable!()
+        };
+        let value = &entry.programmatic.value;
+        assert!(value
+            .snapshot
+            .is_some_and(|submitted| std::ptr::eq(submitted, snapshot)));
+        let identity = (value.identity, value.marked, value.revision);
+        let expected = Some("intlify-programmatic-entry.v0:storefront");
+        assert_eq!(identity, (expected, true, Some(revision.as_str())));
+        let locator = value.locator.as_ref().unwrap();
+        let locator = (locator.variant, locator.payload, locator.non_secret);
+        assert_eq!(locator, (LocatorVariant::SafeLabel, "storefront-app", true));
+        assert!(value.call_site.is_none());
+        let origins = (entry.programmatic.origin, entry.selector.origin);
+        let own = |kind: Kind| Some(kind.id());
+        let slots = (
+            Kind::ConfigurationProgrammatic,
+            Kind::ProfileSelectorProgrammatic,
+        );
+        assert_eq!(origins, (own(slots.0), own(slots.1)));
+    }
+
+    /// D15:889, 1889, 2796: a programmatic entry submits its file case's
+    /// set but for the entry, the Snapshot of the value the file spells, its
+    /// revision the digest, and the interval counts the admitted Snapshot's
+    /// envelope bytes and traversal units, and its value as the file's, but
+    /// none for a Snapshot holding a marker.
+    #[test]
+    fn a_programmatic_entry_submits_and_counts_the_snapshot_of_its_files_value() {
+        use crate::benchmark::cases::workflow_inputs::programmatic;
+
+        let constructed = build(root(), committed::input()).unwrap();
+        for recipe in P::ALL {
+            let raw = programmatic(recipe, &constructed, root()).unwrap();
+            let file = submission(recipe.file(), &constructed, root()).unwrap();
+            let RawEntry::Programmatic { snapshot, revision } = &raw.entry else {
+                panic!("{recipe:?} is programmatic");
+            };
+            let SnapshotReport::Formal { digest, .. } = snapshot else {
+                panic!("{recipe:?} is a formal Snapshot");
+            };
+            assert_eq!(revision, digest);
+            let mut same = raw.clone();
+            same.entry = file.entry.clone();
+            assert!(same == file, "{recipe:?}");
+            let constructed = build(root(), committed::input()).unwrap();
+            let resolved = PreparedWorkflow::new(root(), constructed, raw.clone(), Before::Reused)
+                .resolve()
+                .unwrap();
+            let admitted = resolved.admitted.unwrap();
+            let config = recipe.file().fixture(&recipe.file().limits()).config;
+            let mut tree = from_json(&config);
+            if recipe == P::RejectedMarker {
+                let Node::Object(members) = &mut tree else {
+                    unreachable!()
+                };
+                let marker = Marker::Rejected(MarkerReason::UnsupportedType);
+                members.insert("onLoad".to_owned(), Node::Marker(marker));
+            }
+            let counts = SnapshotCounts::of(&tree);
+            let entry = EntryCounts::Snapshot {
+                envelope: counts.envelope_canonical_bytes,
+                traversal: counts.traversal_units,
+            };
+            assert_eq!(admitted.entry, entry, "{recipe:?}");
+            let value = (counts.rejected_markers == 0).then(|| counts.value());
+            assert_eq!(admitted.value, value, "{recipe:?}");
+            let paired = prepared(recipe.file()).resolve().unwrap();
+            if recipe != P::RejectedMarker {
+                assert_eq!(admitted.value, paired.admitted.unwrap().value);
+            }
+        }
+    }
+
     /// The inputs of `recipe`'s invocation on a reused resolver.
     fn prepared(recipe: R) -> PreparedWorkflow {
         prepared_in(recipe, ResolverState::Reused)
@@ -656,7 +830,7 @@ pub(in crate::benchmark) mod tests {
     fn prepared_in(recipe: R, state: ResolverState) -> PreparedWorkflow {
         let constructed = build(root(), committed::input()).unwrap();
         let raw = submission(recipe, &constructed, root()).unwrap();
-        let before = before(state, &constructed, root()).unwrap();
+        let before = before(state, EntryKind::File, &constructed, root()).unwrap();
         PreparedWorkflow::new(root(), constructed, raw, before)
     }
 
@@ -721,11 +895,18 @@ pub(in crate::benchmark) mod tests {
                 .collect();
             let bytes = bodies.iter().map(Vec::len).sum();
             let admitted = resolved.admitted.unwrap();
-            assert_eq!(admitted.file_bytes, count(raw.file.len()), "{recipe:?}");
+            let EntryCounts::File {
+                bytes: read,
+                tokens,
+            } = admitted.entry
+            else {
+                panic!("{recipe:?} counts a file");
+            };
+            assert_eq!(read, count(raw.file().len()), "{recipe:?}");
             let members = (admitted.members, admitted.member_bytes);
             assert_eq!(members, (count(raw.members.len()), count(bytes)));
             let limits = crate::materialize_tests::limits();
-            let parsed = match materialize_file(Arc::clone(&raw.file), limits) {
+            let parsed = match materialize_file(Arc::clone(raw.file()), limits) {
                 Ok(document) => {
                     let counts = document.counts().unwrap();
                     (counts.parser_tokens, Some(counts.value))
@@ -735,7 +916,7 @@ pub(in crate::benchmark) mod tests {
                     (error.progress.parser_tokens_visited, value)
                 }
             };
-            assert_eq!((admitted.parser_tokens, admitted.value), parsed);
+            assert_eq!((tokens, admitted.value), parsed);
             assert_eq!(admitted.value.is_some(), recipe != R::Malformed);
             let asserted: Value = serde_json::from_slice(&raw.specification).unwrap();
             let profile = &asserted["project-profile"];

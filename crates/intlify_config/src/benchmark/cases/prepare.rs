@@ -1480,7 +1480,7 @@ fn prepare_evidence(declaration: &Declaration) -> Result<Candidate, PreparationF
     })
 }
 
-/// One file entry's complete invocation of a recipe, on a resolver
+/// One entry's complete invocation of a recipe, on a resolver
 /// constructed here from the committed input, with what a binding submits
 /// for it on that resolver and what each repetition in the declared state
 /// runs before its start mark, and the invocation run once in that state
@@ -1492,15 +1492,10 @@ fn prepare_workflow(declaration: &Declaration) -> Result<Candidate, PreparationF
     use crate::construction::resolver::{build, committed};
     use crate::construction::root::ConstructionRoot;
 
-    let Recipe::Workflow { input, resolver } = declaration.fixture else {
-        return Err(PreparationFailure::UndeclaredCase);
-    };
     let root = ConstructionRoot::built_in().map_err(|_| PreparationFailure::CoreInvariant)?;
     let constructed =
         build(root, committed().input().clone()).map_err(|_| PreparationFailure::CoreInvariant)?;
-    let raw = super::workflow_inputs::submission(input, &constructed, root)
-        .ok_or(PreparationFailure::CoreInvariant)?;
-    let before = super::workflow_inputs::before(resolver, &constructed, root)
+    let (raw, before) = super::workflow_inputs::rebuilt(declaration.fixture, &constructed, root)
         .ok_or(PreparationFailure::CoreInvariant)?;
     let prepared = PreparedWorkflow::new(root, constructed, raw, before);
     let resolved = prepared

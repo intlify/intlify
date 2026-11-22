@@ -2,9 +2,9 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 use crate::benchmark::evidence::outcome::RetainedProjection;
-use crate::benchmark::workflow::{require_observable, Resolved};
+use crate::benchmark::workflow::{require_observable, EntryCounts, Resolved};
 
-use super::{LogicalWork, WorkFailure, WorkKind, WorkStage, WorkValue};
+use super::{LogicalWork, UnavailableWork, WorkFailure, WorkKind, WorkStage, WorkValue};
 
 /// A projection's records and the sum of their accounting bytes; none
 /// without the projection.
@@ -20,13 +20,15 @@ fn records(projection: Option<&RetainedProjection>) -> Result<(u64, u64), WorkFa
 }
 
 impl LogicalWork {
-    /// The workload of one file entry's complete invocation in the units of
-    /// the bounds that count it (D15:2796): what strict file entry counts of
-    /// the file and its value, a value's counts unavailable when none is
-    /// complete, and the submitted collection's members and their `C(member)`
-    /// bytes, counted over what the interval admitted; then the records of
-    /// each projection with their accounting bytes and the mandatory reserve,
-    /// counted over the outcome (D15:1847, 2129).
+    /// The workload of one entry's complete invocation in the units of the
+    /// bounds that count it (D15:2796): what strict file entry counts of the
+    /// file and its value, a value's counts unavailable when none is
+    /// complete, or the Snapshot's envelope bytes and traversal units and its
+    /// value's counts, unavailable when it holds a marker, and the submitted
+    /// collection's members and their `C(member)` bytes, counted over what the
+    /// interval admitted; then the records of each projection with their
+    /// accounting bytes and the mandatory reserve, counted over the outcome
+    /// (D15:1847, 1889, 2129).
     pub(super) fn workflow(&mut self, resolved: &Resolved) -> Result<(), WorkFailure> {
         let retained =
             require_observable(resolved).map_err(|_| WorkFailure::InvalidOrdinaryResult)?;
@@ -37,9 +39,29 @@ impl LogicalWork {
         let output = WorkStage::OperationResult;
         let (shared, shared_bytes) = records(retained.shared.as_ref())?;
         let (entry, entry_bytes) = records(Some(&retained.entry))?;
+        let (counted, reason) = match admitted.entry {
+            EntryCounts::File { bytes, tokens } => (
+                [
+                    (WorkKind::RawFileBytes, bytes),
+                    (WorkKind::ParserTokensVisited, tokens),
+                ],
+                UnavailableWork::RawInputNotComplete,
+            ),
+            EntryCounts::Snapshot {
+                envelope,
+                traversal,
+            } => (
+                [
+                    (WorkKind::SnapshotEnvelopeCanonicalBytes, envelope),
+                    (WorkKind::SnapshotTraversalUnits, traversal),
+                ],
+                UnavailableWork::SnapshotHoldsMarkers,
+            ),
+        };
+        for (kind, value) in counted {
+            self.set(kind, input, WorkValue::exact(value));
+        }
         for (kind, stage, value) in [
-            (WorkKind::RawFileBytes, input, admitted.file_bytes),
-            (WorkKind::ParserTokensVisited, input, admitted.parser_tokens),
             (WorkKind::WorkflowSubmittedMembers, input, admitted.members),
             (
                 WorkKind::WorkflowSubmittedCanonicalBytes,
@@ -58,7 +80,7 @@ impl LogicalWork {
         ] {
             self.set(kind, stage, WorkValue::exact(value));
         }
-        self.values(admitted.value, input);
+        self.values_or(admitted.value, input, reason);
         Ok(())
     }
 }
@@ -96,7 +118,7 @@ mod tests {
                 work.exact(kind)
                     .and_then(|value| usize::try_from(value).ok())
             };
-            assert_eq!(exact(WorkKind::RawFileBytes), Some(raw.file.len()));
+            assert_eq!(exact(WorkKind::RawFileBytes), Some(raw.file().len()));
             assert_eq!(
                 exact(WorkKind::WorkflowSubmittedMembers),
                 Some(raw.members.len())
