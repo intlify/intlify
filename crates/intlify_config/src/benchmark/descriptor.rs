@@ -62,9 +62,10 @@ impl Boundary {
                 "reporting",
                 "output-destruction-and-teardown",
             ]),
-            // No workflow interval or profiler span is active in this profile.
+            // Only an end-to-end boundary declares an overlap: no component
+            // names a parent, and no profiler span is active in this profile.
             direct_parents: Vec::new(),
-            direct_children: Vec::new(),
+            direct_children: children(operation),
         }
     }
 
@@ -384,6 +385,8 @@ pub(super) struct Descriptors {
     pub(super) entry_evidence_input: Option<super::evidence::InputFacts>,
     #[serde(deserialize_with = "Option::deserialize")]
     pub(super) outcome_finalization_input: Option<super::evidence::InputFacts>,
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub(super) workflow_input: Option<super::workflow::InputFacts>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -405,6 +408,7 @@ pub(super) enum DescriptorIssue {
     SharedEvidenceInputBindingMismatch,
     EntryEvidenceInputBindingMismatch,
     OutcomeFinalizationInputBindingMismatch,
+    WorkflowInputBindingMismatch,
 }
 
 impl Descriptors {
@@ -472,6 +476,7 @@ impl Descriptors {
             shared_evidence_input: evidence(prepared),
             entry_evidence_input: entry_evidence(prepared),
             outcome_finalization_input: outcome_finalization(prepared),
+            workflow_input: workflow(prepared),
         }
     }
 
@@ -539,6 +544,9 @@ impl Descriptors {
         }
         if self.outcome_finalization_input != outcome_finalization(prepared) {
             issues.push(DescriptorIssue::OutcomeFinalizationInputBindingMismatch);
+        }
+        if self.workflow_input != workflow(prepared) {
+            issues.push(DescriptorIssue::WorkflowInputBindingMismatch);
         }
         issues
     }
@@ -705,6 +713,41 @@ fn outcome_finalization(prepared: &Prepared) -> Option<super::evidence::InputFac
         Prepared::OutcomeFinalization(prepared) => {
             Some(super::evidence::InputFacts::outcome(&prepared.evidence))
         }
+        _ => None,
+    }
+}
+
+/// The component boundaries an end-to-end interval includes, and so may
+/// overlap: the one of each phase an invocation runs, from Phase 1's
+/// materialization through outcome finalization. Construction and its
+/// identity precede every invocation, and none builds an authoring model
+/// (D15:2775, 2777, 2824; plan 025 decision #316).
+fn children(operation: Operation) -> Vec<String> {
+    const INVOKED: [Operation; 13] = [
+        Operation::FileMaterialization,
+        Operation::StructuralAnalysis,
+        Operation::ProfileSelection,
+        Operation::LocaleCanonicalization,
+        Operation::LocalePolicyResolution,
+        Operation::ResourcePolicyBootstrap,
+        Operation::ArtifactCollectionAdmission,
+        Operation::ResolvedBindingConstruction,
+        Operation::TargetAndGroupResolution,
+        Operation::HydrationRelationValidation,
+        Operation::SharedEvidence,
+        Operation::EntryEvidence,
+        Operation::OutcomeFinalization,
+    ];
+    if operation.phase() != "profile_resolve_e2e" {
+        return Vec::new();
+    }
+    INVOKED.map(|child| child.boundary().into()).into()
+}
+
+/// The facts of a complete invocation case.
+fn workflow(prepared: &Prepared) -> Option<super::workflow::InputFacts> {
+    match prepared {
+        Prepared::Workflow(prepared) => Some(super::workflow::InputFacts::observe(prepared)),
         _ => None,
     }
 }

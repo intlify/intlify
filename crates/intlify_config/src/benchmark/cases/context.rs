@@ -32,6 +32,7 @@ pub(in crate::benchmark) enum ContextFailure {
     HydrationInputMismatch,
     ConstructionInputMismatch,
     EvidenceInputMismatch,
+    WorkflowInputMismatch,
 }
 
 pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
@@ -49,7 +50,8 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
             | Prepared::Icu4xLocale { .. }
             | Prepared::ArtifactCollection(_)
             | Prepared::Construction(_)
-            | Prepared::ConstructionIdentity(_),
+            | Prepared::ConstructionIdentity(_)
+            | Prepared::Workflow(_),
             None,
         ) => {
             frame.text("no-file-preparation");
@@ -59,7 +61,8 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
             | Prepared::Icu4xLocale { .. }
             | Prepared::ArtifactCollection(_)
             | Prepared::Construction(_)
-            | Prepared::ConstructionIdentity(_),
+            | Prepared::ConstructionIdentity(_)
+            | Prepared::Workflow(_),
             Some(_),
         )
         | (_, None) => return Err(ContextFailure::PreparationLimitsMismatch),
@@ -389,8 +392,61 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
             )?;
             frame.text(&prepared.identity.text());
         }
+        Prepared::Workflow(prepared) => workflow_input(&mut frame, candidate, prepared)?,
     }
     Ok(frame.finish())
+}
+
+/// One file entry's complete invocation on a resolver its preparation
+/// constructed from the committed input: the resolver, by the identity the
+/// submission names, and every raw value a binding submits, each as the
+/// recipe's submission on that resolver rebuilds it: the Specification Input,
+/// the vocabulary, the canonicalization data's manifest and payloads, every
+/// member in submission order, the Verification Input and the assertion
+/// beside it, the capability, the file and its revision, the selector, and
+/// the case's facts.
+fn workflow_input(
+    frame: &mut Frame,
+    candidate: &Candidate,
+    prepared: &crate::benchmark::workflow::PreparedWorkflow,
+) -> Result<(), ContextFailure> {
+    let Recipe::Workflow {
+        input,
+        resolver: super::ResolverState::Reused,
+    } = candidate.declaration.fixture
+    else {
+        return Err(ContextFailure::WorkflowInputMismatch);
+    };
+    let (root, raw) = (prepared.root, &prepared.raw);
+    let rebuilt = super::workflow_inputs::submission(input, &prepared.constructed, root);
+    if candidate.declaration.selector != super::Selector::App || rebuilt.as_ref() != Some(raw) {
+        return Err(ContextFailure::WorkflowInputMismatch);
+    }
+    let count = |len: usize| u64::try_from(len).map_err(|_| ContextFailure::Encoding);
+    frame.text(&raw.reference);
+    frame.bytes(&raw.specification);
+    frame.bytes(&raw.vocabulary);
+    frame.bytes(raw.manifest);
+    frame.uint(count(raw.payloads.len())?);
+    for (address, payload) in &raw.payloads {
+        frame.text(address);
+        frame.bytes(payload);
+    }
+    frame.uint(count(raw.members.len())?);
+    for member in &raw.members {
+        frame.bytes(member);
+    }
+    frame.bytes(&raw.verification);
+    frame.text(raw.assertion.identity.as_str());
+    frame.text(raw.assertion.revision.as_str());
+    frame.text(raw.assertion.semantic_digest.as_str());
+    frame.json(&raw.capability);
+    frame.bytes(&raw.file);
+    frame.text(&raw.revision);
+    frame.text(&raw.selector);
+    let facts = crate::benchmark::workflow::InputFacts::observe(prepared);
+    frame.json(&serde_json::to_value(facts).map_err(|_| ContextFailure::Encoding)?);
+    Ok(())
 }
 
 /// One file entry's complete invocation: the recipe's configuration file
@@ -591,5 +647,82 @@ fn structural_limits(frame: &mut Frame, limits: StructuralLimits) {
         limits.max_structural_analysis_units,
     ] {
         frame.uint(bound.get());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use serde_json::json;
+
+    use super::*;
+    use crate::benchmark::cases::{EvidenceRecipe, ResolverState, Selector};
+    use crate::benchmark::workflow::tests::candidate;
+    use crate::benchmark::workflow::RawInvocation;
+
+    type Edit = (&'static str, fn(&mut RawInvocation));
+
+    fn raw(candidate: &mut Candidate) -> &mut RawInvocation {
+        let Prepared::Workflow(prepared) = &mut candidate.prepared else {
+            unreachable!()
+        };
+        &mut prepared.raw
+    }
+
+    /// A complete invocation's context binds its recipe, the resolver's
+    /// state, its selector, and every raw value a binding submits: a case any
+    /// one of which is not what its recipe's submission rebuilds is refused.
+    #[test]
+    fn a_workflow_context_refuses_any_input_its_recipe_does_not_rebuild() {
+        let mut candidate = candidate(EvidenceRecipe::Storefront);
+        let context = observe(&candidate);
+        let original = raw(&mut candidate).clone();
+        let edits: [Edit; 12] = [
+            ("reference", |raw| raw.reference.push('0')),
+            ("specification", |raw| raw.specification.push(b' ')),
+            ("vocabulary", |raw| raw.vocabulary.push(b' ')),
+            ("manifest", |raw| raw.manifest = &b"{}"[..]),
+            ("payload", |raw| _ = raw.payloads.pop_first()),
+            ("members", |raw| raw.members.reverse()),
+            ("verification", |raw| raw.verification.push(b' ')),
+            ("assertion", |raw| {
+                raw.assertion.revision = raw.assertion.identity.clone();
+            }),
+            ("capability", |raw| {
+                raw.capability["bootstrapOnly"] = json!({});
+            }),
+            ("file", |raw| raw.file = Arc::from(&b"{}"[..])),
+            ("revision", |raw| raw.revision.push('0')),
+            ("selector", |raw| raw.selector.push('0')),
+        ];
+        for (name, edit) in edits {
+            edit(raw(&mut candidate));
+            let refused = Err(ContextFailure::WorkflowInputMismatch);
+            assert_eq!(observe(&candidate), refused, "{name}");
+            *raw(&mut candidate) = original.clone();
+        }
+        assert!(context.is_ok() && observe(&candidate) == context);
+        let declared = candidate.declaration.fixture;
+        for fixture in [
+            Recipe::Workflow {
+                input: EvidenceRecipe::Storefront,
+                resolver: ResolverState::Fresh,
+            },
+            Recipe::Workflow {
+                input: EvidenceRecipe::Dense,
+                resolver: ResolverState::Reused,
+            },
+        ] {
+            candidate.declaration.fixture = fixture;
+            let refused = Err(ContextFailure::WorkflowInputMismatch);
+            assert_eq!(observe(&candidate), refused, "{fixture:?}");
+        }
+        candidate.declaration.fixture = declared;
+        candidate.declaration.selector = Selector::Absent;
+        let refused = Err(ContextFailure::WorkflowInputMismatch);
+        assert_eq!(observe(&candidate), refused);
+        candidate.declaration.selector = Selector::App;
+        assert_eq!(observe(&candidate), context);
     }
 }

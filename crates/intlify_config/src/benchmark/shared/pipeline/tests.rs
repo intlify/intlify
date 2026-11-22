@@ -28,7 +28,7 @@ fn reseal(value: &mut Value) -> Vec<u8> {
 }
 
 #[test]
-fn actual_owner_run_projects_all_sixteen_pairs_and_raw_samples_through_report_admission() {
+fn actual_owner_run_projects_all_seventeen_pairs_and_raw_samples_through_report_admission() {
     let run = capture();
     let artifacts = produce(&run).unwrap();
     let checked = validate(&run, &artifacts).unwrap();
@@ -39,7 +39,7 @@ fn actual_owner_run_projects_all_sixteen_pairs_and_raw_samples_through_report_ad
             checked.measured_cases,
             checked.non_measured_cases
         ),
-        (413, 413, 0)
+        (419, 419, 0)
     );
     let evidence = value(artifacts.evidence.as_ref().unwrap());
     let evaluation = value(&artifacts.evaluation);
@@ -92,13 +92,23 @@ fn actual_owner_run_projects_all_sixteen_pairs_and_raw_samples_through_report_ad
             row["samples"][0]["repetitionCount"],
             projected["repetitionCount"]
         );
+        // 026 maps a complete invocation's cost to a workflow on the
+        // product workflow surface, and every other one to a component.
+        let e2e = row["ownerPhase"] == "profile_resolve_e2e";
         assert_eq!(row["category"], "toolchain");
-        assert_eq!(row["operationClass"], "component");
-        assert_eq!(row["performanceSurface"], "core");
+        let (class, surface) = if e2e {
+            ("workflow", "product_workflow")
+        } else {
+            ("component", "core")
+        };
+        assert_eq!(
+            (&row["operationClass"], &row["performanceSurface"]),
+            (&json!(class), &json!(surface))
+        );
         assert_eq!(row["metric"], "wall_duration");
         assert_eq!(row["unit"], "nanosecond");
     }
-    assert_eq!(pairs.len(), 16);
+    assert_eq!(pairs.len(), 17);
     assert_eq!(
         report["body"]["sections"][0]["numericPolicy"],
         "observational-only-no-numeric-decisions"
@@ -141,7 +151,7 @@ fn missing_unsupported_malformed_and_duplicate_native_inputs_keep_the_complete_n
         assert_eq!(admitted.outcome, outcome);
         assert_eq!(
             (admitted.measured_cases, admitted.non_measured_cases),
-            (0, 413)
+            (0, 419)
         );
         assert!(artifacts.evidence.is_none());
         let evaluation = value(&artifacts.evaluation);
@@ -155,7 +165,7 @@ fn missing_unsupported_malformed_and_duplicate_native_inputs_keep_the_complete_n
                 .as_array()
                 .unwrap()
                 .len(),
-            413
+            419
         );
         let report = value(&artifacts.report);
         assert_eq!(report["body"]["sections"][0]["rows"], json!([]));
@@ -164,7 +174,7 @@ fn missing_unsupported_malformed_and_duplicate_native_inputs_keep_the_complete_n
                 .as_array()
                 .unwrap()
                 .len(),
-            413
+            419
         );
     }
 }

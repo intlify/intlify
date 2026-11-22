@@ -5,8 +5,9 @@
 //! canonicalization, 015 Phases 7 and 8 locale and locale-policy resolution,
 //! 015 Phase 4 resource policy admission, and 015 Phase 9 collection admission
 //! and exact resolution, 015 Phases 11 to 13 target, group, and hydration
-//! resolution, and 015's resolver construction and its identity. These are
-//! not physical metrics or formal Resource Policy observations.
+//! resolution, 015's resolver construction and its identity, its Evidence
+//! stages, and its complete invocation. These are not physical metrics or
+//! formal Resource Policy observations.
 
 use serde::{Deserialize, Serialize};
 
@@ -26,6 +27,7 @@ mod hydration;
 mod policy;
 mod resolution;
 mod target_group;
+mod workflow;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
@@ -161,6 +163,13 @@ pub(super) enum WorkKind {
     OutcomeFinalizationEntryRecords,
     OutcomeFinalizationSharedRecords,
     OutcomeFinalizationReserveCanonicalBytes,
+    WorkflowSubmittedMembers,
+    WorkflowSubmittedCanonicalBytes,
+    WorkflowSharedRecords,
+    WorkflowSharedCanonicalBytes,
+    WorkflowEntryRecords,
+    WorkflowEntryCanonicalBytes,
+    WorkflowReserveCanonicalBytes,
 }
 
 impl WorkKind {
@@ -335,6 +344,26 @@ impl WorkKind {
         Self::OutcomeFinalizationReserveCanonicalBytes,
     ];
 
+    /// What strict file entry counts of the file and its value, the
+    /// submitted collection's members and their bytes, and what outcome
+    /// finalization counts, with each projection's bytes.
+    const WORKFLOW: [Self; 14] = [
+        Self::RawFileBytes,
+        Self::ParserTokensVisited,
+        Self::LogicalValueNodes,
+        Self::MaximumValueDepth,
+        Self::CollectionEntries,
+        Self::TotalDecodedStringBytes,
+        Self::MaximumDecodedStringBytes,
+        Self::WorkflowSubmittedMembers,
+        Self::WorkflowSubmittedCanonicalBytes,
+        Self::WorkflowSharedRecords,
+        Self::WorkflowSharedCanonicalBytes,
+        Self::WorkflowEntryRecords,
+        Self::WorkflowEntryCanonicalBytes,
+        Self::WorkflowReserveCanonicalBytes,
+    ];
+
     pub(super) fn for_operation(operation: Operation) -> &'static [Self] {
         match operation {
             Operation::LocaleCanonicalization => &Self::LOCALE,
@@ -349,6 +378,7 @@ impl WorkKind {
             Operation::SharedEvidence => &Self::SHARED_EVIDENCE,
             Operation::EntryEvidence => &Self::ENTRY_EVIDENCE,
             Operation::OutcomeFinalization => &Self::OUTCOME_FINALIZATION,
+            Operation::FileEntryCompleteWorkflow => &Self::WORKFLOW,
             _ => &Self::INPUT,
         }
     }
@@ -430,7 +460,9 @@ impl WorkKind {
             | Self::SharedEvidenceRecords
             | Self::EntryEvidenceRecords
             | Self::OutcomeFinalizationEntryRecords
-            | Self::OutcomeFinalizationSharedRecords => WorkUnit::RetainedRecord,
+            | Self::OutcomeFinalizationSharedRecords
+            | Self::WorkflowSharedRecords
+            | Self::WorkflowEntryRecords => WorkUnit::RetainedRecord,
             Self::LocaleOccurrences
             | Self::LocalePolicyResolutionOccurrences
             | Self::LocalePolicyResolutionCanonicalizedOccurrences
@@ -466,7 +498,8 @@ impl WorkKind {
             | Self::ResourcePolicyTargetProfileArtifacts
             | Self::ArtifactCollectionArtifactOccurrences
             | Self::ArtifactCollectionPolicyArtifacts
-            | Self::ArtifactCollectionTargetProfileArtifacts => WorkUnit::ArtifactOccurrence,
+            | Self::ArtifactCollectionTargetProfileArtifacts
+            | Self::WorkflowSubmittedMembers => WorkUnit::ArtifactOccurrence,
             Self::ResourcePolicyDistinctArtifactBodies
             | Self::ArtifactCollectionDistinctArtifactBodies
             | Self::ArtifactCollectionSetArtifacts
@@ -480,7 +513,11 @@ impl WorkKind {
             | Self::EntryEvidenceTotalEvidenceBytes
             | Self::EntryEvidenceCanonicalBytes
             | Self::EntryEvidenceMaximumLogicalPathCanonicalBytes
-            | Self::OutcomeFinalizationReserveCanonicalBytes => WorkUnit::CanonicalOctet,
+            | Self::OutcomeFinalizationReserveCanonicalBytes
+            | Self::WorkflowSubmittedCanonicalBytes
+            | Self::WorkflowSharedCanonicalBytes
+            | Self::WorkflowEntryCanonicalBytes
+            | Self::WorkflowReserveCanonicalBytes => WorkUnit::CanonicalOctet,
             Self::ResourcePolicyReferences
             | Self::ResolvedBindingReferences
             | Self::ResolvedBindingDistinctReferences
@@ -662,6 +699,9 @@ impl LogicalWork {
                 Operation::SharedEvidence => "intlify-config-shared-evidence-work",
                 Operation::EntryEvidence => "intlify-config-entry-evidence-work",
                 Operation::OutcomeFinalization => "intlify-config-outcome-finalization-work",
+                Operation::FileEntryCompleteWorkflow => {
+                    "intlify-config-file-entry-complete-workflow-work"
+                }
                 _ => "intlify-config-minimum-input-work",
             }
             .into(),
@@ -756,6 +796,7 @@ impl LogicalWork {
             (Prepared::OutcomeFinalization(_), Output::OutcomeFinalization(resolved)) => {
                 work.outcome_finalization(resolved)?;
             }
+            (Prepared::Workflow(_), Output::Workflow(resolved)) => work.workflow(resolved)?,
             _ => return Err(WorkFailure::OperationMismatch),
         }
         Ok(work)

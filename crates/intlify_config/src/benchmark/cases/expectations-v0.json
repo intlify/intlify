@@ -57847,6 +57847,930 @@
           }
         ]
       }
+    },
+    {
+      "declaration": {
+        "operation": "file-entry-complete-workflow",
+        "fixture": {
+          "workflow": {
+            "input": "storefront",
+            "resolver": "reused"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-checked"
+      },
+      "inputContext": "c03e8f3c8bfbc7c5c60a3bf112c8b13bb5c890309489635a921e80f430715ece",
+      "result": {
+        "shared": "b4480f1c95745d71b6330a92013987b33ed8b7aba0c8926b8758e1388a0b2e88",
+        "entry": "0e924008dbff4cee53d8048cd39dd9df7c64ed71440375a6b2e65bc7aa935472"
+      },
+      "logicalWork": "768890dc8407141dde4bbb17948932ef2dd3a8e438a3f247be68e62f55c0f267",
+      "work": {
+        "profileIdentity": "intlify-config-file-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "file-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "raw-file-bytes",
+            "unit": "octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2796"
+            }
+          },
+          {
+            "kind": "parser-tokens-visited",
+            "unit": "parser-token",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "413"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "113"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "112"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2215"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11589"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "478"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "347011"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "25"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20462"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "file-entry-complete-workflow",
+        "fixture": {
+          "workflow": {
+            "input": "blocked",
+            "resolver": "reused"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-blocked"
+      },
+      "inputContext": "c32ebc760d526f536037f7b87138bffab0ac643cb4cdaf298660fba3439b7e0d",
+      "result": {
+        "shared": "6354e566f31deda36a4bdc28f00db3151d6a9bf36fb7d5c1660f72aab2114bc3",
+        "entry": "d31ae0002807055a606d4c3b11293959e5c160bd9f8c311cafb22ff69d627af2"
+      },
+      "logicalWork": "477b616a8f0442537f9448b2488229942832e048c5012a8ba34e27af41521c8c",
+      "work": {
+        "profileIdentity": "intlify-config-file-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "file-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "raw-file-bytes",
+            "unit": "octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2764"
+            }
+          },
+          {
+            "kind": "parser-tokens-visited",
+            "unit": "parser-token",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "409"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "112"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "111"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2189"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11589"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "423"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "373679"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "19"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "15180"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "file-entry-complete-workflow",
+        "fixture": {
+          "workflow": {
+            "input": "dense",
+            "resolver": "reused"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-blocked"
+      },
+      "inputContext": "332f70566f861fa3d5b836ead52b68c06fd12eabb814f8808f368f9d911e5dd1",
+      "result": {
+        "shared": "83bf725feb610318955a22b62bb79065405e03dbb3afa8ee9e326b93b70fe534",
+        "entry": "f128b1787524c7d49e7af77cac3375bc80a785f213cd455bcd6d741478b46b81"
+      },
+      "logicalWork": "809d03c5b30e22bbfe453c1c7c94ee194b5b8d6763b617f51c7dbb80e8549b9e",
+      "work": {
+        "profileIdentity": "intlify-config-file-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "file-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "raw-file-bytes",
+            "unit": "octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "21612"
+            }
+          },
+          {
+            "kind": "parser-tokens-visited",
+            "unit": "parser-token",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "3229"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "945"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "944"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "16999"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11589"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3421"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2559080"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "283"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "384145"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "file-entry-complete-workflow",
+        "fixture": {
+          "workflow": {
+            "input": "malformed",
+            "resolver": "reused"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-blocked"
+      },
+      "inputContext": "b633ad10048a5d0bbacb757dc1fcefce8d9d67a468545ea227682796a68777a7",
+      "result": {
+        "shared": "267b72f65887e0fff421f3f64e5860e4ff8e48f7dcf94ec123c5f95fafa53b6d",
+        "entry": "b3140df74b66f1ffd6a5f598a9cfb66678c8f8ace11883a032436c24aa3348bd"
+      },
+      "logicalWork": "3fc53944ef20fef463b82f0c6a35264ef6c411361cea71207412d6c74f6c5834",
+      "work": {
+        "profileIdentity": "intlify-config-file-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "file-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "raw-file-bytes",
+            "unit": "octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2795"
+            }
+          },
+          {
+            "kind": "parser-tokens-visited",
+            "unit": "parser-token",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "412"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "raw-input-not-complete"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "raw-input-not-complete"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "raw-input-not-complete"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "raw-input-not-complete"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "raw-input-not-complete"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11589"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "19"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17635"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "file-entry-complete-workflow",
+        "fixture": {
+          "workflow": {
+            "input": "truncated",
+            "resolver": "reused"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-blocked"
+      },
+      "inputContext": "258794824b8c6a7534e72a6b18d6dc724ee06268666ac3174a5b3e57d21d4635",
+      "result": {
+        "shared": "f33e1a9e3d8a49c0867f906ffd22861eb45f7e8d48a92688d0781b3479f16e38",
+        "entry": "f469dcd1aab5a1a1464dbd53ce779154612df6a8b8e52d5e2a222db3abe38af3"
+      },
+      "logicalWork": "50ed5d57658b79d42ea4d03abd229337e206c4a66833b8b1bad910f47fbf270e",
+      "work": {
+        "profileIdentity": "intlify-config-file-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "file-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "raw-file-bytes",
+            "unit": "octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2796"
+            }
+          },
+          {
+            "kind": "parser-tokens-visited",
+            "unit": "parser-token",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "413"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "113"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "112"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2215"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11579"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "100"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "70419"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "25"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "20462"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1619"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "file-entry-complete-workflow",
+        "fixture": {
+          "workflow": {
+            "input": "inadmissible",
+            "resolver": "reused"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-blocked"
+      },
+      "inputContext": "cde4fc278dbb881be4f98d34bb3345656f8b60cbd025d28909b51e49442902b1",
+      "result": {
+        "shared": "267b72f65887e0fff421f3f64e5860e4ff8e48f7dcf94ec123c5f95fafa53b6d",
+        "entry": "0fdf806b16e7c12a5b9ee471c1e183a7e0445da1ca3e86a0478f167abd89a6a2"
+      },
+      "logicalWork": "c10a8f7edc8f89bb74d458fffd3ae741556ec698e3deec292801bfabd6c7dcfa",
+      "work": {
+        "profileIdentity": "intlify-config-file-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "file-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "raw-file-bytes",
+            "unit": "octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2860"
+            }
+          },
+          {
+            "kind": "parser-tokens-visited",
+            "unit": "parser-token",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "421"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "115"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "114"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2264"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11589"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "26"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "29110"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
     }
   ]
 }

@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Finite owner case declarations for the sixteen active boundaries.
+//! Finite owner case declarations for the seventeen active boundaries.
 //! This is not a common Run Plan, case-identity codec, or a complete 015 suite.
 //! Preparation yields an unadmitted candidate; the separate fixture registry
 //! binds its exact input/result/work before method-bound collection can use it.
@@ -190,6 +190,8 @@ pub(super) enum ExpectedKind {
     EntryEvidenceExhausted,
     OutcomeFinalizationChecked,
     OutcomeFinalizationBlocked,
+    WorkflowChecked,
+    WorkflowBlocked,
 }
 
 #[derive(
@@ -436,7 +438,8 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 | Operation::ConstructionIdentity
                 | Operation::SharedEvidence
                 | Operation::EntryEvidence
-                | Operation::OutcomeFinalization => unreachable!(),
+                | Operation::OutcomeFinalization
+                | Operation::FileEntryCompleteWorkflow => unreachable!(),
             };
             let selector = if operation == Operation::ProfileSelection {
                 Selector::App
@@ -999,6 +1002,28 @@ pub(super) fn declarations() -> Vec<Declaration> {
             case.limit = Some((limit, edge));
             cases.push(case);
         }
+    }
+    // Append one file entry's complete invocation of each recipe without
+    // changing any of the 413 rows: from the pre-invocation admission of what
+    // a binding submits through the outcome, on the resolver preparation
+    // constructed and every interval reuses, the example checked and every
+    // other recipe blocked. No bound has an edge here: a first-over
+    // pre-invocation bound refuses the set, which is no outcome (D15:2826;
+    // plan 025 decisions #34 and #316).
+    for input in EvidenceRecipe::ALL {
+        cases.push(declaration(
+            Operation::FileEntryCompleteWorkflow,
+            Recipe::Workflow {
+                input,
+                resolver: ResolverState::Reused,
+            },
+            Selector::App,
+            if input.checked() {
+                ExpectedKind::WorkflowChecked
+            } else {
+                ExpectedKind::WorkflowBlocked
+            },
+        ));
     }
     cases
 }

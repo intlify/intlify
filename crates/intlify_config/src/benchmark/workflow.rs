@@ -25,6 +25,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::artifacts::envelope::ExactTuple;
@@ -57,11 +58,13 @@ use super::evidence::outcome::{project, RetainedProjection};
 use super::instrument::{Instrument, Interval};
 use super::observation::{Frame, Observation};
 use super::operation::OutputFailure;
+use super::quantity::Quantity;
 
 /// What a binding submits for one file entry's invocation, as the raw values
 /// the pre-invocation boundaries read, each in its typed slot. The file is
 /// named by [`FILE`], which its owner marks non-secret, with the revision of
 /// its bytes and no locator, as the Evidence stages' file is.
+#[derive(Clone, PartialEq)]
 pub(super) struct RawInvocation {
     /// The text of the Resolver Construction Identity the set names.
     pub(super) reference: String,
@@ -424,25 +427,84 @@ pub(in crate::benchmark) fn observe(resolved: &Resolved) -> Result<Observation, 
     })
 }
 
+/// What a complete invocation case runs on and submits, which its
+/// descriptor states.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(in crate::benchmark) struct InputFacts {
+    scope: String,
+    entry_kind: String,
+    resolver: String,
+    specifications: String,
+    capability: String,
+    verification: String,
+    canonicalization: String,
+    submitted_members: Quantity,
+    prerequisites: String,
+    input_storage: String,
+    structural_preparation: String,
+    ordinary_output: String,
+}
+
+impl InputFacts {
+    pub(in crate::benchmark) fn observe(prepared: &PreparedWorkflow) -> Self {
+        let members = u64::try_from(prepared.raw.members.len()).unwrap_or(u64::MAX);
+        Self {
+            scope: "one-file-entry-invocation-from-pre-invocation-admission-through-the-outcome"
+                .into(),
+            entry_kind: "file".into(),
+            resolver: "committed-input-constructed-once-before-the-first-interval-and-reused"
+                .into(),
+            specifications: "every-slot-asserting-what-the-constructed-resolver-supports".into(),
+            capability:
+                "owner-capability-for-the-recipe-bounds-with-the-bootstrap-groups-read-widened"
+                    .into(),
+            verification: "sealed-verification-input-pinning-the-selected-policy-with-assertion"
+                .into(),
+            canonicalization: "committed-icu4x-artifact-submitted-raw-and-admitted-in-the-interval"
+                .into(),
+            submitted_members: Quantity::new(members),
+            prerequisites: "none-every-input-raw-as-a-binding-submits-it".into(),
+            input_storage: "raw-values-borrowed-from-resident-preparation".into(),
+            structural_preparation:
+                "resolver-identity-submission-slot-and-outcome-storage-before-start-mark".into(),
+            ordinary_output:
+                "outcome-and-materialized-set-copied-after-end-mark-or-benchmark-failure".into(),
+        }
+    }
+}
+
 #[cfg(test)]
-mod tests {
+pub(in crate::benchmark) mod tests {
     use std::cell::RefCell;
 
     use intlify_measurement::measurement::Aggregation;
 
     use super::*;
     use crate::artifacts::envelope::FormalMember;
+    use crate::benchmark::cases::prepare::{prepare, Candidate};
     use crate::benchmark::cases::workflow_inputs::submission;
-    use crate::benchmark::cases::EvidenceRecipe as R;
+    use crate::benchmark::cases::{declarations, EvidenceRecipe as R, Recipe, ResolverState};
     use crate::benchmark::clock::tests::ScriptedClock;
     use crate::benchmark::instrument::Timed;
-    use crate::benchmark::quantity::Quantity;
     use crate::construction::resolver::build;
     use crate::construction::{committed, flow, identity};
     use crate::snapshot::from_json;
 
     fn root() -> &'static ConstructionRoot {
         ConstructionRoot::built_in().unwrap()
+    }
+
+    /// `input`'s declared case on a reused resolver, as preparation makes it.
+    pub(in crate::benchmark) fn candidate(input: R) -> Candidate {
+        let recipe = Recipe::Workflow {
+            input,
+            resolver: ResolverState::Reused,
+        };
+        let declaration = declarations()
+            .into_iter()
+            .find(|case| case.fixture == recipe);
+        prepare(&declaration.unwrap()).unwrap()
     }
 
     /// The inputs of `recipe`'s invocation: a resolver constructed once from

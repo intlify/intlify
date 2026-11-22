@@ -35,7 +35,7 @@ use super::measure::{Measured, MeasurementFailure};
 use super::observation::{self, Frame, Observation};
 use super::{
     artifact_collection, construction, evidence, hydration_relation, locale, locale_icu4x,
-    locale_resolution, resolved_binding, resource_policy, target_group,
+    locale_resolution, resolved_binding, resource_policy, target_group, workflow,
 };
 
 pub(super) type Config = IntlifyConfig<PolicyReference, TargetProfileReference>;
@@ -99,10 +99,11 @@ pub(super) enum Operation {
     SharedEvidence,
     EntryEvidence,
     OutcomeFinalization,
+    FileEntryCompleteWorkflow,
 }
 
 impl Operation {
-    pub(super) const ALL: [Self; 16] = [
+    pub(super) const ALL: [Self; 17] = [
         Self::FileMaterialization,
         Self::StructuralAnalysis,
         Self::AuthoringConstruction,
@@ -119,6 +120,7 @@ impl Operation {
         Self::SharedEvidence,
         Self::EntryEvidence,
         Self::OutcomeFinalization,
+        Self::FileEntryCompleteWorkflow,
     ];
     pub(super) const fn phase(self) -> &'static str {
         match self {
@@ -138,6 +140,7 @@ impl Operation {
             Self::SharedEvidence | Self::EntryEvidence | Self::OutcomeFinalization => {
                 "profile_evidence_materialize"
             }
+            Self::FileEntryCompleteWorkflow => "profile_resolve_e2e",
         }
     }
     pub(super) const fn cost(self) -> &'static str {
@@ -158,6 +161,7 @@ impl Operation {
             Self::SharedEvidence => "shared_evidence",
             Self::EntryEvidence => "entry_evidence",
             Self::OutcomeFinalization => "outcome_finalization",
+            Self::FileEntryCompleteWorkflow => "file_entry_complete_workflow",
         }
     }
     pub(super) const fn boundary(self) -> &'static str {
@@ -178,6 +182,7 @@ impl Operation {
             Self::SharedEvidence => "shared-evidence-projection/0",
             Self::EntryEvidence => "entry-evidence-projection/0",
             Self::OutcomeFinalization => "outcome-finalization/0",
+            Self::FileEntryCompleteWorkflow => "file-entry-complete-workflow/0",
         }
     }
     /// The pair and boundary of the peak live memory measured over this
@@ -234,6 +239,7 @@ pub(super) enum Prepared {
     SharedEvidence(Box<evidence::PreparedEvidence>),
     EntryEvidence(Box<evidence::PreparedEvidence>),
     OutcomeFinalization(Box<evidence::outcome::PreparedOutcome>),
+    Workflow(Box<workflow::PreparedWorkflow>),
     Icu4xLocale {
         engine: locale_icu4x::PreparedEngine,
         input: Arc<str>,
@@ -257,6 +263,7 @@ pub(super) enum Output {
     SharedEvidence(evidence::Resolved),
     EntryEvidence(evidence::entry::Resolved),
     OutcomeFinalization(Box<evidence::outcome::Resolved>),
+    Workflow(Box<workflow::Resolved>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -297,6 +304,7 @@ impl Prepared {
             Self::SharedEvidence(_) => Operation::SharedEvidence,
             Self::EntryEvidence(_) => Operation::EntryEvidence,
             Self::OutcomeFinalization(_) => Operation::OutcomeFinalization,
+            Self::Workflow(_) => Operation::FileEntryCompleteWorkflow,
         }
     }
 
@@ -613,6 +621,13 @@ impl Prepared {
                     )),
                 })
             }
+            Self::Workflow(prepared) => {
+                let measured = prepared.interval(instrument)?;
+                Ok(Interval {
+                    quantity: measured.quantity,
+                    output: Output::Workflow(Box::new(measured.output)),
+                })
+            }
             Self::Icu4xLocale { engine, input } => {
                 // A fresh engine is admitted and bound before the start mark
                 // and released after the end mark.
@@ -688,6 +703,7 @@ impl Output {
             Self::SharedEvidence(resolved) => evidence::observe(resolved),
             Self::EntryEvidence(resolved) => evidence::entry::observe(resolved),
             Self::OutcomeFinalization(resolved) => evidence::outcome::observe(resolved),
+            Self::Workflow(resolved) => workflow::observe(resolved),
         }
     }
 }

@@ -128,6 +128,9 @@ pub(in crate::benchmark) fn prepare(
     ) {
         return prepare_evidence(declaration);
     }
+    if declaration.operation == Operation::FileEntryCompleteWorkflow {
+        return prepare_workflow(declaration);
+    }
     let source = declaration.fixture.source();
     let (mut input_limits, mut structural_limits) = fixture_capacity();
     if let Some((kind, edge)) = declaration.limit {
@@ -358,7 +361,8 @@ pub(in crate::benchmark) fn prepare(
             | Operation::ConstructionIdentity
             | Operation::SharedEvidence
             | Operation::EntryEvidence
-            | Operation::OutcomeFinalization => unreachable!(),
+            | Operation::OutcomeFinalization
+            | Operation::FileEntryCompleteWorkflow => unreachable!(),
         }
     };
     // Only dispatch is repeated here; both reference preparation and timed calls
@@ -387,10 +391,11 @@ pub(in crate::benchmark) fn prepare(
         | Prepared::ConstructionIdentity(_)
         | Prepared::SharedEvidence(_)
         | Prepared::EntryEvidence(_)
-        | Prepared::OutcomeFinalization(_) => {
+        | Prepared::OutcomeFinalization(_)
+        | Prepared::Workflow(_) => {
             unreachable!(
-                "Phases 7, 4, 9, 11, 12, and 13, construction, and the Evidence stages have their \
-                 own preparation"
+                "Phases 7, 4, 9, 11, 12, and 13, construction, the Evidence stages, and the \
+                 complete invocation have their own preparation"
             )
         }
     };
@@ -1447,6 +1452,55 @@ fn prepare_evidence(declaration: &Declaration) -> Result<Candidate, PreparationF
     Ok(Candidate {
         declaration: declaration.clone(),
         input_limits: Some(input),
+        prepared,
+        output,
+        observation,
+        logical_work,
+    })
+}
+
+/// One file entry's complete invocation of a recipe, on a resolver
+/// constructed here from the committed input and reused by every interval,
+/// with what a binding submits for it on that resolver, and the invocation
+/// run once (D15:2772, 2775). The outcome is checked or blocked as declared;
+/// a refused set or a resolver defect fails the preparation (D15:2826).
+fn prepare_workflow(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
+    use crate::benchmark::workflow::PreparedWorkflow;
+    use crate::construction::resolver::{build, committed};
+    use crate::construction::root::ConstructionRoot;
+
+    let Recipe::Workflow { input, .. } = declaration.fixture else {
+        return Err(PreparationFailure::UndeclaredCase);
+    };
+    let root = ConstructionRoot::built_in().map_err(|_| PreparationFailure::CoreInvariant)?;
+    let constructed =
+        build(root, committed().input().clone()).map_err(|_| PreparationFailure::CoreInvariant)?;
+    let raw = super::workflow_inputs::submission(input, &constructed, root)
+        .ok_or(PreparationFailure::CoreInvariant)?;
+    let prepared = PreparedWorkflow {
+        root,
+        constructed,
+        raw,
+    };
+    let resolved = prepared.resolve();
+    let kind = match &resolved.result {
+        Ok(retained) if retained.profile.is_some() => ExpectedKind::WorkflowChecked,
+        Ok(_) => ExpectedKind::WorkflowBlocked,
+        Err(_) => return Err(PreparationFailure::PrerequisiteUnavailable),
+    };
+    if declaration.expected_kind != kind {
+        return Err(PreparationFailure::UnexpectedOutputKind);
+    }
+    let output = Output::Workflow(Box::new(resolved));
+    let prepared = Prepared::Workflow(Box::new(prepared));
+    let observation = output
+        .observe()
+        .map_err(|_| PreparationFailure::Observation)?;
+    let logical_work =
+        LogicalWork::observe(&prepared, &output).map_err(|_| PreparationFailure::Observation)?;
+    Ok(Candidate {
+        declaration: declaration.clone(),
+        input_limits: None,
         prepared,
         output,
         observation,
