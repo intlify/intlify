@@ -31,7 +31,7 @@ fn observed(operation: Operation, recipe: ConstructionRecipe) -> Observation {
 #[test]
 fn construction_cases_keep_the_304_rows_and_append_after_them() {
     let cases = declarations();
-    assert_eq!(cases.len(), 443);
+    assert_eq!(cases.len(), 444);
     assert!(cases[..304].iter().all(|case| !matches!(
         case.operation,
         Operation::ConstructionAuthorityAdmission | Operation::ConstructionIdentity
@@ -227,7 +227,7 @@ fn bound_edges_keep_the_318_rows_and_append_after_them() {
             &[Operation::SharedEvidence; 20],
             &[Operation::EntryEvidence; 32],
             &[Operation::FileEntryCompleteWorkflow; 18],
-            &[Operation::ProgrammaticSnapshotAdmission; 12],
+            &[Operation::ProgrammaticSnapshotAdmission; 13],
         ]
         .concat()
     );

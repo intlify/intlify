@@ -1266,7 +1266,8 @@
         "negative-zero",
         "unsupported-type",
         "cycle",
-        "many-markers"
+        "many-markers",
+        "trailing-string"
       ],
       "type": "string"
     },

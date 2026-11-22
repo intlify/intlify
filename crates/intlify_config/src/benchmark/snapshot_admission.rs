@@ -172,7 +172,7 @@ pub(in crate::benchmark) mod tests {
     /// case, and its own Entry domain.
     #[test]
     fn a_snapshot_frames_the_shared_domain_its_files_case_pins() {
-        for recipe in R::ALL.into_iter().filter(|recipe| recipe.materializes()) {
+        for recipe in R::ALL.into_iter().filter(|recipe| recipe.copies()) {
             let observation = serde_json::to_value(observed(recipe)).unwrap();
             let file = expected(Operation::FileMaterialization, recipe.file());
             assert_eq!(observation["shared"], file["shared"], "{recipe:?}");
