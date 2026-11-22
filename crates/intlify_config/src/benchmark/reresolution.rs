@@ -234,10 +234,14 @@ mod tests {
 
     use super::*;
     use crate::artifacts::envelope::FormalMember;
+    use crate::benchmark::cases::prepare::{prepare, Candidate};
     use crate::benchmark::cases::workflow_inputs::{
-        programmatic, submission, ProgrammaticRecipe as P,
+        programmatic, replayed, submission, ProgrammaticRecipe as P,
     };
-    use crate::benchmark::cases::EvidenceRecipe as R;
+    use crate::benchmark::cases::{
+        declarations, EntryKind, EvidenceRecipe as R, Recipe, ReplayRecipe,
+    };
+    use crate::benchmark::operation::{Output as CaseOutput, Prepared};
     use crate::benchmark::quantity::Quantity;
     use crate::benchmark::workflow::RawEntry;
     use crate::construction::resolver::{build, committed};
@@ -313,6 +317,76 @@ mod tests {
             let replay = PreparedReplay::new(root(), constructed, raw).unwrap();
             let paired = observe(&file(recipe).resolve());
             assert_eq!(observe(&replay.resolve()), paired, "{recipe:?}");
+        }
+    }
+
+    /// `recipe`'s declared case, as preparation makes it.
+    fn declared(recipe: ReplayRecipe) -> Candidate {
+        let declaration = declarations()
+            .into_iter()
+            .find(|case| case.fixture == Recipe::Replay(recipe));
+        prepare(&declaration.unwrap()).unwrap()
+    }
+
+    fn held(candidate: &Candidate) -> &PreparedReplay {
+        let Prepared::Replay(prepared) = &candidate.prepared else {
+            unreachable!()
+        };
+        prepared
+    }
+
+    /// D15:2659, D26:1815; plan 025 decision #316: each declared replay
+    /// frames what the invocation whose set it replays predicts of it: that
+    /// outcome's Shared projection, and the profile view and bindings of the
+    /// checked invocation of the example, the outcome's own but when an
+    /// Entry-domain bound withheld them. That invocation is blocked, yet its
+    /// replay has them, and frames what the example's does.
+    #[test]
+    fn each_declared_replay_frames_what_the_invocation_of_its_set_predicts() {
+        let checked = declared(ReplayRecipe::Storefront);
+        let example = held(&checked);
+        let resolver = Resolver::new(&example.constructed, example.root);
+        let (outcome, _) = materialized(&resolver, &example.raw).unwrap();
+        let profile = outcome.profile;
+        assert!(profile.is_some());
+        for recipe in ReplayRecipe::ALL {
+            let candidate = declared(recipe);
+            let prepared = held(&candidate);
+            let resolver = Resolver::new(&prepared.constructed, prepared.root);
+            let (outcome, set) = materialized(&resolver, &prepared.raw).unwrap();
+            assert!(set.is_some_and(|set| set == prepared.set), "{recipe:?}");
+            let source = candidate.declaration.fixture.source();
+            assert_eq!(source, *prepared.raw.file(), "{recipe:?}");
+            let storefront = recipe == ReplayRecipe::Storefront;
+            assert_eq!(outcome.profile.is_some(), storefront, "{recipe:?}");
+            let shared = outcome.shared.unwrap();
+            assert!(shared.terminal.is_none(), "{recipe:?}");
+            let withheld = recipe == ReplayRecipe::EntryWithheld;
+            let predicted = if withheld { &profile } else { &outcome.profile };
+            let CaseOutput::Replay(resolved) = &candidate.output else {
+                unreachable!()
+            };
+            let framed = frame(specification(resolved), &shared, predicted.as_ref());
+            assert_eq!(framed, Ok(candidate.observation.shared), "{recipe:?}");
+            assert_eq!(candidate.observation.entry, None);
+            let same = candidate.observation == checked.observation;
+            assert_eq!(same, recipe.profiled(), "{recipe:?}");
+        }
+    }
+
+    /// D15:2659, 2788: the set of a programmatic entry's invocation of each
+    /// declared recipe, the withheld one's included, replays as the file's
+    /// set does.
+    #[test]
+    fn each_declared_recipe_replays_alike_through_either_entry() {
+        for recipe in ReplayRecipe::ALL {
+            let file = declared(recipe);
+            let built = constructed();
+            let raw = replayed(recipe, EntryKind::Programmatic, &built, root()).unwrap();
+            assert!(matches!(raw.entry, RawEntry::Programmatic { .. }));
+            let replay = PreparedReplay::new(root(), built, raw).unwrap();
+            let observed = observe(&replay.resolve());
+            assert_eq!(observed, Ok(file.observation), "{recipe:?}");
         }
     }
 

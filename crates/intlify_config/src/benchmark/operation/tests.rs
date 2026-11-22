@@ -37,7 +37,7 @@ fn analysis(value: &Value) -> Analysis {
         .unwrap()
 }
 
-pub(crate) fn operations() -> [Prepared; 19] {
+pub(crate) fn operations() -> [Prepared; 20] {
     let source: Arc<[u8]> = Arc::from(serde_json::to_vec(&minimal_config()).unwrap());
     let doc = Arc::new(
         materialize_file(Arc::clone(&source), crate::materialize_tests::limits()).unwrap(),
@@ -82,7 +82,23 @@ pub(crate) fn operations() -> [Prepared; 19] {
         workflow_operation(),
         snapshot_operation(),
         programmatic_operation(),
+        replay_operation(),
     ]
+}
+
+/// The replay of the set of one file entry's invocation of 015's example, as
+/// its case prepares it.
+fn replay_operation() -> Prepared {
+    use crate::benchmark::cases::{declarations, Recipe, ReplayRecipe};
+
+    let recipe = Recipe::Replay(ReplayRecipe::Storefront);
+    let declaration = declarations()
+        .into_iter()
+        .find(|case| case.fixture == recipe)
+        .unwrap();
+    crate::benchmark::cases::prepare::prepare(&declaration)
+        .unwrap()
+        .prepared
 }
 
 /// One programmatic entry's complete invocation of 015's example, as its
@@ -379,6 +395,10 @@ fn every_active_pair_calls_its_real_core_operation_between_exact_markers() {
                 let doc = admitted.document.as_ref().unwrap();
                 let value: Value = doc.decode(doc.root()).unwrap();
                 assert_eq!(value, minimal_config());
+            }
+            Output::Replay(resolved) => {
+                let retained = resolved.result.as_ref().unwrap();
+                assert!(retained.profile.is_some() && retained.shared.terminal.is_none());
             }
             _ => panic!("unexpected owner operation result"),
         }

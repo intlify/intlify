@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Finite owner case declarations for the nineteen active boundaries.
+//! Finite owner case declarations for the twenty active boundaries.
 //! This is not a common Run Plan, case-identity codec, or a complete 015 suite.
 //! Preparation yields an unadmitted candidate; the separate fixture registry
 //! binds its exact input/result/work before method-bound collection can use it.
@@ -37,7 +37,7 @@ pub(super) mod registry;
 pub(super) mod snapshot_inputs;
 pub(super) use snapshot_inputs::SnapshotRecipe;
 pub(super) mod workflow_inputs;
-pub(super) use workflow_inputs::ProgrammaticRecipe;
+pub(super) use workflow_inputs::{ProgrammaticRecipe, ReplayRecipe};
 
 // The fixed inventory uses the formal 015/017 configuration references. Until
 // Intlify is released, a changed recipe rewrites its expectations in place at
@@ -206,6 +206,8 @@ pub(super) enum ExpectedKind {
     SnapshotMaterialized,
     SnapshotMarked,
     SnapshotLimitExceeded,
+    ReplayProfiled,
+    ReplaySharedOnly,
 }
 
 #[derive(
@@ -455,7 +457,8 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 | Operation::OutcomeFinalization
                 | Operation::FileEntryCompleteWorkflow
                 | Operation::ProgrammaticEntryCompleteWorkflow
-                | Operation::ProgrammaticSnapshotAdmission => unreachable!(),
+                | Operation::ProgrammaticSnapshotAdmission
+                | Operation::MaterializedReresolution => unreachable!(),
             };
             let selector = if operation == Operation::ProfileSelection {
                 Selector::App
@@ -1138,6 +1141,22 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 },
             ));
         }
+    }
+    // Then, without changing any of those 487 rows, the replay of the
+    // Materialized Resolution Input Set of one file entry's invocation of
+    // each replay recipe, on the resolver that invocation ran on (D15:2659,
+    // 2772, 2789; plan 025 decisions #34 and #316).
+    for recipe in ReplayRecipe::ALL {
+        cases.push(declaration(
+            Operation::MaterializedReresolution,
+            Recipe::Replay(recipe),
+            Selector::App,
+            if recipe.profiled() {
+                ExpectedKind::ReplayProfiled
+            } else {
+                ExpectedKind::ReplaySharedOnly
+            },
+        ));
     }
     cases
 }

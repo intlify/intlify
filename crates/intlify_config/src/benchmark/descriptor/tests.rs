@@ -62,14 +62,15 @@ fn all_active_pairs_keep_distinct_owner_boundaries_and_exact_method_meaning() {
         assert_eq!(method.numeric_decision_eligibility, "qualified-runner");
         assert!(!method.estimated_overhead_subtraction);
     }
-    assert_eq!(pairs.len(), 19);
-    assert_eq!(identities.len(), 19);
+    assert_eq!(pairs.len(), 20);
+    assert_eq!(identities.len(), 20);
 }
 
 /// D15:2765, 2777, 2824; plan 025 decision #316: only an end-to-end
 /// boundary names children, the component boundary of each phase its
 /// invocation runs, Phase 1's its entry's, and no boundary names a parent,
-/// so each component keeps its boundary.
+/// so each component keeps its boundary. A replay's names those from
+/// structural analysis through the Shared projection stage (D15:2659, 2775).
 #[test]
 fn an_end_to_end_boundary_names_the_component_boundaries_it_includes() {
     // No invocation builds an authoring model or constructs a resolver, and
@@ -93,6 +94,16 @@ fn an_end_to_end_boundary_names_the_component_boundaries_it_includes() {
             Operation::FileEntryCompleteWorkflow => Operation::FileMaterialization,
             Operation::ProgrammaticEntryCompleteWorkflow => {
                 Operation::ProgrammaticSnapshotAdmission
+            }
+            Operation::MaterializedReresolution => {
+                let stages = [Operation::EntryEvidence, Operation::OutcomeFinalization];
+                let replayed = stages.map(|stage| stage.boundary().to_owned());
+                let (included, after) = rest.split_at(rest.len() - 2);
+                assert_eq!(
+                    (&boundary.direct_children[..], after),
+                    (included, &replayed[..])
+                );
+                continue;
             }
             _ => {
                 assert!(boundary.direct_children.is_empty(), "{operation:?}");

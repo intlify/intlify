@@ -2,6 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 use crate::benchmark::evidence::outcome::RetainedProjection;
+use crate::benchmark::reresolution::{self, PreparedReplay, ReplayCounts};
 use crate::benchmark::workflow::{require_observable, EntryCounts, Resolved};
 
 use super::{LogicalWork, UnavailableWork, WorkFailure, WorkKind, WorkStage, WorkValue};
@@ -81,6 +82,52 @@ impl LogicalWork {
             self.set(kind, stage, WorkValue::exact(value));
         }
         self.values_or(admitted.value, input, reason);
+        Ok(())
+    }
+
+    /// The workload of one replay in the units of the bounds that count it
+    /// (D15:2796): what [`ReplayCounts`] counts, the set's value and members
+    /// as the prepared input, admitted when the set was created, and the
+    /// result's Shared records with their bytes and its bindings as the
+    /// operation's result.
+    pub(super) fn replay(
+        &mut self,
+        prepared: &PreparedReplay,
+        resolved: &reresolution::Resolved,
+    ) -> Result<(), WorkFailure> {
+        let retained = resolved
+            .result
+            .as_ref()
+            .map_err(|_| WorkFailure::InvalidOrdinaryResult)?;
+        let counts =
+            ReplayCounts::of(&prepared.set, retained).ok_or(WorkFailure::UnrepresentableCounter)?;
+        let (input, output) = (WorkStage::PreparedInput, WorkStage::OperationResult);
+        for (kind, stage, value) in [
+            (WorkKind::ReplayRetainedMembers, input, counts.members),
+            (
+                WorkKind::ReplayRetainedCanonicalBytes,
+                input,
+                counts.member_bytes,
+            ),
+            (
+                WorkKind::WorkflowSharedRecords,
+                output,
+                counts.shared_records,
+            ),
+            (
+                WorkKind::WorkflowSharedCanonicalBytes,
+                output,
+                counts.shared_bytes,
+            ),
+            (WorkKind::ReplayBindings, output, counts.bindings),
+        ] {
+            self.set(kind, stage, WorkValue::exact(value));
+        }
+        self.values_or(
+            Some(counts.value),
+            input,
+            UnavailableWork::SnapshotHoldsMarkers,
+        );
         Ok(())
     }
 }
@@ -200,6 +247,84 @@ mod tests {
                     assert_eq!(fact.observation, paired.observation, "{recipe:?} {kind:?}");
                 }
             }
+        }
+    }
+
+    /// D15:1889, 2796: a replay counts its set's value as the file entry's
+    /// invocation of that value counts it, the members that invocation
+    /// admitted, and its result's Shared records and the bindings beside its
+    /// profile, none without one. A failed replay has no work, and a count
+    /// past the counter's range is a failure rather than a wrapped value.
+    #[test]
+    fn a_replay_counts_its_set_and_its_result() {
+        use crate::benchmark::cases::prepare::prepare;
+        use crate::benchmark::cases::{declarations, Recipe, ReplayRecipe};
+        use crate::benchmark::reresolution::ReplayFailure;
+        use crate::resolver::replay::ConstructionStale;
+
+        for recipe in ReplayRecipe::ALL {
+            let fixture = Recipe::Replay(recipe);
+            let declaration = declarations()
+                .into_iter()
+                .find(|case| case.fixture == fixture);
+            let replay = prepare(&declaration.unwrap()).unwrap();
+            let Output::Replay(resolved) = &replay.output else {
+                unreachable!()
+            };
+            let retained = resolved.result.as_ref().unwrap();
+            let work = &replay.logical_work;
+            let kinds: Vec<_> = work.facts.iter().map(|fact| fact.kind).collect();
+            assert_eq!(kinds, WorkKind::REPLAY);
+            let file = candidate(if recipe.profiled() {
+                R::Storefront
+            } else {
+                R::Blocked
+            });
+            let file = &file.logical_work;
+            for (kind, paired) in [
+                (
+                    WorkKind::ReplayRetainedMembers,
+                    WorkKind::WorkflowSubmittedMembers,
+                ),
+                (
+                    WorkKind::ReplayRetainedCanonicalBytes,
+                    WorkKind::WorkflowSubmittedCanonicalBytes,
+                ),
+            ]
+            .into_iter()
+            .chain(WorkKind::REPLAY[..5].iter().map(|&kind| (kind, kind)))
+            {
+                assert_eq!(work.exact(kind), file.exact(paired), "{recipe:?} {kind:?}");
+            }
+            let records = retained.shared.records.len();
+            let exact = |kind| {
+                work.exact(kind)
+                    .and_then(|value| usize::try_from(value).ok())
+            };
+            assert_eq!(exact(WorkKind::WorkflowSharedRecords), Some(records));
+            let bindings = retained
+                .profile
+                .as_ref()
+                .map_or(0, |(_, bindings)| bindings.len());
+            assert_eq!(exact(WorkKind::ReplayBindings), Some(bindings));
+            assert_eq!(bindings > 0, recipe.profiled());
+            let failed = |result| {
+                Output::Replay(Box::new(reresolution::Resolved {
+                    result,
+                    specification: resolved.specification.clone(),
+                }))
+            };
+            let stale = failed(Err(ReplayFailure::Stale(ConstructionStale)));
+            assert!(matches!(
+                LogicalWork::observe(&replay.prepared, &stale),
+                Err(WorkFailure::InvalidOrdinaryResult)
+            ));
+            let mut over = retained.clone();
+            over.shared.records[0].1.bytes = u64::MAX;
+            assert!(matches!(
+                LogicalWork::observe(&replay.prepared, &failed(Ok(over))),
+                Err(WorkFailure::UnrepresentableCounter)
+            ));
         }
     }
 }

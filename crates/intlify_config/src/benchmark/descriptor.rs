@@ -736,8 +736,10 @@ fn outcome_finalization(prepared: &Prepared) -> Option<super::evidence::InputFac
 /// overlap: the one of each phase an invocation runs, from Phase 1's
 /// materialization of its entry, a file's or a Snapshot's, through outcome
 /// finalization. Construction and its identity precede every invocation,
-/// and none builds an authoring model (D15:2765, 2775, 2777, 2824; plan 025
-/// decision #316).
+/// and none builds an authoring model. A replay's interval includes those
+/// from structural analysis through the Shared projection stage: it admits
+/// no entry, and builds neither the Entry projection nor an outcome
+/// (D15:2659, 2765, 2775, 2777, 2824; plan 025 decision #316).
 fn children(operation: Operation) -> Vec<String> {
     const INVOKED: [Operation; 12] = [
         Operation::StructuralAnalysis,
@@ -756,6 +758,12 @@ fn children(operation: Operation) -> Vec<String> {
     let entry = match operation {
         Operation::FileEntryCompleteWorkflow => Operation::FileMaterialization,
         Operation::ProgrammaticEntryCompleteWorkflow => Operation::ProgrammaticSnapshotAdmission,
+        Operation::MaterializedReresolution => {
+            let replayed = INVOKED
+                .iter()
+                .take_while(|&&child| child != Operation::EntryEvidence);
+            return replayed.map(|child| child.boundary().into()).collect();
+        }
         _ => return Vec::new(),
     };
     let invoked = std::iter::once(entry).chain(INVOKED);

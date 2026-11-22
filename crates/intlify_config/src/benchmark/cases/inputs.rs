@@ -69,6 +69,7 @@ pub(in crate::benchmark) enum Recipe {
         resolver: super::ResolverState,
     },
     ProgrammaticEvidence(super::ProgrammaticRecipe),
+    Replay(super::ReplayRecipe),
 }
 
 impl Recipe {
@@ -175,6 +176,16 @@ impl Recipe {
                 serde_json::to_vec(&recipe.fixture().config)
                     .expect("finite owner hydration fixture"),
             );
+        }
+        if let Self::Replay(recipe) = self {
+            // The file whose invocation's set the replay replays; the input
+            // context binds that invocation's other inputs.
+            let file = if recipe.profiled() {
+                super::EvidenceRecipe::Storefront
+            } else {
+                super::EvidenceRecipe::Blocked
+            };
+            return Arc::from(file.source(&file.limits()));
         }
         if let Self::Evidence(recipe) | Self::Workflow { input: recipe, .. } = self {
             // The configuration file the invocation reads; the input context

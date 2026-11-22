@@ -22,7 +22,9 @@
 //! A programmatic entry submits, in place of the file, the formal Snapshot
 //! of the value the file's bytes spell, so a programmatic case pairs with
 //! the file case of its recipe (D15:2788), or, for the recipe no file has,
-//! that value of the example holding an ordinary marker.
+//! that value of the example holding an ordinary marker. A replay case
+//! submits one entry's invocation once in preparation, and replays the
+//! Materialized Resolution Input Set beside its outcome.
 
 use std::sync::Arc;
 
@@ -30,16 +32,18 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::artifacts::verification::{sealed, unsealed, VerificationInputArtifact};
-use crate::benchmark::workflow::{Before, RawEntry, RawInvocation};
+use crate::benchmark::workflow::{materialized, Before, RawEntry, RawInvocation};
 use crate::benchmark::{evidence, locale_icu4x};
 use crate::boundary::capability::ImplementationCapability;
 use crate::boundary::snapshot::{read_report, AdmittedSnapshot, SnapshotReport};
 use crate::boundary::source::file_source_revision;
 use crate::boundary::verification::VerificationAssertion;
+use crate::construction::registry::check::RecordKind;
 use crate::construction::resolver::ConstructedResolver;
 use crate::construction::root::ConstructionRoot;
 use crate::locale::VersionedIdentity;
 use crate::resolver::capability::{BootstrapGroup, BOOTSTRAP_ONLY};
+use crate::resolver::invocation::Resolver;
 use crate::resolver::limits::ResolutionLimits;
 use crate::resolver::specification::SupportedSpecifications;
 
@@ -105,6 +109,69 @@ impl ProgrammaticRecipe {
             _ => None,
         }
     }
+}
+
+/// A replay's recipes (plan 025 decisions #34 and #316): the set of the
+/// example, whose replay has the profile; the Blocked recipe's, semantically
+/// blocked after materialization, whose replay has the Shared projection
+/// alone; and the example's under a capability whose `maxTokenInputs` the
+/// Entry scope's token inputs exceed and the Shared scope's are within,
+/// which withholds the invocation's profile but not the replay's (D15:2659).
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub(in crate::benchmark) enum ReplayRecipe {
+    Storefront,
+    Blocked,
+    EntryWithheld,
+}
+
+impl ReplayRecipe {
+    pub(in crate::benchmark) const ALL: [Self; 3] =
+        [Self::Storefront, Self::Blocked, Self::EntryWithheld];
+
+    /// Whether the replay has the profile: every recipe's but the Blocked
+    /// one's.
+    pub(in crate::benchmark) fn profiled(self) -> bool {
+        self != Self::Blocked
+    }
+}
+
+/// What a binding submits through `entry` on `constructed` for the
+/// invocation whose set `recipe`'s replay replays: the example's or the
+/// Blocked recipe's submission, and for the withheld one the example's with
+/// `bootstrapOnly.evidenceMetadata.maxTokenInputs` at the Shared evaluation
+/// statuses its checked invocation commits, one token input each (D15:2659).
+/// `None` when a fixture does not encode, or that invocation fails.
+pub(in crate::benchmark) fn replayed(
+    recipe: ReplayRecipe,
+    entry: EntryKind,
+    constructed: &ConstructedResolver,
+    root: &ConstructionRoot,
+) -> Option<RawInvocation> {
+    let blocked = recipe == ReplayRecipe::Blocked;
+    let mut raw = match entry {
+        EntryKind::File if blocked => submission(EvidenceRecipe::Blocked, constructed, root),
+        EntryKind::File => submission(EvidenceRecipe::Storefront, constructed, root),
+        EntryKind::Programmatic if blocked => {
+            programmatic(ProgrammaticRecipe::Blocked, constructed, root)
+        }
+        EntryKind::Programmatic => programmatic(ProgrammaticRecipe::Storefront, constructed, root),
+    }?;
+    if recipe == ReplayRecipe::EntryWithheld {
+        let (checked, _) = materialized(&Resolver::new(constructed, root), &raw)?;
+        let records = checked.shared?.records;
+        let status = RecordKind::SharedEvaluationStatus;
+        let statuses = records
+            .iter()
+            .filter(|(_, record)| record.kind == status)
+            .count();
+        let metadata = BootstrapGroup::EvidenceMetadata.path();
+        let bound = &mut raw.capability[BOOTSTRAP_ONLY][metadata]["maxTokenInputs"];
+        *bound = Value::from(statuses.to_string());
+    }
+    Some(raw)
 }
 
 /// The `bootstrapOnly` groups the invocation reads that the owner's capability

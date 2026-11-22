@@ -133,7 +133,7 @@ fn each_case_projection_carries_the_execution_state_its_prepared_case_runs_in() 
 fn issuance_freezes_unique_case_inventory_but_fresh_instances_do_not_change_case_identity() {
     let first = issue();
     let second = issue();
-    assert_eq!(first.document().body.case_inventory.len(), 487);
+    assert_eq!(first.document().body.case_inventory.len(), 490);
     assert_eq!(
         first.document().body.case_inventory,
         second.document().body.case_inventory
@@ -204,7 +204,7 @@ fn native_capture_uses_the_plan_already_issued_before_collection_and_retains_it_
         value["result"]["plan"]["commonRunPlan"],
         serde_json::to_value(identity).unwrap()
     );
-    assert_eq!(value["result"]["attempts"].as_array().unwrap().len(), 487);
+    assert_eq!(value["result"]["attempts"].as_array().unwrap().len(), 490);
 }
 
 #[test]
@@ -392,8 +392,10 @@ fn every_projection_declares_the_common_dimensions_it_serializes() {
         );
         // Only a complete invocation's case, which runs on a resolver in a
         // declared state, names that state, as its recipe does (plan 025
-        // decision #33).
-        let e2e = projection.owner_phase == "profile_resolve_e2e";
+        // decision #33); a replay's resolver is no variant of its own
+        // (D15:2789).
+        let replay = projection.owner_cost == "materialized_reresolution";
+        let e2e = projection.owner_phase == "profile_resolve_e2e" && !replay;
         let resolver = value["variant"].get("resolver");
         assert_eq!(resolver.is_some(), e2e);
         if let Some(resolver) = resolver {

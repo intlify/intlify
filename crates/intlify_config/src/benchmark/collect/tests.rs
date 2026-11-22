@@ -154,6 +154,9 @@ fn fixture_observation(prepared: &Prepared) -> (Observation, LogicalWork) {
                 .as_ref()
                 .is_ok_and(|admitted| admitted.document.is_some()));
         }
+        Output::Replay(resolved) => {
+            assert!(resolved.result.as_ref().unwrap().profile.is_some());
+        }
         _ => panic!("fixture preparation did not produce its known result"),
     }
     (
