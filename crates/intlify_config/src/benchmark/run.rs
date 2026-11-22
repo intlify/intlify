@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! One-shot owner-run assembly around the nineteen ordinary operations, the
+//! One-shot owner-run assembly around the twenty ordinary operations, the
 //! components and one complete invocation, timed by a duration run or observed
 //! by a memory run.
 //!

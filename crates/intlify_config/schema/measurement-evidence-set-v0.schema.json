@@ -4016,7 +4016,8 @@
         "outcome-finalization",
         "file-entry-complete-workflow",
         "programmatic-snapshot-admission",
-        "programmatic-entry-complete-workflow"
+        "programmatic-entry-complete-workflow",
+        "materialized-reresolution"
       ],
       "type": "string"
     },
@@ -4436,6 +4437,16 @@
           },
           "required": ["programmatic-evidence"],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "replay": {
+              "$ref": "#/definitions/ReplayRecipe"
+            }
+          },
+          "required": ["replay"],
+          "type": "object"
         }
       ]
     },
@@ -4485,6 +4496,11 @@
           "type": "object"
         }
       ]
+    },
+    "ReplayRecipe": {
+      "description": "A replay's recipes (plan 025 decisions #34 and #316): the set of the\nexample, whose replay has the profile; the Blocked recipe's, semantically\nblocked after materialization, whose replay has the Shared projection\nalone; and the example's under a capability whose `maxTokenInputs` the\nEntry scope's token inputs exceed and the Shared scope's are within,\nwhich withholds the invocation's profile but not the replay's (D15:2659).",
+      "enum": ["storefront", "blocked", "entry-withheld"],
+      "type": "string"
     },
     "ReportedIdentifier": {
       "additionalProperties": false,
@@ -5288,7 +5304,10 @@
         "snapshot-rejected-markers",
         "snapshot-envelope-canonical-bytes",
         "snapshot-maximum-marker-canonical-bytes",
-        "snapshot-traversal-units"
+        "snapshot-traversal-units",
+        "replay-retained-members",
+        "replay-retained-canonical-bytes",
+        "replay-bindings"
       ],
       "type": "string"
     },

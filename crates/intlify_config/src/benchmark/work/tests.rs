@@ -184,6 +184,18 @@ fn every_active_operation_retains_the_complete_ordered_vocabulary_and_its_stages
                 .facts
                 .iter()
                 .all(|item| item.stage == WorkStage::OperationResult));
+        } else if prepared.operation() == Operation::MaterializedReresolution {
+            // The set's value and members, then the result's Shared records
+            // with their bytes and its bindings.
+            assert_eq!(work.facts.len(), 10);
+            for (index, item) in work.facts.iter().enumerate() {
+                let expected = if index < 7 {
+                    WorkStage::PreparedInput
+                } else {
+                    WorkStage::OperationResult
+                };
+                assert_eq!(item.stage, expected, "{:?}", item.kind);
+            }
         } else if prepared.operation() == Operation::ProgrammaticSnapshotAdmission {
             // The admitted tree's nine counts and its document's five.
             assert_eq!(work.facts.len(), 14);

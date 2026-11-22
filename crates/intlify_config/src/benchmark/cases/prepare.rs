@@ -137,6 +137,9 @@ pub(in crate::benchmark) fn prepare(
     if declaration.operation == Operation::ProgrammaticSnapshotAdmission {
         return prepare_snapshot(declaration);
     }
+    if declaration.operation == Operation::MaterializedReresolution {
+        return prepare_replay(declaration);
+    }
     let source = declaration.fixture.source();
     let (mut input_limits, mut structural_limits) = fixture_capacity();
     if let Some((kind, edge)) = declaration.limit {
@@ -386,7 +389,8 @@ pub(in crate::benchmark) fn prepare(
             | Operation::OutcomeFinalization
             | Operation::FileEntryCompleteWorkflow
             | Operation::ProgrammaticEntryCompleteWorkflow
-            | Operation::ProgrammaticSnapshotAdmission => unreachable!(),
+            | Operation::ProgrammaticSnapshotAdmission
+            | Operation::MaterializedReresolution => unreachable!(),
         }
     };
     // Only dispatch is repeated here; both reference preparation and timed calls
@@ -417,10 +421,11 @@ pub(in crate::benchmark) fn prepare(
         | Prepared::EntryEvidence(_)
         | Prepared::OutcomeFinalization(_)
         | Prepared::Workflow(_)
-        | Prepared::Snapshot(_) => {
+        | Prepared::Snapshot(_)
+        | Prepared::Replay(_) => {
             unreachable!(
                 "Phases 7, 4, 9, 11, 12, and 13, construction, the Evidence stages, the complete \
-                 invocation, and the Snapshot admission have their own preparation"
+                 invocation, the Snapshot admission, and the replay have their own preparation"
             )
         }
     };
@@ -1522,6 +1527,53 @@ fn prepare_workflow(declaration: &Declaration) -> Result<Candidate, PreparationF
     }
     let output = Output::Workflow(Box::new(resolved));
     let prepared = Prepared::Workflow(Box::new(prepared));
+    let observation = output
+        .observe()
+        .map_err(|_| PreparationFailure::Observation)?;
+    let logical_work =
+        LogicalWork::observe(&prepared, &output).map_err(|_| PreparationFailure::Observation)?;
+    Ok(Candidate {
+        declaration: declaration.clone(),
+        input_limits: None,
+        prepared,
+        output,
+        observation,
+        logical_work,
+    })
+}
+
+/// A replay case: the resolver built once from the committed input, which
+/// invokes the recipe's file entry submission once, and the Materialized
+/// Resolution Input Set beside that outcome, replayed once as declared, with
+/// the profile or with the Shared projection alone; a stale set or a
+/// resolver defect fails the preparation (D15:2659, 2824, 2826).
+fn prepare_replay(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
+    use crate::benchmark::reresolution::PreparedReplay;
+    use crate::construction::resolver::{build, committed};
+    use crate::construction::root::ConstructionRoot;
+
+    let Recipe::Replay(recipe) = declaration.fixture else {
+        return Err(PreparationFailure::UndeclaredCase);
+    };
+    let root = ConstructionRoot::built_in().map_err(|_| PreparationFailure::CoreInvariant)?;
+    let constructed =
+        build(root, committed().input().clone()).map_err(|_| PreparationFailure::CoreInvariant)?;
+    let entry = super::EntryKind::File;
+    let raw = super::workflow_inputs::replayed(recipe, entry, &constructed, root)
+        .ok_or(PreparationFailure::CoreInvariant)?;
+    let prepared = PreparedReplay::new(root, constructed, raw)
+        .ok_or(PreparationFailure::PrerequisiteUnavailable)?;
+    let resolved = prepared.resolve();
+    let kind = match &resolved.result {
+        Ok(retained) if retained.profile.is_some() => ExpectedKind::ReplayProfiled,
+        Ok(_) => ExpectedKind::ReplaySharedOnly,
+        Err(_) => return Err(PreparationFailure::PrerequisiteUnavailable),
+    };
+    if declaration.expected_kind != kind {
+        return Err(PreparationFailure::UnexpectedOutputKind);
+    }
+    let output = Output::Replay(Box::new(resolved));
+    let prepared = Prepared::Replay(Box::new(prepared));
     let observation = output
         .observe()
         .map_err(|_| PreparationFailure::Observation)?;

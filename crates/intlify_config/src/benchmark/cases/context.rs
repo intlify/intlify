@@ -37,6 +37,7 @@ pub(in crate::benchmark) enum ContextFailure {
     ConstructionInputMismatch,
     EvidenceInputMismatch,
     WorkflowInputMismatch,
+    ReplayInputMismatch,
     SnapshotInputMismatch,
 }
 
@@ -56,7 +57,8 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
             | Prepared::ArtifactCollection(_)
             | Prepared::Construction(_)
             | Prepared::ConstructionIdentity(_)
-            | Prepared::Workflow(_),
+            | Prepared::Workflow(_)
+            | Prepared::Replay(_),
             None,
         ) => {
             frame.text("no-file-preparation");
@@ -67,7 +69,8 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
             | Prepared::ArtifactCollection(_)
             | Prepared::Construction(_)
             | Prepared::ConstructionIdentity(_)
-            | Prepared::Workflow(_),
+            | Prepared::Workflow(_)
+            | Prepared::Replay(_),
             Some(_),
         )
         | (_, None) => return Err(ContextFailure::PreparationLimitsMismatch),
@@ -401,8 +404,38 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
         Prepared::Snapshot(prepared) => {
             snapshot_input(&mut frame, &prepared.report, prepared.limits)?;
         }
+        Prepared::Replay(prepared) => replay_input(&mut frame, candidate, prepared)?,
     }
     Ok(frame.finish())
+}
+
+/// The replay of the Materialized Resolution Input Set of one file entry's
+/// invocation on the resolver its preparation constructed from the committed
+/// input: every raw value of that invocation's submission, as the recipe
+/// rebuilds it on that resolver, which binds the set, the one that
+/// invocation materializes there (D15:2657, 2659).
+fn replay_input(
+    frame: &mut Frame,
+    candidate: &Candidate,
+    prepared: &crate::benchmark::reresolution::PreparedReplay,
+) -> Result<(), ContextFailure> {
+    use crate::benchmark::workflow::materialized;
+    use crate::resolver::invocation::Resolver;
+
+    let Recipe::Replay(recipe) = candidate.declaration.fixture else {
+        return Err(ContextFailure::ReplayInputMismatch);
+    };
+    let (constructed, root) = (&prepared.constructed, prepared.root);
+    let entry = super::EntryKind::File;
+    let rebuilt = super::workflow_inputs::replayed(recipe, entry, constructed, root);
+    let set = || materialized(&Resolver::new(constructed, root), &prepared.raw)?.1;
+    if candidate.declaration.selector != super::Selector::App
+        || rebuilt.as_ref() != Some(&prepared.raw)
+        || set().as_ref() != Some(&prepared.set)
+    {
+        return Err(ContextFailure::ReplayInputMismatch);
+    }
+    submitted_input(frame, &prepared.raw)
 }
 
 /// A Snapshot's admission: the formal Snapshot as submitted, its supplied
@@ -961,6 +994,62 @@ mod tests {
             resolver: state,
         };
         assert_eq!(observe(&candidate), refused);
+    }
+
+    /// D15:2657, 2659: a replay's context binds the submission whose
+    /// invocation's set it replays, and that set: another recipe's
+    /// submission or set in its place, a file spaced otherwise, whose set is
+    /// the same, a declaration of another selector or recipe, and file
+    /// preparation limits it has none of are refused.
+    #[test]
+    fn a_replay_context_binds_its_submission_and_its_set() {
+        use crate::benchmark::cases::prepare::prepare;
+        use crate::benchmark::cases::{declarations, ReplayRecipe};
+        use crate::benchmark::reresolution::PreparedReplay;
+
+        fn replay(candidate: &mut Candidate) -> &mut PreparedReplay {
+            let Prepared::Replay(prepared) = &mut candidate.prepared else {
+                unreachable!()
+            };
+            prepared
+        }
+        let find = |recipe| {
+            let fixture = Recipe::Replay(recipe);
+            let declaration = declarations()
+                .into_iter()
+                .find(|case| case.fixture == fixture);
+            prepare(&declaration.unwrap()).unwrap()
+        };
+        let mut candidate = find(ReplayRecipe::Storefront);
+        let mut other = find(ReplayRecipe::EntryWithheld);
+        let context = observe(&candidate);
+        let refused = Err(ContextFailure::ReplayInputMismatch);
+        std::mem::swap(&mut replay(&mut candidate).raw, &mut replay(&mut other).raw);
+        assert_eq!(observe(&candidate), refused);
+        std::mem::swap(&mut replay(&mut candidate).raw, &mut replay(&mut other).raw);
+        std::mem::swap(&mut replay(&mut candidate).set, &mut replay(&mut other).set);
+        assert_eq!(observe(&candidate), refused);
+        std::mem::swap(&mut replay(&mut candidate).set, &mut replay(&mut other).set);
+        let kept = replay(&mut candidate).raw.clone();
+        let mut spaced = kept.file().to_vec();
+        spaced.push(b' ');
+        let bytes: std::sync::Arc<[u8]> = spaced.into();
+        let revision = crate::boundary::source::file_source_revision(&bytes);
+        replay(&mut candidate).raw.entry = RawEntry::File { bytes, revision };
+        assert_eq!(observe(&candidate), refused);
+        replay(&mut candidate).raw = kept;
+        let declared = candidate.declaration.clone();
+        candidate.declaration.selector = crate::benchmark::cases::Selector::Absent;
+        assert_eq!(observe(&candidate), refused);
+        candidate.declaration = declared.clone();
+        candidate.declaration.fixture = Recipe::Minimal;
+        assert_eq!(observe(&candidate), refused);
+        candidate.declaration = declared;
+        candidate.input_limits = Some(crate::materialize_tests::limits());
+        let limits = Err(ContextFailure::PreparationLimitsMismatch);
+        assert_eq!(observe(&candidate), limits);
+        candidate.input_limits = None;
+        assert!(context.is_ok() && observe(&candidate) == context);
     }
 
     /// D15:2788, 2824: a programmatic Evidence stage's context binds the

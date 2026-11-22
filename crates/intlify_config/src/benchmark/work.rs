@@ -180,6 +180,9 @@ pub(super) enum WorkKind {
     SnapshotEnvelopeCanonicalBytes,
     SnapshotMaximumMarkerCanonicalBytes,
     SnapshotTraversalUnits,
+    ReplayRetainedMembers,
+    ReplayRetainedCanonicalBytes,
+    ReplayBindings,
 }
 
 impl WorkKind {
@@ -394,6 +397,22 @@ impl WorkKind {
         Self::WorkflowReserveCanonicalBytes,
     ];
 
+    /// A replay counts its set's value and members, which were admitted when
+    /// the set was created, and its result's Shared records with their bytes
+    /// and the bindings beside its profile.
+    const REPLAY: [Self; 10] = [
+        Self::LogicalValueNodes,
+        Self::MaximumValueDepth,
+        Self::CollectionEntries,
+        Self::TotalDecodedStringBytes,
+        Self::MaximumDecodedStringBytes,
+        Self::ReplayRetainedMembers,
+        Self::ReplayRetainedCanonicalBytes,
+        Self::WorkflowSharedRecords,
+        Self::WorkflowSharedCanonicalBytes,
+        Self::ReplayBindings,
+    ];
+
     /// What the Snapshot boundary counts under each of the nine
     /// `bootstrapOnly.snapshot` bounds, in the bounds' order, then the
     /// root-value counts of the document.
@@ -431,6 +450,7 @@ impl WorkKind {
             Operation::FileEntryCompleteWorkflow => &Self::WORKFLOW,
             Operation::ProgrammaticEntryCompleteWorkflow => &Self::PROGRAMMATIC_WORKFLOW,
             Operation::ProgrammaticSnapshotAdmission => &Self::SNAPSHOT,
+            Operation::MaterializedReresolution => &Self::REPLAY,
             _ => &Self::INPUT,
         }
     }
@@ -558,7 +578,8 @@ impl WorkKind {
             | Self::ArtifactCollectionArtifactOccurrences
             | Self::ArtifactCollectionPolicyArtifacts
             | Self::ArtifactCollectionTargetProfileArtifacts
-            | Self::WorkflowSubmittedMembers => WorkUnit::ArtifactOccurrence,
+            | Self::WorkflowSubmittedMembers
+            | Self::ReplayRetainedMembers => WorkUnit::ArtifactOccurrence,
             Self::ResourcePolicyDistinctArtifactBodies
             | Self::ArtifactCollectionDistinctArtifactBodies
             | Self::ArtifactCollectionSetArtifacts
@@ -574,6 +595,7 @@ impl WorkKind {
             | Self::EntryEvidenceMaximumLogicalPathCanonicalBytes
             | Self::OutcomeFinalizationReserveCanonicalBytes
             | Self::WorkflowSubmittedCanonicalBytes
+            | Self::ReplayRetainedCanonicalBytes
             | Self::WorkflowSharedCanonicalBytes
             | Self::WorkflowEntryCanonicalBytes
             | Self::WorkflowReserveCanonicalBytes
@@ -582,7 +604,8 @@ impl WorkKind {
             Self::ResourcePolicyReferences
             | Self::ResolvedBindingReferences
             | Self::ResolvedBindingDistinctReferences
-            | Self::ResolvedBindingBindings => WorkUnit::ArtifactReference,
+            | Self::ResolvedBindingBindings
+            | Self::ReplayBindings => WorkUnit::ArtifactReference,
             Self::LocaleCorrectionSuggestions | Self::LocalePolicyResolutionCorrections => {
                 WorkUnit::CorrectionSuggestion
             }
@@ -773,6 +796,9 @@ impl LogicalWork {
                 Operation::ProgrammaticSnapshotAdmission => {
                     "intlify-config-programmatic-snapshot-admission-work"
                 }
+                Operation::MaterializedReresolution => {
+                    "intlify-config-materialized-reresolution-work"
+                }
                 _ => "intlify-config-minimum-input-work",
             }
             .into(),
@@ -869,6 +895,9 @@ impl LogicalWork {
             }
             (Prepared::Workflow(_), Output::Workflow(resolved)) => work.workflow(resolved)?,
             (Prepared::Snapshot(_), Output::Snapshot(resolved)) => work.snapshot(resolved)?,
+            (Prepared::Replay(prepared), Output::Replay(resolved)) => {
+                work.replay(prepared, resolved)?;
+            }
             _ => return Err(WorkFailure::OperationMismatch),
         }
         Ok(work)
