@@ -102,10 +102,11 @@ pub(super) enum Operation {
     OutcomeFinalization,
     FileEntryCompleteWorkflow,
     ProgrammaticSnapshotAdmission,
+    ProgrammaticEntryCompleteWorkflow,
 }
 
 impl Operation {
-    pub(super) const ALL: [Self; 18] = [
+    pub(super) const ALL: [Self; 19] = [
         Self::FileMaterialization,
         Self::StructuralAnalysis,
         Self::AuthoringConstruction,
@@ -124,6 +125,7 @@ impl Operation {
         Self::OutcomeFinalization,
         Self::FileEntryCompleteWorkflow,
         Self::ProgrammaticSnapshotAdmission,
+        Self::ProgrammaticEntryCompleteWorkflow,
     ];
     pub(super) const fn phase(self) -> &'static str {
         match self {
@@ -145,7 +147,9 @@ impl Operation {
             Self::SharedEvidence | Self::EntryEvidence | Self::OutcomeFinalization => {
                 "profile_evidence_materialize"
             }
-            Self::FileEntryCompleteWorkflow => "profile_resolve_e2e",
+            Self::FileEntryCompleteWorkflow | Self::ProgrammaticEntryCompleteWorkflow => {
+                "profile_resolve_e2e"
+            }
         }
     }
     pub(super) const fn cost(self) -> &'static str {
@@ -168,6 +172,7 @@ impl Operation {
             Self::OutcomeFinalization => "outcome_finalization",
             Self::FileEntryCompleteWorkflow => "file_entry_complete_workflow",
             Self::ProgrammaticSnapshotAdmission => "programmatic_snapshot_admission",
+            Self::ProgrammaticEntryCompleteWorkflow => "programmatic_entry_complete_workflow",
         }
     }
     pub(super) const fn boundary(self) -> &'static str {
@@ -190,6 +195,7 @@ impl Operation {
             Self::OutcomeFinalization => "outcome-finalization/0",
             Self::FileEntryCompleteWorkflow => "file-entry-complete-workflow/0",
             Self::ProgrammaticSnapshotAdmission => "programmatic-snapshot-admission/0",
+            Self::ProgrammaticEntryCompleteWorkflow => "programmatic-entry-complete-workflow/0",
         }
     }
     /// The pair and boundary of the peak live memory measured over this
@@ -314,7 +320,7 @@ impl Prepared {
             Self::SharedEvidence(_) => Operation::SharedEvidence,
             Self::EntryEvidence(_) => Operation::EntryEvidence,
             Self::OutcomeFinalization(_) => Operation::OutcomeFinalization,
-            Self::Workflow(_) => Operation::FileEntryCompleteWorkflow,
+            Self::Workflow(prepared) => prepared.operation(),
             Self::Snapshot(_) => Operation::ProgrammaticSnapshotAdmission,
         }
     }

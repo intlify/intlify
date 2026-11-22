@@ -17,8 +17,8 @@
 //! A checked or a blocked outcome is an expected result; a refused set or a
 //! resolver defect is a benchmark failure (D15:2826).
 //!
-//! `file_entry_complete_workflow` measures that path on a resolver in one of
-//! three states (D15:2789; plan 025 decision #33): constructed before each
+//! `file_entry_complete_workflow` and `programmatic_entry_complete_workflow`
+//! measure that path on a resolver in one of three states (D15:2789; plan 025 decision #33): constructed before each
 //! start mark from the input its preparation constructed from, the one its
 //! preparation constructed and every interval reuses, or that one right after
 //! it resolved the Blocked recipe's same entry before each start mark, which
@@ -70,7 +70,7 @@ use super::cases::ResolverState;
 use super::evidence::outcome::{project, RetainedProjection};
 use super::instrument::{Instrument, Interval};
 use super::observation::{Frame, Observation};
-use super::operation::OutputFailure;
+use super::operation::{Operation, OutputFailure};
 use super::quantity::Quantity;
 
 /// The Programmatic Entry identity every programmatic case submits, which its
@@ -124,6 +124,14 @@ impl RawInvocation {
     /// The collection's members as the slot borrows them.
     pub(super) fn members(&self) -> Vec<&[u8]> {
         self.members.iter().map(Vec::as_slice).collect()
+    }
+
+    /// The pair whose interval admits this entry.
+    pub(super) const fn operation(&self) -> Operation {
+        match self.entry {
+            RawEntry::File { .. } => Operation::FileEntryCompleteWorkflow,
+            RawEntry::Programmatic { .. } => Operation::ProgrammaticEntryCompleteWorkflow,
+        }
     }
 
     /// The set as submitted, each value beside its slot's own Safe Origin Kind,
@@ -317,6 +325,10 @@ impl PreparedWorkflow {
 
     pub(in crate::benchmark) const fn state(&self) -> ResolverState {
         self.before.state()
+    }
+
+    pub(in crate::benchmark) const fn operation(&self) -> Operation {
+        self.raw.operation()
     }
 
     /// One invocation measured by `instrument`. What the case's state runs
@@ -635,10 +647,13 @@ pub(in crate::benchmark) struct InputFacts {
 impl InputFacts {
     pub(in crate::benchmark) fn observe(prepared: &PreparedWorkflow) -> Self {
         let members = u64::try_from(prepared.raw.members.len()).unwrap_or(u64::MAX);
+        let programmatic = matches!(prepared.raw.entry, RawEntry::Programmatic { .. });
+        let entry = if programmatic { "programmatic" } else { "file" };
         Self {
-            scope: "one-file-entry-invocation-from-pre-invocation-admission-through-the-outcome"
-                .into(),
-            entry_kind: "file".into(),
+            scope: format!(
+                "one-{entry}-entry-invocation-from-pre-invocation-admission-through-the-outcome"
+            ),
+            entry_kind: entry.into(),
             resolver: match prepared.state() {
                 ResolverState::Fresh => "committed-input-constructed-before-each-start-mark",
                 ResolverState::Reused => {
@@ -699,6 +714,7 @@ pub(in crate::benchmark) mod tests {
     use crate::benchmark::measure::MeasurementFailure;
     use crate::benchmark::memory_domain::{agrees, invocation};
     use crate::benchmark::operation::Operation;
+    use crate::benchmark::operation::Output;
     use crate::construction::{committed, flow, identity};
     use crate::snapshot::{from_json, Marker, MarkerReason, Node};
 
@@ -728,6 +744,55 @@ pub(in crate::benchmark) mod tests {
             .into_iter()
             .find(|case| case.fixture == recipe);
         prepare(&declaration.unwrap()).unwrap()
+    }
+
+    /// `input`'s declared programmatic case on a resolver in `state`, as
+    /// preparation makes it.
+    pub(in crate::benchmark) fn programmatic_in(input: P, state: ResolverState) -> Candidate {
+        let recipe = Recipe::ProgrammaticWorkflow {
+            input,
+            resolver: state,
+        };
+        let declaration = declarations()
+            .into_iter()
+            .find(|case| case.fixture == recipe);
+        prepare(&declaration.unwrap()).unwrap()
+    }
+
+    /// The outcome a case retained.
+    fn retained(candidate: &Candidate) -> &RetainedWorkflow {
+        let Output::Workflow(resolved) = &candidate.output else {
+            unreachable!()
+        };
+        require_observable(resolved).unwrap()
+    }
+
+    /// D15:2788, 2794; plan 025 decision #316: a programmatic entry's
+    /// invocation of the value a file spells frames the Shared domain that
+    /// file's case in the same state does, the Materialized Resolution Input
+    /// Set of that value with it, and an Entry domain of its own. The
+    /// example's value holding a marker has no value: no Shared projection,
+    /// no set, and a blocked outcome.
+    #[test]
+    fn a_programmatic_entry_shares_the_shared_domain_of_its_files_case() {
+        for state in STATES {
+            for recipe in P::ALL {
+                let programmatic = programmatic_in(recipe, state);
+                let file = candidate_in(recipe.file(), state);
+                let source = |candidate: &Candidate| candidate.declaration.fixture.source();
+                assert_eq!(source(&programmatic), source(&file), "{recipe:?}");
+                assert_ne!(programmatic.observation.entry, file.observation.entry);
+                let (retained, paired) = (retained(&programmatic), retained(&file));
+                if recipe == P::RejectedMarker {
+                    assert!(retained.shared.is_none() && retained.profile.is_none());
+                    assert!(retained.materialized.is_none());
+                    continue;
+                }
+                let shared = (&programmatic.observation.shared, &retained.materialized);
+                assert_eq!(shared, (&file.observation.shared, &paired.materialized));
+                assert!(retained.materialized.is_some(), "{recipe:?} {state:?}");
+            }
+        }
     }
 
     /// D15:204, 728, 743, 889: a programmatic entry submits its Snapshot in
@@ -790,10 +855,10 @@ pub(in crate::benchmark) mod tests {
             let mut same = raw.clone();
             same.entry = file.entry.clone();
             assert!(same == file, "{recipe:?}");
-            let constructed = build(root(), committed::input()).unwrap();
-            let resolved = PreparedWorkflow::new(root(), constructed, raw.clone(), Before::Reused)
-                .resolve()
-                .unwrap();
+            let resolved = programmatic_in(recipe, ResolverState::Reused);
+            let Output::Workflow(resolved) = &resolved.output else {
+                unreachable!()
+            };
             let admitted = resolved.admitted.unwrap();
             let config = recipe.file().fixture(&recipe.file().limits()).config;
             let mut tree = from_json(&config);
@@ -812,7 +877,10 @@ pub(in crate::benchmark) mod tests {
             assert_eq!(admitted.entry, entry, "{recipe:?}");
             let value = (counts.rejected_markers == 0).then(|| counts.value());
             assert_eq!(admitted.value, value, "{recipe:?}");
-            let paired = prepared(recipe.file()).resolve().unwrap();
+            let paired = candidate(recipe.file());
+            let Output::Workflow(paired) = &paired.output else {
+                unreachable!()
+            };
             if recipe != P::RejectedMarker {
                 assert_eq!(admitted.value, paired.admitted.unwrap().value);
             }

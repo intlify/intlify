@@ -884,7 +884,8 @@
         "entry-evidence",
         "outcome-finalization",
         "file-entry-complete-workflow",
-        "programmatic-snapshot-admission"
+        "programmatic-snapshot-admission",
+        "programmatic-entry-complete-workflow"
       ],
       "type": "string"
     },
@@ -977,6 +978,11 @@
           "type": "object"
         }
       ]
+    },
+    "ProgrammaticRecipe": {
+      "description": "A programmatic entry's recipes: each Evidence recipe whose value a\nSnapshot represents, submitting the value its file spells, and the\nexample's value holding the ordinary marker of an unsupported host value,\nwhich Phase 1 blocks with no value (D15:861, 2129). The malformed file has\nno value, and the inadmissible one's repeated member and lone surrogate\nare no host value's.",
+      "enum": ["storefront", "blocked", "dense", "truncated", "rejected-marker"],
+      "type": "string"
     },
     "Recipe": {
       "oneOf": [
@@ -1172,6 +1178,26 @@
             }
           },
           "required": ["snapshot"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "programmatic-workflow": {
+              "additionalProperties": false,
+              "properties": {
+                "input": {
+                  "$ref": "#/definitions/ProgrammaticRecipe"
+                },
+                "resolver": {
+                  "$ref": "#/definitions/ResolverState"
+                }
+              },
+              "required": ["input", "resolver"],
+              "type": "object"
+            }
+          },
+          "required": ["programmatic-workflow"],
           "type": "object"
         }
       ]

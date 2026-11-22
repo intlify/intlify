@@ -128,7 +128,10 @@ pub(in crate::benchmark) fn prepare(
     ) {
         return prepare_evidence(declaration);
     }
-    if declaration.operation == Operation::FileEntryCompleteWorkflow {
+    if matches!(
+        declaration.operation,
+        Operation::FileEntryCompleteWorkflow | Operation::ProgrammaticEntryCompleteWorkflow
+    ) {
         return prepare_workflow(declaration);
     }
     if declaration.operation == Operation::ProgrammaticSnapshotAdmission {
@@ -382,6 +385,7 @@ pub(in crate::benchmark) fn prepare(
             | Operation::EntryEvidence
             | Operation::OutcomeFinalization
             | Operation::FileEntryCompleteWorkflow
+            | Operation::ProgrammaticEntryCompleteWorkflow
             | Operation::ProgrammaticSnapshotAdmission => unreachable!(),
         }
     };

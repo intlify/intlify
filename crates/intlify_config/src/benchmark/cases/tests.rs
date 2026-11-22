@@ -25,7 +25,7 @@ fn limits() -> StructuralLimits {
 #[test]
 fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
     let cases = declarations();
-    assert_eq!(cases.len(), 460);
+    assert_eq!(cases.len(), 475);
     assert_eq!(cases, declarations());
     let mut identities = BTreeSet::new();
     for case in &cases {
@@ -48,6 +48,7 @@ fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
                 | Operation::EntryEvidence
                 | Operation::OutcomeFinalization
                 | Operation::FileEntryCompleteWorkflow
+                | Operation::ProgrammaticEntryCompleteWorkflow
         ) {
             assert_eq!(case.selector, Selector::Absent);
         }
@@ -124,6 +125,7 @@ fn declared_unbounded_case_kinds_agree_with_independently_checked_fixture_semant
                     | Operation::EntryEvidence
                     | Operation::OutcomeFinalization
                     | Operation::FileEntryCompleteWorkflow
+                    | Operation::ProgrammaticEntryCompleteWorkflow
                     | Operation::ProgrammaticSnapshotAdmission
             )
     }) {
@@ -198,6 +200,7 @@ fn declared_unbounded_case_kinds_agree_with_independently_checked_fixture_semant
             | Operation::EntryEvidence
             | Operation::OutcomeFinalization
             | Operation::FileEntryCompleteWorkflow
+            | Operation::ProgrammaticEntryCompleteWorkflow
             | Operation::ProgrammaticSnapshotAdmission => unreachable!(),
         }
     }
@@ -500,5 +503,5 @@ fn every_declared_case_is_admitted_against_fixed_input_result_and_work_expectati
                 .matches_expected(fixture.expected_work())
         );
     }
-    assert_eq!(contexts.len(), 460);
+    assert_eq!(contexts.len(), 475);
 }

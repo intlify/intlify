@@ -210,6 +210,11 @@ pub(in crate::benchmark) fn rebuilt(
             resolver,
             EntryKind::File,
         ),
+        Recipe::ProgrammaticWorkflow { input, resolver } => (
+            programmatic(input, constructed, root)?,
+            resolver,
+            EntryKind::Programmatic,
+        ),
         _ => return None,
     };
     Some((raw, before(resolver, entry, constructed, root)?))

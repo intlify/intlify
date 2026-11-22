@@ -734,12 +734,12 @@ fn outcome_finalization(prepared: &Prepared) -> Option<super::evidence::InputFac
 
 /// The component boundaries an end-to-end interval includes, and so may
 /// overlap: the one of each phase an invocation runs, from Phase 1's
-/// materialization through outcome finalization. Construction and its
-/// identity precede every invocation, and none builds an authoring model
-/// (D15:2775, 2777, 2824; plan 025 decision #316).
+/// materialization of its entry, a file's or a Snapshot's, through outcome
+/// finalization. Construction and its identity precede every invocation,
+/// and none builds an authoring model (D15:2765, 2775, 2777, 2824; plan 025
+/// decision #316).
 fn children(operation: Operation) -> Vec<String> {
-    const INVOKED: [Operation; 13] = [
-        Operation::FileMaterialization,
+    const INVOKED: [Operation; 12] = [
         Operation::StructuralAnalysis,
         Operation::ProfileSelection,
         Operation::LocaleCanonicalization,
@@ -753,10 +753,13 @@ fn children(operation: Operation) -> Vec<String> {
         Operation::EntryEvidence,
         Operation::OutcomeFinalization,
     ];
-    if operation.phase() != "profile_resolve_e2e" {
-        return Vec::new();
-    }
-    INVOKED.map(|child| child.boundary().into()).into()
+    let entry = match operation {
+        Operation::FileEntryCompleteWorkflow => Operation::FileMaterialization,
+        Operation::ProgrammaticEntryCompleteWorkflow => Operation::ProgrammaticSnapshotAdmission,
+        _ => return Vec::new(),
+    };
+    let invoked = std::iter::once(entry).chain(INVOKED);
+    invoked.map(|child| child.boundary().into()).collect()
 }
 
 /// The facts of a complete invocation case.

@@ -202,7 +202,14 @@ impl MeasurementProfile {
                         ResolverState::Reused,
                         ResolverState::ReusedAfterBlocked,
                     ]
-                    .map(|state| (Operation::FileEntryCompleteWorkflow, None, Some(state))),
+                    .into_iter()
+                    .flat_map(|state| {
+                        [
+                            Operation::FileEntryCompleteWorkflow,
+                            Operation::ProgrammaticEntryCompleteWorkflow,
+                        ]
+                        .map(|operation| (operation, None, Some(state)))
+                    }),
                 )
                 // A memory run states only the operations it measures.
                 .filter(|(operation, ..)| !memory || operation.peak_memory().is_some())

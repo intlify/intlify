@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Finite owner case declarations for the eighteen active boundaries.
+//! Finite owner case declarations for the nineteen active boundaries.
 //! This is not a common Run Plan, case-identity codec, or a complete 015 suite.
 //! Preparation yields an unadmitted candidate; the separate fixture registry
 //! binds its exact input/result/work before method-bound collection can use it.
@@ -37,6 +37,7 @@ pub(super) mod registry;
 pub(super) mod snapshot_inputs;
 pub(super) use snapshot_inputs::SnapshotRecipe;
 pub(super) mod workflow_inputs;
+pub(super) use workflow_inputs::ProgrammaticRecipe;
 
 // The fixed inventory uses the formal 015/017 configuration references. Until
 // Intlify is released, a changed recipe rewrites its expectations in place at
@@ -453,6 +454,7 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 | Operation::EntryEvidence
                 | Operation::OutcomeFinalization
                 | Operation::FileEntryCompleteWorkflow
+                | Operation::ProgrammaticEntryCompleteWorkflow
                 | Operation::ProgrammaticSnapshotAdmission => unreachable!(),
             };
             let selector = if operation == Operation::ProfileSelection {
@@ -1084,6 +1086,30 @@ pub(super) fn declarations() -> Vec<Declaration> {
             );
             case.limit = Some((limit, edge));
             cases.push(case);
+        }
+    }
+    // Append one programmatic entry's complete invocation of each recipe
+    // without changing any of the 460 rows: through the admission of the
+    // formal Snapshot of the value a recipe's file spells, which pairs with
+    // that file's case, or the example's value holding an ordinary marker, on
+    // a resolver in each state the file entry's cases run on (D15:2772, 2788,
+    // 2789; plan 025 decision #316).
+    for resolver in [
+        ResolverState::Reused,
+        ResolverState::Fresh,
+        ResolverState::ReusedAfterBlocked,
+    ] {
+        for input in ProgrammaticRecipe::ALL {
+            cases.push(declaration(
+                Operation::ProgrammaticEntryCompleteWorkflow,
+                Recipe::ProgrammaticWorkflow { input, resolver },
+                Selector::App,
+                if input == ProgrammaticRecipe::Storefront {
+                    ExpectedKind::WorkflowChecked
+                } else {
+                    ExpectedKind::WorkflowBlocked
+                },
+            ));
         }
     }
     cases

@@ -892,6 +892,60 @@ mod tests {
         assert_eq!(observe(&candidate), context);
     }
 
+    /// D15:2788, 2824; plan 025 decision #316: a programmatic entry's
+    /// invocation binds its Snapshot as submitted and its revision, and so
+    /// does the Blocked recipe's it resolves first: either changed is
+    /// refused, a file in its place is another operation's input, and the
+    /// file case's recipe is refused.
+    #[test]
+    fn a_programmatic_context_binds_the_snapshot_as_submitted() {
+        use crate::benchmark::cases::ProgrammaticRecipe;
+        use crate::benchmark::workflow::tests::programmatic_in;
+
+        let state = ResolverState::ReusedAfterBlocked;
+        let mut candidate = programmatic_in(ProgrammaticRecipe::Storefront, state);
+        let context = observe(&candidate);
+        let refused = Err(ContextFailure::WorkflowInputMismatch);
+        let edits: [Edit; 3] = [
+            ("snapshot", |raw| {
+                let RawEntry::Programmatic { snapshot, .. } = &mut raw.entry else {
+                    unreachable!()
+                };
+                members(snapshot).reverse();
+            }),
+            ("revision", |raw| {
+                let RawEntry::Programmatic { revision, .. } = &mut raw.entry else {
+                    unreachable!()
+                };
+                revision.push('0');
+            }),
+            ("entry", |raw| {
+                raw.entry = RawEntry::File {
+                    bytes: Arc::from(&b"{}"[..]),
+                    revision: String::new(),
+                };
+            }),
+        ];
+        for (name, edit) in edits {
+            let original = raw(&mut candidate).clone();
+            edit(raw(&mut candidate));
+            let other = Err(ContextFailure::OperationMismatch);
+            let expected = if name == "entry" { other } else { refused };
+            assert_eq!(observe(&candidate), expected, "{name}");
+            *raw(&mut candidate) = original;
+            let original = blocked(&mut candidate).clone();
+            edit(blocked(&mut candidate));
+            assert_eq!(observe(&candidate), refused, "{name} first");
+            *blocked(&mut candidate) = original;
+        }
+        assert!(context.is_ok() && observe(&candidate) == context);
+        candidate.declaration.fixture = Recipe::Workflow {
+            input: EvidenceRecipe::Storefront,
+            resolver: state,
+        };
+        assert_eq!(observe(&candidate), refused);
+    }
+
     /// The members of a formal Snapshot's root object.
     fn members(report: &mut SnapshotReport) -> &mut Vec<(Vec<u8>, SubmittedNode)> {
         let SnapshotReport::Formal {
