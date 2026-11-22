@@ -705,7 +705,7 @@ mod tests {
             root: submitted(root),
             digest: root.digest(),
         };
-        read_report(Some(report), limits).unwrap()
+        read_report(Some(&report), limits).unwrap()
     }
 
     /// Phase 1 over `snapshot` under `limits`: the evaluation, and the

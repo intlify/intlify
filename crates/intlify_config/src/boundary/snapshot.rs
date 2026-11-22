@@ -14,6 +14,11 @@
 //! not a sequence of Unicode scalar values, keys in any order or repeated, and
 //! a marker outside the closed model.
 //!
+//! The boundary borrows the report, which stays the binding's (D15:140): it
+//! builds the canonical tree beside the submitted one and frees none of the
+//! report, so an interval that admits a Snapshot built before it releases no
+//! storage acquired before it (D15:2805).
+//!
 //! The checks follow 015's failure positions (D15:3155), and the first that
 //! fails decides:
 //!
@@ -148,7 +153,7 @@ impl AdmittedSnapshot {
 /// Admit a report, `None` when no Snapshot was supplied, under the
 /// capability's `bootstrapOnly.snapshot` bounds.
 pub(crate) fn admit(
-    report: Option<SnapshotReport>,
+    report: Option<&SnapshotReport>,
     capability: &ImplementationCapability,
 ) -> Result<AdmittedSnapshot, SnapshotRefusal> {
     read_report(report, &capability.bootstrap_only().snapshot)
@@ -157,26 +162,29 @@ pub(crate) fn admit(
 /// The boundary's checks under `limits`, which [`admit`] takes from the
 /// capability.
 pub(crate) fn read_report(
-    report: Option<SnapshotReport>,
+    report: Option<&SnapshotReport>,
     limits: &SnapshotLimits,
 ) -> Result<AdmittedSnapshot, SnapshotRefusal> {
     use SnapshotRefusal::{
         ContentDigestMismatch, EnvelopeOverBound, Malformed, Missing, UnsafeHostInspection,
     };
 
-    let (root, digest) = match report.ok_or(Missing)? {
+    let (root, supplied) = match report.ok_or(Missing)? {
         SnapshotReport::Unsafe => return Err(UnsafeHostInspection),
         SnapshotReport::Formal { root, digest } => (root, digest),
     };
-    let terminal = terminal_marker(&root);
-    if !within_bounds(&root, terminal, limits) {
+    let terminal = terminal_marker(root);
+    if !within_bounds(root, terminal, limits) {
         return Err(EnvelopeOverBound);
     }
-    if !closed(&root) || !valid_semantic_digest(&digest) {
+    if !closed(root) || !valid_semantic_digest(supplied) {
         return Err(Malformed);
     }
-    let tree = canonical(&root, terminal, limits).ok_or(EnvelopeOverBound)?;
-    if tree.digest() != digest {
+    let tree = canonical(root, terminal, limits).ok_or(EnvelopeOverBound)?;
+    // The admitted Snapshot keeps the digest computed here, which is the one
+    // supplied, so the report keeps its own.
+    let digest = tree.digest();
+    if digest != *supplied {
         return Err(ContentDigestMismatch);
     }
     Ok(AdmittedSnapshot { root: tree, digest })
@@ -630,12 +638,12 @@ mod tests {
     /// Admit `root` with the digest of `expected`, which must be its
     /// canonical tree.
     fn admits(root: SubmittedNode, expected: &Node, limits: &SnapshotLimits) {
-        let admitted = read_report(Some(formal(root, &expected.digest())), limits).unwrap();
+        let admitted = read_report(Some(&formal(root, &expected.digest())), limits).unwrap();
         assert_eq!(admitted.root().framed(), expected.framed());
         assert_eq!(admitted.digest(), expected.digest());
     }
 
-    fn refused(report: Option<SnapshotReport>, limits: &SnapshotLimits) -> SnapshotRefusal {
+    fn refused(report: Option<&SnapshotReport>, limits: &SnapshotLimits) -> SnapshotRefusal {
         read_report(report, limits)
             .err()
             .expect("the Snapshot is refused")
@@ -644,7 +652,7 @@ mod tests {
     /// The refusal of `root` with a digest that is not its own, so a tree
     /// that passes every other check is a mismatch.
     fn refusal(root: SubmittedNode, limits: &SnapshotLimits) -> SnapshotRefusal {
-        refused(Some(formal(root, OTHER)), limits)
+        refused(Some(&formal(root, OTHER)), limits)
     }
 
     #[test]
@@ -654,7 +662,7 @@ mod tests {
             "b",
             rejected(MarkerReason::Cycle),
         );
-        let admitted = read_report(Some(formal(submitted(&tree), DIGEST)), &roomy()).unwrap();
+        let admitted = read_report(Some(&formal(submitted(&tree), DIGEST)), &roomy()).unwrap();
         assert_eq!(admitted.root().framed(), tree.framed());
         assert_eq!(admitted.digest(), DIGEST);
         admits(submitted(&rich()), &rich(), &roomy());
@@ -680,7 +688,7 @@ mod tests {
     fn a_missing_or_unsafe_report_is_refused_first() {
         assert_eq!(refused(None, &roomy()), SnapshotRefusal::Missing);
         assert_eq!(
-            refused(Some(SnapshotReport::Unsafe), &roomy()),
+            refused(Some(&SnapshotReport::Unsafe), &roomy()),
             SnapshotRefusal::UnsafeHostInspection
         );
     }
@@ -891,7 +899,7 @@ mod tests {
             zeros.clone(),
         ] {
             assert_eq!(
-                refused(Some(formal(SubmittedNode::Null, &digest)), &roomy()),
+                refused(Some(&formal(SubmittedNode::Null, &digest)), &roomy()),
                 Malformed,
                 "{digest}"
             );
@@ -905,11 +913,33 @@ mod tests {
         assert_eq!(refusal(submitted(&rich()), &roomy()), ContentDigestMismatch);
         assert_eq!(
             refused(
-                Some(formal(submitted(&rich()), &Node::Null.digest())),
+                Some(&formal(submitted(&rich()), &Node::Null.digest())),
                 &roomy()
             ),
             ContentDigestMismatch
         );
+    }
+
+    /// The boundary borrows the report, so the binding keeps it whole after
+    /// either result and the same report is admitted, or refused, alike
+    /// again (D15:140, 2805).
+    #[test]
+    fn the_report_stays_the_bindings_and_reads_alike_again() {
+        let tree = rich();
+        let report = formal(submitted(&tree), &tree.digest());
+        let first = read_report(Some(&report), &roomy()).unwrap();
+        let second = read_report(Some(&report), &roomy()).unwrap();
+        assert!(first == second);
+        assert_eq!(first.root().framed(), tree.framed());
+        let SnapshotReport::Formal { root, digest } = &report else {
+            unreachable!()
+        };
+        assert_eq!(counts(root, None).0, SnapshotCounts::of(&tree));
+        assert_eq!(*digest, tree.digest());
+        let other = formal(submitted(&tree), OTHER);
+        for _ in 0..2 {
+            assert_eq!(refused(Some(&other), &roomy()), ContentDigestMismatch);
+        }
     }
 
     /// The first failing position decides: the bounds, the closed model, the
@@ -928,7 +958,10 @@ mod tests {
             refusal(object(vec![("k", nan()), ("k", unknown())]), &roomy()),
             Malformed
         );
-        assert_eq!(refused(Some(formal(nan(), "sha256:")), &roomy()), Malformed);
+        assert_eq!(
+            refused(Some(&formal(nan(), "sha256:")), &roomy()),
+            Malformed
+        );
         assert_eq!(refusal(nan(), &roomy()), EnvelopeOverBound);
     }
 
@@ -1066,7 +1099,7 @@ mod tests {
         }
         preimage.extend_from_slice(&[0x01, 0, 0, 0, 0, 0, 0, 0, 0]);
         let digest = format!("sha256:{}", hex(digest_bytes(&preimage)));
-        let admitted = read_report(Some(formal(chain(), &digest)), &roomy())
+        let admitted = read_report(Some(&formal(chain(), &digest)), &roomy())
             .ok()
             .unwrap();
         assert_eq!(admitted.digest, digest);
@@ -1091,7 +1124,7 @@ mod tests {
         let tree = from_json(&json!([1, 2]));
         let read = |max_nodes| {
             admit(
-                Some(formal(submitted(&tree), &tree.digest())),
+                Some(&formal(submitted(&tree), &tree.digest())),
                 &capability(max_nodes),
             )
             .err()

@@ -15,9 +15,11 @@
 //! candidate, and an optional call-site sidecar report; its
 //! `profile-selector-programmatic` slot's value is the selector report. A
 //! binding submits each value beside its candidate for the Safe Origin Kind
-//! the slot fixes. A mark is carried as supplied and never decides admission;
-//! an adapter that supplies none leaves the identity unmarked (Decision
-//! 015-185).
+//! the slot fixes. The step borrows the Snapshot and selector reports, which
+//! stay the binding's, so an interval that admits them frees neither
+//! (D15:140, 2805). A mark is carried as supplied and never decides
+//! admission; an adapter that supplies none leaves the identity unmarked
+//! (Decision 015-185).
 //!
 //! Each step works like the Common Invocation Input Set's. Every value
 //! boundary and every locator is read under the admitted capability's bounds,
@@ -61,7 +63,7 @@ pub(crate) struct FileValue<'a> {
 /// A file Entry Admission Input Set as submitted, its slots in rank order.
 pub(crate) struct SubmittedFileEntry<'a> {
     pub(crate) file: Component<'a, FileValue<'a>>,
-    pub(crate) selector: Component<'a, SelectorReport>,
+    pub(crate) selector: Component<'a, SelectorReport<'a>>,
 }
 
 /// An admitted file Entry Admission Input Set. Each origin is the Safe Origin
@@ -143,7 +145,7 @@ pub(crate) fn admit(
 /// The `configuration-programmatic` slot's value as submitted. Each part is
 /// `None` when absent.
 pub(crate) struct ProgrammaticValue<'a> {
-    pub(crate) snapshot: Option<SnapshotReport>,
+    pub(crate) snapshot: Option<&'a SnapshotReport>,
     pub(crate) identity: Option<&'a str>,
     /// Whether the frontend marks the Programmatic Entry identity non-secret.
     pub(crate) marked: bool,
@@ -156,7 +158,7 @@ pub(crate) struct ProgrammaticValue<'a> {
 /// order.
 pub(crate) struct SubmittedProgrammaticEntry<'a> {
     pub(crate) programmatic: Component<'a, ProgrammaticValue<'a>>,
-    pub(crate) selector: Component<'a, SelectorReport>,
+    pub(crate) selector: Component<'a, SelectorReport<'a>>,
 }
 
 /// An admitted programmatic Entry Admission Input Set (D15:3163). Each origin
@@ -338,7 +340,7 @@ pub(crate) mod tests {
 
     /// A file entry every boundary admits, each value beside its slot's own
     /// Safe Origin Kind.
-    pub(crate) fn submitted<'a>(revision: &'a str, selector: &str) -> SubmittedFileEntry<'a> {
+    pub(crate) fn submitted<'a>(revision: &'a str, selector: &'a str) -> SubmittedFileEntry<'a> {
         SubmittedFileEntry {
             file: Component {
                 value: FileValue {
@@ -351,7 +353,7 @@ pub(crate) mod tests {
                 origin: Some(Kind::ConfigurationFile.id()),
             },
             selector: Component {
-                value: SelectorReport::String(selector.to_owned()),
+                value: SelectorReport::String(selector),
                 origin: Some(Kind::ProfileSelectorCli.id()),
             },
         }
@@ -553,11 +555,12 @@ pub(crate) mod tests {
     /// Snapshot's one member's value to.
     const SOURCE: &str = "export default defineConfig({ schemaVersion: '0' })\n";
 
-    /// The Snapshot every programmatic entry here submits, its digest, and
-    /// the revision of the sidecar's source.
+    /// The Snapshot every programmatic entry here submits, its digest, the
+    /// binding's report of it, and the revision of the sidecar's source.
     pub(crate) struct Programmatic {
         tree: Node,
         pub(crate) digest: String,
+        report: SnapshotReport,
         revision: String,
     }
 
@@ -566,6 +569,10 @@ pub(crate) mod tests {
             let tree = from_json(&json!({ "schemaVersion": "0" }));
             let digest = tree.digest();
             Self {
+                report: SnapshotReport::Formal {
+                    root: submitted_tree(&tree),
+                    digest: digest.clone(),
+                },
                 tree,
                 digest,
                 revision: call_site_source_revision(SOURCE.as_bytes()),
@@ -574,14 +581,11 @@ pub(crate) mod tests {
 
         /// A programmatic entry every boundary admits, each value beside its
         /// slot's own Safe Origin Kind.
-        pub(crate) fn entry(&self, selector: &str) -> SubmittedProgrammaticEntry<'_> {
+        pub(crate) fn entry<'a>(&'a self, selector: &'a str) -> SubmittedProgrammaticEntry<'a> {
             SubmittedProgrammaticEntry {
                 programmatic: Component {
                     value: ProgrammaticValue {
-                        snapshot: Some(SnapshotReport::Formal {
-                            root: submitted_tree(&self.tree),
-                            digest: self.digest.clone(),
-                        }),
+                        snapshot: Some(&self.report),
                         identity: Some(ENTRY),
                         marked: false,
                         revision: Some(&self.digest),
@@ -591,7 +595,7 @@ pub(crate) mod tests {
                     origin: Some(Kind::ConfigurationProgrammatic.id()),
                 },
                 selector: Component {
-                    value: SelectorReport::String(selector.to_owned()),
+                    value: SelectorReport::String(selector),
                     origin: Some(Kind::ProfileSelectorProgrammatic.id()),
                 },
             }
@@ -686,6 +690,21 @@ pub(crate) mod tests {
             .benchmark_matches_fixture(&SelectorInput::string("app", bound)));
     }
 
+    /// The step borrows the binding's Snapshot and selector reports, so the
+    /// same submission is admitted alike again (D15:140, 2805).
+    #[test]
+    fn the_reports_stay_the_bindings_and_admit_alike_again() {
+        let programmatic = Programmatic::new();
+        let capability = roomy();
+        let first = admit_programmatic(programmatic.entry("app"), Some(&capability));
+        let second = admit_programmatic(programmatic.entry("app"), Some(&capability));
+        assert!(first.is_ok() && first == second);
+        let SnapshotReport::Formal { digest, .. } = &programmatic.report else {
+            unreachable!()
+        };
+        assert_eq!(*digest, programmatic.digest);
+    }
+
     /// The admitted entry keeps the Programmatic Entry identity's mark as the
     /// frontend supplied it, and the mark never changes whether, or why, the
     /// entry is refused.
@@ -759,7 +778,7 @@ pub(crate) mod tests {
         ];
         expected.extend(selector);
         assert_eq!(refused_programmatic(entry, Some(&capability)), expected);
-        let mut entry = failing(&|value| value.snapshot = Some(SnapshotReport::Unsafe));
+        let mut entry = failing(&|value| value.snapshot = Some(&SnapshotReport::Unsafe));
         entry.programmatic.origin = Some(" configuration-programmatic");
         let mut expected = vec![
             failure(
@@ -793,7 +812,7 @@ pub(crate) mod tests {
         };
         for (report, refusal) in [
             (None, SnapshotRefusal::Missing),
-            (Some(other), SnapshotRefusal::ContentDigestMismatch),
+            (Some(&other), SnapshotRefusal::ContentDigestMismatch),
         ] {
             let mut entry = programmatic.entry("app");
             entry.programmatic.value.snapshot = report;
@@ -836,7 +855,7 @@ pub(crate) mod tests {
     fn a_refused_capability_leaves_only_the_programmatic_origins() {
         let programmatic = Programmatic::new();
         let mut entry = programmatic.entry("app");
-        entry.programmatic.value.snapshot = Some(SnapshotReport::Unsafe);
+        entry.programmatic.value.snapshot = Some(&SnapshotReport::Unsafe);
         entry.programmatic.value.identity = None;
         entry.programmatic.value.call_site = Some(CallSiteReport::Unsafe);
         entry.selector.value = SelectorReport::Unsafe;
