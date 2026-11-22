@@ -97,16 +97,21 @@ pub(super) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure>
 
 #[cfg(test)]
 pub(in crate::benchmark) mod tests {
+    use std::any::type_name;
+    use std::cell::RefCell;
     use std::collections::BTreeMap;
 
+    use intlify_measurement::measurement::Aggregation;
     use serde_json::Value;
 
     use super::*;
+    use crate::benchmark::cases::prepare::{prepare, Candidate};
     use crate::benchmark::cases::snapshot_inputs::{limits, report, SnapshotRecipe as R};
-    use crate::benchmark::cases::Recipe;
+    use crate::benchmark::cases::{declarations, Recipe};
     use crate::benchmark::clock::tests::ScriptedClock;
-    use crate::benchmark::instrument::{Instrument, Timed};
+    use crate::benchmark::instrument::{Instrument, Interval, Timed};
     use crate::benchmark::operation::Operation;
+    use crate::benchmark::quantity::Quantity;
     use crate::snapshot::MarkerReason;
 
     /// What a binding submits for `recipe`, admitted untimed.
@@ -117,6 +122,14 @@ pub(in crate::benchmark) mod tests {
 
     fn observed(recipe: R) -> Observation {
         observe(&Ok(admitted(recipe))).unwrap()
+    }
+
+    /// `recipe`'s declared case, as preparation makes it.
+    pub(in crate::benchmark) fn candidate(recipe: R) -> Candidate {
+        let declaration = declarations()
+            .into_iter()
+            .find(|case| case.fixture == Recipe::Snapshot(recipe));
+        prepare(&declaration.unwrap()).unwrap()
     }
 
     /// The `result` the expectations pin for the case of `operation` over
@@ -270,5 +283,64 @@ pub(in crate::benchmark) mod tests {
         let refused = admit((&SnapshotReport::Unsafe, limits()));
         let failure = Err(OutputFailure::SnapshotAdmissionRefused);
         assert_eq!(observe(&refused), failure);
+    }
+
+    /// D15:2765: each case is the cost 015 names over its recipe's file,
+    /// and its interval observes what the case's preparation does and its
+    /// expectation pins.
+    #[test]
+    fn each_case_observes_what_its_expectation_pins() {
+        let operation = Operation::ProgrammaticSnapshotAdmission;
+        let named = (operation.phase(), operation.cost(), operation.boundary());
+        let pair = (
+            "profile_entry_materialize",
+            "programmatic_snapshot_admission",
+        );
+        assert_eq!(named, (pair.0, pair.1, "programmatic-snapshot-admission/0"));
+        for recipe in R::ALL {
+            let candidate = candidate(recipe);
+            let source = candidate.declaration.fixture.source();
+            assert_eq!(source, recipe.file().source(), "{recipe:?}");
+            assert_eq!(candidate.observation, observed(recipe), "{recipe:?}");
+            let clock = ScriptedClock::nanos([0, 1]);
+            let timed = candidate.prepared.interval(&Timed(&clock)).unwrap();
+            assert_eq!(timed.output.observe(), Ok(candidate.observation));
+            let pinned = expected(operation, Recipe::Snapshot(recipe));
+            let observation = serde_json::to_value(candidate.observation).unwrap();
+            assert_eq!(pinned, observation, "{recipe:?}");
+        }
+    }
+
+    /// D15:2765, 2824: a case's interval is handed the submitted report and
+    /// its bounds, never an admitted tree, and hands back the admitted tree
+    /// beside its document.
+    #[test]
+    fn the_interval_is_handed_the_report_and_hands_back_the_document() {
+        struct Recording(RefCell<Vec<(&'static str, &'static str)>>);
+        impl Instrument for Recording {
+            type Failure = ();
+            const AGGREGATION: Aggregation = Aggregation::BatchTotal;
+            fn interval<Input, Output>(
+                &self,
+                input: Input,
+                invoke: fn(Input) -> Output,
+            ) -> Result<Interval<Output>, ()> {
+                let types = (type_name::<Input>(), type_name::<Output>());
+                self.0.borrow_mut().push(types);
+                let output = invoke(input);
+                Ok(Interval {
+                    quantity: Quantity::new(0),
+                    output,
+                })
+            }
+            fn unavailable() {}
+        }
+        let candidate = candidate(R::Minimal);
+        let recording = Recording(RefCell::new(Vec::new()));
+        let measured = candidate.prepared.interval(&recording).unwrap();
+        assert_eq!(measured.output.observe(), Ok(candidate.observation));
+        let handed = recording.0.into_inner();
+        let input = type_name::<(&SnapshotReport, SnapshotLimits)>();
+        assert_eq!(handed, [(input, type_name::<Resolved>())]);
     }
 }

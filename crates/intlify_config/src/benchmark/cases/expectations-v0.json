@@ -60619,6 +60619,1818 @@
           }
         ]
       }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-snapshot-admission",
+        "fixture": {
+          "snapshot": "minimal"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "snapshot-materialized"
+      },
+      "inputContext": "ecd97f26085a1ba1b5b82d2672c8eb090734749c4deea82f2c4c2f0a4cbdf7aa",
+      "result": {
+        "shared": "ac4a248b57fe8906a9e86fe62f0be571eac9f403f8330a5e79208fee5d9182cb",
+        "entry": "35322915899d57ca5bf15f6d85ce8b885998639bef3e08e7f137d34ee18ea8bd"
+      },
+      "logicalWork": "a292627cdfb9d2c89620244cd0da9e84bb0afc6ee2aa4f96459d9aa26eccbb32",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-snapshot-admission-work",
+        "profileRevision": "0",
+        "operation": "programmatic-snapshot-admission",
+        "facts": [
+          {
+            "kind": "snapshot-nodes",
+            "unit": "snapshot-node",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "56"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "snapshot-collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "55"
+            }
+          },
+          {
+            "kind": "snapshot-total-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1250"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "snapshot-rejected-markers",
+            "unit": "rejected-marker",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2358"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-marker-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "111"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "56"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "55"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1250"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-snapshot-admission",
+        "fixture": {
+          "snapshot": "reversed-members"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "snapshot-materialized"
+      },
+      "inputContext": "0c529a42c56942fd3d93bb7cadc772cf885d2fb2987dcd1d150938da9c419182",
+      "result": {
+        "shared": "ac4a248b57fe8906a9e86fe62f0be571eac9f403f8330a5e79208fee5d9182cb",
+        "entry": "35322915899d57ca5bf15f6d85ce8b885998639bef3e08e7f137d34ee18ea8bd"
+      },
+      "logicalWork": "a292627cdfb9d2c89620244cd0da9e84bb0afc6ee2aa4f96459d9aa26eccbb32",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-snapshot-admission-work",
+        "profileRevision": "0",
+        "operation": "programmatic-snapshot-admission",
+        "facts": [
+          {
+            "kind": "snapshot-nodes",
+            "unit": "snapshot-node",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "56"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "snapshot-collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "55"
+            }
+          },
+          {
+            "kind": "snapshot-total-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1250"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "snapshot-rejected-markers",
+            "unit": "rejected-marker",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2358"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-marker-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "111"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "56"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "55"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1250"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-snapshot-admission",
+        "fixture": {
+          "snapshot": "long-string"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "snapshot-materialized"
+      },
+      "inputContext": "28f0224f66600358384f487bbb3c72780226745042c66f39f302f7940367f3c1",
+      "result": {
+        "shared": "ca2d436dd8a99c9401f27af138d2afe0023d9d2ede0ec1fb60d21468de0bd3ab",
+        "entry": "0284aa0265f5b3e76c0278ad6710c687ed756b700d4c6382efadaa9c5b10e96e"
+      },
+      "logicalWork": "a4d1e5d98f8d163d2af221a0ae3c540ad0afe6397deba937700b60c6852e50dd",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-snapshot-admission-work",
+        "profileRevision": "0",
+        "operation": "programmatic-snapshot-admission",
+        "facts": [
+          {
+            "kind": "snapshot-nodes",
+            "unit": "snapshot-node",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "56"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "snapshot-collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "55"
+            }
+          },
+          {
+            "kind": "snapshot-total-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5336"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4096"
+            }
+          },
+          {
+            "kind": "snapshot-rejected-markers",
+            "unit": "rejected-marker",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "6444"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-marker-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "111"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "56"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "55"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "5336"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4096"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-snapshot-admission",
+        "fixture": {
+          "snapshot": "many-profiles"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "snapshot-materialized"
+      },
+      "inputContext": "f89ab53233a79c61de9a8561e15dd28dc6438ce6aef27c110458108a2c6f2b51",
+      "result": {
+        "shared": "39bfde3ef4d3d12a4c9e89326e530dfbdb7d65e7db9759f5a41d19c8d3def1ee",
+        "entry": "74c21652fd383f6bb59eff64d2df0394814c2f57a61f1a7c29801f91ef59563c"
+      },
+      "logicalWork": "8f83232dde25e6a2db0cd97481fb521a3ecb09fead90bb7a3796de0b5b51bcae",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-snapshot-admission-work",
+        "profileRevision": "0",
+        "operation": "programmatic-snapshot-admission",
+        "facts": [
+          {
+            "kind": "snapshot-nodes",
+            "unit": "snapshot-node",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "851"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "snapshot-collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "850"
+            }
+          },
+          {
+            "kind": "snapshot-total-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "19706"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "snapshot-rejected-markers",
+            "unit": "rejected-marker",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "36519"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-marker-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1701"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "851"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "850"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "19706"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-snapshot-admission",
+        "fixture": {
+          "snapshot": "many-locale-occurrences"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "snapshot-materialized"
+      },
+      "inputContext": "1e3764f072d5cea99eb35a3f4d51a19d287b8643b46d29ec081b2795ed479902",
+      "result": {
+        "shared": "b07da8aa3a90f477f9156f32c6eb0a0fd897c8155b6ee5d7d692a7c0dee18e4c",
+        "entry": "3299b6a924df7f80e33124c3c4e56fdf9fd3f8e65de81a980b0a66f103892d28"
+      },
+      "logicalWork": "274a6b34888d3538c3f30d922fa305d30368e0e8b7c5717ecac4eb69358d09ff",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-snapshot-admission-work",
+        "profileRevision": "0",
+        "operation": "programmatic-snapshot-admission",
+        "facts": [
+          {
+            "kind": "snapshot-nodes",
+            "unit": "snapshot-node",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "87"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "snapshot-collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "86"
+            }
+          },
+          {
+            "kind": "snapshot-total-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1312"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "snapshot-rejected-markers",
+            "unit": "rejected-marker",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2699"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-marker-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "173"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "87"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "86"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1312"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-snapshot-admission",
+        "fixture": {
+          "snapshot": "nested-array"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "snapshot-materialized"
+      },
+      "inputContext": "740a8dab539347386bf7819c2d46bf4aba7ccb1becf1e4fbc5f6122b5bf61187",
+      "result": {
+        "shared": "dbff4c60622a73701651a811d7915c81e0484f89891bcac452b051cd3565ed9d",
+        "entry": "5c7945db0466ec5c1b378dc8f2cedcf06e09b5228df37ffde666b94cc1468d6e"
+      },
+      "logicalWork": "7a3ff8c795a48339d5e2b33f2f2f7f7c5b4934eec47e74651b2d4619c5b9fa8a",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-snapshot-admission-work",
+        "profileRevision": "0",
+        "operation": "programmatic-snapshot-admission",
+        "facts": [
+          {
+            "kind": "snapshot-nodes",
+            "unit": "snapshot-node",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "129"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "129"
+            }
+          },
+          {
+            "kind": "snapshot-collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "128"
+            }
+          },
+          {
+            "kind": "snapshot-total-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-rejected-markers",
+            "unit": "rejected-marker",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2185"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-marker-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "257"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "129"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "129"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "128"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-snapshot-admission",
+        "fixture": {
+          "snapshot": "many-values"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "snapshot-materialized"
+      },
+      "inputContext": "77c77d156e2b5a3bd70eeaf39902d5689b242f38c1693c95ac5a981db304e3c8",
+      "result": {
+        "shared": "49f2642e632cd68b243ff3e35fc7d78c3659fea66002c873c4ff15a723540d52",
+        "entry": "beab2077b0817172896834ff8f589c9d318a5c2229697d90d9499053a670f6a7"
+      },
+      "logicalWork": "01724ea737c859000c8d5e783392bcb40f55a83afb327d238b86daa7959dd5d0",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-snapshot-admission-work",
+        "profileRevision": "0",
+        "operation": "programmatic-snapshot-admission",
+        "facts": [
+          {
+            "kind": "snapshot-nodes",
+            "unit": "snapshot-node",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "257"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "snapshot-collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "256"
+            }
+          },
+          {
+            "kind": "snapshot-total-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-rejected-markers",
+            "unit": "rejected-marker",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4369"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-marker-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "513"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "257"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "256"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-snapshot-admission",
+        "fixture": {
+          "snapshot": "portable-maximum"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "snapshot-materialized"
+      },
+      "inputContext": "56503e78c1479d533e87e3356959edccc3aa5ea2d81d15ae72f09f7ff1f6f7c7",
+      "result": {
+        "shared": "ad3c7ade72d75c0102979da61ef1a233e9752b08babffe9e2870771a966d63ae",
+        "entry": "ed3d39753b86e9aa0353ff77a4d47d309ab4633611f691cce061abb75b4e54f5"
+      },
+      "logicalWork": "8f5ac69a5443d1badd738a679078dd3da5cb9f0b992c77a9a914e3ad4732f3f1",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-snapshot-admission-work",
+        "profileRevision": "0",
+        "operation": "programmatic-snapshot-admission",
+        "facts": [
+          {
+            "kind": "snapshot-nodes",
+            "unit": "snapshot-node",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "snapshot-collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-total-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-rejected-markers",
+            "unit": "rejected-marker",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-marker-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-snapshot-admission",
+        "fixture": {
+          "snapshot": "negative-zero"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "snapshot-materialized"
+      },
+      "inputContext": "74057e936fd0aefed4172200d817566091175bdee241869b34d698607364d5c1",
+      "result": {
+        "shared": "9d06ebde455ad6b4221517fcd5dc7fe2d8f892a17db65f9631c8b51a134c218e",
+        "entry": "4c4f5d0d26f6e8fc02889a54da4fd041a4b58d8eb807dfd8cdc5d998c78aee5f"
+      },
+      "logicalWork": "8f5ac69a5443d1badd738a679078dd3da5cb9f0b992c77a9a914e3ad4732f3f1",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-snapshot-admission-work",
+        "profileRevision": "0",
+        "operation": "programmatic-snapshot-admission",
+        "facts": [
+          {
+            "kind": "snapshot-nodes",
+            "unit": "snapshot-node",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "snapshot-collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-total-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-rejected-markers",
+            "unit": "rejected-marker",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "17"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-marker-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-snapshot-admission",
+        "fixture": {
+          "snapshot": "unsupported-type"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "snapshot-marked"
+      },
+      "inputContext": "d0ae23c07bb63297ab0a76bbf372ba2e7cd31d7fea617a58c7fcfac10e481325",
+      "result": {
+        "shared": "2e27142302dbbb1709938620c1c1e6d5ddc463d550401d72ebdc075c9d038bb9",
+        "entry": "182b1b7ab6ad08340a980317c821342387d5df3040b296092171d9ff47dda990"
+      },
+      "logicalWork": "f5db7bb4cd095e91e2cf7a5ee553d441b750b50bc596b8b43bd1442cc4881c30",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-snapshot-admission-work",
+        "profileRevision": "0",
+        "operation": "programmatic-snapshot-admission",
+        "facts": [
+          {
+            "kind": "snapshot-nodes",
+            "unit": "snapshot-node",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "57"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "snapshot-collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "56"
+            }
+          },
+          {
+            "kind": "snapshot-total-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1256"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "snapshot-rejected-markers",
+            "unit": "rejected-marker",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2407"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-marker-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "34"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "113"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-snapshot-admission",
+        "fixture": {
+          "snapshot": "cycle"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "snapshot-marked"
+      },
+      "inputContext": "0863de8e99f1024e59532bd2df8c662e1dfd72c52ee2e13ed7056b56cb3a99d5",
+      "result": {
+        "shared": "2e27142302dbbb1709938620c1c1e6d5ddc463d550401d72ebdc075c9d038bb9",
+        "entry": "96e5d3405bfed5ecd68f88a7b0d1bacfd032e1549bf4d58bfe8f00a4f886a417"
+      },
+      "logicalWork": "32f0e4d03ed0ecc01c8de8aa39fbe81f16c8be3450a1830f092e42d375e8cc1e",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-snapshot-admission-work",
+        "profileRevision": "0",
+        "operation": "programmatic-snapshot-admission",
+        "facts": [
+          {
+            "kind": "snapshot-nodes",
+            "unit": "snapshot-node",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "57"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "snapshot-collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "56"
+            }
+          },
+          {
+            "kind": "snapshot-total-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1254"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "snapshot-rejected-markers",
+            "unit": "rejected-marker",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1"
+            }
+          },
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2394"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-marker-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "23"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "113"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-snapshot-admission",
+        "fixture": {
+          "snapshot": "many-markers"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "snapshot-marked"
+      },
+      "inputContext": "26f5b2226b59edc09fe906076d22a67d9bc85b887b5beb6500b1db09c7c399e8",
+      "result": {
+        "shared": "2e27142302dbbb1709938620c1c1e6d5ddc463d550401d72ebdc075c9d038bb9",
+        "entry": "4c311b54a7886836b4c879117fe275a7432afab4269bd4426484bf2f03676049"
+      },
+      "logicalWork": "93d5807180000cfdd4b12a63d1db3396c50a75c7433ff2c944fdcb9affc331ff",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-snapshot-admission-work",
+        "profileRevision": "0",
+        "operation": "programmatic-snapshot-admission",
+        "facts": [
+          {
+            "kind": "snapshot-nodes",
+            "unit": "snapshot-node",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "121"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "snapshot-collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "120"
+            }
+          },
+          {
+            "kind": "snapshot-total-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1255"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "snapshot-rejected-markers",
+            "unit": "rejected-marker",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "64"
+            }
+          },
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4474"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-marker-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "37"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "241"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          }
+        ]
+      }
     }
   ]
 }

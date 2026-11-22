@@ -35,7 +35,8 @@ use super::measure::{Measured, MeasurementFailure};
 use super::observation::{self, Frame, Observation};
 use super::{
     artifact_collection, construction, evidence, hydration_relation, locale, locale_icu4x,
-    locale_resolution, resolved_binding, resource_policy, target_group, workflow,
+    locale_resolution, resolved_binding, resource_policy, snapshot_admission, target_group,
+    workflow,
 };
 
 pub(super) type Config = IntlifyConfig<PolicyReference, TargetProfileReference>;
@@ -100,10 +101,11 @@ pub(super) enum Operation {
     EntryEvidence,
     OutcomeFinalization,
     FileEntryCompleteWorkflow,
+    ProgrammaticSnapshotAdmission,
 }
 
 impl Operation {
-    pub(super) const ALL: [Self; 17] = [
+    pub(super) const ALL: [Self; 18] = [
         Self::FileMaterialization,
         Self::StructuralAnalysis,
         Self::AuthoringConstruction,
@@ -121,10 +123,13 @@ impl Operation {
         Self::EntryEvidence,
         Self::OutcomeFinalization,
         Self::FileEntryCompleteWorkflow,
+        Self::ProgrammaticSnapshotAdmission,
     ];
     pub(super) const fn phase(self) -> &'static str {
         match self {
-            Self::FileMaterialization => "profile_entry_materialize",
+            Self::FileMaterialization | Self::ProgrammaticSnapshotAdmission => {
+                "profile_entry_materialize"
+            }
             Self::StructuralAnalysis | Self::AuthoringConstruction => "profile_structural_admit",
             Self::ProfileSelection => "profile_select",
             Self::LocaleCanonicalization | Self::LocalePolicyResolution => "profile_locale_resolve",
@@ -162,6 +167,7 @@ impl Operation {
             Self::EntryEvidence => "entry_evidence",
             Self::OutcomeFinalization => "outcome_finalization",
             Self::FileEntryCompleteWorkflow => "file_entry_complete_workflow",
+            Self::ProgrammaticSnapshotAdmission => "programmatic_snapshot_admission",
         }
     }
     pub(super) const fn boundary(self) -> &'static str {
@@ -183,6 +189,7 @@ impl Operation {
             Self::EntryEvidence => "entry-evidence-projection/0",
             Self::OutcomeFinalization => "outcome-finalization/0",
             Self::FileEntryCompleteWorkflow => "file-entry-complete-workflow/0",
+            Self::ProgrammaticSnapshotAdmission => "programmatic-snapshot-admission/0",
         }
     }
     /// The pair and boundary of the peak live memory measured over this
@@ -240,6 +247,7 @@ pub(super) enum Prepared {
     EntryEvidence(Box<evidence::PreparedEvidence>),
     OutcomeFinalization(Box<evidence::outcome::PreparedOutcome>),
     Workflow(Box<workflow::PreparedWorkflow>),
+    Snapshot(Box<snapshot_admission::PreparedSnapshot>),
     Icu4xLocale {
         engine: locale_icu4x::PreparedEngine,
         input: Arc<str>,
@@ -264,6 +272,7 @@ pub(super) enum Output {
     EntryEvidence(evidence::entry::Resolved),
     OutcomeFinalization(Box<evidence::outcome::Resolved>),
     Workflow(Box<workflow::Resolved>),
+    Snapshot(Box<snapshot_admission::Resolved>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -306,6 +315,7 @@ impl Prepared {
             Self::EntryEvidence(_) => Operation::EntryEvidence,
             Self::OutcomeFinalization(_) => Operation::OutcomeFinalization,
             Self::Workflow(_) => Operation::FileEntryCompleteWorkflow,
+            Self::Snapshot(_) => Operation::ProgrammaticSnapshotAdmission,
         }
     }
 
@@ -638,6 +648,18 @@ impl Prepared {
                     output: Output::Workflow(Box::new(measured.output)),
                 })
             }
+            Self::Snapshot(prepared) => {
+                // The report is built before the start mark and borrowed;
+                // the admitted tree and its document own their values.
+                let measured = instrument.interval(
+                    (&prepared.report, prepared.limits),
+                    snapshot_admission::admit,
+                )?;
+                Ok(Interval {
+                    quantity: measured.quantity,
+                    output: Output::Snapshot(Box::new(measured.output)),
+                })
+            }
             Self::Icu4xLocale { engine, input } => {
                 // A fresh engine is admitted and bound before the start mark
                 // and released after the end mark.
@@ -714,6 +736,7 @@ impl Output {
             Self::EntryEvidence(resolved) => evidence::entry::observe(resolved),
             Self::OutcomeFinalization(resolved) => evidence::outcome::observe(resolved),
             Self::Workflow(resolved) => workflow::observe(resolved),
+            Self::Snapshot(resolved) => snapshot_admission::observe(resolved),
         }
     }
 }

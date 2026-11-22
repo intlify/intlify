@@ -875,7 +875,8 @@
         "shared-evidence",
         "entry-evidence",
         "outcome-finalization",
-        "file-entry-complete-workflow"
+        "file-entry-complete-workflow",
+        "programmatic-snapshot-admission"
       ],
       "type": "string"
     },
@@ -1154,6 +1155,16 @@
           },
           "required": ["workflow"],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "snapshot": {
+              "$ref": "#/definitions/SnapshotRecipe"
+            }
+          },
+          "required": ["snapshot"],
+          "type": "object"
         }
       ]
     },
@@ -1242,6 +1253,23 @@
       ],
       "type": "string"
     },
+    "SnapshotRecipe": {
+      "enum": [
+        "minimal",
+        "reversed-members",
+        "long-string",
+        "many-profiles",
+        "many-locale-occurrences",
+        "nested-array",
+        "many-values",
+        "portable-maximum",
+        "negative-zero",
+        "unsupported-type",
+        "cycle",
+        "many-markers"
+      ],
+      "type": "string"
+    },
     "StorageClasses": {
       "additionalProperties": false,
       "description": "The storage classes an observation counts, and those it leaves out.",
@@ -1326,7 +1354,8 @@
         "locale-policy-resolution-requested-not-resolved",
         "artifact-collection-not-admitted",
         "artifact-references-not-resolved",
-        "evidence-paths-not-admitted"
+        "evidence-paths-not-admitted",
+        "snapshot-holds-markers"
       ],
       "type": "string"
     },
@@ -1534,7 +1563,16 @@
         "workflow-shared-canonical-bytes",
         "workflow-entry-records",
         "workflow-entry-canonical-bytes",
-        "workflow-reserve-canonical-bytes"
+        "workflow-reserve-canonical-bytes",
+        "snapshot-nodes",
+        "snapshot-maximum-depth",
+        "snapshot-collection-entries",
+        "snapshot-total-string-bytes",
+        "snapshot-maximum-string-bytes",
+        "snapshot-rejected-markers",
+        "snapshot-envelope-canonical-bytes",
+        "snapshot-maximum-marker-canonical-bytes",
+        "snapshot-traversal-units"
       ],
       "type": "string"
     },
@@ -1589,7 +1627,10 @@
         "evidence-metadata-work",
         "related-evidence",
         "related-evidence-occurrence",
-        "path-segment"
+        "path-segment",
+        "snapshot-node",
+        "rejected-marker",
+        "traversal-unit"
       ],
       "type": "string"
     },

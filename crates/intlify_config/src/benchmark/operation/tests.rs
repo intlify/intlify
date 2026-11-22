@@ -37,7 +37,7 @@ fn analysis(value: &Value) -> Analysis {
         .unwrap()
 }
 
-pub(crate) fn operations() -> [Prepared; 17] {
+pub(crate) fn operations() -> [Prepared; 18] {
     let source: Arc<[u8]> = Arc::from(serde_json::to_vec(&minimal_config()).unwrap());
     let doc = Arc::new(
         materialize_file(Arc::clone(&source), crate::materialize_tests::limits()).unwrap(),
@@ -80,7 +80,16 @@ pub(crate) fn operations() -> [Prepared; 17] {
         evidence_operation(Operation::EntryEvidence),
         evidence_operation(Operation::OutcomeFinalization),
         workflow_operation(),
+        snapshot_operation(),
     ]
+}
+
+/// The admission of Minimal's value as a Snapshot, as its case prepares it.
+fn snapshot_operation() -> Prepared {
+    use crate::benchmark::cases::SnapshotRecipe;
+    use crate::benchmark::snapshot_admission::tests::candidate;
+
+    candidate(SnapshotRecipe::Minimal).prepared
 }
 
 /// One file entry's complete invocation of 015's example, as its case
@@ -343,6 +352,14 @@ fn every_active_pair_calls_its_real_core_operation_between_exact_markers() {
             Output::Workflow(resolved) => {
                 let retained = resolved.result.as_ref().unwrap();
                 assert!(retained.profile.is_some() && retained.materialized.is_some());
+            }
+            Output::Snapshot(resolved) => {
+                let Ok(admitted) = &**resolved else {
+                    panic!("the Snapshot is admitted");
+                };
+                let doc = admitted.document.as_ref().unwrap();
+                let value: Value = doc.decode(doc.root()).unwrap();
+                assert_eq!(value, minimal_config());
             }
             _ => panic!("unexpected owner operation result"),
         }

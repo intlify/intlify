@@ -131,6 +131,9 @@ pub(in crate::benchmark) fn prepare(
     if declaration.operation == Operation::FileEntryCompleteWorkflow {
         return prepare_workflow(declaration);
     }
+    if declaration.operation == Operation::ProgrammaticSnapshotAdmission {
+        return prepare_snapshot(declaration);
+    }
     let source = declaration.fixture.source();
     let (mut input_limits, mut structural_limits) = fixture_capacity();
     if let Some((kind, edge)) = declaration.limit {
@@ -362,7 +365,8 @@ pub(in crate::benchmark) fn prepare(
             | Operation::SharedEvidence
             | Operation::EntryEvidence
             | Operation::OutcomeFinalization
-            | Operation::FileEntryCompleteWorkflow => unreachable!(),
+            | Operation::FileEntryCompleteWorkflow
+            | Operation::ProgrammaticSnapshotAdmission => unreachable!(),
         }
     };
     // Only dispatch is repeated here; both reference preparation and timed calls
@@ -392,10 +396,11 @@ pub(in crate::benchmark) fn prepare(
         | Prepared::SharedEvidence(_)
         | Prepared::EntryEvidence(_)
         | Prepared::OutcomeFinalization(_)
-        | Prepared::Workflow(_) => {
+        | Prepared::Workflow(_)
+        | Prepared::Snapshot(_) => {
             unreachable!(
-                "Phases 7, 4, 9, 11, 12, and 13, construction, the Evidence stages, and the \
-                 complete invocation have their own preparation"
+                "Phases 7, 4, 9, 11, 12, and 13, construction, the Evidence stages, the complete \
+                 invocation, and the Snapshot admission have their own preparation"
             )
         }
     };
@@ -1503,6 +1508,49 @@ fn prepare_workflow(declaration: &Declaration) -> Result<Candidate, PreparationF
     Ok(Candidate {
         declaration: declaration.clone(),
         input_limits: None,
+        prepared,
+        output,
+        observation,
+        logical_work,
+    })
+}
+
+/// The formal Snapshot a binding built for a recipe before the case, as a
+/// file of the recipe's value spells it, admitted once under the case's
+/// bounds through the document of its value (D15:2765, 2824). It is admitted
+/// with a document, or holding a marker without one, as declared; a refused
+/// report fails the preparation (D15:2826).
+fn prepare_snapshot(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
+    use crate::benchmark::snapshot_admission::{admit, PreparedSnapshot};
+
+    let Recipe::Snapshot(recipe) = declaration.fixture else {
+        return Err(PreparationFailure::UndeclaredCase);
+    };
+    let prepared = PreparedSnapshot {
+        report: super::snapshot_inputs::report(recipe).ok_or(PreparationFailure::CoreInvariant)?,
+        limits: super::snapshot_inputs::limits(),
+    };
+    let resolved = admit((&prepared.report, prepared.limits));
+    let kind = match &resolved {
+        Ok(admitted) if admitted.document.is_some() => ExpectedKind::SnapshotMaterialized,
+        Ok(_) => ExpectedKind::SnapshotMarked,
+        Err(_) => return Err(PreparationFailure::PrerequisiteUnavailable),
+    };
+    if declaration.expected_kind != kind {
+        return Err(PreparationFailure::UnexpectedOutputKind);
+    }
+    let output = Output::Snapshot(Box::new(resolved));
+    let prepared = Prepared::Snapshot(Box::new(prepared));
+    let observation = output
+        .observe()
+        .map_err(|_| PreparationFailure::Observation)?;
+    let logical_work =
+        LogicalWork::observe(&prepared, &output).map_err(|_| PreparationFailure::Observation)?;
+    Ok(Candidate {
+        declaration: declaration.clone(),
+        // The tree is built from the recipe's file, materialized under the
+        // fixture capacity.
+        input_limits: Some(fixture_capacity().0),
         prepared,
         output,
         observation,
