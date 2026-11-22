@@ -1199,6 +1199,16 @@
           },
           "required": ["programmatic-workflow"],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "programmatic-evidence": {
+              "$ref": "#/definitions/ProgrammaticRecipe"
+            }
+          },
+          "required": ["programmatic-evidence"],
+          "type": "object"
         }
       ]
     },

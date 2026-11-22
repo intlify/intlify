@@ -68,16 +68,18 @@ pub(in crate::benchmark) enum Recipe {
         input: super::ProgrammaticRecipe,
         resolver: super::ResolverState,
     },
+    ProgrammaticEvidence(super::ProgrammaticRecipe),
 }
 
 impl Recipe {
-    /// The entry kind of a case whose cost both entry kinds have: a file
-    /// entry's invocation for an Evidence stage (D15:2792; plan 025 decision
-    /// #255). `None` for every other case, whose cost names its entry or has
-    /// none.
+    /// The entry kind of a case whose cost both entry kinds have: a file or a
+    /// programmatic entry's invocation for an Evidence stage (D15:2792; plan
+    /// 025 decision #255). `None` for every other case, whose cost names its
+    /// entry or has none.
     pub(in crate::benchmark) const fn entry_kind(self) -> Option<super::EntryKind> {
         match self {
             Self::Evidence(_) => Some(super::EntryKind::File),
+            Self::ProgrammaticEvidence(_) => Some(super::EntryKind::Programmatic),
             _ => None,
         }
     }
@@ -112,7 +114,7 @@ impl Recipe {
             // binds the tree as submitted.
             return recipe.file().source();
         }
-        if let Self::ProgrammaticWorkflow { input, .. } = self {
+        if let Self::ProgrammaticWorkflow { input, .. } | Self::ProgrammaticEvidence(input) = self {
             // Likewise for a programmatic entry's invocation.
             let file = input.file();
             return Arc::from(file.source(&file.limits()));

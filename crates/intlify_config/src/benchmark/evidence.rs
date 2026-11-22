@@ -1,8 +1,10 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! 015's Evidence materialization stages over one file entry's complete
-//! invocation (D15:2771, 2775). Before the interval, the invocation's
+//! 015's Evidence materialization stages over one entry's complete
+//! invocation (D15:2771, 2775): a file's, or a programmatic entry's whose
+//! admitted Snapshot is the value the file spells (D15:2788, 2792). Before the
+//! interval, the invocation's
 //! evaluation phases run on an evaluation of their own over 015's example and
 //! every artifact it names, under fixture-owned inputs: the finite fixture
 //! provider and the specifications the resolver supports for it, a capability
@@ -24,6 +26,7 @@ use crate::artifacts::vocabulary::{
     self, FormalVocabulary, IntentSurfaceClassVocabularyArtifact, VocabularyLimits,
 };
 use crate::boundary::capability::ImplementationCapability;
+use crate::boundary::snapshot::AdmittedSnapshot;
 use crate::boundary::verification::VerificationInput;
 use crate::construction::registry::check::{check_id, RecordKind};
 use crate::input_limits::InputLimits;
@@ -34,9 +37,13 @@ use crate::resolver::entry::fixtures::FileFixture;
 use crate::resolver::evaluation::{Admitted, Evaluation, ExhaustedBound, Status, Unit};
 use crate::resolver::evidence_metadata::fixtures::unbounded;
 use crate::resolver::outcome::{shared_projection, SharedStage};
-use crate::resolver::profile_resolution::{invoke_file, Invocation, Invoked, ResolverInvariant};
+use crate::resolver::profile_resolution::{
+    invoke_file, invoke_programmatic, Invocation, Invoked, ResolverInvariant,
+};
 use crate::resolver::reporting::{Candidates, Record, ReportingDomain};
 use crate::resolver::reporting_plan::Committed;
+use crate::resolver::snapshot_entry::fixtures::SnapshotFixture;
+use crate::resolver::snapshot_entry::SnapshotEntryLimits;
 use crate::resolver::specification::{
     ActiveProfileSpecification, SpecificationInput, SupportedSpecifications, VocabularyAssertion,
 };
@@ -45,6 +52,7 @@ use crate::structural::selection::SelectorInput;
 use crate::structural::StructuralLimits;
 
 use super::cases::evidence_limits;
+use super::cases::snapshot_inputs::limits as snapshot_limits;
 use super::observation::{Frame, Observation};
 use super::operation::{OutputFailure, Schema};
 use super::quantity::Quantity;
@@ -127,12 +135,15 @@ pub(super) fn supported() -> Option<SupportedSpecifications<Id>> {
 }
 
 /// A case's configuration file and the bounds strict file entry reads it
-/// under, the structural stage's bounds and schema, the selector, and the
-/// invocation's other inputs past 015's pre-invocation boundary. No classifier
-/// of the file's keys is kept: each invocation derives it from the capability.
+/// under, for a programmatic entry the Snapshot of the file's value admitted
+/// at its boundary, the structural stage's bounds and schema, the selector,
+/// and the invocation's other inputs past 015's pre-invocation boundary. No
+/// classifier of the file's keys is kept: each invocation derives it from the
+/// capability.
 pub(super) struct PreparedEvidence {
     pub(super) source: Arc<[u8]>,
     pub(super) input: InputLimits,
+    pub(super) snapshot: Option<AdmittedSnapshot>,
     pub(super) structural: StructuralLimits,
     pub(super) schema: Schema,
     pub(super) selector: SelectorInput,
@@ -164,6 +175,24 @@ impl PreparedEvidence {
         FileFixture::new(self.capability.policy_comparable())
     }
 
+    /// What a programmatic entry's Snapshot is admitted under: its keys are
+    /// classified as the file's are, under the same bounds (D15:776, 1889).
+    fn snapshot_fixture(&self) -> SnapshotFixture {
+        SnapshotFixture::new(self.capability.policy_comparable())
+    }
+
+    /// The bounds Phase 1 reads a programmatic entry's Snapshot under: the
+    /// `bootstrapOnly.snapshot` bounds the boundary admitted it under, as the
+    /// file is read under the fixture capacity rather than the capability's
+    /// minima (D15:869, 2129), and the file's value bounds, the same
+    /// `configurationInput` accounting (D15:1889).
+    fn entry_limits(&self) -> SnapshotEntryLimits {
+        SnapshotEntryLimits {
+            snapshot: snapshot_limits(),
+            value: self.input.value,
+        }
+    }
+
     /// Whether every count the stages make has room under the capability:
     /// its bounds are the ones every recipe but `Truncated` is prepared under.
     /// `Truncated`, or a case at the edge of a bound, has a bound at or below
@@ -173,24 +202,39 @@ impl PreparedEvidence {
             && self.capability.bootstrap_only().evidence_metadata == unbounded()
     }
 
-    /// The invocation's evaluation phases over the configuration file,
-    /// recording into `evaluation`: what they leave for the Evidence stages,
-    /// or `None` on a resolver defect. The Set Phase 9 admits is kept in
-    /// `set`.
+    /// The invocation's evaluation phases over the configuration file, or
+    /// over the Snapshot of its value, recording into `evaluation`: what they
+    /// leave for the Evidence stages, or `None` on a resolver defect. The Set
+    /// Phase 9 admits is kept in `set`.
     pub(super) fn invoke<'s>(
         &self,
         evaluation: &mut Evaluation,
         invocation: &Invocation<'s, Id>,
         set: &'s mut Option<Admitted<ArtifactSet<'s>>>,
     ) -> Option<Invoked<'s, Id>> {
+        let structure = (&self.schema, self.structural, &self.selector);
+        let provider = FixtureProvider::new();
+        if let Some(snapshot) = &self.snapshot {
+            let fixture = self.snapshot_fixture();
+            let entry = (&fixture.entry(snapshot), self.entry_limits());
+            return invoke_programmatic(
+                evaluation,
+                entry,
+                structure,
+                invocation,
+                &provider,
+                (set, &mut None),
+            )
+            .ok();
+        }
         let fixture = self.fixture();
         let file = fixture.file(Arc::clone(&self.source));
         invoke_file(
             evaluation,
             (&file, self.input),
-            (&self.schema, self.structural, &self.selector),
+            structure,
             invocation,
-            &FixtureProvider::new(),
+            &provider,
             (set, &mut None),
         )
         .ok()
@@ -441,9 +485,14 @@ impl InputFacts {
         structural_preparation: &str,
         ordinary_output: &str,
     ) -> Self {
+        let entry = if prepared.snapshot.is_some() {
+            "programmatic"
+        } else {
+            "file"
+        };
         Self {
-            scope: scope.into(),
-            entry_kind: "file".into(),
+            scope: scope.replace("-file-", &format!("-{entry}-")),
+            entry_kind: entry.into(),
             specifications:
                 "fixture-active-profile-specification-and-every-slot-asserting-what-it-supports"
                     .into(),
@@ -867,6 +916,83 @@ mod tests {
         assert_eq!(steps(&prepared), [Step::Safe("profiles"), Step::Unsafe]);
     }
 
+    /// A programmatic case's evidence, outcome finalization's, which every
+    /// recipe has.
+    fn programmatic(recipe: crate::benchmark::cases::ProgrammaticRecipe) -> PreparedEvidence {
+        let declaration = declarations().into_iter().find(|case| {
+            case.operation == Operation::OutcomeFinalization
+                && case.fixture == Recipe::ProgrammaticEvidence(recipe)
+        });
+        let prepared = prepare(&declaration.unwrap()).unwrap().prepared;
+        let Prepared::OutcomeFinalization(prepared) = prepared else {
+            unreachable!()
+        };
+        prepared.evidence
+    }
+
+    /// A programmatic entry's keys are classified as the file's are, under
+    /// the capability the input context binds (D15:776, 1889).
+    #[test]
+    fn the_snapshot_is_classified_under_the_capabilitys_bounds() {
+        use crate::benchmark::cases::ProgrammaticRecipe as P;
+        use crate::resolver::evidence_path::Step;
+        use crate::structural::Edge;
+
+        let path = [Edge::Member("profiles"), Edge::Member("app")];
+        let steps = |prepared: &PreparedEvidence| {
+            let fixture = prepared.snapshot_fixture();
+            let entry = fixture.entry(prepared.snapshot.as_ref().unwrap());
+            (entry.classify)(&path, None)
+        };
+        let mut prepared = programmatic(P::Storefront);
+        assert_eq!(
+            steps(&prepared),
+            [Step::Safe("profiles"), Step::Safe("app")]
+        );
+        let bytes = BoundId {
+            group: Group::ConfigurationInput,
+            name: "maxProfileIdBytes",
+        };
+        prepared.capability = capability(Some((bytes, 2)), unbounded());
+        assert_eq!(steps(&prepared), [Step::Safe("profiles"), Step::Unsafe]);
+    }
+
+    /// D15:869, 1889, 2129: Phase 1 reads each programmatic recipe's Snapshot
+    /// under the `bootstrapOnly.snapshot` bounds the boundary admits it
+    /// under, never the capability's minima, which admit none of them, and
+    /// its value under the bounds the file's is read under: the capability's
+    /// `configurationInput` ones, which come from the same capacity, but
+    /// not when a capability narrows them.
+    #[test]
+    fn each_snapshot_is_read_under_the_bounds_it_is_admitted_under() {
+        use crate::benchmark::cases::snapshot_inputs::spelled;
+        use crate::benchmark::cases::ProgrammaticRecipe as P;
+        use crate::boundary::snapshot::read_report;
+
+        let nodes = BoundId {
+            group: Group::ConfigurationInput,
+            name: "maxNodes",
+        };
+        for recipe in P::ALL {
+            let mut prepared = programmatic(recipe);
+            let limits = prepared.entry_limits();
+            let report = spelled(Arc::clone(&prepared.source), recipe.beside()).unwrap();
+            let admitted = read_report(Some(&report), &limits.snapshot).ok();
+            assert!(
+                admitted.is_some() && admitted == prepared.snapshot,
+                "{recipe:?}"
+            );
+            let minima = &prepared.capability.bootstrap_only().snapshot;
+            assert!(read_report(Some(&report), minima).is_err(), "{recipe:?}");
+            let comparable = prepared.capability.policy_comparable();
+            assert_eq!(comparable.configuration_input.value, prepared.input.value);
+            assert_eq!(limits.value, prepared.input.value, "{recipe:?}");
+            prepared.capability = capability(Some((nodes, 1)), unbounded());
+            let limits = prepared.entry_limits();
+            assert_eq!(limits.value, prepared.input.value, "{recipe:?}");
+        }
+    }
+
     /// The digest the vocabulary slot asserts is the sealed vocabulary's.
     #[test]
     fn the_vocabulary_slot_asserts_the_sealed_vocabularys_digest() {
@@ -875,5 +1001,65 @@ mod tests {
         assert_eq!(vocabulary.identity().as_str(), VOCABULARY.0);
         let members: Vec<&str> = vocabulary.members().iter().map(Token::as_str).collect();
         assert_eq!(members, SURFACES);
+    }
+
+    /// D15:2788, 2792, 2794; plan 025 decision #255: each Evidence stage over
+    /// a programmatic entry's invocation, whose Snapshot is the value its
+    /// file case's file spells, frames the Shared domain that file case
+    /// does and an Entry domain of its own, and its facts name the entry
+    /// kind. The example's value holding a marker has no value, so its
+    /// outcome frames another Shared domain.
+    #[test]
+    fn each_programmatic_stage_shares_the_shared_domain_of_its_files_case() {
+        use crate::benchmark::cases::{EntryKind, ProgrammaticRecipe as P};
+
+        let file = |operation, recipe| {
+            let declaration = declarations().into_iter().find(|case| {
+                case.operation == operation
+                    && case.fixture == Recipe::Evidence(recipe)
+                    && case.limit.is_none()
+            });
+            prepare(&declaration.unwrap()).unwrap()
+        };
+        let mut cases = 0;
+        for declaration in declarations() {
+            let Recipe::ProgrammaticEvidence(recipe) = declaration.fixture else {
+                continue;
+            };
+            cases += 1;
+            let kind = declaration.fixture.entry_kind();
+            assert_eq!(kind, Some(EntryKind::Programmatic), "{declaration:?}");
+            let programmatic = prepare(&declaration).unwrap();
+            let paired = file(declaration.operation, recipe.file());
+            let source = paired.declaration.fixture.source();
+            assert_eq!(declaration.fixture.source(), source, "{declaration:?}");
+            let (facts, prepared) = match &programmatic.prepared {
+                Prepared::SharedEvidence(prepared) => (InputFacts::observe(prepared), &**prepared),
+                Prepared::EntryEvidence(prepared) => (InputFacts::entry(prepared), &**prepared),
+                Prepared::OutcomeFinalization(prepared) => {
+                    (InputFacts::outcome(&prepared.evidence), &prepared.evidence)
+                }
+                _ => unreachable!(),
+            };
+            assert!(prepared.snapshot.is_some(), "{declaration:?}");
+            let facts = serde_json::to_value(facts).unwrap();
+            assert_eq!(facts["entryKind"], "programmatic");
+            assert!(facts["scope"]
+                .as_str()
+                .unwrap()
+                .contains("-programmatic-entry-"));
+            let (own, file) = (&programmatic.observation, &paired.observation);
+            if declaration.operation != Operation::SharedEvidence {
+                assert_ne!(own.entry, file.entry, "{declaration:?}");
+            }
+            let marked = recipe == P::RejectedMarker;
+            let outcome = declaration.operation == Operation::OutcomeFinalization;
+            assert_eq!(
+                own.shared == file.shared,
+                !(marked && outcome),
+                "{declaration:?}"
+            );
+        }
+        assert_eq!(cases, 12);
     }
 }

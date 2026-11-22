@@ -1112,6 +1112,33 @@ pub(super) fn declarations() -> Vec<Declaration> {
             ));
         }
     }
+    // Then, without changing any of those 475 rows, 015's Evidence
+    // materialization stages over one programmatic entry's invocation, whose
+    // entry kind each case names: the Shared projection stage over each
+    // recipe with a value, the Entry projection stage over each but the one
+    // its file's cases leave to the Shared edges, and outcome finalization
+    // over each, the example checked (D15:2788, 2792; plan 025 decision #255).
+    let programmatic = [
+        (Operation::SharedEvidence, &ProgrammaticRecipe::VALUED[..]),
+        (Operation::EntryEvidence, &ProgrammaticRecipe::ENTRY[..]),
+        (Operation::OutcomeFinalization, &ProgrammaticRecipe::ALL[..]),
+    ];
+    for (operation, recipes) in programmatic {
+        for &recipe in recipes {
+            let checked = recipe == ProgrammaticRecipe::Storefront;
+            cases.push(declaration(
+                operation,
+                Recipe::ProgrammaticEvidence(recipe),
+                Selector::App,
+                match operation {
+                    Operation::SharedEvidence => ExpectedKind::SharedEvidenceComplete,
+                    Operation::EntryEvidence => ExpectedKind::EntryEvidenceComplete,
+                    _ if checked => ExpectedKind::OutcomeFinalizationChecked,
+                    _ => ExpectedKind::OutcomeFinalizationBlocked,
+                },
+            ));
+        }
+    }
     cases
 }
 

@@ -1338,8 +1338,10 @@ fn prepare_evidence(declaration: &Declaration) -> Result<Candidate, PreparationF
     use crate::benchmark::evidence::Retained;
     use crate::resolver::evidence_metadata::fixtures::unbounded;
 
-    let Recipe::Evidence(recipe) = declaration.fixture else {
-        return Err(PreparationFailure::UndeclaredCase);
+    let (recipe, programmatic) = match declaration.fixture {
+        Recipe::Evidence(recipe) => (recipe, None),
+        Recipe::ProgrammaticEvidence(recipe) => (recipe.file(), Some(recipe)),
+        _ => return Err(PreparationFailure::UndeclaredCase),
     };
     let selector = declaration.selector;
     let edge = declaration
@@ -1385,7 +1387,12 @@ fn prepare_evidence(declaration: &Declaration) -> Result<Candidate, PreparationF
         }
     };
     let (input, _) = fixture_capacity();
-    let prepared = evidence_inputs(recipe, selector, limits, metadata)?;
+    let mut prepared = evidence_inputs(recipe, selector, limits, metadata)?;
+    // A programmatic entry enters with the Snapshot of the file's value.
+    if let Some(programmatic) = programmatic {
+        let admitted = super::workflow_inputs::admitted(programmatic, Arc::clone(&prepared.source));
+        prepared.snapshot = Some(admitted.ok_or(PreparationFailure::CoreInvariant)?);
+    }
     // Each stage's domain commits whole in every declared case.
     let whole = |result: Result<&Retained, _>, kind| match result {
         Ok(retained) if retained.exhausted.is_none() => Ok(kind),
@@ -1645,6 +1652,7 @@ fn evidence_inputs(
     Ok(PreparedEvidence {
         source: Arc::from(recipe.source(&limits)),
         input,
+        snapshot: None,
         structural,
         schema: configuration_schema().clone(),
         selector: selector_input(selector, structural.max_profile_id_bytes),

@@ -133,7 +133,7 @@ fn each_case_projection_carries_the_execution_state_its_prepared_case_runs_in() 
 fn issuance_freezes_unique_case_inventory_but_fresh_instances_do_not_change_case_identity() {
     let first = issue();
     let second = issue();
-    assert_eq!(first.document().body.case_inventory.len(), 475);
+    assert_eq!(first.document().body.case_inventory.len(), 487);
     assert_eq!(
         first.document().body.case_inventory,
         second.document().body.case_inventory
@@ -204,7 +204,7 @@ fn native_capture_uses_the_plan_already_issued_before_collection_and_retains_it_
         value["result"]["plan"]["commonRunPlan"],
         serde_json::to_value(identity).unwrap()
     );
-    assert_eq!(value["result"]["attempts"].as_array().unwrap().len(), 475);
+    assert_eq!(value["result"]["attempts"].as_array().unwrap().len(), 487);
 }
 
 #[test]
@@ -382,9 +382,13 @@ fn every_projection_declares_the_common_dimensions_it_serializes() {
         // Only an Evidence stage's case, whose cost both entry kinds have,
         // declares its entry kind (D15:2792; plan 025 decision #255).
         let evidence = projection.owner_phase == "profile_evidence_materialize";
+        let programmatic = value["variant"]["recipe"]
+            .get("programmatic-evidence")
+            .is_some();
+        let entry = if programmatic { "programmatic" } else { "file" };
         assert_eq!(
             value["variant"].get("entryKind"),
-            evidence.then(|| json!("file")).as_ref()
+            evidence.then(|| json!(entry)).as_ref()
         );
         // Only a complete invocation's case, which runs on a resolver in a
         // declared state, names that state, as its recipe does (plan 025

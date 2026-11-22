@@ -521,7 +521,7 @@ impl<'s> Scan<'s> {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "benchmark"))]
 pub(crate) mod fixtures {
     use crate::boundary::snapshot::AdmittedSnapshot;
     use crate::boundary::source::{read_entry_pair, ExactIdentity, SourceLimits};
