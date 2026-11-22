@@ -359,7 +359,7 @@ mod tests {
     use serde_json::Value;
 
     use super::*;
-    use crate::artifacts::collection::{read_collection, CollectionLimits};
+    use crate::artifacts::collection::{read_collection, CollectionLimits, CollectionReport};
     use crate::artifacts::content::sample;
     use crate::artifacts::envelope::{envelope_of, ArtifactKind, FormalMember};
     use crate::input_limits::Bound;
@@ -387,7 +387,7 @@ mod tests {
         let bytes: Vec<&[u8]> = texts.iter().map(String::as_bytes).collect();
         PreparedCollection {
             policy: ConfirmedPolicy::fixture_owned(fixture_limits(1)),
-            collection: read_collection(Some(&bytes), &ROOM).unwrap(),
+            collection: read_collection(Some(CollectionReport::Formal(&bytes)), &ROOM).unwrap(),
         }
     }
 

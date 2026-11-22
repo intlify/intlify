@@ -353,7 +353,7 @@ mod tests {
     use serde_json::{json, Value};
 
     use super::*;
-    use crate::artifacts::collection::{read_collection, CollectionLimits};
+    use crate::artifacts::collection::{read_collection, CollectionLimits, CollectionReport};
     use crate::artifacts::content::sample;
     use crate::artifacts::envelope::{envelope_of, sealed};
     use crate::resolver::evaluation::{IssueKey, Status};
@@ -374,7 +374,7 @@ mod tests {
     fn collection(values: &[Value]) -> FormalCollection {
         let texts: Vec<String> = values.iter().map(Value::to_string).collect();
         let bytes: Vec<&[u8]> = texts.iter().map(String::as_bytes).collect();
-        read_collection(Some(&bytes), &ROOM).unwrap()
+        read_collection(Some(CollectionReport::Formal(&bytes)), &ROOM).unwrap()
     }
 
     fn confirmed() -> ConfirmedPolicy {

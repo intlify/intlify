@@ -9,9 +9,16 @@
 //! invalid, duplicate, or unreferenced, for the resolver to admit: it never
 //! deduplicates, drops a member, or looks at what a member declares.
 //!
-//! The container's own form and any inspection of host values belong to the
-//! adapter that builds the list of members, so `malformed-container` and
-//! `unsafe-host-inspection` are reported there. The boundary never counts the
+//! Its formal input is the adapter's closed report of what it established
+//! about the host container, as the selector's, Snapshot's, and call-site
+//! sidecar's are: the formal list of members, a container whose form is not
+//! one (`malformed-container`), or one the adapter could not inspect without
+//! running its behavior (`unsafe-host-inspection`). Tests and conformance
+//! supply every report without a live host; inspecting one is the adapter's
+//! work (D15:3142, 3674). The report is checked in 015's order, an absent one
+//! first, then those two, before any bound of a member (D15:3155). A refused
+//! container yields nothing, while a formal one keeps its invalid members for
+//! the resolver's Findings (D15:3165, 3322). The boundary never counts the
 //! submitted occurrences: their number is the resolver's, under the Resource
 //! Limit Policy's `artifactAdmission` (D15:1849).
 
@@ -43,12 +50,30 @@ pub(crate) enum CollectionLimit {
     Depth,
 }
 
+/// The adapter's closed report of what it established about the host
+/// container. No `Debug`: a member can carry an arbitrary secret.
+#[derive(Clone, Copy)]
+pub(crate) enum CollectionReport<'a> {
+    /// The adapter could not inspect the container without running its
+    /// behavior.
+    Unsafe,
+    /// A container inspected safely whose form is not a list of members.
+    MalformedContainer,
+    /// The formal container: each member's bytes, in the order submitted,
+    /// borrowed from the adapter.
+    Formal(&'a [&'a [u8]]),
+}
+
 /// Why the boundary refuses a collection. Each has one of 015's closed
 /// reasons, which [`CollectionFailure::reason`] names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CollectionFailure {
     /// No collection was supplied.
     Missing,
+    /// The adapter could not inspect the container safely.
+    UnsafeHostInspection,
+    /// The container's form is not a list of members.
+    MalformedContainer,
     /// The collection or a member is over one of the caller's limits.
     OverBound(CollectionLimit),
     /// A member is beyond the shared reader's or framing's own capacity.
@@ -64,6 +89,8 @@ impl CollectionFailure {
     pub(crate) const fn reason(self) -> &'static str {
         match self {
             Self::Missing => "missing-input",
+            Self::UnsafeHostInspection => "unsafe-host-inspection",
+            Self::MalformedContainer => "malformed-container",
             Self::OverBound(_) | Self::BeyondCapacity => "formal-envelope-over-bound",
             Self::Unrepresentable => "unrepresentable-member",
         }
@@ -98,16 +125,21 @@ impl FormalCollection {
     }
 }
 
-/// Read a collection at the pre-invocation boundary. Each member's bytes, the
+/// Read an adapter's report at the pre-invocation boundary. A report that holds
+/// no formal container is refused first (D15:3155). Each member's bytes, the
 /// total, and each member's depth are checked before any member is decoded;
 /// then every member is decoded and framed once, and a capacity failure
 /// anywhere comes before an unrepresentable member anywhere. However many
 /// members there are, the boundary does not count them.
 pub(crate) fn read_collection(
-    members: Option<&[&[u8]]>,
+    report: Option<CollectionReport<'_>>,
     limits: &CollectionLimits,
 ) -> Result<FormalCollection, CollectionFailure> {
-    let members = members.ok_or(CollectionFailure::Missing)?;
+    let members = match report.ok_or(CollectionFailure::Missing)? {
+        CollectionReport::Unsafe => return Err(CollectionFailure::UnsafeHostInspection),
+        CollectionReport::MalformedContainer => return Err(CollectionFailure::MalformedContainer),
+        CollectionReport::Formal(members) => members,
+    };
     let mut total = 0_u64;
     for bytes in members {
         let length = count(bytes.len());
@@ -161,7 +193,7 @@ mod tests {
         members: &[&[u8]],
         limits: &CollectionLimits,
     ) -> Result<FormalCollection, CollectionFailure> {
-        read_collection(Some(members), limits)
+        read_collection(Some(CollectionReport::Formal(members)), limits)
     }
 
     #[test]
@@ -177,6 +209,11 @@ mod tests {
     fn each_failure_has_its_015_reason() {
         let reasons = [
             (CollectionFailure::Missing, "missing-input"),
+            (
+                CollectionFailure::UnsafeHostInspection,
+                "unsafe-host-inspection",
+            ),
+            (CollectionFailure::MalformedContainer, "malformed-container"),
             (
                 CollectionFailure::OverBound(CollectionLimit::MemberBytes),
                 "formal-envelope-over-bound",
@@ -198,6 +235,37 @@ mod tests {
         for (failure, reason) in reasons {
             assert_eq!(failure.reason(), reason, "{failure:?}");
         }
+    }
+
+    /// D15:3142, 3155: a report without a formal container is refused with
+    /// its own reason, at a position before every bound of a member, so that
+    /// limits no member could fit change nothing, while the same limits
+    /// refuse a formal container.
+    #[test]
+    fn a_report_without_a_formal_container_is_refused_before_any_bound() {
+        let nothing = CollectionLimits {
+            member_bytes: 0,
+            total_bytes: 0,
+            depth: 0,
+        };
+        for limits in [ROOM, nothing] {
+            assert_eq!(
+                read_collection(None, &limits),
+                Err(CollectionFailure::Missing)
+            );
+            assert_eq!(
+                read_collection(Some(CollectionReport::Unsafe), &limits),
+                Err(CollectionFailure::UnsafeHostInspection)
+            );
+            assert_eq!(
+                read_collection(Some(CollectionReport::MalformedContainer), &limits),
+                Err(CollectionFailure::MalformedContainer)
+            );
+        }
+        assert_eq!(
+            read(&[b"{}"], &nothing),
+            Err(CollectionFailure::OverBound(CollectionLimit::MemberBytes))
+        );
     }
 
     #[test]

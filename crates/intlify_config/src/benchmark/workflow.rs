@@ -35,6 +35,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::artifacts::collection::CollectionReport;
 use crate::artifacts::envelope::ExactTuple;
 use crate::boundary::common::Submitted;
 use crate::boundary::entry::{
@@ -161,7 +162,7 @@ impl RawInvocation {
                 origin: own(Kind::LocaleCanonicalizationData),
             },
             collection: Component {
-                value: Some(members),
+                value: Some(CollectionReport::Formal(members)),
                 origin: own(Kind::ProfileResolutionArtifactCollection),
             },
             verification: Component {

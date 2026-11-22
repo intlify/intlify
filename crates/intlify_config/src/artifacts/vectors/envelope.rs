@@ -14,7 +14,9 @@
 
 use serde_json::{json, Value};
 
-use crate::artifacts::collection::{read_collection, CollectionFailure, CollectionLimits};
+use crate::artifacts::collection::{
+    read_collection, CollectionFailure, CollectionLimits, CollectionReport,
+};
 use crate::artifacts::content::{self, sample};
 use crate::artifacts::envelope::{
     envelope_of, sealed, ArtifactKind, BodyFailure, Declaration, Envelope, ExactTuple,
@@ -355,8 +357,8 @@ fn spellings() -> Result<Vec<String>, String> {
     );
     let texts = vec![compact, spaced, reordered, escaped];
     let bytes: Vec<&[u8]> = texts.iter().map(String::as_bytes).collect();
-    let collection =
-        read_collection(Some(bytes.as_slice()), &ROOM).map_err(|failure| format!("{failure:?}"))?;
+    let collection = read_collection(Some(CollectionReport::Formal(bytes.as_slice())), &ROOM)
+        .map_err(|failure| format!("{failure:?}"))?;
     let members = collection.members();
     if members
         .iter()
@@ -380,7 +382,8 @@ fn unrepresentable() -> Result<Vec<String>, String> {
     ];
     for text in &texts {
         let bytes = [text.as_bytes()];
-        if read_collection(Some(bytes.as_slice()), &ROOM) != Err(CollectionFailure::Unrepresentable)
+        if read_collection(Some(CollectionReport::Formal(bytes.as_slice())), &ROOM)
+            != Err(CollectionFailure::Unrepresentable)
         {
             return Err(format!("{text} was not refused"));
         }

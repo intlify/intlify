@@ -450,7 +450,7 @@ mod tests {
     use serde_json::{json, Map, Value};
 
     use super::*;
-    use crate::artifacts::collection::{read_collection, CollectionLimits};
+    use crate::artifacts::collection::{read_collection, CollectionLimits, CollectionReport};
     use crate::artifacts::content::sample;
     use crate::artifacts::envelope::{envelope_of, ArtifactKind, ExactTuple, FormalMember};
     use crate::input_limits::Bound;
@@ -616,7 +616,8 @@ mod tests {
                 .unwrap();
             let texts: Vec<String> = self.members.iter().map(Value::to_string).collect();
             let bytes: Vec<&[u8]> = texts.iter().map(String::as_bytes).collect();
-            let collection = read_collection(Some(&bytes), &ROOM).unwrap();
+            let collection =
+                read_collection(Some(CollectionReport::Formal(&bytes)), &ROOM).unwrap();
             let set = admit_collection(&mut evaluation, Ok(&confirmed), &collection).unwrap();
             // The policies' references are no concern of Phase 11's.
             let references = observed

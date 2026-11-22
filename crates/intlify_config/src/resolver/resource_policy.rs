@@ -1287,7 +1287,7 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::artifacts::collection::{read_collection, CollectionLimits};
+    use crate::artifacts::collection::{read_collection, CollectionLimits, CollectionReport};
     use crate::artifacts::envelope::{envelope_of, ArtifactKind, ExactTuple};
     use crate::materialize::{materialize_file, NodeKind};
     use crate::materialize_tests::limits as input_limits;
@@ -1398,7 +1398,7 @@ mod tests {
     fn collection(values: &[Value]) -> FormalCollection {
         let texts: Vec<String> = values.iter().map(Value::to_string).collect();
         let bytes: Vec<&[u8]> = texts.iter().map(String::as_bytes).collect();
-        read_collection(Some(&bytes), &ROOM).unwrap()
+        read_collection(Some(CollectionReport::Formal(&bytes)), &ROOM).unwrap()
     }
 
     /// A Policy reference of `kind` the decision never looks at.
