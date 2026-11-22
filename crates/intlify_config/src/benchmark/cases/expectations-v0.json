@@ -62431,6 +62431,157 @@
           }
         ]
       }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-snapshot-admission",
+        "fixture": {
+          "snapshot": "trailing-string"
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "absent",
+        "expectedKind": "snapshot-materialized"
+      },
+      "inputContext": "21c21cf60f0991d0401d401213ff254b2217ec98fdd74081b8d24d5770f40a7f",
+      "result": {
+        "shared": "28bf50c9d163a668c5ab6d2113f527716e8664d49b60edfe7fe9a37ad0560cf8",
+        "entry": "f890c1e289448855352df9f6399a6baa3a534fe58f7ec260cb1a5cbb7bcb51d0"
+      },
+      "logicalWork": "63fa2f0586de93f1d94b6cb7bc8053c3b956e08c39501374015af5669a64c923",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-snapshot-admission-work",
+        "profileRevision": "0",
+        "operation": "programmatic-snapshot-admission",
+        "facts": [
+          {
+            "kind": "snapshot-nodes",
+            "unit": "snapshot-node",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "57"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "snapshot-collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "56"
+            }
+          },
+          {
+            "kind": "snapshot-total-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3305"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2048"
+            }
+          },
+          {
+            "kind": "snapshot-rejected-markers",
+            "unit": "rejected-marker",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "4431"
+            }
+          },
+          {
+            "kind": "snapshot-maximum-marker-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "113"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "57"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "7"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "56"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3305"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2048"
+            }
+          }
+        ]
+      }
     }
   ]
 }

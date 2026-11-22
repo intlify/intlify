@@ -1042,7 +1042,8 @@ pub(super) fn declarations() -> Vec<Declaration> {
     // recipe a file materialization case materializes but the padded one,
     // whose file case it pairs with, and Minimal's value holding rejected
     // markers, admitted with no document (D15:140, 2765, 2788; plan 025
-    // decision #316).
+    // decision #316); then, without changing any of those 443 rows, Minimal's
+    // value ending with a long string (plan 025 decision #325).
     for recipe in SnapshotRecipe::ALL {
         cases.push(declaration(
             Operation::ProgrammaticSnapshotAdmission,
