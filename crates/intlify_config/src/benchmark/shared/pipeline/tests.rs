@@ -581,7 +581,7 @@ fn a_projection_outside_the_common_vocabulary_is_never_projected() {
 }
 
 #[test]
-fn a_memory_run_projects_each_construction_peak_through_report_admission() {
+fn a_memory_run_projects_each_construction_and_invocation_peak_through_report_admission() {
     use crate::benchmark::instrument::tests::{report, ScriptedObserver, DESCRIPTION};
     let run = PreparedRun::acquire_memory(
         Box::new(ScriptedObserver::new([report(4096, 64)])),
@@ -599,19 +599,26 @@ fn a_memory_run_projects_each_construction_peak_through_report_admission() {
             checked.measured_cases,
             checked.non_measured_cases
         ),
-        (40, 40, 0)
+        (73, 73, 0)
     );
     let evidence = value(artifacts.evidence.as_ref().unwrap());
     let report = value(&artifacts.report);
     let cases = evidence["body"]["cases"].as_array().unwrap();
     let rows = report["body"]["sections"][0]["rows"].as_array().unwrap();
-    assert_eq!((cases.len(), rows.len()), (40, 40));
-    for (case, row) in cases.iter().zip(rows) {
+    assert_eq!((cases.len(), rows.len()), (73, 73));
+    for (index, (case, row)) in cases.iter().zip(rows).enumerate() {
         // The peak is the observed one, never divided by the repetitions.
         assert_eq!(case["samples"][0]["aggregateQuantity"], "4096");
         assert_eq!(row["samples"][0]["aggregateQuantity"], "4096");
         assert_eq!(row["ownerPhase"], "profile_resolve_peak_memory");
-        assert_eq!(row["ownerCost"], "construction_peak_live_memory");
+        // The construction cases, then the complete invocations', in
+        // registry order.
+        let cost = if index < 40 {
+            "construction_peak_live_memory"
+        } else {
+            "invocation_peak_live_memory"
+        };
+        assert_eq!(row["ownerCost"], cost);
         assert_eq!(row["category"], "memory");
         assert_eq!(row["operationClass"], "peak_live");
         assert_eq!(row["performanceSurface"], "core");

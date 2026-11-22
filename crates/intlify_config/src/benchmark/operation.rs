@@ -26,7 +26,7 @@ use crate::structural::{
     AdmissionInvariant, AuthoringSchema, StructuralAnalysis, StructuralLimits,
 };
 
-use super::cases::{Engine, ResolverState};
+use super::cases::{Engine, EntryKind, ResolverState};
 use super::clock::Clock;
 use super::instrument::{Instrument, Interval, Timed};
 use super::locale_icu4x::PreparedEngine;
@@ -203,14 +203,32 @@ impl Operation {
         }
     }
     /// The pair and boundary of the peak live memory measured over this
-    /// operation's interval (D15:2773). Only a fresh resolver construction has
-    /// one yet; a complete invocation's comes with that boundary.
+    /// operation's interval (D15:2773): a fresh resolver construction's, and
+    /// each entry's complete invocation's. The two invocations' intervals
+    /// begin with their own entry's admission, so each has a boundary of its
+    /// own, and their one cost names no entry, so each states its entry kind
+    /// (D15:2775, 2792; D26:1527). A replay is neither.
     pub(super) const fn peak_memory(self) -> Option<PeakMemory> {
+        const PHASE: &str = "profile_resolve_peak_memory";
+        const INVOCATION: &str = "invocation_peak_live_memory";
         match self {
             Self::ConstructionAuthorityAdmission => Some(PeakMemory {
-                phase: "profile_resolve_peak_memory",
+                phase: PHASE,
                 cost: "construction_peak_live_memory",
                 boundary: "resolver-construction-peak-memory/0",
+                entry_kind: None,
+            }),
+            Self::FileEntryCompleteWorkflow => Some(PeakMemory {
+                phase: PHASE,
+                cost: INVOCATION,
+                boundary: "file-entry-invocation-peak-memory/0",
+                entry_kind: Some(EntryKind::File),
+            }),
+            Self::ProgrammaticEntryCompleteWorkflow => Some(PeakMemory {
+                phase: PHASE,
+                cost: INVOCATION,
+                boundary: "programmatic-entry-invocation-peak-memory/0",
+                entry_kind: Some(EntryKind::Programmatic),
             }),
             _ => None,
         }
@@ -224,6 +242,8 @@ pub(super) struct PeakMemory {
     pub(super) phase: &'static str,
     pub(super) cost: &'static str,
     pub(super) boundary: &'static str,
+    /// The entry of an invocation's case, which its cost does not name.
+    pub(super) entry_kind: Option<EntryKind>,
 }
 
 pub(super) enum Prepared {

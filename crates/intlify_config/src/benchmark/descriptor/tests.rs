@@ -1072,6 +1072,64 @@ fn actual_provider_description_is_supported_without_a_numeric_threshold() {
     }
 }
 
+/// D15:2773, 2775, 2792; D26:1527, 1534: only a construction and each entry's
+/// complete invocation have a memory pair. Each invocation has a boundary of
+/// its own, whose interval is its duration's, with the same markers and the
+/// same component overlap, and states its entry, which the one cost does not
+/// name; a replay has none.
+#[test]
+fn each_entry_invocation_has_a_memory_boundary_of_its_own() {
+    use crate::benchmark::cases::EntryKind;
+
+    let measured: Vec<Operation> = Operation::ALL
+        .into_iter()
+        .filter(|operation| operation.peak_memory().is_some())
+        .collect();
+    assert_eq!(
+        measured,
+        [
+            Operation::ConstructionAuthorityAdmission,
+            Operation::FileEntryCompleteWorkflow,
+            Operation::ProgrammaticEntryCompleteWorkflow,
+        ]
+    );
+    let construction = Operation::ConstructionAuthorityAdmission.peak_memory();
+    assert_eq!(construction.unwrap().entry_kind, None);
+    let observer = InstrumentDescription::Observer(DESCRIPTION);
+    for (operation, identity, entry) in [
+        (
+            Operation::FileEntryCompleteWorkflow,
+            "file-entry-invocation-peak-memory/0",
+            EntryKind::File,
+        ),
+        (
+            Operation::ProgrammaticEntryCompleteWorkflow,
+            "programmatic-entry-invocation-peak-memory/0",
+            EntryKind::Programmatic,
+        ),
+    ] {
+        assert_eq!(operation.peak_memory().unwrap().entry_kind, Some(entry));
+        let (memory, duration) = (
+            Boundary::for_memory(operation).unwrap(),
+            Boundary::for_operation(operation),
+        );
+        assert_eq!(memory.identity, identity);
+        assert_eq!(
+            (memory.phase.as_str(), memory.cost.as_str()),
+            ("profile_resolve_peak_memory", "invocation_peak_live_memory")
+        );
+        assert_eq!(memory.metric, "peak_live_bytes");
+        assert_eq!(memory.operation, operation);
+        assert_eq!(memory.included_markers, duration.included_markers);
+        assert_eq!(memory.direct_children, duration.direct_children);
+        assert!(memory.direct_parents.is_empty());
+        let prepared = &prepared(operation);
+        let descriptors = Descriptors::for_observer(prepared, DESCRIPTION).unwrap();
+        assert_eq!(descriptors.boundary, memory);
+        assert!(descriptors.validate_with(prepared, observer).is_empty());
+    }
+}
+
 #[test]
 fn a_memory_case_is_described_by_its_observer_and_reads_no_clock() {
     let operation = &prepared(Operation::ConstructionAuthorityAdmission);
@@ -1162,7 +1220,12 @@ fn only_an_operation_with_a_memory_boundary_has_memory_descriptors() {
         let memory = Descriptors::for_observer(operation, DESCRIPTION);
         assert_eq!(
             memory.is_some(),
-            operation.operation() == Operation::ConstructionAuthorityAdmission,
+            matches!(
+                operation.operation(),
+                Operation::ConstructionAuthorityAdmission
+                    | Operation::FileEntryCompleteWorkflow
+                    | Operation::ProgrammaticEntryCompleteWorkflow
+            ),
             "{:?}",
             operation.operation()
         );

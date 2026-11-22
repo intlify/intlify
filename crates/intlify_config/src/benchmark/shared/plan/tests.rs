@@ -478,10 +478,14 @@ fn a_dimension_that_applies_is_present_and_one_that_does_not_is_never_null() {
 }
 
 #[test]
-fn a_memory_run_projects_each_construction_case_as_its_peak() {
+fn a_memory_run_projects_each_construction_and_invocation_case_as_its_peak() {
     use crate::benchmark::instrument::tests::{ScriptedObserver, DESCRIPTION};
     use crate::benchmark::memory_domain;
     use crate::benchmark::operation::Operation;
+    const CONSTRUCTION: Operation = Operation::ConstructionAuthorityAdmission;
+    const FILE: Operation = Operation::FileEntryCompleteWorkflow;
+    const PROGRAMMATIC: Operation = Operation::ProgrammaticEntryCompleteWorkflow;
+
     let registry = Registry::load().unwrap();
     let context =
         CaptureContext::acquire_memory(&registry, Box::new(ScriptedObserver::new([])), DESCRIPTION)
@@ -491,35 +495,49 @@ fn a_memory_run_projects_each_construction_case_as_its_peak() {
     let twins = duration
         .projections()
         .iter()
-        .filter(|projection| {
-            projection.phase_cost()
-                == (
-                    "profile_resolver_construct",
-                    "construction_authority_admission",
-                )
+        .filter_map(|projection| {
+            [CONSTRUCTION, FILE, PROGRAMMATIC]
+                .into_iter()
+                .find(|operation| operation.cost() == projection.phase_cost().1)
+                .map(|operation| (projection, operation))
         })
         .collect::<Vec<_>>();
-    assert_eq!((memory.projections().len(), twins.len()), (40, 40));
+    assert_eq!((memory.projections().len(), twins.len()), (73, 73));
+    let cases = |wanted| twins.iter().filter(|(_, each)| *each == wanted).count();
+    assert_eq!([CONSTRUCTION, FILE, PROGRAMMATIC].map(cases), [40, 18, 15]);
     let schema: Value = serde_json::from_str(include_str!(
         "../../../../schema/measurement-case-identity-v0.schema.json"
     ))
     .unwrap();
     let validator = jsonschema::draft7::new(&schema).unwrap();
-    for (memory, duration) in memory.projections().iter().zip(twins) {
+    for (memory, (duration, operation)) in memory.projections().iter().zip(twins) {
         let common = CommonProjection::common(memory);
         assert_eq!(common.eligibility(), Ok(()));
-        assert_eq!(
-            memory.phase_cost(),
-            (
-                "profile_resolve_peak_memory",
-                "construction_peak_live_memory"
-            )
-        );
+        let (cost, domain, entry) = match (operation, duration.variant.resolver) {
+            (CONSTRUCTION, None) => (
+                "construction_peak_live_memory",
+                memory_domain::construction(),
+                None,
+            ),
+            (FILE, Some(state)) => (
+                "invocation_peak_live_memory",
+                memory_domain::invocation(state),
+                Some(EntryKind::File),
+            ),
+            (PROGRAMMATIC, Some(state)) => (
+                "invocation_peak_live_memory",
+                memory_domain::invocation(state),
+                Some(EntryKind::Programmatic),
+            ),
+            other => panic!("{other:?}"),
+        };
+        assert_eq!(memory.phase_cost(), ("profile_resolve_peak_memory", cost));
         assert_eq!(common.category, Category::Memory);
         assert_eq!(common.operation_class, OperationClass::PeakLive);
+        assert_eq!(common.surface, Surface::Core);
         assert_eq!(common.metric, Metric::PeakLiveBytes);
         assert_eq!(common.aggregation, Aggregation::PeakOverBatch);
-        assert_eq!(common.memory_domain, Some(&memory_domain::construction()));
+        assert_eq!(common.memory_domain, Some(&domain));
         assert!(memory_domain::agrees(
             common.memory_domain.unwrap(),
             &memory.execution_state
@@ -530,14 +548,22 @@ fn a_memory_run_projects_each_construction_case_as_its_peak() {
         );
         assert_eq!(
             Some(&memory.interval_boundary),
-            Boundary::for_memory(Operation::ConstructionAuthorityAdmission).as_ref()
+            Boundary::for_memory(operation).as_ref()
         );
-        // The fixture, variant, workload, and execution state are the
-        // duration case's, and the memory case is another case.
+        // The fixture, workload, and execution state are the duration
+        // case's, its variant is too but for the entry kind only the memory
+        // cost leaves unnamed (D15:2792), and the memory case is another
+        // case.
+        assert_eq!(memory.variant.entry_kind, entry);
+        assert_eq!(duration.variant.entry_kind, None);
+        let variant = Variant {
+            entry_kind: None,
+            ..memory.variant.clone()
+        };
         assert_eq!(
             (
                 &memory.fixture,
-                &memory.variant,
+                &variant,
                 &memory.workload,
                 &memory.execution_state
             ),

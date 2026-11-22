@@ -137,7 +137,7 @@ impl MeasurementProfile {
                 revision: "0".into(),
             },
             scope: if memory {
-                "internal-resolver-construction-peak-live-memory"
+                "internal-resolver-construction-and-complete-invocation-peak-live-memory"
             } else {
                 "internal-configuration-locale-policy-resolution-canonicalization-with-icu4x-resource-policy-bootstrap-artifact-collection-admission-and-resolved-binding-construction"
             }

@@ -267,20 +267,31 @@ impl CaseProjection {
         })
     }
 
-    /// The peak live memory of a case's interval: the same fixture, variant,
-    /// workload, and execution state as its duration, under the memory pair
-    /// and its grouping, the construction domain (D15:2805), and the
-    /// observer's method.
+    /// The peak live memory of a case's interval: the same fixture, workload,
+    /// and execution state as its duration, and its variant with the entry
+    /// kind the memory cost does not name (D15:2792), under the memory pair
+    /// and its grouping, the observer's method, and the domain of what it
+    /// observes: an invocation of a resolver in the case's state, or a
+    /// construction, whose case names no resolver state (D15:2805).
     fn memory(duration: Self, memory: PeakMemory, boundary: Boundary, method: Method) -> Self {
         let (category, operation_class, performance_surface) = grouping(memory.phase);
+        let domain = match duration.variant.resolver {
+            Some(resolver) => memory_domain::invocation(resolver),
+            None => memory_domain::construction(),
+        };
+        let variant = Variant {
+            entry_kind: memory.entry_kind,
+            ..duration.variant.clone()
+        };
         Self {
             owner_phase: memory.phase.into(),
             owner_cost: memory.cost.into(),
             category,
             operation_class,
             performance_surface,
-            memory_observation_domain: Some(memory_domain::construction()),
+            memory_observation_domain: Some(domain),
             interval_boundary: boundary,
+            variant,
             metric: Metric::PeakLiveBytes,
             measurement_method: method,
             sample_aggregation: Aggregation::PeakOverBatch,
