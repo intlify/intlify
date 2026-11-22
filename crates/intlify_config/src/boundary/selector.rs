@@ -21,7 +21,10 @@
 //! The bound is the Admitted Implementation Capability's
 //! `policyComparable.configurationInput.maxProfileIdBytes`. The report is the
 //! boundary's formal input, so tests and conformance supply every report
-//! without a live host; inspecting a live host is the binding's work.
+//! without a live host; inspecting a live host is the binding's work. A
+//! `string` report borrows the string the binding read, which stays the
+//! binding's, so an interval that admits a report made before it frees none
+//! of it (D15:2805).
 
 use crate::artifacts::count;
 use crate::input_limits::Bound;
@@ -31,12 +34,12 @@ use super::capability::ImplementationCapability;
 
 /// The binding's closed report of what it established about the host
 /// selector. No `Debug`: a string can still carry an arbitrary secret.
-#[derive(Clone, PartialEq, Eq)]
-pub(crate) enum SelectorReport {
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SelectorReport<'a> {
     /// No selector was supplied.
     Absent,
-    /// One complete Unicode-scalar string.
-    String(String),
+    /// One complete Unicode-scalar string, borrowed from the binding.
+    String(&'a str),
     /// A string the binding stopped reading once it crossed the bound.
     OverLimitString,
     /// A top-level JSON type other than a string, established safely.
@@ -69,7 +72,7 @@ impl SelectorRefusal {
 
 /// Admit a report under the capability's bound.
 pub(crate) fn admit(
-    report: SelectorReport,
+    report: SelectorReport<'_>,
     capability: &ImplementationCapability,
 ) -> Result<SelectorInput, SelectorRefusal> {
     read_report(
@@ -85,7 +88,7 @@ pub(crate) fn admit(
 /// The boundary's mapping of a report under `bound`, which [`admit`] takes
 /// from the capability.
 pub(crate) fn read_report(
-    report: SelectorReport,
+    report: SelectorReport<'_>,
     bound: Bound,
 ) -> Result<SelectorInput, SelectorRefusal> {
     match report {
@@ -93,7 +96,7 @@ pub(crate) fn read_report(
         SelectorReport::String(value) if count(value.len()) > bound.get() => {
             Err(SelectorRefusal::MalformedNormalized)
         }
-        SelectorReport::String(value) => Ok(SelectorInput::string(&value, bound)),
+        SelectorReport::String(value) => Ok(SelectorInput::string(value, bound)),
         SelectorReport::OverLimitString => Ok(SelectorInput::over_limit(bound)),
         SelectorReport::InvalidType(kind) => Ok(SelectorInput::invalid_type(kind, bound)),
         SelectorReport::Unrepresentable => Err(SelectorRefusal::Unrepresentable),
@@ -124,14 +127,14 @@ mod tests {
     }
 
     /// The normalized input a report becomes, or the refusal.
-    fn admitted(report: SelectorReport, under: Bound) -> SelectorInput {
+    fn admitted(report: SelectorReport<'_>, under: Bound) -> SelectorInput {
         match read_report(report, under) {
             Ok(input) => input,
             Err(refusal) => panic!("refused as {}", refusal.reason()),
         }
     }
 
-    fn refused(report: SelectorReport, under: Bound) -> Option<SelectorRefusal> {
+    fn refused(report: SelectorReport<'_>, under: Bound) -> Option<SelectorRefusal> {
         read_report(report, under).err()
     }
 
@@ -140,7 +143,7 @@ mod tests {
         let under = bound(8);
         assert!(admitted(SelectorReport::Absent, under)
             .benchmark_matches_fixture(&SelectorInput::absent(under)));
-        assert!(admitted(SelectorReport::String("app".to_owned()), under)
+        assert!(admitted(SelectorReport::String("app"), under)
             .benchmark_matches_fixture(&SelectorInput::string("app", under)));
         assert!(admitted(SelectorReport::OverLimitString, under)
             .benchmark_matches_fixture(&SelectorInput::string("123456789", under)));
@@ -149,7 +152,7 @@ mod tests {
                 .benchmark_matches_fixture(&SelectorInput::invalid_type(kind, under)));
         }
         // The empty string is a complete string; its syntax is the resolver's.
-        assert!(admitted(SelectorReport::String(String::new()), under)
+        assert!(admitted(SelectorReport::String(""), under)
             .benchmark_matches_fixture(&SelectorInput::string("", under)));
     }
 
@@ -157,7 +160,7 @@ mod tests {
     #[test]
     fn a_string_spelling_a_type_is_a_string() {
         let under = bound(8);
-        let input = admitted(SelectorReport::String("array".to_owned()), under);
+        let input = admitted(SelectorReport::String("array"), under);
         assert!(
             !input.benchmark_matches_fixture(&SelectorInput::invalid_type(
                 InvalidSelectorType::Array,
@@ -181,24 +184,40 @@ mod tests {
     #[test]
     fn a_complete_string_past_the_bound_is_malformed() {
         let under = bound(4);
-        assert!(admitted(SelectorReport::String("abcd".to_owned()), under)
+        assert!(admitted(SelectorReport::String("abcd"), under)
             .benchmark_matches_fixture(&SelectorInput::string("abcd", under)));
         assert_eq!(
-            refused(SelectorReport::String("abcde".to_owned()), under),
+            refused(SelectorReport::String("abcde"), under),
             Some(SelectorRefusal::MalformedNormalized)
         );
         // The bound counts UTF-8 bytes, not characters.
         assert_eq!(
-            refused(
-                SelectorReport::String("\u{e9}\u{e9}\u{e9}".to_owned()),
-                under
-            ),
+            refused(SelectorReport::String("\u{e9}\u{e9}\u{e9}"), under),
             Some(SelectorRefusal::MalformedNormalized)
         );
-        assert!(
-            admitted(SelectorReport::String("\u{e9}\u{e9}".to_owned()), under)
-                .benchmark_matches_fixture(&SelectorInput::string("\u{e9}\u{e9}", under))
-        );
+        assert!(admitted(SelectorReport::String("\u{e9}\u{e9}"), under)
+            .benchmark_matches_fixture(&SelectorInput::string("\u{e9}\u{e9}", under)));
+    }
+
+    /// The report borrows the binding's string, so the binding keeps it after
+    /// either result and the same report is admitted, or refused, alike
+    /// again (D15:2805).
+    #[test]
+    fn the_string_stays_the_bindings_and_reads_alike_again() {
+        let under = bound(4);
+        let read = String::from("app");
+        let report = SelectorReport::String(&read);
+        let first = admitted(report, under);
+        assert!(first.benchmark_matches_fixture(&admitted(report, under)));
+        assert!(first.benchmark_matches_fixture(&SelectorInput::string("app", under)));
+        assert_eq!(read, "app");
+        let long = String::from("abcde");
+        for _ in 0..2 {
+            assert_eq!(
+                refused(SelectorReport::String(&long), under),
+                Some(SelectorRefusal::MalformedNormalized)
+            );
+        }
     }
 
     #[test]
@@ -232,11 +251,11 @@ mod tests {
     #[test]
     fn the_capability_bounds_the_report() {
         let five = capability(5);
-        let input = admit(SelectorReport::String("abcde".to_owned()), &five)
+        let input = admit(SelectorReport::String("abcde"), &five)
             .unwrap_or_else(|refusal| panic!("refused as {}", refusal.reason()));
         assert!(input.benchmark_matches_fixture(&SelectorInput::string("abcde", bound(5))));
         assert_eq!(
-            admit(SelectorReport::String("abcdef".to_owned()), &five).err(),
+            admit(SelectorReport::String("abcdef"), &five).err(),
             Some(SelectorRefusal::MalformedNormalized)
         );
         let absent = admit(SelectorReport::Absent, &five)

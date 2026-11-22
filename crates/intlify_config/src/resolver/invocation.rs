@@ -478,9 +478,9 @@ pub(crate) mod tests {
             Arc::from(serde_json::to_vec(&self.config).unwrap())
         }
 
-        fn selector(&self, slot: Kind) -> Component<'static, SelectorReport> {
+        fn selector(&self, slot: Kind) -> Component<'_, SelectorReport<'_>> {
             Component {
-                value: SelectorReport::String(self.selected.clone()),
+                value: SelectorReport::String(&self.selected),
                 origin: Some(slot.id()),
             }
         }
@@ -546,11 +546,12 @@ pub(crate) mod tests {
                     mappings: mirrored(&text),
                 })
             });
+            let report = SnapshotReport::Formal {
+                root: submitted(root),
+                digest: digest.clone(),
+            };
             let programmatic = ProgrammaticValue {
-                snapshot: Some(SnapshotReport::Formal {
-                    root: submitted(root),
-                    digest: digest.clone(),
-                }),
+                snapshot: Some(&report),
                 identity: Some(ENTRY),
                 marked,
                 revision: Some(&digest),

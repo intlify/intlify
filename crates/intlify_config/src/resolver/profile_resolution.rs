@@ -1502,7 +1502,7 @@ pub(super) mod tests {
                 root: submitted(&root),
                 digest: root.digest(),
             };
-            let snapshot = read_report(Some(report), &bounds).unwrap();
+            let snapshot = read_report(Some(&report), &bounds).unwrap();
             let pair_limits = SourceLimits {
                 identity_bytes: room,
                 revision_bytes: room,

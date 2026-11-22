@@ -150,7 +150,7 @@ impl RawInvocation {
                 origin: own(Kind::ConfigurationFile),
             },
             selector: Component {
-                value: SelectorReport::String(self.selector.clone()),
+                value: SelectorReport::String(&self.selector),
                 origin: own(Kind::ProfileSelectorCli),
             },
         });
