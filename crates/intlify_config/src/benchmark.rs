@@ -52,6 +52,8 @@ mod operation;
 #[cfg(feature = "benchmark")]
 mod profile;
 #[cfg(feature = "benchmark")]
+mod reresolution;
+#[cfg(feature = "benchmark")]
 mod resolved_binding;
 #[cfg(feature = "benchmark")]
 mod resource_policy;

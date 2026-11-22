@@ -60,7 +60,9 @@ use crate::resolver::entry::fixtures::FILE;
 use crate::resolver::exact_resolution::ArtifactBindings;
 use crate::resolver::finalization::reserved_bytes;
 use crate::resolver::invocation::{OutcomeStorage, Resolution, Resolver};
+use crate::resolver::materialized::MaterializedInputs;
 use crate::resolver::origin::SafeOriginKind as Kind;
+use crate::resolver::outcome::Checked;
 use crate::resolver::profile_resolution::ResolverInvariant;
 use crate::resolver::profile_view::ProfileView;
 use crate::resolver::token::Specification;
@@ -429,6 +431,22 @@ impl PreparedWorkflow {
     }
 }
 
+/// `raw`'s complete invocation on `resolver`, untimed: its outcome as the
+/// output retains it, and the Materialized Resolution Input Set beside it;
+/// `None` when the set is refused or a resolver defect is found.
+pub(in crate::benchmark) fn materialized(
+    resolver: &Resolver<'_>,
+    raw: &RawInvocation,
+) -> Option<(RetainedWorkflow, Option<MaterializedInputs<Icu4xData>>)> {
+    let members = raw.members();
+    let mut slot = None;
+    let mut storage = OutcomeStorage::default();
+    let submitted = raw.submitted(&members);
+    let resolution =
+        complete((resolver, submitted, &raw.assertion, &mut slot, &mut storage)).ok()?;
+    Some((RetainedWorkflow::of(&resolution), resolution.materialized))
+}
+
 /// Whether `raw`'s complete invocation on `resolver` ends in a blocked
 /// outcome. The outcome, the set it admitted, and the storage it borrowed are
 /// released before this returns.
@@ -532,24 +550,26 @@ pub(in crate::benchmark) struct RetainedWorkflow {
     pub(in crate::benchmark) materialized: Option<String>,
 }
 
+/// A profile view and its bindings as the output retains them.
+pub(in crate::benchmark) fn retained_profile(
+    checked: &Checked<'_, '_>,
+) -> (ProfileView, Vec<Binding>) {
+    let body = |artifact: &AdmittedArtifact<'_>| artifact.member.canonical_body().to_vec();
+    let bindings: &ArtifactBindings<'_> = checked.bindings;
+    let bindings = bindings
+        .iter()
+        .map(|(tuple, artifact)| (tuple.clone(), body(artifact)));
+    (checked.profile.clone(), bindings.collect())
+}
+
 impl RetainedWorkflow {
     fn of(resolution: &Resolution<'_, Icu4xData>) -> Self {
         let outcome = &resolution.outcome;
-        let bindings = |bindings: &ArtifactBindings<'_>| {
-            let body = |artifact: &AdmittedArtifact<'_>| artifact.member.canonical_body().to_vec();
-            bindings
-                .iter()
-                .map(|(tuple, artifact)| (tuple.clone(), body(artifact)))
-                .collect()
-        };
         Self {
             identity: outcome.identity,
             entry: RetainedProjection::of(&outcome.evidence.entry),
             shared: outcome.evidence.shared.as_ref().map(RetainedProjection::of),
-            profile: outcome
-                .checked
-                .as_ref()
-                .map(|checked| (checked.profile.clone(), bindings(checked.bindings))),
+            profile: outcome.checked.as_ref().map(retained_profile),
             reserve: reserved_bytes(outcome),
             materialized: resolution
                 .materialized
@@ -600,19 +620,7 @@ pub(in crate::benchmark) fn observe(resolved: &Resolved) -> Result<Observation, 
     if let Some(projection) = &retained.shared {
         project(&mut shared, specification, projection)?;
     }
-    shared.flag(retained.profile.is_some());
-    if let Some((view, bindings)) = &retained.profile {
-        shared.json(&serde_json::to_value(view).map_err(|_| OutputFailure::ObservationEncoding)?);
-        shared.uint(u64::try_from(bindings.len()).unwrap_or(u64::MAX));
-        for (tuple, body) in bindings {
-            shared.text(tuple.kind.spelling());
-            shared.text(tuple.identity.as_str());
-            shared.text(tuple.revision.as_str());
-            shared.text(tuple.specification_revision.as_str());
-            shared.text(tuple.semantic_digest.as_str());
-            shared.bytes(body);
-        }
-    }
+    frame_profile(&mut shared, retained.profile.as_ref())?;
     shared.flag(retained.materialized.is_some());
     if let Some(digest) = &retained.materialized {
         shared.text(digest);
@@ -623,6 +631,29 @@ pub(in crate::benchmark) fn observe(resolved: &Resolved) -> Result<Observation, 
         shared: shared.finish(),
         entry: Some(entry.finish()),
     })
+}
+
+/// Whether `profile` is present, and its view and each binding's tuple and
+/// `C(member)` of its member, as an outcome's and a replay's shared domains
+/// frame them (plan 025 decision #316).
+pub(in crate::benchmark) fn frame_profile(
+    frame: &mut Frame,
+    profile: Option<&(ProfileView, Vec<Binding>)>,
+) -> Result<(), OutputFailure> {
+    frame.flag(profile.is_some());
+    if let Some((view, bindings)) = profile {
+        frame.json(&serde_json::to_value(view).map_err(|_| OutputFailure::ObservationEncoding)?);
+        frame.uint(u64::try_from(bindings.len()).unwrap_or(u64::MAX));
+        for (tuple, body) in bindings {
+            frame.text(tuple.kind.spelling());
+            frame.text(tuple.identity.as_str());
+            frame.text(tuple.revision.as_str());
+            frame.text(tuple.specification_revision.as_str());
+            frame.text(tuple.semantic_digest.as_str());
+            frame.bytes(body);
+        }
+    }
+    Ok(())
 }
 
 /// What a complete invocation case runs on and submits, which its
