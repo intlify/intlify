@@ -229,7 +229,15 @@ pub(in crate::benchmark) fn prepare(
             | LimitKind::InvocationLogicalPathCanonicalBytes
             | LimitKind::InvocationSubjectOccurrences
             | LimitKind::InvocationTokenInputs
-            | LimitKind::InvocationMetadataWorkUnits => {
+            | LimitKind::InvocationMetadataWorkUnits
+            | LimitKind::SnapshotNodes
+            | LimitKind::SnapshotDepth
+            | LimitKind::SnapshotCollectionEntries
+            | LimitKind::SnapshotTotalStringBytes
+            | LimitKind::SnapshotSingleStringBytes
+            | LimitKind::SnapshotRejectedMarkers
+            | LimitKind::SnapshotEnvelopeCanonicalBytes
+            | LimitKind::SnapshotTraversalUnits => {
                 return Err(PreparationFailure::UndeclaredCase);
             }
         };
@@ -315,7 +323,15 @@ pub(in crate::benchmark) fn prepare(
             | LimitKind::InvocationLogicalPathCanonicalBytes
             | LimitKind::InvocationSubjectOccurrences
             | LimitKind::InvocationTokenInputs
-            | LimitKind::InvocationMetadataWorkUnits => unreachable!(),
+            | LimitKind::InvocationMetadataWorkUnits
+            | LimitKind::SnapshotNodes
+            | LimitKind::SnapshotDepth
+            | LimitKind::SnapshotCollectionEntries
+            | LimitKind::SnapshotTotalStringBytes
+            | LimitKind::SnapshotSingleStringBytes
+            | LimitKind::SnapshotRejectedMarkers
+            | LimitKind::SnapshotEnvelopeCanonicalBytes
+            | LimitKind::SnapshotTraversalUnits => unreachable!(),
         }
     }
     let prepared = if declaration.operation == Operation::FileMaterialization {
@@ -1517,23 +1533,73 @@ fn prepare_workflow(declaration: &Declaration) -> Result<Candidate, PreparationF
 
 /// The formal Snapshot a binding built for a recipe before the case, as a
 /// file of the recipe's value spells it, admitted once under the case's
-/// bounds through the document of its value (D15:2765, 2824). It is admitted
-/// with a document, or holding a marker without one, as declared; a refused
-/// report fails the preparation (D15:2826).
+/// bounds through the document of its value (D15:2765, 2824). An edge of a
+/// `bootstrapOnly.snapshot` bound sits at the count an unbounded baseline
+/// admission of the recipe's Snapshot reports in its work, with that
+/// Snapshot, or one under it, with the terminal marker at the first overrun
+/// (plan 025 decision #263; 015-199). It is admitted with a document,
+/// holding a marker without one, or ending with the marker of its bound, as
+/// declared; a refused report fails the preparation (D15:2826).
 fn prepare_snapshot(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
-    use crate::benchmark::snapshot_admission::{admit, PreparedSnapshot};
+    use super::snapshot_inputs::{bound, bounded, first_over, limits, report};
+    use crate::benchmark::snapshot_admission::{admit, markers, PreparedSnapshot};
+    use crate::snapshot::{Marker, SnapshotCounts};
 
     let Recipe::Snapshot(recipe) = declaration.fixture else {
         return Err(PreparationFailure::UndeclaredCase);
     };
-    let prepared = PreparedSnapshot {
-        report: super::snapshot_inputs::report(recipe).ok_or(PreparationFailure::CoreInvariant)?,
-        limits: super::snapshot_inputs::limits(),
+    let report = report(recipe).ok_or(PreparationFailure::CoreInvariant)?;
+    let edge = declaration
+        .limit
+        .map(|(kind, edge)| {
+            bound(kind)
+                .map(|bound| (bound, edge))
+                .ok_or(PreparationFailure::UndeclaredCase)
+        })
+        .transpose()?;
+    let prepared = match edge {
+        None => PreparedSnapshot {
+            report,
+            limits: limits(),
+        },
+        Some((bound, edge)) => {
+            let baseline = admit((&report, limits()))
+                .map_err(|_| PreparationFailure::PrerequisiteUnavailable)?;
+            let counted = SnapshotCounts::of(baseline.snapshot.root())
+                .by_bound()
+                .into_iter()
+                .find_map(|(each, count)| (each == bound).then_some(count));
+            let limit = counted
+                .and_then(|counted| match edge {
+                    LimitEdge::Exact => Some(counted),
+                    LimitEdge::FirstOver => counted.checked_sub(1),
+                })
+                .and_then(Bound::new)
+                .ok_or(PreparationFailure::UnrepresentableCounterEdge)?;
+            let report = match edge {
+                LimitEdge::Exact => report,
+                LimitEdge::FirstOver => first_over(recipe, bound, limit)
+                    .ok_or(PreparationFailure::UnrepresentableCounterEdge)?,
+            };
+            PreparedSnapshot {
+                report,
+                limits: bounded(bound, limit),
+            }
+        }
     };
     let resolved = admit((&prepared.report, prepared.limits));
+    // A first-over edge's Snapshot ends with the marker of its bound, whose
+    // witness the boundary has checked.
     let kind = match &resolved {
         Ok(admitted) if admitted.document.is_some() => ExpectedKind::SnapshotMaterialized,
-        Ok(_) => ExpectedKind::SnapshotMarked,
+        Ok(admitted) => match (markers(admitted.snapshot.root()).last(), edge) {
+            (Some(Marker::Rejected(_)), _) => ExpectedKind::SnapshotMarked,
+            (
+                Some(Marker::BootstrapLimitExceeded { bound, .. }),
+                Some((edged, LimitEdge::FirstOver)),
+            ) if *bound == edged => ExpectedKind::SnapshotLimitExceeded,
+            _ => return Err(PreparationFailure::Observation),
+        },
         Err(_) => return Err(PreparationFailure::PrerequisiteUnavailable),
     };
     if declaration.expected_kind != kind {

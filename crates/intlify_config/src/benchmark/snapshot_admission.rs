@@ -55,7 +55,7 @@ pub(super) fn admit((report, limits): (&SnapshotReport, SnapshotLimits)) -> Reso
 
 /// The markers of the tree at `root` in canonical preorder, found without
 /// recursion (plan 025 decision #298).
-fn markers(root: &Node) -> Vec<Marker> {
+pub(super) fn markers(root: &Node) -> Vec<Marker> {
     let mut found = Vec::new();
     let mut pending = vec![root];
     while let Some(node) = pending.pop() {

@@ -122,6 +122,14 @@ pub(super) enum LimitKind {
     InvocationSubjectOccurrences,
     InvocationTokenInputs,
     InvocationMetadataWorkUnits,
+    SnapshotNodes,
+    SnapshotDepth,
+    SnapshotCollectionEntries,
+    SnapshotTotalStringBytes,
+    SnapshotSingleStringBytes,
+    SnapshotRejectedMarkers,
+    SnapshotEnvelopeCanonicalBytes,
+    SnapshotTraversalUnits,
 }
 
 impl LimitKind {
@@ -196,6 +204,7 @@ pub(super) enum ExpectedKind {
     WorkflowBlocked,
     SnapshotMaterialized,
     SnapshotMarked,
+    SnapshotLimitExceeded,
 }
 
 #[derive(
@@ -1055,6 +1064,27 @@ pub(super) fn declarations() -> Vec<Declaration> {
                 ExpectedKind::SnapshotMarked
             },
         ));
+    }
+    // Then, without changing any of those 444 rows, the exact and first-over
+    // edges of each `bootstrapOnly.snapshot` bound a recipe reaches: at the
+    // count of the recipe's Snapshot, admitted as it is, and one under it,
+    // with the terminal marker where a binding finds the first overrun
+    // (D15:867, 2786; plan 025 decisions #132, #263, and #325).
+    for (limit, recipe) in snapshot_inputs::EDGES {
+        for edge in [LimitEdge::Exact, LimitEdge::FirstOver] {
+            let mut case = declaration(
+                Operation::ProgrammaticSnapshotAdmission,
+                Recipe::Snapshot(recipe),
+                Selector::Absent,
+                match edge {
+                    LimitEdge::FirstOver => ExpectedKind::SnapshotLimitExceeded,
+                    LimitEdge::Exact if recipe.materializes() => ExpectedKind::SnapshotMaterialized,
+                    LimitEdge::Exact => ExpectedKind::SnapshotMarked,
+                },
+            );
+            case.limit = Some((limit, edge));
+            cases.push(case);
+        }
     }
     cases
 }

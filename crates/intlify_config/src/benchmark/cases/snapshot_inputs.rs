@@ -37,10 +37,59 @@ use crate::snapshot::{
 
 use super::prepare::fixture_capacity;
 use super::workflow_inputs::ROOM;
-use super::Recipe;
+use super::{LimitKind, Recipe};
 
 /// A frame's tag and `U64` payload length (D15:873).
 const HEADER: u64 = 9;
+
+/// Each `bootstrapOnly.snapshot` bound with edges, in the table's order, and
+/// the first recipe whose count of it is at least 2 and its minimum, so that
+/// an Admitted Implementation Capability can hold both edges (D15:1773,
+/// 1790), and whose first-over Snapshot the boundary admits. One under a
+/// recipe's envelope, the first overrun is its last node in traversal order,
+/// which in the recipes before `TrailingString` frames shorter than the
+/// terminal marker taking its place, so the Snapshot is over the bound it
+/// names (D15:869). `maxSingleMarkerCanonicalBytes` has no edge: no marker
+/// frames as long as its minimum, and the terminal marker frames longer than
+/// any ordinary one it would take the place of (plan 025 decisions #132,
+/// #134, #263, and #325).
+pub(in crate::benchmark) const EDGES: [(LimitKind, SnapshotRecipe); 8] = [
+    (LimitKind::SnapshotNodes, SnapshotRecipe::Minimal),
+    (LimitKind::SnapshotDepth, SnapshotRecipe::Minimal),
+    (
+        LimitKind::SnapshotCollectionEntries,
+        SnapshotRecipe::Minimal,
+    ),
+    (LimitKind::SnapshotTotalStringBytes, SnapshotRecipe::Minimal),
+    (
+        LimitKind::SnapshotSingleStringBytes,
+        SnapshotRecipe::Minimal,
+    ),
+    (
+        LimitKind::SnapshotRejectedMarkers,
+        SnapshotRecipe::ManyMarkers,
+    ),
+    (
+        LimitKind::SnapshotEnvelopeCanonicalBytes,
+        SnapshotRecipe::TrailingString,
+    ),
+    (LimitKind::SnapshotTraversalUnits, SnapshotRecipe::Minimal),
+];
+
+/// The `bootstrapOnly.snapshot` bound `kind` names, if any.
+pub(in crate::benchmark) const fn bound(kind: LimitKind) -> Option<SnapshotBound> {
+    Some(match kind {
+        LimitKind::SnapshotNodes => SnapshotBound::Nodes,
+        LimitKind::SnapshotDepth => SnapshotBound::Depth,
+        LimitKind::SnapshotCollectionEntries => SnapshotBound::CollectionEntries,
+        LimitKind::SnapshotTotalStringBytes => SnapshotBound::TotalStringBytes,
+        LimitKind::SnapshotSingleStringBytes => SnapshotBound::SingleStringBytes,
+        LimitKind::SnapshotRejectedMarkers => SnapshotBound::RejectedMarkers,
+        LimitKind::SnapshotEnvelopeCanonicalBytes => SnapshotBound::EnvelopeCanonicalBytes,
+        LimitKind::SnapshotTraversalUnits => SnapshotBound::TraversalUnits,
+        _ => return None,
+    })
+}
 
 /// How many markers the recipe with many of them holds.
 const MARKERS: usize = 64;
@@ -482,8 +531,9 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::boundary::snapshot::read_report;
+    use crate::boundary::snapshot::{read_report, SnapshotRefusal};
     use crate::input_limits::{InputLimits, RawInputLimits, ValueLimits};
+    use crate::resolver::capability::BootstrapLimits;
     use crate::snapshot::from_json;
 
     fn formal(recipe: SnapshotRecipe) -> (SubmittedNode, String) {
@@ -642,6 +692,19 @@ mod tests {
         assert_eq!(SnapshotCounts::of(admitted.root()).depth, depth);
     }
 
+    /// The count of `recipe`'s Snapshot under `bound`, which its unbounded
+    /// case's work reports
+    /// (`the_work_counts_the_admitted_tree_and_its_document`).
+    fn count_of(recipe: SnapshotRecipe, bound: SnapshotBound) -> u64 {
+        let admitted = read_report(report(recipe).as_ref(), &limits()).unwrap();
+        let counts = SnapshotCounts::of(admitted.root()).by_bound();
+        counts
+            .into_iter()
+            .find(|(each, _)| *each == bound)
+            .unwrap()
+            .1
+    }
+
     fn object(members: Vec<(&str, Node)>) -> Node {
         Node::Object(
             members
@@ -773,5 +836,199 @@ mod tests {
         let counts = SnapshotCounts::of(admitted.root());
         let found = (counts.nodes, counts.depth, counts.rejected_markers);
         assert_eq!(found, (LEVELS + 1, LEVELS + 1, 1));
+    }
+
+    /// The boundary's verdict on `recipe`'s first-over Snapshot of `bound`.
+    fn first_over_of(recipe: SnapshotRecipe, bound: SnapshotBound) -> Result<(), SnapshotRefusal> {
+        let limit = Bound::new(count_of(recipe, bound) - 1).unwrap();
+        let report = first_over(recipe, bound, limit).unwrap();
+        read_report(Some(&report), &bounded(bound, limit)).map(|_| ())
+    }
+
+    /// Plan 025 decisions #132, #263, and #325; D15:869, 1773, 1790: every
+    /// bound but `maxSingleMarkerCanonicalBytes` has edges, in the table's
+    /// order, each on the first recipe whose count of it is at least 2 and
+    /// the bound's minimum and whose first-over Snapshot the boundary admits.
+    /// Only the envelope's passes recipes over: from `LongString` on, those
+    /// that reach its minimum frame their last node in traversal order
+    /// shorter than the terminal marker that takes its place, so their
+    /// first-over Snapshot is over the bound. A file entry's bound names no
+    /// Snapshot bound.
+    #[test]
+    fn each_edge_is_on_the_first_recipe_that_reaches_it() {
+        use SnapshotRecipe as R;
+
+        let minimum = BootstrapLimits::MINIMUM.snapshot;
+        let edged: Vec<_> = EDGES.iter().map(|&(kind, _)| bound(kind)).collect();
+        let expected: Vec<_> = SnapshotBound::ALL
+            .into_iter()
+            .filter(|&each| each != SnapshotBound::SingleMarkerCanonicalBytes)
+            .map(Some)
+            .collect();
+        assert_eq!(edged, expected);
+        let mut passed = Vec::new();
+        for (kind, recipe) in EDGES {
+            let bound = bound(kind).unwrap();
+            let least = bound.limit(&minimum).get().max(2);
+            let reaches = |&each: &SnapshotRecipe| count_of(each, bound) >= least;
+            let mut first = None;
+            for each in SnapshotRecipe::ALL.into_iter().filter(reaches) {
+                match first_over_of(each, bound) {
+                    Ok(()) => {
+                        first = Some(each);
+                        break;
+                    }
+                    Err(refusal) => passed.push((bound, each, refusal)),
+                }
+            }
+            assert_eq!(first, Some(recipe), "{bound:?}");
+        }
+        let envelope = SnapshotBound::EnvelopeCanonicalBytes;
+        let over = |recipe| (envelope, recipe, SnapshotRefusal::EnvelopeOverBound);
+        let refused = [
+            R::LongString,
+            R::ManyProfiles,
+            R::ManyValues,
+            R::ManyMarkers,
+        ];
+        assert_eq!(passed, refused.map(over));
+        assert_eq!(bound(LimitKind::Nodes), None);
+    }
+
+    /// D15:869, 1773, 1790, 1803: `maxSingleMarkerCanonicalBytes` has neither
+    /// edge. Every marker frames shorter than its minimum, below which the
+    /// capability boundary refuses a capability first, so no admitted
+    /// capability's bound is reached; and the terminal marker naming it
+    /// frames longer than any ordinary marker, so where one is its first
+    /// overrun the Snapshot is over the bound and the boundary refuses it.
+    #[test]
+    fn no_snapshot_reaches_the_single_marker_bound() {
+        let bound = SnapshotBound::SingleMarkerCanonicalBytes;
+        let frame = |marker: Node| count(marker.framed().len());
+        let ordinary =
+            MarkerReason::ALL.map(|reason| frame(Node::Marker(Marker::Rejected(reason))));
+        let terminals = SnapshotBound::ALL.map(|each| frame(terminal(each, 1)));
+        let minimum = bound.limit(&BootstrapLimits::MINIMUM.snapshot).get();
+        let every = ordinary.iter().chain(&terminals);
+        assert!(every.into_iter().all(|&each| each < minimum));
+        let named = frame(terminal(bound, 1));
+        assert!(ordinary.iter().all(|&each| each < named));
+        let largest = count_of(SnapshotRecipe::ManyMarkers, bound);
+        assert_eq!(Some(&largest), ordinary.iter().max());
+        let limit = Bound::new(largest - 1).unwrap();
+        let report = first_over(SnapshotRecipe::ManyMarkers, bound, limit).unwrap();
+        let refused = read_report(Some(&report), &bounded(bound, limit)).err();
+        assert_eq!(refused, Some(SnapshotRefusal::EnvelopeOverBound));
+    }
+
+    /// Each node of the tree at `root` in canonical preorder: its depth, the
+    /// key it is held under, and its frame, a container's tag alone.
+    fn preorder(root: &Node) -> Vec<(u64, Option<&str>, Vec<u8>)> {
+        let mut found = Vec::new();
+        let mut pending = vec![(root, 1, None)];
+        while let Some((node, depth, key)) = pending.pop() {
+            let frame = match node {
+                Node::Array(elements) => {
+                    pending.extend(elements.iter().rev().map(|each| (each, depth + 1, None)));
+                    vec![0x05]
+                }
+                Node::Object(members) => {
+                    let held = members.iter().rev();
+                    pending.extend(held.map(|(key, each)| (each, depth + 1, Some(key.as_str()))));
+                    vec![0x06]
+                }
+                leaf => leaf.framed(),
+            };
+            found.push((depth, key, frame));
+        }
+        found
+    }
+
+    /// The path to the last node of the tree at `root` in canonical order,
+    /// and that node.
+    fn last(root: &Node) -> (Vec<Slot>, &Node) {
+        let mut path = Vec::new();
+        let mut node = root;
+        loop {
+            node = match node {
+                Node::Array(elements) if !elements.is_empty() => {
+                    path.push(Slot::Element(elements.len() - 1));
+                    &elements[elements.len() - 1]
+                }
+                Node::Object(members) if !members.is_empty() => {
+                    let (key, value) = members.iter().next_back().unwrap();
+                    path.push(Slot::Member(key.clone()));
+                    value
+                }
+                _ => return (path, node),
+            };
+        }
+    }
+
+    /// D15:867, 869; 015-199; plan 025 decision #263: each edge's case is
+    /// admitted under its bound at the count its recipe's unbounded case
+    /// reports, or one under it, and every other bound at the room. The
+    /// exact edge admits the recipe's Snapshot. The first-over edge's holds
+    /// the recipe's nodes in traversal order up to the first one that takes
+    /// the count over the limit, in whose place the marker of the bound
+    /// stands, its witness one over the limit.
+    #[test]
+    fn each_edge_is_at_its_count_or_its_first_overrun() {
+        use crate::benchmark::cases::prepare::prepare;
+        use crate::benchmark::cases::{declarations, LimitEdge};
+        use crate::benchmark::operation::{Operation, Output, Prepared};
+
+        let mut first_overs = 0;
+        for case in declarations() {
+            let (Recipe::Snapshot(recipe), Some((kind, edge))) = (case.fixture, case.limit) else {
+                continue;
+            };
+            assert_eq!(case.operation, Operation::ProgrammaticSnapshotAdmission);
+            let bound = bound(kind).unwrap();
+            let counted = count_of(recipe, bound);
+            let limit = counted - u64::from(edge == LimitEdge::FirstOver);
+            let prepared = prepare(&case).unwrap();
+            let (Prepared::Snapshot(snapshot), Output::Snapshot(resolved)) =
+                (&prepared.prepared, &prepared.output)
+            else {
+                unreachable!()
+            };
+            let bounds = bounded(bound, Bound::new(limit).unwrap());
+            assert_eq!(snapshot.limits, bounds, "{case:?}");
+            let Ok(admitted) = &**resolved else {
+                panic!("{case:?} is admitted");
+            };
+            let tree = admitted.snapshot.root();
+            let (_, recipes) = trees(recipe).unwrap();
+            if edge == LimitEdge::Exact {
+                assert!(*tree == recipes, "{case:?}");
+                continue;
+            }
+            first_overs += 1;
+            let (path, marker) = last(tree);
+            assert!(*marker == terminal(bound, limit + 1), "{case:?}");
+            // The recipe's node where the marker is, without what it holds,
+            // ends the recipe's nodes the Snapshot keeps and overruns.
+            let original = path.iter().fold(&recipes, |node, slot| match (node, slot) {
+                (Node::Array(elements), Slot::Element(index)) => &elements[*index],
+                (Node::Object(members), Slot::Member(key)) => &members[key],
+                _ => unreachable!(),
+            });
+            let alone = match original {
+                Node::Array(_) => Node::Array(Vec::new()),
+                Node::Object(_) => Node::Object(BTreeMap::new()),
+                leaf => leaf.clone(),
+            };
+            let through = place(trees(recipe).unwrap().1, &path, alone).unwrap();
+            let kept = preorder(&through);
+            assert_eq!(kept, preorder(&recipes)[..kept.len()], "{case:?}");
+            let found = preorder(tree);
+            assert_eq!(found.len(), kept.len(), "{case:?}");
+            assert_eq!(found[..found.len() - 1], kept[..kept.len() - 1], "{case:?}");
+            let counts = SnapshotCounts::of(&through).by_bound();
+            let over = |(each, count): (SnapshotBound, u64)| each == bound && count > limit;
+            assert!(counts.into_iter().any(over), "{case:?}");
+        }
+        assert_eq!(first_overs, 8);
     }
 }
