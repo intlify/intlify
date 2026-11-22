@@ -67,12 +67,13 @@ pub fn observe_smoke() -> Result<CompletedObservation, ObservationError> {
     complete(PreparedRun::acquire())
 }
 
-/// Observe the fixed 40-case peak live memory of fresh resolver construction
-/// (design 015's `construction_peak_live_memory`) with the observer handed in,
-/// described as it describes itself. The observer is a seam: a memory
-/// measurement's own binary installs the allocator it counts through, so this
-/// library names none. The run's identity takes Linux/macOS entropy; elsewhere
-/// the capture fails explicitly, as the duration run's does.
+/// Observe the fixed 73-case peak live memory of fresh resolver construction
+/// and of each entry's complete invocation (design 015's
+/// `construction_peak_live_memory` and `invocation_peak_live_memory`) with the
+/// observer handed in, described as it describes itself. The observer is a
+/// seam: a memory measurement's own binary installs the allocator it counts
+/// through, so this library names none. The run's identity takes Linux/macOS
+/// entropy; elsewhere the capture fails explicitly, as the duration run's does.
 pub fn observe_memory_smoke(
     observer: Box<dyn MemoryObserver>,
     description: ObserverDescription,
@@ -194,7 +195,7 @@ mod tests {
     }
 
     #[test]
-    fn the_memory_facade_observes_each_construction_case_and_revalidates_its_bytes() {
+    fn the_memory_facade_observes_each_memory_case_and_revalidates_its_bytes() {
         use crate::benchmark::instrument::tests::{report, ScriptedObserver, DESCRIPTION};
         let observation = observe_memory_smoke(
             Box::new(ScriptedObserver::new([report(4096, 64)])),
@@ -216,8 +217,8 @@ mod tests {
             observation.verify_saved(&records).unwrap(),
             ObservationSummary {
                 outcome: ObservationOutcome::Complete,
-                planned_cases: 40,
-                measured_cases: 40,
+                planned_cases: 73,
+                measured_cases: 73,
                 non_measured_cases: 0
             }
         );

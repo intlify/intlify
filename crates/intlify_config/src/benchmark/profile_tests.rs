@@ -247,25 +247,32 @@ fn paths(value: &Value, pointer: String, leaves: &mut Vec<String>, objects: &mut
 }
 
 #[test]
-fn the_memory_profile_measures_each_construction_case_at_its_peak() {
+fn the_memory_profile_measures_each_construction_and_invocation_case_at_its_peak() {
+    use crate::benchmark::cases::ResolverState;
+
+    const CONSTRUCTION: Operation = Operation::ConstructionAuthorityAdmission;
+    const FILE: Operation = Operation::FileEntryCompleteWorkflow;
+    const PROGRAMMATIC: Operation = Operation::ProgrammaticEntryCompleteWorkflow;
+
     let registry = Registry::load().unwrap();
     let profile = AdmittedProfile::memory_smoke(&registry);
     let document = profile.document();
-    // The construction cases, in registry order; the identity cases' interval
-    // is not the construction's (D15:2775).
-    let construction = registry
+    // The construction cases and each entry's complete invocations, in
+    // registry order; the identity cases' interval is not the construction's,
+    // and a replay's is no complete invocation (D15:2773, 2775).
+    let measured = registry
         .declarations()
-        .filter(|declaration| declaration.operation == Operation::ConstructionAuthorityAdmission)
+        .filter(|declaration| [CONSTRUCTION, FILE, PROGRAMMATIC].contains(&declaration.operation))
         .cloned()
         .collect::<Vec<_>>();
-    assert_eq!(document.cases(), construction);
-    assert_eq!(document.cases().len(), 40);
+    assert_eq!(document.cases(), measured);
+    assert_eq!(document.cases().len(), 73);
     let value = serde_json::to_value(document).unwrap();
     assert_eq!(value["identity"], "intlify-config-minimum-memory-smoke");
     assert_eq!(value["revision"], "0");
     assert_eq!(
         value["scope"],
-        "internal-resolver-construction-peak-live-memory"
+        "internal-resolver-construction-and-complete-invocation-peak-live-memory"
     );
     assert_eq!(value["sampling"]["aggregation"], "peak_over_batch");
     assert_eq!(value["sampling"]["warmupRepetitions"], "1");
@@ -280,10 +287,16 @@ fn the_memory_profile_measures_each_construction_case_at_its_peak() {
     );
     assert_eq!(
         value["operationStates"],
-        json!([{
-            "operation": "construction-authority-admission",
-            "execution": prepared_core(Operation::ConstructionAuthorityAdmission, None, None),
-        }])
+        json!([
+            {"operation": CONSTRUCTION, "execution": prepared_core(CONSTRUCTION, None, None)},
+            {"operation": FILE, "execution": prepared_core(FILE, None, None)},
+            {"operation": PROGRAMMATIC, "execution": prepared_core(PROGRAMMATIC, None, None)},
+            {"operation": FILE, "execution": prepared_core(FILE, None, Some(ResolverState::Fresh))},
+            {
+                "operation": PROGRAMMATIC,
+                "execution": prepared_core(PROGRAMMATIC, None, Some(ResolverState::Fresh)),
+            },
+        ])
     );
     let decoded: MeasurementProfile = serde_json::from_value(value).unwrap();
     assert!(decoded.validate_memory_smoke(&registry).is_empty());

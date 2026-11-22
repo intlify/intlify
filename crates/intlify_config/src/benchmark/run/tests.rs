@@ -506,7 +506,7 @@ fn a_failed_multi_sample_prefix_roundtrips_but_is_not_a_successful_capture() {
 }
 
 #[test]
-fn a_memory_run_plans_the_construction_cases_apart_and_keeps_failed_from_invalid() {
+fn a_memory_run_plans_its_cases_apart_and_keeps_failed_from_invalid() {
     use crate::benchmark::shared::pipeline;
     const FAILURES: [MemoryFailure; 3] = [
         MemoryFailure::InvocationPanicked,
@@ -514,15 +514,22 @@ fn a_memory_run_plans_the_construction_cases_apart_and_keeps_failed_from_invalid
         MemoryFailure::NegativeNet,
     ];
     let memory = memory_run();
-    assert_eq!(memory.fixtures.len(), 40);
+    assert_eq!(memory.fixtures.len(), 73);
     assert!(memory.fixtures.iter().all(Result::is_ok));
     let registry = Registry::load().unwrap();
     let rows = registry
         .expectations()
         .iter()
-        .filter(|row| row.declaration().operation == Operation::ConstructionAuthorityAdmission)
+        .filter(|row| {
+            [
+                Operation::ConstructionAuthorityAdmission,
+                Operation::FileEntryCompleteWorkflow,
+                Operation::ProgrammaticEntryCompleteWorkflow,
+            ]
+            .contains(&row.declaration().operation)
+        })
         .collect::<Vec<_>>();
-    assert_eq!((memory.plan.cases.len(), rows.len()), (40, 40));
+    assert_eq!((memory.plan.cases.len(), rows.len()), (73, 73));
     for (planned, row) in memory.plan.cases.iter().zip(rows) {
         // The duration case's row, bound as another case.
         assert_eq!(planned.expectation, *row);
@@ -530,8 +537,8 @@ fn a_memory_run_plans_the_construction_cases_apart_and_keeps_failed_from_invalid
         assert_ne!(planned.case, duration);
     }
     let failure = |ordinal: Quantity| FAILURES[usize::try_from(ordinal.get() % 3).unwrap()];
-    // Every case reports a failure, so no construction runs; the cases take
-    // the three in turn.
+    // Every case reports a failure, so no interval runs; the cases take the
+    // three in turn.
     let recorded = memory
         .collect_with(|_, ordinal, _, _| Err(failed_memory_capture(failure(ordinal))))
         .unwrap();
@@ -552,7 +559,7 @@ fn a_memory_run_plans_the_construction_cases_apart_and_keeps_failed_from_invalid
     assert!(artifacts.evidence.is_none());
     let evaluation: Value = serde_json::from_slice(&artifacts.evaluation).unwrap();
     let cases = evaluation["body"]["cases"].as_array().unwrap();
-    assert_eq!(cases.len(), 40);
+    assert_eq!(cases.len(), 73);
     for (ordinal, case) in (0..).map(Quantity::new).zip(cases) {
         let result = &case["result"];
         let reason = &result["reasons"][0];
