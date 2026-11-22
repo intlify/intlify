@@ -64,6 +64,10 @@ pub(in crate::benchmark) enum Recipe {
         resolver: super::ResolverState,
     },
     Snapshot(super::SnapshotRecipe),
+    ProgrammaticWorkflow {
+        input: super::ProgrammaticRecipe,
+        resolver: super::ResolverState,
+    },
 }
 
 impl Recipe {
@@ -82,7 +86,9 @@ impl Recipe {
     /// for every other case.
     pub(in crate::benchmark) const fn resolver_state(self) -> Option<super::ResolverState> {
         match self {
-            Self::Workflow { resolver, .. } => Some(resolver),
+            Self::Workflow { resolver, .. } | Self::ProgrammaticWorkflow { resolver, .. } => {
+                Some(resolver)
+            }
             _ => None,
         }
     }
@@ -105,6 +111,11 @@ impl Recipe {
             // The file whose value the Snapshot submits; the input context
             // binds the tree as submitted.
             return recipe.file().source();
+        }
+        if let Self::ProgrammaticWorkflow { input, .. } = self {
+            // Likewise for a programmatic entry's invocation.
+            let file = input.file();
+            return Arc::from(file.source(&file.limits()));
         }
         if let Self::Locale(recipe) = self {
             return Arc::from(recipe.spelling().as_bytes());

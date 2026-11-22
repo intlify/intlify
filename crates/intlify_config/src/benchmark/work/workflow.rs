@@ -148,4 +148,58 @@ mod tests {
             }
         }
     }
+
+    /// D15:1802, 1804, 1889, 2796: a programmatic entry's invocation counts
+    /// the admitted Snapshot's envelope bytes and traversal units in place of
+    /// the file's bytes and parser tokens, and the rest as its file's case
+    /// counts it in the same state, but a Snapshot holding a marker has no
+    /// value to count.
+    #[test]
+    fn a_programmatic_entry_counts_its_snapshot_in_place_of_the_file() {
+        use crate::benchmark::cases::{ProgrammaticRecipe as P, ResolverState};
+        use crate::benchmark::workflow::tests::{candidate_in, programmatic_in};
+
+        let state = ResolverState::Fresh;
+        for recipe in P::ALL {
+            let candidate = programmatic_in(recipe, state);
+            let Output::Workflow(resolved) = &candidate.output else {
+                unreachable!()
+            };
+            let Some(EntryCounts::Snapshot {
+                envelope,
+                traversal,
+            }) = resolved.admitted.map(|admitted| admitted.entry)
+            else {
+                panic!("{recipe:?} counts a Snapshot");
+            };
+            let work = &candidate.logical_work;
+            let kinds: Vec<_> = work.facts.iter().map(|fact| fact.kind).collect();
+            assert_eq!(kinds, WorkKind::PROGRAMMATIC_WORKFLOW, "{recipe:?}");
+            let entry = [
+                WorkKind::SnapshotEnvelopeCanonicalBytes,
+                WorkKind::SnapshotTraversalUnits,
+            ];
+            assert_eq!(
+                entry.map(|kind| work.exact(kind)),
+                [envelope, traversal].map(Some)
+            );
+            let file = candidate_in(recipe.file(), state).logical_work;
+            let values = &WorkKind::PROGRAMMATIC_WORKFLOW[2..7];
+            let entry = [
+                WorkKind::WorkflowEntryRecords,
+                WorkKind::WorkflowEntryCanonicalBytes,
+            ];
+            let marked = recipe == P::RejectedMarker;
+            for (fact, paired) in work.facts.iter().zip(&file.facts).skip(2) {
+                assert_eq!((fact.kind, fact.stage), (paired.kind, paired.stage));
+                if marked && values.contains(&fact.kind) {
+                    let reason = UnavailableWork::SnapshotHoldsMarkers;
+                    assert_eq!(fact.observation, WorkValue::Unavailable { reason });
+                } else if !marked && !entry.contains(&fact.kind) {
+                    let kind = fact.kind;
+                    assert_eq!(fact.observation, paired.observation, "{recipe:?} {kind:?}");
+                }
+            }
+        }
+    }
 }

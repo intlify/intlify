@@ -374,6 +374,26 @@ impl WorkKind {
         Self::WorkflowReserveCanonicalBytes,
     ];
 
+    /// A programmatic entry's complete invocation counts its Snapshot's
+    /// envelope bytes and traversal units in place of the file's bytes and
+    /// parser tokens, and the rest as a file entry's does.
+    const PROGRAMMATIC_WORKFLOW: [Self; 14] = [
+        Self::SnapshotEnvelopeCanonicalBytes,
+        Self::SnapshotTraversalUnits,
+        Self::LogicalValueNodes,
+        Self::MaximumValueDepth,
+        Self::CollectionEntries,
+        Self::TotalDecodedStringBytes,
+        Self::MaximumDecodedStringBytes,
+        Self::WorkflowSubmittedMembers,
+        Self::WorkflowSubmittedCanonicalBytes,
+        Self::WorkflowSharedRecords,
+        Self::WorkflowSharedCanonicalBytes,
+        Self::WorkflowEntryRecords,
+        Self::WorkflowEntryCanonicalBytes,
+        Self::WorkflowReserveCanonicalBytes,
+    ];
+
     /// What the Snapshot boundary counts under each of the nine
     /// `bootstrapOnly.snapshot` bounds, in the bounds' order, then the
     /// root-value counts of the document.
@@ -409,6 +429,7 @@ impl WorkKind {
             Operation::EntryEvidence => &Self::ENTRY_EVIDENCE,
             Operation::OutcomeFinalization => &Self::OUTCOME_FINALIZATION,
             Operation::FileEntryCompleteWorkflow => &Self::WORKFLOW,
+            Operation::ProgrammaticEntryCompleteWorkflow => &Self::PROGRAMMATIC_WORKFLOW,
             Operation::ProgrammaticSnapshotAdmission => &Self::SNAPSHOT,
             _ => &Self::INPUT,
         }
@@ -745,6 +766,9 @@ impl LogicalWork {
                 Operation::OutcomeFinalization => "intlify-config-outcome-finalization-work",
                 Operation::FileEntryCompleteWorkflow => {
                     "intlify-config-file-entry-complete-workflow-work"
+                }
+                Operation::ProgrammaticEntryCompleteWorkflow => {
+                    "intlify-config-programmatic-entry-complete-workflow-work"
                 }
                 Operation::ProgrammaticSnapshotAdmission => {
                     "intlify-config-programmatic-snapshot-admission-work"

@@ -64998,6 +64998,2316 @@
           }
         ]
       }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-entry-complete-workflow",
+        "fixture": {
+          "programmatic-workflow": {
+            "input": "storefront",
+            "resolver": "reused"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-checked"
+      },
+      "inputContext": "119be6d4be93638302bab99c360ce75d5069c7acc85be8a723fb7f3b0c0a58d1",
+      "result": {
+        "shared": "b4480f1c95745d71b6330a92013987b33ed8b7aba0c8926b8758e1388a0b2e88",
+        "entry": "4104aa3462673e83047b15da36462d8102636c773431cece4c4e5dc69995bd60"
+      },
+      "logicalWork": "4fff99f3a73964405d06ccc330b4d0872da97073dd8fcb6cd0cca780a545d53e",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "programmatic-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4390"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "225"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "113"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "112"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2215"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11589"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "478"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "347011"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "30"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "24115"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-entry-complete-workflow",
+        "fixture": {
+          "programmatic-workflow": {
+            "input": "blocked",
+            "resolver": "reused"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-blocked"
+      },
+      "inputContext": "b28627bcb7cbcdc5f6a9a701c005d8f8318da96a9688a7efbd176351a3eeac5d",
+      "result": {
+        "shared": "6354e566f31deda36a4bdc28f00db3151d6a9bf36fb7d5c1660f72aab2114bc3",
+        "entry": "c8442f4abddfda33f37950a18ca63c265f2183dde14f53fa91e4f37234b1323c"
+      },
+      "logicalWork": "995e66c1e96f520b3e1b2be29e80eba5682dbe6861e88a8eedd8d59d9234ccb0",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "programmatic-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4354"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "223"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "112"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "111"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2189"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11589"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "423"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "373679"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "24"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "18987"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-entry-complete-workflow",
+        "fixture": {
+          "programmatic-workflow": {
+            "input": "dense",
+            "resolver": "reused"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-blocked"
+      },
+      "inputContext": "95592c069f86657891df17f64cc87655b5c8f922454cb3bfb9905cf9b8108928",
+      "result": {
+        "shared": "83bf725feb610318955a22b62bb79065405e03dbb3afa8ee9e326b93b70fe534",
+        "entry": "0fcc9940072ac7c9871986931a91d041c1eb6f13139e4f28707cb3f44362999c"
+      },
+      "logicalWork": "d82341c7ec0897148194688f881aa45462f9a7db8df10c7340f8f6ffee092957",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "programmatic-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "33382"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1889"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "945"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "944"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "16999"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11589"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3421"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2559080"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "288"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "379587"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-entry-complete-workflow",
+        "fixture": {
+          "programmatic-workflow": {
+            "input": "truncated",
+            "resolver": "reused"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-blocked"
+      },
+      "inputContext": "2882f1696cad5d304d1cfd2164d116cb9923e01efec4f2132683ab3a2ff1b2cb",
+      "result": {
+        "shared": "f33e1a9e3d8a49c0867f906ffd22861eb45f7e8d48a92688d0781b3479f16e38",
+        "entry": "5f007ec35a49aeb8a30727bbae5d4cc6b61801c0a42f7e74bed4938f860e6db3"
+      },
+      "logicalWork": "78141fd1b08f7b83ed5e41eb10cf0b6379bdadcaed1bb1bd770b8ef07182b7b7",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "programmatic-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4390"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "225"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "113"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "112"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2215"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11579"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "100"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "70419"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "30"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "24115"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1619"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-entry-complete-workflow",
+        "fixture": {
+          "programmatic-workflow": {
+            "input": "rejected-marker",
+            "resolver": "reused"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-blocked"
+      },
+      "inputContext": "289dcfa074aa7d4a8df486caa081d5a21378822807e3b4ba7f1a6fc02bcbca8f",
+      "result": {
+        "shared": "267b72f65887e0fff421f3f64e5860e4ff8e48f7dcf94ec123c5f95fafa53b6d",
+        "entry": "03885a00a4b5eda2755bfb5b6557ab8480c897acae025ed7ba6e37a4f90223a6"
+      },
+      "logicalWork": "49184eb1414e0979deb7f74d0809ffabf459da924f87164689307ed336ec0855",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "programmatic-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4439"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "227"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11589"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "24"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "21469"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-entry-complete-workflow",
+        "fixture": {
+          "programmatic-workflow": {
+            "input": "storefront",
+            "resolver": "fresh"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-checked"
+      },
+      "inputContext": "2dab411d6af5430b2502f93ae1928dc5c9bb37847fd0dd4553c2d06dc0158ab7",
+      "result": {
+        "shared": "b4480f1c95745d71b6330a92013987b33ed8b7aba0c8926b8758e1388a0b2e88",
+        "entry": "4104aa3462673e83047b15da36462d8102636c773431cece4c4e5dc69995bd60"
+      },
+      "logicalWork": "4fff99f3a73964405d06ccc330b4d0872da97073dd8fcb6cd0cca780a545d53e",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "programmatic-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4390"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "225"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "113"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "112"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2215"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11589"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "478"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "347011"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "30"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "24115"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-entry-complete-workflow",
+        "fixture": {
+          "programmatic-workflow": {
+            "input": "blocked",
+            "resolver": "fresh"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-blocked"
+      },
+      "inputContext": "4184cd9bd8b39645c1babfab71017b6123337ba42f9391363716039a476d6b6d",
+      "result": {
+        "shared": "6354e566f31deda36a4bdc28f00db3151d6a9bf36fb7d5c1660f72aab2114bc3",
+        "entry": "c8442f4abddfda33f37950a18ca63c265f2183dde14f53fa91e4f37234b1323c"
+      },
+      "logicalWork": "995e66c1e96f520b3e1b2be29e80eba5682dbe6861e88a8eedd8d59d9234ccb0",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "programmatic-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4354"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "223"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "112"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "111"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2189"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11589"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "423"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "373679"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "24"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "18987"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-entry-complete-workflow",
+        "fixture": {
+          "programmatic-workflow": {
+            "input": "dense",
+            "resolver": "fresh"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-blocked"
+      },
+      "inputContext": "7a220cf2b7a1592d8286cfccd4f17ee785d82a5ca2c5557c6de01cbe83a8bb31",
+      "result": {
+        "shared": "83bf725feb610318955a22b62bb79065405e03dbb3afa8ee9e326b93b70fe534",
+        "entry": "0fcc9940072ac7c9871986931a91d041c1eb6f13139e4f28707cb3f44362999c"
+      },
+      "logicalWork": "d82341c7ec0897148194688f881aa45462f9a7db8df10c7340f8f6ffee092957",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "programmatic-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "33382"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1889"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "945"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "944"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "16999"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11589"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3421"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2559080"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "288"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "379587"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-entry-complete-workflow",
+        "fixture": {
+          "programmatic-workflow": {
+            "input": "truncated",
+            "resolver": "fresh"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-blocked"
+      },
+      "inputContext": "acff723fd423e116c49c0e558dd296c7130a7ced860eaf43b3990e0aaee64c21",
+      "result": {
+        "shared": "f33e1a9e3d8a49c0867f906ffd22861eb45f7e8d48a92688d0781b3479f16e38",
+        "entry": "5f007ec35a49aeb8a30727bbae5d4cc6b61801c0a42f7e74bed4938f860e6db3"
+      },
+      "logicalWork": "78141fd1b08f7b83ed5e41eb10cf0b6379bdadcaed1bb1bd770b8ef07182b7b7",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "programmatic-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4390"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "225"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "113"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "112"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2215"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11579"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "100"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "70419"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "30"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "24115"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1619"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-entry-complete-workflow",
+        "fixture": {
+          "programmatic-workflow": {
+            "input": "rejected-marker",
+            "resolver": "fresh"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-blocked"
+      },
+      "inputContext": "ca653abca9a3003762072b667fffb7e3c309ebf51577b941e8643a5b6ad31a70",
+      "result": {
+        "shared": "267b72f65887e0fff421f3f64e5860e4ff8e48f7dcf94ec123c5f95fafa53b6d",
+        "entry": "03885a00a4b5eda2755bfb5b6557ab8480c897acae025ed7ba6e37a4f90223a6"
+      },
+      "logicalWork": "49184eb1414e0979deb7f74d0809ffabf459da924f87164689307ed336ec0855",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "programmatic-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4439"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "227"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11589"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "24"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "21469"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-entry-complete-workflow",
+        "fixture": {
+          "programmatic-workflow": {
+            "input": "storefront",
+            "resolver": "reused-after-blocked"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-checked"
+      },
+      "inputContext": "bd202ac3de81bd3b08a12964b6f42ea348f5bc8d4be4bea3209919cdc6dc0509",
+      "result": {
+        "shared": "b4480f1c95745d71b6330a92013987b33ed8b7aba0c8926b8758e1388a0b2e88",
+        "entry": "4104aa3462673e83047b15da36462d8102636c773431cece4c4e5dc69995bd60"
+      },
+      "logicalWork": "4fff99f3a73964405d06ccc330b4d0872da97073dd8fcb6cd0cca780a545d53e",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "programmatic-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4390"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "225"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "113"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "112"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2215"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11589"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "478"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "347011"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "30"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "24115"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-entry-complete-workflow",
+        "fixture": {
+          "programmatic-workflow": {
+            "input": "blocked",
+            "resolver": "reused-after-blocked"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-blocked"
+      },
+      "inputContext": "f0aa58bd7dd394c3b05fa1f005c08540b19163a4815d98cd757c8814728da270",
+      "result": {
+        "shared": "6354e566f31deda36a4bdc28f00db3151d6a9bf36fb7d5c1660f72aab2114bc3",
+        "entry": "c8442f4abddfda33f37950a18ca63c265f2183dde14f53fa91e4f37234b1323c"
+      },
+      "logicalWork": "995e66c1e96f520b3e1b2be29e80eba5682dbe6861e88a8eedd8d59d9234ccb0",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "programmatic-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4354"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "223"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "112"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "111"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2189"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11589"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "423"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "373679"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "24"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "18987"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-entry-complete-workflow",
+        "fixture": {
+          "programmatic-workflow": {
+            "input": "dense",
+            "resolver": "reused-after-blocked"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-blocked"
+      },
+      "inputContext": "94c589e4905568ba8bd9a2dd814906f4e46fc9af05c80528f8e9233a5b526251",
+      "result": {
+        "shared": "83bf725feb610318955a22b62bb79065405e03dbb3afa8ee9e326b93b70fe534",
+        "entry": "0fcc9940072ac7c9871986931a91d041c1eb6f13139e4f28707cb3f44362999c"
+      },
+      "logicalWork": "d82341c7ec0897148194688f881aa45462f9a7db8df10c7340f8f6ffee092957",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "programmatic-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "33382"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "1889"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "945"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "944"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "16999"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11589"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "3421"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "2559080"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "288"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "379587"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-entry-complete-workflow",
+        "fixture": {
+          "programmatic-workflow": {
+            "input": "truncated",
+            "resolver": "reused-after-blocked"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-blocked"
+      },
+      "inputContext": "3b48368666275779b8bc1ff84d5cef93ecd319cb5671a56415e9838135c1bd6a",
+      "result": {
+        "shared": "f33e1a9e3d8a49c0867f906ffd22861eb45f7e8d48a92688d0781b3479f16e38",
+        "entry": "5f007ec35a49aeb8a30727bbae5d4cc6b61801c0a42f7e74bed4938f860e6db3"
+      },
+      "logicalWork": "78141fd1b08f7b83ed5e41eb10cf0b6379bdadcaed1bb1bd770b8ef07182b7b7",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "programmatic-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4390"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "225"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "113"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "8"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "112"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "2215"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "71"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11579"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "100"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "70419"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "30"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "24115"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "1619"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "declaration": {
+        "operation": "programmatic-entry-complete-workflow",
+        "fixture": {
+          "programmatic-workflow": {
+            "input": "rejected-marker",
+            "resolver": "reused-after-blocked"
+          }
+        },
+        "fixtureRevision": "0",
+        "limit": null,
+        "selector": "app",
+        "expectedKind": "workflow-blocked"
+      },
+      "inputContext": "1de5931d0ad850b1a094944016c88a14382a43002e184bde489cbfeef448acfc",
+      "result": {
+        "shared": "267b72f65887e0fff421f3f64e5860e4ff8e48f7dcf94ec123c5f95fafa53b6d",
+        "entry": "03885a00a4b5eda2755bfb5b6557ab8480c897acae025ed7ba6e37a4f90223a6"
+      },
+      "logicalWork": "49184eb1414e0979deb7f74d0809ffabf459da924f87164689307ed336ec0855",
+      "work": {
+        "profileIdentity": "intlify-config-programmatic-entry-complete-workflow-work",
+        "profileRevision": "0",
+        "operation": "programmatic-entry-complete-workflow",
+        "facts": [
+          {
+            "kind": "snapshot-envelope-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "4439"
+            }
+          },
+          {
+            "kind": "snapshot-traversal-units",
+            "unit": "traversal-unit",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "227"
+            }
+          },
+          {
+            "kind": "logical-value-nodes",
+            "unit": "logical-value",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "maximum-value-depth",
+            "unit": "value-level",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "collection-entries",
+            "unit": "collection-entry",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "total-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "maximum-decoded-string-bytes",
+            "unit": "utf8-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "unavailable",
+              "reason": "snapshot-holds-markers"
+            }
+          },
+          {
+            "kind": "workflow-submitted-members",
+            "unit": "artifact-occurrence",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "9"
+            }
+          },
+          {
+            "kind": "workflow-submitted-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "prepared-input",
+            "observation": {
+              "state": "exact",
+              "value": "11589"
+            }
+          },
+          {
+            "kind": "workflow-shared-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "workflow-shared-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "0"
+            }
+          },
+          {
+            "kind": "workflow-entry-records",
+            "unit": "retained-record",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "24"
+            }
+          },
+          {
+            "kind": "workflow-entry-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "21469"
+            }
+          },
+          {
+            "kind": "workflow-reserve-canonical-bytes",
+            "unit": "canonical-octet",
+            "stage": "operation-result",
+            "observation": {
+              "state": "exact",
+              "value": "161"
+            }
+          }
+        ]
+      }
     }
   ]
 }

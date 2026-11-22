@@ -37,7 +37,7 @@ fn analysis(value: &Value) -> Analysis {
         .unwrap()
 }
 
-pub(crate) fn operations() -> [Prepared; 18] {
+pub(crate) fn operations() -> [Prepared; 19] {
     let source: Arc<[u8]> = Arc::from(serde_json::to_vec(&minimal_config()).unwrap());
     let doc = Arc::new(
         materialize_file(Arc::clone(&source), crate::materialize_tests::limits()).unwrap(),
@@ -81,7 +81,26 @@ pub(crate) fn operations() -> [Prepared; 18] {
         evidence_operation(Operation::OutcomeFinalization),
         workflow_operation(),
         snapshot_operation(),
+        programmatic_operation(),
     ]
+}
+
+/// One programmatic entry's complete invocation of 015's example, as its
+/// case prepares it.
+fn programmatic_operation() -> Prepared {
+    use crate::benchmark::cases::{declarations, ProgrammaticRecipe, Recipe, ResolverState};
+
+    let recipe = Recipe::ProgrammaticWorkflow {
+        input: ProgrammaticRecipe::Storefront,
+        resolver: ResolverState::Reused,
+    };
+    let declaration = declarations()
+        .into_iter()
+        .find(|case| case.fixture == recipe)
+        .unwrap();
+    crate::benchmark::cases::prepare::prepare(&declaration)
+        .unwrap()
+        .prepared
 }
 
 /// The admission of Minimal's value as a Snapshot, as its case prepares it.

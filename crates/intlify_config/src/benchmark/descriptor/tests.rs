@@ -62,34 +62,45 @@ fn all_active_pairs_keep_distinct_owner_boundaries_and_exact_method_meaning() {
         assert_eq!(method.numeric_decision_eligibility, "qualified-runner");
         assert!(!method.estimated_overhead_subtraction);
     }
-    assert_eq!(pairs.len(), 18);
-    assert_eq!(identities.len(), 18);
+    assert_eq!(pairs.len(), 19);
+    assert_eq!(identities.len(), 19);
 }
 
-/// D15:2777, 2824; plan 025 decision #316: only an end-to-end boundary
-/// names children, the component boundary of each phase its invocation runs,
-/// and no boundary names a parent, so each component keeps its boundary.
+/// D15:2765, 2777, 2824; plan 025 decision #316: only an end-to-end
+/// boundary names children, the component boundary of each phase its
+/// invocation runs, Phase 1's its entry's, and no boundary names a parent,
+/// so each component keeps its boundary.
 #[test]
 fn an_end_to_end_boundary_names_the_component_boundaries_it_includes() {
-    // A file entry's invocation builds no authoring model, constructs no
-    // resolver, and admits no Snapshot.
+    // No invocation builds an authoring model or constructs a resolver, and
+    // each materializes only its own entry.
     let excluded = [
         Operation::AuthoringConstruction,
         Operation::ConstructionAuthorityAdmission,
         Operation::ConstructionIdentity,
+        Operation::FileMaterialization,
         Operation::ProgrammaticSnapshotAdmission,
     ];
     let components = Operation::ALL
         .into_iter()
         .filter(|operation| operation.phase() != "profile_resolve_e2e")
         .filter(|operation| !excluded.contains(operation));
-    let children: Vec<String> = components.map(|child| child.boundary().into()).collect();
+    let rest: Vec<String> = components.map(|child| child.boundary().into()).collect();
     for operation in Operation::ALL {
         let boundary = Boundary::for_operation(operation);
         assert!(boundary.direct_parents.is_empty(), "{operation:?}");
-        let e2e = operation.phase() == "profile_resolve_e2e";
-        let expected = if e2e { &children[..] } else { &[] };
-        assert_eq!(boundary.direct_children, expected, "{operation:?}");
+        let entry = match operation {
+            Operation::FileEntryCompleteWorkflow => Operation::FileMaterialization,
+            Operation::ProgrammaticEntryCompleteWorkflow => {
+                Operation::ProgrammaticSnapshotAdmission
+            }
+            _ => {
+                assert!(boundary.direct_children.is_empty(), "{operation:?}");
+                continue;
+            }
+        };
+        let (first, others) = boundary.direct_children.split_first().unwrap();
+        assert_eq!((first.as_str(), others), (entry.boundary(), &rest[..]));
     }
 }
 
