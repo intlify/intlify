@@ -43,16 +43,16 @@ use super::{LimitKind, Recipe};
 const HEADER: u64 = 9;
 
 /// Each `bootstrapOnly.snapshot` bound with edges, in the table's order, and
-/// the first recipe whose count of it is at least 2 and its minimum, so that
-/// an Admitted Implementation Capability can hold both edges (D15:1773,
-/// 1790), and whose first-over Snapshot the boundary admits. One under a
-/// recipe's envelope, the first overrun is its last node in traversal order,
-/// which in the recipes before `TrailingString` frames shorter than the
-/// terminal marker taking its place, so the Snapshot is over the bound it
-/// names (D15:869). `maxSingleMarkerCanonicalBytes` has no edge: no marker
-/// frames as long as its minimum, and the terminal marker frames longer than
-/// any ordinary one it would take the place of (plan 025 decisions #132,
-/// #134, #263, and #325).
+/// the first recipe whose count of it is over its minimum, so that an
+/// Admitted Implementation Capability can hold both the count and one under
+/// it (D15:1773, 1790), and whose first-over Snapshot the boundary admits.
+/// One under a recipe's envelope, the first overrun is its last node in
+/// traversal order, which in the recipes before `TrailingString` frames
+/// shorter than the terminal marker taking its place, so the Snapshot is over
+/// the bound it names (D15:869). `maxSingleMarkerCanonicalBytes` has no edge:
+/// no marker frames as long as its minimum, and the terminal marker frames
+/// longer than any ordinary one it would take the place of (plan 025
+/// decisions #132, #134, #263, and #325).
 pub(in crate::benchmark) const EDGES: [(LimitKind, SnapshotRecipe); 8] = [
     (LimitKind::SnapshotNodes, SnapshotRecipe::Minimal),
     (LimitKind::SnapshotDepth, SnapshotRecipe::Minimal),
@@ -847,8 +847,9 @@ mod tests {
 
     /// Plan 025 decisions #132, #263, and #325; D15:869, 1773, 1790: every
     /// bound but `maxSingleMarkerCanonicalBytes` has edges, in the table's
-    /// order, each on the first recipe whose count of it is at least 2 and
-    /// the bound's minimum and whose first-over Snapshot the boundary admits.
+    /// order, each on the first recipe whose count of it is over the bound's
+    /// minimum, so the limit one under it is admissible too, and whose
+    /// first-over Snapshot the boundary admits.
     /// Only the envelope's passes recipes over: from `LongString` on, those
     /// that reach its minimum frame their last node in traversal order
     /// shorter than the terminal marker that takes its place, so their
@@ -869,7 +870,7 @@ mod tests {
         let mut passed = Vec::new();
         for (kind, recipe) in EDGES {
             let bound = bound(kind).unwrap();
-            let least = bound.limit(&minimum).get().max(2);
+            let least = bound.limit(&minimum).get() + 1;
             let reaches = |&each: &SnapshotRecipe| count_of(each, bound) >= least;
             let mut first = None;
             for each in SnapshotRecipe::ALL.into_iter().filter(reaches) {
