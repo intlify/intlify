@@ -25,7 +25,7 @@ fn limits() -> StructuralLimits {
 #[test]
 fn declared_matrix_is_finite_unique_ordered_and_covers_every_active_boundary() {
     let cases = declarations();
-    assert_eq!(cases.len(), 444);
+    assert_eq!(cases.len(), 460);
     assert_eq!(cases, declarations());
     let mut identities = BTreeSet::new();
     for case in &cases {
@@ -233,7 +233,7 @@ fn raw_scaling_and_member_permutation_preserve_logical_input_but_not_source_iden
 #[test]
 fn every_finite_case_prepares_its_exact_result_and_work_including_all_limit_edges() {
     use crate::benchmark::clock::tests::ScriptedClock;
-    use crate::benchmark::operation::Output;
+    use crate::benchmark::operation::{Output, Prepared};
     use crate::benchmark::work::LogicalWork;
     use crate::materialize::InputFailure;
     use crate::structural::StructuralFailure;
@@ -386,12 +386,29 @@ fn every_finite_case_prepares_its_exact_result_and_work_including_all_limit_edge
                             Some(bound.exhausted())
                         );
                     }
+                    Output::Snapshot(resolved) => {
+                        // The Snapshot is admitted ending with the marker of
+                        // the bound, one past its value.
+                        let Prepared::Snapshot(prepared) = &candidate.prepared else {
+                            unreachable!()
+                        };
+                        let bound = super::snapshot_inputs::bound(kind).unwrap();
+                        let witness = bound.limit(&prepared.limits).get() + 1;
+                        let Ok(admitted) = &**resolved else {
+                            panic!("{declaration:?} is admitted");
+                        };
+                        let root = admitted.snapshot.root();
+                        let last = crate::benchmark::snapshot_admission::markers(root).pop();
+                        let marker =
+                            crate::snapshot::Marker::BootstrapLimitExceeded { bound, witness };
+                        assert_eq!(last, Some(marker));
+                    }
                     _ => panic!("first-over must fail its owning stage"),
                 }
             }
         }
     }
-    assert_eq!(edges, 153);
+    assert_eq!(edges, 169);
 }
 
 #[test]
@@ -483,5 +500,5 @@ fn every_declared_case_is_admitted_against_fixed_input_result_and_work_expectati
                 .matches_expected(fixture.expected_work())
         );
     }
-    assert_eq!(contexts.len(), 444);
+    assert_eq!(contexts.len(), 460);
 }

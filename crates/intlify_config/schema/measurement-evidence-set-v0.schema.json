@@ -3249,7 +3249,15 @@
         "invocation-logical-path-canonical-bytes",
         "invocation-subject-occurrences",
         "invocation-token-inputs",
-        "invocation-metadata-work-units"
+        "invocation-metadata-work-units",
+        "snapshot-nodes",
+        "snapshot-depth",
+        "snapshot-collection-entries",
+        "snapshot-total-string-bytes",
+        "snapshot-single-string-bytes",
+        "snapshot-rejected-markers",
+        "snapshot-envelope-canonical-bytes",
+        "snapshot-traversal-units"
       ],
       "type": "string"
     },
