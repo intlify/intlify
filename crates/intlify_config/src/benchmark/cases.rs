@@ -1009,21 +1009,28 @@ pub(super) fn declarations() -> Vec<Declaration> {
     // constructed and every interval reuses, the example checked and every
     // other recipe blocked. No bound has an edge here: a first-over
     // pre-invocation bound refuses the set, which is no outcome (D15:2826;
-    // plan 025 decisions #34 and #316).
-    for input in EvidenceRecipe::ALL {
-        cases.push(declaration(
-            Operation::FileEntryCompleteWorkflow,
-            Recipe::Workflow {
-                input,
-                resolver: ResolverState::Reused,
-            },
-            Selector::App,
-            if input.checked() {
-                ExpectedKind::WorkflowChecked
-            } else {
-                ExpectedKind::WorkflowBlocked
-            },
-        ));
+    // plan 025 decisions #34 and #316). Then, without changing any of those
+    // 419 rows, the same invocations on a resolver constructed before each
+    // start mark, and on the prepared one right after it resolved the
+    // Blocked recipe before each start mark, whose outcomes are the reused
+    // one's (D15:2751, 2789, 3689; plan 025 decision #33).
+    for resolver in [
+        ResolverState::Reused,
+        ResolverState::Fresh,
+        ResolverState::ReusedAfterBlocked,
+    ] {
+        for input in EvidenceRecipe::ALL {
+            cases.push(declaration(
+                Operation::FileEntryCompleteWorkflow,
+                Recipe::Workflow { input, resolver },
+                Selector::App,
+                if input.checked() {
+                    ExpectedKind::WorkflowChecked
+                } else {
+                    ExpectedKind::WorkflowBlocked
+                },
+            ));
+        }
     }
     cases
 }

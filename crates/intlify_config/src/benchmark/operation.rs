@@ -26,7 +26,7 @@ use crate::structural::{
     AdmissionInvariant, AuthoringSchema, StructuralAnalysis, StructuralLimits,
 };
 
-use super::cases::Engine;
+use super::cases::{Engine, ResolverState};
 use super::clock::Clock;
 use super::instrument::{Instrument, Interval, Timed};
 use super::locale_icu4x::PreparedEngine;
@@ -314,6 +314,15 @@ impl Prepared {
         match self {
             Self::Icu4xLocale { engine, .. } => Some(engine.engine()),
             Self::LocalePolicyResolution(prepared) => prepared.icu4x().map(PreparedEngine::engine),
+            _ => None,
+        }
+    }
+
+    /// The state of the resolver a complete invocation case invokes; `None`
+    /// for every other case.
+    pub(super) fn resolver_state(&self) -> Option<ResolverState> {
+        match self {
+            Self::Workflow(prepared) => Some(prepared.state()),
             _ => None,
         }
     }

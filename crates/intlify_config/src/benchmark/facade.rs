@@ -60,7 +60,7 @@ pub struct CompletedObservation {
     artifacts: pipeline::Artifacts,
 }
 
-/// Execute the fixed 419-case, seventeen-boundary native observational smoke profile.
+/// Execute the fixed 431-case, seventeen-boundary native observational smoke profile.
 /// POSIX clock acquisition is supported on Linux/macOS; unsupported acquisition
 /// fails explicitly rather than selecting an undeclared alternative method.
 pub fn observe_smoke() -> Result<CompletedObservation, ObservationError> {
@@ -167,8 +167,8 @@ mod tests {
             summary,
             ObservationSummary {
                 outcome: ObservationOutcome::Complete,
-                planned_cases: 419,
-                measured_cases: 419,
+                planned_cases: 431,
+                measured_cases: 431,
                 non_measured_cases: 0
             }
         );

@@ -14,7 +14,7 @@ fn smoke_profile_fixes_the_complete_inventory_and_observational_sampling() {
     let profile = AdmittedProfile::smoke(&registry);
     let document = profile.document();
     assert_eq!(document.cases(), declarations());
-    assert_eq!(document.cases().len(), 419);
+    assert_eq!(document.cases().len(), 431);
     for operation in Operation::ALL {
         assert!(document
             .cases()
@@ -61,17 +61,23 @@ fn the_profile_declares_exactly_the_execution_states_its_cases_run_in() {
         let prepared = fixture.prepared();
         let state = json!({
             "operation": prepared.operation(),
-            "execution": prepared_core(prepared.operation(), prepared.icu4x_engine()),
+            "execution": prepared_core(
+                prepared.operation(),
+                prepared.icu4x_engine(),
+                prepared.resolver_state(),
+            ),
         });
         assert!(declared.contains(&state), "{state}");
         if !used.contains(&state) {
             used.push(state);
         }
     }
-    // Each operation's own state, and both engine states of each operation
-    // that the ICU4X cases run. Phases 7 and 8's own state is the one their
-    // reused engine runs in, so it is declared once.
-    assert_eq!(declared.len(), 20);
+    // Each operation's own state, both engine states of each operation that
+    // the ICU4X cases run, and a complete invocation's fresh resolver. Phases
+    // 7 and 8's own state is the one their reused engine runs in, and a
+    // complete invocation's the one its reused resolver runs in, before or
+    // after a blocked outcome, so each is declared once.
+    assert_eq!(declared.len(), 21);
     assert_eq!(used.len(), declared.len());
 }
 
@@ -276,7 +282,7 @@ fn the_memory_profile_measures_each_construction_case_at_its_peak() {
         value["operationStates"],
         json!([{
             "operation": "construction-authority-admission",
-            "execution": prepared_core(Operation::ConstructionAuthorityAdmission, None),
+            "execution": prepared_core(Operation::ConstructionAuthorityAdmission, None, None),
         }])
     );
     let decoded: MeasurementProfile = serde_json::from_value(value).unwrap();
@@ -361,7 +367,7 @@ mod native {
         }
         drop(registry);
         drop(profile);
-        assert_eq!(retained.len(), 419);
+        assert_eq!(retained.len(), 431);
         assert!(!serde_json::to_vec(&retained).unwrap().is_empty());
         // This array alone is not a complete Owner Result, admitted Run Plan,
         // or common Measurement Evidence; build/environment and record gates
@@ -410,7 +416,7 @@ mod native {
         }
         for ordinal in [
             Quantity::new(1),
-            Quantity::new(419),
+            Quantity::new(431),
             Quantity::new(u64::MAX),
         ] {
             assert!(matches!(

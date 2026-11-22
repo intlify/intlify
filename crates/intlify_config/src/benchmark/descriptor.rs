@@ -8,7 +8,7 @@
 use intlify_measurement::acquisition::memory::ObserverDescription;
 use serde::{Deserialize, Serialize};
 
-use super::cases::Engine;
+use super::cases::{Engine, ResolverState};
 use super::clock::ClockDescription;
 use super::instrument::InstrumentDescription;
 use super::locale::InputFacts;
@@ -290,8 +290,13 @@ pub(super) use intlify_measurement::environment::ClockObservation;
 pub(super) use intlify_measurement::execution::{Execution, OutputBuffer};
 
 /// The execution state this owner's prepared core actually runs in. `icu4x` is
-/// the engine state of a case canonicalizing through the ICU4X provider.
-pub(super) fn prepared_core(operation: Operation, icu4x: Option<Engine>) -> Execution {
+/// the engine state of a case canonicalizing through the ICU4X provider, and
+/// `resolver` the state of the resolver a complete invocation case invokes.
+pub(super) fn prepared_core(
+    operation: Operation,
+    icu4x: Option<Engine>,
+    resolver: Option<ResolverState>,
+) -> Execution {
     if let Some(engine) = icu4x {
         return Execution {
             process_state: "reused-process".into(),
@@ -316,12 +321,13 @@ pub(super) fn prepared_core(operation: Operation, icu4x: Option<Engine>) -> Exec
         };
     }
     let locale = operation == Operation::LocaleCanonicalization;
-    // A construction case builds a fresh resolver in every interval; every
-    // other case, the identity's included, reuses what preparation built.
-    let engine = if operation == Operation::ConstructionAuthorityAdmission {
-        "fresh"
-    } else {
-        "reused"
+    // A construction case builds a fresh resolver in every interval, and a
+    // complete invocation invokes one in its declared state; every other
+    // case, the identity's included, reuses what preparation built.
+    let engine = match resolver {
+        Some(resolver) => resolver.engine_state(),
+        None if operation == Operation::ConstructionAuthorityAdmission => "fresh",
+        None => "reused",
     };
     Execution {
         // The harness invokes prepared calls in its existing process. Its
@@ -458,7 +464,11 @@ impl Descriptors {
             boundary,
             method,
             clock_observation,
-            execution: prepared_core(operation, prepared.icu4x_engine()),
+            execution: prepared_core(
+                operation,
+                prepared.icu4x_engine(),
+                prepared.resolver_state(),
+            ),
             locale_input: finite(prepared),
             locale_policy_resolution_input: match prepared {
                 Prepared::LocalePolicyResolution(prepared) => {
@@ -502,7 +512,12 @@ impl Descriptors {
                 self.validate_observer(operation, observer)
             }
         };
-        if self.execution != prepared_core(operation, prepared.icu4x_engine()) {
+        let execution = prepared_core(
+            operation,
+            prepared.icu4x_engine(),
+            prepared.resolver_state(),
+        );
+        if self.execution != execution {
             issues.push(DescriptorIssue::ExecutionMismatch);
         }
         if self.locale_input != finite(prepared) || self.admitted_locale_input != admitted(prepared)

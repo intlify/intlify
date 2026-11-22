@@ -398,30 +398,49 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
 }
 
 /// One file entry's complete invocation on a resolver its preparation
-/// constructed from the committed input: the resolver, by the identity the
-/// submission names, and every raw value a binding submits, each as the
-/// recipe's submission on that resolver rebuilds it: the Specification Input,
-/// the vocabulary, the canonicalization data's manifest and payloads, every
-/// member in submission order, the Verification Input and the assertion
-/// beside it, the capability, the file and its revision, the selector, and
-/// the case's facts.
+/// constructed from the committed input, in the declared state: the
+/// resolver, by the identity the submission names, every raw value a binding
+/// submits, and the case's facts, which state what each repetition runs
+/// before its start mark; and, for a resolver reused after a blocked
+/// outcome, every raw value of the Blocked recipe's submission it resolves
+/// first. Each is as the recipe and the state rebuild it on that resolver.
 fn workflow_input(
     frame: &mut Frame,
     candidate: &Candidate,
     prepared: &crate::benchmark::workflow::PreparedWorkflow,
 ) -> Result<(), ContextFailure> {
-    let Recipe::Workflow {
-        input,
-        resolver: super::ResolverState::Reused,
-    } = candidate.declaration.fixture
-    else {
+    use crate::benchmark::workflow::{Before, InputFacts};
+
+    let Recipe::Workflow { input, resolver } = candidate.declaration.fixture else {
         return Err(ContextFailure::WorkflowInputMismatch);
     };
     let (root, raw) = (prepared.root, &prepared.raw);
     let rebuilt = super::workflow_inputs::submission(input, &prepared.constructed, root);
-    if candidate.declaration.selector != super::Selector::App || rebuilt.as_ref() != Some(raw) {
+    let before = super::workflow_inputs::before(resolver, &prepared.constructed, root);
+    if candidate.declaration.selector != super::Selector::App
+        || rebuilt.as_ref() != Some(raw)
+        || before.as_ref() != Some(&prepared.before)
+    {
         return Err(ContextFailure::WorkflowInputMismatch);
     }
+    submitted_input(frame, raw)?;
+    let facts = InputFacts::observe(prepared);
+    frame.json(&serde_json::to_value(facts).map_err(|_| ContextFailure::Encoding)?);
+    if let Before::AfterBlocked(blocked) = &prepared.before {
+        submitted_input(frame, blocked)?;
+    }
+    Ok(())
+}
+
+/// What a binding submits for one file entry's invocation: the
+/// Specification Input, the vocabulary, the canonicalization data's manifest
+/// and payloads, every member in submission order, the Verification Input
+/// and the assertion beside it, the capability, the file and its revision,
+/// and the selector, under the identity the set names.
+fn submitted_input(
+    frame: &mut Frame,
+    raw: &crate::benchmark::workflow::RawInvocation,
+) -> Result<(), ContextFailure> {
     let count = |len: usize| u64::try_from(len).map_err(|_| ContextFailure::Encoding);
     frame.text(&raw.reference);
     frame.bytes(&raw.specification);
@@ -444,8 +463,6 @@ fn workflow_input(
     frame.bytes(&raw.file);
     frame.text(&raw.revision);
     frame.text(&raw.selector);
-    let facts = crate::benchmark::workflow::InputFacts::observe(prepared);
-    frame.json(&serde_json::to_value(facts).map_err(|_| ContextFailure::Encoding)?);
     Ok(())
 }
 
@@ -658,16 +675,29 @@ mod tests {
 
     use super::*;
     use crate::benchmark::cases::{EvidenceRecipe, ResolverState, Selector};
-    use crate::benchmark::workflow::tests::candidate;
-    use crate::benchmark::workflow::RawInvocation;
+    use crate::benchmark::workflow::tests::{candidate, candidate_in};
+    use crate::benchmark::workflow::{Before, PreparedWorkflow, RawInvocation};
 
     type Edit = (&'static str, fn(&mut RawInvocation));
 
-    fn raw(candidate: &mut Candidate) -> &mut RawInvocation {
+    fn workflow(candidate: &mut Candidate) -> &mut PreparedWorkflow {
         let Prepared::Workflow(prepared) = &mut candidate.prepared else {
             unreachable!()
         };
-        &mut prepared.raw
+        prepared
+    }
+
+    fn raw(candidate: &mut Candidate) -> &mut RawInvocation {
+        &mut workflow(candidate).raw
+    }
+
+    /// The Blocked recipe's submission a case reused after a blocked outcome
+    /// resolves first.
+    fn blocked(candidate: &mut Candidate) -> &mut RawInvocation {
+        let Before::AfterBlocked(blocked) = &mut workflow(candidate).before else {
+            unreachable!()
+        };
+        blocked
     }
 
     /// A complete invocation's context binds its recipe, the resolver's
@@ -723,6 +753,46 @@ mod tests {
         let refused = Err(ContextFailure::WorkflowInputMismatch);
         assert_eq!(observe(&candidate), refused);
         candidate.declaration.selector = Selector::App;
+        assert_eq!(observe(&candidate), context);
+    }
+
+    /// D15:2751, 2824: a case reused after a blocked outcome binds the
+    /// Blocked recipe's submission it resolves first as well, and every case
+    /// the state its preparation runs: a case whose first submission is not
+    /// what the Blocked recipe's rebuilds, or whose declared state is not the
+    /// prepared one, is refused.
+    #[test]
+    fn a_workflow_context_binds_the_state_and_what_it_resolves_first() {
+        let state = ResolverState::ReusedAfterBlocked;
+        let mut candidate = candidate_in(EvidenceRecipe::Storefront, state);
+        let context = observe(&candidate);
+        let original = blocked(&mut candidate).clone();
+        let refused = Err(ContextFailure::WorkflowInputMismatch);
+        let edits: [Edit; 3] = [
+            ("file", |raw| raw.file = Arc::from(&b"{}"[..])),
+            ("members", |raw| raw.members.reverse()),
+            ("selector", |raw| raw.selector.push('0')),
+        ];
+        for (name, edit) in edits {
+            edit(blocked(&mut candidate));
+            assert_eq!(observe(&candidate), refused, "{name}");
+            *blocked(&mut candidate) = original.clone();
+        }
+        assert!(context.is_ok() && observe(&candidate) == context);
+        for declared in [ResolverState::Fresh, ResolverState::Reused] {
+            candidate.declaration.fixture = Recipe::Workflow {
+                input: EvidenceRecipe::Storefront,
+                resolver: declared,
+            };
+            assert_eq!(observe(&candidate), refused, "{declared:?}");
+        }
+        candidate.declaration.fixture = Recipe::Workflow {
+            input: EvidenceRecipe::Storefront,
+            resolver: state,
+        };
+        let kept = std::mem::replace(&mut workflow(&mut candidate).before, Before::Fresh);
+        assert_eq!(observe(&candidate), refused);
+        workflow(&mut candidate).before = kept;
         assert_eq!(observe(&candidate), context);
     }
 }

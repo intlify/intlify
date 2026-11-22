@@ -10,7 +10,7 @@ use intlify_measurement::measurement::Metric;
 use serde::{Deserialize, Serialize};
 
 use super::cases::registry::{AdmittedFixture, Registry, RegistryBinding};
-use super::cases::{Declaration, Engine};
+use super::cases::{Declaration, Engine, ResolverState};
 use super::collect::{collect_operation, CollectedOperation, CollectionFailure, CollectionIssue};
 use super::descriptor::Execution;
 use super::instrument::{InstrumentDescription, RunInstrument};
@@ -176,13 +176,15 @@ impl MeasurementProfile {
                 cancellation: "external-process-termination-no-complete-result".into(),
                 failed_capture: "stop-case-retain-diagnostic-prefix-only".into(),
             },
-            // Every state a case runs in, once: each operation's own, and both
+            // Every state a case runs in, once: each operation's own, both
             // engine states of canonicalization and Phases 7 and 8 through
-            // the ICU4X provider. Phases 7 and 8's own state is the one their
-            // reused engine runs in.
+            // the ICU4X provider, and each state of the resolver a complete
+            // invocation invokes. Phases 7 and 8's own state is the one their
+            // reused engine runs in, and a complete invocation's the one its
+            // reused resolver runs in.
             operation_states: Operation::ALL
                 .into_iter()
-                .map(|operation| (operation, None))
+                .map(|operation| (operation, None, None))
                 .chain(
                     [
                         Operation::LocaleCanonicalization,
@@ -190,14 +192,25 @@ impl MeasurementProfile {
                     ]
                     .into_iter()
                     .flat_map(|operation| {
-                        [Engine::Reused, Engine::Fresh].map(|engine| (operation, Some(engine)))
+                        [Engine::Reused, Engine::Fresh]
+                            .map(|engine| (operation, Some(engine), None))
                     }),
                 )
+                .chain(
+                    [
+                        ResolverState::Fresh,
+                        ResolverState::Reused,
+                        ResolverState::ReusedAfterBlocked,
+                    ]
+                    .map(|state| (Operation::FileEntryCompleteWorkflow, None, Some(state))),
+                )
                 // A memory run states only the operations it measures.
-                .filter(|(operation, _)| !memory || operation.peak_memory().is_some())
-                .map(|(operation, icu4x)| OperationState {
+                .filter(|(operation, ..)| !memory || operation.peak_memory().is_some())
+                .map(|(operation, icu4x, resolver)| OperationState {
                     operation,
-                    execution: crate::benchmark::descriptor::prepared_core(operation, icu4x),
+                    execution: crate::benchmark::descriptor::prepared_core(
+                        operation, icu4x, resolver,
+                    ),
                 })
                 .fold(Vec::new(), |mut states, state| {
                     if !states.contains(&state) {
