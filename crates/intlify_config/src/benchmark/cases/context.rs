@@ -570,8 +570,10 @@ fn evidence_input(
     use crate::locale::fixtures::fixture_pins;
     use crate::locale::VersionedIdentity;
 
-    let Recipe::Evidence(recipe) = candidate.declaration.fixture else {
-        return Err(ContextFailure::EvidenceInputMismatch);
+    let (recipe, programmatic) = match candidate.declaration.fixture {
+        Recipe::Evidence(recipe) => (recipe, None),
+        Recipe::ProgrammaticEvidence(recipe) => (recipe.file(), Some(recipe)),
+        _ => return Err(ContextFailure::EvidenceInputMismatch),
     };
     let expected = selector_input(
         candidate.declaration.selector,
@@ -591,8 +593,23 @@ fn evidence_input(
     {
         return Err(ContextFailure::EvidenceInputMismatch);
     }
+    // A programmatic entry's Snapshot is the one the file's value rebuilds.
+    let rebuilt = programmatic
+        .map(|recipe| {
+            let source = std::sync::Arc::clone(&prepared.source);
+            super::workflow_inputs::admitted(recipe, source)
+                .ok_or(ContextFailure::EvidenceInputMismatch)
+        })
+        .transpose()?;
+    if rebuilt != prepared.snapshot {
+        return Err(ContextFailure::EvidenceInputMismatch);
+    }
     frame.bytes(&prepared.source);
     input_limits(frame, prepared.input);
+    if let Some(snapshot) = &prepared.snapshot {
+        frame.text(snapshot.digest());
+        frame.bytes(&snapshot.root().framed());
+    }
     structural_limits(frame, prepared.structural);
     frame.json(prepared.schema.schema_body());
     let members = prepared.collection.members();
@@ -944,6 +961,44 @@ mod tests {
             resolver: state,
         };
         assert_eq!(observe(&candidate), refused);
+    }
+
+    /// D15:2788, 2824: a programmatic Evidence stage's context binds the
+    /// Snapshot its entry enters with: none, or another recipe's, in its
+    /// place is refused.
+    #[test]
+    fn a_programmatic_evidence_context_binds_its_snapshot() {
+        use crate::benchmark::cases::prepare::prepare;
+        use crate::benchmark::cases::workflow_inputs::admitted;
+        use crate::benchmark::cases::{declarations, ProgrammaticRecipe};
+        use crate::boundary::snapshot::AdmittedSnapshot;
+
+        fn snapshot(candidate: &mut Candidate) -> &mut Option<AdmittedSnapshot> {
+            let Prepared::SharedEvidence(prepared) = &mut candidate.prepared else {
+                unreachable!()
+            };
+            &mut prepared.snapshot
+        }
+        let recipe = Recipe::ProgrammaticEvidence(ProgrammaticRecipe::Storefront);
+        let declaration = declarations()
+            .into_iter()
+            .find(|case| case.fixture == recipe);
+        let mut candidate = prepare(&declaration.unwrap()).unwrap();
+        let context = observe(&candidate);
+        let refused = Err(ContextFailure::EvidenceInputMismatch);
+        let kept = snapshot(&mut candidate).take();
+        assert_eq!(observe(&candidate), refused);
+        let Prepared::SharedEvidence(prepared) = &candidate.prepared else {
+            unreachable!()
+        };
+        let other = admitted(
+            ProgrammaticRecipe::RejectedMarker,
+            Arc::clone(&prepared.source),
+        );
+        *snapshot(&mut candidate) = other;
+        assert_eq!(observe(&candidate), refused);
+        *snapshot(&mut candidate) = kept;
+        assert!(context.is_ok() && observe(&candidate) == context);
     }
 
     /// The members of a formal Snapshot's root object.

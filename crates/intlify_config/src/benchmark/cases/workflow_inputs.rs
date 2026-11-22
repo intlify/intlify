@@ -33,7 +33,7 @@ use crate::artifacts::verification::{sealed, unsealed, VerificationInputArtifact
 use crate::benchmark::workflow::{Before, RawEntry, RawInvocation};
 use crate::benchmark::{evidence, locale_icu4x};
 use crate::boundary::capability::ImplementationCapability;
-use crate::boundary::snapshot::SnapshotReport;
+use crate::boundary::snapshot::{read_report, AdmittedSnapshot, SnapshotReport};
 use crate::boundary::source::file_source_revision;
 use crate::boundary::verification::VerificationAssertion;
 use crate::construction::resolver::ConstructedResolver;
@@ -44,7 +44,7 @@ use crate::resolver::limits::ResolutionLimits;
 use crate::resolver::specification::SupportedSpecifications;
 
 use super::policy_inputs::{reference_value, tuple_of};
-use super::snapshot_inputs::{spelled, SnapshotRecipe};
+use super::snapshot_inputs::{limits, spelled, SnapshotRecipe};
 use super::{EntryKind, EvidenceRecipe, Recipe, ResolverState};
 
 /// A programmatic entry's recipes: each Evidence recipe whose value a
@@ -74,6 +74,20 @@ impl ProgrammaticRecipe {
         Self::RejectedMarker,
     ];
 
+    /// The recipes of the Shared projection stage, the ones with a value
+    /// whose file recipe has that stage's case (D15:2369, 2771).
+    pub(in crate::benchmark) const VALUED: [Self; 3] =
+        [Self::Storefront, Self::Blocked, Self::Dense];
+
+    /// The recipes of the Entry projection stage: every one but the one that
+    /// exhausts only the Shared domain, as the file's.
+    pub(in crate::benchmark) const ENTRY: [Self; 4] = [
+        Self::Storefront,
+        Self::Blocked,
+        Self::Dense,
+        Self::RejectedMarker,
+    ];
+
     /// The file recipe whose value the Snapshot submits.
     pub(in crate::benchmark) const fn file(self) -> EvidenceRecipe {
         match self {
@@ -85,7 +99,7 @@ impl ProgrammaticRecipe {
     }
 
     /// The Snapshot recipe whose root member the value holds beside it.
-    const fn beside(self) -> Option<SnapshotRecipe> {
+    pub(in crate::benchmark) const fn beside(self) -> Option<SnapshotRecipe> {
         match self {
             Self::RejectedMarker => Some(SnapshotRecipe::UnsupportedType),
             _ => None,
@@ -167,6 +181,17 @@ pub(in crate::benchmark) fn programmatic(
     let revision = digest.clone();
     raw.entry = RawEntry::Programmatic { snapshot, revision };
     Some(raw)
+}
+
+/// The Snapshot of the value `source`, `recipe`'s file, spells, admitted at
+/// its boundary under room for every count, which a programmatic entry's
+/// Evidence stages enter with (D15:2788, 2824).
+pub(in crate::benchmark) fn admitted(
+    recipe: ProgrammaticRecipe,
+    source: Arc<[u8]>,
+) -> Option<AdmittedSnapshot> {
+    let report = spelled(source, recipe.beside())?;
+    read_report(Some(&report), &limits()).ok()
 }
 
 /// What each repetition of a case invoking a resolver in `state` runs before
