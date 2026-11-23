@@ -38,9 +38,9 @@ pub mod schema;
 
 pub use canonicalize::{RawFailure, ENGINE};
 pub use conformance::{
-    Collection, ConformanceFailure, ConformanceLimits, Correction, Extension, ExtensionKey,
-    ExtensionType, Limited, LocaleConformanceData, TypeClass, ValidityField, ValidityGroup,
-    ValidityStatus, ValueType,
+    Collection, ConformanceCounts, ConformanceFailure, ConformanceLimits, Correction,
+    DecodedConformance, Extension, ExtensionKey, ExtensionType, Limited, LocaleConformanceData,
+    TypeClass, ValidityField, ValidityGroup, ValidityStatus, ValueType,
 };
 pub use dataset::{
     DatasetFailure, LocaleCanonicalizationDataset, DATASET_DOMAIN, DATASET_SCHEMA_IDENTITY,
@@ -54,8 +54,8 @@ pub use manifest::{
 };
 pub use markers::{BlobFailure, Layout, Marker, MarkerBlob};
 pub use payload::{LogicalPayload, PayloadFailure};
-pub use primitives::{FileDigest, LogicalAddress, NonemptyText, SemanticDigest};
+pub use primitives::{FileDigest, LogicalAddress, Measured, NonemptyText, SemanticDigest};
 pub use reader::{
-    AdmittedData, ArtifactLimit, DataFailure, DecodedManifest, PayloadCheck, ReadFailure,
-    ReadLimits, VerifiedManifest, CONFORMANCE_FORMAT, MARKERS_FORMAT,
+    AdmittedData, ArtifactLimit, DataFailure, DecodedManifest, DecodedMarkers, PayloadCheck,
+    ReadFailure, ReadLimits, VerifiedManifest, CONFORMANCE_FORMAT, MARKERS_FORMAT,
 };

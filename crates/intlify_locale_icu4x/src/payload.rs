@@ -15,6 +15,7 @@ use icu_provider::prelude::*;
 use serde_json::Value;
 
 use crate::markers::{Marker, MarkerBlob};
+use crate::primitives::Measured;
 
 /// Serializes one singleton marker's data struct as ICU4X's human-readable
 /// serde form. A macro, because the generic bounds of a data struct across
@@ -73,22 +74,12 @@ macro_rules! measure {
     }};
 }
 
-/// Why the logical payloads were not taken within a limit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Within {
-    /// Written as compact JSON text, they are over the limit.
-    Over,
-    Failed(PayloadFailure),
-}
-
 /// Counts the bytes a serializer writes and keeps none of them.
-struct Counter(u64);
+struct Counter(Measured);
 
 impl std::io::Write for Counter {
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-        self.0 = self
-            .0
-            .saturating_add(u64::try_from(bytes.len()).unwrap_or(u64::MAX));
+        self.0 = self.0.plus(Measured::of(bytes.len()));
         Ok(bytes.len())
     }
 
@@ -106,20 +97,12 @@ impl MarkerBlob {
             .collect()
     }
 
-    /// The four logical payloads, if they are within `limit` bytes as compact
-    /// JSON text. The bytes are counted before any payload is built, so a
-    /// blob over the limit never has its payloads allocated.
-    pub(crate) fn payloads_within(&self, limit: u64) -> Result<Vec<LogicalPayload>, Within> {
-        if self.written_bytes().map_err(Within::Failed)? > limit {
-            return Err(Within::Over);
-        }
-        self.payloads().map_err(Within::Failed)
-    }
-
-    /// The bytes of the four logical payloads as compact JSON text.
-    pub(crate) fn written_bytes(&self) -> Result<u64, PayloadFailure> {
+    /// The bytes of the four logical payloads as compact JSON text, counted
+    /// without building any of them, so that a blob over a limit never has
+    /// its payloads allocated.
+    pub(crate) fn written_bytes(&self) -> Result<Measured, PayloadFailure> {
         let provider = self.provider().as_deserializing();
-        let mut counter = Counter(0);
+        let mut counter = Counter(Measured::ZERO);
         for marker in Marker::ALL {
             match marker {
                 Marker::LocaleAliasesV1 => measure!(provider, LocaleAliasesV1, counter),
@@ -349,19 +332,19 @@ mod tests {
                 .map(|payload| serde_json::to_string(payload.value()).unwrap().len())
                 .sum();
             let expected = u64::try_from(expected).unwrap();
-            assert_eq!(blob.written_bytes(), Ok(expected));
-            assert_eq!(blob.payloads_within(expected), Ok(blob.payloads().unwrap()));
-            assert_eq!(blob.payloads_within(expected - 1), Err(Within::Over));
+            assert_eq!(blob.written_bytes(), Ok(Measured::Exact(expected)));
         }
     }
 
     #[test]
-    fn the_counter_saturates_rather_than_wrapping() {
+    fn a_count_past_u64_is_reported_rather_than_saturated() {
         use std::io::Write;
 
-        let mut counter = Counter(u64::MAX - 1);
+        let mut counter = Counter(Measured::Exact(u64::MAX - 3));
         assert_eq!(counter.write(b"abc").unwrap(), 3);
-        assert_eq!(counter.0, u64::MAX);
+        assert_eq!(counter.0, Measured::Exact(u64::MAX));
+        assert_eq!(counter.write(b"a").unwrap(), 1);
+        assert_eq!(counter.0, Measured::BeyondU64);
         counter.flush().unwrap();
     }
 }

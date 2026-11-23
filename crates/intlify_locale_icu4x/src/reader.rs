@@ -15,6 +15,12 @@
 //! boundary is 015's specification admission, so a caller that admits the
 //! envelope before invocation leaves the rest to the resolver.
 //!
+//! A caller that judges each limit on its own reads through the same steps in
+//! stages: the counts the manifest decides, [`DecodedManifest::verify_integrity`],
+//! [`VerifiedManifest::check_payloads`], each payload's decoding and counts,
+//! one payload's failure leaving the other to read, and
+//! [`VerifiedManifest::finish`] over payloads it has seen within its limits.
+//!
 //! Admitting data is not admitting a specification. Whether the
 //! specification is supported, and whether the dataset is the one it admits,
 //! are the owner's checks, which come after this.
@@ -24,12 +30,14 @@ use std::fmt;
 use intlify_shared_json::encoding::EncodingFailure;
 use intlify_shared_json::token::VersionedIdentity;
 
-use crate::conformance::{ConformanceFailure, ConformanceLimits, LocaleConformanceData};
+use crate::conformance::{
+    ConformanceFailure, ConformanceLimits, DecodedConformance, LocaleConformanceData,
+};
 use crate::dataset::{self, DATASET_SCHEMA_IDENTITY, DATASET_SCHEMA_REVISION};
 use crate::manifest::{self, EnvelopeFailure, LocaleCanonicalizationDataArtifact, Payload, Role};
 use crate::markers::{BlobFailure, MarkerBlob};
-use crate::payload::{LogicalPayload, PayloadFailure, Within};
-use crate::primitives::{FileDigest, LogicalAddress};
+use crate::payload::{LogicalPayload, PayloadFailure};
+use crate::primitives::{FileDigest, LogicalAddress, Measured};
 
 /// The format of a conformance payload: canonical JSON text revision "0".
 pub const CONFORMANCE_FORMAT: (&str, &str) = ("intlify-canonical-json-text", "0");
@@ -64,9 +72,9 @@ pub enum ReadFailure {
     /// 015's `locale-canonicalization-data-artifact` pre-invocation boundary;
     /// the resolver is not invoked.
     Envelope(EnvelopeFailure),
-    /// Everything after the boundary, which 015 reports as
-    /// `project-profile-locale-data-not-admitted` during specification
-    /// admission.
+    /// Everything after the boundary, which 015 reports during specification
+    /// admission: a limit as its `project-profile-bootstrap-limit-exceeded`,
+    /// and anything else as `project-profile-locale-data-not-admitted`.
     Data(DataFailure),
 }
 
@@ -158,17 +166,31 @@ impl DecodedManifest {
     /// integrity. The manifest's own byte and depth limits were the
     /// boundary's, so `limits` is not asked for them again.
     pub fn verify(self, limits: &ReadLimits) -> Result<VerifiedManifest, ReadFailure> {
-        let manifest = self.manifest;
-        if count(manifest.payloads().len()) > limits.payloads {
+        if self.payload_count().over(limits.payloads) {
             return Err(data(DataFailure::Limit(ArtifactLimit::Payloads)));
         }
-        if manifest
-            .payloads()
-            .iter()
-            .any(|payload| payload.byte_length() > limits.payload_bytes)
-        {
+        if self.declares_over(limits.payload_bytes) {
             return Err(data(DataFailure::Limit(ArtifactLimit::PayloadBytes)));
         }
+        self.verify_integrity()
+    }
+
+    /// The manifest's payload entries.
+    pub fn payload_count(&self) -> Measured {
+        Measured::of(self.manifest.payloads().len())
+    }
+
+    /// Whether any payload declares more than `limit` bytes.
+    pub fn declares_over(&self, limit: u64) -> bool {
+        self.manifest
+            .payloads()
+            .iter()
+            .any(|payload| payload.byte_length() > limit)
+    }
+
+    /// 017 step 3: the manifest's integrity.
+    pub fn verify_integrity(self) -> Result<VerifiedManifest, ReadFailure> {
+        let manifest = self.manifest;
         if !framed(manifest.verify_integrity())? {
             return Err(data(DataFailure::Integrity));
         }
@@ -205,21 +227,84 @@ impl VerifiedManifest {
         limits: &ReadLimits,
     ) -> Result<AdmittedData, ReadFailure> {
         // Step 4, for every payload before any is decoded.
-        let conformance = supplied(self.payload(Role::Conformance), conformance)?;
-        supplied(self.payload(Role::Markers), markers.as_deref())?;
-        // `supplied` has just refused a missing payload.
+        self.check_payloads(conformance, markers.as_deref())?;
+        // `check_payloads` has just refused a missing payload.
+        let conformance = conformance.unwrap_or_default();
         let markers = markers.unwrap_or_default();
 
-        // Step 5. The dataset schema decides what the payloads must hold.
-        let schema = self.manifest.dataset().schema();
-        if !named(schema, (DATASET_SCHEMA_IDENTITY, DATASET_SCHEMA_REVISION)) {
-            return Err(data(DataFailure::DatasetSchema));
-        }
+        // Step 5.
         let conformance = self.conformance(conformance, &limits.conformance)?;
         let (markers, payloads) = self.markers(markers, limits.marker_bytes)?;
 
         // Step 6.
-        let digest = framed(dataset::digest_of(&payloads, &conformance))?;
+        self.conclude(conformance, markers, &payloads)
+    }
+
+    /// 017 step 4 for every payload, and the dataset schema, which decides
+    /// what the payloads must hold. Nothing is decoded.
+    pub fn check_payloads(
+        &self,
+        conformance: Option<&[u8]>,
+        markers: Option<&[u8]>,
+    ) -> Result<(), ReadFailure> {
+        supplied(self.payload(Role::Conformance), conformance)?;
+        supplied(self.payload(Role::Markers), markers)?;
+        let schema = self.manifest.dataset().schema();
+        if !named(schema, (DATASET_SCHEMA_IDENTITY, DATASET_SCHEMA_REVISION)) {
+            return Err(data(DataFailure::DatasetSchema));
+        }
+        Ok(())
+    }
+
+    /// The markers payload decoded under the one format its role admits, with
+    /// its logical bytes measured and none of its payloads built.
+    pub fn decode_markers(&self, bytes: Box<[u8]>) -> Result<DecodedMarkers, ReadFailure> {
+        if !named(self.payload(Role::Markers).format(), MARKERS_FORMAT) {
+            return Err(data(DataFailure::Format(Role::Markers)));
+        }
+        let blob =
+            MarkerBlob::read(bytes).map_err(|failure| data(DataFailure::Markers(failure)))?;
+        let written = blob
+            .written_bytes()
+            .map_err(|failure| data(DataFailure::MarkerPayload(failure)))?;
+        Ok(DecodedMarkers { blob, written })
+    }
+
+    /// The conformance payload decoded under the one format its role admits,
+    /// and counted, with nothing projected.
+    pub fn decode_conformance(&self, bytes: &[u8]) -> Result<DecodedConformance, ReadFailure> {
+        if !named(self.payload(Role::Conformance).format(), CONFORMANCE_FORMAT) {
+            return Err(data(DataFailure::Format(Role::Conformance)));
+        }
+        DecodedConformance::decode(bytes).map_err(|failure| data(DataFailure::Conformance(failure)))
+    }
+
+    /// The rest of 017 steps 5 and 6 over payloads a caller has seen within
+    /// its limits: the closed conformance structure, the logical marker
+    /// payloads, and the dataset's semantic digest.
+    pub fn finish(
+        self,
+        conformance: DecodedConformance,
+        markers: DecodedMarkers,
+    ) -> Result<AdmittedData, ReadFailure> {
+        let conformance = conformance
+            .project()
+            .map_err(|failure| data(DataFailure::Conformance(failure)))?;
+        let payloads = markers
+            .blob
+            .payloads()
+            .map_err(|failure| data(DataFailure::MarkerPayload(failure)))?;
+        self.conclude(conformance, markers.blob, &payloads)
+    }
+
+    /// 017 step 6.
+    fn conclude(
+        self,
+        conformance: LocaleConformanceData,
+        markers: MarkerBlob,
+        payloads: &[LogicalPayload],
+    ) -> Result<AdmittedData, ReadFailure> {
+        let digest = framed(dataset::digest_of(payloads, &conformance))?;
         if digest != *self.manifest.dataset().semantic_digest() {
             return Err(data(DataFailure::SemanticDigest));
         }
@@ -250,18 +335,15 @@ impl VerifiedManifest {
         bytes: Box<[u8]>,
         limit: u64,
     ) -> Result<(MarkerBlob, Vec<LogicalPayload>), ReadFailure> {
-        if !named(self.payload(Role::Markers).format(), MARKERS_FORMAT) {
-            return Err(data(DataFailure::Format(Role::Markers)));
+        let decoded = self.decode_markers(bytes)?;
+        if decoded.written.over(limit) {
+            return Err(data(DataFailure::Limit(ArtifactLimit::MarkerBytes)));
         }
-        let blob =
-            MarkerBlob::read(bytes).map_err(|failure| data(DataFailure::Markers(failure)))?;
-        let payloads = blob.payloads_within(limit).map_err(|failure| {
-            data(match failure {
-                Within::Over => DataFailure::Limit(ArtifactLimit::MarkerBytes),
-                Within::Failed(failure) => DataFailure::MarkerPayload(failure),
-            })
-        })?;
-        Ok((blob, payloads))
+        let payloads = decoded
+            .blob
+            .payloads()
+            .map_err(|failure| data(DataFailure::MarkerPayload(failure)))?;
+        Ok((decoded.blob, payloads))
     }
 
     fn payload(&self, role: Role) -> &Payload {
@@ -277,6 +359,19 @@ fn payload_of(manifest: &LocaleCanonicalizationDataArtifact, role: Role) -> &Pay
         Role::Markers => 1,
     };
     &manifest.payloads()[index]
+}
+
+/// A markers payload decoded under its format, with the bytes of its logical
+/// payloads as compact JSON text measured and none of them built.
+pub struct DecodedMarkers {
+    blob: MarkerBlob,
+    written: Measured,
+}
+
+impl DecodedMarkers {
+    pub const fn written_bytes(&self) -> Measured {
+        self.written
+    }
 }
 
 impl AdmittedData {
@@ -819,6 +914,136 @@ pub(crate) mod tests {
             Some(MARKERS_WIDE)
         )
         .is_ok());
+    }
+
+    /// The stages a caller with several checks reads through admit what one
+    /// admission does, and measure each count on the way.
+    #[test]
+    fn the_stages_read_what_one_admission_reads() {
+        let decoded = DecodedManifest::decode(NARROW, u64::MAX, u64::MAX).unwrap();
+        assert_eq!(decoded.payload_count(), Measured::Exact(2));
+        let longest = |manifest: &DecodedManifest| {
+            manifest
+                .manifest
+                .payloads()
+                .iter()
+                .map(Payload::byte_length)
+                .max()
+                .unwrap()
+        };
+        let longest = longest(&decoded);
+        assert!(!decoded.declares_over(longest));
+        assert!(decoded.declares_over(longest - 1));
+        let manifest = decoded.verify_integrity().unwrap();
+        manifest
+            .check_payloads(Some(CONFORMANCE), Some(MARKERS_NARROW))
+            .unwrap();
+        let markers = manifest.decode_markers(MARKERS_NARROW.into()).unwrap();
+        let once = admit(NARROW, Some(CONFORMANCE), Some(MARKERS_NARROW)).unwrap();
+        assert_eq!(
+            markers.written_bytes(),
+            once.markers().written_bytes().unwrap()
+        );
+        let conformance = manifest.decode_conformance(CONFORMANCE).unwrap();
+        assert_eq!(conformance.counts().work, Measured::Exact(44));
+        let admitted = manifest.finish(conformance, markers).unwrap();
+        assert_eq!(admitted.manifest(), once.manifest());
+        assert_eq!(admitted.conformance(), once.conformance());
+    }
+
+    /// Each stage reports its own failure: the manifest's before any decoding,
+    /// and one payload's decoding leaves the other's to read (D15:2365).
+    #[test]
+    fn one_payloads_decoding_leaves_the_others_to_read() {
+        let manifest = |bytes: &[u8]| VerifiedManifest::read(bytes, &GENEROUS).unwrap();
+        let failure = |result: Result<(), ReadFailure>| match result {
+            Err(ReadFailure::Data(failure)) => failure,
+            other => panic!("not a data failure: {other:?}"),
+        };
+        let narrow = manifest(NARROW);
+        assert_eq!(
+            failure(narrow.check_payloads(None, Some(MARKERS_NARROW))),
+            DataFailure::Payload(Role::Conformance, PayloadCheck::Missing)
+        );
+        assert_eq!(
+            failure(narrow.check_payloads(Some(CONFORMANCE), None)),
+            DataFailure::Payload(Role::Markers, PayloadCheck::Missing)
+        );
+        let schema = resealed(|value| value["dataset"]["schema"]["revision"] = json!("1"));
+        assert_eq!(
+            failure(manifest(&schema).check_payloads(Some(CONFORMANCE), Some(MARKERS_NARROW))),
+            DataFailure::DatasetSchema
+        );
+        // Markers that do not decode leave the conformance payload to count.
+        let broken = manifest(&pointing_at(1, b"not a blob"));
+        broken
+            .check_payloads(Some(CONFORMANCE), Some(b"not a blob"))
+            .unwrap();
+        assert!(matches!(
+            broken.decode_markers(Box::from(*b"not a blob")),
+            Err(ReadFailure::Data(DataFailure::Markers(_)))
+        ));
+        assert_eq!(
+            broken
+                .decode_conformance(CONFORMANCE)
+                .unwrap()
+                .counts()
+                .codes,
+            Measured::Exact(20)
+        );
+        // Conformance that does not decode leaves the markers to measure.
+        let broken = manifest(&pointing_at(0, b"not json"));
+        assert!(matches!(
+            broken.decode_conformance(b"not json"),
+            Err(ReadFailure::Data(DataFailure::Conformance(
+                ConformanceFailure::Text(_)
+            )))
+        ));
+        assert!(broken.decode_markers(MARKERS_NARROW.into()).is_ok());
+        // A format no stage admits is that stage's alone.
+        let format = |index: usize| {
+            manifest(&resealed(|value| {
+                value["payloads"][index]["format"]["revision"] = json!("9");
+            }))
+        };
+        let other = format(0);
+        assert!(matches!(
+            other.decode_conformance(CONFORMANCE),
+            Err(ReadFailure::Data(DataFailure::Format(Role::Conformance)))
+        ));
+        assert!(other.decode_markers(MARKERS_NARROW.into()).is_ok());
+        let other = format(1);
+        assert!(matches!(
+            other.decode_markers(MARKERS_NARROW.into()),
+            Err(ReadFailure::Data(DataFailure::Format(Role::Markers)))
+        ));
+        assert!(other.decode_conformance(CONFORMANCE).is_ok());
+    }
+
+    /// What is left after the bounds fails in `finish`: the closed structure,
+    /// and the dataset's digest.
+    #[test]
+    fn the_rest_of_the_read_fails_when_it_finishes() {
+        let value = json!({"corrections": [], "extensionKeys": [], "validity": "x"});
+        let shape = text::write(&value).unwrap();
+        let manifest =
+            VerifiedManifest::read(&pointing_at(0, shape.as_bytes()), &GENEROUS).unwrap();
+        let conformance = manifest.decode_conformance(shape.as_bytes()).unwrap();
+        let markers = manifest.decode_markers(MARKERS_NARROW.into()).unwrap();
+        assert_eq!(
+            data_failure(manifest.finish(conformance, markers)),
+            DataFailure::Conformance(ConformanceFailure::Shape)
+        );
+        let other = resealed(|value| {
+            value["dataset"]["semanticDigest"] = json!(format!("sha256:{}", "0".repeat(64)));
+        });
+        let manifest = VerifiedManifest::read(&other, &GENEROUS).unwrap();
+        let conformance = manifest.decode_conformance(CONFORMANCE).unwrap();
+        let markers = manifest.decode_markers(MARKERS_NARROW.into()).unwrap();
+        assert_eq!(
+            data_failure(manifest.finish(conformance, markers)),
+            DataFailure::SemanticDigest
+        );
     }
 
     #[test]

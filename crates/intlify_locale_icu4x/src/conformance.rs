@@ -20,7 +20,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::primitives::NonemptyText;
+use crate::primitives::{Measured, NonemptyText};
 
 /// The validity records, extension keys and types, and corrections that the
 /// conformance layer of a Locale Canonicalization Specification uses.
@@ -198,15 +198,43 @@ pub enum ConformanceFailure {
     Unflattened,
 }
 
+/// A conformance payload decoded as canonical JSON text and counted, not yet
+/// projected into the closed structure. Only a caller that has seen every
+/// count within its limits projects it.
+#[derive(Debug, Clone)]
+pub struct DecodedConformance {
+    value: Value,
+    counts: ConformanceCounts,
+}
+
+impl DecodedConformance {
+    /// Decode the payload's text and count what the limits bound.
+    pub fn decode(bytes: &[u8]) -> Result<Self, ConformanceFailure> {
+        let value = text::read(bytes).map_err(ConformanceFailure::Text)?;
+        let counts = ConformanceCounts::of(&value);
+        Ok(Self { value, counts })
+    }
+
+    pub const fn counts(&self) -> &ConformanceCounts {
+        &self.counts
+    }
+
+    /// The closed structure in canonical order.
+    pub fn project(self) -> Result<LocaleConformanceData, ConformanceFailure> {
+        let data: LocaleConformanceData =
+            serde_json::from_value(self.value).map_err(|_| ConformanceFailure::Shape)?;
+        data.check()?;
+        Ok(data)
+    }
+}
+
 impl LocaleConformanceData {
     /// Read a conformance payload: canonical JSON text of the closed structure
     /// in canonical order.
     pub fn read(bytes: &[u8], limits: &ConformanceLimits) -> Result<Self, ConformanceFailure> {
-        let value = text::read(bytes).map_err(ConformanceFailure::Text)?;
-        Counts::of(&value).within(limits)?;
-        let data: Self = serde_json::from_value(value).map_err(|_| ConformanceFailure::Shape)?;
-        data.check()?;
-        Ok(data)
+        let decoded = DecodedConformance::decode(bytes)?;
+        decoded.counts.within(limits)?;
+        decoded.project()
     }
 
     /// The payload's exact bytes: this value as canonical JSON text.
@@ -545,37 +573,37 @@ impl TypeClass {
 
 /// The counts the limits bound, taken from the decoded value. A member that is
 /// missing or of another type counts nothing here and fails projection next.
-struct Counts {
-    validity_groups: u64,
-    codes: u64,
-    extension_keys: u64,
-    types: u64,
-    corrections: u64,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConformanceCounts {
+    pub validity_groups: Measured,
+    pub codes: Measured,
+    pub extension_keys: Measured,
+    pub types: Measured,
+    pub corrections: Measured,
+    /// Every group, code, key, type, and correction, each counted once.
+    pub work: Measured,
 }
 
-impl Counts {
+impl ConformanceCounts {
     fn of(value: &Value) -> Self {
         let groups = items(value.get("validity"));
         let keys = items(value.get("extensionKeys"));
+        let validity_groups = Measured::of(groups.len());
+        let codes = total(groups, "codes");
+        let extension_keys = Measured::of(keys.len());
+        let types = total(keys, "types");
+        let corrections = Measured::of(items(value.get("corrections")).len());
         Self {
-            validity_groups: count(groups.len()),
-            codes: total(groups, "codes"),
-            extension_keys: count(keys.len()),
-            types: total(keys, "types"),
-            corrections: count(items(value.get("corrections")).len()),
+            validity_groups,
+            codes,
+            extension_keys,
+            types,
+            corrections,
+            work: sum([validity_groups, codes, extension_keys, types, corrections]),
         }
     }
 
     fn within(&self, limits: &ConformanceLimits) -> Result<(), ConformanceFailure> {
-        let work = [
-            self.validity_groups,
-            self.codes,
-            self.extension_keys,
-            self.types,
-            self.corrections,
-        ]
-        .into_iter()
-        .fold(0_u64, u64::saturating_add);
         for (actual, limit, limited) in [
             (
                 self.validity_groups,
@@ -590,9 +618,9 @@ impl Counts {
             ),
             (self.types, limits.types, Limited::Types),
             (self.corrections, limits.corrections, Limited::Corrections),
-            (work, limits.work, Limited::Work),
+            (self.work, limits.work, Limited::Work),
         ] {
-            if actual > limit {
+            if actual.over(limit) {
                 return Err(ConformanceFailure::Limit(limited));
             }
         }
@@ -604,16 +632,16 @@ fn items(value: Option<&Value>) -> &[Value] {
     value.and_then(Value::as_array).map_or(&[], Vec::as_slice)
 }
 
-fn count(length: usize) -> u64 {
-    u64::try_from(length).unwrap_or(u64::MAX)
+/// The checked total of `counts`.
+fn sum(counts: impl IntoIterator<Item = Measured>) -> Measured {
+    counts.into_iter().fold(Measured::ZERO, Measured::plus)
 }
 
 /// The total length of one array member across `entries`.
-fn total(entries: &[Value], member: &str) -> u64 {
-    entries
+fn total(entries: &[Value], member: &str) -> Measured {
+    sum(entries
         .iter()
-        .map(|entry| count(items(entry.get(member)).len()))
-        .fold(0, u64::saturating_add)
+        .map(|entry| Measured::of(items(entry.get(member)).len())))
 }
 
 #[cfg(test)]
@@ -1015,6 +1043,34 @@ pub(crate) mod tests {
                 Err(ConformanceFailure::Limit(limited))
             );
         }
+    }
+
+    /// Each count is the exact total of its collection, and the work is the
+    /// checked total of the five.
+    #[test]
+    fn a_decoded_payload_counts_each_collection_exactly() {
+        let bytes = text::write(&sample()).unwrap();
+        let decoded = DecodedConformance::decode(bytes.as_bytes()).unwrap();
+        assert_eq!(
+            *decoded.counts(),
+            ConformanceCounts {
+                validity_groups: Measured::Exact(9),
+                codes: Measured::Exact(20),
+                extension_keys: Measured::Exact(4),
+                types: Measured::Exact(9),
+                corrections: Measured::Exact(2),
+                work: Measured::Exact(44),
+            }
+        );
+        assert_eq!(decoded.project(), read(&sample()));
+        assert_eq!(
+            sum([Measured::Exact(u64::MAX), Measured::Exact(1)]),
+            Measured::BeyondU64
+        );
+        assert!(matches!(
+            DecodedConformance::decode(b"not json"),
+            Err(ConformanceFailure::Text(_))
+        ));
     }
 
     #[test]
