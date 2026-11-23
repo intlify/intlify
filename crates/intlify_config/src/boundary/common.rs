@@ -29,7 +29,9 @@
 
 use serde_json::Value;
 
-use crate::artifacts::collection::{read_collection, CollectionLimits, FormalCollection};
+use crate::artifacts::collection::{
+    read_collection, CollectionLimits, CollectionReport, FormalCollection,
+};
 use crate::artifacts::vocabulary::{self, FormalVocabulary, VocabularyLimits};
 use crate::input_limits::Bound;
 use crate::locale::{EnvelopeReason, FormalData, VersionedIdentity};
@@ -43,8 +45,8 @@ use super::step::{slot, Component, InputFailure, Refusal};
 use super::verification::{self, VerificationAssertion, VerificationInput};
 
 /// The Common Invocation Input Set as submitted, its slots in rank order.
-/// Each raw value is `None` when absent. The collection is its members'
-/// bytes, since the container's own form is its adapter's. `data` reads the
+/// Each raw value is `None` when absent. The collection is its adapter's
+/// closed report of the host container. `data` reads the
 /// canonicalization data's envelope as its adapter does, such as
 /// `Icu4xData::read`, under the two bounds it is given:
 /// `inputBoundary.maxLocaleDataManifestBytes` and `maxDepth`.
@@ -52,7 +54,7 @@ pub(crate) struct Submitted<'a, R> {
     pub(crate) specification: Component<'a, Option<&'a [u8]>>,
     pub(crate) vocabulary: Component<'a, Option<&'a [u8]>>,
     pub(crate) data: Component<'a, R>,
-    pub(crate) collection: Component<'a, Option<&'a [&'a [u8]]>>,
+    pub(crate) collection: Component<'a, Option<CollectionReport<'a>>>,
     pub(crate) verification: Component<'a, Option<&'a [u8]>>,
     pub(crate) capability: Component<'a, Option<&'a Value>>,
 }
@@ -379,7 +381,7 @@ pub(crate) mod tests {
                     origin: own(Kind::LocaleCanonicalizationData),
                 },
                 collection: Component {
-                    value: Some(&COLLECTION),
+                    value: Some(CollectionReport::Formal(&COLLECTION)),
                     origin: own(Kind::ProfileResolutionArtifactCollection),
                 },
                 verification: Component {
@@ -430,7 +432,11 @@ pub(crate) mod tests {
         );
         assert_eq!(
             admitted.collection,
-            read_collection(Some(&COLLECTION), &collection_limits(bounds)).unwrap()
+            read_collection(
+                Some(CollectionReport::Formal(&COLLECTION)),
+                &collection_limits(bounds)
+            )
+            .unwrap()
         );
         assert_eq!(admitted.collection.members().len(), 2);
         assert_eq!(
@@ -456,7 +462,7 @@ pub(crate) mod tests {
         submitted.vocabulary.value = None;
         submitted.data.origin = Some(" Locale-Canonicalization-Data");
         submitted.collection = Component {
-            value: Some(&NUMBER),
+            value: Some(CollectionReport::Formal(&NUMBER)),
             origin: Some("intent-surface-class-vocabulary"),
         };
         submitted.verification = Component {
@@ -521,6 +527,57 @@ pub(crate) mod tests {
                 Refusal::Data(EnvelopeReason::DuplicateMember)
             )]
         );
+    }
+
+    /// D15:3142, 3157, 3159: a collection adapter's report without a formal
+    /// container is that slot's one failure under its boundary and reason,
+    /// after the slot's origin failure, and a refused capability leaves it
+    /// without a result, as every value that reads its bounds.
+    #[test]
+    fn the_adapters_container_report_is_the_collection_slots_failure() {
+        const SLOT: Kind = Kind::ProfileResolutionArtifactCollection;
+        let inputs = Inputs::new();
+        for (report, refused) in [
+            (
+                CollectionReport::Unsafe,
+                CollectionFailure::UnsafeHostInspection,
+            ),
+            (
+                CollectionReport::MalformedContainer,
+                CollectionFailure::MalformedContainer,
+            ),
+        ] {
+            let value = failure(SLOT, Refusal::Collection(refused));
+            let mut submitted = inputs.submitted(read);
+            submitted.collection.value = Some(report);
+            let failures = inputs.admit(submitted).unwrap_err();
+            assert_eq!(failures, [value]);
+            assert_eq!(
+                failures[0].refusal.boundary_kind(),
+                "submitted-profile-resolution-artifact-collection"
+            );
+            assert_eq!(failures[0].refusal.reason(), refused.reason());
+            let mut submitted = inputs.submitted(read);
+            submitted.collection.value = Some(report);
+            submitted.collection.origin = None;
+            assert_eq!(
+                inputs.admit(submitted).unwrap_err(),
+                [
+                    failure(SLOT, Refusal::Origin(OriginRefusal::Missing)),
+                    value
+                ]
+            );
+            let mut submitted = inputs.submitted(read);
+            submitted.collection.value = Some(report);
+            submitted.capability.value = None;
+            assert_eq!(
+                inputs.admit(submitted).unwrap_err(),
+                [failure(
+                    Kind::ImplementationCapability,
+                    Refusal::Capability(CapabilityRefusal::Missing)
+                )]
+            );
+        }
     }
 
     /// A refused capability leaves every value that reads its bounds without

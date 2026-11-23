@@ -9,7 +9,9 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
-use crate::artifacts::collection::{read_collection, CollectionLimits, FormalCollection};
+use crate::artifacts::collection::{
+    read_collection, CollectionLimits, CollectionReport, FormalCollection,
+};
 use crate::boundary::capability::ImplementationCapability;
 use crate::input_limits::{Bound, InputLimits, RawInputLimits, ValueLimits};
 use crate::locale::fixtures::{fixture_pins, FixtureProvider};
@@ -1726,7 +1728,7 @@ fn submitted(members: &[Value]) -> Result<FormalCollection, PreparationFailure> 
         .collect::<Result<Vec<_>, _>>()
         .map_err(|_| PreparationFailure::CoreInvariant)?;
     let bytes = members.iter().map(Vec::as_slice).collect::<Vec<_>>();
-    read_collection(Some(&bytes), &COLLECTION_LIMITS)
+    read_collection(Some(CollectionReport::Formal(&bytes)), &COLLECTION_LIMITS)
         .map_err(|_| PreparationFailure::PrerequisiteUnavailable)
 }
 

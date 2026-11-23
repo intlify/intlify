@@ -360,7 +360,7 @@ mod tests {
     use serde_json::{json, Map, Value};
 
     use super::*;
-    use crate::artifacts::collection::{read_collection, CollectionLimits};
+    use crate::artifacts::collection::{read_collection, CollectionLimits, CollectionReport};
     use crate::artifacts::content::sample;
     use crate::artifacts::envelope::{envelope_of, FormalMember};
     use crate::input_limits::Bound;
@@ -555,7 +555,8 @@ mod tests {
                 serde_json::from_value(declaration["targetProfiles"].clone()).unwrap();
             let texts: Vec<String> = self.members.iter().map(Value::to_string).collect();
             let bytes: Vec<&[u8]> = texts.iter().map(String::as_bytes).collect();
-            let collection = read_collection(Some(&bytes), &ROOM).unwrap();
+            let collection =
+                read_collection(Some(CollectionReport::Formal(&bytes)), &ROOM).unwrap();
             let confirmed = ConfirmedPolicy::fixture_owned(self.limits.clone());
             let declared = self.targets.clone().map(|()| &targets);
             let behind = stand_in(Slot::ProjectProfile);

@@ -274,7 +274,8 @@ pub(crate) mod tests {
     use serde_json::{json, Value};
 
     use super::*;
-    use crate::artifacts::envelope::ExactTuple;
+    use crate::artifacts::collection::{CollectionFailure, CollectionReport};
+    use crate::artifacts::envelope::{ExactTuple, FormalMember};
     use crate::artifacts::vectors::vocabulary as vectors;
     use crate::artifacts::verification::{sealed, unsealed, VerificationInputArtifact};
     use crate::artifacts::vocabulary::IntentSurfaceClassVocabularyArtifact;
@@ -283,12 +284,12 @@ pub(crate) mod tests {
     use crate::boundary::entry::{
         FileValue, ProgrammaticValue, SubmittedFileEntry, SubmittedProgrammaticEntry,
     };
-    use crate::boundary::invocation::SubmittedEntry;
+    use crate::boundary::invocation::{InvocationFailures, SubmittedEntry};
     use crate::boundary::locator::{LocatorCandidate, LocatorVariant};
     use crate::boundary::selector::SelectorReport;
     use crate::boundary::snapshot::{submitted, SnapshotReport};
     use crate::boundary::source::{call_site_source_revision, file_source_revision};
-    use crate::boundary::step::Component;
+    use crate::boundary::step::{Component, InputFailure, Refusal};
     use crate::construction::flow::construct;
     use crate::construction::identity::derive;
     use crate::construction::registry::check::RecordKind;
@@ -503,6 +504,20 @@ pub(crate) mod tests {
             bytes: Arc<[u8]>,
             marked: bool,
         ) -> InvocationInputs<PinnedFixture> {
+            let members = self.member_bytes();
+            let report = CollectionReport::Formal(&members);
+            self.submit_file(resolver, bytes, marked, report).unwrap()
+        }
+
+        /// The file of `bytes` submitted beside the collection as `report`
+        /// states it: the admitted set, or every failure.
+        fn submit_file(
+            &self,
+            resolver: &Resolver<'_>,
+            bytes: Arc<[u8]>,
+            marked: bool,
+            report: CollectionReport<'_>,
+        ) -> Result<InvocationInputs<PinnedFixture>, InvocationFailures> {
             let revision = file_source_revision(&bytes);
             let file = FileValue {
                 bytes,
@@ -511,7 +526,7 @@ pub(crate) mod tests {
                 revision: Some(&revision),
                 locator: Some(candidate(LocatorVariant::RelativePath, FILE_LOCATOR)),
             };
-            self.admit(
+            self.submit(
                 resolver,
                 SubmittedEntry::File(SubmittedFileEntry {
                     file: Component {
@@ -520,6 +535,7 @@ pub(crate) mod tests {
                     },
                     selector: self.selector(Kind::ProfileSelectorCli),
                 }),
+                report,
             )
         }
 
@@ -580,6 +596,11 @@ pub(crate) mod tests {
             self.snapshot(resolver, &from_json(&self.config), marked, mirror)
         }
 
+        /// Each member's bytes, as a collection's formal report borrows them.
+        fn member_bytes(&self) -> Vec<&[u8]> {
+            self.members.iter().map(Vec::as_slice).collect()
+        }
+
         /// The set of these values and `entry`, each beside its slot's own
         /// Safe Origin Kind, admitted on `resolver`.
         fn admit(
@@ -587,8 +608,20 @@ pub(crate) mod tests {
             resolver: &Resolver<'_>,
             entry: SubmittedEntry<'_>,
         ) -> InvocationInputs<PinnedFixture> {
+            let members = self.member_bytes();
+            let report = CollectionReport::Formal(&members);
+            self.submit(resolver, entry, report).unwrap()
+        }
+
+        /// These values and `entry`, with the collection as `report` states
+        /// it, submitted on `resolver`: the admitted set, or every failure.
+        fn submit(
+            &self,
+            resolver: &Resolver<'_>,
+            entry: SubmittedEntry<'_>,
+            report: CollectionReport<'_>,
+        ) -> Result<InvocationInputs<PinnedFixture>, InvocationFailures> {
             let own = |slot: Kind| Some(slot.id());
-            let members: Vec<&[u8]> = self.members.iter().map(Vec::as_slice).collect();
             let provider = self.provider.clone();
             let common = Submitted {
                 specification: Component {
@@ -604,7 +637,7 @@ pub(crate) mod tests {
                     origin: own(Kind::LocaleCanonicalizationData),
                 },
                 collection: Component {
-                    value: Some(&members),
+                    value: Some(report),
                     origin: own(Kind::ProfileResolutionArtifactCollection),
                 },
                 verification: Component {
@@ -622,7 +655,7 @@ pub(crate) mod tests {
                 common,
                 entry,
             };
-            resolver.admit(submitted, &self.assertion).unwrap()
+            resolver.admit(submitted, &self.assertion)
         }
     }
 
@@ -950,5 +983,82 @@ pub(crate) mod tests {
                 assert!(resolution.materialized.is_some());
             }
         }
+    }
+
+    /// D15:3155, 3321: a report without a formal container is one typed
+    /// failure of the collection's slot. The pattern names every field of the
+    /// refused set, so nothing resolver-shaped can come beside it.
+    #[test]
+    fn a_refused_container_leaves_no_resolver_shaped_output() {
+        let resolver = resolver();
+        let raw = example(|inputs| inputs);
+        for (report, failure) in [
+            (
+                CollectionReport::Unsafe,
+                CollectionFailure::UnsafeHostInspection,
+            ),
+            (
+                CollectionReport::MalformedContainer,
+                CollectionFailure::MalformedContainer,
+            ),
+        ] {
+            let refused = raw.submit_file(&resolver, raw.bytes(), true, report);
+            let InvocationFailures {
+                construction_identity,
+                common,
+                entry,
+            } = refused.err().unwrap();
+            assert_eq!(construction_identity, None);
+            assert_eq!(entry, None);
+            let expected = InputFailure {
+                slot: Kind::ProfileResolutionArtifactCollection,
+                refusal: Refusal::Collection(failure),
+            };
+            assert_eq!(common, Some(vec![expected]));
+        }
+    }
+
+    /// D15:3165, 3322: a formal container is admitted with every representable
+    /// invalid member and occurrence, in the order submitted, and the
+    /// resolver reports them: one Shared Finding for the repeated member and
+    /// one Entry occurrence for each time it was submitted. The same members
+    /// in a container reported as malformed reach no resolver.
+    #[test]
+    fn an_admitted_container_keeps_its_invalid_members_for_the_resolver() {
+        let resolver = resolver();
+        let mut raw = example(|inputs| inputs);
+        let invalid = br#"{"kind":"not-an-artifact"}"#.to_vec();
+        raw.members.insert(1, invalid.clone());
+        raw.members.push(invalid);
+        let inputs = raw.file(&resolver, true);
+        let expected: Vec<FormalMember> = raw
+            .members
+            .iter()
+            .map(|bytes| FormalMember::new(serde_json::from_slice(bytes).unwrap()).unwrap())
+            .collect();
+        assert_eq!(inputs.common.collection.members(), expected.as_slice());
+        let shown = resolved(&resolver, &inputs);
+        assert!(shown.checked.is_none());
+        let (records, _) = shown.shared.as_ref().unwrap();
+        let findings: Vec<&Value> = records
+            .iter()
+            .filter(|(_, kind, _)| *kind == RecordKind::SharedFinding)
+            .map(|(_, _, view)| view)
+            .collect();
+        let [finding] = findings[..] else {
+            panic!("one Finding for the repeated member: {findings:?}");
+        };
+        let key = &finding["key"];
+        assert_eq!(
+            key["code"],
+            "project-profile-artifact-collection-not-admitted"
+        );
+        assert_eq!(key["reason"], "kind-unsupported");
+        let occurrences = entry_views(&shown, RecordKind::FindingOccurrence);
+        assert_eq!(occurrences.len(), 2);
+        assert!(occurrences.iter().all(|view| view["finding"] == *key));
+        let report = CollectionReport::MalformedContainer;
+        let refused = raw.submit_file(&resolver, raw.bytes(), true, report);
+        assert!(refused.is_err());
     }
 }
