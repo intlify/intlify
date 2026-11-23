@@ -353,7 +353,7 @@ const fn none(check: &'static str, code: Code) -> Pair {
 
 /// Every (check, code) pair of the Check Registry, in its order.
 #[rustfmt::skip]
-const PAIRS: [Pair; 191] = {
+const PAIRS: [Pair; 201] = {
     use Code as C;
     use Shape as S;
     [
@@ -466,6 +466,16 @@ const PAIRS: [Pair; 191] = {
         pair("specification.vocabulary.asserted", C::IntentSurfaceClassVocabularyNotAdmitted, AI, &[SI], &[S::Root(VOCABULARY), S::Slot(Slot::IntentSurfaceClassVocabulary)]),
         pair("specification.locale-data.within-payloads", C::BootstrapLimitExceeded, AI, &[IC], &[S::Root(LOCALE_DATA), S::Bound("bootstrapOnly.localeData.maxPayloads")]),
         pair("specification.locale-data.within-payload-bytes", C::BootstrapLimitExceeded, AI, &[IC], &[S::Root(LOCALE_DATA), S::Bound("bootstrapOnly.localeData.maxPayloadBytes")]),
+        pair("specification.locale-data.manifest-intact", C::LocaleDataNotAdmitted, AI, &[], &[S::Root(LOCALE_DATA)]),
+        pair("specification.locale-data.markers-readable", C::LocaleDataNotAdmitted, AI, &[], &[S::Root(LOCALE_DATA)]),
+        pair("specification.locale-data.within-marker-bytes", C::BootstrapLimitExceeded, AI, &[IC], &[S::Root(LOCALE_DATA), S::Bound("bootstrapOnly.localeData.maxMarkerBytes")]),
+        pair("specification.locale-data.conformance-readable", C::LocaleDataNotAdmitted, AI, &[], &[S::Root(LOCALE_DATA)]),
+        pair("specification.locale-data.within-validity-groups", C::BootstrapLimitExceeded, AI, &[IC], &[S::Root(LOCALE_DATA), S::Bound("bootstrapOnly.localeData.maxValidityGroups")]),
+        pair("specification.locale-data.within-codes", C::BootstrapLimitExceeded, AI, &[IC], &[S::Root(LOCALE_DATA), S::Bound("bootstrapOnly.localeData.maxCodes")]),
+        pair("specification.locale-data.within-extension-keys", C::BootstrapLimitExceeded, AI, &[IC], &[S::Root(LOCALE_DATA), S::Bound("bootstrapOnly.localeData.maxExtensionKeys")]),
+        pair("specification.locale-data.within-types", C::BootstrapLimitExceeded, AI, &[IC], &[S::Root(LOCALE_DATA), S::Bound("bootstrapOnly.localeData.maxTypes")]),
+        pair("specification.locale-data.within-corrections", C::BootstrapLimitExceeded, AI, &[IC], &[S::Root(LOCALE_DATA), S::Bound("bootstrapOnly.localeData.maxCorrections")]),
+        pair("specification.locale-data.within-validation-work", C::BootstrapLimitExceeded, AI, &[IC], &[S::Root(LOCALE_DATA), S::Bound("bootstrapOnly.localeData.maxValidationWorkUnits")]),
         pair("specification.locale-data.matching", C::LocaleDataNotAdmitted, AI, &[SI], &[S::Root(LOCALE_DATA), S::Slot(Slot::LocaleCanonicalization)]),
         // locale-resolution
         pair("locale.occurrences.within-bound", C::ResourceLimitExceeded, CV, &[AI], &[ADMITTED]),
@@ -1045,7 +1055,7 @@ mod tests {
                 .paths
                 .clone()
         };
-        assert_eq!(paths_of(&bootstrap, IC).len(), 2 + 9 + 4 + 2);
+        assert_eq!(paths_of(&bootstrap, IC).len(), 2 + 9 + 4 + 9);
         let limits = row(Code::ResourceLimitExceeded);
         assert_eq!(kinds(&limits), [ES, CV, PS, AI, IC]);
         assert_eq!(origins_of(&limits, ES), CONFIGURATION);
@@ -1097,7 +1107,7 @@ mod tests {
             .map(|shape| serde_json::to_string(shape).unwrap())
             .collect();
         assert_eq!(carried, pinned);
-        assert_eq!(pinned.len(), 85);
+        assert_eq!(pinned.len(), 92);
         assert!(are_reachable(&registry.rows, &registry.policies));
     }
 

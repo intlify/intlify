@@ -18,16 +18,16 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use intlify_locale_icu4x::{
-    AdmittedData, ConformanceLimits, DecodedManifest, EnvelopeFailure, LayerFailure, Measured,
+    AdmittedData, ConformanceCounts, DecodedManifest, EnvelopeFailure, LayerFailure, Measured,
     ReadFailure, ReadLimits, Role, VerifiedManifest, ENGINE, MARKERS_FORMAT,
 };
 
 use crate::input_limits::Bound;
 
 use super::{
-    Admission, AdmissionFacts, DataCount, DataFacts, DataNotAdmitted, DataReading, DatasetPin,
-    EnvelopeReason, FormalData, LocaleDataLimits, Provider, ProviderBinding, ProviderFailure,
-    SemanticPins, VersionedIdentity,
+    Admission, AdmissionFacts, DataCount, DataCounts, DataFacts, DataNotAdmitted, DataReading,
+    DatasetPin, EnvelopeReason, FormalData, LocaleDataLimits, PayloadFacts, Provider,
+    ProviderBinding, ProviderFailure, SemanticPins, VersionedIdentity,
 };
 
 /// One artifact past 015's `locale-canonicalization-data-artifact` boundary:
@@ -71,38 +71,88 @@ impl Icu4xData {
 impl FormalData for Icu4xData {
     type Provider = Icu4xProvider;
 
-    /// The two counts the manifest decides, and the rest of 017's steps under
-    /// the capability's `localeData` bounds: the limits the manifest decides
-    /// and its integrity, and then each payload and the dataset.
+    /// The rest of 017's steps under the capability's `localeData` bounds, in
+    /// the stages the resolver's checks judge: the bounds the manifest
+    /// decides, the manifest's read, each payload's decoding and counts, and
+    /// the rest, only of data within every bound.
     ///
     /// Nothing is fetched: each payload is the bytes kept at the address the
-    /// manifest names, where an acquiring closure, asked for the conformance
-    /// payload and then the markers once the manifest was verified, answered
-    /// before. They are read only once the manifest is verified, in the
-    /// reader's order, and a payload kept as `None` is missing as the
-    /// closure's `None` was, so the bounds, the failure, and its Finding stay
-    /// the same. The marker blob owns its bytes, so they are copied only once
-    /// the manifest is verified.
+    /// manifest names. They are read only once the manifest is verified, and
+    /// a payload kept as `None` is missing. The marker blob owns its bytes,
+    /// so they are copied only once the manifest's read has held.
     fn read(&self, limits: &LocaleDataLimits) -> DataReading<Icu4xProvider> {
-        let facts = DataFacts {
-            payloads: data_count(self.manifest.payload_count()),
-            payload_bytes_over: self.manifest.declares_over(limits.max_payload_bytes.get()),
+        let payloads = data_count(self.manifest.payload_count());
+        let payload_bytes_over = self.manifest.declares_over(limits.max_payload_bytes.get());
+        let (read, provider) = if self
+            .manifest
+            .payload_count()
+            .over(limits.max_payloads.get())
+            || payload_bytes_over
+        {
+            (Err(DataNotAdmitted), Err(DataNotAdmitted))
+        } else {
+            self.read_payloads(limits)
         };
-        let limits = read_limits(limits);
-        let provider = self
+        DataReading {
+            facts: DataFacts {
+                payloads,
+                payload_bytes_over,
+                read,
+            },
+            provider,
+        }
+    }
+}
+
+impl Icu4xData {
+    /// The manifest's read, each payload's own, and the provider of data
+    /// within the bounds of what the payloads count.
+    fn read_payloads(
+        &self,
+        limits: &LocaleDataLimits,
+    ) -> (
+        Result<PayloadFacts, DataNotAdmitted>,
+        Result<Icu4xProvider, DataNotAdmitted>,
+    ) {
+        let conformance = self.conformance.as_deref();
+        let markers = self.markers.as_deref();
+        let Ok(manifest) = self
             .manifest
             .clone()
-            .verify(&limits)
+            .verify_integrity()
             .and_then(|manifest| {
-                let markers = self.markers.as_deref().map(Box::from);
-                Icu4xProvider::from_verified(
-                    manifest,
-                    (self.conformance.as_deref(), markers),
-                    &limits,
-                )
+                manifest
+                    .check_payloads(conformance, markers)
+                    .map(|()| manifest)
             })
-            .map_err(|_| DataNotAdmitted);
-        DataReading { facts, provider }
+        else {
+            return (Err(DataNotAdmitted), Err(DataNotAdmitted));
+        };
+        // The manifest's read has just refused a missing payload.
+        let markers = manifest.decode_markers(markers.map(Box::from).unwrap_or_default());
+        let conformance = manifest.decode_conformance(conformance.unwrap_or_default());
+        let facts = PayloadFacts {
+            markers: markers
+                .as_ref()
+                .map(|markers| data_count(markers.written_bytes()))
+                .map_err(|_| DataNotAdmitted),
+            conformance: conformance
+                .as_ref()
+                .map(|conformance| data_counts(conformance.counts()))
+                .map_err(|_| DataNotAdmitted),
+        };
+        let provider = match (markers, conformance) {
+            (Ok(markers), Ok(conformance))
+                if within(markers.written_bytes(), conformance.counts(), limits) =>
+            {
+                manifest
+                    .finish(conformance, markers)
+                    .map(Icu4xProvider::of)
+                    .map_err(|_| DataNotAdmitted)
+            }
+            _ => Err(DataNotAdmitted),
+        };
+        (Ok(facts), provider)
     }
 }
 
@@ -113,25 +163,32 @@ const fn data_count(count: Measured) -> DataCount {
     }
 }
 
-/// The reader's limits for the rest of the artifact, the capability's
-/// `localeData` bounds. The manifest's own bytes and depth were the
-/// boundary's, and the rest of the reading never asks for them.
-fn read_limits(limits: &LocaleDataLimits) -> ReadLimits {
-    ReadLimits {
-        manifest_bytes: u64::MAX,
-        manifest_depth: u64::MAX,
-        payloads: limits.max_payloads.get(),
-        payload_bytes: limits.max_payload_bytes.get(),
-        marker_bytes: limits.max_marker_bytes.get(),
-        conformance: ConformanceLimits {
-            validity_groups: limits.max_validity_groups.get(),
-            codes: limits.max_codes.get(),
-            extension_keys: limits.max_extension_keys.get(),
-            types: limits.max_types.get(),
-            corrections: limits.max_corrections.get(),
-            work: limits.max_validation_work_units.get(),
-        },
+const fn data_counts(counts: &ConformanceCounts) -> DataCounts {
+    DataCounts {
+        validity_groups: data_count(counts.validity_groups),
+        codes: data_count(counts.codes),
+        extension_keys: data_count(counts.extension_keys),
+        types: data_count(counts.types),
+        corrections: data_count(counts.corrections),
+        validation_work: data_count(counts.work),
     }
+}
+
+/// Whether what the payloads count is within the capability's bounds of it.
+const fn within(
+    marker_bytes: Measured,
+    counts: &ConformanceCounts,
+    limits: &LocaleDataLimits,
+) -> bool {
+    !(marker_bytes.over(limits.max_marker_bytes.get())
+        || counts
+            .validity_groups
+            .over(limits.max_validity_groups.get())
+        || counts.codes.over(limits.max_codes.get())
+        || counts.extension_keys.over(limits.max_extension_keys.get())
+        || counts.types.over(limits.max_types.get())
+        || counts.corrections.over(limits.max_corrections.get())
+        || counts.work.over(limits.max_validation_work_units.get()))
 }
 
 /// One admitted artifact and what it binds. Only [`Icu4xProvider::admit`]
@@ -169,11 +226,15 @@ impl Icu4xProvider {
         (conformance, markers): (Option<&[u8]>, Option<Box<[u8]>>),
         limits: &ReadLimits,
     ) -> Result<Self, ReadFailure> {
-        let data = manifest.admit(conformance, markers, limits)?;
-        Ok(Self {
+        manifest.admit(conformance, markers, limits).map(Self::of)
+    }
+
+    /// The provider of data that has been admitted.
+    fn of(data: AdmittedData) -> Self {
+        Self {
             binding: binding(&data),
             data,
-        })
+        }
     }
 }
 
@@ -261,10 +322,10 @@ fn provider_failure(failure: LayerFailure) -> ProviderFailure {
 #[cfg(test)]
 mod tests {
     use intlify_locale_icu4x::{
-        ArtifactLimit, Component, ConformanceLimits, DataFailure, EnvelopeLimit, PayloadCheck,
-        Rejection,
+        ArtifactLimit, Component, ConformanceLimits, DataFailure, EnvelopeLimit, FileDigest,
+        LocaleCanonicalizationDataArtifact, PayloadCheck, Rejection,
     };
-    use serde_json::Value;
+    use serde_json::{json, Value};
 
     use super::*;
     use crate::input_limits::Bound;
@@ -272,6 +333,9 @@ mod tests {
     use crate::locale::{
         BindingFailure, BindingPart, CanonicalizationFailure, Canonicalizer, Supported,
     };
+    use crate::resolver::evaluation::{Actual, BootstrapLimitExceeded, Check, Code, Evaluation};
+    use crate::resolver::limits::{fixture_limits, ConfirmedPolicy};
+    use crate::resolver::locale_data::{admit_data, DataBound};
 
     const MANIFEST: &[u8] = include_bytes!("../../../intlify_locale_icu4x/data/manifest.json");
     const CONFORMANCE: &[u8] =
@@ -709,6 +773,105 @@ mod tests {
         assert_eq!(data_count(Measured::BeyondU64), DataCount::BeyondU64);
     }
 
+    /// One `localeData` bound's field.
+    type Field = fn(&mut LocaleDataLimits) -> &mut Bound;
+
+    /// Each bound with its field, in the bounds' order.
+    const FIELDS: [(DataBound, Field); 9] = [
+        (DataBound::Payloads, |l| &mut l.max_payloads),
+        (DataBound::PayloadBytes, |l| &mut l.max_payload_bytes),
+        (DataBound::MarkerBytes, |l| &mut l.max_marker_bytes),
+        (DataBound::ValidityGroups, |l| &mut l.max_validity_groups),
+        (DataBound::Codes, |l| &mut l.max_codes),
+        (DataBound::ExtensionKeys, |l| &mut l.max_extension_keys),
+        (DataBound::Types, |l| &mut l.max_types),
+        (DataBound::Corrections, |l| &mut l.max_corrections),
+        (DataBound::ValidationWork, |l| {
+            &mut l.max_validation_work_units
+        }),
+    ];
+
+    /// The bounds the committed artifact stands exactly at, as the reader
+    /// counts them apart from the adapter's facts.
+    fn exact_bounds() -> LocaleDataLimits {
+        let manifest = VerifiedManifest::read(MANIFEST, &LIMITS).unwrap();
+        let markers = manifest.decode_markers(MARKERS.into()).unwrap();
+        let conformance = manifest.decode_conformance(CONFORMANCE).unwrap();
+        let counts = conformance.counts();
+        let bound = |count| match count {
+            Measured::Exact(count) => Bound::new(count).unwrap(),
+            Measured::BeyondU64 => panic!("an in-memory count"),
+        };
+        let longest = u64::try_from(CONFORMANCE.len().max(MARKERS.len())).unwrap();
+        LocaleDataLimits {
+            max_payloads: Bound::new(2).unwrap(),
+            max_payload_bytes: Bound::new(longest).unwrap(),
+            max_marker_bytes: bound(markers.written_bytes()),
+            max_validity_groups: bound(counts.validity_groups),
+            max_codes: bound(counts.codes),
+            max_extension_keys: bound(counts.extension_keys),
+            max_types: bound(counts.types),
+            max_corrections: bound(counts.corrections),
+            max_validation_work_units: bound(counts.work),
+        }
+    }
+
+    /// The Findings of the data's checks over the committed artifact under
+    /// `limits`, and whether it bound a canonicalizer.
+    fn committed_checks(
+        limits: &LocaleDataLimits,
+    ) -> (Vec<(Check, Code, Option<BootstrapLimitExceeded>)>, bool) {
+        let (bytes, depth) = envelope();
+        let data = Icu4xData::read(Some(MANIFEST), &payloads(), bytes, depth).unwrap();
+        let pins = committed().binding().pins.clone();
+        let policy = ConfirmedPolicy::fixture_owned(fixture_limits(100));
+        let mut evaluation = Evaluation::default();
+        let bound = admit_data(&mut evaluation, &data, limits, Ok(pins), Ok(&policy)).unwrap();
+        let found = evaluation
+            .issues()
+            .map(|key| {
+                (
+                    key.unit().check,
+                    key.code(),
+                    evaluation.bootstrap_limit(key),
+                )
+            })
+            .collect();
+        (found, bound.is_ok())
+    }
+
+    /// D15:3302 over the committed artifact: each `localeData` bound admits
+    /// the artifact's exact value, and one below it is that bound's Finding
+    /// alone, with its path, its value, and the exact total, except the
+    /// payload length's first-over witness (Decision 015-157).
+    #[test]
+    fn each_locale_data_bound_admits_its_exact_value_and_reports_the_next() {
+        let exact = exact_bounds();
+        assert_eq!(committed_checks(&exact), (vec![], true));
+        for (bound, field) in FIELDS {
+            let mut below = exact;
+            let count = field(&mut below).get();
+            let limit = Bound::new(count - 1).unwrap();
+            *field(&mut below) = limit;
+            let actual = if bound == DataBound::PayloadBytes {
+                Actual::AtLeast(count)
+            } else {
+                Actual::Exact(count)
+            };
+            let reported = BootstrapLimitExceeded {
+                bound: bound.id(),
+                limit,
+                actual,
+            };
+            let expected = (bound.check(), Code::BootstrapLimitExceeded, Some(reported));
+            assert_eq!(
+                committed_checks(&below),
+                (vec![expected], false),
+                "{bound:?}"
+            );
+        }
+    }
+
     /// The two counts the manifest decides are measured whatever stops the
     /// rest of the read.
     #[test]
@@ -747,8 +910,68 @@ mod tests {
             let reading = data.read(&limits);
             assert_eq!(reading.facts.payloads, DataCount::Exact(2));
             assert_eq!(reading.facts.payload_bytes_over, over);
+            assert_eq!(reading.facts.read.is_ok(), admitted);
             assert_eq!(reading.provider.is_ok(), admitted);
         }
+    }
+
+    /// A payload without its bytes, or a manifest whose integrity fails, stops
+    /// the manifest's read.
+    #[test]
+    fn what_fails_the_manifests_read_leaves_no_payload_read() {
+        let (bytes, depth) = envelope();
+        let mut without = payloads();
+        without.remove("markers.postcard");
+        let mut value: Value = serde_json::from_slice(MANIFEST).unwrap();
+        value["dataset"]["identity"] = Value::from("another-dataset");
+        let tampered = serde_json::to_vec(&value).unwrap();
+        for (manifest, supplied) in [(MANIFEST, &without), (tampered.as_slice(), &payloads())] {
+            let data = Icu4xData::read(Some(manifest), supplied, bytes, depth).unwrap();
+            let reading = data.read(&locale_data());
+            assert_eq!(reading.facts.read, Err(DataNotAdmitted));
+            assert!(reading.provider.is_err());
+        }
+    }
+
+    /// The committed manifest pointing at `bytes` for the payload at `index`,
+    /// sealed again, and the payloads with those bytes at its address.
+    fn with_payload(index: usize, bytes: &[u8]) -> (Vec<u8>, BTreeMap<String, Arc<[u8]>>) {
+        let mut value: Value = serde_json::from_slice(MANIFEST).unwrap();
+        value["payloads"][index]["byteLength"] = json!(bytes.len().to_string());
+        value["payloads"][index]["digest"] = json!(FileDigest::of(bytes).as_str());
+        let sealed = serde_json::from_value::<LocaleCanonicalizationDataArtifact>(value)
+            .unwrap()
+            .seal()
+            .unwrap();
+        let mut supplied = payloads();
+        let address = ["conformance.json", "markers.postcard"][index];
+        supplied.insert(address.to_owned(), bytes.into());
+        (serde_json::to_vec(&sealed).unwrap(), supplied)
+    }
+
+    /// One payload that does not decode leaves the other's counts measured,
+    /// and builds no provider (D15:2365).
+    #[test]
+    fn one_payload_that_does_not_decode_leaves_the_others_counts() {
+        let (bytes, depth) = envelope();
+        let reading = |manifest: &[u8], supplied: &BTreeMap<String, Arc<[u8]>>| {
+            Icu4xData::read(Some(manifest), supplied, bytes, depth)
+                .unwrap()
+                .read(&locale_data())
+        };
+        let whole = reading(MANIFEST, &payloads()).facts.read.unwrap();
+        let (manifest, supplied) = with_payload(1, b"not a blob");
+        let broken = reading(&manifest, &supplied);
+        let read = broken.facts.read.unwrap();
+        assert_eq!(read.markers, Err(DataNotAdmitted));
+        assert_eq!(read.conformance, whole.conformance);
+        assert!(broken.provider.is_err());
+        let (manifest, supplied) = with_payload(0, b"not json");
+        let broken = reading(&manifest, &supplied);
+        let read = broken.facts.read.unwrap();
+        assert_eq!(read.conformance, Err(DataNotAdmitted));
+        assert_eq!(read.markers, whole.markers);
+        assert!(broken.provider.is_err());
     }
 
     #[test]

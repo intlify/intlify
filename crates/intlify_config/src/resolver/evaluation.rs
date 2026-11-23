@@ -262,6 +262,27 @@ pub(crate) enum Check {
     /// Each payload's declared length stays within
     /// `localeData.maxPayloadBytes`.
     WithinDataPayloadBytes,
+    /// The data's manifest reads: its integrity, each payload's length and
+    /// digest, and the dataset schema.
+    DataManifest,
+    /// The markers payload decodes under its format.
+    DataMarkers,
+    /// The marker payloads stay within `localeData.maxMarkerBytes`.
+    WithinDataMarkerBytes,
+    /// The conformance payload decodes under its format.
+    DataConformance,
+    /// The validity groups stay within `localeData.maxValidityGroups`.
+    WithinDataValidityGroups,
+    /// The codes stay within `localeData.maxCodes`.
+    WithinDataCodes,
+    /// The extension keys stay within `localeData.maxExtensionKeys`.
+    WithinDataExtensionKeys,
+    /// The types stay within `localeData.maxTypes`.
+    WithinDataTypes,
+    /// The corrections stay within `localeData.maxCorrections`.
+    WithinDataCorrections,
+    /// The conformance work stays within `localeData.maxValidationWorkUnits`.
+    WithinDataValidationWork,
     /// The rest of the data reads, and it is the dataset the admitted
     /// specification admits.
     MatchingData,
