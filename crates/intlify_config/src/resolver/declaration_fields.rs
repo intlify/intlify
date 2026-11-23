@@ -23,9 +23,9 @@ use crate::model::{
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::StructuralAnalysis;
 
-use super::declaration_fragments::DeclarationFragments;
+use super::declaration_fragments::{DeclarationFragments, TargetEntries};
 use super::evaluation::{Admitted, Causes};
-use super::locales::LocaleFields;
+use super::locales::{LocaleFields, TargetLocaleFields, TargetMapFields};
 use super::resource_policy::DeclarationReferences;
 use super::structural_admission::StructuralInvariant;
 use super::tally::Tally;
@@ -53,6 +53,8 @@ pub(crate) struct DeclarationFields<Policy, Target> {
     coverage: Admitted<Option<Coverage>>,
     policies: Admitted<Policies<Policy>>,
     target_profiles: Admitted<TargetProfiles<Target>>,
+    /// The same map entry by entry, which Phase 7 reads.
+    target_entries: Admitted<TargetEntries>,
     deployment_groups: Admitted<DeploymentGroups>,
     delivery: Admitted<Option<Delivery>>,
 }
@@ -84,6 +86,7 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
             coverage: read.optional("coverage")?,
             policies: read.required("policies")?,
             target_profiles: read.required("targetProfiles")?,
+            target_entries: read.target_entries()?,
             deployment_groups: read.required("deploymentGroups")?,
             delivery: read.optional("delivery")?,
         })
@@ -98,21 +101,30 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
     }
 
     /// The locale-bearing fields, which Phases 7 and 8 read.
-    pub(crate) fn locale_fields(&self) -> LocaleFields<'_, Target> {
+    pub(crate) fn locale_fields(&self) -> LocaleFields<'_> {
         LocaleFields {
             spellings: self.locale_spellings.clone(),
-            requested_locales: borrowed(&self.requested_locales, |items| {
-                items
-                    .iter()
-                    .map(|item| item.as_deref().map_err(Causes::clone))
-                    .collect()
-            }),
+            requested_locales: strings(&self.requested_locales),
             default_requested_locale: borrowed(&self.default_requested_locale, String::as_str),
             default_source_locale: borrowed(&self.default_source_locale, Option::as_deref),
             locale_negotiation: borrowed(&self.locale_negotiation, Option::as_ref),
             message_fallback: borrowed(&self.message_fallback, Option::as_ref),
             coverage: borrowed(&self.coverage, Option::as_ref),
-            target_profiles: borrowed(&self.target_profiles, |profiles| profiles),
+            target_entries: borrowed(&self.target_entries, |targets| TargetMapFields {
+                submitted: targets.submitted,
+                entries: targets
+                    .entries
+                    .iter()
+                    .map(|entry| TargetLocaleFields {
+                        id: &entry.id,
+                        requested_locales: strings(&entry.requested_locales),
+                        default_requested_locale: borrowed(
+                            &entry.default_requested_locale,
+                            Option::as_deref,
+                        ),
+                    })
+                    .collect(),
+            }),
         }
     }
 
@@ -146,6 +158,7 @@ impl<Policy, Target> DeclarationFields<Policy, Target> {
             coverage: Err(causes.clone()),
             policies: Err(causes.clone()),
             target_profiles: Err(causes.clone()),
+            target_entries: Err(causes.clone()),
             deployment_groups: Err(causes.clone()),
             delivery: Err(causes.clone()),
         }
@@ -160,6 +173,16 @@ impl DeclarationFields<PolicyReference, TargetProfileReference> {
             target_profiles: borrowed(&self.target_profiles, |profiles| profiles),
         }
     }
+}
+
+/// An array of strings, element by element, borrowed.
+fn strings(items: &Admitted<Vec<Admitted<String>>>) -> Admitted<Vec<Admitted<&str>>> {
+    borrowed(items, |items| {
+        items
+            .iter()
+            .map(|item| item.as_deref().map_err(Causes::clone))
+            .collect()
+    })
 }
 
 /// `field` borrowed through `project`, or its causes.
@@ -415,6 +438,7 @@ mod tests {
             fields.coverage.as_ref().err(),
             fields.policies.as_ref().err(),
             fields.target_profiles.as_ref().err(),
+            fields.target_entries.as_ref().err(),
             fields.deployment_groups.as_ref().err(),
             fields.delivery.as_ref().err(),
         ];

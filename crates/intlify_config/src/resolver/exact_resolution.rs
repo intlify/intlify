@@ -370,7 +370,9 @@ mod tests {
     use crate::resolver::evaluation::{IssueKey, Reason, Status};
     use crate::resolver::limits::{fixture_limits, ConfirmedPolicy, ResolutionLimits};
     use crate::resolver::locales::fixtures::{canonicalizer, stand_in, units};
-    use crate::resolver::locales::{self, resolve_locales, LocaleFields, LocaleSubject};
+    use crate::resolver::locales::{
+        self, resolve_locales, LocaleFields, LocaleSubject, TargetMapFields,
+    };
     use crate::resolver::resource_policy::PolicySlot::{
         self, Approval, GlossarySet, ProviderRouting, ResourceLimits, Selection, SourceAdmission,
         Trust,
@@ -568,7 +570,7 @@ mod tests {
                 locale_negotiation: Err(behind.clone()),
                 message_fallback: Err(behind.clone()),
                 coverage: Err(behind),
-                target_profiles: declared.clone(),
+                target_entries: declared.clone().map(TargetMapFields::declared),
             };
             // The references are observed in the declaration they are read
             // from.

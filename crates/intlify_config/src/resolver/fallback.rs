@@ -646,7 +646,7 @@ mod tests {
     use serde_json::{json, Value};
 
     use super::*;
-    use crate::fixtures::{minimal_config, FixtureTargetReference};
+    use crate::fixtures::minimal_config;
     use crate::input_limits::Bound;
     use crate::resolver::declaration_observer::fixtures::Observed;
     use crate::resolver::declaration_observer::DeclarationObserver;
@@ -715,7 +715,7 @@ mod tests {
     /// through `observer` when there is one, then Phase 8's fallback under
     /// `policy` and `specification`, into one evaluation.
     fn resolve_with(
-        fields: &LocaleFields<'_, FixtureTargetReference>,
+        fields: &LocaleFields<'_>,
         policy: Result<&ConfirmedPolicy, &Causes>,
         specification: &Admitted<VersionedIdentity<Id>>,
         spelling: &Spelling<'_>,
@@ -750,7 +750,7 @@ mod tests {
     }
 
     fn resolve_fields(
-        fields: &LocaleFields<'_, FixtureTargetReference>,
+        fields: &LocaleFields<'_>,
         policy: Result<&ConfirmedPolicy, &Causes>,
         specification: &Admitted<VersionedIdentity<Id>>,
     ) -> Resolved {

@@ -4306,7 +4306,7 @@ pub(super) mod tests {
     const WAITING_ON_A_TARGET: &str = "dependency.deployment-groups.established dependency.targets.established group.member.known hydration.endpoint.known hydration.endpoint.role hydration.relation.same-effective-default hydration.relation.same-requested-locales hydration.relation.static-compatibility";
 
     /// The rows left without a subject by the same failure.
-    const WITHOUT_A_SUBJECT: &str = "artifact.target-profile-reference.resolved group.target.single-group locale.target-default-requested.canonical locale.target-id.within-bound locale.target-profiles.within-bound locale.target-requested.canonical locale.target-requested.unique target.effective-default.supported target.requested-locales.directed target.requested-locales.project-subset";
+    const WITHOUT_A_SUBJECT: &str = "artifact.target-profile-reference.resolved group.target.single-group target.effective-default.supported target.requested-locales.directed target.requested-locales.project-subset";
 
     /// End to end, one target's failed `profile` leaves one Finding, and each
     /// row is evaluated, waits on it alone, or has no subject; only the failed
@@ -4350,6 +4350,155 @@ pub(super) mod tests {
                 split(WITHOUT_A_SUBJECT)
             );
             assert_eq!(names(|[on, off]| *on > 0 && *off > 0).len(), 2);
+        });
+    }
+
+    /// Each of `units` was evaluated.
+    fn all_evaluated(evaluation: &Evaluation, units: &[Unit]) {
+        for unit in units {
+            assert_eq!(
+                evaluation.status(unit),
+                Some(&Status::Evaluated),
+                "{unit:?}"
+            );
+        }
+    }
+
+    /// `unit` waits on exactly `causes`.
+    fn waits_on_exactly(evaluation: &Evaluation, unit: &Unit, causes: &BTreeSet<IssueKey>) {
+        let Some(Status::NotEvaluated(found)) = evaluation.status(unit) else {
+            panic!("{unit:?} is not waiting");
+        };
+        assert_eq!(&keys(found), causes, "{unit:?}");
+    }
+
+    /// One element of a target's `requestedLocales` that failed holds back
+    /// neither its sibling nor the other target's checks, and the map's bound
+    /// and each Target ID's are evaluated (D15:1930, 1931, 2367, 3445).
+    #[test]
+    fn a_target_element_that_failed_leaves_every_other_locale_check() {
+        use crate::resolver::locales::fixtures::{key, target};
+        use crate::resolver::locales::LocaleSubject as L;
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["targetProfiles"]["server"]["requestedLocales"] = json!(["ja", 42]);
+        inputs.resolve(|evaluation, _| {
+            only_issue(&evaluation);
+            let locale = |id: &str, spelling: &str, check| {
+                phase_7(L::TargetRequestedLocale(target(id), key(spelling)), check)
+            };
+            all_evaluated(
+                &evaluation,
+                &[
+                    phase_7(L::TargetProfiles, Check::WithinBound),
+                    phase_7(L::TargetId(target("browser")), Check::WithinBound),
+                    phase_7(L::TargetId(target("server")), Check::WithinBound),
+                    locale("browser", "ja", Check::CanonicalLocale),
+                    locale("browser", "en", Check::UniqueLocale),
+                    locale("server", "ja", Check::CanonicalLocale),
+                    locale("server", "ja", Check::UniqueLocale),
+                    phase_7(
+                        L::TargetDefaultRequestedLocale(target("browser")),
+                        Check::CanonicalLocale,
+                    ),
+                ],
+            );
+        });
+    }
+
+    /// An entry whose value is no object keeps its key's subject: its bound
+    /// is checked and its default's unit waits on why, while the other
+    /// target's checks run (D15:1171, 2184, 2367).
+    #[test]
+    fn a_target_entry_that_is_no_object_keeps_its_subject() {
+        use crate::resolver::locales::fixtures::{key, target};
+        use crate::resolver::locales::LocaleSubject as L;
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["targetProfiles"]["server"] = json!(7);
+        inputs.resolve(|evaluation, _| {
+            let found = BTreeSet::from([only_issue(&evaluation)]);
+            all_evaluated(
+                &evaluation,
+                &[
+                    phase_7(L::TargetId(target("server")), Check::WithinBound),
+                    phase_7(
+                        L::TargetRequestedLocale(target("browser"), key("ja")),
+                        Check::CanonicalLocale,
+                    ),
+                ],
+            );
+            waits_on_exactly(
+                &evaluation,
+                &phase_7(
+                    L::TargetDefaultRequestedLocale(target("server")),
+                    Check::CanonicalLocale,
+                ),
+                &found,
+            );
+        });
+    }
+
+    /// A map that is no object has no entry to read, but its bound's unit is
+    /// named by its path, and waits on why (D15:1157, 1171, 1930).
+    #[test]
+    fn a_target_map_that_failed_still_records_its_bound() {
+        use crate::resolver::locales::LocaleSubject as L;
+        let without: [fn(&mut Value); 2] = [
+            |app| app["targetProfiles"] = json!(7),
+            |app| {
+                app.as_object_mut().unwrap().remove("targetProfiles");
+            },
+        ];
+        for edit in without {
+            let mut inputs = Inputs::complete();
+            edit(inputs.declaration());
+            inputs.resolve(|evaluation, _| {
+                let found = BTreeSet::from([only_issue(&evaluation)]);
+                let bound = phase_7(L::TargetProfiles, Check::WithinBound);
+                waits_on_exactly(&evaluation, &bound, &found);
+                assert!(!evaluation
+                    .statuses()
+                    .any(|(unit, _)| matches!(unit.subject, Subject::Locale(L::TargetId(_)))));
+            });
+        }
+    }
+
+    /// An entry whose key fails counts under `maxTargetProfiles` and has no
+    /// later subject of its own, while the entries beside it wait only on the
+    /// map's bound (D15:1930, 2184, 3354).
+    #[test]
+    fn a_target_whose_key_fails_counts_without_a_subject() {
+        use crate::resolver::evaluation::Actual;
+        use crate::resolver::locales::fixtures::target;
+        use crate::resolver::locales::LocaleSubject as L;
+        let mut inputs = Inputs::complete();
+        let copy = inputs.declaration()["targetProfiles"]["server"].clone();
+        inputs.declaration()["targetProfiles"]["Web App"] = copy;
+        let mut limits = policy_limits();
+        limits.target_grouping.max_target_profiles = bound(2);
+        inputs.select_policy(resource_limit_policy(&limits));
+        inputs.resolve(|evaluation, _| {
+            let map = phase_7(L::TargetProfiles, Check::WithinBound);
+            let over = evaluation
+                .issues()
+                .find(|key| *key.unit() == map)
+                .expect("the entry with the invalid key counts")
+                .clone();
+            assert_eq!(
+                evaluation.limit(&over).map(|exceeded| exceeded.actual),
+                Some(Actual::Exact(3))
+            );
+            for id in ["browser", "server"] {
+                waits_on_exactly(
+                    &evaluation,
+                    &phase_7(L::TargetId(target(id)), Check::WithinBound),
+                    &BTreeSet::from([over.clone()]),
+                );
+            }
+            let ids = evaluation
+                .statuses()
+                .filter(|(unit, _)| matches!(unit.subject, Subject::Locale(L::TargetId(_))))
+                .count();
+            assert_eq!(ids, 2);
         });
     }
 

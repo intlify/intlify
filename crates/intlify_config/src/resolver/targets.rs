@@ -244,7 +244,9 @@ impl Checks<'_, '_> {
         references: &ReferenceResults<'s>,
     ) -> Result<TargetFacts<'s>, TargetInvariant> {
         let admitted = own.clone().and_then(|own| own.admitted.clone());
-        let requested = own.clone().and_then(|own| own.requested.clone());
+        let requested = own
+            .clone()
+            .and_then(|own| own.requested.complete().cloned());
         // A target locale the project's set holds is in it whatever else
         // the set lacks, and one it does not hold is unproved while it lacks
         // any (D15:2365, 2367).
@@ -600,7 +602,7 @@ mod tests {
             let policy = unconfirmed.as_ref().map_or(Ok(&confirmed), Err);
             let declared = self.declared.clone().map(|()| &declaration.target_profiles);
             let mut fields = LocaleFields::declared(&declaration);
-            fields.target_profiles = declared.clone();
+            fields.target_entries = declared.clone().map(locales::TargetMapFields::declared);
             let mut evaluation = Evaluation::default();
             let observed = Observed::declaration(&self.app);
             let locales = observed
@@ -1303,7 +1305,11 @@ mod tests {
         inputs.declared = Err(causes.clone());
         inputs.resolve(|evaluation, targets| {
             assert_eq!(statuses(&evaluation), []);
-            assert_eq!(evaluation.status(&map_unit()), None);
+            // The map's bound is named by its path and waits on why.
+            assert_eq!(
+                evaluation.status(&map_unit()),
+                Some(&Status::NotEvaluated(causes.clone()))
+            );
             // Phase 7 bounds no target, so a Target Profile reference Phase 9
             // still sees waits on why.
             for id in ["browser", "server"] {
