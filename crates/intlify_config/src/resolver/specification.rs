@@ -183,7 +183,7 @@ const fn unit(phase: Phase, slot: Slot) -> Unit {
 }
 
 /// The units Phase 5 records, in their canonical order.
-pub(crate) const PHASE_5: [Unit; 22] = [
+pub(crate) const PHASE_5: [Unit; 23] = [
     unit(Phase::SpecificationAdmission, Slot::LocaleCanonicalization),
     unit(Phase::SpecificationAdmission, Slot::LocaleNegotiation),
     unit(Phase::SpecificationAdmission, Slot::MessageLocaleFallback),
@@ -208,6 +208,7 @@ pub(crate) const PHASE_5: [Unit; 22] = [
     data_unit(Check::WithinDataTypes),
     data_unit(Check::WithinDataCorrections),
     data_unit(Check::WithinDataValidationWork),
+    data_unit(Check::IntactDataset),
     DATA,
 ];
 
@@ -839,6 +840,7 @@ mod tests {
                 Subject::CanonicalizationData,
                 Subject::CanonicalizationData,
                 Subject::CanonicalizationData,
+                Subject::CanonicalizationData,
             ]
         );
         assert!(PHASE_5.windows(2).all(|pair| pair[0] < pair[1]));
@@ -1114,8 +1116,8 @@ mod tests {
     }
 
     /// The boundary admitted only the envelope, so the rest is read in the
-    /// data's unit, under the capability's `localeData` bounds, and data whose
-    /// rest does not read is not admitted there (D15:3165).
+    /// data's checks, under the capability's `localeData` bounds, and data
+    /// whose rest does not read is not admitted there (D15:3165).
     #[test]
     fn the_rest_of_the_data_is_read_under_the_locale_data_bounds() {
         let read = Admission::run_with(
@@ -1138,14 +1140,23 @@ mod tests {
         );
         assert_eq!(
             unread.issues(),
-            [(DATA, "project-profile-locale-data-not-admitted", None)]
+            [(
+                data_unit(Check::IntactDataset),
+                "project-profile-locale-data-not-admitted",
+                None
+            )]
         );
         // The specification was admitted; only the data was not.
         assert_eq!(
             unread.specifications.locale_canonicalization,
             Ok(fixture_pins().specification)
         );
-        assert_eq!(unread.not_evaluated(), []);
+        let waiting: Vec<Unit> = unread
+            .not_evaluated()
+            .into_iter()
+            .map(|(unit, _)| unit)
+            .collect();
+        assert_eq!(waiting, [DATA]);
         assert!(unread.set().is_ok());
     }
 
@@ -1189,7 +1200,7 @@ mod tests {
             .into_iter()
             .map(|(unit, _)| unit)
             .collect();
-        assert_eq!(waiting, [DATA]);
+        assert_eq!(waiting, [data_unit(Check::IntactDataset), DATA]);
     }
 
     /// Nothing reads the data before the Resource Limit Policy is confirmed

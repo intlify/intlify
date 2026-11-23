@@ -993,7 +993,7 @@ pub(super) mod tests {
     use crate::resolver::resource_policy::{self, PolicySlot, PolicySubject, ReferenceField};
     use crate::resolver::snapshot_entry::fixtures::ENTRY;
     use crate::resolver::specification::{
-        admit_project_profile, ActiveProfileSpecification, Slot, VocabularyAssertion, DATA,
+        admit_project_profile, ActiveProfileSpecification, Slot, VocabularyAssertion,
     };
     use crate::resolver::structural_admission::{selection, CAPABILITY};
     use crate::resolver::subject::{EntryPath, SubjectKind};
@@ -4026,7 +4026,8 @@ pub(super) mod tests {
             let mut other = bounds;
             other.max_codes = Bound::new(bounds.max_codes.get() + 1).unwrap();
             let (found, canonicalized) = resolved(&Behind(other));
-            assert_eq!(found, [(DATA, Code::LocaleDataNotAdmitted, None)]);
+            let dataset = crate::resolver::locale_data::unit(Check::IntactDataset);
+            assert_eq!(found, [(dataset, Code::LocaleDataNotAdmitted, None)]);
             assert!(!canonicalized);
         });
     }

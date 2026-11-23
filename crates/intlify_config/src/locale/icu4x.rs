@@ -335,6 +335,7 @@ mod tests {
     };
     use crate::resolver::evaluation::{Actual, BootstrapLimitExceeded, Check, Code, Evaluation};
     use crate::resolver::limits::{fixture_limits, ConfirmedPolicy};
+    use crate::resolver::locale_data::tests::{found, slot_causes, waiting};
     use crate::resolver::locale_data::{admit_data, DataBound};
 
     const MANIFEST: &[u8] = include_bytes!("../../../intlify_locale_icu4x/data/manifest.json");
@@ -939,14 +940,65 @@ mod tests {
         let mut value: Value = serde_json::from_slice(MANIFEST).unwrap();
         value["payloads"][index]["byteLength"] = json!(bytes.len().to_string());
         value["payloads"][index]["digest"] = json!(FileDigest::of(bytes).as_str());
+        let mut supplied = payloads();
+        let address = ["conformance.json", "markers.postcard"][index];
+        supplied.insert(address.to_owned(), bytes.into());
+        (sealed(value), supplied)
+    }
+
+    /// The manifest `value`, sealed again.
+    fn sealed(value: Value) -> Vec<u8> {
         let sealed = serde_json::from_value::<LocaleCanonicalizationDataArtifact>(value)
             .unwrap()
             .seal()
             .unwrap();
-        let mut supplied = payloads();
-        let address = ["conformance.json", "markers.postcard"][index];
-        supplied.insert(address.to_owned(), bytes.into());
-        (serde_json::to_vec(&sealed).unwrap(), supplied)
+        serde_json::to_vec(&sealed).unwrap()
+    }
+
+    /// What the data's checks of `manifest` and `supplied` find, and which
+    /// wait, with no value of the `locale-canonicalization` slot.
+    fn without_the_slot(
+        manifest: &[u8],
+        supplied: &BTreeMap<String, Arc<[u8]>>,
+    ) -> (Vec<(Check, Code)>, Vec<Check>) {
+        let (bytes, depth) = envelope();
+        let data = Icu4xData::read(Some(manifest), supplied, bytes, depth).unwrap();
+        let policy = ConfirmedPolicy::fixture_owned(fixture_limits(100));
+        let mut evaluation = Evaluation::default();
+        let pins = Err(slot_causes());
+        let bound = admit_data(&mut evaluation, &data, &locale_data(), pins, Ok(&policy));
+        assert!(bound.unwrap().is_err());
+        (found(&evaluation), waiting(&evaluation))
+    }
+
+    /// D15:2365, D17:1071: a conformance value outside the closed structure
+    /// needs no value of the slot to prove.
+    #[test]
+    fn a_closed_structure_that_fails_is_reported_without_the_slot() {
+        let text = br#"{"corrections":[],"extensionKeys":[],"validity":"x"}"#;
+        let (manifest, supplied) = with_payload(0, text);
+        assert_eq!(
+            without_the_slot(&manifest, &supplied),
+            (
+                vec![(Check::IntactDataset, Code::LocaleDataNotAdmitted)],
+                vec![Check::MatchingData]
+            )
+        );
+    }
+
+    /// D15:2365, D17:1072: the committed artifact with another semantic digest
+    /// needs no value of the slot to prove.
+    #[test]
+    fn a_semantic_digest_that_differs_is_reported_without_the_slot() {
+        let mut value: Value = serde_json::from_slice(MANIFEST).unwrap();
+        value["dataset"]["semanticDigest"] = json!(format!("sha256:{}", "0".repeat(64)));
+        assert_eq!(
+            without_the_slot(&sealed(value), &payloads()),
+            (
+                vec![(Check::IntactDataset, Code::LocaleDataNotAdmitted)],
+                vec![Check::MatchingData]
+            )
+        );
     }
 
     /// One payload that does not decode leaves the other's counts measured,

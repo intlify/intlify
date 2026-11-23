@@ -353,7 +353,7 @@ const fn none(check: &'static str, code: Code) -> Pair {
 
 /// Every (check, code) pair of the Check Registry, in its order.
 #[rustfmt::skip]
-const PAIRS: [Pair; 201] = {
+const PAIRS: [Pair; 202] = {
     use Code as C;
     use Shape as S;
     [
@@ -476,6 +476,7 @@ const PAIRS: [Pair; 201] = {
         pair("specification.locale-data.within-types", C::BootstrapLimitExceeded, AI, &[IC], &[S::Root(LOCALE_DATA), S::Bound("bootstrapOnly.localeData.maxTypes")]),
         pair("specification.locale-data.within-corrections", C::BootstrapLimitExceeded, AI, &[IC], &[S::Root(LOCALE_DATA), S::Bound("bootstrapOnly.localeData.maxCorrections")]),
         pair("specification.locale-data.within-validation-work", C::BootstrapLimitExceeded, AI, &[IC], &[S::Root(LOCALE_DATA), S::Bound("bootstrapOnly.localeData.maxValidationWorkUnits")]),
+        pair("specification.locale-data.dataset-intact", C::LocaleDataNotAdmitted, AI, &[], &[S::Root(LOCALE_DATA)]),
         pair("specification.locale-data.matching", C::LocaleDataNotAdmitted, AI, &[SI], &[S::Root(LOCALE_DATA), S::Slot(Slot::LocaleCanonicalization)]),
         // locale-resolution
         pair("locale.occurrences.within-bound", C::ResourceLimitExceeded, CV, &[AI], &[ADMITTED]),
