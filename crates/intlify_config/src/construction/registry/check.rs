@@ -153,7 +153,7 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:14379d2409f00913db091bd73ce65f41982b3a7977319e2e4885337163726886";
+    "sha256:fd5443253cbc6dc588b07337b263b2f130de1b135eba9867beb453e846b637e9";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
@@ -1016,6 +1016,7 @@ const fn check_ids(kind: SubjectKind) -> &'static [&'static str] {
             "specification.locale-data.within-types",
             "specification.locale-data.within-corrections",
             "specification.locale-data.within-validation-work",
+            "specification.locale-data.dataset-intact",
             "specification.locale-data.matching",
         ],
         K::LocaleCanonicalizationDependency => &["dependency.locale-canonicalization.established"],
@@ -1399,8 +1400,9 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         ],
         // The bounds the manifest decides wait on the confirmed policy alone,
         // its read on both, each payload's read on it, each count on its
-        // payload's read, and only the comparison with the slot on the slot
-        // (D15:2008, 2133, 2149, 2365).
+        // payload's read, the dataset on every count, and only the comparison
+        // with the slot on the slot and the dataset (D15:2008, 2133, 2149,
+        // 2365).
         K::CanonicalizationData => &[
             CONFIRMED_POLICY,
             CONFIRMED_POLICY,
@@ -1418,7 +1420,6 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
             &["specification.locale-data.conformance-readable"],
             &["specification.locale-data.conformance-readable"],
             &[
-                "specification.locale-canonicalization.supported",
                 "specification.locale-data.within-marker-bytes",
                 "specification.locale-data.within-validity-groups",
                 "specification.locale-data.within-codes",
@@ -1426,6 +1427,10 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
                 "specification.locale-data.within-types",
                 "specification.locale-data.within-corrections",
                 "specification.locale-data.within-validation-work",
+            ],
+            &[
+                "specification.locale-canonicalization.supported",
+                "specification.locale-data.dataset-intact",
             ],
         ],
         K::LocaleCanonicalizationDependency => &[&["specification.locale-data.matching"]],
@@ -1867,6 +1872,7 @@ const fn finding_codes(kind: SubjectKind) -> &'static [&'static [Code]] {
             &[C::BootstrapLimitExceeded],
             &[C::BootstrapLimitExceeded],
             &[C::BootstrapLimitExceeded],
+            &[C::LocaleDataNotAdmitted],
             &[C::LocaleDataNotAdmitted],
         ],
         K::RequestedLocale | K::TargetRequestedLocale => &[SPELLING, &[C::LocaleDuplicate]],
@@ -2443,7 +2449,7 @@ mod tests {
             .map(|row| (row.subject_kind, row.check_id.as_str()))
             .collect();
         assert_eq!(written, listed);
-        assert_eq!(rows.len(), 190);
+        assert_eq!(rows.len(), 191);
         for kind in SubjectKind::ALL {
             assert_eq!(check_ids(kind).len(), kind.checks().len(), "{kind:?}");
         }

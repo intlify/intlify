@@ -2675,6 +2675,7 @@
         "specification.locale-data.manifest-intact",
         "specification.locale-data.markers-readable",
         "specification.locale-data.conformance-readable",
+        "specification.locale-data.dataset-intact",
         "specification.locale-data.matching"
       ],
       "severity": "error",
@@ -2697,6 +2698,10 @@
           "kind": "artifact-input"
         },
         {
+          "checkId": "specification.locale-data.dataset-intact",
+          "kind": "artifact-input"
+        },
+        {
           "checkId": "specification.locale-data.matching",
           "kind": "artifact-input"
         }
@@ -2712,6 +2717,10 @@
         },
         {
           "checkId": "specification.locale-data.conformance-readable",
+          "kinds": []
+        },
+        {
+          "checkId": "specification.locale-data.dataset-intact",
           "kinds": []
         },
         {

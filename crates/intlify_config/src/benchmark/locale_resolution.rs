@@ -586,6 +586,7 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::WithinDataTypes
         | Check::WithinDataCorrections
         | Check::WithinDataValidationWork
+        | Check::IntactDataset
         | Check::MatchingData
         | Check::IntactArtifact
         | Check::AssertedArtifact

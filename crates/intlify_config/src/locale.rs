@@ -230,7 +230,7 @@ pub(crate) struct DataFacts {
 }
 
 /// The facts of one read and the provider it built, which only data within
-/// every bound builds.
+/// every bound whose dataset holds builds (D17:1071, 1072).
 #[derive(Debug)]
 pub(crate) struct DataReading<P> {
     pub(crate) facts: DataFacts,
@@ -278,7 +278,8 @@ pub(crate) trait FormalData: Eq {
 
     /// Read the rest of the artifact under `limits`, leaving the data as it
     /// was: what each stage established, and the provider of data within
-    /// every bound. A stage an earlier one stops is not read.
+    /// every bound whose closed conformance structure, marker payloads, and
+    /// semantic digest hold. A stage an earlier one stops is not read.
     fn read(&self, limits: &LocaleDataLimits) -> DataReading<Self::Provider>;
 
     /// The provider that serves the data, when it reads within `limits`.

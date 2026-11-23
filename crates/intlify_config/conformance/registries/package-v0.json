@@ -23,12 +23,12 @@
     "check-registry": {
       "identity": "intlify-project-profile-check-registry",
       "revision": "0",
-      "digest": "sha256:14379d2409f00913db091bd73ce65f41982b3a7977319e2e4885337163726886"
+      "digest": "sha256:fd5443253cbc6dc588b07337b263b2f130de1b135eba9867beb453e846b637e9"
     },
     "finding-registry": {
       "identity": "intlify-project-profile-finding-registry",
       "revision": "0",
-      "digest": "sha256:f3e01909b2928d87786b5dbd9816f9e8d9ce6ad66a15bfac07fde8017a793b86"
+      "digest": "sha256:d405c874231d337898513ca326d38e097a460f337eea62c60e4e88f854ead4e8"
     }
   }
 }

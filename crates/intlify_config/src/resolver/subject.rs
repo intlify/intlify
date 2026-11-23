@@ -643,6 +643,7 @@ impl SubjectKind {
                 Check::WithinDataTypes,
                 Check::WithinDataCorrections,
                 Check::WithinDataValidationWork,
+                Check::IntactDataset,
                 Check::MatchingData,
             ],
             Self::DeclarationField => &[Check::OpaqueIdentity],

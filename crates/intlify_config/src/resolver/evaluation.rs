@@ -283,8 +283,10 @@ pub(crate) enum Check {
     WithinDataCorrections,
     /// The conformance work stays within `localeData.maxValidationWorkUnits`.
     WithinDataValidationWork,
-    /// The rest of the data reads, and it is the dataset the admitted
-    /// specification admits.
+    /// The rest of the data holds without its slot: the conformance value's
+    /// closed structure, the marker payloads, and the semantic digest.
+    IntactDataset,
+    /// The data is the dataset the admitted specification admits.
     MatchingData,
     /// The artifact's integrity holds and its members are valid, unique, and
     /// sorted.

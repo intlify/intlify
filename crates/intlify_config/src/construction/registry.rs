@@ -65,7 +65,7 @@ pub(crate) const PATH: &str = "registries/package-v0.json";
 
 /// The container's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:06ff0e9d1250bbb320242027dec2eab9b6a290a54ab4241c98688b48b53247c8";
+    "sha256:ff52912109e8e7b6b3609006d827c1103c02eb9aed3c0c23a9fbce5ef88ce0f1";
 
 /// A rank's spelling in a registry: a shortest decimal string.
 pub(crate) const RANK_PATTERN: &str = "^(0|[1-9][0-9]*)$";

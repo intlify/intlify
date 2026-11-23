@@ -4570,6 +4570,46 @@
       }
     },
     {
+      "checkId": "specification.locale-data.dataset-intact",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.locale-data.dataset-intact",
+      "subjectKind": "canonicalization-data",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "canonicalization-data",
+      "subjectKindRank": "8",
+      "checkRank": "12",
+      "prerequisiteCheckIds": [
+        "specification.locale-data.within-marker-bytes",
+        "specification.locale-data.within-validity-groups",
+        "specification.locale-data.within-codes",
+        "specification.locale-data.within-extension-keys",
+        "specification.locale-data.within-types",
+        "specification.locale-data.within-corrections",
+        "specification.locale-data.within-validation-work"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-locale-data-not-admitted"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "finding-occurrence",
+        "evidence-index",
+        "shared-finding",
+        "shared-evaluation-status"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-locale-data-not-admitted",
+            "members": [],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
       "checkId": "specification.locale-data.matching",
       "phaseId": "specification-admission",
       "ruleId": "015.specification.locale-data.matching",
@@ -4578,16 +4618,10 @@
       "subjectContentProjection": "none",
       "owningScope": "canonicalization-data",
       "subjectKindRank": "8",
-      "checkRank": "12",
+      "checkRank": "13",
       "prerequisiteCheckIds": [
         "specification.locale-canonicalization.supported",
-        "specification.locale-data.within-marker-bytes",
-        "specification.locale-data.within-validity-groups",
-        "specification.locale-data.within-codes",
-        "specification.locale-data.within-extension-keys",
-        "specification.locale-data.within-types",
-        "specification.locale-data.within-corrections",
-        "specification.locale-data.within-validation-work"
+        "specification.locale-data.dataset-intact"
       ],
       "possibleFindingCodes": [
         "project-profile-locale-data-not-admitted"

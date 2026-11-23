@@ -10,16 +10,18 @@
 //! The checks run in the bounds' order, except that a bound measured from a
 //! decoded payload follows the read that decodes it (D15:2008): the two bounds
 //! the manifest decides, the manifest's read, the markers' read and their
-//! bound, the conformance payload's read and its six bounds, and the match
-//! with the admitted specification (D17:1069 to 1072). One payload's failure
-//! leaves the other's bounds to report (D15:2365). Past `maxPayloadBytes`
+//! bound, the conformance payload's read and its six bounds, what is left of
+//! the reader's steps (the closed conformance structure, the marker payloads,
+//! and the semantic digest), and the match with the admitted specification
+//! (D17:1069 to 1072, 1074). One payload's failure leaves the other's bounds to
+//! report (D15:2365). Past `maxPayloadBytes`
 //! neither payload is read: the bound is one check of a singleton, and what a
 //! check waits on does not vary with the value it finds (D15:2149).
 //!
 //! Only the match waits on the `locale-canonicalization` slot. Reading the
-//! data and measuring it need the confirmed policy and no value of the slot,
-//! so a bound's violation stays provable beside an invalid slot (D15:2133,
-//! 2365).
+//! data, measuring it, and proving that its dataset holds need the confirmed
+//! policy and no value of the slot, so each of those failures stays provable
+//! beside an invalid slot (D15:2133, 2365).
 
 use crate::input_limits::Bound;
 use crate::locale::{
@@ -206,8 +208,8 @@ fn check_read<P, T>(
 }
 
 /// The checks of the data, under the confirmed `policy`, and its canonicalizer
-/// when it reads within every bound and is the data `pins` admit. Without a
-/// confirmed policy nothing is read.
+/// when it reads within every bound, its dataset holds, and it is the data
+/// `pins` admit. Without a confirmed policy nothing is read.
 pub(crate) fn admit_data<Id, D>(
     evaluation: &mut Evaluation,
     data: &D,
@@ -265,6 +267,14 @@ where
         )?;
         within = both(within, checked).map(|((), ())| ());
     }
+    // What is left of the reader's steps needs no value of the slot
+    // (D15:2365; D17:1071, 1072, 1074).
+    let dataset = check_read(
+        evaluation,
+        Check::IntactDataset,
+        within.map(|()| provider),
+        |provider| provider,
+    )?;
     // The match compares the data with the slot it must be, so it alone is
     // observed beside the slot (D15:833, 1140, 2249).
     let observed = Observation {
@@ -275,10 +285,8 @@ where
     };
     Ok(evaluation.check_found(
         DATA,
-        both(both(pins, policy), within).map(|(admitted, ())| admitted),
-        |(pins, policy): (SemanticPins<Id>, &ConfirmedPolicy)| {
-            let mismatch = || Found::observed(NOT_ADMITTED, observed.clone());
-            let provider = provider.map_err(|DataNotAdmitted| mismatch())?;
+        both(both(pins, policy), dataset),
+        |((pins, policy), provider): ((SemanticPins<Id>, &ConfirmedPolicy), D::Provider)| {
             Canonicalizer::bind(
                 &pins,
                 Some(provider),
@@ -287,13 +295,13 @@ where
                     .locale_resolution
                     .max_locale_identifier_bytes,
             )
-            .map_err(|_| mismatch())
+            .map_err(|_| Found::observed(NOT_ADMITTED, observed))
         },
     )?)
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::locale::fixtures::FixtureProvider;
     use crate::locale::{DataReading, PayloadFacts};
@@ -318,8 +326,8 @@ mod tests {
         (DataBound::ValidationWork, "maxValidationWorkUnits"),
     ];
 
-    /// The thirteen checks, in their canonical order.
-    const CHECKS: [Check; 13] = [
+    /// The fourteen checks, in their canonical order.
+    const CHECKS: [Check; 14] = [
         Check::WithinDataPayloads,
         Check::WithinDataPayloadBytes,
         Check::DataManifest,
@@ -332,10 +340,11 @@ mod tests {
         Check::WithinDataTypes,
         Check::WithinDataCorrections,
         Check::WithinDataValidationWork,
+        Check::IntactDataset,
         Check::MatchingData,
     ];
 
-    /// Where the match stands in [`CHECKS`].
+    /// Where the dataset's check stands in [`CHECKS`].
     const LAST: usize = 12;
 
     /// The capability's minima, each bound at [`LIMIT`].
@@ -395,12 +404,27 @@ mod tests {
         }
     }
 
+    /// Data within every bound whose dataset does not hold.
+    #[derive(PartialEq, Eq)]
+    struct Broken;
+
+    impl FormalData for Broken {
+        type Provider = FixtureProvider;
+
+        fn read(&self, _: &LocaleDataLimits) -> DataReading<FixtureProvider> {
+            DataReading {
+                facts: at_every_bound(),
+                provider: Err(DataNotAdmitted),
+            }
+        }
+    }
+
     fn pins() -> SemanticPins<&'static str> {
         FixtureProvider::new().binding().pins.clone()
     }
 
     /// The causes of a `locale-canonicalization` slot that names nothing.
-    fn slot_causes() -> Causes {
+    pub(crate) fn slot_causes() -> Causes {
         let slot = Unit {
             phase: Phase::SpecificationAdmission,
             subject: Subject::Slot(Slot::LocaleCanonicalization),
@@ -420,9 +444,17 @@ mod tests {
     /// The checks of data reading as `facts` under a confirmed policy, and
     /// whether a canonicalizer was bound.
     fn run(facts: DataFacts, pins: Admitted<SemanticPins<&'static str>>) -> (Evaluation, bool) {
+        run_data(&Read(facts), pins)
+    }
+
+    /// The checks of `data` under a confirmed policy.
+    fn run_data(
+        data: &impl FormalData<Provider = FixtureProvider>,
+        pins: Admitted<SemanticPins<&'static str>>,
+    ) -> (Evaluation, bool) {
         let policy = ConfirmedPolicy::fixture_owned(fixture_limits(100));
         let mut evaluation = Evaluation::default();
-        let bound = admit_data(&mut evaluation, &Read(facts), &limits(), pins, Ok(&policy));
+        let bound = admit_data(&mut evaluation, data, &limits(), pins, Ok(&policy));
         (evaluation, bound.unwrap().is_ok())
     }
 
@@ -431,7 +463,7 @@ mod tests {
     }
 
     /// The checks that found something, each with its code.
-    fn found(evaluation: &Evaluation) -> Vec<(Check, Code)> {
+    pub(crate) fn found(evaluation: &Evaluation) -> Vec<(Check, Code)> {
         evaluation
             .issues()
             .map(|key| (key.unit().check, key.code()))
@@ -439,7 +471,7 @@ mod tests {
     }
 
     /// The checks not evaluated, in canonical order.
-    fn waiting(evaluation: &Evaluation) -> Vec<Check> {
+    pub(crate) fn waiting(evaluation: &Evaluation) -> Vec<Check> {
         evaluation
             .statuses()
             .filter(|(_, status)| matches!(status, Status::NotEvaluated(_)))
@@ -513,7 +545,7 @@ mod tests {
         let (evaluation, _) = read(facts);
         let expected: Vec<_> = BOUNDS[2..].iter().map(|(data, _)| over(*data)).collect();
         assert_eq!(found(&evaluation), expected);
-        assert_eq!(waiting(&evaluation), [Check::MatchingData]);
+        assert_eq!(waiting(&evaluation), CHECKS[LAST..]);
         let (_, status) = evaluation
             .statuses()
             .find(|(unit, _)| **unit == DATA)
@@ -571,7 +603,11 @@ mod tests {
         );
         assert_eq!(
             waiting(&evaluation),
-            [Check::WithinDataMarkerBytes, Check::MatchingData]
+            [
+                Check::WithinDataMarkerBytes,
+                Check::IntactDataset,
+                Check::MatchingData
+            ]
         );
         assert!(!bound);
 
@@ -627,6 +663,65 @@ mod tests {
         };
         assert_eq!(candidate.primary, root());
         assert_eq!(candidate.related, []);
+    }
+
+    /// D15:2365, D17:1071, 1072, 1074: a dataset that does not hold is proved
+    /// without the slot, at the data's root, and only the match waits.
+    #[test]
+    fn a_dataset_that_does_not_hold_is_reported_with_or_without_the_slot() {
+        for pins in [Ok(pins()), Err(slot_causes())] {
+            let (evaluation, bound) = run_data(&Broken, pins);
+            assert_eq!(
+                found(&evaluation),
+                [(Check::IntactDataset, Code::LocaleDataNotAdmitted)]
+            );
+            assert_eq!(waiting(&evaluation), [Check::MatchingData]);
+            assert!(!bound);
+            let [candidate] = evaluation.occurrence_candidates() else {
+                panic!("one candidate");
+            };
+            assert_eq!(candidate.primary, root());
+            assert_eq!(candidate.related, []);
+        }
+    }
+
+    /// D15:2365: past a bound the dataset is not evaluated, and the bound's
+    /// Finding is its cause.
+    #[test]
+    fn a_bound_past_its_limit_is_the_cause_the_dataset_waits_on() {
+        for (data, _) in BOUNDS {
+            let (evaluation, _) = read(with(at_every_bound(), data, OVER));
+            let dataset = unit(Check::IntactDataset);
+            let status = evaluation.statuses().find(|(unit, _)| **unit == dataset);
+            let Some((_, Status::NotEvaluated(causes))) = status else {
+                panic!("the dataset waits past {data:?}");
+            };
+            assert!(causes.keys().eq(evaluation.issues()), "{data:?}");
+        }
+    }
+
+    /// D17:1074: a dataset that holds and is not the one the pins admit is the
+    /// match's Finding alone, at the data's root beside its slot.
+    #[test]
+    fn pins_that_differ_are_a_finding_of_the_match_at_root_and_slot() {
+        let mut other = pins();
+        other.dataset.semantic_digest = "sha256:another-dataset";
+        let (evaluation, bound) = run(at_every_bound(), Ok(other));
+        assert_eq!(
+            found(&evaluation),
+            [(Check::MatchingData, Code::LocaleDataNotAdmitted)]
+        );
+        assert_eq!(waiting(&evaluation), []);
+        assert!(!bound);
+        let [candidate] = evaluation.occurrence_candidates() else {
+            panic!("one candidate");
+        };
+        let slot = ComponentPath::specification(Slot::LocaleCanonicalization);
+        assert_eq!(candidate.primary, root());
+        assert_eq!(
+            candidate.related,
+            [EvidenceProjection::resolver_input(slot)]
+        );
     }
 
     /// Each bound the manifest decides reads its own value of the capability.
