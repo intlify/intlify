@@ -253,7 +253,7 @@ pub(crate) mod tests {
         IDENTITY as CAPABILITY, REVISION as CAPABILITY_REVISION,
     };
     use crate::locale::fixtures::FixtureProvider;
-    use crate::locale::{DataNotAdmitted, LocaleDataLimits};
+    use crate::locale::{DataReading, LocaleDataLimits};
     use crate::resolver::limits::fixture_limits;
     use crate::resolver::origin::SafeOriginKind as Kind;
 
@@ -286,8 +286,8 @@ pub(crate) mod tests {
     impl FormalData for Envelope {
         type Provider = FixtureProvider;
 
-        fn admit(&self, _: &LocaleDataLimits) -> Result<FixtureProvider, DataNotAdmitted> {
-            Ok(FixtureProvider::new())
+        fn read(&self, _: &LocaleDataLimits) -> DataReading<FixtureProvider> {
+            DataReading::settled(Ok(FixtureProvider::new()))
         }
     }
 

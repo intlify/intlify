@@ -39,6 +39,7 @@ pub(crate) mod hydration;
 pub(crate) mod identity;
 pub(crate) mod invocation;
 pub(crate) mod limits;
+pub(crate) mod locale_data;
 pub(crate) mod locales;
 pub(crate) mod materialized;
 pub(crate) mod negotiation;

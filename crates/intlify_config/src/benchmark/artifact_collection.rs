@@ -182,6 +182,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         Check::SingleOccurrence => 1,
         Check::ConsistentContent => 2,
         Check::SupportedAssertion
+        | Check::WithinDataPayloads
+        | Check::WithinDataPayloadBytes
         | Check::MatchingData
         | Check::IntactArtifact
         | Check::AssertedArtifact

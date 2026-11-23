@@ -4082,6 +4082,118 @@
       }
     },
     {
+      "checkId": "specification.locale-data.within-payloads",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.locale-data.within-payloads",
+      "subjectKind": "canonicalization-data",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "canonicalization-data",
+      "subjectKindRank": "8",
+      "checkRank": "0",
+      "prerequisiteCheckIds": [
+        "resource-policy.root-nodes.within-bound",
+        "resource-policy.root-depth.within-bound",
+        "resource-policy.root-collection-entries.within-bound",
+        "resource-policy.root-string-bytes.within-bound",
+        "resource-policy.root-longest-string.within-bound",
+        "resource-policy.profiles.within-bound",
+        "resource-policy.profile-id.within-bound",
+        "resource-policy.selector.within-bound",
+        "resource-policy.structural-analysis.within-bound",
+        "resource-policy.artifacts.within-bound",
+        "resource-policy.policy-artifacts.within-bound",
+        "resource-policy.target-profile-artifacts.within-bound",
+        "resource-policy.references.within-bound",
+        "resource-policy.artifact.within-bound",
+        "resource-policy.artifact-bytes.within-bound",
+        "resource-policy.policy-reference.within-bound",
+        "resource-policy.target-profile-reference.within-bound",
+        "resource-policy.reference-bytes.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "finding-occurrence",
+        "evidence-index",
+        "shared-finding",
+        "shared-evaluation-status"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "specification.locale-data.within-payload-bytes",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.locale-data.within-payload-bytes",
+      "subjectKind": "canonicalization-data",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "canonicalization-data",
+      "subjectKindRank": "8",
+      "checkRank": "1",
+      "prerequisiteCheckIds": [
+        "resource-policy.root-nodes.within-bound",
+        "resource-policy.root-depth.within-bound",
+        "resource-policy.root-collection-entries.within-bound",
+        "resource-policy.root-string-bytes.within-bound",
+        "resource-policy.root-longest-string.within-bound",
+        "resource-policy.profiles.within-bound",
+        "resource-policy.profile-id.within-bound",
+        "resource-policy.selector.within-bound",
+        "resource-policy.structural-analysis.within-bound",
+        "resource-policy.artifacts.within-bound",
+        "resource-policy.policy-artifacts.within-bound",
+        "resource-policy.target-profile-artifacts.within-bound",
+        "resource-policy.references.within-bound",
+        "resource-policy.artifact.within-bound",
+        "resource-policy.artifact-bytes.within-bound",
+        "resource-policy.policy-reference.within-bound",
+        "resource-policy.target-profile-reference.within-bound",
+        "resource-policy.reference-bytes.within-bound"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "finding-occurrence",
+        "evidence-index",
+        "shared-finding",
+        "shared-evaluation-status"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "key-only",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
       "checkId": "specification.locale-data.matching",
       "phaseId": "specification-admission",
       "ruleId": "015.specification.locale-data.matching",
@@ -4090,9 +4202,11 @@
       "subjectContentProjection": "none",
       "owningScope": "canonicalization-data",
       "subjectKindRank": "8",
-      "checkRank": "0",
+      "checkRank": "2",
       "prerequisiteCheckIds": [
-        "specification.locale-canonicalization.supported"
+        "specification.locale-canonicalization.supported",
+        "specification.locale-data.within-payloads",
+        "specification.locale-data.within-payload-bytes"
       ],
       "possibleFindingCodes": [
         "project-profile-locale-data-not-admitted"

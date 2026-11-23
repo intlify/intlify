@@ -153,7 +153,7 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:65af97897193eddc6be19fdb46680eb659d9bc528c4189ed4688f32c7a181eb3";
+    "sha256:433c5841513210b7372548b8afccb35a1d8a8d1f2c556b0a57788196dc27df34";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
@@ -1003,7 +1003,11 @@ const fn check_ids(kind: SubjectKind) -> &'static [&'static str] {
             "specification.vocabulary.intact",
             "specification.vocabulary.asserted",
         ],
-        K::CanonicalizationData => &["specification.locale-data.matching"],
+        K::CanonicalizationData => &[
+            "specification.locale-data.within-payloads",
+            "specification.locale-data.within-payload-bytes",
+            "specification.locale-data.matching",
+        ],
         K::LocaleCanonicalizationDependency => &["dependency.locale-canonicalization.established"],
         K::DeclarationField => &["identity.declaration-field.opaque"],
         K::ProjectIdentityDependency => &["dependency.project-identity.established"],
@@ -1383,7 +1387,18 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
                 "specification.vocabulary.intact",
             ],
         ],
-        K::CanonicalizationData => &[&["specification.locale-canonicalization.supported"]],
+        // The bounds the manifest decides wait on the confirmed policy alone,
+        // and only the comparison with the slot on the slot (D15:2008, 2133,
+        // 2149, 2365).
+        K::CanonicalizationData => &[
+            CONFIRMED_POLICY,
+            CONFIRMED_POLICY,
+            &[
+                "specification.locale-canonicalization.supported",
+                "specification.locale-data.within-payloads",
+                "specification.locale-data.within-payload-bytes",
+            ],
+        ],
         K::LocaleCanonicalizationDependency => &[&["specification.locale-data.matching"]],
         K::ProjectIdentityDependency => &[&["identity.declaration-field.opaque"]],
         K::RequestedLocale => &[
@@ -1810,7 +1825,11 @@ const fn finding_codes(kind: SubjectKind) -> &'static [&'static [Code]] {
             &[C::IntentSurfaceClassVocabularyNotAdmitted],
             &[C::IntentSurfaceClassVocabularyNotAdmitted],
         ],
-        K::CanonicalizationData => &[&[C::LocaleDataNotAdmitted]],
+        K::CanonicalizationData => &[
+            &[C::BootstrapLimitExceeded],
+            &[C::BootstrapLimitExceeded],
+            &[C::LocaleDataNotAdmitted],
+        ],
         K::RequestedLocale | K::TargetRequestedLocale => &[SPELLING, &[C::LocaleDuplicate]],
         K::DefaultSourceLocale
         | K::NegotiationAliasKey
@@ -2069,6 +2088,12 @@ const fn derivation(kind: SubjectKind, check: Check) -> Derivation {
             }
             _ => Exact,
         },
+        // The singleton's payloads are two occurrences of the one bound on
+        // a payload's length; its other counts are one total each.
+        K::CanonicalizationData => match check {
+            Check::WithinDataPayloadBytes => KeyOnly,
+            _ => Exact,
+        },
         K::RootField
         | K::ProfileKey
         | K::ProfileField
@@ -2140,7 +2165,6 @@ const fn derivation(kind: SubjectKind, check: Check) -> Derivation {
         | K::DeliveryGraphSlot
         | K::DeliveryPlacementSlot
         | K::Vocabulary
-        | K::CanonicalizationData
         | K::LocaleCanonicalizationDependency
         | K::DeclarationField
         | K::ProjectIdentityDependency
@@ -2380,7 +2404,7 @@ mod tests {
             .map(|row| (row.subject_kind, row.check_id.as_str()))
             .collect();
         assert_eq!(written, listed);
-        assert_eq!(rows.len(), 178);
+        assert_eq!(rows.len(), 180);
         for kind in SubjectKind::ALL {
             assert_eq!(check_ids(kind).len(), kind.checks().len(), "{kind:?}");
         }
@@ -3567,6 +3591,7 @@ mod tests {
             (K::CompleteInput, Check::JsonCompatible),
             (K::CompleteInput, Check::WithinSingleStringBytes),
             (K::RootLongestString, Check::WithinBound),
+            (K::CanonicalizationData, Check::WithinDataPayloadBytes),
         ];
         for row in &rows {
             if row.subject_key_strategy == KeyStrategy::Singleton {

@@ -14,8 +14,8 @@
 
 use crate::artifacts::vocabulary::FormalVocabulary;
 use crate::locale::{
-    Canonicalizer, FormalData, LocaleDataLimits, Provider, SemanticPins, SpecificationNotAdmitted,
-    Supported, VersionedIdentity,
+    Canonicalizer, FormalData, LocaleDataLimits, Provider, SpecificationNotAdmitted, Supported,
+    VersionedIdentity,
 };
 
 use super::evaluation::{
@@ -25,6 +25,8 @@ use super::evaluation::{
 use super::evidence::EvidenceProjection;
 use super::evidence_component::{ComponentInvariant, ComponentPath};
 use super::limits::ConfirmedPolicy;
+pub(crate) use super::locale_data::DATA;
+use super::locale_data::{admit_data, unit as data_unit};
 use super::vocabulary::{admit_vocabulary, SurfaceVocabulary, ASSERTED, INTACT};
 
 /// 015's eight fixed slots, declared in their canonical order.
@@ -180,15 +182,8 @@ const fn unit(phase: Phase, slot: Slot) -> Unit {
     }
 }
 
-/// The unit Phase 5 binds the canonicalization data in.
-pub(crate) const DATA: Unit = Unit {
-    phase: Phase::SpecificationAdmission,
-    subject: Subject::CanonicalizationData,
-    check: Check::MatchingData,
-};
-
 /// The units Phase 5 records, in their canonical order.
-pub(crate) const PHASE_5: [Unit; 10] = [
+pub(crate) const PHASE_5: [Unit; 12] = [
     unit(Phase::SpecificationAdmission, Slot::LocaleCanonicalization),
     unit(Phase::SpecificationAdmission, Slot::LocaleNegotiation),
     unit(Phase::SpecificationAdmission, Slot::MessageLocaleFallback),
@@ -201,6 +196,8 @@ pub(crate) const PHASE_5: [Unit; 10] = [
     unit(Phase::SpecificationAdmission, Slot::DeliveryPlacement),
     INTACT,
     ASSERTED,
+    data_unit(Check::WithinDataPayloads),
+    data_unit(Check::WithinDataPayloadBytes),
     DATA,
 ];
 
@@ -343,7 +340,8 @@ pub(crate) struct AdmittedSpecifications<Id, P: Provider> {
 /// artifacts the pre-invocation boundary already admitted as envelopes; here
 /// the vocabulary must be intact and the one its slot asserts, and the rest of
 /// the data is read under the capability's `localeData` bounds, `data_limits`,
-/// and must carry the dataset the admitted specification admits (D15:3165).
+/// each its own check, and must carry the dataset the admitted specification
+/// admits (D15:2356, 3165).
 /// The data is read in place, and stays its caller's.
 pub(crate) fn admit_specifications<Id, D>(
     evaluation: &mut Evaluation,
@@ -430,41 +428,10 @@ where
         intent_surface_class_vocabulary.as_ref(),
         vocabulary,
     )?;
-    let canonicalizer = evaluation.check_found(
-        DATA,
-        both(pins.clone(), policy.map_err(Causes::clone)),
-        |(pins, policy): (SemanticPins<Id>, &ConfirmedPolicy)| {
-            // The boundary admitted only the envelope: the rest of the data is
-            // read here, and then it must be the data the admitted
-            // specification admits. Either failure is the data's, observed at
-            // its root beside the slot it must match (D15:833, 2249).
-            let not_admitted = || {
-                Found::observed(
-                    Blocking {
-                        code: Code::LocaleDataNotAdmitted,
-                        reason: None,
-                        details: None,
-                    },
-                    Observation {
-                        primary: EvidenceProjection::resolver_input(ComponentPath::data_root()),
-                        related: vec![EvidenceProjection::resolver_input(
-                            ComponentPath::specification(Slot::LocaleCanonicalization),
-                        )],
-                    },
-                )
-            };
-            let provider = data.admit(data_limits).map_err(|_| not_admitted())?;
-            Canonicalizer::bind(
-                &pins,
-                Some(provider),
-                policy
-                    .limits()
-                    .locale_resolution
-                    .max_locale_identifier_bytes,
-            )
-            .map_err(|_| not_admitted())
-        },
-    )?;
+    // The boundary admitted only the envelope: the rest of the data is read
+    // here, under its bounds, and then it must be the data the admitted
+    // specification admits.
+    let canonicalizer = admit_data(evaluation, data, data_limits, pins.clone(), policy)?;
     Ok(AdmittedSpecifications {
         locale_canonicalization: pins.map(|pins| pins.specification),
         locale_negotiation,
@@ -592,7 +559,7 @@ mod tests {
     use crate::artifacts::vectors::vocabulary::{self as vectors, formal};
     use crate::input_limits::Bound;
     use crate::locale::fixtures::{fixture_pins, FixtureProvider};
-    use crate::locale::{DataNotAdmitted, DatasetPin};
+    use crate::locale::{DataNotAdmitted, DataReading, DatasetPin, SemanticPins};
     use crate::model::CONFIGURATION_SCHEMA_VERSION;
     use crate::resolver::capability::BootstrapLimits;
     use crate::resolver::evaluation::Status;
@@ -788,12 +755,12 @@ mod tests {
     impl FormalData for Behind {
         type Provider = FixtureProvider;
 
-        fn admit(&self, limits: &LocaleDataLimits) -> Result<FixtureProvider, DataNotAdmitted> {
-            if *limits == self.expected {
+        fn read(&self, limits: &LocaleDataLimits) -> DataReading<FixtureProvider> {
+            DataReading::settled(if *limits == self.expected {
                 Ok(FixtureProvider::new())
             } else {
                 Err(DataNotAdmitted)
-            }
+            })
         }
     }
 
@@ -804,8 +771,8 @@ mod tests {
     impl FormalData for Untouched {
         type Provider = FixtureProvider;
 
-        fn admit(&self, _: &LocaleDataLimits) -> Result<FixtureProvider, DataNotAdmitted> {
-            panic!("the data was read before its slot was admitted")
+        fn read(&self, _: &LocaleDataLimits) -> DataReading<FixtureProvider> {
+            panic!("the data was read without a confirmed policy")
         }
     }
 
@@ -849,6 +816,8 @@ mod tests {
                 Subject::Slot(Slot::DeliveryPlacement),
                 Subject::Vocabulary,
                 Subject::Vocabulary,
+                Subject::CanonicalizationData,
+                Subject::CanonicalizationData,
                 Subject::CanonicalizationData,
             ]
         );
@@ -1076,8 +1045,10 @@ mod tests {
         assert_eq!(admission.set().err(), admission.project_profile.err());
     }
 
+    /// Of the data's checks only the match waits for its slot: reading the
+    /// data and measuring it need no value of the slot (D15:2133, 2149).
     #[test]
-    fn the_canonicalization_data_waits_for_its_slot() {
+    fn only_the_data_match_waits_for_its_slot() {
         for asserted in [None, Some(identity("another-specification", "0"))] {
             let mut input = complete();
             input.locale_canonicalization = asserted;
@@ -1158,14 +1129,22 @@ mod tests {
         assert!(unread.set().is_ok());
     }
 
-    /// Nothing reads the data before its slot is admitted.
+    /// Nothing reads the data before the Resource Limit Policy is confirmed
+    /// (D15:2133).
     #[test]
-    fn the_data_is_read_only_once_its_slot_is_admitted() {
+    fn the_data_is_read_only_under_a_confirmed_policy() {
         let mut input = complete();
-        input.locale_canonicalization = None;
-        let admission = Admission::run_with(&supported(), &input, Ok(&policy()), &Untouched);
-        let causes = only_cause(&admission);
-        assert_eq!(admission.not_evaluated(), [(DATA, causes)]);
+        input.project_profile = None;
+        let mut stand_in = Evaluation::default();
+        let causes = admit_project_profile(&mut stand_in, &supported(), &input)
+            .unwrap()
+            .unwrap_err();
+        let admission = Admission::run_with(&supported(), &complete(), Err(&causes), &Untouched);
+        assert_eq!(admission.issues(), []);
+        assert_eq!(
+            admission.not_evaluated(),
+            PHASE_5.map(|unit| (unit, causes.clone()))
+        );
     }
 
     #[test]

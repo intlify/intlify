@@ -961,8 +961,8 @@ pub(super) mod tests {
     use crate::input_limits::{Bound, InputLimits, RawInputLimits};
     use crate::locale::fixtures::{fixture_pins, FixtureProvider};
     use crate::locale::{
-        CanonicalLocale, DataNotAdmitted, LocaleDataLimits, ProviderFailure, Supported,
-        VersionedIdentity,
+        CanonicalLocale, DataNotAdmitted, DataReading, LocaleDataLimits, ProviderFailure,
+        Supported, VersionedIdentity,
     };
     use crate::materialize::materialize_file;
     use crate::model::CoverageMode;
@@ -3983,12 +3983,12 @@ pub(super) mod tests {
         impl FormalData for Behind {
             type Provider = FixtureProvider;
 
-            fn admit(&self, limits: &LocaleDataLimits) -> Result<FixtureProvider, DataNotAdmitted> {
-                if *limits == self.0 {
+            fn read(&self, limits: &LocaleDataLimits) -> DataReading<FixtureProvider> {
+                DataReading::settled(if *limits == self.0 {
                     Ok(FixtureProvider::new())
                 } else {
                     Err(DataNotAdmitted)
-                }
+                })
             }
         }
 

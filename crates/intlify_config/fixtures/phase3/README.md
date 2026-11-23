@@ -85,7 +85,7 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 | A missing slot, `project-profile` and `locale-canonicalization` included, is `missing-required-slot` and names its slot | `a_missing_slot_is_incomplete_and_names_its_slot`, `a_missing_project_profile_slot_leaves_only_its_groups_owner_waiting` |
 | Another identity is unsupported and another revision incompatible in every slot, with no host fallback for canonicalization | `another_identity_is_unsupported_and_another_revision_incompatible_in_every_specification_slot`, `data_naming_another_specification_or_dataset_is_not_admitted` |
 | The configuration `schemaVersion` and the specification revisions are separate version domains | `the_configuration_version_and_the_specification_revisions_are_separate_domains` |
-| Phase 0 suppresses nothing itself; a unit needing a slot waits on it | `phase_0_suppresses_nothing_but_keeps_the_set_from_forming`, `the_canonicalization_data_waits_for_its_slot`, `a_missing_slot_hides_only_the_comparison` |
+| Phase 0 suppresses nothing itself; a unit needing a slot waits on it | `phase_0_suppresses_nothing_but_keeps_the_set_from_forming`, `only_the_data_match_waits_for_its_slot`, `a_missing_slot_hides_only_the_comparison` |
 
 ### Resource policy and selection
 

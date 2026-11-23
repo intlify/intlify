@@ -1569,6 +1569,40 @@
               "rank": "3"
             }
           ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "localeData",
+              "rank": "4"
+            },
+            {
+              "role": "maxPayloads",
+              "rank": "0"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "localeData",
+              "rank": "4"
+            },
+            {
+              "role": "maxPayloadBytes",
+              "rank": "1"
+            }
+          ]
         }
       ]
     }
@@ -5541,13 +5575,16 @@
         "resource-policy.resource-limits.within-metadata-scan",
         "resource-policy.resource-limits.within-envelope-depth",
         "resource-policy.resource-limits.within-decoded-allocation",
-        "resource-policy.resource-limits.within-validation-work"
+        "resource-policy.resource-limits.within-validation-work",
+        "specification.locale-data.within-payloads",
+        "specification.locale-data.within-payload-bytes"
       ],
       "severity": "error",
       "blocking": true,
       "allowedSubjectKinds": [
         "complete-input",
-        "resource-limits"
+        "resource-limits",
+        "canonicalization-data"
       ],
       "allowedReasons": [],
       "occurrencePrimaryEvidenceKindByCheck": [
@@ -5609,6 +5646,14 @@
         },
         {
           "checkId": "resource-policy.resource-limits.within-validation-work",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "specification.locale-data.within-payloads",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "specification.locale-data.within-payload-bytes",
           "kind": "artifact-input"
         }
       ],
@@ -5705,6 +5750,18 @@
             "configuration-value",
             "implementation-capability"
           ]
+        },
+        {
+          "checkId": "specification.locale-data.within-payloads",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "specification.locale-data.within-payload-bytes",
+          "kinds": [
+            "implementation-capability"
+          ]
         }
       ],
       "evidenceDisclosurePolicies": [
@@ -5717,6 +5774,10 @@
         {
           "evidenceKind": "artifact-input",
           "paths": [
+            {
+              "origin": "locale-canonicalization-data",
+              "roles": []
+            },
             {
               "origin": "profile-resolution-artifact-collection",
               "roles": []
@@ -5990,6 +6051,40 @@
                   "rank": "3"
                 }
               ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "localeData",
+                  "rank": "4"
+                },
+                {
+                  "role": "maxPayloads",
+                  "rank": "0"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "localeData",
+                  "rank": "4"
+                },
+                {
+                  "role": "maxPayloadBytes",
+                  "rank": "1"
+                }
+              ]
             }
           ]
         }
@@ -6012,6 +6107,7 @@
         {
           "evidenceKind": "artifact-input",
           "origins": [
+            "locale-canonicalization-data",
             "profile-resolution-artifact-collection"
           ]
         },

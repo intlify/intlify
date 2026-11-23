@@ -430,6 +430,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         | Check::CompleteTable
         | Check::EffectiveMode
         | Check::SupportedAssertion
+        | Check::WithinDataPayloads
+        | Check::WithinDataPayloadBytes
         | Check::MatchingData
         | Check::IntactArtifact
         | Check::AssertedArtifact

@@ -184,21 +184,70 @@ pub(crate) struct LocaleDataLimits {
     pub(crate) max_validation_work_units: Bound,
 }
 
+/// One count an adapter measured reading the data: exact, or past what a
+/// `u64` holds, and so past every bound (D15:1997).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DataCount {
+    Exact(u64),
+    BeyondU64,
+}
+
+/// What reading the data established, for its checks to judge (D15:1820 to
+/// 1828, 2008).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DataFacts {
+    /// The admitted manifest's payload entries.
+    pub(crate) payloads: DataCount,
+    /// Whether a payload declares more bytes than `maxPayloadBytes`. The
+    /// singleton's check sees each payload on its own, so it reports a
+    /// witness rather than a length (Decision 015-157).
+    pub(crate) payload_bytes_over: bool,
+}
+
+/// The facts of one read and the provider it built, which only data within
+/// every bound builds.
+#[derive(Debug)]
+pub(crate) struct DataReading<P> {
+    pub(crate) facts: DataFacts,
+    pub(crate) provider: Result<P, DataNotAdmitted>,
+}
+
+impl<P> DataReading<P> {
+    /// A reading with nothing left to measure, as a provider built before
+    /// invocation has: every count is zero, and `provider` is the result.
+    pub(crate) const fn settled(provider: Result<P, DataNotAdmitted>) -> Self {
+        Self {
+            facts: DataFacts {
+                payloads: DataCount::Exact(0),
+                payload_bytes_over: false,
+            },
+            provider,
+        }
+    }
+}
+
 /// Canonicalization data past the pre-invocation boundary: its envelope
 /// admitted, the rest still to read. Specification admission reads the rest
-/// under the capability's `localeData` bounds, and a failure there, a payload
-/// limit, the integrity, a payload, or the dataset, is
-/// `project-profile-locale-data-not-admitted`, a Resolver Case and not a
-/// boundary failure (D15:3165). The data is a Common Invocation Input Set
+/// under the capability's `localeData` bounds: past one the manifest decides
+/// is that bound's `project-profile-bootstrap-limit-exceeded` (D15:2356), and
+/// a failure past another, or of the integrity, a payload, or the dataset, is
+/// `project-profile-locale-data-not-admitted`, Resolver Cases and not boundary
+/// failures (D15:3165). The data is a Common Invocation Input Set
 /// value that invocation staleness compares by value and the Materialized
 /// Resolution Input Set retains (D15:2583, 2589, 2651), so it has a value
 /// equality and its caller keeps it past the invocation.
 pub(crate) trait FormalData: Eq {
     type Provider: Provider;
 
-    /// Read the rest of the artifact into the provider that serves it,
-    /// leaving the data as it was.
-    fn admit(&self, limits: &LocaleDataLimits) -> Result<Self::Provider, DataNotAdmitted>;
+    /// Read the rest of the artifact under `limits`, leaving the data as it
+    /// was: what each stage established, and the provider of data within
+    /// every bound. A stage an earlier one stops is not read.
+    fn read(&self, limits: &LocaleDataLimits) -> DataReading<Self::Provider>;
+
+    /// The provider that serves the data, when it reads within `limits`.
+    fn admit(&self, limits: &LocaleDataLimits) -> Result<Self::Provider, DataNotAdmitted> {
+        self.read(limits).provider
+    }
 }
 
 /// The data behind an admitted envelope was not admitted.
@@ -210,8 +259,8 @@ pub(crate) struct DataNotAdmitted;
 impl<P: Provider + Clone + Eq> FormalData for P {
     type Provider = P;
 
-    fn admit(&self, _: &LocaleDataLimits) -> Result<P, DataNotAdmitted> {
-        Ok(self.clone())
+    fn read(&self, _: &LocaleDataLimits) -> DataReading<P> {
+        DataReading::settled(Ok(self.clone()))
     }
 }
 
