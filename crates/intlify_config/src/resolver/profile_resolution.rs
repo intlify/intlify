@@ -69,6 +69,7 @@ use crate::structural::{
 use super::artifact_resolution::{admit_collection, ArtifactSet, CollectionInvariant};
 use super::coverage::{resolve_coverage, CoveragePolicy};
 use super::declaration_fields::DeclarationFields;
+use super::declaration_fragments::DeclarationFragments;
 use super::declaration_observer::{DeclarationObserver, ObserverInvariant};
 use super::delivery::{resolve_delivery, DeliveryPolicy};
 use super::dependency::{own, EntryInputs, SemanticGroup, OPTIONAL_POLICIES, REQUIRED_POLICIES};
@@ -90,7 +91,7 @@ use super::profile_selection::{select_profile, ProfileSelectionInvariant};
 use super::reporting::ReportingInvariant;
 use super::resource_policy::{
     admit_resource_policy, ConfigurationMeasures, DeclarationReferences, PolicyInvariant,
-    PolicyOutcome,
+    PolicyOutcome, ReferenceOccurrence,
 };
 use super::snapshot_entry::{
     admit_snapshot_entry, EntrySnapshot, ProgrammaticEntry, SnapshotEntryLimits,
@@ -122,6 +123,9 @@ type Declaration = ProfileDeclaration<PolicyReference, TargetProfileReference>;
 /// needs (D15:2142).
 pub(crate) struct SelectedConfiguration<'a> {
     fields: DeclarationFields<PolicyReference, TargetProfileReference>,
+    /// Every reference of the declaration as Phase 4's bounds read it, whether
+    /// or not structural admission admitted it, or the causes of no selection.
+    occurrences: Admitted<Vec<ReferenceOccurrence>>,
     /// Where a check of the selected declaration looks, when there is one.
     observer: Option<DeclarationObserver<'a>>,
     resource_limits: Result<&'a PolicyReference, Causes>,
@@ -154,6 +158,9 @@ impl<'a> SelectedConfiguration<'a> {
     ) -> Result<Self, ResolverInvariant> {
         let fields = DeclarationFields::read(values, analysis, selection.id().as_str())
             .map_err(ResolverInvariant::Structural)?;
+        let occurrences = DeclarationFragments::new(values, analysis, selection.id().as_str())
+            .and_then(|fragments| fragments.reference_occurrences())
+            .map_err(ResolverInvariant::Structural)?;
         let declarations = analysis
             .declarations()
             .map_err(admission)?
@@ -163,6 +170,7 @@ impl<'a> SelectedConfiguration<'a> {
             .map_err(ResolverInvariant::Observer)?;
         Ok(Self {
             fields,
+            occurrences: Ok(occurrences),
             observer: Some(observer),
             resource_limits: Ok(selection.resource_limits()),
             selector,
@@ -198,6 +206,7 @@ impl<'a> SelectedConfiguration<'a> {
             .ok_or_else(|| causes.clone());
         Ok(Self {
             fields: DeclarationFields::unavailable(causes),
+            occurrences: Err(causes.clone()),
             observer: None,
             resource_limits: Err(causes.clone()),
             selector,
@@ -496,7 +505,10 @@ where
         invocation.capability,
         invocation.collection,
         configuration.resource_limits.as_ref().copied(),
-        (&declared, configuration.observer.as_ref()),
+        (
+            configuration.occurrences.as_deref(),
+            configuration.observer.as_ref(),
+        ),
         &configuration.measures(),
         invocation.verification,
     )?;
@@ -998,7 +1010,9 @@ pub(super) mod tests {
     use crate::resolver::outcome::{outcome, Outcome};
     use crate::resolver::profile_selection::{capability, selector, SelectionSubject};
     use crate::resolver::profile_view::{project, ProfileView};
-    use crate::resolver::resource_policy::{self, PolicySlot, PolicySubject, ReferenceField};
+    use crate::resolver::resource_policy::{
+        self, ArtifactSubject, PolicySlot, PolicySubject, ReferenceField,
+    };
     use crate::resolver::snapshot_entry::fixtures::ENTRY;
     use crate::resolver::specification::{
         admit_project_profile, ActiveProfileSpecification, Slot, VocabularyAssertion,
@@ -3924,6 +3938,176 @@ pub(super) mod tests {
                     "{unit:?} waits on {causes:?}"
                 );
             }
+        });
+    }
+
+    /// Phase 4's two units of `subject`: under the capability and as the
+    /// admitted policy's recheck.
+    fn stages(subject: ArtifactSubject) -> [Unit; 2] {
+        [
+            resource_policy::unit(
+                PolicySubject::Capability(subject.clone()),
+                Check::WithinCapability,
+            ),
+            resource_policy::unit(PolicySubject::Recheck(subject), Check::WithinBound),
+        ]
+    }
+
+    fn slot(slot: PolicySlot) -> ArtifactSubject {
+        ArtifactSubject::Reference(ReferenceField::Policy(slot))
+    }
+
+    fn profile_of(id: &str) -> ArtifactSubject {
+        let id = serde_json::from_value(json!(id)).unwrap();
+        ArtifactSubject::Reference(ReferenceField::TargetProfile(id))
+    }
+
+    /// After `edit`, the selection is confirmed beside the one Finding: each
+    /// of `waiting` waits on it, and the count, the total, and each of
+    /// `checked` are evaluated.
+    fn confirmed_beside(
+        edit: impl FnOnce(&mut Value),
+        waiting: &[ArtifactSubject],
+        checked: &[ArtifactSubject],
+    ) {
+        let mut inputs = Inputs::complete();
+        edit(inputs.declaration());
+        inputs.resolve(|evaluation, state| {
+            let found = only_issue(&evaluation);
+            assert!(state.policy.confirmed.is_ok() && state.identity.is_ok());
+            assert!(state.structure.is_err());
+            for unit in waiting.iter().cloned().flat_map(stages) {
+                let Some(Status::NotEvaluated(causes)) = evaluation.status(&unit) else {
+                    panic!("{unit:?} is not waiting");
+                };
+                assert_eq!(keys(causes), BTreeSet::from([found.clone()]), "{unit:?}");
+            }
+            let totals = [ArtifactSubject::References, ArtifactSubject::ReferenceBytes];
+            for unit in checked.iter().cloned().chain(totals).flat_map(stages) {
+                assert_eq!(
+                    evaluation.status(&unit),
+                    Some(&Status::Evaluated),
+                    "{unit:?}"
+                );
+            }
+        });
+    }
+
+    /// One policy slot that fails, or is missing, has no canonical bytes: its
+    /// byte checks wait on its Finding, an independent slot's are evaluated,
+    /// and the selection is confirmed (D15:1918, 1924, 2149, 2367; plan 025
+    /// decision #342).
+    #[test]
+    fn a_policy_slot_that_fails_leaves_the_selection_confirmed() {
+        let (trust, approval) = (slot(PolicySlot::Trust), slot(PolicySlot::Approval));
+        confirmed_beside(
+            |app| app["policies"]["trust"] = json!(42),
+            std::slice::from_ref(&trust),
+            &[approval.clone(), profile_of("server")],
+        );
+        confirmed_beside(
+            |app| {
+                app["policies"].as_object_mut().unwrap().remove("trust");
+            },
+            &[trust],
+            &[approval],
+        );
+    }
+
+    /// A failure in a target's field other than `profile` is no failure of a
+    /// reference, and one target's `profile` that fails leaves the other's
+    /// checked (D15:1921, 1924, 2367; plan 025 decision #342).
+    #[test]
+    fn a_target_that_fails_leaves_the_selection_confirmed() {
+        confirmed_beside(
+            |app| app["targetProfiles"]["server"]["requestedLocales"] = json!(["en", 42]),
+            &[],
+            &[profile_of("browser"), profile_of("server")],
+        );
+        confirmed_beside(
+            |app| app["targetProfiles"]["server"]["profile"] = json!(42),
+            &[profile_of("server")],
+            &[profile_of("browser")],
+        );
+    }
+
+    /// A reference that failed still occurs, and past the bound it is a
+    /// Finding, which holds the selection back. A missing one does not
+    /// occur, so eight are within a bound of eight (D15:1736, 1918, 1924).
+    #[test]
+    fn a_bound_past_its_limit_beside_a_failed_reference_holds_the_selection_back() {
+        let count = BoundId {
+            group: Group::ArtifactAdmission,
+            name: "maxArtifactReferences",
+        };
+        let mut over = Inputs::complete().bounding(&[], &[(count, 8)]);
+        over.declaration()["targetProfiles"]["server"]["profile"] = json!(42);
+        over.resolve(|evaluation, state| {
+            assert!(state.policy.confirmed.is_err());
+            let [_, recheck] = stages(ArtifactSubject::References);
+            let key = evaluation.issues().find(|key| *key.unit() == recheck);
+            assert_eq!(
+                evaluation
+                    .limit(key.unwrap())
+                    .map(|exceeded| exceeded.actual),
+                Some(crate::resolver::evaluation::Actual::Exact(9))
+            );
+        });
+        let mut within = Inputs::complete().bounding(&[], &[(count, 8)]);
+        let policies = within.declaration()["policies"].as_object_mut();
+        policies.unwrap().remove("trust");
+        within.resolve(|_, state| assert!(state.policy.confirmed.is_ok()));
+    }
+
+    /// The rows that wait on one target's failed `profile`: `targetProfiles`
+    /// is still read as a whole by the rest (plan 025 interpretation #219).
+    const WAITING_ON_A_TARGET: &str = "coverage.cells.within-bound coverage.comparisons.within-bound coverage.locale.canonical coverage.locale.member coverage.locale.unique coverage.rule.normalized-domain coverage.table.complete dependency.coverage.established dependency.deployment-groups.established dependency.locale-negotiation.established dependency.message-fallback.established dependency.project-locales.established dependency.targets.established fallback.candidate.canonical fallback.candidate.distinct-from-source fallback.intent-source.unique fallback.literal.unique fallback.sequence.within-bound fallback.source.member fallback.source.unique group.member.known hydration.endpoint.known hydration.endpoint.role hydration.relation.same-effective-default hydration.relation.same-requested-locales hydration.relation.static-compatibility locale.alias-destination.canonical locale.alias-key.canonical locale.default-requested.canonical locale.default-requested.member locale.default-source.canonical locale.fallback-key.canonical locale.occurrences.within-bound locale.requested-set.within-bound locale.requested.canonical locale.requested.unique negotiation.alias-key.unique negotiation.destination.member";
+
+    /// The rows left without a subject by the same failure.
+    const WITHOUT_A_SUBJECT: &str = "artifact.target-profile-reference.resolved coverage.cell.effective-mode coverage.domain.unique group.target.single-group locale.target-default-requested.canonical locale.target-id.within-bound locale.target-profiles.within-bound locale.target-requested.canonical locale.target-requested.unique target.effective-default.supported target.requested-locales.directed target.requested-locales.project-subset";
+
+    /// End to end, one target's failed `profile` leaves one Finding, and each
+    /// row is evaluated, waits on it alone, or has no subject; only the failed
+    /// reference's own rows are both (D15:1924, 2149, 2367, 3446).
+    #[test]
+    fn a_failed_target_profile_changes_only_what_reads_the_targets() {
+        let rows = |evaluation: &Evaluation| {
+            let mut rows: BTreeMap<&str, [usize; 2]> = BTreeMap::new();
+            for (unit, status) in evaluation.statuses() {
+                if unit.phase >= Phase::ResourcePolicyAdmission {
+                    let at = usize::from(*status != Status::Evaluated);
+                    rows.entry(row_of(unit)).or_default()[at] += 1;
+                }
+            }
+            rows
+        };
+        let split = |names: &'static str| names.split(' ').collect::<BTreeSet<&str>>();
+        let complete = Inputs::complete().resolve(|evaluation, _| rows(&evaluation));
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["targetProfiles"]["server"]["profile"] = json!(42);
+        inputs.resolve(|evaluation, state| {
+            let found = only_issue(&evaluation);
+            assert!(state.policy.confirmed.is_ok() && state.structure.is_err());
+            for (unit, status) in evaluation.statuses() {
+                if let Status::NotEvaluated(causes) = status {
+                    assert_eq!(keys(causes), BTreeSet::from([found.clone()]), "{unit:?}");
+                }
+            }
+            let after = rows(&evaluation);
+            let names = |kept: fn(&[usize; 2]) -> bool| -> BTreeSet<&str> {
+                let kept = after.iter().filter(|(_, counts)| kept(counts));
+                kept.map(|(row, _)| *row).collect()
+            };
+            assert_eq!(
+                names(|[on, off]| *on == 0 && *off > 0),
+                split(WAITING_ON_A_TARGET)
+            );
+            let gone = complete.keys().filter(|row| !after.contains_key(*row));
+            assert_eq!(
+                gone.copied().collect::<BTreeSet<_>>(),
+                split(WITHOUT_A_SUBJECT)
+            );
+            assert_eq!(names(|[on, off]| *on > 0 && *off > 0).len(), 2);
         });
     }
 

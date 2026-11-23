@@ -66,7 +66,7 @@ use super::limits::{
     ArtifactAdmissionLimits, BoundId, ConfigurationInputLimits, ConfirmedPolicy, DiagnosticsLimits,
     Group, ResolutionLimits,
 };
-use super::tally::{actual, first_over, measure, total, within, Tally};
+use super::tally::{actual, first_over, total, within, Tally};
 
 const fn configuration_bound(name: &'static str) -> BoundId {
     BoundId {
@@ -190,6 +190,17 @@ pub(crate) enum PolicySlot {
 }
 
 impl PolicySlot {
+    /// Every slot, in the unsigned byte order of their names.
+    pub(crate) const ALL: [Self; 7] = [
+        Self::Approval,
+        Self::GlossarySet,
+        Self::ProviderRouting,
+        Self::ResourceLimits,
+        Self::Selection,
+        Self::SourceAdmission,
+        Self::Trust,
+    ];
+
     pub(crate) const fn name(self) -> &'static str {
         match self {
             Self::Approval => "approval",
@@ -224,6 +235,37 @@ impl ReferenceField {
             Self::Policy(slot) => slot.kind(),
             Self::TargetProfile(_) => ArtifactKind::TargetProfile,
         }
+    }
+}
+
+/// A reference of the selected declaration as Phase 4's bounds read it, whether
+/// or not structural admission admitted it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ReferenceOccurrence {
+    /// Where it is, which names its byte check: none under a Target ID key
+    /// without the identifier syntax, which has no later subject (D15:2184).
+    pub(crate) field: Option<ReferenceField>,
+    /// Whether it occurs: not for a required reference the declaration
+    /// lacks, whose byte check still waits on that Finding (D15:1918, 2203).
+    pub(crate) occurs: bool,
+    /// Its canonical bytes, or why it has none (D15:1924).
+    pub(crate) bytes: Admitted<u64>,
+}
+
+/// The canonical bytes of the references that have them: an exact total,
+/// since one that failed structural admission has none to add (D15:1924,
+/// 1997, 2006). Not evaluated only when every value is excluded, with the
+/// causes of each (D15:2184, 3354).
+fn reference_total(references: &[ReferenceOccurrence]) -> Admitted<Tally> {
+    let admitted = references
+        .iter()
+        .filter_map(|each| each.bytes.as_ref().ok());
+    let excluded = references
+        .iter()
+        .filter_map(|each| each.bytes.as_ref().err());
+    match excluded.cloned().reduce(Causes::union) {
+        Some(causes) if admitted.clone().next().is_none() => Err(causes),
+        _ => Ok(total(admitted.map(|&bytes| Tally::exactly(bytes)))),
     }
 }
 
@@ -264,6 +306,22 @@ impl DeclarationReferences<'_> {
             Err(ref causes) => unavailable = Some(join(unavailable, causes)),
         }
         (visible, unavailable)
+    }
+
+    /// The references of fields structural admission admitted whole, each
+    /// occurring with its bytes, or the causes of a field it did not.
+    #[cfg(any(test, feature = "benchmark"))]
+    pub(crate) fn occurrences(&self) -> Admitted<Vec<ReferenceOccurrence>> {
+        let (visible, unavailable) = self.visible(
+            PolicyReference::canonical_bytes,
+            TargetProfileReference::canonical_bytes,
+        );
+        let occurrence = |(field, bytes)| ReferenceOccurrence {
+            field: Some(field),
+            occurs: true,
+            bytes: Ok(bytes),
+        };
+        unavailable.map_or_else(|| Ok(visible.into_iter().map(occurrence).collect()), Err)
     }
 }
 
@@ -337,6 +395,13 @@ impl From<ObserverInvariant> for PolicyInvariant {
         Self::Observer(invariant)
     }
 }
+
+/// The selected declaration's references, or the causes of its absence, and
+/// where a check of it looks.
+type Declared<'r, 'o> = (
+    Result<&'r [ReferenceOccurrence], &'r Causes>,
+    Option<&'r DeclarationObserver<'o>>,
+);
 
 /// That every recheck under the admitted policy held. Only Phase 4 states it,
 /// and only a confirmed policy takes it.
@@ -495,13 +560,16 @@ struct Inspected {
 /// declaration's fields; the decision needs the `resourceLimits` reference,
 /// every collection bound, and that reference's own bytes; the comparison
 /// needs the admitted policy; and each recheck needs the compatible policy and
-/// what it measures.
+/// what it measures. A reference that failed structural admission has no bytes
+/// the bounds protect, so it holds no confirmation back; a recheck's Finding
+/// does, and so does a complete input it cannot measure (D15:1736, 1924, 2151,
+/// 2367; plan 025 decision #342).
 pub(crate) fn admit_resource_policy(
     evaluation: &mut Evaluation,
     capability: &ImplementationCapability,
     collection: &FormalCollection,
     resource_limits: Result<&PolicyReference, &Causes>,
-    declared: (&DeclarationReferences<'_>, Option<&DeclarationObserver<'_>>),
+    declared: Declared<'_, '_>,
     measures: &ConfigurationMeasures<'_>,
     verification: &VerificationInput,
 ) -> Result<PolicyOutcome, PolicyInvariant> {
@@ -575,7 +643,7 @@ fn admit_and_compare(
     capability: &ImplementationCapability,
     submitted: &Submitted<'_>,
     resource_limits: Result<&PolicyReference, &Causes>,
-    declared: (&DeclarationReferences<'_>, Option<&DeclarationObserver<'_>>),
+    declared: Declared<'_, '_>,
     verification: &VerificationInput,
 ) -> Result<Admitted<AdmittedResourcePolicy>, PolicyInvariant> {
     let inspected = artifact_bounds(
@@ -814,25 +882,6 @@ fn witnessed_at(
     )
 }
 
-/// One bound's unit over a count part of which may be unavailable: proved
-/// only once what is visible exceeds the bound. Its Finding is observed
-/// through `observed` when there is one.
-fn measured(
-    evaluation: &mut Evaluation,
-    unit: Unit,
-    (bound, limit): (BoundId, Result<Bound, &Causes>),
-    (visible, unavailable): (Tally, Option<&Causes>),
-    observed: Option<Observation>,
-) -> Result<Admitted<()>, EvaluationInvariant> {
-    let measured = match limit {
-        Ok(limit) => measure(visible, unavailable.cloned(), limit).map(|actual| (limit, actual)),
-        Err(causes) => Err(join(unavailable.cloned(), causes)),
-    };
-    evaluation.check_found(unit, measured, |(limit, actual)| {
-        within(bound, limit, actual).map_err(|blocking| found(blocking, observed))
-    })
-}
-
 /// What a `configurationInput` recheck past the admitted `policy`'s bound
 /// observes: where `at` looks in the configuration, beside the policy, which
 /// supplies the bound (D15:2249). Nothing is observed without the policy or
@@ -1018,33 +1067,30 @@ fn configuration_bounds(
 /// The eight `artifactAdmission` bounds of one stage, in 015's table order:
 /// the collection's occurrences and its Policy and Target Profile
 /// occurrences, the declaration's references, each member key and the
-/// collection's bytes, and each reference and the references' bytes. A field
-/// structural admission did not admit has no references to count: a count is
-/// proved only when what is visible already exceeds the bound.
+/// collection's bytes, and each reference and the references' bytes. Every
+/// reference that occurs counts, one that failed structural admission
+/// included, and a value of the wrong type holds none (D15:1918, 1924).
 fn artifact_bounds(
     evaluation: &mut Evaluation,
     stage: Stage<'_>,
     limits: Result<&ArtifactAdmissionLimits, &Causes>,
     submitted: &Submitted<'_>,
     resource_limits: Result<&PolicyReference, &Causes>,
-    (references, observer): (&DeclarationReferences<'_>, Option<&DeclarationObserver<'_>>),
+    (references, observer): Declared<'_, '_>,
 ) -> Result<Inspected, PolicyInvariant> {
     let occurrences = occurrence_bounds(evaluation, stage, limits, submitted.members)?;
-    let (visible, unavailable) = references.visible(
-        PolicyReference::canonical_bytes,
-        TargetProfileReference::canonical_bytes,
-    );
     // The declaration's count and total never gate the decision for the
     // selected reference. Both count over the whole declaration (D15:1918,
     // 1922).
-    let count = measured(
+    let count = bounded_at(
         evaluation,
         stage.unit(ArtifactSubject::References),
         (
             MAX_ARTIFACT_REFERENCES,
             limits.map(|limits| limits.max_artifact_references),
         ),
-        (Tally::of(visible.len()), unavailable.as_ref()),
+        references
+            .map(|references| Tally::of(references.iter().filter(|each| each.occurs).count())),
         stage.at_declaration(observer, &[], MAX_ARTIFACT_REFERENCES)?,
     )?;
     let collection = and(
@@ -1055,20 +1101,18 @@ fn artifact_bounds(
         evaluation,
         stage,
         limits,
-        (resource_limits, &visible),
+        (resource_limits, references.unwrap_or(&[])),
         observer,
     )?;
-    let bytes = measured(
+    let sum = references.map_err(Causes::clone).and_then(reference_total);
+    let bytes = bounded_at(
         evaluation,
         stage.unit(ArtifactSubject::ReferenceBytes),
         (
             MAX_TOTAL_REFERENCE_CANONICAL_BYTES,
             limits.map(|limits| limits.max_total_reference_canonical_bytes),
         ),
-        (
-            total(visible.iter().map(|&(_, bytes)| Tally::exactly(bytes))),
-            unavailable.as_ref(),
-        ),
+        sum.as_ref().copied(),
         stage.at_declaration(observer, &[], MAX_TOTAL_REFERENCE_CANONICAL_BYTES)?,
     )?;
     Ok(Inspected {
@@ -1174,14 +1218,15 @@ fn body_bounds(
 }
 
 /// Each reference's own bytes: whether the `resourceLimits` reference's hold,
-/// and whether every one does. The selected reference is checked from what
-/// selection admitted, even when the rest of `policies` was not. The units
-/// commit in canonical order whatever order they run in.
+/// and whether every one that has bytes does. The selected reference is
+/// checked from what selection admitted, even when the rest of `policies` was
+/// not. One without bytes waits on why, and holds nothing back (D15:1924).
+/// The units commit in canonical order whatever order they run in.
 fn each_reference(
     evaluation: &mut Evaluation,
     stage: Stage<'_>,
     limits: Result<&ArtifactAdmissionLimits, &Causes>,
-    (resource_limits, visible): (Result<&PolicyReference, &Causes>, &[(ReferenceField, u64)]),
+    (resource_limits, references): (Result<&PolicyReference, &Causes>, &[ReferenceOccurrence]),
     observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<(Admitted<()>, Admitted<()>), PolicyInvariant> {
     let single_limit = limits.map(|limits| limits.max_single_reference_canonical_bytes);
@@ -1208,18 +1253,24 @@ fn each_reference(
         at(&selected)?,
     )?;
     let mut holds = own_bytes.clone();
-    for (field, bytes) in visible {
-        if *field == selected {
+    for reference in references {
+        let Some(field) = reference.field.as_ref().filter(|field| **field != selected) else {
             continue;
-        }
+        };
+        let observed = match reference.bytes {
+            Ok(_) => at(field)?,
+            Err(_) => None,
+        };
         let held = bounded_at(
             evaluation,
             stage.unit(ArtifactSubject::Reference(field.clone())),
             (MAX_SINGLE_REFERENCE_CANONICAL_BYTES, single_limit),
-            Ok(Tally::exactly(*bytes)),
-            at(field)?,
+            reference.bytes.as_ref().map(|&bytes| Tally::exactly(bytes)),
+            observed,
         )?;
-        holds = and(holds, held);
+        if reference.bytes.is_ok() {
+            holds = and(holds, held);
+        }
     }
     Ok((own_bytes, holds))
 }
@@ -1499,6 +1550,8 @@ mod tests {
         resource_limits: Admitted<PolicyReference>,
         policies: Admitted<Policies<PolicyReference>>,
         targets: Admitted<NonEmptyMap<TargetId, TargetDeclaration<TargetProfileReference>>>,
+        /// References that failed structural admission, with why.
+        failed: Vec<(ReferenceField, Causes)>,
         measures: Measures,
     }
 
@@ -1541,14 +1594,28 @@ mod tests {
                 resource_limits: Ok(reference_to(policy)),
                 policies: Ok(policies_for(policy)),
                 targets: Ok(targets()),
+                failed: Vec::new(),
             }
         }
 
-        fn references(&self) -> DeclarationReferences<'_> {
-            DeclarationReferences {
+        /// The references as Phase 4 reads them: those of [`Self::failed`]
+        /// without bytes, or the causes of no selection.
+        fn references(&self) -> Admitted<Vec<ReferenceOccurrence>> {
+            let mut references = DeclarationReferences {
                 policies: self.policies.as_ref().map_err(Causes::clone),
                 target_profiles: self.targets.as_ref().map_err(Causes::clone),
             }
+            .occurrences()?;
+            for reference in &mut references {
+                let failed = self
+                    .failed
+                    .iter()
+                    .find(|(field, _)| reference.field.as_ref() == Some(field));
+                if let Some((_, causes)) = failed {
+                    reference.bytes = Err(causes.clone());
+                }
+            }
+            Ok(references)
         }
 
         /// 018's input as trusted setup supplies it: it pins the selected
@@ -1600,10 +1667,7 @@ mod tests {
 
         /// Runs `phase` with these inputs' references and where a check
         /// looks at them in the file holding [`Self::config`].
-        fn observing<R>(
-            &self,
-            phase: impl FnOnce((&DeclarationReferences<'_>, Option<&DeclarationObserver<'_>>)) -> R,
-        ) -> R {
+        fn observing<R>(&self, phase: impl FnOnce(Declared<'_, '_>) -> R) -> R {
             let bytes: Arc<[u8]> = Arc::from(serde_json::to_vec(&self.config()).unwrap());
             let document = materialize_file(Arc::clone(&bytes), input_limits()).unwrap();
             let NodeKind::Object(root) = document.node(document.root()).kind() else {
@@ -1614,7 +1678,8 @@ mod tests {
             let file = fixture.file(bytes);
             let observer =
                 DeclarationObserver::new(&file, (&document, profiles), SELECTED).unwrap();
-            phase((&self.references(), Some(&observer)))
+            let references = self.references();
+            phase((references.as_deref(), Some(&observer)))
         }
 
         /// Phase 4 up to the comparison.
@@ -2385,10 +2450,11 @@ mod tests {
         );
         // Each reference's value, at the pointer of its path from the root.
         let expected: Vec<(Unit, Value, Vec<Value>, u64)> = inputs.observing(|(references, _)| {
-            let (visible, _) = references.visible(|_| (), |_| ());
-            visible
-                .into_iter()
-                .map(|(field, ())| {
+            references
+                .unwrap()
+                .iter()
+                .map(|reference| {
+                    let field = reference.field.clone().unwrap();
                     let pointer = match &field {
                         ReferenceField::Policy(slot) => {
                             format!("/profiles/{SELECTED}/policies/{}", slot.name())
@@ -3117,36 +3183,58 @@ mod tests {
         assert!(admitted.is_err());
     }
 
+    /// The total is of the references with bytes, exact, and is not evaluated
+    /// only when none has any (D15:1924, 2006, 3354).
     #[test]
-    fn a_reference_field_structural_admission_did_not_admit_is_counted_only_past_the_bound() {
-        let unavailable = earlier(Code::SpecificationInputIncomplete);
+    fn the_total_waits_only_when_every_reference_is_excluded() {
+        let of = |bytes| ReferenceOccurrence {
+            field: None,
+            occurs: true,
+            bytes,
+        };
+        let one = earlier(Code::SpecificationInputIncomplete);
+        let other = earlier(Code::SpecificationNotAdmitted);
+        assert_eq!(reference_total(&[]), Ok(Tally::of(0)));
+        assert_eq!(
+            reference_total(&[of(Ok(3)), of(Err(one.clone())), of(Ok(4))]),
+            Ok(Tally::of(7))
+        );
+        assert_eq!(
+            reference_total(&[of(Err(one.clone())), of(Err(other.clone()))]),
+            Err(one.union(other))
+        );
+    }
+
+    #[test]
+    fn a_reference_that_failed_counts_without_its_bytes() {
+        let failed = earlier(Code::SpecificationInputIncomplete);
+        let trust = ReferenceField::Policy(PolicySlot::Trust);
         let mut inputs = Inputs::new();
-        inputs.policies = Err(unavailable.clone());
+        inputs.failed = vec![(trust.clone(), failed.clone())];
         let (evaluation, admitted) = inputs.run();
-        // The two targets alone are within the bounds, so nothing is proved.
-        for subject in [ArtifactSubject::References, ArtifactSubject::ReferenceBytes] {
-            let cause: Vec<IssueKey> = unavailable.keys().cloned().collect();
-            assert_eq!(waits_on(&evaluation, &capability_unit(subject)), cause);
-        }
-        // The selected reference is still checked from what selection
-        // admitted, and the other policy slots have no unit.
-        assert_eq!(
-            evaluation.status(&reference_unit(ReferenceField::Policy(
-                PolicySlot::ResourceLimits
-            ))),
-            Some(&Status::Evaluated)
-        );
-        assert_eq!(
-            evaluation.status(&reference_unit(ReferenceField::Policy(PolicySlot::Trust))),
-            None
-        );
+        assert_eq!(waits_on(&evaluation, &reference_unit(trust)), keys(&failed));
         assert!(admitted.is_ok());
-        // When the visible targets already exceed the bound, the excess is
-        // proved with the smallest witness.
-        inputs.capability = capability(|limits| limits.max_artifact_references = bound(1));
+        // It still counts, and the others' bytes are an exact total.
+        let references = inputs.references().unwrap();
+        let total = references.iter().flat_map(|each| each.bytes.as_ref());
+        let (count, total) = (references.len() as u64, total.sum::<u64>());
+        inputs.capability = capability(|limits| limits.max_artifact_references = bound(count - 1));
         let (evaluation, _) = inputs.run();
         let key = key_of(&evaluation, &capability_unit(ArtifactSubject::References));
-        assert_eq!(evaluation.limit(&key).unwrap().actual, Actual::AtLeast(2));
+        assert_eq!(evaluation.limit(&key).unwrap().actual, Actual::Exact(count));
+        inputs.capability = capability(|limits| {
+            limits.max_total_reference_canonical_bytes = bound(total - 1);
+        });
+        let (evaluation, _) = inputs.run();
+        let key = key_of(
+            &evaluation,
+            &capability_unit(ArtifactSubject::ReferenceBytes),
+        );
+        assert_eq!(evaluation.limit(&key).unwrap().actual, Actual::Exact(total));
+        inputs.capability = capability(|limits| {
+            limits.max_total_reference_canonical_bytes = bound(total);
+        });
+        assert_eq!(issues(&inputs.run().0), []);
     }
 
     #[test]
@@ -3172,6 +3260,11 @@ mod tests {
             );
         }
         assert!(admitted.is_err());
+        inputs.policies = Err(unselected);
+        let (evaluation, _) = inputs.run();
+        for subject in [ArtifactSubject::References, ArtifactSubject::ReferenceBytes] {
+            assert_eq!(waits_on(&evaluation, &capability_unit(subject)), causes);
+        }
     }
 
     #[test]
@@ -3708,7 +3801,8 @@ mod tests {
         inputs.measures.declarations = Err(declarations.clone());
         inputs.measures.profile_ids = Err(declarations.clone());
         inputs.measures.structural_units = Err(work.clone());
-        inputs.policies = Err(fields.clone());
+        let trust = ReferenceField::Policy(PolicySlot::Trust);
+        inputs.failed = vec![(trust.clone(), fields.clone())];
         let (evaluation, outcome) = inputs.confirm();
         assert_eq!(issues(&evaluation), []);
         assert_eq!(evaluation.status(&comparison()), Some(&Status::Evaluated));
@@ -3738,22 +3832,25 @@ mod tests {
             waits_on(&evaluation, &recheck(PolicySubject::StructuralAnalysis)),
             keys(&work)
         );
-        // The visible targets alone prove no count, so the declaration's
-        // reference rechecks wait as well.
+        // A reference that failed waits alone: the count and the total hold
+        // over the others (D15:1918, 1924; plan 025 decision #342).
+        assert_eq!(
+            waits_on(
+                &evaluation,
+                &artifact_recheck(ArtifactSubject::Reference(trust.clone()))
+            ),
+            keys(&fields)
+        );
         for subject in [ArtifactSubject::References, ArtifactSubject::ReferenceBytes] {
             assert_eq!(
-                waits_on(&evaluation, &artifact_recheck(subject)),
-                keys(&fields)
+                evaluation.status(&artifact_recheck(subject)),
+                Some(&Status::Evaluated)
             );
         }
         // The policy is admitted and compatible, but not confirmed: its
         // diagnostic bounds take over reporting all the same.
         assert_eq!(outcome.diagnostics, Some(ample().diagnostics));
-        let every = root
-            .clone()
-            .union(declarations)
-            .union(work)
-            .union(fields.clone());
+        let every = root.clone().union(declarations).union(work);
         assert_eq!(keys(&outcome.confirmed.unwrap_err()), keys(&every));
         // Without the policy as well, a recheck waits on both.
         let unselected = earlier(Code::NegotiationSpecificationNotAdmitted);
@@ -3765,8 +3862,19 @@ mod tests {
         );
         assert_eq!(
             waits_on(&evaluation, &artifact_recheck(ArtifactSubject::References)),
-            keys(&fields.union(unselected))
+            keys(&unselected)
         );
+        assert_eq!(
+            waits_on(
+                &evaluation,
+                &artifact_recheck(ArtifactSubject::Reference(trust.clone()))
+            ),
+            keys(&fields.clone().union(unselected))
+        );
+        // A reference that failed holds no confirmation back on its own.
+        let mut alone = under(|_| {});
+        alone.failed = vec![(trust, fields)];
+        assert!(alone.confirm().1.confirmed.is_ok());
     }
 
     #[test]

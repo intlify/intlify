@@ -29,7 +29,7 @@ use crate::resolver::evaluation::{
 use crate::resolver::limits::ResolutionLimits;
 use crate::resolver::resource_policy::{
     admit_resource_policy, ArtifactSubject, ConfigurationMeasures, DeclarationReferences,
-    PolicyInvariant, PolicyOutcome, PolicySubject, ReferenceField,
+    PolicyInvariant, PolicyOutcome, PolicySubject, ReferenceField, ReferenceOccurrence,
 };
 use crate::structural::selection::{SelectorInput, StringLengthFact};
 
@@ -61,7 +61,7 @@ pub(super) struct PreparedPolicy {
 /// trusted setup supplies, built before the interval.
 pub(super) struct PolicyInputs<'a> {
     pub(super) resource_limits: &'a PolicyReference,
-    pub(super) references: DeclarationReferences<'a>,
+    pub(super) references: Vec<ReferenceOccurrence>,
     pub(super) measures: ConfigurationMeasures<'a>,
     pub(super) verification: VerificationInput,
 }
@@ -106,7 +106,9 @@ impl PreparedPolicy {
             references: DeclarationReferences {
                 policies: Ok(&declaration.policies),
                 target_profiles: Ok(&declaration.target_profiles),
-            },
+            }
+            .occurrences()
+            .ok()?,
             measures: ConfigurationMeasures {
                 value: Ok(self.analysis.value_counts()),
                 // A prepared configuration is complete: every declaration's
@@ -144,7 +146,7 @@ pub(super) fn resolve(
         capability,
         collection,
         Ok(inputs.resource_limits),
-        (&inputs.references, Some(observer)),
+        (Ok(inputs.references.as_slice()), Some(observer)),
         &inputs.measures,
         &inputs.verification,
     );
