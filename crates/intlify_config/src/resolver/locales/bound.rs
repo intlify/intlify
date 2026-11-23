@@ -19,12 +19,14 @@
 
 use std::collections::BTreeMap;
 
-use crate::model::{FallbackCandidate, NonEmptyMap, TargetDeclaration, TargetId};
+use crate::model::{
+    FallbackCandidate, NonEmptyMap, ProfileDeclaration, TargetDeclaration, TargetId,
+};
 
 use super::super::declaration_observer::{beside, DeclarationObserver};
 use super::super::evaluation::{both, Actual, Admitted, Causes, Check, Evaluation, Found};
 use super::super::limits::{BoundId, ConfirmedPolicy, Group};
-use super::super::tally::{actual, measure, total, within, Tally};
+use super::super::tally::{actual, total, within, Tally};
 use super::{unit, LocaleFields, LocaleInvariant, LocaleSet, LocaleSubject};
 
 const fn locale_bound(name: &'static str) -> BoundId {
@@ -48,92 +50,71 @@ const fn grouping_bound(name: &'static str) -> BoundId {
 const MAX_TARGET_PROFILES: BoundId = grouping_bound("maxTargetProfiles");
 const MAX_TARGET_ID_BYTES: BoundId = grouping_bound("maxTargetIdBytes");
 
-/// Each field's locale spellings as `maxLocaleOccurrences` counts them: an
-/// alias key and its destination, a fallback key and its literal candidates
-/// (not the Intent source-locale marker), and every coverage locale selector
-/// item, though Phase 7 canonicalizes neither a candidate nor a selector.
-fn field_tallies<'f, Target>(
-    fields: &'f LocaleFields<'_, Target>,
-) -> [Result<Tally, &'f Causes>; 7] {
-    [
-        fields
-            .requested_locales
-            .as_ref()
-            .map(|requested| Tally::of(requested.len())),
-        fields
-            .default_requested_locale
-            .as_ref()
-            .map(|_| Tally::of(1)),
-        fields
-            .default_source_locale
-            .as_ref()
-            .map(|source| Tally::of(usize::from(source.is_some()))),
-        fields.locale_negotiation.as_ref().map(|negotiation| {
-            let aliases = Tally::of(
-                negotiation
-                    .and_then(|negotiation| negotiation.aliases.as_option())
-                    .map_or(0, BTreeMap::len),
-            );
-            aliases.plus(aliases)
-        }),
-        fields.message_fallback.as_ref().map(|fallback| {
-            total(
-                fallback
-                    .iter()
-                    .flat_map(|fallback| fallback.values())
-                    .map(|sequence| {
-                        let literals = sequence
-                            .as_slice()
-                            .iter()
-                            .filter(|candidate| matches!(candidate, FallbackCandidate::Locale(_)))
-                            .count();
-                        Tally::of(1).plus(Tally::of(literals))
-                    }),
-            )
-        }),
-        fields.coverage.as_ref().map(|coverage| {
-            total(
-                coverage
-                    .and_then(|coverage| coverage.rules.as_option())
-                    .into_iter()
-                    .flatten()
-                    .map(|rule| Tally::of(rule.requested_locales().map_or(0, <[String]>::len))),
-            )
-        }),
-        fields.target_profiles.as_ref().map(|targets| {
-            total(targets.values().map(|target| {
-                Tally::of(target.requested_locales.as_slice().len()).plus(Tally::of(usize::from(
-                    !target.default_requested_locale.is_absent(),
-                )))
-            }))
-        }),
-    ]
+/// The locale spellings of a declaration structural admission admitted
+/// whole, as `maxLocaleOccurrences` counts them: an alias key and its
+/// destination, a fallback key and its literal candidates (not the Intent
+/// source-locale marker), and every coverage locale selector item, though
+/// Phase 7 canonicalizes neither a candidate nor a selector.
+pub(super) fn declared_spellings<Policy, Target>(
+    declaration: &ProfileDeclaration<Policy, Target>,
+) -> Tally {
+    let aliases = Tally::of(
+        declaration
+            .locale_negotiation
+            .as_option()
+            .and_then(|negotiation| negotiation.aliases.as_option())
+            .map_or(0, BTreeMap::len),
+    );
+    let fallback = declaration
+        .message_fallback
+        .as_option()
+        .into_iter()
+        .flat_map(BTreeMap::values)
+        .map(|sequence| {
+            let literals = sequence
+                .as_slice()
+                .iter()
+                .filter(|candidate| matches!(candidate, FallbackCandidate::Locale(_)))
+                .count();
+            Tally::of(1).plus(Tally::of(literals))
+        });
+    let selectors = declaration
+        .coverage
+        .as_option()
+        .and_then(|coverage| coverage.rules.as_option())
+        .into_iter()
+        .flatten()
+        .map(|rule| Tally::of(rule.requested_locales().map_or(0, <[String]>::len)));
+    let targets = declaration.target_profiles.values().map(|target| {
+        Tally::of(target.requested_locales.as_slice().len()).plus(Tally::of(usize::from(
+            !target.default_requested_locale.is_absent(),
+        )))
+    });
+    total([
+        Tally::of(declaration.requested_locales.as_slice().len()),
+        Tally::of(1),
+        Tally::of(usize::from(!declaration.default_source_locale.is_absent())),
+        aliases.plus(aliases),
+        total(fallback),
+        total(selectors),
+        total(targets),
+    ])
 }
 
-/// The occurrence bound's unit: what the admitted fields prove against
-/// `maxLocaleOccurrences`, and whether canonicalization may run. Past it,
-/// the declaration is observed: it holds every field the bound counts.
+/// The occurrence bound's unit: the spellings against `maxLocaleOccurrences`,
+/// and whether canonicalization may run. Past it, the declaration is observed:
+/// it holds every field the bound counts.
 pub(super) fn occurrences<Target>(
     evaluation: &mut Evaluation,
     policy: Result<&ConfirmedPolicy, &Causes>,
     fields: &LocaleFields<'_, Target>,
     observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<(Option<Actual>, Admitted<()>), LocaleInvariant> {
-    let mut visible = Tally::of(0);
-    let mut unavailable: Option<Causes> = None;
-    for field in field_tallies(fields) {
-        match field {
-            Ok(tally) => visible = visible.plus(tally),
-            Err(causes) => unavailable = Some(join(unavailable, causes)),
-        }
-    }
-    let measured = match policy {
-        Ok(policy) => {
+    let measured =
+        both(policy.map_err(Causes::clone), fields.spellings.clone()).map(|(policy, spellings)| {
             let limit = policy.limits().locale_resolution.max_locale_occurrences;
-            measure(visible, unavailable, limit).map(|actual| (limit, actual))
-        }
-        Err(causes) => Err(join(unavailable, causes)),
-    };
+            (limit, actual(spellings, limit))
+        });
     let total = measured.as_ref().ok().map(|&(_, actual)| actual);
     let observed = beside(policy, observer, |observer| observer.value(&[]))?;
     let bounded = evaluation.check_found(
@@ -145,13 +126,6 @@ pub(super) fn occurrences<Target>(
         },
     )?;
     Ok((total, bounded))
-}
-
-fn join(earlier: Option<Causes>, causes: &Causes) -> Causes {
-    match earlier {
-        Some(earlier) => earlier.union(causes.clone()),
-        None => causes.clone(),
-    }
 }
 
 /// The requested-set bound's unit: the set's canonical size, which a repeated
@@ -467,65 +441,26 @@ mod tests {
         });
     }
 
+    /// A field that failed holds the count back no more: the count is of the
+    /// spellings, which is what it is whatever a field's failure (D15:1896,
+    /// 1907). What it reads is the declaration's own, here beside a field
+    /// the caller marked unavailable.
     #[test]
-    fn an_unavailable_field_leaves_the_bound_unproved_until_the_rest_exceeds_it() {
+    fn a_field_that_failed_leaves_the_bound_measured() {
         let config = complete_config();
         let declaration = declaration(&config, |_| {});
         let mut fields = LocaleFields::declared(&declaration);
-        let coverage = stand_in(Slot::Coverage);
-        // The two coverage selector items are the unseen part: 10 are visible.
-        fields.coverage = Err(coverage.clone());
-        let observed_config = Observed::new(&config);
+        fields.coverage = Err(stand_in(Slot::Coverage));
+        fields.requested_locales = Err(stand_in(Slot::DeliveryGraph));
         let mut evaluation = Evaluation::default();
-        let (total, bounded) = observed_config.app(|observer| {
-            occurrences(
-                &mut evaluation,
-                Ok(&policy(64, 10, 100)),
-                &fields,
-                Some(observer),
-            )
-            .unwrap()
-        });
-        assert_eq!((total, bounded), (None, Err(coverage.clone())));
-        assert_eq!(
-            waits_on(&evaluation, &occurrence_unit()),
-            Some(units(&coverage))
-        );
-
-        // What is visible past the bound is observed at the declaration all
-        // the same.
-        let mut evaluation = Evaluation::default();
-        let confirmed = policy(64, 9, 100);
-        let (total, bounded) = observed_config.app(|observer| {
-            occurrences(&mut evaluation, Ok(&confirmed), &fields, Some(observer)).unwrap()
-        });
-        assert_eq!(total, Some(Actual::AtLeast(10)));
-        assert_eq!(evaluation.issues().count(), 1);
-        let key = evaluation.issues().next().unwrap();
-        assert_eq!(
-            evaluation.limit(key).map(|exceeded| exceeded.actual),
-            Some(Actual::AtLeast(10))
-        );
-        assert_eq!(units(&bounded.unwrap_err()), [occurrence_unit()]);
-        observed_config.app(|observer| {
-            assert_eq!(
-                observed(&evaluation),
-                [(
-                    occurrence_unit(),
-                    beside_policy(observer.value(&[]).unwrap(), &confirmed)
-                )]
-            );
-        });
-
-        // Every unavailable field's causes, together.
-        let requested = stand_in(Slot::DeliveryGraph);
-        fields.requested_locales = Err(requested.clone());
-        let mut evaluation = Evaluation::default();
-        let (_, bounded) =
-            occurrences(&mut evaluation, Ok(&policy(64, 100, 100)), &fields, None).unwrap();
-        assert_eq!(bounded, Err(coverage.union(requested)));
+        let (total, bounded) =
+            occurrences(&mut evaluation, Ok(&policy(64, 12, 100)), &fields, None).unwrap();
+        assert_eq!((total, bounded), (Some(Actual::Exact(12)), Ok(())));
+        assert_eq!(waits_on(&evaluation, &occurrence_unit()), None);
     }
 
+    /// Without a declaration there is nothing to count, and without a policy
+    /// no bound: the unit waits on every cause there is (D15:2131).
     #[test]
     fn an_unconfirmed_policy_leaves_the_bound_not_evaluated_with_every_cause() {
         let declaration = declaration(&minimal_config(), |_| {});
@@ -536,12 +471,19 @@ mod tests {
             occurrences(&mut evaluation, Err(&policy_causes), &fields, None).unwrap();
         assert_eq!((total, bounded), (None, Err(policy_causes.clone())));
 
-        let target = stand_in(Slot::DeliveryPlacement);
-        fields.target_profiles = Err(target.clone());
+        let unselected = stand_in(Slot::DeliveryPlacement);
+        fields.spellings = Err(unselected.clone());
         let mut evaluation = Evaluation::default();
-        let (_, bounded) =
+        let (total, bounded) =
             occurrences(&mut evaluation, Err(&policy_causes), &fields, None).unwrap();
-        assert_eq!(bounded, Err(policy_causes.union(target)));
+        assert_eq!(
+            (total, bounded),
+            (None, Err(policy_causes.union(unselected.clone())))
+        );
+        let mut evaluation = Evaluation::default();
+        let (total, bounded) =
+            occurrences(&mut evaluation, Ok(&policy(64, 100, 100)), &fields, None).unwrap();
+        assert_eq!((total, bounded), (None, Err(unselected)));
     }
 
     /// Past the bound, the project's `requestedLocales` is observed beside

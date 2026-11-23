@@ -505,7 +505,11 @@ mod tests {
     fn an_index_record_owned_by_another_unit_than_the_first_referrer_is_a_resolver_bug() {
         blocked().outcome(None, identity(), |_, _, outcome| {
             let mut entry = outcome.evidence.entry.clone();
-            let index = first(&entry, RecordKind::EvidenceIndex);
+            // The earliest owner: the decision table owns its records last.
+            let index = (0..entry.records.len())
+                .filter(|&at| entry.records[at].1.kind == RecordKind::EvidenceIndex)
+                .min_by_key(|&at| entry.records[at].0)
+                .unwrap();
             let owner = entry.records[index].0;
             let later = entry
                 .records

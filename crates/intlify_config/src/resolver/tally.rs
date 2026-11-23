@@ -2,13 +2,12 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Counts kept with checked arithmetic, and what a count proves against a
-//! bound when part of what it counts may be unavailable. 015 requires checked
-//! unsigned accounting: a count past `u64` is past every bound, and a bound is
-//! never proved from a prefix it does not exceed.
+//! bound. 015 requires checked unsigned accounting: a count past `u64` is past
+//! every bound.
 
 use crate::input_limits::Bound;
 
-use super::evaluation::{Actual, Admitted, Blocking, Causes, LimitExceeded};
+use super::evaluation::{Actual, Blocking, LimitExceeded};
 use super::limits::BoundId;
 
 /// A count kept with checked arithmetic. `None` is a count past `u64`.
@@ -63,18 +62,6 @@ pub(crate) fn first_over(tally: Tally, limit: Bound) -> Actual {
     }
 }
 
-/// What a count proves against `limit` while part of what it counts may be
-/// unavailable: an exact total when nothing is, a witness when what is
-/// visible already exceeds `limit` (the rest can only add), and otherwise
-/// nothing, with the causes of the missing part.
-pub(crate) fn measure(tally: Tally, unavailable: Option<Causes>, limit: Bound) -> Admitted<Actual> {
-    match (actual(tally, limit), unavailable) {
-        (actual, None) => Ok(actual),
-        (Actual::Exact(total), Some(causes)) if total <= limit.get() => Err(causes),
-        (_, Some(_)) => Ok(Actual::AtLeast(limit.get() + 1)),
-    }
-}
-
 /// The bound's issue when `actual` exceeds `limit`.
 pub(crate) fn within(bound: BoundId, limit: Bound, actual: Actual) -> Result<(), Blocking> {
     match actual {
@@ -91,8 +78,6 @@ pub(crate) fn within(bound: BoundId, limit: Bound, actual: Actual) -> Result<(),
 mod tests {
     use super::*;
     use crate::resolver::limits::Group;
-    use crate::resolver::locales::fixtures::stand_in;
-    use crate::resolver::specification::Slot;
 
     const BOUND: BoundId = BoundId {
         group: Group::LocaleResolution,
@@ -136,32 +121,6 @@ mod tests {
         for tally in [Tally(Some(6)), Tally(Some(900)), Tally(None)] {
             assert_eq!(first_over(tally, bound(5)), Actual::AtLeast(6));
         }
-    }
-
-    #[test]
-    fn a_missing_part_is_measured_only_once_what_is_visible_exceeds_the_bound() {
-        let causes = stand_in(Slot::Coverage);
-        assert_eq!(
-            measure(Tally(Some(3)), None, bound(5)),
-            Ok(Actual::Exact(3))
-        );
-        assert_eq!(
-            measure(Tally(Some(9)), None, bound(5)),
-            Ok(Actual::Exact(9))
-        );
-        assert_eq!(
-            measure(Tally(Some(5)), Some(causes.clone()), bound(5)),
-            Err(causes.clone())
-        );
-        assert_eq!(
-            measure(Tally(Some(6)), Some(causes.clone()), bound(5)),
-            Ok(Actual::AtLeast(6))
-        );
-        assert_eq!(
-            measure(Tally(None), Some(causes), bound(5)),
-            Ok(Actual::AtLeast(6))
-        );
-        assert_eq!(measure(Tally(None), None, bound(5)), Ok(Actual::AtLeast(6)));
     }
 
     #[test]
