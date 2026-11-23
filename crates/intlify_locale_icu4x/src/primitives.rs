@@ -117,11 +117,74 @@ impl JsonSchema for LogicalAddress {
     }
 }
 
+/// A measured total: the exact count, or the proof that the count is past
+/// what a `u64` holds, and so past every limit. It never wraps or saturates
+/// (D15:1997).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Measured {
+    Exact(u64),
+    BeyondU64,
+}
+
+impl Measured {
+    pub(crate) const ZERO: Self = Self::Exact(0);
+
+    /// The count of `length` items, which a host may hold past a `u64`.
+    pub(crate) fn of(length: usize) -> Self {
+        u64::try_from(length).map_or(Self::BeyondU64, Self::Exact)
+    }
+
+    /// The total of the two, past a `u64` when either is or their sum is.
+    pub(crate) const fn plus(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Exact(first), Self::Exact(second)) => match first.checked_add(second) {
+                Some(total) => Self::Exact(total),
+                None => Self::BeyondU64,
+            },
+            _ => Self::BeyondU64,
+        }
+    }
+
+    /// Whether the total is past `limit`.
+    pub const fn over(self, limit: u64) -> bool {
+        match self {
+            Self::Exact(total) => total > limit,
+            Self::BeyondU64 => true,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
 
     use super::*;
+
+    /// D15:1997: a total is checked, and one past a `u64` is past every limit
+    /// instead of a wrapped or saturated count.
+    #[test]
+    fn a_measured_total_past_u64_is_past_every_limit() {
+        let most = Measured::Exact(u64::MAX);
+        assert_eq!(Measured::of(7), Measured::Exact(7));
+        assert_eq!(
+            Measured::Exact(2).plus(Measured::Exact(3)),
+            Measured::Exact(5)
+        );
+        assert_eq!(Measured::Exact(u64::MAX - 1).plus(Measured::Exact(1)), most);
+        assert_eq!(most.plus(Measured::Exact(1)), Measured::BeyondU64);
+        assert_eq!(
+            Measured::BeyondU64.plus(Measured::ZERO),
+            Measured::BeyondU64
+        );
+        assert_eq!(
+            Measured::ZERO.plus(Measured::BeyondU64),
+            Measured::BeyondU64
+        );
+        assert!(!Measured::Exact(5).over(5));
+        assert!(Measured::Exact(6).over(5));
+        assert!(!most.over(u64::MAX));
+        assert!(Measured::BeyondU64.over(u64::MAX));
+    }
 
     #[test]
     fn nonempty_text_is_any_string_but_the_empty_one() {
