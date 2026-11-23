@@ -353,7 +353,7 @@ const fn none(check: &'static str, code: Code) -> Pair {
 
 /// Every (check, code) pair of the Check Registry, in its order.
 #[rustfmt::skip]
-const PAIRS: [Pair; 189] = {
+const PAIRS: [Pair; 191] = {
     use Code as C;
     use Shape as S;
     [
@@ -464,6 +464,8 @@ const PAIRS: [Pair; 189] = {
         pair("specification.delivery-placement.supported", C::DeliverySpecificationNotAdmitted, SI, &[], &[S::Slot(Slot::DeliveryPlacement)]),
         pair("specification.vocabulary.intact", C::IntentSurfaceClassVocabularyNotAdmitted, AI, &[], &[S::Root(VOCABULARY), VOCABULARY_MEMBER, REDACTED_VOCABULARY_MEMBER]),
         pair("specification.vocabulary.asserted", C::IntentSurfaceClassVocabularyNotAdmitted, AI, &[SI], &[S::Root(VOCABULARY), S::Slot(Slot::IntentSurfaceClassVocabulary)]),
+        pair("specification.locale-data.within-payloads", C::BootstrapLimitExceeded, AI, &[IC], &[S::Root(LOCALE_DATA), S::Bound("bootstrapOnly.localeData.maxPayloads")]),
+        pair("specification.locale-data.within-payload-bytes", C::BootstrapLimitExceeded, AI, &[IC], &[S::Root(LOCALE_DATA), S::Bound("bootstrapOnly.localeData.maxPayloadBytes")]),
         pair("specification.locale-data.matching", C::LocaleDataNotAdmitted, AI, &[SI], &[S::Root(LOCALE_DATA), S::Slot(Slot::LocaleCanonicalization)]),
         // locale-resolution
         pair("locale.occurrences.within-bound", C::ResourceLimitExceeded, CV, &[AI], &[ADMITTED]),
@@ -1043,7 +1045,7 @@ mod tests {
                 .paths
                 .clone()
         };
-        assert_eq!(paths_of(&bootstrap, IC).len(), 2 + 9 + 4);
+        assert_eq!(paths_of(&bootstrap, IC).len(), 2 + 9 + 4 + 2);
         let limits = row(Code::ResourceLimitExceeded);
         assert_eq!(kinds(&limits), [ES, CV, PS, AI, IC]);
         assert_eq!(origins_of(&limits, ES), CONFIGURATION);
@@ -1095,7 +1097,7 @@ mod tests {
             .map(|shape| serde_json::to_string(shape).unwrap())
             .collect();
         assert_eq!(carried, pinned);
-        assert_eq!(pinned.len(), 83);
+        assert_eq!(pinned.len(), 85);
         assert!(are_reachable(&registry.rows, &registry.policies));
     }
 

@@ -574,6 +574,8 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
         Check::NormalizedDomain => 10,
         Check::CompleteTable => 11,
         Check::SupportedAssertion
+        | Check::WithinDataPayloads
+        | Check::WithinDataPayloadBytes
         | Check::MatchingData
         | Check::IntactArtifact
         | Check::AssertedArtifact

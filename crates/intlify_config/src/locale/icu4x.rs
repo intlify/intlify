@@ -18,15 +18,16 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use intlify_locale_icu4x::{
-    AdmittedData, ConformanceLimits, DecodedManifest, EnvelopeFailure, LayerFailure, ReadFailure,
-    ReadLimits, Role, VerifiedManifest, ENGINE, MARKERS_FORMAT,
+    AdmittedData, ConformanceLimits, DecodedManifest, EnvelopeFailure, LayerFailure, Measured,
+    ReadFailure, ReadLimits, Role, VerifiedManifest, ENGINE, MARKERS_FORMAT,
 };
 
 use crate::input_limits::Bound;
 
 use super::{
-    Admission, AdmissionFacts, DataNotAdmitted, DatasetPin, EnvelopeReason, FormalData,
-    LocaleDataLimits, Provider, ProviderBinding, ProviderFailure, SemanticPins, VersionedIdentity,
+    Admission, AdmissionFacts, DataCount, DataFacts, DataNotAdmitted, DataReading, DatasetPin,
+    EnvelopeReason, FormalData, LocaleDataLimits, Provider, ProviderBinding, ProviderFailure,
+    SemanticPins, VersionedIdentity,
 };
 
 /// One artifact past 015's `locale-canonicalization-data-artifact` boundary:
@@ -70,9 +71,9 @@ impl Icu4xData {
 impl FormalData for Icu4xData {
     type Provider = Icu4xProvider;
 
-    /// The rest of 017's steps under the capability's `localeData` bounds: the
-    /// limits the manifest decides and its integrity, and then each payload
-    /// and the dataset.
+    /// The two counts the manifest decides, and the rest of 017's steps under
+    /// the capability's `localeData` bounds: the limits the manifest decides
+    /// and its integrity, and then each payload and the dataset.
     ///
     /// Nothing is fetched: each payload is the bytes kept at the address the
     /// manifest names, where an acquiring closure, asked for the conformance
@@ -82,16 +83,33 @@ impl FormalData for Icu4xData {
     /// closure's `None` was, so the bounds, the failure, and its Finding stay
     /// the same. The marker blob owns its bytes, so they are copied only once
     /// the manifest is verified.
-    fn admit(&self, limits: &LocaleDataLimits) -> Result<Icu4xProvider, DataNotAdmitted> {
+    fn read(&self, limits: &LocaleDataLimits) -> DataReading<Icu4xProvider> {
+        let facts = DataFacts {
+            payloads: data_count(self.manifest.payload_count()),
+            payload_bytes_over: self.manifest.declares_over(limits.max_payload_bytes.get()),
+        };
         let limits = read_limits(limits);
-        let manifest = self
+        let provider = self
             .manifest
             .clone()
             .verify(&limits)
-            .map_err(|_| DataNotAdmitted)?;
-        let markers = self.markers.as_deref().map(Box::from);
-        Icu4xProvider::from_verified(manifest, (self.conformance.as_deref(), markers), &limits)
-            .map_err(|_| DataNotAdmitted)
+            .and_then(|manifest| {
+                let markers = self.markers.as_deref().map(Box::from);
+                Icu4xProvider::from_verified(
+                    manifest,
+                    (self.conformance.as_deref(), markers),
+                    &limits,
+                )
+            })
+            .map_err(|_| DataNotAdmitted);
+        DataReading { facts, provider }
+    }
+}
+
+const fn data_count(count: Measured) -> DataCount {
+    match count {
+        Measured::Exact(count) => DataCount::Exact(count),
+        Measured::BeyondU64 => DataCount::BeyondU64,
     }
 }
 
@@ -682,6 +700,54 @@ mod tests {
                 Some(DataNotAdmitted),
                 "bound {index}"
             );
+        }
+    }
+
+    #[test]
+    fn a_count_keeps_whether_it_passed_u64() {
+        assert_eq!(data_count(Measured::Exact(7)), DataCount::Exact(7));
+        assert_eq!(data_count(Measured::BeyondU64), DataCount::BeyondU64);
+    }
+
+    /// The two counts the manifest decides are measured whatever stops the
+    /// rest of the read.
+    #[test]
+    fn the_counts_the_manifest_decides_come_beside_the_provider() {
+        let (bytes, depth) = envelope();
+        let data = Icu4xData::read(Some(MANIFEST), &payloads(), bytes, depth).unwrap();
+        let longest = u64::try_from(CONFORMANCE.len().max(MARKERS.len())).unwrap();
+        let bound = |value| Bound::new(value).unwrap();
+        for (limits, over, admitted) in [
+            (
+                LocaleDataLimits {
+                    max_payloads: bound(2),
+                    max_payload_bytes: bound(longest),
+                    ..locale_data()
+                },
+                false,
+                true,
+            ),
+            (
+                LocaleDataLimits {
+                    max_payloads: bound(1),
+                    ..locale_data()
+                },
+                false,
+                false,
+            ),
+            (
+                LocaleDataLimits {
+                    max_payload_bytes: bound(longest - 1),
+                    ..locale_data()
+                },
+                true,
+                false,
+            ),
+        ] {
+            let reading = data.read(&limits);
+            assert_eq!(reading.facts.payloads, DataCount::Exact(2));
+            assert_eq!(reading.facts.payload_bytes_over, over);
+            assert_eq!(reading.provider.is_ok(), admitted);
         }
     }
 

@@ -344,7 +344,8 @@ const INDEPENDENT_SINGLETON_CHECKS = [
   'entry.input.unique-members',
   'entry.input.json-compatible',
   'entry.input.within-single-string-bytes',
-  'resource-policy.root-longest-string.within-bound'
+  'resource-policy.root-longest-string.within-bound',
+  'specification.locale-data.within-payload-bytes'
 ]
 
 /**
@@ -1306,7 +1307,7 @@ const role = (name, rank) => ({ role: name, rank: String(rank) })
  * root and members, each member with an admitted key and then a redacted
  * one; the verification input's `pins`; and every `policyComparable` bound
  * with the `bootstrapOnly` bounds of `rawInput`, `snapshot`, and
- * `artifactBootstrap`.
+ * `artifactBootstrap` and the two of `localeData` the manifest decides.
  * The `diagnostics` groups share one parent role, ranked where the first of
  * them stands.
  *
@@ -1350,14 +1351,21 @@ function reachablePaths(kind) {
         }))
       })
       const bootstrap = BOOTSTRAP_GROUPS.flatMap(([path, bounds], group) =>
-        ['rawInput', 'snapshot', 'artifactBootstrap'].includes(path)
+        ['rawInput', 'snapshot', 'artifactBootstrap', 'localeData'].includes(path)
           ? bounds.map(([name], rank) => ({
               origin,
               roles: [role('bootstrapOnly', 1), role(path, group), role(name, rank)]
             }))
           : []
       )
-      return [...comparable, ...bootstrap]
+      return [
+        ...comparable,
+        ...bootstrap.filter(
+          ({ roles }) =>
+            roles[1].role !== 'localeData' ||
+            ['maxPayloads', 'maxPayloadBytes'].includes(roles[2].role)
+        )
+      ]
     }
     default:
       return []

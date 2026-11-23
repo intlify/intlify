@@ -628,7 +628,13 @@ impl SubjectKind {
             | Self::GroupMembers
             | Self::Relations => &[Check::WithinBound],
             Self::Vocabulary => &[Check::IntactArtifact, Check::AssertedArtifact],
-            Self::CanonicalizationData => &[Check::MatchingData],
+            // A `localeData` bound is its own check, before the work it
+            // protects (D15:2008, 2356).
+            Self::CanonicalizationData => &[
+                Check::WithinDataPayloads,
+                Check::WithinDataPayloadBytes,
+                Check::MatchingData,
+            ],
             Self::DeclarationField => &[Check::OpaqueIdentity],
             Self::RequestedLocale | Self::TargetRequestedLocale => {
                 &[Check::CanonicalLocale, Check::UniqueLocale]

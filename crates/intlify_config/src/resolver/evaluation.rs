@@ -257,7 +257,13 @@ pub(crate) enum Check {
     FieldValue,
     /// The object at the path has no member the schema does not declare.
     KnownField,
-    /// The data is the dataset the admitted specification admits.
+    /// The data's payload entries stay within `localeData.maxPayloads`.
+    WithinDataPayloads,
+    /// Each payload's declared length stays within
+    /// `localeData.maxPayloadBytes`.
+    WithinDataPayloadBytes,
+    /// The rest of the data reads, and it is the dataset the admitted
+    /// specification admits.
     MatchingData,
     /// The artifact's integrity holds and its members are valid, unique, and
     /// sorted.
