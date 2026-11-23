@@ -1780,8 +1780,9 @@ mod tests {
         let limits = structural();
         let mut evaluation = Evaluation::default();
         let schema = Schema::for_model().unwrap();
-        let analysis =
-            admit_structure(&mut evaluation, entry, document, &schema, limits, Ok(())).unwrap();
+        let analysis = admit_structure(&mut evaluation, entry, document, &schema, limits, Ok(()))
+            .unwrap()
+            .analysis;
         let input = SelectorInput::string(selector, limits.max_profile_id_bytes);
         // What Phase 3 selects is beside the point: only its Findings are.
         let _ = select_profile(

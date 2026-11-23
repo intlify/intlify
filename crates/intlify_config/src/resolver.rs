@@ -17,6 +17,7 @@ pub(crate) mod capability;
 pub(crate) mod coverage;
 pub(crate) mod decision_evidence;
 pub(crate) mod declaration_fields;
+pub(crate) mod declaration_fragments;
 pub(crate) mod declaration_observer;
 pub(crate) mod delivery;
 pub(crate) mod dependency;
@@ -63,6 +64,7 @@ pub(crate) mod subject;
 pub(crate) mod tally;
 pub(crate) mod targets;
 pub(crate) mod token;
+pub(crate) mod value_admissions;
 pub(crate) mod vocabulary;
 
 #[cfg(test)]

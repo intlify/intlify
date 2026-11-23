@@ -19,10 +19,12 @@
 //! selected once structural admission admitted its boundary and its
 //! `resourceLimits` reference, whatever else of it or of the root it rejected
 //! (D15:2131, 2367, 3434; plan 025 interpretation #218), and read each of its
-//! fields on its own ([`super::declaration_fields`]): a field structural
-//! admission did not admit holds back only the checks that read it, with its
-//! Findings as their causes (D15:3340), for now the whole field even where
-//! the failure is in one of its entries (plan 025 interpretation #219).
+//! fields on its own ([`super::declaration_fields`]), from what each
+//! candidate left at its value ([`super::value_admissions`]): a field
+//! structural admission did not admit holds back only the checks that read
+//! it, with its Findings as their causes (D15:3340), for now the whole field
+//! even where the failure is in one of its entries (plan 025 interpretation
+//! #219).
 //! Without a selection, each check that reads the declaration, or the Policy
 //! its reference selects, is not evaluated with what held the selection back,
 //! while Phase 4 still checks the collection under the capability (D15:2131,
@@ -97,8 +99,11 @@ use super::specification::{
     admit_project_profile, admit_specifications, SpecificationInput, SpecificationInvariant,
     SpecificationSet, SupportedSpecifications,
 };
-use super::structural_admission::{admit_structure, whole, StructuralInvariant};
+use super::structural_admission::{
+    admit_structure, whole, StructuralAdmission, StructuralInvariant,
+};
 use super::targets::{resolve_targets, ResolvedTargets, TargetInvariant};
+use super::value_admissions::ValueAdmissions;
 use super::vocabulary::SurfaceVocabulary;
 
 type Analysis = StructuralAnalysis<PolicyReference, TargetProfileReference>;
@@ -133,21 +138,21 @@ pub(crate) struct SelectedConfiguration<'a> {
 impl<'a> SelectedConfiguration<'a> {
     /// The configuration of `analysis`, which `entry` holds, once Phase 3
     /// provisionally selected one of its declarations, `selection`, with
-    /// `selector`, each field as `evaluation` recorded structural admission's
-    /// checks under it, observed in the entry (D15:790). `whole` is whether
-    /// structural admission admitted the whole root.
+    /// `selector`, each field as `values` holds what structural admission's
+    /// candidates left at and below it, observed in the entry (D15:790).
+    /// `whole` is whether structural admission admitted the whole root.
     ///
     /// # Errors
     ///
     /// Returns the resolver bug of checks that admit a field the analysis
     /// does not.
     pub(crate) fn new(
-        evaluation: &Evaluation,
+        values: &ValueAdmissions,
         (analysis, entry): (&'a Analysis, &'a dyn ConfigurationEntry),
         (selector, selection): (&'a SelectorInput, &'a ProvisionalSelection<PolicyReference>),
         whole: Admitted<()>,
     ) -> Result<Self, ResolverInvariant> {
-        let fields = DeclarationFields::read(evaluation, analysis, selection.id().as_str())
+        let fields = DeclarationFields::read(values, analysis, selection.id().as_str())
             .map_err(ResolverInvariant::Structural)?;
         let declarations = analysis
             .declarations()
@@ -894,7 +899,10 @@ where
     P::Identity: AsRef<str>,
     D: FormalData<Provider = P>,
 {
-    let structure = admit_structure(
+    let StructuralAdmission {
+        analysis: structure,
+        values,
+    } = admit_structure(
         evaluation,
         entry,
         document,
@@ -918,7 +926,7 @@ where
     let root = whole(evaluation);
     let configuration = match (&structure, &selection) {
         (Ok(analysis), Ok(selection)) => {
-            SelectedConfiguration::new(evaluation, (analysis, entry), (selector, selection), root)?
+            SelectedConfiguration::new(&values, (analysis, entry), (selector, selection), root)?
         }
         (_, Err(causes)) => {
             SelectedConfiguration::unselected(structure.as_ref().ok(), (selector, causes), root)?
@@ -1638,7 +1646,7 @@ pub(super) mod tests {
                 panic!("{} is not selected", self.selected);
             };
             let configuration = SelectedConfiguration::new(
-                &Evaluation::default(),
+                &ValueAdmissions::default(),
                 (&analysis, &file),
                 (&selector, &selection),
                 Ok(()),
@@ -3818,7 +3826,7 @@ pub(super) mod tests {
         let configuration = |config: &Value, analysis| {
             let file = fixture.file(entry_input(config, &capability).0);
             SelectedConfiguration::new(
-                &Evaluation::default(),
+                &ValueAdmissions::default(),
                 (analysis, &file),
                 (&selector, &selection),
                 Ok(()),

@@ -296,6 +296,13 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
     pub(crate) fn profiles_value(&self) -> Option<(&MaterializedDocument, NodeId)> {
         self.profiles.map(|value| (&*self.doc, value))
     }
+    /// The materialized document and the value of the declaration `id` in
+    /// it, where a later phase finds what structural admission left at each
+    /// of its values. None without that declaration, or under a key without
+    /// the identifier syntax (D15:2184).
+    pub(crate) fn declaration_value(&self, id: &str) -> Option<(&MaterializedDocument, NodeId)> {
+        self.profile_node(id).map(|value| (&*self.doc, value))
+    }
     /// The materialized root's value counts, which Phase 4 rechecks.
     pub(crate) fn value_counts(&self) -> ValueCounts {
         self.doc.value_counts()

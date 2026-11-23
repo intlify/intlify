@@ -48,7 +48,9 @@
 //! ([`profile_keys`]), whatever else of it or of the root they rejected
 //! (D15:2131, 2184, 2363; plan 025 interpretation #218). Profile projection
 //! needs a complete `IntlifyConfig`, the whole root ([`whole`]) (D15:2142,
-//! 2367).
+//! 2367). The semantic phases read the selected declaration from what each
+//! candidate left at its value ([`ValueAdmissions`]), since a unit keyed by a
+//! path with `*` cannot tell its elements apart (D15:2184, 2367, 3340).
 
 use std::cell::OnceCell;
 use std::collections::BTreeMap;
@@ -73,6 +75,7 @@ use super::evaluation::{
 use super::evidence::{EvidenceInvariant, EvidenceProjection};
 use super::evidence_component::{ComponentInvariant, ComponentPath};
 use super::limits::{BoundId, Group};
+use super::value_admissions::ValueAdmissions;
 
 /// The unit that owns the materialized dependency records.
 pub(crate) const OWNER: Unit = Unit {
@@ -140,20 +143,6 @@ impl StructuralSubject {
         match profile {
             EntryKey::Identity(id) => Some(id),
             EntryKey::Content(_) => None,
-        }
-    }
-
-    /// Whether the subject lies under the declaration's field `name`: a field
-    /// whose path starts at it, or a key or field of an entry of the map it
-    /// names.
-    fn under(&self, name: &str) -> bool {
-        match self {
-            Self::ProfileField(_, field) => {
-                field.path.first().is_some_and(|first| &**first == name)
-            }
-            Self::TargetProfileKey(..) | Self::TargetField(..) => name == "targetProfiles",
-            Self::DeploymentGroupKey(..) | Self::GroupField(..) => name == "deploymentGroups",
-            Self::RootField(_) | Self::ProfileKey(_) => false,
         }
     }
 
@@ -252,19 +241,6 @@ pub(crate) fn selectable(evaluation: &Evaluation, id: &str) -> Admitted<()> {
     })
 }
 
-/// Whether structural admission admitted the field `name` of the declaration
-/// `id`: every unit under the field evaluated without a blocking result, its
-/// own checks and those of the values below it, the keys and fields of the
-/// entries of `targetProfiles` and `deploymentGroups` included. Otherwise the
-/// causes. A field's failure suppresses only what reads that field
-/// (D15:2367, 3340).
-pub(crate) fn field(evaluation: &Evaluation, id: &str, name: &str) -> Admitted<()> {
-    evaluation.admitted_within(|unit| match &unit.subject {
-        Subject::Structural(subject) => subject.declaration() == Some(id) && subject.under(name),
-        _ => false,
-    })
-}
-
 /// Whether structural admission admitted the whole root, which a complete
 /// `IntlifyConfig` and so a profile projection need: every structural check
 /// evaluated without a blocking result. Otherwise the causes: every blocking
@@ -359,12 +335,19 @@ impl From<EvaluationInvariant> for StructuralInvariant {
     }
 }
 
+/// What Phase 2 leaves: the analysis, or the causes of its absence, and what
+/// each of its candidates left at its value.
+pub(crate) struct StructuralAdmission<Policy, Target> {
+    pub(crate) analysis: Admitted<StructuralAnalysis<Policy, Target>>,
+    pub(crate) values: ValueAdmissions,
+}
+
 /// Phase 2 over `document`, the value Phase 1 admitted, with `schema`, the
 /// configuration schema construction admitted, under `limits`: the analysis
 /// when the selection selected `schema` and the analysis stayed within the
-/// capability's bound, or the causes of its absence. `project_profile` is
-/// what Phase 0 admitted, which the `profileSpecification` group's owner
-/// waits on.
+/// capability's bound, or the causes of its absence, beside what each
+/// candidate left at its value. `project_profile` is what Phase 0 admitted,
+/// which the `profileSpecification` group's owner waits on.
 ///
 /// # Errors
 ///
@@ -376,7 +359,7 @@ pub(crate) fn admit_structure<Policy, Target>(
     schema: &AuthoringSchema<Policy, Target>,
     limits: StructuralLimits,
     project_profile: Admitted<()>,
-) -> Result<Admitted<StructuralAnalysis<Policy, Target>>, StructuralInvariant> {
+) -> Result<StructuralAdmission<Policy, Target>, StructuralInvariant> {
     // The owner records the materialized dependencies, and nothing waits on
     // it.
     let _: Admitted<()> = evaluation.check(OWNER, Ok(()), |()| Ok::<(), Blocking>(()))?;
@@ -433,9 +416,10 @@ pub(crate) fn admit_structure<Policy, Target>(
     }
     // An analysis past the capability stopped before its candidates, which
     // alone name the scope levels' subjects.
-    if let Some(facts) = analysis.facts() {
-        scope_levels(evaluation, (&analysis, &observer), facts, &within)?;
-    }
+    let values = match analysis.facts() {
+        Some(facts) => scope_levels(evaluation, (&analysis, &observer), facts, &within)?,
+        None => ValueAdmissions::default(),
+    };
     // The assertion Phase 0 admitted never selects structure: only the owner
     // of the group it establishes waits on it.
     own(
@@ -443,19 +427,24 @@ pub(crate) fn admit_structure<Policy, Target>(
         SemanticGroup::ProfileSpecification,
         project_profile,
     )?;
-    Ok(within.map(|()| analysis))
+    Ok(StructuralAdmission {
+        analysis: within.map(|()| analysis),
+        values,
+    })
 }
 
 /// Records each candidate the analysis found as one candidate of the unit
 /// over its subject at its scope level. A candidate waits on the result of
 /// the type check it needs, and the root's own type check on `measured`, the
-/// analysis's measure (D15:2149, 2184).
+/// analysis's measure (D15:2149, 2184). Returns what each candidate that did
+/// not pass left at its value.
 fn scope_levels<Policy, Target>(
     evaluation: &mut Evaluation,
     (analysis, observer): (&StructuralAnalysis<Policy, Target>, &Observer<'_, '_>),
     facts: &Facts,
     measured: &Admitted<()>,
-) -> Result<(), StructuralInvariant> {
+) -> Result<ValueAdmissions, StructuralInvariant> {
+    let mut values = ValueAdmissions::default();
     let mut paths: BTreeMap<Option<FieldPathId>, Arc<[Box<str>]>> = BTreeMap::new();
     let mut scopes: BTreeMap<ScopeId, Vec<EntryKey>> = BTreeMap::new();
     let mut typed: BTreeMap<CandidateId, Admitted<()>> = BTreeMap::new();
@@ -516,11 +505,14 @@ fn scope_levels<Policy, Target>(
             // The value's failed type check is what it needs.
             Outcome::Excluded => unreachable!("an excluded value's type check failed"),
         })?;
+        if let Err(causes) = &result {
+            values.reject(facts, candidate, causes);
+        }
         if candidate.check == facts::Check::Type {
             typed.insert(id, result);
         }
     }
-    Ok(())
+    Ok(values)
 }
 
 /// The keys of the entries that hold `scope`, the outermost first: none for
@@ -845,8 +837,8 @@ mod tests {
     use crate::structural::{AuthoringSchema, StructuralLimits};
 
     use super::{
-        admit_structure, selectable, selection, whole, EntryKey, Field, StructuralInvariant,
-        StructuralSubject, CAPABILITY, OWNER,
+        admit_structure, selectable, selection, whole, EntryKey, Field, StructuralAdmission,
+        StructuralInvariant, StructuralSubject, CAPABILITY, OWNER,
     };
 
     use StructuralSubject as S;
@@ -886,7 +878,7 @@ mod tests {
         let bytes: Arc<[u8]> = Arc::from(serde_json::to_vec(value).unwrap());
         let document = materialize_file(Arc::clone(&bytes), limits()).unwrap();
         let fixture = FileFixture::new(&fixture_limits(100));
-        let analysis = admit_structure(
+        let StructuralAdmission { analysis, .. } = admit_structure(
             &mut evaluation,
             &fixture.file(bytes),
             document,
@@ -1761,7 +1753,7 @@ mod tests {
                     ))
                 );
             } else {
-                assert!(result.unwrap().is_ok());
+                assert!(result.unwrap().analysis.is_ok());
             }
         }
     }
