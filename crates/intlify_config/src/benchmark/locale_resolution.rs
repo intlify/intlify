@@ -741,7 +741,8 @@ fn aliases(frame: &mut Frame, aliases: &[AliasLocales]) -> Result<(), OutputFail
     frame.uint(count(aliases.len())?);
     for alias in aliases {
         admitted(frame, &alias.key.locale, locale)?;
-        admitted(frame, &alias.value.locale, locale)?;
+        let destination = alias.destination().cloned().map_err(Causes::clone);
+        admitted(frame, &destination, locale)?;
     }
     Ok(())
 }

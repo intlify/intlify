@@ -81,8 +81,9 @@ impl<Id> NegotiationProfile<Id> {
 /// Phase 8's negotiation checks over what Phase 7 resolved, observed through
 /// `observer` when the declaration's file is there; the caller hands it what
 /// Phase 5 bound. Every unit waits on the alias bound, which counts each
-/// submitted entry before any collision is looked for; the profile exists
-/// only when every unit passed.
+/// submitted entry, whatever its destination, before any collision is looked
+/// for (D15:1898); the profile exists only when every unit passed and every
+/// entry, and all else under `localeNegotiation`, was admitted (D15:2418).
 pub(crate) fn resolve_negotiation<Id: Clone>(
     evaluation: &mut Evaluation,
     policy: Result<&ConfirmedPolicy, &Causes>,
@@ -130,16 +131,19 @@ pub(crate) fn resolve_negotiation<Id: Clone>(
         )?;
         checked = both(checked, member).map(|((), ())| ());
     }
-    let mut map = Ok(BTreeMap::new());
+    // Built from every entry: one without a destination leaves no profile.
+    let mut map = locales
+        .negotiation_structure
+        .clone()
+        .map(|()| BTreeMap::new());
     for alias in entries {
-        map = both(
-            map,
-            both(alias.key.locale.clone(), alias.value.locale.clone()),
-        )
-        .map(|(mut map, (key, value))| {
-            map.insert(key, value);
-            map
-        });
+        let destination = alias.destination().cloned().map_err(Causes::clone);
+        map = both(map, both(alias.key.locale.clone(), destination)).map(
+            |(mut map, (key, value))| {
+                map.insert(key, value);
+                map
+            },
+        );
     }
     Ok(
         both(both(specification.clone(), checked), map).map(|((specification, ()), aliases)| {
@@ -177,7 +181,7 @@ fn unique(
     let reason = if sharing.len() == 1 {
         Ok(None)
     } else {
-        duplicate(sharing.iter().map(|(_, alias)| &alias.value.locale)).map(Some)
+        duplicate(sharing.iter().map(|(_, alias)| alias.destination())).map(Some)
     };
     // Only a key two entries name is found, at each of them.
     let keys = match observer {
@@ -204,7 +208,7 @@ fn unique(
 /// destinations that differ prove a conflict whatever the others are; the
 /// same destination needs every one admitted, and is otherwise unproved.
 fn duplicate<'a>(
-    destinations: impl Iterator<Item = &'a Admitted<CanonicalLocale>>,
+    destinations: impl Iterator<Item = Result<&'a CanonicalLocale, &'a Causes>>,
 ) -> Admitted<Reason> {
     let mut seen: Option<&CanonicalLocale> = None;
     let mut unavailable: Option<Causes> = None;
@@ -227,17 +231,20 @@ fn duplicate<'a>(
 
 /// The destinations by their subject under their key's subject, each with
 /// the ranks of the entries naming it: entries whose keys and destinations
-/// share their subjects are one unit, each entry one occurrence of it.
+/// share their subjects are one unit, each entry one occurrence of it. A
+/// destination without a spelling names no subject (D15:1477, 2367).
 fn destinations(
     entries: &[AliasLocales],
 ) -> BTreeMap<(&LocaleKey, &LocaleKey), (&Spelled, Vec<usize>)> {
     let mut destinations: BTreeMap<_, (_, Vec<_>)> = BTreeMap::new();
     for (rank, alias) in entries.iter().enumerate() {
-        destinations
-            .entry((&alias.key.key, &alias.value.key))
-            .or_insert_with(|| (&alias.value, Vec::new()))
-            .1
-            .push(rank);
+        if let Ok(value) = &alias.value {
+            destinations
+                .entry((&alias.key.key, &value.key))
+                .or_insert_with(|| (value, Vec::new()))
+                .1
+                .push(rank);
+        }
     }
     destinations
 }
@@ -310,7 +317,9 @@ mod tests {
         canonical, canonicalizer, content, declaration, key, limits, rejected, stand_in, target,
         units, waits_on, Declaration,
     };
-    use crate::resolver::locales::{self, resolve_locales, LocaleFields, LocaleSubject};
+    use crate::resolver::locales::{
+        self, resolve_locales, AliasFields, LocaleFields, LocaleSubject,
+    };
     use crate::resolver::specification::Slot;
 
     type Id = &'static str;
@@ -625,8 +634,9 @@ mod tests {
         let other = stand_in(Slot::DeliveryGraph);
         let (de, fr) = (Ok(canonical("de")), Ok(canonical("fr")));
         let unavailable = Err(missing.clone());
-        let reason =
-            |destinations: &[&Admitted<CanonicalLocale>]| duplicate(destinations.iter().copied());
+        let reason = |destinations: &[&Admitted<CanonicalLocale>]| {
+            duplicate(destinations.iter().map(|destination| destination.as_ref()))
+        };
         assert_eq!(reason(&[&de, &de]), Ok(Reason::SameDestination));
         assert_eq!(reason(&[&de, &fr]), Ok(Reason::ConflictingDestination));
         // Two that differ prove a conflict wherever the unavailable one is.
@@ -817,13 +827,111 @@ mod tests {
         // A field structural admission left unavailable has nothing to count.
         let mut fields = LocaleFields::declared(&declaration);
         let rejected = stand_in(Slot::DeliveryGraph);
-        fields.locale_negotiation = Err(rejected.clone());
+        fields.negotiation_aliases = Err(rejected.clone());
         let resolved = resolve_fields(&fields, Ok(&confirmed), &Ok(SPECIFICATION), None);
         assert_eq!(
             statuses(&resolved.evaluation),
             [(bound_unit(), Status::NotEvaluated(rejected.clone()))]
         );
         assert_eq!(resolved.profile, Err(rejected));
+    }
+
+    /// Phases 7 and 8 over `declaration` with `edit` applied to its alias
+    /// fields, observed in it, under an alias bound of `aliases`.
+    fn resolve_edited(
+        declaration: &Declaration,
+        aliases: u64,
+        edit: impl FnOnce(&mut AliasFields<'_>),
+    ) -> Resolved {
+        let mut fields = LocaleFields::declared(declaration);
+        edit(fields.negotiation_aliases.as_mut().unwrap());
+        Observed::declaration(declaration).app(|observer| {
+            resolve_fields(
+                &fields,
+                Ok(&policy(aliases)),
+                &Ok(SPECIFICATION),
+                Some(observer),
+            )
+        })
+    }
+
+    /// A destination that failed counts under the bound, which is measured
+    /// exactly, and names no subject, while the entry beside it is found
+    /// outside the requested locales at its own rank (D15:1477, 1898, 2367).
+    #[test]
+    fn a_failed_destination_counts_and_holds_back_only_itself() {
+        let declaration = declared(&["en"], json!({"de": "en", "fr": "ja"}));
+        let failed = stand_in(Slot::DeliveryGraph);
+        let edit = |fields: &mut AliasFields<'_>| fields.entries[0].value = Err(failed.clone());
+        let over = resolve_edited(&declaration, 1, edit);
+        let found = over.evaluation.issues().last().unwrap();
+        assert_eq!(
+            over.evaluation.limit(found),
+            Some(LimitExceeded {
+                bound: MAX_NEGOTIATION_ALIASES,
+                limit: Bound::new(1).unwrap(),
+                actual: Actual::Exact(2),
+            })
+        );
+        let resolved = resolve_edited(&declaration, 2, edit);
+        let outside = destination_unit(key("fr"), key("ja"));
+        assert_eq!(
+            issues(&resolved.evaluation),
+            [(
+                outside.clone(),
+                "project-profile-negotiation-alias-destination-not-requested",
+                None
+            )]
+        );
+        let (primary, requested) = at(&declaration, |observer| {
+            (
+                observer.ranked_value(&ALIASES, 1).unwrap(),
+                observer.value(&["requestedLocales"]).unwrap(),
+            )
+        });
+        assert_eq!(
+            observed(&resolved.evaluation),
+            [(
+                outside.clone(),
+                Observation {
+                    primary,
+                    related: vec![requested],
+                }
+            )]
+        );
+        assert_eq!(
+            statuses(&resolved.evaluation)
+                .into_iter()
+                .map(|(unit, _)| unit)
+                .collect::<Vec<_>>(),
+            [
+                bound_unit(),
+                key_unit(key("de")),
+                key_unit(key("fr")),
+                outside.clone(),
+            ]
+        );
+        let waits = resolved.profile.unwrap_err();
+        assert!(units(&waits).contains(&outside));
+        assert!(units(&failed)
+            .iter()
+            .all(|unit| units(&waits).contains(unit)));
+    }
+
+    /// Every unit passes under a `localeNegotiation` with a failure beside
+    /// its aliases, and only the profile, which needs all of it, waits on it.
+    #[test]
+    fn a_failure_beside_the_aliases_holds_back_only_the_profile() {
+        let declaration = declared(&["en", "fr-FR"], json!({"fr": "fr-FR"}));
+        let failed = stand_in(Slot::DeliveryGraph);
+        let resolved = resolve_edited(&declaration, 100, |fields| {
+            fields.whole = Err(failed.clone());
+        });
+        assert!(statuses(&resolved.evaluation)
+            .iter()
+            .all(|(_, status)| *status == Status::Evaluated));
+        assert_eq!(issues(&resolved.evaluation), []);
+        assert_eq!(resolved.profile, Err(failed));
     }
 
     #[test]

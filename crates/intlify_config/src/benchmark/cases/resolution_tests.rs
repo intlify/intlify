@@ -360,7 +360,12 @@ fn every_role_hands_each_locale_policy_input_to_phase_8_which_resolves_each_poli
         .as_ref()
         .unwrap()
         .iter()
-        .map(|alias| (canonical(&alias.key.locale), canonical(&alias.value.locale)))
+        .map(|alias| {
+            (
+                canonical(&alias.key.locale),
+                alias.destination().unwrap().as_str(),
+            )
+        })
         .collect::<Vec<_>>();
     assert_eq!(aliases, [("en-US", "en"), ("fr", "en")]);
     // Phase 7 spells the fallback keys; their sequences are Phase 8's.
