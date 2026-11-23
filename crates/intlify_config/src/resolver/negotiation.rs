@@ -347,7 +347,7 @@ mod tests {
     /// through `observer` when there is one, then Phase 8's negotiation under
     /// `policy` and `specification`, into one evaluation.
     fn resolve_fields(
-        fields: &LocaleFields<'_, crate::fixtures::FixtureTargetReference>,
+        fields: &LocaleFields<'_>,
         policy: Result<&ConfirmedPolicy, &Causes>,
         specification: &Admitted<VersionedIdentity<Id>>,
         observer: Option<&DeclarationObserver<'_>>,

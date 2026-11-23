@@ -19,15 +19,13 @@
 
 use std::collections::BTreeMap;
 
-use crate::model::{
-    FallbackCandidate, NonEmptyMap, ProfileDeclaration, TargetDeclaration, TargetId,
-};
+use crate::model::{FallbackCandidate, ProfileDeclaration, TargetId};
 
 use super::super::declaration_observer::{beside, DeclarationObserver};
 use super::super::evaluation::{both, Actual, Admitted, Causes, Check, Evaluation, Found};
 use super::super::limits::{BoundId, ConfirmedPolicy, Group};
 use super::super::tally::{actual, total, within, Tally};
-use super::{unit, KnownSet, LocaleFields, LocaleInvariant, LocaleSubject};
+use super::{unit, KnownSet, LocaleFields, LocaleInvariant, LocaleSubject, TargetMapFields};
 
 const fn locale_bound(name: &'static str) -> BoundId {
     BoundId {
@@ -104,10 +102,10 @@ pub(super) fn declared_spellings<Policy, Target>(
 /// The occurrence bound's unit: the spellings against `maxLocaleOccurrences`,
 /// and whether canonicalization may run. Past it, the declaration is observed:
 /// it holds every field the bound counts.
-pub(super) fn occurrences<Target>(
+pub(super) fn occurrences(
     evaluation: &mut Evaluation,
     policy: Result<&ConfirmedPolicy, &Causes>,
-    fields: &LocaleFields<'_, Target>,
+    fields: &LocaleFields<'_>,
     observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<(Option<Actual>, Admitted<()>), LocaleInvariant> {
     let measured =
@@ -169,35 +167,45 @@ pub(super) struct TargetBounds {
 }
 
 /// The target bounds' units: the Target ID map within `maxTargetProfiles`,
-/// which every per-target check waits on, and then each Target ID key within
-/// `maxTargetIdBytes`, which every other check of that target waits on. Past
-/// a bound, the map is observed, or the Target ID at its key, which is
-/// classified by facts fixed when the record is constructed (D15:776).
-pub(super) fn targets<Target>(
+/// every entry counted whatever its key, or waiting on why the map has no
+/// entry to count (D15:1171, 1930), and then each admitted Target ID key
+/// within `maxTargetIdBytes`, which every other check of that target waits
+/// on. Past a bound, the map is observed, or the Target ID at its key, which
+/// is classified by facts fixed when the record is constructed (D15:776).
+pub(super) fn targets(
     evaluation: &mut Evaluation,
     confirmed: Result<&ConfirmedPolicy, &Causes>,
-    targets: &NonEmptyMap<TargetId, TargetDeclaration<Target>>,
+    targets: &Admitted<TargetMapFields<'_>>,
     observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<TargetBounds, LocaleInvariant> {
     let policy = confirmed.map_err(Causes::clone);
-    let observed = beside(confirmed, observer, |observer| {
-        observer.value(&["targetProfiles"])
-    })?;
+    // The map is there to observe once it has entries to count.
+    let observed = match targets {
+        Ok(_) => beside(confirmed, observer, |observer| {
+            observer.value(&["targetProfiles"])
+        })?,
+        Err(_) => None,
+    };
+    let submitted = targets
+        .as_ref()
+        .map(|targets| targets.submitted)
+        .map_err(Causes::clone);
     let bounded = evaluation.check_found(
         unit(LocaleSubject::TargetProfiles, Check::WithinBound),
-        policy.clone(),
-        |policy| {
+        both(policy.clone(), submitted),
+        |(policy, submitted)| {
             let limit = policy.limits().target_grouping.max_target_profiles;
             within(
                 MAX_TARGET_PROFILES,
                 limit,
-                actual(Tally::of(targets.len()), limit),
+                actual(Tally::of(submitted), limit),
             )
             .map_err(|blocking| Found::through(blocking, observed))
         },
     )?;
     let mut admitted = BTreeMap::new();
-    for (id, _) in targets.iter() {
+    let entries = targets.iter().flat_map(|targets| &targets.entries);
+    for id in entries.map(|entry| entry.id) {
         let observed = beside(confirmed, observer, |observer| {
             observer.member_key(&["targetProfiles"], id.as_str())
         })?;
@@ -623,7 +631,7 @@ mod tests {
         // `browser` is seven bytes and `server` six.
         let config = complete_config();
         let declaration = declaration(&config, |_| {});
-        let declared = &declaration.target_profiles;
+        let declared = &Ok(TargetMapFields::declared(&declaration.target_profiles));
         let observed_config = Observed::new(&config);
         let mut evaluation = Evaluation::default();
         let bounds = observed_config.app(|observer| {
@@ -726,7 +734,7 @@ mod tests {
         let bounds = targets(
             &mut evaluation,
             Err(&unconfirmed),
-            &declaration.target_profiles,
+            &Ok(TargetMapFields::declared(&declaration.target_profiles)),
             None,
         )
         .unwrap();

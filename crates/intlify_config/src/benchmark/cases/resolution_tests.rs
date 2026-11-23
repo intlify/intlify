@@ -380,7 +380,7 @@ fn every_role_hands_each_locale_policy_input_to_phase_8_which_resolves_each_poli
         .map(|target| {
             (
                 target.id.as_str(),
-                names(target.requested.as_ref().unwrap().as_slice()),
+                names(target.requested.complete().unwrap().as_slice()),
                 target
                     .default
                     .as_ref()
@@ -896,7 +896,7 @@ fn the_scales_grow_spellings_and_canonical_locales_through_icu4x() {
             assert_eq!(targets.len(), target_count);
             for target in targets {
                 assert_eq!(
-                    names(target.requested.as_ref().unwrap().as_slice()),
+                    names(target.requested.complete().unwrap().as_slice()),
                     target_requested
                 );
             }

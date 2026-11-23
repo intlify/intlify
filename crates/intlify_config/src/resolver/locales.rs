@@ -259,7 +259,7 @@ fn joined(earlier: Option<Causes>, causes: &Causes) -> Causes {
 /// spellings are counted apart from them, since no field's failure hides
 /// what its bound counts (D15:1896, 1907); and the project's requested locales
 /// are read element by element.
-pub(crate) struct LocaleFields<'a, Target> {
+pub(crate) struct LocaleFields<'a> {
     pub(crate) spellings: Admitted<Tally>,
     pub(crate) requested_locales: Admitted<Vec<Admitted<&'a str>>>,
     pub(crate) default_requested_locale: Admitted<&'a str>,
@@ -268,12 +268,60 @@ pub(crate) struct LocaleFields<'a, Target> {
     pub(crate) message_fallback:
         Admitted<Option<&'a BTreeMap<String, NonEmptyVec<FallbackCandidate>>>>,
     pub(crate) coverage: Admitted<Option<&'a Coverage>>,
-    pub(crate) target_profiles: Admitted<&'a NonEmptyMap<TargetId, TargetDeclaration<Target>>>,
+    /// The Target ID map entry by entry, or why it has no entry to read.
+    pub(crate) target_entries: Admitted<TargetMapFields<'a>>,
 }
 
-impl<'a, Target> LocaleFields<'a, Target> {
+/// One entry of the Target ID map whose key was admitted: its locale-bearing
+/// fields, each admitted or unavailable with the causes behind it.
+#[derive(Debug, Clone)]
+pub(crate) struct TargetLocaleFields<'a> {
+    pub(crate) id: &'a TargetId,
+    pub(crate) requested_locales: Admitted<Vec<Admitted<&'a str>>>,
+    pub(crate) default_requested_locale: Admitted<Option<&'a str>>,
+}
+
+/// The Target ID map's entries as Phase 7 reads them: how many it holds, one
+/// whose key failed included (D15:1930), and each with an admitted key, in
+/// Target ID order. An entry whose key failed has no subject here (D15:2184).
+#[derive(Debug, Clone)]
+pub(crate) struct TargetMapFields<'a> {
+    pub(crate) submitted: usize,
+    pub(crate) entries: Vec<TargetLocaleFields<'a>>,
+}
+
+impl<'a> TargetMapFields<'a> {
+    /// The entries of a map structural admission admitted whole.
+    pub(crate) fn declared<Target>(
+        targets: &'a NonEmptyMap<TargetId, TargetDeclaration<Target>>,
+    ) -> Self {
+        Self {
+            submitted: targets.len(),
+            entries: targets
+                .iter()
+                .map(|(id, target)| TargetLocaleFields {
+                    id,
+                    requested_locales: Ok(target
+                        .requested_locales
+                        .as_slice()
+                        .iter()
+                        .map(|locale| Ok(locale.as_str()))
+                        .collect()),
+                    default_requested_locale: Ok(target
+                        .default_requested_locale
+                        .as_option()
+                        .map(String::as_str)),
+                })
+                .collect(),
+        }
+    }
+}
+
+impl<'a> LocaleFields<'a> {
     /// The fields of a declaration structural admission admitted whole.
-    pub(crate) fn declared<Policy>(declaration: &'a ProfileDeclaration<Policy, Target>) -> Self {
+    pub(crate) fn declared<Policy, Target>(
+        declaration: &'a ProfileDeclaration<Policy, Target>,
+    ) -> Self {
         Self {
             spellings: Ok(bound::declared_spellings(declaration)),
             requested_locales: Ok(declaration
@@ -290,7 +338,7 @@ impl<'a, Target> LocaleFields<'a, Target> {
             locale_negotiation: Ok(declaration.locale_negotiation.as_option()),
             message_fallback: Ok(declaration.message_fallback.as_option()),
             coverage: Ok(declaration.coverage.as_option()),
-            target_profiles: Ok(&declaration.target_profiles),
+            target_entries: Ok(TargetMapFields::declared(&declaration.target_profiles)),
         }
     }
 }
@@ -311,15 +359,16 @@ pub(crate) struct AliasLocales {
 }
 
 /// One target's locales as Phase 7 left them. The set holds the canonical
-/// identities even when a member repeats, which only `distinct` records;
-/// Phase 11 checks the set and the default against the project's.
+/// identities even when a member repeats, which only `distinct` records, and
+/// an element without an identity leaves the others' (D15:2367); Phase 11
+/// checks the set and the default against the project's.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TargetLocales {
     pub(crate) id: TargetId,
     /// The Target ID within the map's bound and its own: what every later
     /// check of the target waits on, whatever its locales.
     pub(crate) admitted: Admitted<()>,
-    pub(crate) requested: Admitted<LocaleSet>,
+    pub(crate) requested: KnownSet,
     /// Whether no requested locale repeats.
     pub(crate) distinct: Admitted<()>,
     pub(crate) default: Admitted<Option<CanonicalLocale>>,
@@ -409,11 +458,11 @@ impl From<ObserverInvariant> for LocaleInvariant {
 /// Every spelling is counted first; none is canonicalized unless the count is
 /// proved within `maxLocaleOccurrences`, so an over-bound declaration never has
 /// a valid prefix resolved.
-pub(crate) fn resolve_locales<P: Provider, Target>(
+pub(crate) fn resolve_locales<P: Provider>(
     evaluation: &mut Evaluation,
     policy: Result<&ConfirmedPolicy, &Causes>,
     canonicalizer: Result<&Canonicalizer<P>, &Causes>,
-    fields: &LocaleFields<'_, Target>,
+    fields: &LocaleFields<'_>,
     observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<ResolvedLocales, LocaleInvariant> {
     let (occurrence_total, bounded) = bound::occurrences(evaluation, policy, fields, observer)?;
@@ -436,12 +485,10 @@ pub(crate) fn resolve_locales<P: Provider, Target>(
         Ok(fallback) => Ok(pass.fallback_keys(fallback)?),
         Err(ref causes) => Err(causes.clone()),
     };
-    let (target_bound, targets) = match fields.target_profiles {
-        Ok(targets) => {
-            let bounds = bound::targets(pass.evaluation, policy, targets, observer)?;
-            (bounds.map, Ok(pass.targets(targets, &bounds.targets)?))
-        }
-        Err(ref causes) => (Err(causes.clone()), Err(causes.clone())),
+    let bounds = bound::targets(pass.evaluation, policy, &fields.target_entries, observer)?;
+    let targets = match &fields.target_entries {
+        Ok(entries) => Ok(pass.targets(entries, &bounds.targets)?),
+        Err(causes) => Err(causes.clone()),
     };
     Ok(ResolvedLocales {
         occurrence_total,
@@ -452,7 +499,7 @@ pub(crate) fn resolve_locales<P: Provider, Target>(
         project,
         negotiation_aliases,
         fallback_keys,
-        target_bound,
+        target_bound: bounds.map,
         targets,
     })
 }
@@ -468,10 +515,10 @@ struct ProjectResolution {
 /// The project's requested set, checked for repeats and size, the default and
 /// its membership in that set, and the source default, with every independent
 /// check run.
-fn project<P: Provider, Target>(
+fn project<P: Provider>(
     pass: &mut Pass<'_, '_, '_, P>,
     policy: Result<&ConfirmedPolicy, &Causes>,
-    fields: &LocaleFields<'_, Target>,
+    fields: &LocaleFields<'_>,
     observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<ProjectResolution, LocaleInvariant> {
     let (requested_set, distinct) = pass.requested(&fields.requested_locales)?;
@@ -1024,14 +1071,20 @@ mod tests {
                 TargetLocales {
                     id: target("browser"),
                     admitted: Ok(()),
-                    requested: Ok(set(&["en"])),
+                    requested: KnownSet {
+                        known: set(&["en"]),
+                        missing: None,
+                    },
                     distinct: Ok(()),
                     default: Ok(Some(canonical("en"))),
                 },
                 TargetLocales {
                     id: target("server"),
                     admitted: Ok(()),
-                    requested: Ok(set(&["en"])),
+                    requested: KnownSet {
+                        known: set(&["en"]),
+                        missing: None,
+                    },
                     distinct: Ok(()),
                     default: Ok(None),
                 },
@@ -1443,7 +1496,7 @@ mod tests {
             }
         );
         let targets = resolved.targets.unwrap();
-        assert!(targets[0].requested.is_err() && targets[0].default.is_err());
+        assert!(targets[0].requested.complete().is_err() && targets[0].default.is_err());
         assert_eq!(targets[1].default, Ok(None));
     }
 
@@ -1497,7 +1550,7 @@ mod tests {
         fields.locale_negotiation = Err(negotiation.clone());
         fields.message_fallback = Err(fallback.clone());
         fields.coverage = Err(coverage);
-        fields.target_profiles = Err(targets.clone());
+        fields.target_entries = Err(targets.clone());
         let mut evaluation = Evaluation::default();
         let resolved = resolve_locales(
             &mut evaluation,
@@ -1532,6 +1585,10 @@ mod tests {
                         Check::RequestedMember
                     ),
                     Status::NotEvaluated(default.clone().union(requested.clone()))
+                ),
+                (
+                    unit(LocaleSubject::TargetProfiles, Check::WithinBound),
+                    Status::NotEvaluated(targets.clone())
                 ),
             ]
         );

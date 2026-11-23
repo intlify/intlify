@@ -21,7 +21,7 @@ use std::sync::Arc;
 use crate::locale::{
     CanonicalLocale, CanonicalizationFailure, Canonicalizer, Provider, ProviderFailure,
 };
-use crate::model::{FallbackCandidate, NonEmptyMap, NonEmptyVec, TargetDeclaration, TargetId};
+use crate::model::{FallbackCandidate, NonEmptyVec, TargetId};
 
 use super::super::declaration_observer::{DeclarationObserver, ObserverInvariant};
 use super::super::evaluation::{
@@ -32,7 +32,7 @@ use super::super::evidence::EvidenceProjection;
 use super::bound::MAX_LOCALE_IDENTIFIER_BYTES;
 use super::{
     issue, joined, unit, AliasLocales, Content, KnownSet, LocaleInvariant, LocaleKey,
-    LocaleOccurrence, LocaleSet, LocaleSubject, Location, Spelled, TargetLocales,
+    LocaleOccurrence, LocaleSubject, Location, Spelled, TargetLocales, TargetMapFields,
 };
 
 /// Where a spelling sits before its own key is known: its subject's kind and
@@ -288,18 +288,6 @@ impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
             .collect())
     }
 
-    pub(super) fn spell_one(
-        &mut self,
-        location: Location,
-        scope: Scope,
-        raw: &str,
-    ) -> Result<Spelled, LocaleInvariant> {
-        Ok(self
-            .spell(vec![(location, scope, raw)])?
-            .pop()
-            .expect("one result per spelling"))
-    }
-
     /// The canonical locale of the single-valued field at `location`, or,
     /// when structural admission left it none, its unit waiting on why: its
     /// path names it without its value (D15:1157, 1171, 2184).
@@ -309,26 +297,63 @@ impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
         scope: Scope,
         raw: Admitted<&str>,
     ) -> Result<Admitted<CanonicalLocale>, LocaleInvariant> {
+        self.field_after(location, scope, raw, &Ok(()))
+    }
+
+    /// The same, once `after` also holds: the unit of a field without a
+    /// value waits on why, and on `after`.
+    fn field_after(
+        &mut self,
+        location: Location,
+        scope: Scope,
+        raw: Admitted<&str>,
+        after: &Admitted<()>,
+    ) -> Result<Admitted<CanonicalLocale>, LocaleInvariant> {
         match raw {
-            Ok(raw) => Ok(self.spell_one(location, scope, raw)?.locale),
+            Ok(raw) => Ok(self
+                .spell_after(vec![(location, scope, raw)], after)?
+                .pop()
+                .expect("one result per spelling")
+                .locale),
             Err(causes) => {
                 let subject = scope.subject(LocaleKey::Content(Content::projected()));
                 Ok(self.evaluation.check_found(
                     unit(subject, Check::CanonicalLocale),
-                    Err::<CanonicalLocale, _>(causes),
+                    both(after.clone(), Err::<CanonicalLocale, _>(causes))
+                        .map(|((), locale)| locale),
                     Ok,
                 )?)
             }
         }
     }
 
-    /// The project's requested locales, element by element: those admitted
-    /// are spelled and checked for a locale named twice among them, and each
-    /// that failed adds only why the set lacks its identity (D15:1382, 2367).
-    /// Returns the set and whether no locale repeats.
+    /// The project's requested locales, element by element. Returns the set
+    /// and whether no locale repeats.
     pub(super) fn requested(
         &mut self,
         items: &Admitted<Vec<Admitted<&str>>>,
+    ) -> Result<(KnownSet, Admitted<()>), LocaleInvariant> {
+        self.requested_after(
+            items,
+            &Ok(()),
+            Location::RequestedLocale,
+            || Scope::RequestedLocale,
+            LocaleSubject::RequestedLocale,
+        )
+    }
+
+    /// One set of requested locales, element by element, once `after` holds:
+    /// those admitted are spelled at their own positions and checked for a
+    /// locale named twice among them, and each that failed adds only why the
+    /// set lacks its identity (D15:1382, 2367). Returns the set and whether
+    /// no locale repeats.
+    fn requested_after(
+        &mut self,
+        items: &Admitted<Vec<Admitted<&str>>>,
+        after: &Admitted<()>,
+        at: impl Fn(usize) -> Location,
+        scope: impl Fn() -> Scope,
+        subject: impl Fn(LocaleKey) -> LocaleSubject,
     ) -> Result<(KnownSet, Admitted<()>), LocaleInvariant> {
         let (items, mut excluded): (&[Admitted<&str>], Option<Causes>) = match items {
             Ok(items) => (items, None),
@@ -340,21 +365,13 @@ impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
             match item {
                 Ok(raw) => {
                     positions.push(index);
-                    spellings.push((
-                        Location::RequestedLocale(index),
-                        Scope::RequestedLocale,
-                        *raw,
-                    ));
+                    spellings.push((at(index), scope(), *raw));
                 }
                 Err(causes) => excluded = Some(joined(excluded, causes)),
             }
         }
-        let spelled = self.spell(spellings)?;
-        let distinct = self.unique(
-            &spelled,
-            |position| Location::RequestedLocale(positions[position]),
-            LocaleSubject::RequestedLocale,
-        )?;
+        let spelled = self.spell_after(spellings, after)?;
+        let distinct = self.unique(&spelled, |position| at(positions[position]), subject)?;
         Ok((KnownSet::new(&spelled, excluded), distinct))
     }
 
@@ -471,63 +488,46 @@ impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
         )
     }
 
-    /// Each target's requested locales, checked for a locale named twice, and
-    /// its default, once the target's bounds hold: `admitted` has each Target
-    /// ID's result, which includes the map's.
-    pub(super) fn targets<Target>(
+    /// Each entry's requested locales, element by element, checked for a
+    /// locale named twice, and its default, once the target's bounds hold:
+    /// `admitted` has each Target ID's result, which includes the map's. A
+    /// field that failed leaves only what reads it waiting (D15:2367).
+    pub(super) fn targets(
         &mut self,
-        targets: &NonEmptyMap<TargetId, TargetDeclaration<Target>>,
+        targets: &TargetMapFields<'_>,
         admitted: &BTreeMap<TargetId, Admitted<()>>,
     ) -> Result<Vec<TargetLocales>, LocaleInvariant> {
-        let mut resolved = Vec::with_capacity(targets.len());
-        for (id, target) in targets.iter() {
+        let mut resolved = Vec::with_capacity(targets.entries.len());
+        for entry in &targets.entries {
+            let id = entry.id;
             let own = admitted
                 .get(id)
-                .expect("every declared Target ID has its bound's result")
+                .expect("every admitted Target ID has its bound's result")
                 .clone();
-            let requested = self.spell_after(
-                target
-                    .requested_locales
-                    .as_slice()
-                    .iter()
-                    .enumerate()
-                    .map(|(index, raw)| {
-                        (
-                            Location::TargetRequestedLocale(id.clone(), index),
-                            Scope::TargetRequestedLocale(id.clone()),
-                            raw.as_str(),
-                        )
-                    })
-                    .collect(),
-                &own,
-            )?;
             // A repeated member is an issue of its own; the set still holds
             // the canonical identities Phase 11 compares.
-            let distinct = self.unique(
-                &requested,
+            let (requested, distinct) = self.requested_after(
+                &entry.requested_locales,
+                &own,
                 |index| Location::TargetRequestedLocale(id.clone(), index),
+                || Scope::TargetRequestedLocale(id.clone()),
                 |key| LocaleSubject::TargetRequestedLocale(id.clone(), key),
             )?;
-            let default = match target.default_requested_locale.as_option() {
+            let default = match entry.default_requested_locale.clone().transpose() {
                 Some(raw) => self
-                    .spell_after(
-                        vec![(
-                            Location::TargetDefaultRequestedLocale(id.clone()),
-                            Scope::TargetDefaultRequestedLocale(id.clone()),
-                            raw,
-                        )],
+                    .field_after(
+                        Location::TargetDefaultRequestedLocale(id.clone()),
+                        Scope::TargetDefaultRequestedLocale(id.clone()),
+                        raw,
                         &own,
                     )?
-                    .pop()
-                    .expect("one result per spelling")
-                    .locale
                     .map(Some),
                 None => Ok(None),
             };
             resolved.push(TargetLocales {
                 id: id.clone(),
                 admitted: own,
-                requested: set(&requested),
+                requested,
                 distinct,
                 default,
             });
@@ -561,19 +561,6 @@ pub(crate) fn canonicalize<P: Provider>(
     }
 }
 
-/// The set of the spellings' canonical locales, once each has one; otherwise
-/// the causes of every spelling without one, not just the first.
-pub(super) fn set(spelled: &[Spelled]) -> Admitted<LocaleSet> {
-    let mut locales = Ok(Vec::with_capacity(spelled.len()));
-    for spelling in spelled {
-        locales = both(locales, spelling.locale.clone()).map(|(mut locales, locale)| {
-            locales.push(locale);
-            locales
-        });
-    }
-    locales.map(LocaleSet::new)
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -590,6 +577,7 @@ mod tests {
     use crate::model::NonEmptyMap;
     use crate::resolver::declaration_observer::fixtures::{view, Observed};
     use crate::resolver::evaluation::Unit;
+    use crate::resolver::locales::TargetLocaleFields;
     use crate::resolver::specification::Slot;
 
     fn requested(spellings: &[&'static str]) -> Vec<(Location, Scope, &'static str)> {
@@ -904,11 +892,11 @@ mod tests {
                     Ok(&canonicalizer),
                     (Some(observer), Some(confirmed.evidence())),
                 );
-                pass.spell_one(
+                pass.spell(vec![(
                     Location::DefaultSourceLocale,
                     Scope::DefaultSourceLocale,
                     "EN-us",
-                )
+                )])
                 .unwrap();
                 observer.value(&["defaultSourceLocale"]).unwrap()
             });
@@ -1055,7 +1043,7 @@ mod tests {
         .0
         .unwrap();
         assert_eq!(
-            set(&spelled).unwrap().as_slice(),
+            KnownSet::new(&spelled, None).complete().unwrap().as_slice(),
             ["de", "en", "fr"].map(canonical)
         );
         let mut evaluation = Evaluation::default();
@@ -1067,10 +1055,15 @@ mod tests {
         .0
         .unwrap();
         assert_eq!(
-            units(&set(&spelled).unwrap_err()),
+            units(&KnownSet::new(&spelled, None).complete().unwrap_err()),
             [requested_unit(rejected())]
         );
-        assert_eq!(set(&[]).map(|set| set.as_slice().len()), Ok(0));
+        assert_eq!(
+            KnownSet::new(&[], None)
+                .complete()
+                .map(|set| set.as_slice().len()),
+            Ok(0)
+        );
     }
 
     /// An element that failed is passed over: the others keep the positions
@@ -1341,7 +1334,7 @@ mod tests {
                 "defaultRequestedLocale": "de"
             }
         });
-        let targets: NonEmptyMap<TargetId, TargetDeclaration<serde_json::Value>> =
+        let targets: NonEmptyMap<TargetId, crate::model::TargetDeclaration<serde_json::Value>> =
             serde_json::from_value(declared.clone()).unwrap();
         let canonicalizer = canonicalizer(64);
         let confirmed = policy(64, 100, 100);
@@ -1354,7 +1347,9 @@ mod tests {
                     (Some(observer), Some(confirmed.evidence())),
                 );
                 let admitted = targets.iter().map(|(id, _)| (id.clone(), Ok(()))).collect();
-                let resolved = pass.targets(&targets, &admitted).unwrap();
+                let resolved = pass
+                    .targets(&TargetMapFields::declared(&targets), &admitted)
+                    .unwrap();
                 let browser: Vec<EvidenceProjection> = (0..3)
                     .map(|index| {
                         observer
@@ -1378,7 +1373,7 @@ mod tests {
                 .iter()
                 .map(|target| (
                     target.id.clone(),
-                    target.requested.clone(),
+                    target.requested.complete().cloned(),
                     target.distinct.as_ref().map_err(units).copied(),
                     target.default.clone(),
                 ))
@@ -1386,13 +1381,16 @@ mod tests {
             [
                 (
                     target("browser"),
-                    Ok(LocaleSet::new(vec![canonical("de"), canonical("en")])),
+                    Ok(super::super::LocaleSet::new(vec![
+                        canonical("de"),
+                        canonical("en")
+                    ])),
                     Err(vec![duplicate]),
                     Ok(Some(canonical("de"))),
                 ),
                 (
                     target("server"),
-                    Ok(LocaleSet::new(vec![canonical("de")])),
+                    Ok(super::super::LocaleSet::new(vec![canonical("de")])),
                     Ok(()),
                     Ok(Some(canonical("en"))),
                 ),
@@ -1472,9 +1470,100 @@ mod tests {
         );
     }
 
+    /// A target's element that failed is passed over: the others keep the
+    /// positions they hold in its array, where each repeat is observed, and
+    /// its set adds why it lacks one; a field without a value waits on why,
+    /// and on the target's own bound (D15:1171, 2367, 2410).
+    #[test]
+    fn a_target_element_that_failed_is_passed_over_at_its_own_position() {
+        let (failed, bound) = (stand_in(Slot::Coverage), stand_in(Slot::DeliveryGraph));
+        let (browser, server, worker) = (target("browser"), target("server"), target("worker"));
+        let entries = TargetMapFields {
+            submitted: 3,
+            entries: vec![
+                TargetLocaleFields {
+                    id: &browser,
+                    requested_locales: Ok(vec![Ok("EN"), Err(failed.clone()), Ok("en")]),
+                    default_requested_locale: Err(failed.clone()),
+                },
+                TargetLocaleFields {
+                    id: &server,
+                    requested_locales: Err(failed.clone()),
+                    default_requested_locale: Err(failed.clone()),
+                },
+                TargetLocaleFields {
+                    id: &worker,
+                    requested_locales: Ok(vec![Ok("en")]),
+                    default_requested_locale: Ok(None),
+                },
+            ],
+        };
+        let admitted = BTreeMap::from([
+            (browser.clone(), Ok(())),
+            (server.clone(), Err(bound.clone())),
+            (worker.clone(), Err(bound.clone())),
+        ]);
+        let canonicalizer = canonicalizer(64);
+        let mut evaluation = Evaluation::default();
+        let document =
+            json!({"targetProfiles": {"browser": {"requestedLocales": ["EN", 7, "en"]}}});
+        let (resolved, occurrences, at) = Observed::declaration(&document).app(|observer| {
+            let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer), (Some(observer), None));
+            let resolved = pass.targets(&entries, &admitted).unwrap();
+            let at = [0, 2].map(|index| {
+                observer
+                    .element(&["targetProfiles", "browser", "requestedLocales"], index)
+                    .unwrap()
+            });
+            (resolved, pass.into_occurrences(), at)
+        });
+        assert_eq!(
+            occurrences
+                .iter()
+                .map(|occurrence| occurrence.location.clone())
+                .collect::<Vec<_>>(),
+            [
+                Location::TargetRequestedLocale(browser.clone(), 0),
+                Location::TargetRequestedLocale(browser.clone(), 2),
+                Location::TargetRequestedLocale(worker.clone(), 0),
+            ]
+        );
+        let unique = unit(
+            LocaleSubject::TargetRequestedLocale(browser.clone(), key("en")),
+            Check::UniqueLocale,
+        );
+        let repeats: Vec<_> = evaluation
+            .occurrence_candidates()
+            .iter()
+            .filter(|candidate| *candidate.finding.unit() == unique)
+            .map(|candidate| candidate.primary.clone())
+            .collect();
+        assert_eq!(repeats, at);
+        assert_eq!(resolved[0].requested.complete(), Err(failed.clone()));
+        assert_eq!(resolved[0].requested.covers([&canonical("en")]), Ok(true));
+        assert_eq!(resolved[0].default, Err(failed.clone()));
+        // The default's unit waits on its own causes and the target's bound.
+        assert_eq!(
+            waits_on(
+                &evaluation,
+                &canonical_unit(LocaleSubject::TargetDefaultRequestedLocale(server.clone()))
+            ),
+            Some(units(&bound.clone().union(failed.clone())))
+        );
+        assert_eq!(
+            resolved[1].default,
+            Err(bound.clone().union(failed.clone()))
+        );
+        // An array that failed itself holds nothing, and its bound is apart.
+        assert_eq!(resolved[1].requested.complete(), Err(failed));
+        assert_eq!(resolved[1].admitted, Err(bound));
+        // A target without a default of its own has none to wait on.
+        assert_eq!(resolved[2].default, Ok(None));
+    }
+
     #[test]
     fn a_target_whose_bounds_do_not_hold_keeps_its_spellings_as_they_are() {
-        let targets: NonEmptyMap<TargetId, TargetDeclaration<serde_json::Value>> =
+        let targets: NonEmptyMap<TargetId, crate::model::TargetDeclaration<serde_json::Value>> =
             serde_json::from_value(serde_json::json!({
                 "server": {"profile": {}, "requestedLocales": ["de"]},
                 "browser": {
@@ -1493,7 +1582,9 @@ mod tests {
         let canonicalizer = canonicalizer(64);
         let mut evaluation = Evaluation::default();
         let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer), (None, None));
-        let resolved = pass.targets(&targets, &admitted).unwrap();
+        let resolved = pass
+            .targets(&TargetMapFields::declared(&targets), &admitted)
+            .unwrap();
         drop(pass);
         // Each of the browser's spellings stands for itself and waits on its
         // bound, so neither the repeat nor the casing is found.
@@ -1518,7 +1609,7 @@ mod tests {
                 .map(|target| (
                     target.id.clone(),
                     target.admitted.clone(),
-                    target.requested.clone(),
+                    target.requested.complete().cloned(),
                     target.distinct.clone(),
                     target.default.clone(),
                 ))
@@ -1534,7 +1625,7 @@ mod tests {
                 (
                     target("server"),
                     Ok(()),
-                    Ok(LocaleSet::new(vec![canonical("de")])),
+                    Ok(super::super::LocaleSet::new(vec![canonical("de")])),
                     Ok(()),
                     Ok(None),
                 ),

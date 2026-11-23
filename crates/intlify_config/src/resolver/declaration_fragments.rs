@@ -21,6 +21,28 @@ use super::structural_admission::StructuralInvariant;
 use super::tally::{total, Tally};
 use super::value_admissions::ValueAdmissions;
 
+/// One entry of `targetProfiles` whose key structural admission admitted, as
+/// Phase 7 reads it: each locale-bearing field's value, element by element,
+/// or why it has none. Its key names the subjects of its fields, so one field
+/// that failed holds back neither the other nor another entry (D15:2184,
+/// 2367).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TargetEntry {
+    pub(crate) id: TargetId,
+    pub(crate) requested_locales: Admitted<Vec<Admitted<String>>>,
+    pub(crate) default_requested_locale: Admitted<Option<String>>,
+}
+
+/// The Target ID map entry by entry: how many entries it holds, every one
+/// counted whatever its key (D15:1930), and each entry with an admitted key,
+/// in the map's order. An entry whose key failed has no later subject
+/// (D15:2184, 3354).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TargetEntries {
+    pub(crate) submitted: usize,
+    pub(crate) entries: Vec<TargetEntry>,
+}
+
 /// The declaration `id` of an analysis, with what structural admission left
 /// at its values.
 pub(crate) struct DeclarationFragments<'r, Policy, Target> {
@@ -109,11 +131,81 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
         &self,
         name: &str,
     ) -> Result<Admitted<Vec<Admitted<String>>>, StructuralInvariant> {
-        let value = self.member_value(self.declaration, name);
+        self.strings_at(self.declaration, name)
+    }
+
+    /// The Target ID map, entry by entry, or why it has no entry to read.
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug of a map the checks admitted that is absent
+    /// or no object, of a key they admitted that is no Target ID, or of a
+    /// locale value they admitted that is no string.
+    pub(crate) fn target_entries(&self) -> Result<Admitted<TargetEntries>, StructuralInvariant> {
+        let map = self.member_value(self.declaration, "targetProfiles");
+        let members = match map.map(|map| (map, self.document.node(map).kind())) {
+            Some((map, NodeKind::Object(members))) if self.values.value(map).is_ok() => members,
+            _ => {
+                return match self
+                    .values
+                    .member(self.document, self.declaration, "targetProfiles")
+                {
+                    Err(causes) => Ok(Err(causes)),
+                    Ok(()) => Err(StructuralInvariant::UnreportedFailure),
+                };
+            }
+        };
+        let mut entries = Vec::with_capacity(members.len());
+        for (key, member) in members {
+            let entry = member.value();
+            if self.values.key(entry).is_ok() {
+                entries.push(TargetEntry {
+                    id: target_id(key)?,
+                    requested_locales: self.strings_at(entry, "requestedLocales")?,
+                    default_requested_locale: self
+                        .string_at_member(entry, "defaultRequestedLocale")?,
+                });
+            }
+        }
+        Ok(Ok(TargetEntries {
+            submitted: members.len(),
+            entries,
+        }))
+    }
+
+    /// The optional string member `name` of `object`, absent when it is, or
+    /// why it has none.
+    fn string_at_member(
+        &self,
+        object: NodeId,
+        name: &str,
+    ) -> Result<Admitted<Option<String>>, StructuralInvariant> {
+        if let Err(causes) = self.values.member(self.document, object, name) {
+            return Ok(Err(causes));
+        }
+        match self
+            .member_value(object, name)
+            .map(|value| self.document.node(value).kind())
+        {
+            None => Ok(Ok(None)),
+            Some(NodeKind::String(text)) => Ok(Ok(Some(text.clone()))),
+            Some(_) => Err(StructuralInvariant::Admission(
+                AdmissionInvariant::AuthoringTypeMismatch,
+            )),
+        }
+    }
+
+    /// The required array of strings `name` of `object`, element by element.
+    fn strings_at(
+        &self,
+        object: NodeId,
+        name: &str,
+    ) -> Result<Admitted<Vec<Admitted<String>>>, StructuralInvariant> {
+        let value = self.member_value(object, name);
         let items = match value.map(|array| (array, self.document.node(array).kind())) {
             Some((array, NodeKind::Array(items))) if self.values.value(array).is_ok() => items,
             _ => {
-                return match self.values.member(self.document, self.declaration, name) {
+                return match self.values.member(self.document, object, name) {
                     Err(causes) => Ok(Err(causes)),
                     Ok(()) => Err(StructuralInvariant::UnreportedFailure),
                 };
@@ -281,10 +373,7 @@ impl DeclarationFragments<'_, PolicyReference, TargetProfileReference> {
         entry: NodeId,
     ) -> Result<Option<ReferenceOccurrence>, StructuralInvariant> {
         let field = match self.values.key(entry) {
-            Ok(()) => Some(ReferenceField::TargetProfile(
-                TargetId::deserialize(BorrowedStrDeserializer::<KeyError>::new(key))
-                    .map_err(|_| StructuralInvariant::UnreportedFailure)?,
-            )),
+            Ok(()) => Some(ReferenceField::TargetProfile(target_id(key)?)),
             Err(_) => None,
         };
         let value = self.member_value(entry, "profile");
@@ -311,6 +400,12 @@ impl DeclarationFragments<'_, PolicyReference, TargetProfileReference> {
     }
 }
 
+/// The Target ID an admitted key spells.
+fn target_id(key: &str) -> Result<TargetId, StructuralInvariant> {
+    TargetId::deserialize(BorrowedStrDeserializer::<KeyError>::new(key))
+        .map_err(|_| StructuralInvariant::UnreportedFailure)
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::{json, Value};
@@ -334,7 +429,7 @@ mod tests {
     use crate::resolver::value_admissions::ValueAdmissions;
     use crate::structural::{AdmissionInvariant, StructuralAnalysis};
 
-    use super::DeclarationFragments;
+    use super::{DeclarationFragments, TargetEntries};
 
     /// One way to break the declaration, by its name.
     type Edit = (&'static str, fn(&mut Value));
@@ -494,6 +589,111 @@ mod tests {
         }
         assert_eq!(
             bug(|app| app["requestedLocales"] = json!([7])),
+            Some(StructuralInvariant::Admission(
+                AdmissionInvariant::AuthoringTypeMismatch
+            ))
+        );
+    }
+
+    /// The Target ID map once `edit` changed the declaration.
+    fn entries(
+        admissions: Option<ValueAdmissions>,
+        edit: fn(&mut Value),
+    ) -> Result<Admitted<TargetEntries>, StructuralInvariant> {
+        let mut config = complete_config();
+        edit(&mut config["profiles"]["app"]);
+        let (_, values, analysis) = structured_in(Evaluation::default(), &config);
+        let values = admissions.unwrap_or(values);
+        DeclarationFragments::new(&values, &analysis, "app")?.target_entries()
+    }
+
+    /// Each entry is read on its own: a field that failed holds back neither
+    /// its sibling field nor another entry, an entry that is no object keeps
+    /// its key's subject, and one whose key failed counts without one
+    /// (D15:1930, 2184, 2367, 3354).
+    #[test]
+    fn the_target_map_is_read_entry_by_entry() {
+        let whole = entries(None, |_| {}).unwrap().unwrap();
+        assert_eq!(whole.submitted, 2);
+        let ids: Vec<&str> = whole.entries.iter().map(|each| each.id.as_str()).collect();
+        assert_eq!(ids, ["browser", "server"]);
+        assert_eq!(
+            whole.entries[0].requested_locales,
+            Ok(vec![Ok("en".to_owned())])
+        );
+        assert_eq!(
+            whole.entries[0].default_requested_locale,
+            Ok(Some("en".to_owned()))
+        );
+        assert_eq!(whole.entries[1].default_requested_locale, Ok(None));
+
+        let read = entries(None, |app| {
+            app["targetProfiles"]["browser"]["requestedLocales"] = json!(["ja", 7]);
+            app["targetProfiles"]["server"]["defaultRequestedLocale"] = json!(7);
+        });
+        let read = read.unwrap().unwrap();
+        let items = read.entries[0].requested_locales.as_ref().unwrap();
+        assert_eq!(items[0], Ok("ja".to_owned()));
+        assert!(items[1].is_err());
+        assert_eq!(
+            read.entries[0].default_requested_locale,
+            Ok(Some("en".to_owned()))
+        );
+        assert_eq!(
+            read.entries[1].requested_locales,
+            Ok(vec![Ok("en".to_owned())])
+        );
+        assert!(read.entries[1].default_requested_locale.is_err());
+
+        let read = entries(None, |app| app["targetProfiles"]["server"] = json!(7));
+        let read = read.unwrap().unwrap();
+        assert_eq!(read.submitted, 2);
+        assert!(read.entries[1].requested_locales.is_err());
+        assert!(read.entries[1].default_requested_locale.is_err());
+        assert!(read.entries[0].requested_locales.is_ok());
+
+        let read = entries(None, |app| {
+            let copy = app["targetProfiles"]["server"].clone();
+            app["targetProfiles"]["Web App"] = copy;
+        });
+        let read = read.unwrap().unwrap();
+        assert_eq!(read.submitted, 3);
+        let ids: Vec<&str> = read.entries.iter().map(|each| each.id.as_str()).collect();
+        assert_eq!(ids, ["browser", "server"]);
+    }
+
+    /// A map that failed itself, or is missing, has no entry to read.
+    #[test]
+    fn a_target_map_that_failed_has_no_entries() {
+        let whole: [fn(&mut Value); 3] = [
+            |app| app["targetProfiles"] = json!(7),
+            |app| app["targetProfiles"] = json!({}),
+            |app| lacking(app, &[], "targetProfiles"),
+        ];
+        for edit in whole {
+            assert!(entries(None, edit).unwrap().is_err());
+        }
+    }
+
+    /// What the checks admitted and the document does not hold is a resolver
+    /// bug: a map that is no object or is absent, a key that is no Target ID,
+    /// and a default that is no string.
+    #[test]
+    fn a_target_map_the_checks_admit_and_the_value_lacks_is_a_resolver_bug() {
+        let bug = |edit| entries(Some(ValueAdmissions::default()), edit).err();
+        let unreported: [fn(&mut Value); 3] = [
+            |app| app["targetProfiles"] = json!(7),
+            |app| lacking(app, &[], "targetProfiles"),
+            |app| {
+                let copy = app["targetProfiles"]["server"].clone();
+                app["targetProfiles"]["Web App"] = copy;
+            },
+        ];
+        for edit in unreported {
+            assert_eq!(bug(edit), Some(StructuralInvariant::UnreportedFailure));
+        }
+        assert_eq!(
+            bug(|app| app["targetProfiles"]["server"]["defaultRequestedLocale"] = json!(7)),
             Some(StructuralInvariant::Admission(
                 AdmissionInvariant::AuthoringTypeMismatch
             ))

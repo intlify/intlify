@@ -1104,7 +1104,7 @@ mod tests {
     use serde_json::{json, Value};
 
     use super::*;
-    use crate::fixtures::{minimal_config, FixtureTargetReference};
+    use crate::fixtures::minimal_config;
     use crate::model::CoverageMode::{DirectRequired, FallbackAllowed};
     use crate::resolver::declaration_observer::fixtures::Observed;
     use crate::resolver::declaration_observer::DeclarationObserver;
@@ -1204,16 +1204,13 @@ mod tests {
     }
 
     /// Phase 7 over `fields`, then Phase 8's coverage, into one evaluation.
-    fn resolve_fields(
-        fields: &LocaleFields<'_, FixtureTargetReference>,
-        setup: &Setup<'_>,
-    ) -> Resolved {
+    fn resolve_fields(fields: &LocaleFields<'_>, setup: &Setup<'_>) -> Resolved {
         resolve_observed(fields, setup, None)
     }
 
     /// The same, where Phase 7 observes what it finds through `observer`.
     fn resolve_observed(
-        fields: &LocaleFields<'_, FixtureTargetReference>,
+        fields: &LocaleFields<'_>,
         setup: &Setup<'_>,
         observer: Option<&DeclarationObserver<'_>>,
     ) -> Resolved {

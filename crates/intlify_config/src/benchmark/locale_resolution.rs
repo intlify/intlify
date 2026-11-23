@@ -18,7 +18,6 @@ use crate::locale::{
     VersionedIdentity,
 };
 use crate::model::{CoverageMode, ProfileId};
-use crate::references::TargetProfileReference;
 use crate::resolver::coverage::{
     resolve_coverage, CoveragePolicy, CoverageSubject, Decision, Domain, RuleContent, RuleMember,
     SurfaceKey,
@@ -115,7 +114,7 @@ impl PreparedLocales {
     }
 
     /// The selected declaration's locale fields, borrowed before the interval.
-    pub(super) fn fields(&self) -> Option<LocaleFields<'_, TargetProfileReference>> {
+    pub(super) fn fields(&self) -> Option<LocaleFields<'_>> {
         if !self.analysis.is_complete() {
             return None;
         }
@@ -149,10 +148,7 @@ pub(super) fn resolve<P: Provider>(
     policy: &ConfirmedPolicy,
     inputs: &PolicyInputs,
     canonicalizer: &Canonicalizer<P>,
-    declared: (
-        &LocaleFields<'_, TargetProfileReference>,
-        &DeclarationObserver<'_>,
-    ),
+    declared: (&LocaleFields<'_>, &DeclarationObserver<'_>),
 ) -> Resolved {
     let mut evaluation = Evaluation::default();
     let result = policies(&mut evaluation, policy, inputs, canonicalizer, declared);
@@ -166,10 +162,7 @@ fn policies<P: Provider>(
     policy: &ConfirmedPolicy,
     inputs: &PolicyInputs,
     canonicalizer: &Canonicalizer<P>,
-    (fields, observer): (
-        &LocaleFields<'_, TargetProfileReference>,
-        &DeclarationObserver<'_>,
-    ),
+    (fields, observer): (&LocaleFields<'_>, &DeclarationObserver<'_>),
 ) -> Result<Policies, LocaleInvariant> {
     // The phases after Phase 5 observe through what it bound.
     let observer = observer.with_locales(canonicalizer);
@@ -767,7 +760,9 @@ fn targets(frame: &mut Frame, targets: &[TargetLocales]) -> Result<(), OutputFai
     for target in targets {
         frame.text(target.id.as_str());
         admitted(frame, &target.admitted, |_, ()| Ok(()))?;
-        admitted(frame, &target.requested, set)?;
+        admitted(frame, &target.requested.complete(), |frame, whole| {
+            set(frame, whole)
+        })?;
         admitted(frame, &target.default, |frame, default| {
             frame.flag(default.is_some());
             if let Some(default) = default {
