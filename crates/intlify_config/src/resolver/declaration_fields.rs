@@ -44,7 +44,8 @@ pub(crate) struct DeclarationFields<Policy, Target> {
     /// Every locale spelling the declaration holds, which no field's failure
     /// hides: without a selected declaration, why there is none.
     locale_spellings: Admitted<Tally>,
-    requested_locales: Admitted<NonEmptyVec<String>>,
+    /// Each element's value or why it has none, or why the array has none.
+    requested_locales: Admitted<Vec<Admitted<String>>>,
     default_requested_locale: Admitted<String>,
     default_source_locale: Admitted<Option<String>>,
     locale_negotiation: Admitted<Option<LocaleNegotiation>>,
@@ -75,7 +76,7 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
             project_id: read.required("projectId")?,
             selection_scope: read.required("selectionScope")?,
             locale_spellings: Ok(read.locale_spellings()),
-            requested_locales: read.required("requestedLocales")?,
+            requested_locales: read.string_items("requestedLocales")?,
             default_requested_locale: read.required("defaultRequestedLocale")?,
             default_source_locale: read.optional("defaultSourceLocale")?,
             locale_negotiation: read.optional("localeNegotiation")?,
@@ -100,7 +101,12 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
     pub(crate) fn locale_fields(&self) -> LocaleFields<'_, Target> {
         LocaleFields {
             spellings: self.locale_spellings.clone(),
-            requested_locales: borrowed(&self.requested_locales, NonEmptyVec::as_slice),
+            requested_locales: borrowed(&self.requested_locales, |items| {
+                items
+                    .iter()
+                    .map(|item| item.as_deref().map_err(Causes::clone))
+                    .collect()
+            }),
             default_requested_locale: borrowed(&self.default_requested_locale, String::as_str),
             default_source_locale: borrowed(&self.default_source_locale, Option::as_deref),
             locale_negotiation: borrowed(&self.locale_negotiation, Option::as_ref),
@@ -228,10 +234,7 @@ mod tests {
     fn a_declaration_admitted_whole_has_every_field() {
         let fields = read(&minimal_config());
         assert!(fields.project_id.is_ok() && fields.selection_scope.is_ok());
-        assert_eq!(
-            fields.requested_locales.as_ref().unwrap().as_slice(),
-            ["en"]
-        );
+        assert_eq!(fields.requested_locales, Ok(vec![Ok("en".to_owned())]));
         assert_eq!(fields.default_source_locale, Ok(None));
         assert_eq!(fields.coverage, Ok(None));
         assert_eq!(fields.delivery, Ok(None));
@@ -258,8 +261,11 @@ mod tests {
             .unwrap()
             .remove("projectId");
         let fields = read(&config);
+        // The element that failed is on its own, beside the one that did not.
+        let items = fields.requested_locales.as_ref().unwrap();
+        assert_eq!(items[0], Ok("en".to_owned()));
         assert_eq!(
-            checks(&fields.requested_locales),
+            checks(&items[1]),
             BTreeSet::from([(
                 vec!["requestedLocales".to_owned(), "*".to_owned()],
                 Check::FieldType

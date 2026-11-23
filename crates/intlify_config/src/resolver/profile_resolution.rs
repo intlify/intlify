@@ -1329,6 +1329,21 @@ pub(super) mod tests {
             self.declaration()["targetProfiles"][target]["profile"] = reference_value(&tuple);
         }
 
+        /// `complete`'s profile requesting one locale, so that a check over
+        /// the requested set waits once that locale's unit does not pass: a
+        /// unit over several values waits only when every one is excluded
+        /// (D15:2184).
+        pub(crate) fn one_locale() -> Self {
+            let mut inputs = Self::complete();
+            let app = inputs.declaration();
+            app["requestedLocales"] = json!(["en"]);
+            app["targetProfiles"]["browser"]["requestedLocales"] = json!(["en"]);
+            app["targetProfiles"]["server"]["requestedLocales"] = json!(["en"]);
+            app.as_object_mut().unwrap().remove("messageFallback");
+            app["coverage"] = json!({"defaultMode": "direct-required"});
+            inputs
+        }
+
         /// `complete`'s profile with a second group, `jobs`: its one member
         /// `worker` requests only `ja`, overrides the default with it, and
         /// names a Target Profile of its own, submitted last.
@@ -2560,7 +2575,11 @@ pub(super) mod tests {
     #[test]
     fn the_check_registry_lists_what_each_check_waits_on() {
         let mut waits = BTreeSet::new();
-        for inputs in [Inputs::complete(), Inputs::two_groups()] {
+        for inputs in [
+            Inputs::complete(),
+            Inputs::two_groups(),
+            Inputs::one_locale(),
+        ] {
             let complete = inputs.resolve(|evaluation, _| candidates(&evaluation));
             assert!(complete.values().all(|status| *status == Status::Evaluated));
             for blocked in complete.keys() {
@@ -4127,6 +4146,32 @@ pub(super) mod tests {
         }
     }
 
+    /// One element of the project's `requestedLocales` that failed leaves the
+    /// others spelled, each repeat still found and each correction suggested
+    /// (D15:1382, 2367, 3445).
+    #[test]
+    fn a_requested_element_that_failed_leaves_its_siblings_checked() {
+        use crate::resolver::locales::fixtures::key;
+        use crate::resolver::locales::LocaleSubject as L;
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["requestedLocales"] = json!(["ja", 42, "EN", "en"]);
+        inputs.resolve(|evaluation, state| {
+            let en = L::RequestedLocale(key("en"));
+            let ja = L::RequestedLocale(key("ja"));
+            assert!(evaluation
+                .issues()
+                .any(|issue| *issue.unit() == phase_7(en.clone(), Check::UniqueLocale)));
+            assert_eq!(
+                evaluation.status(&phase_7(ja, Check::UniqueLocale)),
+                Some(&Status::Evaluated)
+            );
+            assert!(evaluation
+                .notices()
+                .any(|notice| *notice.unit() == phase_7(en.clone(), Check::CanonicalLocale)));
+            assert!(state.locales.project.is_err());
+        });
+    }
+
     /// A missing project default holds back only what needs it: the target
     /// locale Phase 7 finds invalid is a Finding beside it, and the default's
     /// own checks are named and wait on it (D15:1157, 1171, 2365, 2367, 2416,
@@ -4171,6 +4216,88 @@ pub(super) mod tests {
                 panic!("the inherited default is not waiting");
             };
             assert!(keys(causes).contains(&missing));
+        });
+    }
+
+    /// Membership in a set with an element that failed is proved from the
+    /// elements it holds: one of them passes, and any other waits, since
+    /// proving it outside needs the identity that element lacks (D15:2365,
+    /// 2367).
+    #[test]
+    fn a_set_with_a_failed_element_proves_only_what_it_holds() {
+        use SubjectKind as K;
+        let membership = |requested: Value, check: Check| {
+            let mut inputs = Inputs::complete();
+            inputs.declaration()["requestedLocales"] = requested;
+            inputs.resolve(|evaluation, _| {
+                let found = only_issue(&evaluation);
+                assert_eq!(found.code(), Code::FieldTypeInvalid);
+                let mut held = BTreeMap::<K, bool>::new();
+                for (unit, status) in evaluation.statuses() {
+                    if unit.check == check {
+                        let waits = matches!(status, Status::NotEvaluated(_));
+                        if let Status::NotEvaluated(causes) = status {
+                            assert_eq!(keys(causes), BTreeSet::from([found.clone()]));
+                        }
+                        held.insert(unit.subject.kind(), waits);
+                    }
+                }
+                held
+            })
+        };
+        // Every locale named is held: nothing waits.
+        let held = membership(json!(["ja", "en", 42]), Check::RequestedMember);
+        assert_eq!(
+            held,
+            BTreeMap::from([
+                (K::DefaultRequestedLocale, false),
+                (K::NegotiationDestination, false),
+                (K::FallbackSource, false),
+                (K::CoverageLocale, false),
+            ])
+        );
+        assert_eq!(
+            membership(json!(["ja", "en", 42]), Check::ProjectSubset),
+            BTreeMap::from([(K::Target, false)])
+        );
+        // `ja` is not held, so what names it waits, and what names `en` passes.
+        let held = membership(json!(["en", 42]), Check::RequestedMember);
+        assert_eq!(
+            held,
+            BTreeMap::from([
+                (K::DefaultRequestedLocale, false),
+                (K::NegotiationDestination, false),
+                (K::FallbackSource, true),
+                (K::CoverageLocale, true),
+            ])
+        );
+        assert_eq!(
+            membership(json!(["en", 42]), Check::ProjectSubset),
+            BTreeMap::from([(K::Target, true)])
+        );
+    }
+
+    /// A target without its own set waits on why, and on what the project's
+    /// set lacks, which it would need to compare a locale it does not hold
+    /// (D15:2365, 2367).
+    #[test]
+    fn a_target_without_its_set_waits_on_the_projects_missing_element_too() {
+        let mut inputs = Inputs::complete();
+        let app = inputs.declaration();
+        app["requestedLocales"] = json!(["ja", "en", 42]);
+        app["targetProfiles"]["server"]["requestedLocales"] = json!(["ja", "zz"]);
+        let server = serde_json::from_value(json!("server")).unwrap();
+        inputs.resolve(|evaluation, _| {
+            let subset = crate::resolver::targets::unit(
+                crate::resolver::targets::TargetSubject::Target(server),
+                Check::ProjectSubset,
+            );
+            let every: BTreeSet<IssueKey> = evaluation.issues().cloned().collect();
+            assert_eq!(every.len(), 2);
+            let Some(Status::NotEvaluated(causes)) = evaluation.status(&subset) else {
+                panic!("the subset is not waiting");
+            };
+            assert_eq!(keys(causes), every);
         });
     }
 

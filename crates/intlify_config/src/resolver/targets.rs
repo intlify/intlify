@@ -245,10 +245,14 @@ impl Checks<'_, '_> {
     ) -> Result<TargetFacts<'s>, TargetInvariant> {
         let admitted = own.clone().and_then(|own| own.admitted.clone());
         let requested = own.clone().and_then(|own| own.requested.clone());
-        let subset_input = both(
-            both(admitted.clone(), requested.clone()),
-            locales.requested_set.clone(),
-        );
+        // A target locale the project's set holds is in it whatever else
+        // the set lacks, and one it does not hold is unproved while it lacks
+        // any (D15:2365, 2367).
+        let covered = match &requested {
+            Ok(own) => locales.requested_set.covers(own.as_slice()),
+            Err(_) => locales.requested_set.complete().map(|_| true),
+        };
+        let subset_input = both(both(admitted.clone(), requested.clone()), covered);
         // What each check observes, made before its unit records it, and only
         // once its input is admitted, which the declaration then holds.
         let beside_project = match (self.observer, &subset_input) {
@@ -261,12 +265,8 @@ impl Checks<'_, '_> {
         let subset = evaluation.check_found(
             self.unit(Check::ProjectSubset),
             subset_input,
-            |(((), requested), project)| {
-                if requested
-                    .as_slice()
-                    .iter()
-                    .all(|locale| project.contains(locale))
-                {
+            |(_, covered)| {
+                if covered {
                     Ok(())
                 } else {
                     let outside = issue(Code::TargetLocalesNotSubset, None);

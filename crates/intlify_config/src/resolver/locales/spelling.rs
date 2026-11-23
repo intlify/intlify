@@ -25,14 +25,14 @@ use crate::model::{FallbackCandidate, NonEmptyMap, NonEmptyVec, TargetDeclaratio
 
 use super::super::declaration_observer::{DeclarationObserver, ObserverInvariant};
 use super::super::evaluation::{
-    both, Actual, Admitted, Blocking, Check, Code, Evaluation, Found, LimitExceeded, Notice,
-    Observation,
+    both, Actual, Admitted, Blocking, Causes, Check, Code, Evaluation, Found, LimitExceeded,
+    Notice, Observation,
 };
 use super::super::evidence::EvidenceProjection;
 use super::bound::MAX_LOCALE_IDENTIFIER_BYTES;
 use super::{
-    issue, unit, AliasLocales, Content, LocaleInvariant, LocaleKey, LocaleOccurrence, LocaleSet,
-    LocaleSubject, Location, Spelled, TargetLocales,
+    issue, joined, unit, AliasLocales, Content, KnownSet, LocaleInvariant, LocaleKey,
+    LocaleOccurrence, LocaleSet, LocaleSubject, Location, Spelled, TargetLocales,
 };
 
 /// Where a spelling sits before its own key is known: its subject's kind and
@@ -320,6 +320,42 @@ impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
                 )?)
             }
         }
+    }
+
+    /// The project's requested locales, element by element: those admitted
+    /// are spelled and checked for a locale named twice among them, and each
+    /// that failed adds only why the set lacks its identity (D15:1382, 2367).
+    /// Returns the set and whether no locale repeats.
+    pub(super) fn requested(
+        &mut self,
+        items: &Admitted<Vec<Admitted<&str>>>,
+    ) -> Result<(KnownSet, Admitted<()>), LocaleInvariant> {
+        let (items, mut excluded): (&[Admitted<&str>], Option<Causes>) = match items {
+            Ok(items) => (items, None),
+            Err(causes) => (&[], Some(causes.clone())),
+        };
+        let mut spellings = Vec::with_capacity(items.len());
+        let mut positions = Vec::with_capacity(items.len());
+        for (index, item) in items.iter().enumerate() {
+            match item {
+                Ok(raw) => {
+                    positions.push(index);
+                    spellings.push((
+                        Location::RequestedLocale(index),
+                        Scope::RequestedLocale,
+                        *raw,
+                    ));
+                }
+                Err(causes) => excluded = Some(joined(excluded, causes)),
+            }
+        }
+        let spelled = self.spell(spellings)?;
+        let distinct = self.unique(
+            &spelled,
+            |position| Location::RequestedLocale(positions[position]),
+            LocaleSubject::RequestedLocale,
+        )?;
+        Ok((KnownSet::new(&spelled, excluded), distinct))
     }
 
     /// One unit per subject of a set's spellings, `spelled` at the locations
@@ -1035,6 +1071,64 @@ mod tests {
             [requested_unit(rejected())]
         );
         assert_eq!(set(&[]).map(|set| set.as_slice().len()), Ok(0));
+    }
+
+    /// An element that failed is passed over: the others keep the positions
+    /// they hold in the array, where each repeat is found, and the set adds
+    /// why it lacks one (D15:2367, 2410).
+    #[test]
+    fn a_failed_element_leaves_the_others_at_their_positions() {
+        let canonicalizer = canonicalizer(64);
+        let failed = stand_in(Slot::Coverage);
+        // `x` stands where the element that failed is in the declaration.
+        let spellings = ["en", "x", "EN"];
+        let confirmed = policy(64, 100, 100);
+        let mut evaluation = Evaluation::default();
+        let (known, distinct, occurrences) =
+            Observed::declaration(&json!({ "requestedLocales": spellings })).app(|observer| {
+                let mut pass = Pass::new(
+                    &mut evaluation,
+                    Ok(&canonicalizer),
+                    (Some(observer), Some(confirmed.evidence())),
+                );
+                let (known, distinct) = pass
+                    .requested(&Ok(vec![Ok("en"), Err(failed.clone()), Ok("EN")]))
+                    .unwrap();
+                (known, distinct, pass.into_occurrences())
+            });
+        assert_eq!(
+            occurrences
+                .iter()
+                .map(|occurrence| occurrence.location.clone())
+                .collect::<Vec<_>>(),
+            [Location::RequestedLocale(0), Location::RequestedLocale(2)]
+        );
+        let unique = unit(
+            LocaleSubject::RequestedLocale(key("en")),
+            Check::UniqueLocale,
+        );
+        assert_eq!(units(&distinct.unwrap_err()), std::slice::from_ref(&unique));
+        assert_eq!(
+            observed_spellings(&evaluation, &spellings),
+            [
+                (
+                    requested_unit(key("en")),
+                    Code::LocaleNonCanonical,
+                    2,
+                    vec![]
+                ),
+                (unique.clone(), Code::LocaleDuplicate, 0, vec![Some(2)]),
+                (unique, Code::LocaleDuplicate, 2, vec![Some(0)]),
+            ]
+        );
+        assert_eq!(known.complete(), Err(failed.clone()));
+        assert_eq!(known.covers([&canonical("en")]), Ok(true));
+        // An array that failed itself holds nothing, and nothing is spelled.
+        let mut evaluation = Evaluation::default();
+        let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer), (None, None));
+        let (known, distinct) = pass.requested(&Err(failed.clone())).unwrap();
+        assert_eq!(pass.into_occurrences(), []);
+        assert_eq!((known.complete(), distinct), (Err(failed), Ok(())));
     }
 
     #[test]

@@ -391,7 +391,7 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
                     Some(6),
                     None,
                     Some(21),
-                    Some(6),
+                    Some(5),
                     Some(3),
                     Some(1),
                 ],

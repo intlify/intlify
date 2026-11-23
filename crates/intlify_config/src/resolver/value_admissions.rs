@@ -68,6 +68,13 @@ impl ValueAdmissions {
         self.keys.get(&entry).cloned().map_or(Ok(()), Err)
     }
 
+    /// Whether every candidate that looked at `value` itself passed, or the
+    /// causes of those that did not: an array's own type and not its elements',
+    /// each of which has a result of its own (D15:2184).
+    pub(crate) fn value(&self, value: NodeId) -> Admitted<()> {
+        self.values.get(&value).cloned().map_or(Ok(()), Err)
+    }
+
     /// Whether every candidate of the member `name` of `object` passed, those
     /// of the values below it and of the keys of their entries included, or
     /// the causes of those that did not. A member `object` does not hold has
@@ -272,6 +279,9 @@ pub(crate) mod tests {
             panic!("an array");
         };
         assert_eq!(values.values.keys().collect::<Vec<_>>(), [&items[1]]);
+        assert!(values.value(items[1]).is_err());
+        assert_eq!(values.value(items[0]), Ok(()));
+        assert_eq!(values.value(array), Ok(()));
         assert_eq!(held_back(&values, &analysis), ["requestedLocales"]);
         assert_eq!(
             checks(&member(&values, &analysis, "requestedLocales")),

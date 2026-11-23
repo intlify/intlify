@@ -35,7 +35,7 @@ use super::limits::ConfirmedPolicy;
 use super::tally::Tally;
 
 pub(crate) use spelling::canonicalize;
-use spelling::{set, Pass, Scope};
+use spelling::{Pass, Scope};
 
 mod bound;
 mod spelling;
@@ -169,13 +169,99 @@ impl LocaleSet {
     }
 }
 
+/// A locale set some of whose elements may have no canonical identity: the
+/// identities of those that do, and why the others have none. Membership is
+/// then one of three results (D15:2365, 2367): a locale it holds is a member
+/// whatever the rest is, one it does not hold is outside it only when no
+/// element is missing, and is otherwise unproved, with the causes of those
+/// that are.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct KnownSet {
+    known: LocaleSet,
+    missing: Option<Causes>,
+}
+
+impl KnownSet {
+    /// The set of `spelled`'s canonical locales, beside `excluded`, why the
+    /// elements that were not spelled have none.
+    fn new(spelled: &[Spelled], excluded: Option<Causes>) -> Self {
+        let mut known = Vec::with_capacity(spelled.len());
+        let mut missing = excluded;
+        for spelling in spelled {
+            match &spelling.locale {
+                Ok(locale) => known.push(locale.clone()),
+                Err(causes) => missing = Some(joined(missing, causes)),
+            }
+        }
+        Self {
+            known: LocaleSet::new(known),
+            missing,
+        }
+    }
+
+    /// The whole set, once every element has its identity, or why one has
+    /// none: what a check that spans the set needs.
+    pub(crate) fn complete(&self) -> Admitted<&LocaleSet> {
+        match &self.missing {
+            Some(causes) => Err(causes.clone()),
+            None => Ok(&self.known),
+        }
+    }
+
+    /// The identities a count over the set reads: one without an identity has
+    /// none to add, so the count waits only when no element has one (D15:2184,
+    /// 3354).
+    fn counted(&self) -> Admitted<&LocaleSet> {
+        match &self.missing {
+            Some(causes) if self.known.as_slice().is_empty() => Err(causes.clone()),
+            _ => Ok(&self.known),
+        }
+    }
+
+    /// Whether every one of `locales` is a member, or, when one is not among
+    /// the identities held and an element is missing, why that is unproved.
+    pub(crate) fn covers<'l>(
+        &self,
+        locales: impl IntoIterator<Item = &'l CanonicalLocale>,
+    ) -> Admitted<bool> {
+        let held = locales
+            .into_iter()
+            .all(|locale| self.known.contains(locale));
+        match &self.missing {
+            Some(causes) if !held => Err(causes.clone()),
+            _ => Ok(held),
+        }
+    }
+
+    /// Whether `locale` is a member; without its identity, unproved with its
+    /// causes and those of any missing element.
+    pub(crate) fn holds(&self, locale: &Admitted<CanonicalLocale>) -> Admitted<bool> {
+        match locale {
+            Ok(locale) => self.covers([locale]),
+            Err(causes) => Err(match &self.missing {
+                Some(missing) => causes.clone().union(missing.clone()),
+                None => causes.clone(),
+            }),
+        }
+    }
+}
+
+/// `causes` added to what `earlier` holds.
+fn joined(earlier: Option<Causes>, causes: &Causes) -> Causes {
+    match earlier {
+        Some(earlier) => earlier.union(causes.clone()),
+        None => causes.clone(),
+    }
+}
+
 /// The selected declaration's locale-bearing fields as structural admission
 /// left them, each admitted or unavailable with the causes behind it. The
 /// spellings are counted apart from them, since no field's failure hides
-/// what its bound counts (D15:1896, 1907).
+/// what its bound counts (D15:1896, 1907); and the project's requested locales
+/// are read element by element.
 pub(crate) struct LocaleFields<'a, Target> {
     pub(crate) spellings: Admitted<Tally>,
-    pub(crate) requested_locales: Admitted<&'a [String]>,
+    pub(crate) requested_locales: Admitted<Vec<Admitted<&'a str>>>,
     pub(crate) default_requested_locale: Admitted<&'a str>,
     pub(crate) default_source_locale: Admitted<Option<&'a str>>,
     pub(crate) locale_negotiation: Admitted<Option<&'a LocaleNegotiation>>,
@@ -190,7 +276,12 @@ impl<'a, Target> LocaleFields<'a, Target> {
     pub(crate) fn declared<Policy>(declaration: &'a ProfileDeclaration<Policy, Target>) -> Self {
         Self {
             spellings: Ok(bound::declared_spellings(declaration)),
-            requested_locales: Ok(declaration.requested_locales.as_slice()),
+            requested_locales: Ok(declaration
+                .requested_locales
+                .as_slice()
+                .iter()
+                .map(|locale| Ok(locale.as_str()))
+                .collect()),
             default_requested_locale: Ok(&declaration.default_requested_locale),
             default_source_locale: Ok(declaration
                 .default_source_locale
@@ -268,8 +359,9 @@ pub(crate) struct ResolvedLocales {
     /// Every spelling Phase 7 reached, in location order.
     pub(crate) occurrences: Vec<LocaleOccurrence>,
     /// The project's canonical requested locales, even when one repeats or
-    /// there are too many: membership needs only their identities.
-    pub(crate) requested_set: Admitted<LocaleSet>,
+    /// there are too many: membership needs only their identities, and an
+    /// element without one leaves the others' (D15:2367).
+    pub(crate) requested_set: KnownSet,
     /// The project's canonical default requested locale, even when it is not
     /// one of the requested locales: a target that inherits it needs only its
     /// identity.
@@ -368,7 +460,7 @@ pub(crate) fn resolve_locales<P: Provider, Target>(
 /// The project's requested set and canonical default as Phase 7 resolved
 /// them, and the project's locales once every check over them passed.
 struct ProjectResolution {
-    requested_set: Admitted<LocaleSet>,
+    requested_set: KnownSet,
     requested_default: Admitted<CanonicalLocale>,
     project: Admitted<ProjectLocales>,
 }
@@ -382,31 +474,7 @@ fn project<P: Provider, Target>(
     fields: &LocaleFields<'_, Target>,
     observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<ProjectResolution, LocaleInvariant> {
-    let requested = match fields.requested_locales {
-        Ok(requested) => Ok(pass.spell(
-            requested
-                .iter()
-                .enumerate()
-                .map(|(index, raw)| {
-                    (
-                        Location::RequestedLocale(index),
-                        Scope::RequestedLocale,
-                        raw.as_str(),
-                    )
-                })
-                .collect(),
-        )?),
-        Err(ref causes) => Err(causes.clone()),
-    };
-    let distinct = match &requested {
-        Ok(spelled) => pass.unique(
-            spelled,
-            Location::RequestedLocale,
-            LocaleSubject::RequestedLocale,
-        )?,
-        Err(causes) => Err(causes.clone()),
-    };
-    let requested_set = requested.and_then(|spelled| set(&spelled));
+    let (requested_set, distinct) = pass.requested(&fields.requested_locales)?;
     let size = bound::requested(pass.evaluation, policy, &requested_set, observer)?;
     let requested_default = pass.field(
         Location::DefaultRequestedLocale,
@@ -430,7 +498,7 @@ fn project<P: Provider, Target>(
         None => Ok(None),
     };
     let project = both(
-        both(source, requested_set.clone()),
+        both(source, requested_set.complete().cloned()),
         both(
             both(requested_default.clone(), member),
             both(distinct, size),
@@ -451,17 +519,19 @@ fn project<P: Provider, Target>(
 }
 
 /// The default's unit: its canonical locale must be one of the project's
-/// requested locales. A default outside them is observed at its token,
-/// beside the requested locales, a set that counts as one location (D15:2249,
-/// 2416).
+/// requested locales, which an element without an identity leaves unproved
+/// only for a locale the others do not name (D15:2365, 2367). A default
+/// outside them is observed at its token, beside the requested locales, a set
+/// that counts as one location (D15:2249, 2416).
 fn member(
     evaluation: &mut Evaluation,
     default: &Admitted<CanonicalLocale>,
-    requested: &Admitted<LocaleSet>,
+    requested: &KnownSet,
     observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<Admitted<()>, LocaleInvariant> {
-    let observed = match (observer, default, requested) {
-        (Some(observer), Ok(locale), Ok(set)) if !set.contains(locale) => Some(Observation {
+    let held = requested.holds(default);
+    let observed = match (observer, &held) {
+        (Some(observer), Ok(false)) => Some(Observation {
             primary: observer.value(&["defaultRequestedLocale"])?,
             related: vec![observer.value(&["requestedLocales"])?],
         }),
@@ -472,9 +542,9 @@ fn member(
             LocaleSubject::DefaultRequestedLocale,
             Check::RequestedMember,
         ),
-        both(default.clone(), requested.as_ref().map_err(Causes::clone)),
-        |(locale, requested)| {
-            if requested.contains(&locale) {
+        held,
+        |held| {
+            if held {
                 Ok(())
             } else {
                 Err(Found::through(
@@ -806,6 +876,61 @@ mod tests {
         assert!(locations.windows(2).all(|pair| pair[0] < pair[1]));
     }
 
+    /// Membership is one of three results: a locale the set holds passes
+    /// whatever else it lacks, one it does not hold is outside only a set
+    /// that lacks nothing, and otherwise waits, with the causes of what is
+    /// missing and of a locale that has no identity (D15:2365, 2367).
+    #[test]
+    fn membership_is_proved_from_what_the_set_holds() {
+        let missing = stand_in(Slot::Coverage);
+        let invalid = stand_in(Slot::DeliveryGraph);
+        let whole = KnownSet::new(&[spelled("en"), spelled("ja")], None);
+        let partial = KnownSet::new(&[spelled("en")], Some(missing.clone()));
+        let (en, de) = (canonical("en"), canonical("de"));
+        assert_eq!(whole.holds(&Ok(en.clone())), Ok(true));
+        assert_eq!(whole.holds(&Ok(de.clone())), Ok(false));
+        assert_eq!(partial.holds(&Ok(en.clone())), Ok(true));
+        assert_eq!(partial.holds(&Ok(de.clone())), Err(missing.clone()));
+        assert_eq!(whole.holds(&Err(invalid.clone())), Err(invalid.clone()));
+        assert_eq!(
+            partial.holds(&Err(invalid.clone())),
+            Err(invalid.clone().union(missing.clone()))
+        );
+        // Over several locales, one the set does not hold decides.
+        assert_eq!(whole.covers([&en, &canonical("ja")]), Ok(true));
+        assert_eq!(whole.covers([&en, &de]), Ok(false));
+        assert_eq!(partial.covers([&en]), Ok(true));
+        assert_eq!(partial.covers([&en, &de]), Err(missing));
+    }
+
+    /// A spelling without an identity is missing from the set, beside what
+    /// was never spelled; a check that spans the set waits on all of it, and
+    /// a count over it only when nothing has an identity (D15:2184, 3354).
+    #[test]
+    fn a_known_set_holds_the_identities_and_why_the_others_have_none() {
+        let excluded = stand_in(Slot::Coverage);
+        let invalid = stand_in(Slot::DeliveryGraph);
+        let without = Spelled {
+            key: content("zz"),
+            locale: Err(invalid.clone()),
+        };
+        let every = excluded.clone().union(invalid.clone());
+        let both = KnownSet::new(
+            &[spelled("en"), without.clone(), spelled("EN")],
+            Some(excluded.clone()),
+        );
+        assert_eq!(both.complete(), Err(every.clone()));
+        assert_eq!(both.counted(), Ok(&set(&["en"])));
+        let only = KnownSet::new(&[without], None);
+        assert_eq!(only.complete(), Err(invalid.clone()));
+        assert_eq!(only.counted(), Err(invalid));
+        let none = KnownSet::new(&[], Some(excluded.clone()));
+        assert_eq!(none.counted(), Err(excluded));
+        let whole = KnownSet::new(&[spelled("en")], None);
+        assert_eq!(whole.complete(), Ok(&set(&["en"])));
+        assert_eq!(whole.counted(), Ok(&set(&["en"])));
+    }
+
     #[test]
     fn a_rejected_spelling_never_shows_in_debug_output() {
         let rejected = "en_US.UTF-8";
@@ -883,7 +1008,7 @@ mod tests {
         assert_eq!(project.source_default(), Some(&canonical("en")));
         assert_eq!(project.requested(), &set(&["en"]));
         assert_eq!(project.requested_default(), &canonical("en"));
-        assert_eq!(resolved.requested_set, Ok(set(&["en"])));
+        assert_eq!(resolved.requested_set.complete(), Ok(&set(&["en"])));
         assert_eq!(
             resolved.negotiation_aliases,
             Ok(vec![AliasLocales {
@@ -992,7 +1117,10 @@ mod tests {
             // Repeats and the size block the project's locales, never the
             // canonical set membership is checked against, nor the default's
             // identity a target inheriting it compares.
-            assert_eq!(resolved.requested_set, Ok(set(&["de", "en", "he-IL"])));
+            assert_eq!(
+                resolved.requested_set.complete(),
+                Ok(&set(&["de", "en", "he-IL"]))
+            );
             assert_eq!(resolved.requested_default, Ok(canonical("fr")));
             assert_eq!(
                 units(&resolved.project.unwrap_err()),
@@ -1048,33 +1176,37 @@ mod tests {
                 invalid(LocaleSubject::DefaultSourceLocale),
             ]
         );
-        for waiting in [
-            unit(
-                LocaleSubject::RequestedLocale(content("zz")),
-                Check::UniqueLocale,
+        assert_eq!(
+            waits_on(
+                &evaluation,
+                &unit(
+                    LocaleSubject::RequestedLocale(content("zz")),
+                    Check::UniqueLocale,
+                )
             ),
-            unit(LocaleSubject::RequestedLocales, Check::WithinBound),
-            unit(
-                LocaleSubject::DefaultRequestedLocale,
-                Check::RequestedMember,
-            ),
-        ] {
-            assert_eq!(waits_on(&evaluation, &waiting), Some(vec![zz.clone()]));
-        }
+            Some(vec![zz.clone()])
+        );
+        // The set still holds `en`, so its size and the default's membership
+        // need nothing of `zz` (D15:2184, 2365).
         for independent in [
             unit(
                 LocaleSubject::RequestedLocale(key("en")),
                 Check::UniqueLocale,
             ),
+            unit(LocaleSubject::RequestedLocales, Check::WithinBound),
             unit(
                 LocaleSubject::DefaultRequestedLocale,
                 Check::CanonicalLocale,
+            ),
+            unit(
+                LocaleSubject::DefaultRequestedLocale,
+                Check::RequestedMember,
             ),
         ] {
             assert_eq!(waits_on(&evaluation, &independent), None);
         }
         assert_eq!(
-            units(&resolved.requested_set.unwrap_err()),
+            units(&resolved.requested_set.complete().unwrap_err()),
             std::slice::from_ref(&zz)
         );
         assert_eq!(
@@ -1085,6 +1217,29 @@ mod tests {
             ]
         );
         assert!(resolved.targets.is_ok());
+
+        // A default the set does not hold is unproved, not found outside it:
+        // the proof needs the identity that `zz` lacks (D15:2365).
+        let unproved = declaration(&minimal_config(), |app| {
+            app["requestedLocales"] = json!(["en", "zz"]);
+            app["defaultRequestedLocale"] = json!("de");
+        });
+        let (evaluation, _) = resolve(&unproved);
+        let invalid_set = unit(
+            LocaleSubject::RequestedLocale(rejected()),
+            Check::CanonicalLocale,
+        );
+        assert_eq!(
+            waits_on(
+                &evaluation,
+                &unit(
+                    LocaleSubject::DefaultRequestedLocale,
+                    Check::RequestedMember
+                )
+            ),
+            Some(vec![invalid_set])
+        );
+        assert_eq!(evaluation.issues().count(), 1);
 
         // An invalid default leaves only its membership not evaluated.
         let invalid_default = declaration(&minimal_config(), |app| {
@@ -1269,7 +1424,7 @@ mod tests {
                         | LocaleSubject::TargetDefaultRequestedLocale(_)
                 )
         }));
-        let over = resolved.requested_set.clone().unwrap_err();
+        let over = resolved.requested_set.complete().unwrap_err();
         assert_eq!(units(&over), [occurrence_unit()]);
         assert_eq!(resolved.project.unwrap_err(), over);
         // Each spelling stands for itself and waits on the bound.
@@ -1381,7 +1536,7 @@ mod tests {
             ]
         );
         assert_eq!(resolved.occurrence_total, Some(Actual::Exact(3)));
-        assert_eq!(resolved.requested_set, Err(requested.clone()));
+        assert_eq!(resolved.requested_set.complete(), Err(requested.clone()));
         assert_eq!(
             resolved.project,
             Err(source.union(requested).union(default))
@@ -1417,7 +1572,7 @@ mod tests {
                 Check::CanonicalLocale,
             );
             assert_eq!(waits_on(&evaluation, &spelled), Some(units(&causes)));
-            assert_eq!(resolved.requested_set, Err(causes.clone()));
+            assert_eq!(resolved.requested_set.complete(), Err(causes.clone()));
             assert_eq!(issues(&evaluation), []);
         }
     }

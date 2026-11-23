@@ -97,6 +97,43 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
         }
     }
 
+    /// The required array of strings `name`, element by element: each one's
+    /// value or why it has none, so that one that failed holds back no other
+    /// (D15:2367). The array itself failing leaves no element to read.
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug of an array the checks admitted that is absent
+    /// or no array, or of an element they admitted that is no string.
+    pub(crate) fn string_items(
+        &self,
+        name: &str,
+    ) -> Result<Admitted<Vec<Admitted<String>>>, StructuralInvariant> {
+        let value = self.member_value(self.declaration, name);
+        let items = match value.map(|array| (array, self.document.node(array).kind())) {
+            Some((array, NodeKind::Array(items))) if self.values.value(array).is_ok() => items,
+            _ => {
+                return match self.values.member(self.document, self.declaration, name) {
+                    Err(causes) => Ok(Err(causes)),
+                    Ok(()) => Err(StructuralInvariant::UnreportedFailure),
+                };
+            }
+        };
+        items
+            .iter()
+            .map(
+                |&item| match (self.values.value(item), self.document.node(item).kind()) {
+                    (Err(causes), _) => Ok(Err(causes)),
+                    (Ok(()), NodeKind::String(text)) => Ok(Ok(text.clone())),
+                    (Ok(()), _) => Err(StructuralInvariant::Admission(
+                        AdmissionInvariant::AuthoringTypeMismatch,
+                    )),
+                },
+            )
+            .collect::<Result<Vec<_>, _>>()
+            .map(Ok)
+    }
+
     /// Every locale spelling of the declaration, as `maxLocaleOccurrences`
     /// counts them, whatever structural admission made of the fields that hold
     /// them: each string at a locale role and each key of a map keyed by
@@ -408,6 +445,58 @@ mod tests {
         assert_eq!(
             DeclarationFragments::new(&values, &analysis, "absent").err(),
             Some(StructuralInvariant::UnreportedFailure)
+        );
+    }
+
+    /// The project's `requestedLocales` once `edit` changed the declaration.
+    fn items(
+        admissions: Option<ValueAdmissions>,
+        edit: fn(&mut Value),
+    ) -> Result<Admitted<Vec<Admitted<String>>>, StructuralInvariant> {
+        let mut config = complete_config();
+        edit(&mut config["profiles"]["app"]);
+        let (_, values, analysis) = structured_in(Evaluation::default(), &config);
+        let values = admissions.unwrap_or(values);
+        DeclarationFragments::new(&values, &analysis, "app")?.string_items("requestedLocales")
+    }
+
+    /// Each element is read on its own: one that failed holds back no other,
+    /// and an array that failed itself has no element to read (D15:2367).
+    #[test]
+    fn an_array_of_strings_is_read_element_by_element() {
+        assert_eq!(items(None, |_| {}), Ok(Ok(vec![Ok("en".to_owned())])));
+        let read = items(None, |app| app["requestedLocales"] = json!(["ja", 7, "zz"]));
+        let read = read.unwrap().unwrap();
+        assert_eq!(read[0], Ok("ja".to_owned()));
+        assert!(read[1].is_err());
+        assert_eq!(read[2], Ok("zz".to_owned()));
+        let whole: [fn(&mut Value); 3] = [
+            |app| app["requestedLocales"] = json!("en"),
+            |app| app["requestedLocales"] = json!([]),
+            |app| lacking(app, &[], "requestedLocales"),
+        ];
+        for edit in whole {
+            assert!(items(None, edit).unwrap().is_err());
+        }
+    }
+
+    /// An array the checks admitted that is not one, and an element they
+    /// admitted that is no string, are resolver bugs.
+    #[test]
+    fn an_array_the_checks_admit_and_the_value_lacks_is_a_resolver_bug() {
+        let bug = |edit| items(Some(ValueAdmissions::default()), edit).err();
+        let unreported: [fn(&mut Value); 2] = [
+            |app| app["requestedLocales"] = json!("en"),
+            |app| lacking(app, &[], "requestedLocales"),
+        ];
+        for edit in unreported {
+            assert_eq!(bug(edit), Some(StructuralInvariant::UnreportedFailure));
+        }
+        assert_eq!(
+            bug(|app| app["requestedLocales"] = json!([7])),
+            Some(StructuralInvariant::Admission(
+                AdmissionInvariant::AuthoringTypeMismatch
+            ))
         );
     }
 
