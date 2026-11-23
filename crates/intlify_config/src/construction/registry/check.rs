@@ -153,7 +153,7 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:fd5443253cbc6dc588b07337b263b2f130de1b135eba9867beb453e846b637e9";
+    "sha256:509fd27c5eb25481ea659a4516abc216ebde9aa313a4b88ba303ccaf87f84572";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
@@ -1217,15 +1217,13 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         | K::CapabilityTargetProfileArtifacts
         | K::CapabilityArtifact
         | K::CapabilityArtifactBytes => &[NONE],
-        // A count of the selected declaration's references reads the fields
-        // that hold them, `policies` and the Target ID entries (D15:1918,
-        // 1921-1922), and waits on the selection: on its Profile ID and the
-        // selector naming it, and on the structural checks of its boundary
-        // and `resourceLimits` reference, which no check of profile selection
-        // reports (D15:2131).
-        K::CapabilityReferences
-        | K::CapabilityTargetProfileReference
-        | K::CapabilityReferenceBytes => &[&[
+        // A target's reference waits on the structural checks of its key and
+        // `profile` (D15:1921, 1924). Each reference bound waits on the
+        // selection: its Profile ID, the selector naming it, and the structural
+        // checks of its boundary and `resourceLimits` reference, which no check
+        // of profile selection reports (D15:2131). No one reference's failure
+        // holds the count or the total back (D15:1918, 1922, 1924, 3354).
+        K::CapabilityTargetProfileReference => &[&[
             "structural.profile.required-field",
             "structural.profile.field-value",
             "structural.profile.known-field",
@@ -1236,13 +1234,15 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
             "selection.profile-id.within-capability",
             "selection.selector.declared",
         ]],
-        K::CapabilityPolicyReference => &[&[
-            "structural.profile.required-field",
-            "structural.profile.field-value",
-            "structural.profile.known-field",
-            "selection.profile-id.within-capability",
-            "selection.selector.declared",
-        ]],
+        K::CapabilityReferences | K::CapabilityReferenceBytes | K::CapabilityPolicyReference => {
+            &[&[
+                "structural.profile.required-field",
+                "structural.profile.field-value",
+                "structural.profile.known-field",
+                "selection.profile-id.within-capability",
+                "selection.selector.declared",
+            ]]
+        }
         K::ProfileSpecificationDependency => &[&["specification.project-profile.supported"]],
         // The selection's checks wait on the one before them: a `schemaVersion`
         // member of an object root, then its string (D15:2130, 2149). The
@@ -1371,8 +1371,10 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         | K::TargetProfileArtifacts
         | K::Artifact
         | K::ArtifactBytes
-        | K::PolicyReference => &[&["resource-policy.resource-limits.compatible"]],
-        K::References | K::TargetProfileReference | K::ReferenceBytes => &[&[
+        | K::References
+        | K::PolicyReference
+        | K::ReferenceBytes => &[&["resource-policy.resource-limits.compatible"]],
+        K::TargetProfileReference => &[&[
             "structural.target-key.field-value",
             "structural.target.required-field",
             "structural.target.field-value",

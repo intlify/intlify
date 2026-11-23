@@ -30,7 +30,8 @@ extend-exclude = [
 # name that has to be reported as unknown rather than silently lost. Only a
 # line that ends with `spellchecker:disable-line` is skipped, so the word is
 # still checked everywhere else.
-extend-ignore-re = ["(?Rm)^.*//\\s*spellchecker:disable-line$"]
+# A Resolver Construction Identity is a base64url digest, not a word.
+extend-ignore-re = ["(?Rm)^.*//\\s*spellchecker:disable-line$", "rci0_[A-Za-z0-9_-]+"]
 
 [default.extend-words]
 # Paired benchmark schedules use A/B ordering such as AB, BA, and ABBA.

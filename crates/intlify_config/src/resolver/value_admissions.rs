@@ -9,12 +9,13 @@
 //! from its candidates therefore keeps a failure of one element out of its
 //! siblings (D15:393, 2367, 3340).
 //!
-//! A value's candidates are its own checks, and the check of the key when the
-//! value is an entry of an identity map. An undeclared member is a failure of
-//! the object that holds it, and a missing required member is kept by its
-//! object and its name, since it has no value (D15:2180, 2184). Only what
-//! did not pass is kept, so a configuration structural admission admitted
-//! whole holds nothing here.
+//! A value's candidates are its own checks. The check of an identity map's
+//! key is kept apart, by the entry's value: an entry without an admitted key
+//! has no subject in a later phase, while its fields are still checked
+//! (D15:2184). An undeclared member is a failure of the object that holds it,
+//! and a missing required member is kept by its object and its name, since it
+//! has no value (D15:2180, 2184). Only what did not pass is kept, so a
+//! configuration structural admission admitted whole holds nothing here.
 
 use std::collections::BTreeMap;
 
@@ -29,6 +30,8 @@ use super::evaluation::{Admitted, Causes};
 pub(crate) struct ValueAdmissions {
     /// By the value a candidate looked at.
     values: BTreeMap<NodeId, Causes>,
+    /// By the value of the entry whose key a candidate looked at.
+    keys: BTreeMap<NodeId, Causes>,
     /// By the object that lacks a required member, and the member's name.
     missing: BTreeMap<NodeId, BTreeMap<Box<str>, Causes>>,
 }
@@ -45,7 +48,7 @@ impl ValueAdmissions {
                     .scope(scope)
                     .entry
                     .expect("a key's scope is its entry's");
-                join(&mut self.values, entry.value, causes);
+                join(&mut self.keys, entry.value, causes);
             }
             At::Missing { object } => {
                 let steps = facts.steps(candidate.path);
@@ -59,9 +62,17 @@ impl ValueAdmissions {
         }
     }
 
+    /// Whether the check of the key of the entry whose value is `entry`
+    /// passed, or its causes.
+    pub(crate) fn key(&self, entry: NodeId) -> Admitted<()> {
+        self.keys.get(&entry).cloned().map_or(Ok(()), Err)
+    }
+
     /// Whether every candidate of the member `name` of `object` passed, those
-    /// of the values below it included, or the causes of those that did not.
-    /// A member `object` does not hold has only the check that requires it.
+    /// of the values below it and of the keys of their entries included, or
+    /// the causes of those that did not. A member `object` does not hold has
+    /// only the check that requires it, and a value that is no object holds
+    /// none for the failure of its own type.
     pub(crate) fn member(
         &self,
         document: &MaterializedDocument,
@@ -73,19 +84,21 @@ impl ValueAdmissions {
             .get(&object)
             .and_then(|missing| missing.get(name))
             .cloned();
-        let mut pending: Vec<NodeId> = match document.node(object).kind() {
-            NodeKind::Object(members) => members.get(name).map(ObjectMember::value),
-            _ => None,
+        let mut pending: Vec<NodeId> = Vec::new();
+        match document.node(object).kind() {
+            NodeKind::Object(members) => {
+                pending.extend(members.get(name).map(ObjectMember::value));
+            }
+            _ => found = self.values.get(&object).cloned(),
         }
-        .into_iter()
-        .collect();
         while let Some(value) = pending.pop() {
             let lacking = self
                 .missing
                 .get(&value)
                 .into_iter()
                 .flat_map(BTreeMap::values);
-            for causes in self.values.get(&value).into_iter().chain(lacking) {
+            let own = self.values.get(&value).into_iter();
+            for causes in own.chain(self.keys.get(&value)).chain(lacking) {
                 found = Some(match found {
                     Some(earlier) => earlier.union(causes.clone()),
                     None => causes.clone(),
@@ -116,6 +129,7 @@ fn join<K: Ord>(held: &mut BTreeMap<K, Causes>, key: K, causes: &Causes) {
 pub(crate) mod tests {
     use std::sync::Arc;
 
+    use schemars::JsonSchema;
     use serde_json::{json, Value};
 
     use crate::fixtures::{
@@ -135,13 +149,24 @@ pub(crate) mod tests {
     use super::ValueAdmissions;
 
     pub(crate) type Analysis = StructuralAnalysis<FixturePolicyReference, FixtureTargetReference>;
-    type Schema = AuthoringSchema<FixturePolicyReference, FixtureTargetReference>;
 
     /// Phase 2 over `value`, recording into `evaluation`.
     pub(crate) fn structured_in(
-        mut evaluation: Evaluation,
+        evaluation: Evaluation,
         value: &Value,
     ) -> (Evaluation, ValueAdmissions, Analysis) {
+        structured_as(evaluation, value)
+    }
+
+    /// The same under the authoring model of `Policy` and `Target`.
+    pub(crate) fn structured_as<Policy: JsonSchema, Target: JsonSchema>(
+        mut evaluation: Evaluation,
+        value: &Value,
+    ) -> (
+        Evaluation,
+        ValueAdmissions,
+        StructuralAnalysis<Policy, Target>,
+    ) {
         let bytes: Arc<[u8]> = Arc::from(serde_json::to_vec(value).unwrap());
         let document = materialize_file(Arc::clone(&bytes), input_limits()).unwrap();
         let fixture = FileFixture::new(&fixture_limits(100));
@@ -154,7 +179,7 @@ pub(crate) mod tests {
             &mut evaluation,
             &fixture.file(bytes),
             document,
-            &Schema::for_model().unwrap(),
+            &AuthoringSchema::for_model().unwrap(),
             limits,
             Ok(()),
         )
@@ -225,7 +250,8 @@ pub(crate) mod tests {
     fn a_configuration_admitted_whole_holds_nothing() {
         for config in [minimal_config(), complete_config()] {
             let (_, values, analysis) = structured_in(Evaluation::default(), &config);
-            assert!(values.values.is_empty() && values.missing.is_empty());
+            assert!(values.values.is_empty() && values.keys.is_empty());
+            assert!(values.missing.is_empty());
             assert_eq!(held_back(&values, &analysis), Vec::<&str>::new());
         }
     }
@@ -319,8 +345,8 @@ pub(crate) mod tests {
         assert_eq!(held_back(&values, &analysis), Vec::<&str>::new());
     }
 
-    /// A key without the identifier syntax is a failure of its entry's value,
-    /// which joins the failures already there.
+    /// A key without the identifier syntax is kept apart from the failures
+    /// of its entry's value, and a field gathers both.
     #[test]
     fn a_failing_key_joins_the_failures_of_its_entry() {
         let mut config = minimal_config();
@@ -328,7 +354,11 @@ pub(crate) mod tests {
         target["extra"] = json!(true);
         config["profiles"]["app"]["targetProfiles"]["Web App"] = target;
         let (_, values, analysis) = structured_in(Evaluation::default(), &config);
-        assert_eq!(values.values.len(), 1);
+        assert_eq!((values.values.len(), values.keys.len()), (1, 1));
+        let entry = *values.keys.keys().next().unwrap();
+        assert!(values.key(entry).is_err());
+        let (document, _) = app(&analysis);
+        assert_eq!(values.member(document, entry, "profile"), Ok(()));
         assert_eq!(held_back(&values, &analysis), ["targetProfiles"]);
         assert_eq!(
             checks(&member(&values, &analysis, "targetProfiles")),
@@ -360,7 +390,8 @@ pub(crate) mod tests {
         );
     }
 
-    /// A value that is no object holds no member, whatever is kept there.
+    /// A value that is no object holds no member: a member of it waits on
+    /// the failure of the value's own type, and on nothing below it.
     #[test]
     fn a_value_that_is_no_object_has_no_member() {
         let mut config = minimal_config();
@@ -372,5 +403,14 @@ pub(crate) mod tests {
         };
         let array = members["requestedLocales"].value();
         assert_eq!(values.member(document, array, "requestedLocales"), Ok(()));
+        let mut config = minimal_config();
+        config["profiles"]["app"]["targetProfiles"]["browser"] = json!(7);
+        let (_, values, analysis) = structured_in(Evaluation::default(), &config);
+        let (document, _) = app(&analysis);
+        let browser = *values.values.keys().next().unwrap();
+        assert_eq!(
+            checks(&values.member(document, browser, "profile")),
+            [("target", Check::FieldType)]
+        );
     }
 }

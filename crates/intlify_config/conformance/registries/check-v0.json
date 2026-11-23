@@ -2214,10 +2214,6 @@
         "structural.profile.required-field",
         "structural.profile.field-value",
         "structural.profile.known-field",
-        "structural.target-key.field-value",
-        "structural.target.required-field",
-        "structural.target.field-value",
-        "structural.target.known-field",
         "selection.profile-id.within-capability",
         "selection.selector.declared"
       ],
@@ -2435,10 +2431,6 @@
         "structural.profile.required-field",
         "structural.profile.field-value",
         "structural.profile.known-field",
-        "structural.target-key.field-value",
-        "structural.target.required-field",
-        "structural.target.field-value",
-        "structural.target.known-field",
         "selection.profile-id.within-capability",
         "selection.selector.declared"
       ],
@@ -3275,10 +3267,6 @@
       "subjectKindRank": "22",
       "checkRank": "0",
       "prerequisiteCheckIds": [
-        "structural.target-key.field-value",
-        "structural.target.required-field",
-        "structural.target.field-value",
-        "structural.target.known-field",
         "resource-policy.resource-limits.compatible"
       ],
       "possibleFindingCodes": [
@@ -3488,10 +3476,6 @@
       "subjectKindRank": "27",
       "checkRank": "0",
       "prerequisiteCheckIds": [
-        "structural.target-key.field-value",
-        "structural.target.required-field",
-        "structural.target.field-value",
-        "structural.target.known-field",
         "resource-policy.resource-limits.compatible"
       ],
       "possibleFindingCodes": [

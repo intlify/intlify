@@ -790,6 +790,30 @@ pub(crate) mod tests {
         });
     }
 
+    /// A structural failure of one reference or target no longer holds the
+    /// selection back, and the phases after it run, but a profile needs the
+    /// whole root, so the outcome stays blocked (D15:2142, 2367; plan 025
+    /// decision #342).
+    #[test]
+    fn a_confirmed_selection_beside_a_structural_failure_stays_blocked() {
+        let edits: [fn(&mut Value); 3] = [
+            |app| app["policies"]["trust"] = json!(42),
+            |app| app["targetProfiles"]["server"]["profile"] = json!(42),
+            |app| app["targetProfiles"]["server"]["requestedLocales"] = json!(["en", 42]),
+        ];
+        for edit in edits {
+            let mut inputs = Inputs::complete();
+            edit(inputs.declaration());
+            reporting(&inputs, &[], &[]).outcome(None, identity(), |_, invoked, outcome| {
+                let state = invoked.state.as_ref().unwrap();
+                assert!(state.policy.confirmed.is_ok());
+                assert!(state.structure.is_err());
+                assert!(outcome.checked.is_none());
+                assert!(outcome.evidence.complete());
+            });
+        }
+    }
+
     /// A domain past a bound of the admitted policy leaves the bundle
     /// incomplete, with one terminal state for each exhausted domain, Entry
     /// before Shared, and the outcome blocked, though no Finding blocks:
