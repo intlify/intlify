@@ -30,7 +30,7 @@ use std::collections::BTreeMap;
 
 use crate::artifacts::content::Content;
 use crate::locale::CanonicalLocale;
-use crate::model::{NonEmptyMap, TargetDeclaration, TargetId};
+use crate::model::TargetId;
 
 use super::artifact_resolution::{self, AdmittedArtifact};
 use super::declaration_observer::{DeclarationObserver, ObserverInvariant};
@@ -121,11 +121,14 @@ pub(crate) struct TargetFacts<'s> {
     pub(crate) resolved: Admitted<ResolvedTarget<'s>>,
 }
 
-/// Every declared target's facts, in Target ID order, and the map's bound as
-/// Phase 7 checked it, which a later check over the set of Target IDs needs.
+/// Every target with an admitted Target ID's facts, in Target ID order; the
+/// map's bound as Phase 7 checked it, which a later check over the set of
+/// Target IDs needs; and whether structural admission admitted the whole map,
+/// which a phase that still reads the targets as one set waits on.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ResolvedTargets<'s> {
     bounded: Admitted<()>,
+    structure: Admitted<()>,
     facts: BTreeMap<TargetId, TargetFacts<'s>>,
 }
 
@@ -143,9 +146,19 @@ impl<'s> ResolvedTargets<'s> {
         self.facts.iter()
     }
 
-    /// Whether every target resolved, or the causes of each that did not.
+    /// These targets, once structural admission admitted the whole map: what
+    /// Phases 12 and 13 read, each as one set until they read it by entry.
+    pub(crate) fn whole(&self) -> Result<&Self, &Causes> {
+        match &self.structure {
+            Ok(()) => Ok(self),
+            Err(causes) => Err(causes),
+        }
+    }
+
+    /// Whether the whole map was admitted and every target resolved, or the
+    /// causes of what was not and of each that did not.
     pub(crate) fn complete(&self) -> Admitted<()> {
-        let mut holds = Ok(());
+        let mut holds = self.structure.clone();
         for facts in self.facts.values() {
             let resolved = facts.resolved.as_ref().map(|_| ()).map_err(Causes::clone);
             holds = and(holds, resolved);
@@ -154,40 +167,34 @@ impl<'s> ResolvedTargets<'s> {
     }
 }
 
-/// Phase 11 over the declared targets, the locales and target bounds Phase 7
-/// resolved, and the references Phase 9 resolved, observed through
-/// `observer`, the selected declaration's, when there is one. Each check of a
+/// Phase 11 over the targets Phase 7 read, each with its locales and bounds,
+/// and the references Phase 9 resolved, observed through `observer`, the
+/// selected declaration's, when there is one. `structure` is whether
+/// structural admission admitted the whole Target ID map. Each check of a
 /// target waits on its Target ID's bounds. The subset, the effective default,
-/// and the directions are checked independently of each other; only the
-/// directions wait on the Target Profile, and the resolved target needs every
-/// one.
+/// and the directions are checked independently of each other, over the
+/// values of its set that were admitted (D15:2184, 3354); only the directions
+/// wait on the Target Profile, so an invalid one stops what needs it alone
+/// (D15:2367), and the resolved target needs every one. Without a map to read
+/// there is no target, and no unit.
 ///
 /// # Errors
 ///
 /// Returns the resolver bug of a unit recorded against its phase's rules, or
 /// of a declared value without Evidence.
-pub(crate) fn resolve_targets<'s, Target>(
+pub(crate) fn resolve_targets<'s>(
     evaluation: &mut Evaluation,
-    declared: Admitted<&NonEmptyMap<TargetId, TargetDeclaration<Target>>>,
+    structure: Admitted<()>,
     locales: &ResolvedLocales,
     (references, observer): (&ReferenceResults<'s>, Option<&DeclarationObserver<'_>>),
 ) -> Result<Admitted<ResolvedTargets<'s>>, TargetInvariant> {
-    let declared = match declared {
-        Ok(declared) => declared,
-        Err(causes) => return Ok(Err(causes)),
+    let targets = match &locales.targets {
+        Ok(targets) => targets,
+        Err(causes) => return Ok(Err(causes.clone())),
     };
-    let by_id: Admitted<BTreeMap<&TargetId, &TargetLocales>> = locales
-        .targets
-        .as_ref()
-        .map(|targets| targets.iter().map(|target| (&target.id, target)).collect())
-        .map_err(Causes::clone);
     let mut facts = BTreeMap::new();
-    for (id, _) in declared.iter() {
-        let own = by_id.as_ref().map_err(Causes::clone).map(|by_id| {
-            *by_id
-                .get(id)
-                .expect("Phase 7 resolves the locales of every declared target")
-        });
+    for own in targets {
+        let id = &own.id;
         facts.insert(
             id.clone(),
             Checks { id, observer }.resolve(evaluation, own, locales, references)?,
@@ -195,6 +202,7 @@ pub(crate) fn resolve_targets<'s, Target>(
     }
     Ok(Ok(ResolvedTargets {
         bounded: locales.target_bound.clone(),
+        structure,
         facts,
     }))
 }
@@ -239,26 +247,27 @@ impl Checks<'_, '_> {
     fn resolve<'s>(
         &self,
         evaluation: &mut Evaluation,
-        own: Admitted<&TargetLocales>,
+        own: &TargetLocales,
         locales: &ResolvedLocales,
         references: &ReferenceResults<'s>,
     ) -> Result<TargetFacts<'s>, TargetInvariant> {
-        let admitted = own.clone().and_then(|own| own.admitted.clone());
-        let requested = own
-            .clone()
-            .and_then(|own| own.requested.complete().cloned());
+        let admitted = own.admitted.clone();
+        // The identities of the target's set that were admitted: a check
+        // over them waits only when every element is excluded (D15:2184,
+        // 3354).
+        let counted = own.requested.counted().cloned();
         // A target locale the project's set holds is in it whatever else
         // the set lacks, and one it does not hold is unproved while it lacks
         // any (D15:2365, 2367).
-        let covered = match &requested {
+        let covered = match &counted {
             Ok(own) => locales.requested_set.covers(own.as_slice()),
             Err(_) => locales.requested_set.complete().map(|_| true),
         };
-        let subset_input = both(both(admitted.clone(), requested.clone()), covered);
+        let subset_input = both(both(admitted.clone(), counted.clone()), covered);
         // What each check observes, made before its unit records it, and only
-        // once its input is admitted, which the declaration then holds.
+        // once it finds what it observes, which the declaration then holds.
         let beside_project = match (self.observer, &subset_input) {
-            (Some(observer), Ok(_)) => Some(Observation {
+            (Some(observer), Ok((_, false))) => Some(Observation {
                 primary: observer.value(&self.path("requestedLocales"))?,
                 related: vec![observer.value(&["requestedLocales"])?],
             }),
@@ -276,11 +285,16 @@ impl Checks<'_, '_> {
                 }
             },
         )?;
-        let origin = effective_default(own.clone(), locales);
+        let origin = effective_default(own, locales);
         let default_origin = origin.as_ref().ok().map(|&(_, reason)| reason);
-        let default_input = both(both(admitted.clone(), requested.clone()), origin);
+        // The default is among the admitted values, or else unproved beside
+        // an element without an identity (D15:2365, 2367).
+        let held = own
+            .requested
+            .holds(&origin.clone().map(|(locale, _)| locale));
+        let default_input = both(both(admitted.clone(), held), origin);
         let beside_set = match (self.observer, &default_input) {
-            (Some(observer), Ok((_, (_, reason)))) => {
+            (Some(observer), Ok((((), false), (_, reason)))) => {
                 let written = if *reason == Reason::ExplicitOverride {
                     observer.value(&self.path("defaultRequestedLocale"))?
                 } else {
@@ -293,11 +307,11 @@ impl Checks<'_, '_> {
             }
             _ => None,
         };
-        let default = evaluation.check_found(
+        let checked = evaluation.check_found(
             self.unit(Check::SupportedDefault),
             default_input,
-            |(((), requested), (locale, reason))| {
-                if requested.contains(&locale) {
+            |(((), held), (locale, reason))| {
+                if held {
                     Ok(locale)
                 } else {
                     let unsupported = issue(Code::TargetDefaultLocaleNotSupported, Some(reason));
@@ -305,8 +319,13 @@ impl Checks<'_, '_> {
                 }
             },
         )?;
+        // The check read the values admitted, while what a later phase reads
+        // also waits on those excluded: an invalid target emits no effective
+        // default (D15:2184, 2416).
+        let default =
+            both(checked, own.requested.complete().map(|_| ())).map(|(locale, ())| locale);
         let profile = profile(references, self.id);
-        let directed_input = both(both(admitted.clone(), requested.clone()), profile.clone());
+        let directed_input = both(both(admitted.clone(), counted), profile.clone());
         let sight = match (self.observer, &directed_input) {
             (Some(observer), Ok((_, (tuple, _)))) => Some(Directions {
                 items: self
@@ -337,10 +356,10 @@ impl Checks<'_, '_> {
                 }
             },
         )?;
-        let distinct = own.and_then(|own| own.distinct.clone());
-        let requested = both(requested, subset).map(|(requested, ())| requested);
+        let requested =
+            both(own.requested.complete().cloned(), subset).map(|(requested, ())| requested);
         let resolved = both(
-            both(requested.clone(), distinct),
+            both(requested.clone(), own.distinct.clone()),
             both(default.clone(), both(profile.clone(), directed)),
         )
         .map(
@@ -364,17 +383,17 @@ impl Checks<'_, '_> {
 /// The target's effective default and where it came from: its own override,
 /// or else the project's default.
 fn effective_default(
-    own: Admitted<&TargetLocales>,
+    own: &TargetLocales,
     locales: &ResolvedLocales,
 ) -> Admitted<(CanonicalLocale, Reason)> {
-    own.and_then(|own| match &own.default {
+    match &own.default {
         Ok(Some(locale)) => Ok((locale.clone(), Reason::ExplicitOverride)),
         Ok(None) => locales
             .requested_default
             .clone()
             .map(|locale| (locale, Reason::InheritedProjectDefault)),
         Err(causes) => Err(causes.clone()),
-    })
+    }
 }
 
 /// What the directions check observes, made before its unit records it:
@@ -428,13 +447,10 @@ fn undirected<'l>(
 /// The Set's Target Profile the target's reference names, or why it names
 /// none.
 fn profile<'s>(references: &ReferenceResults<'s>, id: &TargetId) -> Admitted<Named<'s>> {
-    match references.get(&ReferenceField::TargetProfile(id.clone())) {
-        Some(found) => found.clone(),
-        None => Err(references
-            .unavailable()
-            .cloned()
-            .expect("Phase 9 resolves or suppresses every declared target's reference")),
-    }
+    references
+        .get(&ReferenceField::TargetProfile(id.clone()))
+        .expect("Phase 9 records every admitted target's reference")
+        .clone()
 }
 
 const fn issue(code: Code, reason: Option<Reason>) -> Blocking {
@@ -470,7 +486,7 @@ mod tests {
         canonical, canonicalizer, content, key, rejected, stand_in, target, waits_on,
     };
     use crate::resolver::locales::{self, resolve_locales, LocaleFields, LocaleSubject};
-    use crate::resolver::resource_policy::DeclarationReferences;
+    use crate::resolver::resource_policy::{DeclarationReferences, TargetReferences};
     use crate::resolver::specification::Slot;
 
     type Declaration = ProfileDeclaration<PolicyReference, TargetProfileReference>;
@@ -521,6 +537,8 @@ mod tests {
         limits: ResolutionLimits,
         policy: Admitted<()>,
         declared: Admitted<()>,
+        /// Whether structural admission admitted everything under the map.
+        structure: Admitted<()>,
     }
 
     impl Inputs {
@@ -557,6 +575,7 @@ mod tests {
                 limits: fixture_limits(100),
                 policy: Ok(()),
                 declared: Ok(()),
+                structure: Ok(()),
             }
         }
 
@@ -629,7 +648,9 @@ mod tests {
                         set.as_ref(),
                         &DeclarationReferences {
                             policies: Err(stand_in(Slot::ProjectProfile)),
-                            target_profiles: Ok(&declaration.target_profiles),
+                            target_profiles: Ok(TargetReferences::declared(
+                                &declaration.target_profiles,
+                            )),
                         },
                         (locales.targets.as_deref(), Some(observer)),
                     )
@@ -639,7 +660,7 @@ mod tests {
                 .app(|observer| {
                     resolve_targets(
                         &mut evaluation,
-                        declared,
+                        and(self.declared.clone(), self.structure.clone()),
                         &locales,
                         (&references, Some(observer)),
                     )
@@ -1205,24 +1226,90 @@ mod tests {
                 LocaleSubject::TargetDefaultRequestedLocale(target("browser")),
                 Check::CanonicalLocale,
             );
+            // `ja` keeps its identity, so the checks over the set's values
+            // are evaluated; the default names none and waits.
             for check in [Check::ProjectSubset, Check::DirectedLocales] {
-                assert_eq!(
-                    waits_on(&evaluation, &target_unit("browser", check)),
-                    Some(vec![member.clone()])
-                );
+                assert_eq!(waits_on(&evaluation, &target_unit("browser", check)), None);
             }
             assert_eq!(
                 waits_on(
                     &evaluation,
                     &target_unit("browser", Check::SupportedDefault)
                 ),
-                Some(vec![member, default])
+                Some(vec![member.clone(), default])
             );
             // The ID was checked in Phase 7, and the server is untouched.
             assert_eq!(waits_on(&evaluation, &id_unit("browser")), None);
             let targets = targets.unwrap();
             assert_eq!(facts(&targets, "browser").admitted, Ok(()));
+            // The set still lacks an identity, so the target does not resolve.
+            assert_eq!(
+                facts(&targets, "browser")
+                    .requested
+                    .as_ref()
+                    .map_err(|causes| causes
+                        .keys()
+                        .map(|key| key.unit().clone())
+                        .collect::<Vec<_>>())
+                    .unwrap_err(),
+                vec![member]
+            );
+            assert!(facts(&targets, "browser").resolved.is_err());
             assert!(facts(&targets, "server").resolved.is_ok());
+        });
+    }
+
+    /// A default the admitted values hold passes its check, and a later phase
+    /// still reads no effective default from a target whose set lacks an
+    /// identity (D15:2184, 2365, 2416).
+    #[test]
+    fn a_default_held_beside_a_failed_element_hands_on_no_effective_default() {
+        let mut inputs = Inputs::new();
+        inputs.target("browser")["requestedLocales"] = json!(["ja", "en-x-brand"]);
+        inputs.resolve(|evaluation, targets| {
+            let check = target_unit("browser", Check::SupportedDefault);
+            assert_eq!(waits_on(&evaluation, &check), None);
+            let member = locales::unit(
+                LocaleSubject::TargetRequestedLocale(target("browser"), rejected()),
+                Check::CanonicalLocale,
+            );
+            let targets = targets.unwrap();
+            let browser = facts(&targets, "browser");
+            let causes = browser.effective_default.as_ref().unwrap_err();
+            assert_eq!(
+                causes
+                    .keys()
+                    .map(|key| key.unit().clone())
+                    .collect::<Vec<_>>(),
+                [member]
+            );
+            assert_eq!(browser.default_origin, Some(Reason::ExplicitOverride));
+            assert!(facts(&targets, "server").effective_default.is_ok());
+        });
+    }
+
+    /// With no element of its set admitted, a target's checks over its
+    /// values have none to read and wait on why (D15:2184, 3354).
+    #[test]
+    fn a_target_without_an_admitted_locale_waits_on_its_elements() {
+        let mut inputs = Inputs::new();
+        inputs.target("browser")["requestedLocales"] = json!(["en-x-brand"]);
+        inputs.resolve(|evaluation, _| {
+            let member = locales::unit(
+                LocaleSubject::TargetRequestedLocale(target("browser"), rejected()),
+                Check::CanonicalLocale,
+            );
+            for check in [
+                Check::ProjectSubset,
+                Check::DirectedLocales,
+                Check::SupportedDefault,
+            ] {
+                assert_eq!(
+                    waits_on(&evaluation, &target_unit("browser", check)),
+                    Some(vec![member.clone()]),
+                    "{check:?}"
+                );
+            }
         });
     }
 
@@ -1321,6 +1408,31 @@ mod tests {
             }
             assert_eq!(targets, Err(causes));
         });
+    }
+
+    /// Beside a failure under the map, each target keeps its facts, while
+    /// what reads the targets as one set waits on it, and every target's
+    /// own causes join it (D15:2367).
+    #[test]
+    fn a_map_not_admitted_whole_keeps_each_targets_facts() {
+        let mut inputs = Inputs::new();
+        let causes = stand_in(Slot::DeliveryGraph);
+        inputs.structure = Err(causes.clone());
+        inputs.target("browser")["requestedLocales"] = json!(["ja", "de"]);
+        inputs.resolve(|evaluation, targets| {
+            let targets = targets.unwrap();
+            assert!(facts(&targets, "server").resolved.is_ok());
+            assert!(facts(&targets, "browser").requested.is_err());
+            assert_eq!(targets.whole().unwrap_err(), &causes);
+            let found: BTreeSet<_> = evaluation.issues().cloned().collect();
+            assert!(!found.is_empty());
+            let every = found.into_iter().chain(causes.keys().cloned());
+            assert_eq!(
+                keys(&targets.complete().unwrap_err()),
+                every.collect::<BTreeSet<_>>()
+            );
+        });
+        Inputs::new().resolve(|_, targets| assert!(targets.unwrap().whole().is_ok()));
     }
 
     #[test]

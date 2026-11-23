@@ -21,26 +21,29 @@ use super::structural_admission::StructuralInvariant;
 use super::tally::{total, Tally};
 use super::value_admissions::ValueAdmissions;
 
-/// One entry of `targetProfiles` whose key structural admission admitted, as
-/// Phase 7 reads it: each locale-bearing field's value, element by element,
+/// One entry of `targetProfiles` whose key structural admission admitted:
+/// its reference, and each locale-bearing field's value, element by element,
 /// or why it has none. Its key names the subjects of its fields, so one field
 /// that failed holds back neither the other nor another entry (D15:2184,
 /// 2367).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct TargetEntry {
+pub(crate) struct TargetEntry<Target> {
     pub(crate) id: TargetId,
+    pub(crate) profile: Admitted<Target>,
     pub(crate) requested_locales: Admitted<Vec<Admitted<String>>>,
     pub(crate) default_requested_locale: Admitted<Option<String>>,
 }
 
 /// The Target ID map entry by entry: how many entries it holds, every one
-/// counted whatever its key (D15:1930), and each entry with an admitted key,
-/// in the map's order. An entry whose key failed has no later subject
-/// (D15:2184, 3354).
+/// counted whatever its key (D15:1930), each entry with an admitted key, in
+/// the map's order, and whether everything at and below the map passed, which
+/// a later phase that still reads the targets as one set waits on. An entry
+/// whose key failed has no later subject (D15:2184, 3354).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct TargetEntries {
+pub(crate) struct TargetEntries<Target> {
     pub(crate) submitted: usize,
-    pub(crate) entries: Vec<TargetEntry>,
+    pub(crate) entries: Vec<TargetEntry<Target>>,
+    pub(crate) whole: Admitted<()>,
 }
 
 /// The declaration `id` of an analysis, with what structural admission left
@@ -140,8 +143,13 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
     ///
     /// Returns the resolver bug of a map the checks admitted that is absent
     /// or no object, of a key they admitted that is no Target ID, or of a
-    /// locale value they admitted that is no string.
-    pub(crate) fn target_entries(&self) -> Result<Admitted<TargetEntries>, StructuralInvariant> {
+    /// value they admitted that its type cannot read.
+    pub(crate) fn target_entries(
+        &self,
+    ) -> Result<Admitted<TargetEntries<Target>>, StructuralInvariant>
+    where
+        Target: DeserializeOwned,
+    {
         let map = self.member_value(self.declaration, "targetProfiles");
         let members = match map.map(|map| (map, self.document.node(map).kind())) {
             Some((map, NodeKind::Object(members))) if self.values.value(map).is_ok() => members,
@@ -161,6 +169,7 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
             if self.values.key(entry).is_ok() {
                 entries.push(TargetEntry {
                     id: target_id(key)?,
+                    profile: self.required_at(entry, "profile")?,
                     requested_locales: self.strings_at(entry, "requestedLocales")?,
                     default_requested_locale: self
                         .string_at_member(entry, "defaultRequestedLocale")?,
@@ -170,7 +179,32 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
         Ok(Ok(TargetEntries {
             submitted: members.len(),
             entries,
+            whole: self
+                .values
+                .member(self.document, self.declaration, "targetProfiles"),
         }))
+    }
+
+    /// The required member `name` of `object` as `T`, or why it has none.
+    fn required_at<T: DeserializeOwned>(
+        &self,
+        object: NodeId,
+        name: &str,
+    ) -> Result<Admitted<T>, StructuralInvariant> {
+        if let Err(causes) = self.values.member(self.document, object, name) {
+            return Ok(Err(causes));
+        }
+        let value = self
+            .member_value(object, name)
+            .ok_or(StructuralInvariant::UnreportedFailure)?;
+        self.decoded(value).map(Ok)
+    }
+
+    /// The admitted value at `node`, as `T`.
+    fn decoded<T: DeserializeOwned>(&self, node: NodeId) -> Result<T, StructuralInvariant> {
+        self.document
+            .decode(node)
+            .map_err(|_| StructuralInvariant::Admission(AdmissionInvariant::AuthoringTypeMismatch))
     }
 
     /// The optional string member `name` of `object`, absent when it is, or
@@ -391,13 +425,6 @@ impl DeclarationFragments<'_, PolicyReference, TargetProfileReference> {
             bytes,
         }))
     }
-
-    /// The admitted value at `node`, as `T`.
-    fn decoded<T: DeserializeOwned>(&self, node: NodeId) -> Result<T, StructuralInvariant> {
-        self.document
-            .decode(node)
-            .map_err(|_| StructuralInvariant::Admission(AdmissionInvariant::AuthoringTypeMismatch))
-    }
 }
 
 /// The Target ID an admitted key spells.
@@ -410,7 +437,7 @@ fn target_id(key: &str) -> Result<TargetId, StructuralInvariant> {
 mod tests {
     use serde_json::{json, Value};
 
-    use crate::fixtures::{complete_config, minimal_config};
+    use crate::fixtures::{complete_config, minimal_config, FixtureTargetReference};
     use crate::model::ProfileDeclaration;
     use crate::references::{PolicyReference, TargetProfileReference};
     use crate::resolver::evaluation::{Admitted, Evaluation, Subject, Unit};
@@ -418,7 +445,7 @@ mod tests {
     use crate::resolver::locales::LocaleFields;
     use crate::resolver::profile_resolution::tests::Inputs;
     use crate::resolver::resource_policy::{
-        DeclarationReferences, PolicySlot, ReferenceField, ReferenceOccurrence,
+        DeclarationReferences, PolicySlot, ReferenceField, ReferenceOccurrence, TargetReferences,
     };
     use crate::resolver::structural_admission::{
         EntryKey, StructuralInvariant, StructuralSubject as S,
@@ -599,7 +626,7 @@ mod tests {
     fn entries(
         admissions: Option<ValueAdmissions>,
         edit: fn(&mut Value),
-    ) -> Result<Admitted<TargetEntries>, StructuralInvariant> {
+    ) -> Result<Admitted<TargetEntries<FixtureTargetReference>>, StructuralInvariant> {
         let mut config = complete_config();
         edit(&mut config["profiles"]["app"]);
         let (_, values, analysis) = structured_in(Evaluation::default(), &config);
@@ -626,6 +653,8 @@ mod tests {
             Ok(Some("en".to_owned()))
         );
         assert_eq!(whole.entries[1].default_requested_locale, Ok(None));
+        assert!(whole.entries.iter().all(|each| each.profile.is_ok()));
+        assert_eq!(whole.whole, Ok(()));
 
         let read = entries(None, |app| {
             app["targetProfiles"]["browser"]["requestedLocales"] = json!(["ja", 7]);
@@ -644,6 +673,14 @@ mod tests {
             Ok(vec![Ok("en".to_owned())])
         );
         assert!(read.entries[1].default_requested_locale.is_err());
+        assert!(read.whole.is_err());
+
+        let read = entries(None, |app| {
+            app["targetProfiles"]["server"]["profile"] = json!(7);
+        });
+        let read = read.unwrap().unwrap();
+        assert!(read.entries[0].profile.is_ok() && read.entries[1].profile.is_err());
+        assert!(read.entries[1].requested_locales.is_ok());
 
         let read = entries(None, |app| app["targetProfiles"]["server"] = json!(7));
         let read = read.unwrap().unwrap();
@@ -681,23 +718,30 @@ mod tests {
     #[test]
     fn a_target_map_the_checks_admit_and_the_value_lacks_is_a_resolver_bug() {
         let bug = |edit| entries(Some(ValueAdmissions::default()), edit).err();
-        let unreported: [fn(&mut Value); 3] = [
+        let unreported: [fn(&mut Value); 4] = [
             |app| app["targetProfiles"] = json!(7),
             |app| lacking(app, &[], "targetProfiles"),
             |app| {
                 let copy = app["targetProfiles"]["server"].clone();
                 app["targetProfiles"]["Web App"] = copy;
             },
+            |app| lacking(app, &["targetProfiles", "server"], "profile"),
         ];
         for edit in unreported {
             assert_eq!(bug(edit), Some(StructuralInvariant::UnreportedFailure));
         }
-        assert_eq!(
-            bug(|app| app["targetProfiles"]["server"]["defaultRequestedLocale"] = json!(7)),
-            Some(StructuralInvariant::Admission(
-                AdmissionInvariant::AuthoringTypeMismatch
-            ))
-        );
+        let mismatched: [fn(&mut Value); 2] = [
+            |app| app["targetProfiles"]["server"]["defaultRequestedLocale"] = json!(7),
+            |app| app["targetProfiles"]["server"]["profile"] = json!(7),
+        ];
+        for edit in mismatched {
+            assert_eq!(
+                bug(edit),
+                Some(StructuralInvariant::Admission(
+                    AdmissionInvariant::AuthoringTypeMismatch
+                ))
+            );
+        }
     }
 
     /// What the document holds of a declaration admitted whole is what its
@@ -762,7 +806,7 @@ mod tests {
         let declared: ProfileDeclaration<_, _> = serde_json::from_value(app).unwrap();
         let typed = DeclarationReferences {
             policies: Ok(&declared.policies),
-            target_profiles: Ok(&declared.target_profiles),
+            target_profiles: Ok(TargetReferences::declared(&declared.target_profiles)),
         };
         assert_eq!(Ok(occurrences(|_| {})), typed.occurrences());
         let trust = ReferenceField::Policy(PolicySlot::Trust);

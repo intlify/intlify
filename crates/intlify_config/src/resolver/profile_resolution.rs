@@ -640,7 +640,7 @@ where
     own(evaluation, SemanticGroup::Delivery, held(delivery.as_ref()))?;
     let targets = resolve_targets(
         evaluation,
-        fields.target_profiles(),
+        fields.target_structure(),
         &locales,
         (&results, observer.as_ref()),
     )?;
@@ -651,18 +651,21 @@ where
             .as_ref()
             .map_or_else(|causes| Err(causes.clone()), ResolvedTargets::complete),
     )?;
+    // The groups and relations still read the targets as one set, which any
+    // failure under the map leaves unavailable (plan 025 decision #343).
+    let whole_targets = targets.as_ref().and_then(ResolvedTargets::whole);
     let groups = resolve_groups(
         evaluation,
         confirmed,
         fields.deployment_groups(),
-        (targets.as_ref(), observer.as_ref()),
+        (whole_targets, observer.as_ref()),
     )?;
     // Every relation shares the negotiation profile; none compares it.
     let hydration = validate_hydration(
         evaluation,
         confirmed,
         fields.deployment_groups(),
-        targets.as_ref(),
+        whole_targets,
         (groups.as_ref(), observer.as_ref()),
         negotiation.as_ref().map(|_| ()).map_err(Causes::clone),
     )?;
@@ -4277,15 +4280,15 @@ pub(super) mod tests {
         );
     }
 
-    /// A target without its own set waits on why, and on what the project's
-    /// set lacks, which it would need to compare a locale it does not hold
-    /// (D15:2365, 2367).
+    /// A target with no admitted value in its set waits on why, and on what
+    /// the project's set lacks, which it would need to compare a locale it
+    /// does not hold (D15:2184, 2365, 2367, 3354).
     #[test]
     fn a_target_without_its_set_waits_on_the_projects_missing_element_too() {
         let mut inputs = Inputs::complete();
         let app = inputs.declaration();
         app["requestedLocales"] = json!(["ja", "en", 42]);
-        app["targetProfiles"]["server"]["requestedLocales"] = json!(["ja", "zz"]);
+        app["targetProfiles"]["server"]["requestedLocales"] = json!(["zz"]);
         let server = serde_json::from_value(json!("server")).unwrap();
         inputs.resolve(|evaluation, _| {
             let subset = crate::resolver::targets::unit(
@@ -4306,7 +4309,11 @@ pub(super) mod tests {
     const WAITING_ON_A_TARGET: &str = "dependency.deployment-groups.established dependency.targets.established group.member.known hydration.endpoint.known hydration.endpoint.role hydration.relation.same-effective-default hydration.relation.same-requested-locales hydration.relation.static-compatibility";
 
     /// The rows left without a subject by the same failure.
-    const WITHOUT_A_SUBJECT: &str = "artifact.target-profile-reference.resolved group.target.single-group target.effective-default.supported target.requested-locales.directed target.requested-locales.project-subset";
+    const WITHOUT_A_SUBJECT: &str = "group.target.single-group";
+
+    /// The rows of the failed reference: its own bounds and the two checks
+    /// that need its Target Profile wait on it, and the other target's run.
+    const PER_TARGET: &str = "artifact.target-profile-reference.resolved resource-policy.target-profile-reference.within-bound resource-policy.target-profile-reference.within-capability target.requested-locales.directed";
 
     /// End to end, one target's failed `profile` leaves one Finding, and each
     /// row is evaluated, waits on it alone, or has no subject; only the failed
@@ -4349,7 +4356,7 @@ pub(super) mod tests {
                 gone.copied().collect::<BTreeSet<_>>(),
                 split(WITHOUT_A_SUBJECT)
             );
-            assert_eq!(names(|[on, off]| *on > 0 && *off > 0).len(), 2);
+            assert_eq!(names(|[on, off]| *on > 0 && *off > 0), split(PER_TARGET));
         });
     }
 
@@ -4500,6 +4507,146 @@ pub(super) mod tests {
                 .count();
             assert_eq!(ids, 2);
         });
+    }
+
+    /// An entry whose key fails has no reference to resolve, while what
+    /// needs every reference, or every target, waits on its Finding, and
+    /// each target beside it resolves (D15:2184, 2367, 3354).
+    #[test]
+    fn a_target_whose_key_fails_holds_back_what_needs_every_target() {
+        use crate::resolver::locales::fixtures::target;
+        let mut inputs = Inputs::complete();
+        let copy = inputs.declaration()["targetProfiles"]["server"].clone();
+        inputs.declaration()["targetProfiles"]["Web App"] = copy;
+        inputs.resolve(|evaluation, state| {
+            let found = BTreeSet::from([only_issue(&evaluation)]);
+            assert_eq!(keys(state.references.as_ref().unwrap_err()), found);
+            assert_eq!(keys(state.bindings.as_ref().unwrap_err()), found);
+            let targets = state.targets.as_ref().unwrap();
+            for id in ["browser", "server"] {
+                assert!(targets.get(&target(id)).unwrap().resolved.is_ok(), "{id}");
+            }
+            assert_eq!(keys(targets.complete().as_ref().unwrap_err()), found);
+        });
+    }
+
+    /// One target's failed `profile` holds back only the checks that need
+    /// that profile: its reference and its directions wait on the Finding,
+    /// and every other check of it, and of the other target, is evaluated
+    /// (D15:2139, 2367, 3445, 3446).
+    #[test]
+    fn a_target_profile_that_failed_stops_only_what_needs_it() {
+        use crate::resolver::locales::fixtures::target;
+        let edits: [fn(&mut Value); 2] = [
+            |server| server["profile"] = json!(42),
+            |server| {
+                server.as_object_mut().unwrap().remove("profile");
+            },
+        ];
+        for edit in edits {
+            let mut inputs = Inputs::complete();
+            edit(&mut inputs.declaration()["targetProfiles"]["server"]);
+            inputs.resolve(|evaluation, state| {
+                let found = BTreeSet::from([only_issue(&evaluation)]);
+                let check =
+                    |id: &str, check| targets::unit(TargetSubject::Target(target(id)), check);
+                let reference =
+                    |id: &str| exact_resolution::unit(ReferenceField::TargetProfile(target(id)));
+                all_evaluated(
+                    &evaluation,
+                    &[
+                        reference("browser"),
+                        check("browser", Check::ProjectSubset),
+                        check("browser", Check::SupportedDefault),
+                        check("browser", Check::DirectedLocales),
+                        check("server", Check::ProjectSubset),
+                        check("server", Check::SupportedDefault),
+                    ],
+                );
+                waits_on_exactly(&evaluation, &reference("server"), &found);
+                waits_on_exactly(
+                    &evaluation,
+                    &check("server", Check::DirectedLocales),
+                    &found,
+                );
+                let targets = state.targets.as_ref().unwrap();
+                assert!(targets.get(&target("browser")).unwrap().resolved.is_ok());
+                assert!(targets.get(&target("server")).unwrap().resolved.is_err());
+                assert_eq!(keys(targets.complete().as_ref().unwrap_err()), found);
+                assert!(targets.whole().is_err());
+            });
+        }
+    }
+
+    /// What Phase 11 records of the target `server` once its
+    /// `requestedLocales` is `requested` and the project's `project`: the
+    /// three checks' results, as `None` when evaluated and otherwise the
+    /// number of causes, and the codes found.
+    fn server_checks(project: Value, requested: Value) -> (Vec<Option<usize>>, Vec<Code>) {
+        use crate::resolver::locales::fixtures::target;
+        let mut inputs = Inputs::complete();
+        let app = inputs.declaration();
+        app["requestedLocales"] = project;
+        app["targetProfiles"]["server"]["requestedLocales"] = requested;
+        inputs.resolve(|evaluation, _| {
+            let results = [
+                Check::ProjectSubset,
+                Check::SupportedDefault,
+                Check::DirectedLocales,
+            ]
+            .map(|check| {
+                let unit = targets::unit(TargetSubject::Target(target("server")), check);
+                match evaluation.status(&unit) {
+                    Some(Status::Evaluated) => None,
+                    Some(Status::NotEvaluated(causes)) => Some(keys(causes).len()),
+                    None => panic!("{unit:?} was not recorded"),
+                }
+            });
+            let codes = evaluation.issues().map(IssueKey::code).collect();
+            (results.to_vec(), codes)
+        })
+    }
+
+    /// A target's checks over its set read the values admitted: one that the
+    /// project's set proves outside it is a Finding, and one it cannot prove
+    /// waits. A default its admitted values do not hold is unproved beside
+    /// an element without an identity (D15:2184, 2365, 2367, 3354).
+    #[test]
+    fn a_target_set_with_a_failed_element_is_checked_over_what_it_holds() {
+        let type_found = Code::FieldTypeInvalid;
+        // Every admitted value is in the project's set: only the inherited
+        // default `en`, which the set does not hold, waits.
+        assert_eq!(
+            server_checks(json!(["ja", "en"]), json!(["ja", 42])),
+            (vec![None, Some(1), None], vec![type_found])
+        );
+        // `fr` is proved outside a project set with every identity, and
+        // the Target Profile has no direction for it.
+        assert_eq!(
+            server_checks(json!(["ja", "en"]), json!(["fr", 42])),
+            (
+                vec![None, Some(1), None],
+                vec![
+                    type_found,
+                    Code::TargetLocalesNotSubset,
+                    Code::TargetLocaleDirectionMissing
+                ]
+            )
+        );
+        // Beside an element of the project's set without an identity, `fr`
+        // is unproved and no Finding is made up.
+        assert_eq!(
+            server_checks(json!(["ja", "en", 42]), json!(["fr", 42])),
+            (
+                vec![Some(1), Some(1), None],
+                vec![type_found, type_found, Code::TargetLocaleDirectionMissing]
+            )
+        );
+        // With no value admitted, each of the three waits on why.
+        assert_eq!(
+            server_checks(json!(["ja", "en"]), json!([42])),
+            (vec![Some(1), Some(1), Some(1)], vec![type_found])
+        );
     }
 
     /// A declaration whose key lacks the identifier syntax counts under the

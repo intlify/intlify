@@ -30,7 +30,7 @@ use crate::resolver::exact_resolution::{
 };
 use crate::resolver::limits::ConfirmedPolicy;
 use crate::resolver::locales::{resolve_locales, LocaleFields, TargetLocales};
-use crate::resolver::resource_policy::{DeclarationReferences, ReferenceField};
+use crate::resolver::resource_policy::{DeclarationReferences, ReferenceField, TargetReferences};
 
 use super::observation::{Frame, Observation};
 use super::operation::{observer, Analysis, Config, ConfigFile, OutputFailure};
@@ -94,7 +94,7 @@ impl PreparedBindings {
         Some(BindingInputs {
             references: DeclarationReferences {
                 policies: Ok(&declaration.policies),
-                target_profiles: Ok(&declaration.target_profiles),
+                target_profiles: Ok(TargetReferences::declared(&declaration.target_profiles)),
             },
             targets: locales.targets,
             set,
