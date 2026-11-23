@@ -25,8 +25,8 @@
 //! ranks, and the key that ends it, as the Resolver Input Component Path
 //! builds them. No Finding reaches the verification `mode` role, the root of
 //! the Specification Input, the verification input, or the capability, or a
-//! `bootstrapOnly` bound other than those of `rawInput`, `snapshot`, and
-//! `artifactBootstrap` and the two of `localeData` the manifest decides.
+//! `bootstrapOnly` group other than `rawInput`, `snapshot`,
+//! `artifactBootstrap`, and `localeData`.
 //!
 //! Construction reads the policies with the registry cross-references (row
 //! 41): one for each evidence kind, in 015's order, whose members and
@@ -466,9 +466,8 @@ const fn classes(component: Component) -> &'static [NonSecretClass] {
 /// every Specification Input slot; the vocabulary's root and members, the
 /// canonicalization data's root, and the artifact collection's root and
 /// members; the verification input's `pins`; and every `policyComparable`
-/// bound with the `bootstrapOnly` bounds of `rawInput` and
-/// `artifactBootstrap` and the two of `localeData` the manifest decides, which
-/// construction and invocation check.
+/// bound with the `bootstrapOnly` bounds of `rawInput`, `artifactBootstrap`,
+/// and `localeData`, which construction and invocation check.
 fn reachable_paths(kind: EvidenceKind) -> Vec<PathShape> {
     match kind {
         EvidenceKind::SpecificationInput => Slot::ALL
@@ -492,15 +491,13 @@ fn reachable_paths(kind: EvidenceKind) -> Vec<PathShape> {
             .into_iter()
             .filter(|(bound, _)| match bound {
                 CapabilityBound::PolicyComparable(_) => true,
-                CapabilityBound::BootstrapOnly(id) => {
-                    matches!(
-                        id.group,
-                        BootstrapGroup::RawInput
-                            | BootstrapGroup::Snapshot
-                            | BootstrapGroup::ArtifactBootstrap
-                    ) || (id.group == BootstrapGroup::LocaleData
-                        && matches!(id.name, "maxPayloads" | "maxPayloadBytes"))
-                }
+                CapabilityBound::BootstrapOnly(id) => matches!(
+                    id.group,
+                    BootstrapGroup::RawInput
+                        | BootstrapGroup::Snapshot
+                        | BootstrapGroup::ArtifactBootstrap
+                        | BootstrapGroup::LocaleData
+                ),
             })
             .filter_map(|(bound, _)| ComponentPath::capability(bound).ok())
             .map(|path| PathShape::of(&path))
@@ -807,7 +804,7 @@ mod tests {
         assert_eq!(verification.len(), 1);
         assert_eq!(roles(&verification[0]), [("pins", "1")]);
         let capability = shapes(EvidenceKind::ImplementationCapability);
-        assert_eq!(capability.len(), 52 + 2 + 9 + 4 + 2);
+        assert_eq!(capability.len(), 52 + 2 + 9 + 4 + 9);
         assert!(capability
             .iter()
             .all(|shape| !shape.roles.is_empty() && shape.key.is_none()));
@@ -834,6 +831,13 @@ mod tests {
                 "artifactBootstrap",
                 "artifactBootstrap",
                 "artifactBootstrap",
+                "localeData",
+                "localeData",
+                "localeData",
+                "localeData",
+                "localeData",
+                "localeData",
+                "localeData",
                 "localeData",
                 "localeData"
             ]

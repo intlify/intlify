@@ -1603,6 +1603,125 @@
               "rank": "1"
             }
           ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "localeData",
+              "rank": "4"
+            },
+            {
+              "role": "maxMarkerBytes",
+              "rank": "2"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "localeData",
+              "rank": "4"
+            },
+            {
+              "role": "maxValidityGroups",
+              "rank": "3"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "localeData",
+              "rank": "4"
+            },
+            {
+              "role": "maxCodes",
+              "rank": "4"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "localeData",
+              "rank": "4"
+            },
+            {
+              "role": "maxExtensionKeys",
+              "rank": "5"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "localeData",
+              "rank": "4"
+            },
+            {
+              "role": "maxTypes",
+              "rank": "6"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "localeData",
+              "rank": "4"
+            },
+            {
+              "role": "maxCorrections",
+              "rank": "7"
+            }
+          ]
+        },
+        {
+          "origin": "implementation-capability",
+          "roles": [
+            {
+              "role": "bootstrapOnly",
+              "rank": "1"
+            },
+            {
+              "role": "localeData",
+              "rank": "4"
+            },
+            {
+              "role": "maxValidationWorkUnits",
+              "rank": "8"
+            }
+          ]
         }
       ]
     }
@@ -2553,6 +2672,9 @@
     {
       "code": "project-profile-locale-data-not-admitted",
       "allowedCheckIds": [
+        "specification.locale-data.manifest-intact",
+        "specification.locale-data.markers-readable",
+        "specification.locale-data.conformance-readable",
         "specification.locale-data.matching"
       ],
       "severity": "error",
@@ -2563,11 +2685,35 @@
       "allowedReasons": [],
       "occurrencePrimaryEvidenceKindByCheck": [
         {
+          "checkId": "specification.locale-data.manifest-intact",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "specification.locale-data.markers-readable",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "specification.locale-data.conformance-readable",
+          "kind": "artifact-input"
+        },
+        {
           "checkId": "specification.locale-data.matching",
           "kind": "artifact-input"
         }
       ],
       "occurrenceRelatedEvidenceKindsByCheck": [
+        {
+          "checkId": "specification.locale-data.manifest-intact",
+          "kinds": []
+        },
+        {
+          "checkId": "specification.locale-data.markers-readable",
+          "kinds": []
+        },
+        {
+          "checkId": "specification.locale-data.conformance-readable",
+          "kinds": []
+        },
         {
           "checkId": "specification.locale-data.matching",
           "kinds": [
@@ -5577,7 +5723,14 @@
         "resource-policy.resource-limits.within-decoded-allocation",
         "resource-policy.resource-limits.within-validation-work",
         "specification.locale-data.within-payloads",
-        "specification.locale-data.within-payload-bytes"
+        "specification.locale-data.within-payload-bytes",
+        "specification.locale-data.within-marker-bytes",
+        "specification.locale-data.within-validity-groups",
+        "specification.locale-data.within-codes",
+        "specification.locale-data.within-extension-keys",
+        "specification.locale-data.within-types",
+        "specification.locale-data.within-corrections",
+        "specification.locale-data.within-validation-work"
       ],
       "severity": "error",
       "blocking": true,
@@ -5654,6 +5807,34 @@
         },
         {
           "checkId": "specification.locale-data.within-payload-bytes",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "specification.locale-data.within-marker-bytes",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "specification.locale-data.within-validity-groups",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "specification.locale-data.within-codes",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "specification.locale-data.within-extension-keys",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "specification.locale-data.within-types",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "specification.locale-data.within-corrections",
+          "kind": "artifact-input"
+        },
+        {
+          "checkId": "specification.locale-data.within-validation-work",
           "kind": "artifact-input"
         }
       ],
@@ -5759,6 +5940,48 @@
         },
         {
           "checkId": "specification.locale-data.within-payload-bytes",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "specification.locale-data.within-marker-bytes",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "specification.locale-data.within-validity-groups",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "specification.locale-data.within-codes",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "specification.locale-data.within-extension-keys",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "specification.locale-data.within-types",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "specification.locale-data.within-corrections",
+          "kinds": [
+            "implementation-capability"
+          ]
+        },
+        {
+          "checkId": "specification.locale-data.within-validation-work",
           "kinds": [
             "implementation-capability"
           ]
@@ -6083,6 +6306,125 @@
                 {
                   "role": "maxPayloadBytes",
                   "rank": "1"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "localeData",
+                  "rank": "4"
+                },
+                {
+                  "role": "maxMarkerBytes",
+                  "rank": "2"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "localeData",
+                  "rank": "4"
+                },
+                {
+                  "role": "maxValidityGroups",
+                  "rank": "3"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "localeData",
+                  "rank": "4"
+                },
+                {
+                  "role": "maxCodes",
+                  "rank": "4"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "localeData",
+                  "rank": "4"
+                },
+                {
+                  "role": "maxExtensionKeys",
+                  "rank": "5"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "localeData",
+                  "rank": "4"
+                },
+                {
+                  "role": "maxTypes",
+                  "rank": "6"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "localeData",
+                  "rank": "4"
+                },
+                {
+                  "role": "maxCorrections",
+                  "rank": "7"
+                }
+              ]
+            },
+            {
+              "origin": "implementation-capability",
+              "roles": [
+                {
+                  "role": "bootstrapOnly",
+                  "rank": "1"
+                },
+                {
+                  "role": "localeData",
+                  "rank": "4"
+                },
+                {
+                  "role": "maxValidationWorkUnits",
+                  "rank": "8"
                 }
               ]
             }

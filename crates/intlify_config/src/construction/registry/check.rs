@@ -153,7 +153,7 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:433c5841513210b7372548b8afccb35a1d8a8d1f2c556b0a57788196dc27df34";
+    "sha256:14379d2409f00913db091bd73ce65f41982b3a7977319e2e4885337163726886";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
@@ -1006,6 +1006,16 @@ const fn check_ids(kind: SubjectKind) -> &'static [&'static str] {
         K::CanonicalizationData => &[
             "specification.locale-data.within-payloads",
             "specification.locale-data.within-payload-bytes",
+            "specification.locale-data.manifest-intact",
+            "specification.locale-data.markers-readable",
+            "specification.locale-data.within-marker-bytes",
+            "specification.locale-data.conformance-readable",
+            "specification.locale-data.within-validity-groups",
+            "specification.locale-data.within-codes",
+            "specification.locale-data.within-extension-keys",
+            "specification.locale-data.within-types",
+            "specification.locale-data.within-corrections",
+            "specification.locale-data.within-validation-work",
             "specification.locale-data.matching",
         ],
         K::LocaleCanonicalizationDependency => &["dependency.locale-canonicalization.established"],
@@ -1388,15 +1398,34 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
             ],
         ],
         // The bounds the manifest decides wait on the confirmed policy alone,
-        // and only the comparison with the slot on the slot (D15:2008, 2133,
-        // 2149, 2365).
+        // its read on both, each payload's read on it, each count on its
+        // payload's read, and only the comparison with the slot on the slot
+        // (D15:2008, 2133, 2149, 2365).
         K::CanonicalizationData => &[
             CONFIRMED_POLICY,
             CONFIRMED_POLICY,
             &[
-                "specification.locale-canonicalization.supported",
                 "specification.locale-data.within-payloads",
                 "specification.locale-data.within-payload-bytes",
+            ],
+            &["specification.locale-data.manifest-intact"],
+            &["specification.locale-data.markers-readable"],
+            &["specification.locale-data.manifest-intact"],
+            &["specification.locale-data.conformance-readable"],
+            &["specification.locale-data.conformance-readable"],
+            &["specification.locale-data.conformance-readable"],
+            &["specification.locale-data.conformance-readable"],
+            &["specification.locale-data.conformance-readable"],
+            &["specification.locale-data.conformance-readable"],
+            &[
+                "specification.locale-canonicalization.supported",
+                "specification.locale-data.within-marker-bytes",
+                "specification.locale-data.within-validity-groups",
+                "specification.locale-data.within-codes",
+                "specification.locale-data.within-extension-keys",
+                "specification.locale-data.within-types",
+                "specification.locale-data.within-corrections",
+                "specification.locale-data.within-validation-work",
             ],
         ],
         K::LocaleCanonicalizationDependency => &[&["specification.locale-data.matching"]],
@@ -1826,6 +1855,16 @@ const fn finding_codes(kind: SubjectKind) -> &'static [&'static [Code]] {
             &[C::IntentSurfaceClassVocabularyNotAdmitted],
         ],
         K::CanonicalizationData => &[
+            &[C::BootstrapLimitExceeded],
+            &[C::BootstrapLimitExceeded],
+            &[C::LocaleDataNotAdmitted],
+            &[C::LocaleDataNotAdmitted],
+            &[C::BootstrapLimitExceeded],
+            &[C::LocaleDataNotAdmitted],
+            &[C::BootstrapLimitExceeded],
+            &[C::BootstrapLimitExceeded],
+            &[C::BootstrapLimitExceeded],
+            &[C::BootstrapLimitExceeded],
             &[C::BootstrapLimitExceeded],
             &[C::BootstrapLimitExceeded],
             &[C::LocaleDataNotAdmitted],
@@ -2404,7 +2443,7 @@ mod tests {
             .map(|row| (row.subject_kind, row.check_id.as_str()))
             .collect();
         assert_eq!(written, listed);
-        assert_eq!(rows.len(), 180);
+        assert_eq!(rows.len(), 190);
         for kind in SubjectKind::ALL {
             assert_eq!(check_ids(kind).len(), kind.checks().len(), "{kind:?}");
         }

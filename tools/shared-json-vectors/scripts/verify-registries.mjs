@@ -1306,8 +1306,8 @@ const role = (name, rank) => ({ role: name, rank: String(rank) })
  * members, the canonicalization data's root, and the artifact collection's
  * root and members, each member with an admitted key and then a redacted
  * one; the verification input's `pins`; and every `policyComparable` bound
- * with the `bootstrapOnly` bounds of `rawInput`, `snapshot`, and
- * `artifactBootstrap` and the two of `localeData` the manifest decides.
+ * with the `bootstrapOnly` bounds of `rawInput`, `snapshot`,
+ * `artifactBootstrap`, and `localeData`.
  * The `diagnostics` groups share one parent role, ranked where the first of
  * them stands.
  *
@@ -1358,14 +1358,7 @@ function reachablePaths(kind) {
             }))
           : []
       )
-      return [
-        ...comparable,
-        ...bootstrap.filter(
-          ({ roles }) =>
-            roles[1].role !== 'localeData' ||
-            ['maxPayloads', 'maxPayloadBytes'].includes(roles[2].role)
-        )
-      ]
+      return [...comparable, ...bootstrap]
     }
     default:
       return []

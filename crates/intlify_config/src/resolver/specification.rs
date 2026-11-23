@@ -183,7 +183,7 @@ const fn unit(phase: Phase, slot: Slot) -> Unit {
 }
 
 /// The units Phase 5 records, in their canonical order.
-pub(crate) const PHASE_5: [Unit; 12] = [
+pub(crate) const PHASE_5: [Unit; 22] = [
     unit(Phase::SpecificationAdmission, Slot::LocaleCanonicalization),
     unit(Phase::SpecificationAdmission, Slot::LocaleNegotiation),
     unit(Phase::SpecificationAdmission, Slot::MessageLocaleFallback),
@@ -198,6 +198,16 @@ pub(crate) const PHASE_5: [Unit; 12] = [
     ASSERTED,
     data_unit(Check::WithinDataPayloads),
     data_unit(Check::WithinDataPayloadBytes),
+    data_unit(Check::DataManifest),
+    data_unit(Check::DataMarkers),
+    data_unit(Check::WithinDataMarkerBytes),
+    data_unit(Check::DataConformance),
+    data_unit(Check::WithinDataValidityGroups),
+    data_unit(Check::WithinDataCodes),
+    data_unit(Check::WithinDataExtensionKeys),
+    data_unit(Check::WithinDataTypes),
+    data_unit(Check::WithinDataCorrections),
+    data_unit(Check::WithinDataValidationWork),
     DATA,
 ];
 
@@ -559,7 +569,7 @@ mod tests {
     use crate::artifacts::vectors::vocabulary::{self as vectors, formal};
     use crate::input_limits::Bound;
     use crate::locale::fixtures::{fixture_pins, FixtureProvider};
-    use crate::locale::{DataNotAdmitted, DataReading, DatasetPin, SemanticPins};
+    use crate::locale::{DataCount, DataNotAdmitted, DataReading, DatasetPin, SemanticPins};
     use crate::model::CONFIGURATION_SCHEMA_VERSION;
     use crate::resolver::capability::BootstrapLimits;
     use crate::resolver::evaluation::Status;
@@ -816,6 +826,16 @@ mod tests {
                 Subject::Slot(Slot::DeliveryPlacement),
                 Subject::Vocabulary,
                 Subject::Vocabulary,
+                Subject::CanonicalizationData,
+                Subject::CanonicalizationData,
+                Subject::CanonicalizationData,
+                Subject::CanonicalizationData,
+                Subject::CanonicalizationData,
+                Subject::CanonicalizationData,
+                Subject::CanonicalizationData,
+                Subject::CanonicalizationData,
+                Subject::CanonicalizationData,
+                Subject::CanonicalizationData,
                 Subject::CanonicalizationData,
                 Subject::CanonicalizationData,
                 Subject::CanonicalizationData,
@@ -1127,6 +1147,49 @@ mod tests {
         );
         assert_eq!(unread.not_evaluated(), []);
         assert!(unread.set().is_ok());
+    }
+
+    /// A slot that names nothing leaves the data's bounds provable: past one
+    /// it reports beside the slot's own Finding, and only the match waits
+    /// (D15:2133, 2365).
+    #[test]
+    fn a_bound_of_the_data_is_reported_beside_an_invalid_slot() {
+        #[derive(PartialEq, Eq)]
+        struct OverCodes;
+
+        impl FormalData for OverCodes {
+            type Provider = FixtureProvider;
+
+            fn read(&self, limits: &LocaleDataLimits) -> DataReading<FixtureProvider> {
+                let mut reading = DataReading::settled(Err(DataNotAdmitted));
+                let read = reading.facts.read.as_mut().unwrap();
+                read.conformance.as_mut().unwrap().codes =
+                    DataCount::Exact(limits.max_codes.get() + 1);
+                reading
+            }
+        }
+
+        let mut input = complete();
+        input.locale_canonicalization = None;
+        let admission = Admission::run_with(&supported(), &input, Ok(&policy()), &OverCodes);
+        let codes = data_unit(Check::WithinDataCodes);
+        assert_eq!(
+            admission.issues(),
+            [
+                (
+                    unit(Phase::SpecificationAdmission, Slot::LocaleCanonicalization),
+                    "project-profile-specification-input-incomplete",
+                    Some("missing-required-slot")
+                ),
+                (codes, "project-profile-bootstrap-limit-exceeded", None),
+            ]
+        );
+        let waiting: Vec<Unit> = admission
+            .not_evaluated()
+            .into_iter()
+            .map(|(unit, _)| unit)
+            .collect();
+        assert_eq!(waiting, [DATA]);
     }
 
     /// Nothing reads the data before the Resource Limit Policy is confirmed

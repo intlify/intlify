@@ -4194,6 +4194,382 @@
       }
     },
     {
+      "checkId": "specification.locale-data.manifest-intact",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.locale-data.manifest-intact",
+      "subjectKind": "canonicalization-data",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "canonicalization-data",
+      "subjectKindRank": "8",
+      "checkRank": "2",
+      "prerequisiteCheckIds": [
+        "specification.locale-data.within-payloads",
+        "specification.locale-data.within-payload-bytes"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-locale-data-not-admitted"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "finding-occurrence",
+        "evidence-index",
+        "shared-finding",
+        "shared-evaluation-status"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-locale-data-not-admitted",
+            "members": [],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "specification.locale-data.markers-readable",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.locale-data.markers-readable",
+      "subjectKind": "canonicalization-data",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "canonicalization-data",
+      "subjectKindRank": "8",
+      "checkRank": "3",
+      "prerequisiteCheckIds": [
+        "specification.locale-data.manifest-intact"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-locale-data-not-admitted"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "finding-occurrence",
+        "evidence-index",
+        "shared-finding",
+        "shared-evaluation-status"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-locale-data-not-admitted",
+            "members": [],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "specification.locale-data.within-marker-bytes",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.locale-data.within-marker-bytes",
+      "subjectKind": "canonicalization-data",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "canonicalization-data",
+      "subjectKindRank": "8",
+      "checkRank": "4",
+      "prerequisiteCheckIds": [
+        "specification.locale-data.markers-readable"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "finding-occurrence",
+        "evidence-index",
+        "shared-finding",
+        "shared-evaluation-status"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "specification.locale-data.conformance-readable",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.locale-data.conformance-readable",
+      "subjectKind": "canonicalization-data",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "canonicalization-data",
+      "subjectKindRank": "8",
+      "checkRank": "5",
+      "prerequisiteCheckIds": [
+        "specification.locale-data.manifest-intact"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-locale-data-not-admitted"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "finding-occurrence",
+        "evidence-index",
+        "shared-finding",
+        "shared-evaluation-status"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-locale-data-not-admitted",
+            "members": [],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "specification.locale-data.within-validity-groups",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.locale-data.within-validity-groups",
+      "subjectKind": "canonicalization-data",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "canonicalization-data",
+      "subjectKindRank": "8",
+      "checkRank": "6",
+      "prerequisiteCheckIds": [
+        "specification.locale-data.conformance-readable"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "finding-occurrence",
+        "evidence-index",
+        "shared-finding",
+        "shared-evaluation-status"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "specification.locale-data.within-codes",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.locale-data.within-codes",
+      "subjectKind": "canonicalization-data",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "canonicalization-data",
+      "subjectKindRank": "8",
+      "checkRank": "7",
+      "prerequisiteCheckIds": [
+        "specification.locale-data.conformance-readable"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "finding-occurrence",
+        "evidence-index",
+        "shared-finding",
+        "shared-evaluation-status"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "specification.locale-data.within-extension-keys",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.locale-data.within-extension-keys",
+      "subjectKind": "canonicalization-data",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "canonicalization-data",
+      "subjectKindRank": "8",
+      "checkRank": "8",
+      "prerequisiteCheckIds": [
+        "specification.locale-data.conformance-readable"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "finding-occurrence",
+        "evidence-index",
+        "shared-finding",
+        "shared-evaluation-status"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "specification.locale-data.within-types",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.locale-data.within-types",
+      "subjectKind": "canonicalization-data",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "canonicalization-data",
+      "subjectKindRank": "8",
+      "checkRank": "9",
+      "prerequisiteCheckIds": [
+        "specification.locale-data.conformance-readable"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "finding-occurrence",
+        "evidence-index",
+        "shared-finding",
+        "shared-evaluation-status"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "specification.locale-data.within-corrections",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.locale-data.within-corrections",
+      "subjectKind": "canonicalization-data",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "canonicalization-data",
+      "subjectKindRank": "8",
+      "checkRank": "10",
+      "prerequisiteCheckIds": [
+        "specification.locale-data.conformance-readable"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "finding-occurrence",
+        "evidence-index",
+        "shared-finding",
+        "shared-evaluation-status"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
+      "checkId": "specification.locale-data.within-validation-work",
+      "phaseId": "specification-admission",
+      "ruleId": "015.specification.locale-data.within-validation-work",
+      "subjectKind": "canonicalization-data",
+      "subjectKeyStrategy": "singleton",
+      "subjectContentProjection": "none",
+      "owningScope": "canonicalization-data",
+      "subjectKindRank": "8",
+      "checkRank": "11",
+      "prerequisiteCheckIds": [
+        "specification.locale-data.conformance-readable"
+      ],
+      "possibleFindingCodes": [
+        "project-profile-bootstrap-limit-exceeded"
+      ],
+      "possibleEvidenceRecordKinds": [
+        "finding-occurrence",
+        "evidence-index",
+        "shared-finding",
+        "shared-evaluation-status"
+      ],
+      "ownedDependencies": [],
+      "findingPayloadStrategy": {
+        "derivation": "exact",
+        "details": [
+          {
+            "code": "project-profile-bootstrap-limit-exceeded",
+            "members": [
+              "bound",
+              "limit",
+              "actual",
+              "actualRelation"
+            ],
+            "reasons": []
+          }
+        ]
+      }
+    },
+    {
       "checkId": "specification.locale-data.matching",
       "phaseId": "specification-admission",
       "ruleId": "015.specification.locale-data.matching",
@@ -4202,11 +4578,16 @@
       "subjectContentProjection": "none",
       "owningScope": "canonicalization-data",
       "subjectKindRank": "8",
-      "checkRank": "2",
+      "checkRank": "12",
       "prerequisiteCheckIds": [
         "specification.locale-canonicalization.supported",
-        "specification.locale-data.within-payloads",
-        "specification.locale-data.within-payload-bytes"
+        "specification.locale-data.within-marker-bytes",
+        "specification.locale-data.within-validity-groups",
+        "specification.locale-data.within-codes",
+        "specification.locale-data.within-extension-keys",
+        "specification.locale-data.within-types",
+        "specification.locale-data.within-corrections",
+        "specification.locale-data.within-validation-work"
       ],
       "possibleFindingCodes": [
         "project-profile-locale-data-not-admitted"

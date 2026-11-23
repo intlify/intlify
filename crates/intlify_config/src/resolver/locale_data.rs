@@ -2,17 +2,19 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Phase 5's reading of the Locale Canonicalization Data Artifact past its
-//! boundary, as the checks of its singleton subject (D15:1990). A
-//! `bootstrapOnly.localeData` bound is a check of its own, reporting
+//! boundary, as the checks of its singleton subject (D15:1990). Each of the
+//! nine `bootstrapOnly.localeData` bounds is a check of its own, reporting
 //! `project-profile-bootstrap-limit-exceeded` with the bound's capability path
 //! (D15:2356, 3356; Decision 015-160).
 //!
-//! The two bounds the manifest decides come first and do not hide each other
-//! (D15:2008), then the match with the admitted specification, which still
-//! reads the rest of the data under the other seven bounds, which have no check
-//! of their own yet. Past `maxPayloadBytes` neither payload is read: the bound
-//! is one check of a singleton, and what a check waits on does not vary with
-//! the value it finds (D15:2149).
+//! The checks run in the bounds' order, except that a bound measured from a
+//! decoded payload follows the read that decodes it (D15:2008): the two bounds
+//! the manifest decides, the manifest's read, the markers' read and their
+//! bound, the conformance payload's read and its six bounds, and the match
+//! with the admitted specification (D17:1069 to 1072). One payload's failure
+//! leaves the other's bounds to report (D15:2365). Past `maxPayloadBytes`
+//! neither payload is read: the bound is one check of a singleton, and what a
+//! check waits on does not vary with the value it finds (D15:2149).
 //!
 //! Only the match waits on the `locale-canonicalization` slot. Reading the
 //! data and measuring it need the confirmed policy and no value of the slot,
@@ -21,14 +23,14 @@
 
 use crate::input_limits::Bound;
 use crate::locale::{
-    Canonicalizer, DataCount, DataFacts, DataNotAdmitted, FormalData, LocaleDataLimits, Provider,
-    SemanticPins,
+    Canonicalizer, DataCount, DataCounts, DataFacts, DataNotAdmitted, FormalData, LocaleDataLimits,
+    Provider, SemanticPins,
 };
 
 use super::capability::{BootstrapBoundId, BootstrapGroup, CapabilityBound};
 use super::evaluation::{
     both, Actual, Admitted, Blocking, BootstrapLimitExceeded, Causes, Check, Code, Evaluation,
-    Found, Observation, Phase, Subject, Unit,
+    EvaluationInvariant, Found, Observation, Phase, Subject, Unit,
 };
 use super::evidence::EvidenceProjection;
 use super::evidence_component::ComponentPath;
@@ -47,12 +49,18 @@ pub(crate) const fn unit(check: Check) -> Unit {
 /// The unit Phase 5 binds the canonicalization data in.
 pub(crate) const DATA: Unit = unit(Check::MatchingData);
 
-/// The `localeData` bounds with a check of their own, in the Capability
-/// Specification's order.
+/// The nine `localeData` bounds, in the Capability Specification's order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum DataBound {
     Payloads,
     PayloadBytes,
+    MarkerBytes,
+    ValidityGroups,
+    Codes,
+    ExtensionKeys,
+    Types,
+    Corrections,
+    ValidationWork,
 }
 
 impl DataBound {
@@ -61,6 +69,13 @@ impl DataBound {
         match self {
             Self::Payloads => Check::WithinDataPayloads,
             Self::PayloadBytes => Check::WithinDataPayloadBytes,
+            Self::MarkerBytes => Check::WithinDataMarkerBytes,
+            Self::ValidityGroups => Check::WithinDataValidityGroups,
+            Self::Codes => Check::WithinDataCodes,
+            Self::ExtensionKeys => Check::WithinDataExtensionKeys,
+            Self::Types => Check::WithinDataTypes,
+            Self::Corrections => Check::WithinDataCorrections,
+            Self::ValidationWork => Check::WithinDataValidationWork,
         }
     }
 
@@ -71,6 +86,13 @@ impl DataBound {
             name: match self {
                 Self::Payloads => "maxPayloads",
                 Self::PayloadBytes => "maxPayloadBytes",
+                Self::MarkerBytes => "maxMarkerBytes",
+                Self::ValidityGroups => "maxValidityGroups",
+                Self::Codes => "maxCodes",
+                Self::ExtensionKeys => "maxExtensionKeys",
+                Self::Types => "maxTypes",
+                Self::Corrections => "maxCorrections",
+                Self::ValidationWork => "maxValidationWorkUnits",
             },
         }
     }
@@ -80,9 +102,29 @@ impl DataBound {
         match self {
             Self::Payloads => limits.max_payloads,
             Self::PayloadBytes => limits.max_payload_bytes,
+            Self::MarkerBytes => limits.max_marker_bytes,
+            Self::ValidityGroups => limits.max_validity_groups,
+            Self::Codes => limits.max_codes,
+            Self::ExtensionKeys => limits.max_extension_keys,
+            Self::Types => limits.max_types,
+            Self::Corrections => limits.max_corrections,
+            Self::ValidationWork => limits.max_validation_work_units,
         }
     }
 }
+
+/// What reads one count from the conformance payload's.
+type CountOf = fn(&DataCounts) -> DataCount;
+
+/// The six bounds of what the conformance payload counts, with each count.
+const CONFORMANCE: [(DataBound, CountOf); 6] = [
+    (DataBound::ValidityGroups, |counts| counts.validity_groups),
+    (DataBound::Codes, |counts| counts.codes),
+    (DataBound::ExtensionKeys, |counts| counts.extension_keys),
+    (DataBound::Types, |counts| counts.types),
+    (DataBound::Corrections, |counts| counts.corrections),
+    (DataBound::ValidationWork, |counts| counts.validation_work),
+];
 
 /// The first-over witness of a total no exact count can report: `Bound`
 /// excludes `u64::MAX`, so it is representable (D15:2002, 2006).
@@ -142,6 +184,27 @@ fn check_bound<T>(
     )
 }
 
+/// The check of one read, whose failure is the data's, observed at its root
+/// and compared with nothing else.
+fn check_read<P, T>(
+    evaluation: &mut Evaluation,
+    check: Check,
+    prerequisite: Admitted<P>,
+    read: impl FnOnce(P) -> Result<T, DataNotAdmitted>,
+) -> Result<Admitted<T>, EvaluationInvariant> {
+    evaluation.check_found(unit(check), prerequisite, |value| {
+        read(value).map_err(|DataNotAdmitted| {
+            Found::observed(
+                NOT_ADMITTED,
+                Observation {
+                    primary: root(),
+                    related: Vec::new(),
+                },
+            )
+        })
+    })
+}
+
 /// The checks of the data, under the confirmed `policy`, and its canonicalizer
 /// when it reads within every bound and is the data `pins` admit. Without a
 /// confirmed policy nothing is read.
@@ -176,9 +239,32 @@ where
         evaluation,
         DataBound::PayloadBytes,
         limits,
-        facts,
+        facts.clone(),
         |facts, limit| facts.payload_bytes_over.then(|| first_over(limit)),
     )?;
+    let manifest = check_read(
+        evaluation,
+        Check::DataManifest,
+        both(both(payloads, payload_bytes), facts).map(|(_, facts)| facts),
+        |facts| facts.read,
+    )?;
+    let markers = check_read(evaluation, Check::DataMarkers, manifest.clone(), |read| {
+        read.markers
+    })?;
+    let mut within = check_bound(evaluation, DataBound::MarkerBytes, limits, markers, past)?;
+    let conformance = check_read(evaluation, Check::DataConformance, manifest, |read| {
+        read.conformance
+    })?;
+    for (bound, count) in CONFORMANCE {
+        let checked = check_bound(
+            evaluation,
+            bound,
+            limits,
+            conformance.clone(),
+            |counts, limit| past(count(&counts), limit),
+        )?;
+        within = both(within, checked).map(|((), ())| ());
+    }
     // The match compares the data with the slot it must be, so it alone is
     // observed beside the slot (D15:833, 1140, 2249).
     let observed = Observation {
@@ -189,7 +275,7 @@ where
     };
     Ok(evaluation.check_found(
         DATA,
-        both(both(pins, policy), both(payloads, payload_bytes)).map(|(admitted, _)| admitted),
+        both(both(pins, policy), within).map(|(admitted, ())| admitted),
         |(pins, policy): (SemanticPins<Id>, &ConfirmedPolicy)| {
             let mismatch = || Found::observed(NOT_ADMITTED, observed.clone());
             let provider = provider.map_err(|DataNotAdmitted| mismatch())?;
@@ -210,7 +296,7 @@ where
 mod tests {
     use super::*;
     use crate::locale::fixtures::FixtureProvider;
-    use crate::locale::DataReading;
+    use crate::locale::{DataReading, PayloadFacts};
     use crate::resolver::capability::BootstrapLimits;
     use crate::resolver::evaluation::{Reason, Status};
     use crate::resolver::limits::fixture_limits;
@@ -220,17 +306,37 @@ mod tests {
     const OVER: DataCount = DataCount::Exact(LIMIT + 1);
 
     /// Each bound, in its order, with its capability name.
-    const BOUNDS: [(DataBound, &str); 2] = [
+    const BOUNDS: [(DataBound, &str); 9] = [
         (DataBound::Payloads, "maxPayloads"),
         (DataBound::PayloadBytes, "maxPayloadBytes"),
+        (DataBound::MarkerBytes, "maxMarkerBytes"),
+        (DataBound::ValidityGroups, "maxValidityGroups"),
+        (DataBound::Codes, "maxCodes"),
+        (DataBound::ExtensionKeys, "maxExtensionKeys"),
+        (DataBound::Types, "maxTypes"),
+        (DataBound::Corrections, "maxCorrections"),
+        (DataBound::ValidationWork, "maxValidationWorkUnits"),
     ];
 
-    /// The three checks, in their canonical order.
-    const CHECKS: [Check; 3] = [
+    /// The thirteen checks, in their canonical order.
+    const CHECKS: [Check; 13] = [
         Check::WithinDataPayloads,
         Check::WithinDataPayloadBytes,
+        Check::DataManifest,
+        Check::DataMarkers,
+        Check::WithinDataMarkerBytes,
+        Check::DataConformance,
+        Check::WithinDataValidityGroups,
+        Check::WithinDataCodes,
+        Check::WithinDataExtensionKeys,
+        Check::WithinDataTypes,
+        Check::WithinDataCorrections,
+        Check::WithinDataValidationWork,
         Check::MatchingData,
     ];
+
+    /// Where the match stands in [`CHECKS`].
+    const LAST: usize = 12;
 
     /// The capability's minima, each bound at [`LIMIT`].
     const fn limits() -> LocaleDataLimits {
@@ -242,14 +348,34 @@ mod tests {
         DataFacts {
             payloads: AT,
             payload_bytes_over: false,
+            read: Ok(PayloadFacts {
+                markers: Ok(AT),
+                conformance: Ok(DataCounts {
+                    validity_groups: AT,
+                    codes: AT,
+                    extension_keys: AT,
+                    types: AT,
+                    corrections: AT,
+                    validation_work: AT,
+                }),
+            }),
         }
     }
 
     /// The facts with what `bound` judges past it, as `count` says.
     fn with(mut facts: DataFacts, bound: DataBound, count: DataCount) -> DataFacts {
+        let read = facts.read.as_mut().unwrap();
+        let counts = read.conformance.as_mut().unwrap();
         match bound {
             DataBound::Payloads => facts.payloads = count,
             DataBound::PayloadBytes => facts.payload_bytes_over = true,
+            DataBound::MarkerBytes => read.markers = Ok(count),
+            DataBound::ValidityGroups => counts.validity_groups = count,
+            DataBound::Codes => counts.codes = count,
+            DataBound::ExtensionKeys => counts.extension_keys = count,
+            DataBound::Types => counts.types = count,
+            DataBound::Corrections => counts.corrections = count,
+            DataBound::ValidationWork => counts.validation_work = count,
         }
         facts
     }
@@ -356,7 +482,13 @@ mod tests {
             };
             assert_eq!(reported.actual, actual, "{data:?}");
             assert!(!bound, "{data:?}");
-            assert_eq!(waiting(&evaluation), [Check::MatchingData], "{data:?}");
+            let manifest = matches!(data, DataBound::Payloads | DataBound::PayloadBytes);
+            let expected = if manifest {
+                &CHECKS[2..]
+            } else {
+                &CHECKS[LAST..]
+            };
+            assert_eq!(waiting(&evaluation), expected, "{data:?}");
         }
     }
 
@@ -368,6 +500,28 @@ mod tests {
             let actual = exceeded(&read(facts).0, data).actual;
             assert_eq!(actual, Actual::AtLeast(LIMIT + 1), "{data:?}");
         }
+    }
+
+    /// D15:2008: no violation hides another, and the match waits on them all.
+    #[test]
+    fn every_bound_past_its_limit_is_reported_in_order() {
+        let facts = BOUNDS[2..]
+            .iter()
+            .fold(at_every_bound(), |facts, (data, _)| {
+                with(facts, *data, OVER)
+            });
+        let (evaluation, _) = read(facts);
+        let expected: Vec<_> = BOUNDS[2..].iter().map(|(data, _)| over(*data)).collect();
+        assert_eq!(found(&evaluation), expected);
+        assert_eq!(waiting(&evaluation), [Check::MatchingData]);
+        let (_, status) = evaluation
+            .statuses()
+            .find(|(unit, _)| **unit == DATA)
+            .unwrap();
+        let Status::NotEvaluated(causes) = status else {
+            panic!("the match waits");
+        };
+        assert_eq!(causes.keys().count(), expected.len());
     }
 
     /// D15:2008: the two bounds the manifest decides do not hide each other.
@@ -386,6 +540,55 @@ mod tests {
         assert_eq!(waiting(&evaluation), CHECKS[2..]);
     }
 
+    /// D15:2365: a manifest that does not read stops what reads the payloads.
+    #[test]
+    fn a_manifest_that_does_not_read_leaves_the_payloads_unread() {
+        let (evaluation, bound) = read(DataFacts {
+            read: Err(DataNotAdmitted),
+            ..at_every_bound()
+        });
+        assert_eq!(
+            found(&evaluation),
+            [(Check::DataManifest, Code::LocaleDataNotAdmitted)]
+        );
+        assert_eq!(waiting(&evaluation), CHECKS[3..]);
+        assert!(!bound);
+    }
+
+    /// D15:2365: one payload that does not read leaves the other's bounds to
+    /// report.
+    #[test]
+    fn one_payloads_failure_leaves_the_others_bounds_to_report() {
+        let mut markers = with(at_every_bound(), DataBound::Codes, OVER);
+        markers.read.as_mut().unwrap().markers = Err(DataNotAdmitted);
+        let (evaluation, bound) = read(markers);
+        assert_eq!(
+            found(&evaluation),
+            [
+                (Check::DataMarkers, Code::LocaleDataNotAdmitted),
+                over(DataBound::Codes),
+            ]
+        );
+        assert_eq!(
+            waiting(&evaluation),
+            [Check::WithinDataMarkerBytes, Check::MatchingData]
+        );
+        assert!(!bound);
+
+        let mut conformance = with(at_every_bound(), DataBound::MarkerBytes, OVER);
+        conformance.read.as_mut().unwrap().conformance = Err(DataNotAdmitted);
+        let (evaluation, bound) = read(conformance);
+        assert_eq!(
+            found(&evaluation),
+            [
+                over(DataBound::MarkerBytes),
+                (Check::DataConformance, Code::LocaleDataNotAdmitted),
+            ]
+        );
+        assert_eq!(waiting(&evaluation), CHECKS[6..]);
+        assert!(!bound);
+    }
+
     /// D15:2133, 2365: without a value of the slot the bounds still report,
     /// and of the checks only the match waits on it.
     #[test]
@@ -399,8 +602,8 @@ mod tests {
         assert_eq!(found(&evaluation), [over(DataBound::Payloads)]);
     }
 
-    /// A bound is observed at the data's root beside the capability's bound
-    /// (D15:2249).
+    /// A bound is observed at the data's root beside the capability's bound,
+    /// and a read at the root alone (D15:2249).
     #[test]
     fn each_check_is_observed_at_the_data_root() {
         for (data, _) in BOUNDS {
@@ -415,6 +618,15 @@ mod tests {
                 [EvidenceProjection::resolver_input(bound.unwrap())]
             );
         }
+        let (evaluation, _) = read(DataFacts {
+            read: Err(DataNotAdmitted),
+            ..at_every_bound()
+        });
+        let [candidate] = evaluation.occurrence_candidates() else {
+            panic!("one candidate");
+        };
+        assert_eq!(candidate.primary, root());
+        assert_eq!(candidate.related, []);
     }
 
     /// Each bound the manifest decides reads its own value of the capability.

@@ -192,6 +192,27 @@ pub(crate) enum DataCount {
     BeyondU64,
 }
 
+/// What the conformance payload counts, one for each of its `localeData`
+/// bounds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DataCounts {
+    pub(crate) validity_groups: DataCount,
+    pub(crate) codes: DataCount,
+    pub(crate) extension_keys: DataCount,
+    pub(crate) types: DataCount,
+    pub(crate) corrections: DataCount,
+    pub(crate) validation_work: DataCount,
+}
+
+/// What each payload's own read established, past the manifest's read: one
+/// payload's failure leaves the other's to report (D15:2365).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PayloadFacts {
+    /// The bytes of the four marker payloads as compact JSON text.
+    pub(crate) markers: Result<DataCount, DataNotAdmitted>,
+    pub(crate) conformance: Result<DataCounts, DataNotAdmitted>,
+}
+
 /// What reading the data established, for its checks to judge (D15:1820 to
 /// 1828, 2008).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -202,6 +223,10 @@ pub(crate) struct DataFacts {
     /// singleton's check sees each payload on its own, so it reports a
     /// witness rather than a length (Decision 015-157).
     pub(crate) payload_bytes_over: bool,
+    /// The manifest's read: its integrity, each payload's length and digest,
+    /// and the dataset schema (D17:1069, 1070). An `Err` also when a bound the
+    /// manifest decides stopped the read, whose check this one then waits on.
+    pub(crate) read: Result<PayloadFacts, DataNotAdmitted>,
 }
 
 /// The facts of one read and the provider it built, which only data within
@@ -216,10 +241,22 @@ impl<P> DataReading<P> {
     /// A reading with nothing left to measure, as a provider built before
     /// invocation has: every count is zero, and `provider` is the result.
     pub(crate) const fn settled(provider: Result<P, DataNotAdmitted>) -> Self {
+        const NONE: DataCount = DataCount::Exact(0);
         Self {
             facts: DataFacts {
-                payloads: DataCount::Exact(0),
+                payloads: NONE,
                 payload_bytes_over: false,
+                read: Ok(PayloadFacts {
+                    markers: Ok(NONE),
+                    conformance: Ok(DataCounts {
+                        validity_groups: NONE,
+                        codes: NONE,
+                        extension_keys: NONE,
+                        types: NONE,
+                        corrections: NONE,
+                        validation_work: NONE,
+                    }),
+                }),
             },
             provider,
         }
@@ -228,9 +265,9 @@ impl<P> DataReading<P> {
 
 /// Canonicalization data past the pre-invocation boundary: its envelope
 /// admitted, the rest still to read. Specification admission reads the rest
-/// under the capability's `localeData` bounds: past one the manifest decides
-/// is that bound's `project-profile-bootstrap-limit-exceeded` (D15:2356), and
-/// a failure past another, or of the integrity, a payload, or the dataset, is
+/// under the capability's `localeData` bounds: past one is that bound's
+/// `project-profile-bootstrap-limit-exceeded` (D15:2356), and a failure of the
+/// integrity, a payload, or the dataset is
 /// `project-profile-locale-data-not-admitted`, Resolver Cases and not boundary
 /// failures (D15:3165). The data is a Common Invocation Input Set
 /// value that invocation staleness compares by value and the Materialized
