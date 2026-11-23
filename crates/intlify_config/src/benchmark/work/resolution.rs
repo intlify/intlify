@@ -158,7 +158,7 @@ impl LogicalWork {
         self.set(
             WorkKind::LocalePolicyResolutionCanonicalRequestedLocales,
             WorkStage::OperationResult,
-            match &locales.requested_set {
+            match locales.requested_set.complete() {
                 Ok(set) => WorkValue::exact(count(set.as_slice().len())?),
                 Err(_) => WorkValue::Unavailable {
                     reason: UnavailableWork::LocalePolicyResolutionRequestedNotResolved,
@@ -253,7 +253,7 @@ impl LogicalWork {
                 WorkValue::exact(count(value)?),
             );
         }
-        let cells = match &policies.locales.requested_set {
+        let cells = match policies.locales.requested_set.complete() {
             Ok(requested) => Some(
                 requested
                     .as_slice()

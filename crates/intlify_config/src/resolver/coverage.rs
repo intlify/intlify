@@ -50,7 +50,7 @@ use super::evidence::EvidenceProjection;
 use super::evidence_component::ComponentPath;
 use super::limits::{BoundId, ConfirmedPolicy, Group, LocaleResolutionLimits};
 use super::locales::{
-    canonicalize, Content, LocaleInvariant, LocaleKey, LocaleSet, ResolvedLocales,
+    canonicalize, Content, KnownSet, LocaleInvariant, LocaleKey, LocaleSet, ResolvedLocales,
 };
 use super::specification::Slot;
 use super::vocabulary::SurfaceVocabulary;
@@ -309,7 +309,7 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
 ) -> Result<Admitted<CoveragePolicy<Id>>, LocaleInvariant> {
     let policy = confirmed.map_err(Causes::clone);
     let vocabulary = vocabulary.map_err(Causes::clone);
-    let requested = locales.requested_set.as_ref().map_err(Causes::clone);
+    let requested = locales.requested_set.complete();
     let rules = coverage
         .as_ref()
         .ok()
@@ -381,7 +381,7 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
             both(rules_bounded.clone(), surface_items_bounded.clone()),
         )
         .map(|(vocabulary, _)| vocabulary),
-        requested: requested.clone(),
+        requested: &locales.requested_set,
         vocabulary: vocabulary.clone(),
         observer,
         policy: confirmed.ok().map(ConfirmedPolicy::evidence),
@@ -518,7 +518,7 @@ fn count(
 struct Selectors<'a, P: Provider> {
     spelling: Admitted<&'a Canonicalizer<P>>,
     naming: Admitted<&'a SurfaceVocabulary>,
-    requested: Admitted<&'a LocaleSet>,
+    requested: &'a KnownSet,
     vocabulary: Admitted<&'a SurfaceVocabulary>,
     observer: Option<&'a DeclarationObserver<'a>>,
     policy: Option<&'a EvidenceProjection>,
@@ -598,7 +598,7 @@ fn normalize<P: Provider>(
             Some(items) => selected_locales(evaluation, selectors, (content, raws), items)?,
             None => selectors
                 .requested
-                .clone()
+                .complete()
                 .map(|requested| requested.as_slice().to_vec()),
         };
         let surfaces = match rule.intent_surface_classes() {
@@ -769,27 +769,24 @@ fn locale_units<P: Provider>(
             Err(each_rule(issue(Code::LocaleDuplicate, None), repeated))
         }
     })?;
-    let outside = match (selectors.observer, &locale, &selectors.requested) {
-        (Some(observer), Ok(locale), Ok(requested)) if !requested.contains(locale) => observed(
+    let held = selectors.requested.holds(&locale);
+    let outside = match (selectors.observer, &held) {
+        (Some(observer), Ok(false)) => observed(
             selectors.items(raws, REQUESTED_LOCALES, &positions)?,
             &[observer.value(&[REQUESTED_LOCALES])?],
         ),
         _ => Vec::new(),
     };
-    let member = evaluation.check_found(
-        subject(Check::RequestedMember),
-        both(locale.clone(), selectors.requested.clone()),
-        |(locale, requested)| {
-            if requested.contains(&locale) {
-                Ok(())
-            } else {
-                Err(Found::each(
-                    issue(Code::CoverageRuleInvalid, Some(Reason::LocaleNotRequested)),
-                    outside,
-                ))
-            }
-        },
-    )?;
+    let member = evaluation.check_found(subject(Check::RequestedMember), held, |held| {
+        if held {
+            Ok(())
+        } else {
+            Err(Found::each(
+                issue(Code::CoverageRuleInvalid, Some(Reason::LocaleNotRequested)),
+                outside,
+            ))
+        }
+    })?;
     Ok(both(locale, both(once, member)).map(|(locale, _)| locale))
 }
 
@@ -2663,9 +2660,22 @@ mod tests {
             assert_eq!(waits_on(&resolved.evaluation, unit), Some(units(&missing)));
         }
         assert_eq!(units(&resolved.policy.unwrap_err()), units(&missing));
-        // A requested set Phase 7 could not form leaves membership waiting.
-        let resolved = resolve(&requesting(|app| {
+        // A locale a set with an invalid element holds is a member: the
+        // element is needed only by what the set does not hold (D15:2367).
+        let held = resolve(&requesting(|app| {
             app["requestedLocales"] = json!(["en", "fr", "ja", "zz"]);
+            app["coverage"] = json!({"rules": [selector]});
+        }));
+        assert_eq!(
+            waits_on(
+                &held.evaluation,
+                &locale_unit(&owner, key("fr"), Check::RequestedMember)
+            ),
+            None
+        );
+        // One it does not hold waits on the element.
+        let resolved = resolve(&requesting(|app| {
+            app["requestedLocales"] = json!(["en", "ja", "zz"]);
             app["coverage"] = json!({"rules": [selector]});
         }));
         let invalid = locales::unit(

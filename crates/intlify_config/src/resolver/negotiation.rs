@@ -28,7 +28,7 @@ use super::evaluation::{
 };
 use super::limits::{BoundId, ConfirmedPolicy, Group};
 use super::locales::{
-    AliasLocales, LocaleInvariant, LocaleKey, LocaleSet, ResolvedLocales, Spelled,
+    AliasLocales, KnownSet, LocaleInvariant, LocaleKey, ResolvedLocales, Spelled,
 };
 
 const MAX_NEGOTIATION_ALIASES: BoundId = BoundId {
@@ -120,11 +120,10 @@ pub(crate) fn resolve_negotiation<Id: Clone>(
         let found = unique(evaluation, &bounded, key, &sharing, observer)?;
         checked = both(checked, found).map(|((), ())| ());
     }
-    let requested = locales.requested_set.as_ref().map_err(Causes::clone);
     for (subjects, (destination, ranks)) in destinations(entries) {
         let member = member(
             evaluation,
-            (&bounded, &requested),
+            (&bounded, &locales.requested_set),
             subjects,
             (destination, &ranks),
             observer,
@@ -249,13 +248,14 @@ fn destinations(
 /// (D15:2249, 2387).
 fn member(
     evaluation: &mut Evaluation,
-    (bounded, requested): (&Admitted<()>, &Admitted<&LocaleSet>),
+    (bounded, requested): (&Admitted<()>, &KnownSet),
     (key, value): (&LocaleKey, &LocaleKey),
     (destination, ranks): (&Spelled, &[usize]),
     observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<Admitted<()>, LocaleInvariant> {
-    let observed = match (observer, &destination.locale, requested) {
-        (Some(observer), Ok(locale), Ok(set)) if !set.contains(locale) => {
+    let held = requested.holds(&destination.locale);
+    let observed = match (observer, &held) {
+        (Some(observer), Ok(false)) => {
             let locales = observer.value(&["requestedLocales"])?;
             ranks
                 .iter()
@@ -274,12 +274,9 @@ fn member(
             NegotiationSubject::Destination(key.clone(), value.clone()),
             Check::RequestedMember,
         ),
-        both(
-            both(bounded.clone(), destination.locale.clone()),
-            requested.clone(),
-        ),
-        |(((), locale), requested)| {
-            if requested.contains(&locale) {
+        both(bounded.clone(), held),
+        |((), held)| {
+            if held {
                 Ok(())
             } else {
                 Err(Found::each(

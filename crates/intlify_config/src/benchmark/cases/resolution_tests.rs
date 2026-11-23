@@ -589,7 +589,7 @@ fn blocked_recipes_keep_exact_subjects_codes_and_independent_checks() {
         assert_eq!(
             locales
                 .requested_set
-                .as_ref()
+                .complete()
                 .ok()
                 .map(|set| set.as_slice().len()),
             requested,

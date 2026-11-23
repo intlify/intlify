@@ -914,7 +914,11 @@ pub(super) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure>
     if let Some(total) = locales.occurrence_total {
         actual(&mut shared, total);
     }
-    admitted(&mut shared, &locales.requested_set, set)?;
+    admitted(
+        &mut shared,
+        &locales.requested_set.complete(),
+        |frame, whole| set(frame, whole),
+    )?;
     admitted(&mut shared, &locales.project, project)?;
     admitted(&mut shared, &locales.negotiation_aliases, |frame, list| {
         aliases(frame, list)

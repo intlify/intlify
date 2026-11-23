@@ -27,7 +27,7 @@ use super::super::declaration_observer::{beside, DeclarationObserver};
 use super::super::evaluation::{both, Actual, Admitted, Causes, Check, Evaluation, Found};
 use super::super::limits::{BoundId, ConfirmedPolicy, Group};
 use super::super::tally::{actual, total, within, Tally};
-use super::{unit, LocaleFields, LocaleInvariant, LocaleSet, LocaleSubject};
+use super::{unit, KnownSet, LocaleFields, LocaleInvariant, LocaleSubject};
 
 const fn locale_bound(name: &'static str) -> BoundId {
     BoundId {
@@ -128,18 +128,19 @@ pub(super) fn occurrences<Target>(
     Ok((total, bounded))
 }
 
-/// The requested-set bound's unit: the set's canonical size, which a repeated
-/// locale does not grow, within `maxRequestedLocales`, observed past it at the
-/// project's `requestedLocales`.
+/// The requested-set bound's unit: the canonical size of what the set holds,
+/// which a repeated locale does not grow and an element without an identity
+/// has none to add to, within `maxRequestedLocales`, observed past it at the
+/// project's `requestedLocales` (D15:1897, 2184, 3354).
 pub(super) fn requested(
     evaluation: &mut Evaluation,
     policy: Result<&ConfirmedPolicy, &Causes>,
-    set: &Admitted<LocaleSet>,
+    set: &KnownSet,
     observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<Admitted<()>, LocaleInvariant> {
-    // The field is there only when structural admission admitted it, which
-    // the set needs.
-    let observed = match set {
+    let counted = set.counted();
+    // The field is there once an element of it has an identity.
+    let observed = match &counted {
         Ok(_) => beside(policy, observer, |observer| {
             observer.value(&["requestedLocales"])
         })?,
@@ -147,10 +148,7 @@ pub(super) fn requested(
     };
     Ok(evaluation.check_found(
         unit(LocaleSubject::RequestedLocales, Check::WithinBound),
-        both(
-            policy.map_err(Causes::clone),
-            set.as_ref().map_err(Causes::clone),
-        ),
+        both(policy.map_err(Causes::clone), counted),
         |(policy, set)| {
             let limit = policy.limits().locale_resolution.max_requested_locales;
             within(
@@ -229,7 +227,7 @@ mod tests {
     use serde_json::{json, Value};
 
     use super::super::fixtures::{
-        canonical, declaration, issues, limits, policy, stand_in, target, units, waits_on,
+        declaration, issues, limits, policy, spelled, stand_in, target, units, waits_on,
     };
     use super::*;
     use crate::fixtures::{complete_config, minimal_config};
@@ -486,16 +484,18 @@ mod tests {
         assert_eq!((total, bounded), (None, Err(unselected)));
     }
 
+    /// The set of `locales`, with `missing` as why an element has no identity.
+    fn known(locales: &[&str], missing: Option<Causes>) -> KnownSet {
+        let spelled: Vec<_> = locales.iter().map(|locale| spelled(locale)).collect();
+        KnownSet::new(&spelled, missing)
+    }
+
     /// Past the bound, the project's `requestedLocales` is observed beside
     /// the policy (D15:2249).
     #[test]
     fn the_requested_set_is_bounded_by_its_canonical_size() {
         let requested_unit = unit(LocaleSubject::RequestedLocales, Check::WithinBound);
-        let set: Admitted<LocaleSet> = Ok(LocaleSet::new(vec![
-            canonical("en"),
-            canonical("de"),
-            canonical("fr"),
-        ]));
+        let set = known(&["en", "de", "fr"], None);
         let observed_config = Observed::new(&minimal_config());
         let mut evaluation = Evaluation::default();
         assert_eq!(
@@ -533,7 +533,8 @@ mod tests {
         );
 
         // A field structural admission did not admit is not in the
-        // declaration: without the set, the unit observes nothing there.
+        // declaration: with no element's identity, the unit observes nothing
+        // there and waits.
         let mut unadmitted = minimal_config();
         unadmitted["profiles"]["app"]
             .as_object_mut()
@@ -545,7 +546,7 @@ mod tests {
             requested(
                 &mut evaluation,
                 Ok(&policy(64, 100, 2)),
-                &Err(missing.clone()),
+                &known(&[], Some(missing.clone())),
                 Some(observer),
             )
         });
@@ -560,6 +561,46 @@ mod tests {
             waits_on(&evaluation, &requested_unit),
             Some(units(&unconfirmed))
         );
+    }
+
+    /// An element without an identity has none to add: the bound holds over
+    /// the others, exactly, and is found past them, observed at the field
+    /// that still holds them (D15:1897, 2184, 3354).
+    #[test]
+    fn the_requested_set_is_bounded_by_what_it_holds_beside_a_failed_element() {
+        let requested_unit = unit(LocaleSubject::RequestedLocales, Check::WithinBound);
+        let failed = stand_in(Slot::Coverage);
+        let set = known(&["en", "de"], Some(failed));
+        let mut evaluation = Evaluation::default();
+        assert_eq!(
+            requested(&mut evaluation, Ok(&policy(64, 100, 2)), &set, None).unwrap(),
+            Ok(())
+        );
+        assert_eq!(waits_on(&evaluation, &requested_unit), None);
+        let observed_config = Observed::new(&minimal_config());
+        let mut evaluation = Evaluation::default();
+        let confirmed = policy(64, 100, 1);
+        let found = observed_config.app(|observer| {
+            requested(&mut evaluation, Ok(&confirmed), &set, Some(observer)).unwrap()
+        });
+        assert_eq!(
+            units(&found.unwrap_err()),
+            std::slice::from_ref(&requested_unit)
+        );
+        let key = evaluation.issues().next().unwrap();
+        assert_eq!(
+            evaluation.limit(key).map(|exceeded| exceeded.actual),
+            Some(Actual::Exact(2))
+        );
+        observed_config.app(|observer| {
+            assert_eq!(
+                observed(&evaluation),
+                [(
+                    requested_unit.clone(),
+                    beside_policy(observer.value(&["requestedLocales"]).unwrap(), &confirmed)
+                )]
+            );
+        });
     }
 
     #[test]

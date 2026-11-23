@@ -43,7 +43,8 @@ use super::evaluation::{
 use super::evidence::EvidenceProjection;
 use super::limits::{BoundId, ConfirmedPolicy, Group};
 use super::locales::{
-    canonicalize, Content, LocaleInvariant, LocaleKey, LocaleSet, ResolvedLocales, Spelled,
+    canonicalize, Content, KnownSet, LocaleInvariant, LocaleKey, LocaleSet, ResolvedLocales,
+    Spelled,
 };
 
 const MAX_FALLBACK_SOURCES: BoundId = BoundId {
@@ -184,11 +185,11 @@ pub(crate) fn resolve_fallback<Id: Clone, P: Provider>(
         locales.occurrence_bound.clone(),
     )
     .map(|(canonicalizer, ())| canonicalizer);
-    let requested = locales.requested_set.as_ref().map_err(Causes::clone);
+    let requested = &locales.requested_set;
     let mut checked = bounded.clone();
     let mut sequences = Ok(BTreeMap::new());
     for (key, sharing) in by_source(&entries) {
-        let (alone, member) = source(evaluation, (&bounded, &requested), key, &sharing, observer)?;
+        let (alone, member) = source(evaluation, (&bounded, requested), key, &sharing, observer)?;
         let sequence = bounded_sequence(evaluation, (confirmed, &alone), key, &sharing, observer)?;
         let sight = Sight {
             observer,
@@ -260,7 +261,7 @@ fn by_source<'e, 'a>(entries: &'e [Entry<'a>]) -> BTreeMap<&'a LocaleKey, Vec<&'
 /// is requested.
 fn source(
     evaluation: &mut Evaluation,
-    (bounded, requested): (&Admitted<()>, &Admitted<&LocaleSet>),
+    (bounded, requested): (&Admitted<()>, &KnownSet),
     key: &LocaleKey,
     sharing: &[&Entry<'_>],
     observer: Option<&DeclarationObserver<'_>>,
@@ -285,8 +286,9 @@ fn source(
             }
         },
     )?;
-    let outside = match (observer, &spelled.locale, requested) {
-        (Some(observer), Ok(locale), Ok(set)) if !set.contains(locale) => {
+    let held = requested.holds(&spelled.locale);
+    let outside = match (observer, &held) {
+        (Some(observer), Ok(false)) => {
             let locales = observer.value(&["requestedLocales"])?;
             sharing
                 .iter()
@@ -302,12 +304,9 @@ fn source(
     };
     let member = evaluation.check_found(
         unit(FallbackSubject::Source(key.clone()), Check::RequestedMember),
-        both(
-            both(bounded.clone(), spelled.locale.clone()),
-            requested.clone(),
-        ),
-        |(((), locale), requested)| {
-            if requested.contains(&locale) {
+        both(bounded.clone(), held),
+        |((), held)| {
+            if held {
                 Ok(())
             } else {
                 Err(Found::each(
@@ -1667,7 +1666,19 @@ mod tests {
 
     #[test]
     fn a_requested_set_phase_7_could_not_form_leaves_only_membership_not_evaluated() {
-        let resolved = resolve(&declared(&["ja", "zz"], json!({"ja": ["en"]})));
+        // A source the set holds is requested beside the element without an
+        // identity (D15:2365, 2367).
+        let held = resolve(&declared(&["ja", "zz"], json!({"ja": ["en"]})));
+        assert_eq!(
+            waits_on(
+                &held.evaluation,
+                &source_unit(key("ja"), Check::RequestedMember)
+            ),
+            None
+        );
+        assert!(held.policy.is_ok());
+        // One it does not hold is unproved rather than found outside it.
+        let resolved = resolve(&declared(&["en", "zz"], json!({"ja": ["en"]})));
         let invalid = locales::unit(
             LocaleSubject::RequestedLocale(rejected()),
             Check::CanonicalLocale,
