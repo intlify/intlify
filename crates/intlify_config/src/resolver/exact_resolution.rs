@@ -132,10 +132,10 @@ impl<'s> ArtifactBindings<'s> {
 pub(crate) type Named<'s> = (&'s ExactTuple, &'s AdmittedArtifact<'s>);
 
 /// Phase 9's ordinary exact resolution reference by reference: what each
-/// present reference names or why it names nothing, and the causes of the
-/// reference fields structural admission did not admit. A later phase that
-/// needs one reference reads its result alone, so a reference that failed
-/// leaves only what needs it unavailable.
+/// present reference names or why it names nothing, and the causes of what
+/// structural admission did not admit under the reference fields. A later
+/// phase that needs one reference reads its result alone, so a reference that
+/// failed leaves only what needs it unavailable (D15:2367, 3445).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ReferenceResults<'s> {
     found: BTreeMap<ReferenceField, Admitted<Named<'s>>>,
@@ -148,11 +148,6 @@ impl<'s> ReferenceResults<'s> {
     /// admission did not admit.
     pub(crate) fn get(&self, field: &ReferenceField) -> Option<&Admitted<Named<'s>>> {
         self.found.get(field)
-    }
-
-    /// The causes of the reference fields structural admission did not admit.
-    pub(crate) const fn unavailable(&self) -> Option<&Causes> {
-        self.unavailable.as_ref()
     }
 
     /// Every present reference's artifact, when each one resolved and no
@@ -188,9 +183,10 @@ impl<'s> ReferenceResults<'s> {
 
 /// Phase 9's ordinary exact resolution. Each present reference is one unit
 /// under the Set; a Target Profile reference also waits on its target's
-/// bounds, which `targets` holds as Phase 7 checked them. A field structural
-/// admission did not admit has no references to resolve, and its causes leave
-/// the resolution unavailable. A reference that names nothing is observed
+/// bounds, which `targets` holds as Phase 7 checked them, and on its own
+/// value. A `policies` field or Target ID map structural admission did not
+/// admit has no references to resolve, and what it did not admit leaves the
+/// whole resolution unavailable. A reference that names nothing is observed
 /// through `observer`, the selected declaration's, when there is one.
 ///
 /// # Errors
@@ -297,15 +293,22 @@ pub(crate) fn resolve_fields<'s>(
     let mut found = BTreeMap::new();
     for (field, reference) in present {
         let role = field.role_kind();
-        let prerequisite = both(set.clone(), bounded(&bounds, &field)).map(|(set, ())| set);
-        let at = observer
-            .map(|observer| observer.value(&reference_path(&field)))
-            .transpose()?;
+        // A reference that failed is there to observe only once it has a
+        // value, and its unit waits on why it has none (D15:1171, 2184).
+        let at = match (&reference, observer) {
+            (Ok(_), Some(observer)) => Some(observer.value(&reference_path(&field))?),
+            _ => None,
+        };
+        let prerequisite = both(both(set.clone(), bounded(&bounds, &field)), reference);
         let sight = at.as_ref().zip(compared.as_ref());
-        let result = evaluation.check_found(unit(field.clone()), prerequisite, |set| {
-            resolve(set, &reference, role)
-                .map_err(|(blocking, mismatch)| observed(blocking, sight, &mismatch))
-        })?;
+        let result = evaluation.check_found(
+            unit(field.clone()),
+            prerequisite,
+            |((set, ()), reference)| {
+                resolve(set, &reference, role)
+                    .map_err(|(blocking, mismatch)| observed(blocking, sight, &mismatch))
+            },
+        )?;
         found.insert(field, result);
     }
     Ok(ReferenceResults { found, unavailable })
@@ -377,6 +380,7 @@ mod tests {
         self, Approval, GlossarySet, ProviderRouting, ResourceLimits, Selection, SourceAdmission,
         Trust,
     };
+    use crate::resolver::resource_policy::TargetReferences;
     use crate::resolver::specification::Slot;
 
     const ROOM: CollectionLimits = CollectionLimits {
@@ -596,7 +600,7 @@ mod tests {
             let set = admit_collection(&mut evaluation, Ok(&confirmed), &collection).unwrap();
             let references = DeclarationReferences {
                 policies: self.policies.clone().map(|()| &policies),
-                target_profiles: declared,
+                target_profiles: declared.map(TargetReferences::declared),
             };
             let resolved = observed
                 .app(|observer| {

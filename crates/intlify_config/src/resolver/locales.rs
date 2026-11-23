@@ -211,7 +211,7 @@ impl KnownSet {
     /// The identities a count over the set reads: one without an identity has
     /// none to add, so the count waits only when no element has one (D15:2184,
     /// 3354).
-    fn counted(&self) -> Admitted<&LocaleSet> {
+    pub(crate) fn counted(&self) -> Admitted<&LocaleSet> {
         match &self.missing {
             Some(causes) if self.known.as_slice().is_empty() => Err(causes.clone()),
             _ => Ok(&self.known),

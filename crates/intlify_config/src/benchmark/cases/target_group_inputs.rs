@@ -329,8 +329,8 @@ impl TargetAndGroupRecipe {
                 .as_array_mut()
                 .expect("the sample's directions")
                 .retain(|entry| entry["locale"] != "fr-FR"),
-            // Phase 7 rejects the spelling, so the target's locales are
-            // unavailable.
+            // Phase 7 rejects the spelling, so the target's set lacks its
+            // identity.
             Self::TargetLocaleInvalid => declared.target("ssr").requested[2] = "en_US",
             // Phase 7 canonicalizes `EN` to the target's `en`.
             Self::TargetLocaleRepeated => declared.target("ssr").requested.push("EN"),

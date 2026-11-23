@@ -18,7 +18,7 @@ use serde::de::DeserializeOwned;
 
 use crate::model::{
     Coverage, Delivery, DeploymentGroup, DeploymentGroupId, FallbackCandidate, LocaleNegotiation,
-    NonEmptyMap, NonEmptyVec, Policies, ProjectId, SelectionScope, TargetDeclaration, TargetId,
+    NonEmptyMap, NonEmptyVec, Policies, ProjectId, SelectionScope,
 };
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::StructuralAnalysis;
@@ -26,12 +26,11 @@ use crate::structural::StructuralAnalysis;
 use super::declaration_fragments::{DeclarationFragments, TargetEntries};
 use super::evaluation::{Admitted, Causes};
 use super::locales::{LocaleFields, TargetLocaleFields, TargetMapFields};
-use super::resource_policy::DeclarationReferences;
+use super::resource_policy::{DeclarationReferences, TargetReferences};
 use super::structural_admission::StructuralInvariant;
 use super::tally::Tally;
 use super::value_admissions::ValueAdmissions;
 
-type TargetProfiles<Target> = NonEmptyMap<TargetId, TargetDeclaration<Target>>;
 type DeploymentGroups = NonEmptyMap<DeploymentGroupId, DeploymentGroup>;
 type MessageFallback = BTreeMap<String, NonEmptyVec<FallbackCandidate>>;
 
@@ -52,9 +51,8 @@ pub(crate) struct DeclarationFields<Policy, Target> {
     message_fallback: Admitted<Option<MessageFallback>>,
     coverage: Admitted<Option<Coverage>>,
     policies: Admitted<Policies<Policy>>,
-    target_profiles: Admitted<TargetProfiles<Target>>,
-    /// The same map entry by entry, which Phase 7 reads.
-    target_entries: Admitted<TargetEntries>,
+    /// The Target ID map entry by entry, which Phases 7, 9, and 11 read.
+    target_entries: Admitted<TargetEntries<Target>>,
     deployment_groups: Admitted<DeploymentGroups>,
     delivery: Admitted<Option<Delivery>>,
 }
@@ -85,7 +83,6 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
             message_fallback: read.optional("messageFallback")?,
             coverage: read.optional("coverage")?,
             policies: read.required("policies")?,
-            target_profiles: read.required("targetProfiles")?,
             target_entries: read.target_entries()?,
             deployment_groups: read.required("deploymentGroups")?,
             delivery: read.optional("delivery")?,
@@ -128,8 +125,13 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
         }
     }
 
-    pub(crate) fn target_profiles(&self) -> Admitted<&TargetProfiles<Target>> {
-        borrowed(&self.target_profiles, |profiles| profiles)
+    /// Whether everything at and below the Target ID map passed, or why not:
+    /// what a phase that still reads the targets as one set waits on.
+    pub(crate) fn target_structure(&self) -> Admitted<()> {
+        self.target_entries
+            .as_ref()
+            .map_err(Causes::clone)
+            .and_then(|targets| targets.whole.clone())
     }
 
     pub(crate) fn deployment_groups(&self) -> Admitted<&DeploymentGroups> {
@@ -157,7 +159,6 @@ impl<Policy, Target> DeclarationFields<Policy, Target> {
             message_fallback: Err(causes.clone()),
             coverage: Err(causes.clone()),
             policies: Err(causes.clone()),
-            target_profiles: Err(causes.clone()),
             target_entries: Err(causes.clone()),
             deployment_groups: Err(causes.clone()),
             delivery: Err(causes.clone()),
@@ -170,7 +171,14 @@ impl DeclarationFields<PolicyReference, TargetProfileReference> {
     pub(crate) fn references(&self) -> DeclarationReferences<'_> {
         DeclarationReferences {
             policies: borrowed(&self.policies, |policies| policies),
-            target_profiles: borrowed(&self.target_profiles, |profiles| profiles),
+            target_profiles: borrowed(&self.target_entries, |targets| TargetReferences {
+                entries: targets
+                    .entries
+                    .iter()
+                    .map(|entry| (&entry.id, borrowed(&entry.profile, |profile| profile)))
+                    .collect(),
+                whole: targets.whole.clone(),
+            }),
         }
     }
 }
@@ -262,7 +270,7 @@ mod tests {
         assert_eq!(fields.coverage, Ok(None));
         assert_eq!(fields.delivery, Ok(None));
         assert!(fields.policies.is_ok());
-        assert!(fields.target_profiles.is_ok() && fields.deployment_groups.is_ok());
+        assert!(fields.target_structure().is_ok() && fields.deployment_groups.is_ok());
         let complete = read(&complete_config());
         assert!(matches!(complete.locale_negotiation, Ok(Some(_))));
         assert!(matches!(complete.message_fallback, Ok(Some(_))));
@@ -305,7 +313,7 @@ mod tests {
         assert!(fields.selection_scope.is_ok());
         assert!(fields.default_requested_locale.is_ok());
         assert!(fields.policies.is_ok());
-        assert!(fields.target_profiles.is_ok() && fields.deployment_groups.is_ok());
+        assert!(fields.target_structure().is_ok() && fields.deployment_groups.is_ok());
     }
 
     /// An undeclared member of the declaration belongs to no field.
@@ -315,7 +323,7 @@ mod tests {
         config["profiles"]["app"]["extra"] = json!(true);
         let fields = read(&config);
         assert!(fields.project_id.is_ok() && fields.requested_locales.is_ok());
-        assert!(fields.policies.is_ok() && fields.target_profiles.is_ok());
+        assert!(fields.policies.is_ok() && fields.target_structure().is_ok());
     }
 
     /// A Target ID entry's failure holds back `targetProfiles` alone, its key
@@ -326,7 +334,7 @@ mod tests {
         config["profiles"]["app"]["targetProfiles"]["browser"]["requestedLocales"] = json!("en");
         let fields = read(&config);
         assert_eq!(
-            checks(&fields.target_profiles),
+            checks(&fields.target_structure()),
             BTreeSet::from([(
                 vec!["targetProfiles".to_owned(), "*".to_owned()],
                 Check::FieldType
@@ -338,7 +346,7 @@ mod tests {
         keyed["profiles"]["app"]["targetProfiles"]["Web App"] = target;
         let fields = read(&keyed);
         assert_eq!(
-            checks(&fields.target_profiles),
+            checks(&fields.target_structure()),
             BTreeSet::from([(
                 vec!["targetProfiles".to_owned(), "*".to_owned()],
                 Check::FieldValue
@@ -392,7 +400,7 @@ mod tests {
                 Check::FieldType
             )])
         );
-        assert!(fields.target_profiles.is_ok() && fields.policies.is_ok());
+        assert!(fields.target_structure().is_ok() && fields.policies.is_ok());
     }
 
     /// Another declaration's failures hold back none of this one's fields.
@@ -437,7 +445,6 @@ mod tests {
             fields.message_fallback.as_ref().err(),
             fields.coverage.as_ref().err(),
             fields.policies.as_ref().err(),
-            fields.target_profiles.as_ref().err(),
             fields.target_entries.as_ref().err(),
             fields.deployment_groups.as_ref().err(),
             fields.delivery.as_ref().err(),

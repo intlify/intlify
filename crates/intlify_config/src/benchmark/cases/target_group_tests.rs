@@ -306,26 +306,22 @@ fn a_prerequisite_failure_leaves_only_what_waits_on_it() {
             .map(|key| key.unit().subject.clone())
             .collect::<Vec<_>>()
     };
-    // Phase 7 rejects one spelling, so none of the target's three locale
-    // checks runs.
+    // Phase 7 rejects one spelling: the target's three locale checks read
+    // the values it admitted, and the whole set, which it no longer forms,
+    // waits on that Finding (D15:2184, 2367, 3354).
     let (evaluation, invalid) = ssr(R::TargetLocaleInvalid);
-    let waiting = evaluation
+    assert!(evaluation
         .statuses()
-        .filter_map(|(unit, status)| match status {
-            Status::NotEvaluated(causes) => Some((unit.check, subjects(causes))),
-            Status::Evaluated => None,
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(waiting.len(), 3);
-    assert!(waiting.iter().all(|(check, subjects)| {
-        matches!(
-            check,
-            Check::ProjectSubset | Check::SupportedDefault | Check::DirectedLocales
-        ) && subjects
-            .iter()
-            .all(|subject| matches!(subject, Subject::Locale(_)))
-    }));
-    assert!(invalid.requested.is_err() && invalid.resolved.is_err());
+        .all(|(_, status)| *status == Status::Evaluated));
+    let causes = invalid.requested.clone().unwrap_err();
+    assert_eq!(
+        causes
+            .keys()
+            .map(|key| key.unit().check)
+            .collect::<Vec<_>>(),
+        [Check::CanonicalLocale]
+    );
+    assert!(invalid.resolved.is_err());
     // Phase 7 records the repeat, which only the resolved target needs.
     let (evaluation, repeated) = ssr(R::TargetLocaleRepeated);
     assert!(evaluation

@@ -530,7 +530,7 @@ mod tests {
     use crate::resolver::limits::{fixture_limits, ConfirmedPolicy, ResolutionLimits};
     use crate::resolver::locales::fixtures::{canonicalizer, stand_in, target, waits_on};
     use crate::resolver::locales::{self, resolve_locales, LocaleFields, LocaleSubject};
-    use crate::resolver::resource_policy::DeclarationReferences;
+    use crate::resolver::resource_policy::{DeclarationReferences, TargetReferences};
     use crate::resolver::specification::Slot;
     use crate::resolver::targets::{self, resolve_targets, TargetSubject};
 
@@ -655,7 +655,9 @@ mod tests {
                         set.as_ref(),
                         &DeclarationReferences {
                             policies: Err(stand_in(Slot::ProjectProfile)),
-                            target_profiles: Ok(&declaration.target_profiles),
+                            target_profiles: Ok(TargetReferences::declared(
+                                &declaration.target_profiles,
+                            )),
                         },
                         (locales.targets.as_deref(), Some(observer)),
                     )
@@ -665,7 +667,7 @@ mod tests {
                 .app(|observer| {
                     resolve_targets(
                         &mut evaluation,
-                        Ok(&declaration.target_profiles),
+                        Ok(()),
                         &locales,
                         (&references, Some(observer)),
                     )

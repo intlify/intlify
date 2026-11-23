@@ -32,7 +32,7 @@ use crate::resolver::groups::{resolve_groups, GroupSubject, ResolvedGroups};
 use crate::resolver::limits::ConfirmedPolicy;
 use crate::resolver::locales::{resolve_locales, LocaleFields, ResolvedLocales};
 use crate::resolver::profile_resolution::ResolverInvariant;
-use crate::resolver::resource_policy::DeclarationReferences;
+use crate::resolver::resource_policy::{DeclarationReferences, TargetReferences};
 use crate::resolver::targets::{resolve_targets, ResolvedTargets, TargetSubject};
 
 use super::observation::{Frame, Observation};
@@ -119,7 +119,7 @@ impl PreparedTargets {
             set.as_ref(),
             &DeclarationReferences {
                 policies: Ok(&declaration.policies),
-                target_profiles: Ok(&declaration.target_profiles),
+                target_profiles: Ok(TargetReferences::declared(&declaration.target_profiles)),
             },
             (locales.targets.as_deref(), Some(&observer)),
         )
@@ -166,7 +166,7 @@ fn phases<'s>(
 ) -> Result<(Admitted<ResolvedTargets<'s>>, Admitted<ResolvedGroups>), ResolverInvariant> {
     let targets = resolve_targets(
         evaluation,
-        Ok(&inputs.declaration.target_profiles),
+        Ok(()),
         &inputs.locales,
         (&inputs.references, Some(observer)),
     )?;
