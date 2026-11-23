@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! The selected declaration's fields as the semantic phases read them, each
-//! on its own from what structural admission admitted: the field's value,
+//! on its own from its fragment ([`DeclarationFragments`]): the field's value,
 //! absent where an optional field is, or the causes of its absence, the
 //! Findings of the field and of what lies below it. A field structural
 //! admission did not admit suppresses only the work that reads it, while its
@@ -21,12 +21,14 @@ use crate::model::{
     NonEmptyMap, NonEmptyVec, Policies, ProjectId, SelectionScope, TargetDeclaration, TargetId,
 };
 use crate::references::{PolicyReference, TargetProfileReference};
-use crate::structural::{Member, StructuralAnalysis};
+use crate::structural::StructuralAnalysis;
 
-use super::evaluation::{Admitted, Causes, Evaluation};
+use super::declaration_fragments::DeclarationFragments;
+use super::evaluation::{Admitted, Causes};
 use super::locales::LocaleFields;
 use super::resource_policy::DeclarationReferences;
-use super::structural_admission::{field, StructuralInvariant};
+use super::structural_admission::StructuralInvariant;
+use super::value_admissions::ValueAdmissions;
 
 type TargetProfiles<Target> = NonEmptyMap<TargetId, TargetDeclaration<Target>>;
 type DeploymentGroups = NonEmptyMap<DeploymentGroupId, DeploymentGroup>;
@@ -51,24 +53,20 @@ pub(crate) struct DeclarationFields<Policy, Target> {
 }
 
 impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Policy, Target> {
-    /// The fields of the declaration `id` of `analysis`, as `evaluation`
-    /// recorded structural admission's checks under each.
+    /// The fields of the declaration `id` of `analysis`, as `values` holds
+    /// what structural admission's candidates left at and below each.
     ///
     /// # Errors
     ///
-    /// Returns the resolver bug of a field the checks admitted and the
-    /// analysis did not, or of a required one they admitted though it is
-    /// absent.
+    /// Returns the resolver bug of a declaration the analysis lacks, of a
+    /// field the checks admitted and the analysis did not, or of a required
+    /// one they admitted though it is absent.
     pub(crate) fn read(
-        evaluation: &Evaluation,
+        values: &ValueAdmissions,
         analysis: &StructuralAnalysis<Policy, Target>,
         id: &str,
     ) -> Result<Self, StructuralInvariant> {
-        let read = Reader {
-            evaluation,
-            analysis,
-            id,
-        };
+        let read = DeclarationFragments::new(values, analysis, id)?;
         Ok(Self {
             project_id: read.required("projectId")?,
             selection_scope: read.required("selectionScope")?,
@@ -156,100 +154,34 @@ fn borrowed<'a, T, U>(field: &'a Admitted<T>, project: impl FnOnce(&'a T) -> U) 
     field.as_ref().map(project).map_err(Causes::clone)
 }
 
-/// Reads the fields of the declaration `id`.
-struct Reader<'r, Policy, Target> {
-    evaluation: &'r Evaluation,
-    analysis: &'r StructuralAnalysis<Policy, Target>,
-    id: &'r str,
-}
-
-impl<Policy, Target> Reader<'_, Policy, Target> {
-    /// The optional field `name`: its value once the checks under it admitted
-    /// it, absent when it is, or the causes.
-    fn optional<T: DeserializeOwned>(
-        &self,
-        name: &str,
-    ) -> Result<Admitted<Option<T>>, StructuralInvariant> {
-        let member = self
-            .analysis
-            .profile_member(self.id, name)
-            .map_err(StructuralInvariant::Admission)?;
-        match (field(self.evaluation, self.id, name), member) {
-            (Err(causes), _) => Ok(Err(causes)),
-            (Ok(()), Member::Admitted(value)) => Ok(Ok(Some(value))),
-            (Ok(()), Member::Absent) => Ok(Ok(None)),
-            // The checks decide, so a field they admitted and the analysis
-            // did not is a resolver bug.
-            (Ok(()), Member::Unadmitted) => Err(StructuralInvariant::UnreportedFailure),
-        }
-    }
-
-    /// The required field `name`, whose absence its required check reports.
-    fn required<T: DeserializeOwned>(
-        &self,
-        name: &str,
-    ) -> Result<Admitted<T>, StructuralInvariant> {
-        match self.optional(name)? {
-            Ok(Some(value)) => Ok(Ok(value)),
-            Ok(None) => Err(StructuralInvariant::UnreportedFailure),
-            Err(causes) => Ok(Err(causes)),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
-    use std::sync::Arc;
 
     use serde_json::{json, Value};
 
     use crate::fixtures::{
         complete_config, minimal_config, FixturePolicyReference, FixtureTargetReference,
     };
-    use crate::input_limits::Bound;
-    use crate::materialize::materialize_file;
-    use crate::materialize_tests::limits as input_limits;
-    use crate::resolver::entry::fixtures::FileFixture;
     use crate::resolver::evaluation::{Admitted, Check, Evaluation, IssueKey, Unit};
-    use crate::resolver::limits::fixture_limits;
-    use crate::resolver::structural_admission::{admit_structure, StructuralInvariant};
-    use crate::structural::{AuthoringSchema, StructuralAnalysis, StructuralLimits};
+    use crate::resolver::structural_admission::StructuralInvariant;
+    use crate::resolver::value_admissions::tests::{structured_in, Analysis};
+    use crate::resolver::value_admissions::ValueAdmissions;
 
     use super::DeclarationFields;
 
-    type Schema = AuthoringSchema<FixturePolicyReference, FixtureTargetReference>;
-    type Analysis = StructuralAnalysis<FixturePolicyReference, FixtureTargetReference>;
     type Fields = DeclarationFields<FixturePolicyReference, FixtureTargetReference>;
 
-    /// Phase 2 over `value`: the evaluation it recorded and its analysis.
-    fn structured(value: &Value) -> (Evaluation, Analysis) {
-        let mut evaluation = Evaluation::default();
-        let bytes: Arc<[u8]> = Arc::from(serde_json::to_vec(value).unwrap());
-        let document = materialize_file(Arc::clone(&bytes), input_limits()).unwrap();
-        let fixture = FileFixture::new(&fixture_limits(100));
-        let limits = StructuralLimits {
-            max_profiles: Bound::new(16).unwrap(),
-            max_profile_id_bytes: Bound::new(64).unwrap(),
-            max_structural_analysis_units: Bound::new(1_000_000).unwrap(),
-        };
-        let analysis = admit_structure(
-            &mut evaluation,
-            &fixture.file(bytes),
-            document,
-            &Schema::for_model().unwrap(),
-            limits,
-            Ok(()),
-        )
-        .unwrap()
-        .unwrap();
-        (evaluation, analysis)
+    /// Phase 2 over `value`: what its candidates left, and its analysis.
+    fn structured(value: &Value) -> (ValueAdmissions, Analysis) {
+        let (_, values, analysis) = structured_in(Evaluation::default(), value);
+        (values, analysis)
     }
 
     /// The fields of the declaration `app` of `value`.
     fn read(value: &Value) -> Fields {
-        let (evaluation, analysis) = structured(value);
-        Fields::read(&evaluation, &analysis, "app").unwrap()
+        let (values, analysis) = structured(value);
+        Fields::read(&values, &analysis, "app").unwrap()
     }
 
     /// The checks behind `causes`.
@@ -387,7 +319,7 @@ mod tests {
         invalid["profiles"]["app"]["projectId"] = json!("Store Front");
         let (_, analysis) = structured(&invalid);
         assert_eq!(
-            Fields::read(&Evaluation::default(), &analysis, "app").err(),
+            Fields::read(&ValueAdmissions::default(), &analysis, "app").err(),
             Some(StructuralInvariant::UnreportedFailure)
         );
         let mut missing = minimal_config();
@@ -397,7 +329,7 @@ mod tests {
             .remove("projectId");
         let (_, analysis) = structured(&missing);
         assert_eq!(
-            Fields::read(&Evaluation::default(), &analysis, "app").err(),
+            Fields::read(&ValueAdmissions::default(), &analysis, "app").err(),
             Some(StructuralInvariant::UnreportedFailure)
         );
         // An optional field too: present, its checks admitting it, yet not
@@ -406,7 +338,7 @@ mod tests {
         optional["profiles"]["app"]["coverage"] = json!(false);
         let (_, analysis) = structured(&optional);
         assert_eq!(
-            Fields::read(&Evaluation::default(), &analysis, "app").err(),
+            Fields::read(&ValueAdmissions::default(), &analysis, "app").err(),
             Some(StructuralInvariant::UnreportedFailure)
         );
     }

@@ -556,7 +556,8 @@ mod tests {
             limits,
             Ok(()),
         )
-        .unwrap();
+        .unwrap()
+        .analysis;
         let selected = select_profile(
             &mut evaluation,
             &file,
