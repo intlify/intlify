@@ -561,6 +561,7 @@ mod tests {
             let declared = self.targets.clone().map(|()| &targets);
             let behind = stand_in(Slot::ProjectProfile);
             let fields = LocaleFields {
+                spellings: Err(behind.clone()),
                 requested_locales: Err(behind.clone()),
                 default_requested_locale: Err(behind.clone()),
                 default_source_locale: Err(behind.clone()),

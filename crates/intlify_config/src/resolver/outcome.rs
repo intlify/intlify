@@ -530,7 +530,7 @@ pub(crate) mod tests {
             .as_object_mut()
             .unwrap()
             .remove("defaultRequestedLocale");
-        declaration["targetProfiles"]["server"]["requestedLocales"] = json!(["en", 42]);
+        declaration["targetProfiles"]["server"]["requestedLocales"] = json!(["en", "zz"]);
         reporting(&inputs, &[], &[])
     }
 
@@ -765,8 +765,7 @@ pub(crate) mod tests {
             let blocking: Vec<&IssueKey> = evaluation.issues().collect();
             assert_eq!(findings(shared), blocking);
             let codes: Vec<Code> = blocking.iter().map(|key| key.code()).collect();
-            assert!(codes.contains(&Code::RequiredFieldMissing));
-            assert!(codes.contains(&Code::FieldTypeInvalid));
+            assert_eq!(codes, [Code::RequiredFieldMissing, Code::LocaleInvalid]);
             let reported: Vec<&Unit> = shared
                 .records
                 .iter()

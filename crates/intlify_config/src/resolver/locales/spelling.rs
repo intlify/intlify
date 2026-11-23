@@ -300,6 +300,28 @@ impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
             .expect("one result per spelling"))
     }
 
+    /// The canonical locale of the single-valued field at `location`, or,
+    /// when structural admission left it none, its unit waiting on why: its
+    /// path names it without its value (D15:1157, 1171, 2184).
+    pub(super) fn field(
+        &mut self,
+        location: Location,
+        scope: Scope,
+        raw: Admitted<&str>,
+    ) -> Result<Admitted<CanonicalLocale>, LocaleInvariant> {
+        match raw {
+            Ok(raw) => Ok(self.spell_one(location, scope, raw)?.locale),
+            Err(causes) => {
+                let subject = scope.subject(LocaleKey::Content(Content::projected()));
+                Ok(self.evaluation.check_found(
+                    unit(subject, Check::CanonicalLocale),
+                    Err::<CanonicalLocale, _>(causes),
+                    Ok,
+                )?)
+            }
+        }
+    }
+
     /// One unit per subject of a set's spellings, `spelled` at the locations
     /// `at` gives their positions: two spellings naming one locale are a
     /// duplicate, equal or aliases alike, each spelling one candidate. A

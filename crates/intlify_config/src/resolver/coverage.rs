@@ -2591,14 +2591,6 @@ mod tests {
                 &unconfirmed,
                 [counts.as_slice(), &items, &rules, &table].concat(),
             ),
-            // Without the field no rule can be named, and Phase 7 cannot
-            // count its selectors, so not even the requested set forms.
-            (
-                &fields_without,
-                setup(ROOM, &vocabulary),
-                &field,
-                [counts.as_slice(), &table].concat(),
-            ),
         ] {
             let resolved = resolve_fields(fields, &setup);
             assert_eq!(
@@ -2610,6 +2602,23 @@ mod tests {
             );
             assert_eq!(units(&resolved.policy.unwrap_err()), units(causes));
         }
+        // Without the field no rule can be named, while Phase 7 counted its
+        // selectors: the requested set forms, so the cells' bound, which
+        // reads no rule, is evaluated, and every cell it names waits.
+        let resolved = resolve_fields(&fields_without, &setup(ROOM, &vocabulary));
+        let recorded = statuses(&resolved.evaluation);
+        for (unit, status) in &recorded {
+            let expected = if *unit == table[0] {
+                Status::Evaluated
+            } else {
+                Status::NotEvaluated(field.clone())
+            };
+            assert_eq!(*status, expected, "{unit:?}");
+        }
+        assert!(recorded
+            .iter()
+            .any(|(unit, _)| matches!(unit.subject, Subject::Coverage(CoverageSubject::Cell(..)))));
+        assert_eq!(units(&resolved.policy.unwrap_err()), units(&field));
     }
 
     #[test]

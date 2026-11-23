@@ -4059,12 +4059,127 @@ pub(super) mod tests {
         within.resolve(|_, state| assert!(state.policy.confirmed.is_ok()));
     }
 
+    /// The unit of `check` over a Phase 7 `subject`.
+    fn phase_7(subject: crate::resolver::locales::LocaleSubject, check: Check) -> Unit {
+        crate::resolver::locales::unit(subject, check)
+    }
+
+    /// The bound counts spellings, so no field that failed holds it back: a
+    /// value that is no string is no spelling, an invalid string is one, and
+    /// an entry under a key that failed still holds its own (D15:1896, 1907,
+    /// 2184, 3348).
+    #[test]
+    fn the_occurrence_bound_counts_the_spellings_beside_a_field_that_failed() {
+        use crate::resolver::evaluation::Actual;
+        use crate::resolver::locales::LocaleSubject as L;
+        type Edit = fn(&mut Value);
+        let total = |edit: Edit| {
+            let mut inputs = Inputs::complete();
+            edit(inputs.declaration());
+            inputs.resolve(|evaluation, state| {
+                let bound = phase_7(L::Occurrences, Check::WithinBound);
+                assert_eq!(evaluation.status(&bound), Some(&Status::Evaluated));
+                state.locales.occurrence_total
+            })
+        };
+        let Some(Actual::Exact(whole)) = total(|_| {}) else {
+            panic!("the complete declaration has an exact total");
+        };
+        let cases: [(u64, u64, Edit); 16] = [
+            (1, 0, |app| app["requestedLocales"] = json!(["ja", 42])),
+            (0, 0, |app| app["requestedLocales"] = json!(["ja", "zz"])),
+            (2, 0, |app| app["requestedLocales"] = json!("en")),
+            (1, 0, |app| {
+                app.as_object_mut()
+                    .unwrap()
+                    .remove("defaultRequestedLocale");
+            }),
+            (1, 0, |app| app["defaultRequestedLocale"] = json!(42)),
+            (1, 0, |app| app["defaultSourceLocale"] = json!(42)),
+            (1, 0, |app| {
+                app["localeNegotiation"]["aliases"]["de"] = json!(1);
+            }),
+            (2, 0, |app| app["localeNegotiation"] = json!(7)),
+            (0, 0, |app| app["messageFallback"]["ja"] = json!(["en", 7])),
+            (1, 0, |app| app["messageFallback"]["ja"] = json!([7])),
+            (1, 0, |app| {
+                app["coverage"]["rules"][0]["requestedLocales"] = json!([7]);
+            }),
+            (2, 0, |app| app["coverage"] = json!(false)),
+            (1, 0, |app| {
+                app["targetProfiles"]["server"]["requestedLocales"] = json!(["ja", 7]);
+            }),
+            (1, 0, |app| {
+                app["targetProfiles"]["browser"]["defaultRequestedLocale"] = json!(7);
+            }),
+            (2, 0, |app| app["targetProfiles"]["server"] = json!(7)),
+            (0, 1, |app| {
+                app["targetProfiles"]["Web App"] =
+                    json!({"profile": 1, "requestedLocales": ["en", 7]});
+            }),
+        ];
+        for (index, (fewer, more, edit)) in cases.into_iter().enumerate() {
+            assert_eq!(
+                total(edit),
+                Some(Actual::Exact(whole - fewer + more)),
+                "{index}"
+            );
+        }
+    }
+
+    /// A missing project default holds back only what needs it: the target
+    /// locale Phase 7 finds invalid is a Finding beside it, and the default's
+    /// own checks are named and wait on it (D15:1157, 1171, 2365, 2367, 2416,
+    /// 3446; plan 025 interpretation #252).
+    #[test]
+    fn a_missing_default_leaves_an_invalid_target_locale_found() {
+        use crate::resolver::locales::fixtures::rejected;
+        use crate::resolver::locales::LocaleSubject as L;
+        let mut inputs = Inputs::complete();
+        let app = inputs.declaration();
+        app.as_object_mut()
+            .unwrap()
+            .remove("defaultRequestedLocale");
+        app["targetProfiles"]["server"]["requestedLocales"] = json!(["ja", "zz"]);
+        let server: crate::model::TargetId = serde_json::from_value(json!("server")).unwrap();
+        inputs.resolve(|evaluation, _| {
+            let found: Vec<Code> = evaluation.issues().map(IssueKey::code).collect();
+            assert_eq!(found, [Code::RequiredFieldMissing, Code::LocaleInvalid]);
+            let missing = evaluation
+                .issues()
+                .find(|key| key.code() == Code::RequiredFieldMissing)
+                .unwrap()
+                .clone();
+            let invalid = phase_7(
+                L::TargetRequestedLocale(server.clone(), rejected()),
+                Check::CanonicalLocale,
+            );
+            assert!(evaluation.issues().any(|key| *key.unit() == invalid));
+            for check in [Check::CanonicalLocale, Check::RequestedMember] {
+                let Some(Status::NotEvaluated(causes)) =
+                    evaluation.status(&phase_7(L::DefaultRequestedLocale, check))
+                else {
+                    panic!("the default's {check:?} is not waiting");
+                };
+                assert_eq!(keys(causes), BTreeSet::from([missing.clone()]));
+            }
+            let inherited = crate::resolver::targets::unit(
+                crate::resolver::targets::TargetSubject::Target(server.clone()),
+                Check::SupportedDefault,
+            );
+            let Some(Status::NotEvaluated(causes)) = evaluation.status(&inherited) else {
+                panic!("the inherited default is not waiting");
+            };
+            assert!(keys(causes).contains(&missing));
+        });
+    }
+
     /// The rows that wait on one target's failed `profile`: `targetProfiles`
     /// is still read as a whole by the rest (plan 025 interpretation #219).
-    const WAITING_ON_A_TARGET: &str = "coverage.cells.within-bound coverage.comparisons.within-bound coverage.locale.canonical coverage.locale.member coverage.locale.unique coverage.rule.normalized-domain coverage.table.complete dependency.coverage.established dependency.deployment-groups.established dependency.locale-negotiation.established dependency.message-fallback.established dependency.project-locales.established dependency.targets.established fallback.candidate.canonical fallback.candidate.distinct-from-source fallback.intent-source.unique fallback.literal.unique fallback.sequence.within-bound fallback.source.member fallback.source.unique group.member.known hydration.endpoint.known hydration.endpoint.role hydration.relation.same-effective-default hydration.relation.same-requested-locales hydration.relation.static-compatibility locale.alias-destination.canonical locale.alias-key.canonical locale.default-requested.canonical locale.default-requested.member locale.default-source.canonical locale.fallback-key.canonical locale.occurrences.within-bound locale.requested-set.within-bound locale.requested.canonical locale.requested.unique negotiation.alias-key.unique negotiation.destination.member";
+    const WAITING_ON_A_TARGET: &str = "dependency.deployment-groups.established dependency.targets.established group.member.known hydration.endpoint.known hydration.endpoint.role hydration.relation.same-effective-default hydration.relation.same-requested-locales hydration.relation.static-compatibility";
 
     /// The rows left without a subject by the same failure.
-    const WITHOUT_A_SUBJECT: &str = "artifact.target-profile-reference.resolved coverage.cell.effective-mode coverage.domain.unique group.target.single-group locale.target-default-requested.canonical locale.target-id.within-bound locale.target-profiles.within-bound locale.target-requested.canonical locale.target-requested.unique target.effective-default.supported target.requested-locales.directed target.requested-locales.project-subset";
+    const WITHOUT_A_SUBJECT: &str = "artifact.target-profile-reference.resolved group.target.single-group locale.target-default-requested.canonical locale.target-id.within-bound locale.target-profiles.within-bound locale.target-requested.canonical locale.target-requested.unique target.effective-default.supported target.requested-locales.directed target.requested-locales.project-subset";
 
     /// End to end, one target's failed `profile` leaves one Finding, and each
     /// row is evaluated, waits on it alone, or has no subject; only the failed

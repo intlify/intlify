@@ -286,9 +286,10 @@ impl EvidenceBound {
 pub(in crate::benchmark) enum EvidenceRecipe {
     /// 015's example: no Finding.
     Storefront,
-    /// The example without its project default and with a target locale that
-    /// is no string: blocking Findings after materialization (D15:1907; plan
-    /// 025 interpretation #252).
+    /// The example without its project default and with an invalid target
+    /// locale: blocking Findings after materialization, neither of which
+    /// holds the other back (D15:1907, 2367, 3446; plan 025 interpretation
+    /// #252).
     Blocked,
     /// The example with [`DENSE`] more targets, each requesting a locale
     /// outside the project's that its Target Profile has no direction for:
@@ -466,7 +467,7 @@ impl EvidenceRecipe {
                 app.as_object_mut()
                     .expect("the example's declaration is an object")
                     .remove("defaultRequestedLocale");
-                app["targetProfiles"]["server"]["requestedLocales"] = json!(["en", 42]);
+                app["targetProfiles"]["server"]["requestedLocales"] = json!(["en", "zz"]);
             }
             Self::Dense => {
                 let browser = app["targetProfiles"]["browser"].clone();

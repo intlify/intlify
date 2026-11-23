@@ -28,6 +28,7 @@ use super::evaluation::{Admitted, Causes};
 use super::locales::LocaleFields;
 use super::resource_policy::DeclarationReferences;
 use super::structural_admission::StructuralInvariant;
+use super::tally::Tally;
 use super::value_admissions::ValueAdmissions;
 
 type TargetProfiles<Target> = NonEmptyMap<TargetId, TargetDeclaration<Target>>;
@@ -40,6 +41,9 @@ type MessageFallback = BTreeMap<String, NonEmptyVec<FallbackCandidate>>;
 pub(crate) struct DeclarationFields<Policy, Target> {
     project_id: Admitted<ProjectId>,
     selection_scope: Admitted<SelectionScope>,
+    /// Every locale spelling the declaration holds, which no field's failure
+    /// hides: without a selected declaration, why there is none.
+    locale_spellings: Admitted<Tally>,
     requested_locales: Admitted<NonEmptyVec<String>>,
     default_requested_locale: Admitted<String>,
     default_source_locale: Admitted<Option<String>>,
@@ -70,6 +74,7 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
         Ok(Self {
             project_id: read.required("projectId")?,
             selection_scope: read.required("selectionScope")?,
+            locale_spellings: Ok(read.locale_spellings()),
             requested_locales: read.required("requestedLocales")?,
             default_requested_locale: read.required("defaultRequestedLocale")?,
             default_source_locale: read.optional("defaultSourceLocale")?,
@@ -94,6 +99,7 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
     /// The locale-bearing fields, which Phases 7 and 8 read.
     pub(crate) fn locale_fields(&self) -> LocaleFields<'_, Target> {
         LocaleFields {
+            spellings: self.locale_spellings.clone(),
             requested_locales: borrowed(&self.requested_locales, NonEmptyVec::as_slice),
             default_requested_locale: borrowed(&self.default_requested_locale, String::as_str),
             default_source_locale: borrowed(&self.default_source_locale, Option::as_deref),
@@ -125,6 +131,7 @@ impl<Policy, Target> DeclarationFields<Policy, Target> {
         Self {
             project_id: Err(causes.clone()),
             selection_scope: Err(causes.clone()),
+            locale_spellings: Err(causes.clone()),
             requested_locales: Err(causes.clone()),
             default_requested_locale: Err(causes.clone()),
             default_source_locale: Err(causes.clone()),
@@ -390,6 +397,7 @@ mod tests {
         config["profiles"]["app"]["projectId"] = json!(1);
         let causes = read(&config).project_id.unwrap_err();
         let fields = Fields::unavailable(&causes);
+        assert_eq!(fields.locale_spellings, Err(causes.clone()));
         let unavailable = [
             fields.project_id.as_ref().err(),
             fields.selection_scope.as_ref().err(),

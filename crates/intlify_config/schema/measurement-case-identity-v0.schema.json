@@ -413,7 +413,7 @@
         },
         {
           "const": "blocked",
-          "description": "The example without its project default and with a target locale that\nis no string: blocking Findings after materialization (D15:1907; plan\n025 interpretation #252).",
+          "description": "The example without its project default and with an invalid target\nlocale: blocking Findings after materialization, neither of which\nholds the other back (D15:1907, 2367, 3446; plan 025 interpretation\n#252).",
           "type": "string"
         },
         {

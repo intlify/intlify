@@ -32,6 +32,7 @@ use super::evaluation::{
     Observation, Phase, Subject, Unit,
 };
 use super::limits::ConfirmedPolicy;
+use super::tally::Tally;
 
 pub(crate) use spelling::canonicalize;
 use spelling::{set, Pass, Scope};
@@ -169,8 +170,11 @@ impl LocaleSet {
 }
 
 /// The selected declaration's locale-bearing fields as structural admission
-/// left them, each admitted or unavailable with the causes behind it.
+/// left them, each admitted or unavailable with the causes behind it. The
+/// spellings are counted apart from them, since no field's failure hides
+/// what its bound counts (D15:1896, 1907).
 pub(crate) struct LocaleFields<'a, Target> {
+    pub(crate) spellings: Admitted<Tally>,
     pub(crate) requested_locales: Admitted<&'a [String]>,
     pub(crate) default_requested_locale: Admitted<&'a str>,
     pub(crate) default_source_locale: Admitted<Option<&'a str>>,
@@ -185,6 +189,7 @@ impl<'a, Target> LocaleFields<'a, Target> {
     /// The fields of a declaration structural admission admitted whole.
     pub(crate) fn declared<Policy>(declaration: &'a ProfileDeclaration<Policy, Target>) -> Self {
         Self {
+            spellings: Ok(bound::declared_spellings(declaration)),
             requested_locales: Ok(declaration.requested_locales.as_slice()),
             default_requested_locale: Ok(&declaration.default_requested_locale),
             default_source_locale: Ok(declaration
@@ -403,31 +408,27 @@ fn project<P: Provider, Target>(
     };
     let requested_set = requested.and_then(|spelled| set(&spelled));
     let size = bound::requested(pass.evaluation, policy, &requested_set, observer)?;
-    let default = match fields.default_requested_locale {
-        Ok(raw) => Ok(pass.spell_one(
-            Location::DefaultRequestedLocale,
-            Scope::DefaultRequestedLocale,
-            raw,
-        )?),
-        Err(ref causes) => Err(causes.clone()),
-    };
-    let member = match &default {
-        Ok(spelled) => member(pass.evaluation, spelled, &requested_set, observer)?,
-        Err(causes) => Err(causes.clone()),
-    };
-    let source = match fields.default_source_locale {
-        Ok(Some(raw)) => pass
-            .spell_one(
+    let requested_default = pass.field(
+        Location::DefaultRequestedLocale,
+        Scope::DefaultRequestedLocale,
+        fields.default_requested_locale.clone(),
+    )?;
+    let member = member(
+        pass.evaluation,
+        &requested_default,
+        &requested_set,
+        observer,
+    )?;
+    let source = match fields.default_source_locale.clone().transpose() {
+        Some(raw) => pass
+            .field(
                 Location::DefaultSourceLocale,
                 Scope::DefaultSourceLocale,
                 raw,
             )?
-            .locale
             .map(Some),
-        Ok(None) => Ok(None),
-        Err(ref causes) => Err(causes.clone()),
+        None => Ok(None),
     };
-    let requested_default = default.and_then(|spelled| spelled.locale);
     let project = both(
         both(source, requested_set.clone()),
         both(
@@ -455,11 +456,11 @@ fn project<P: Provider, Target>(
 /// 2416).
 fn member(
     evaluation: &mut Evaluation,
-    default: &Spelled,
+    default: &Admitted<CanonicalLocale>,
     requested: &Admitted<LocaleSet>,
     observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<Admitted<()>, LocaleInvariant> {
-    let observed = match (observer, &default.locale, requested) {
+    let observed = match (observer, default, requested) {
         (Some(observer), Ok(locale), Ok(set)) if !set.contains(locale) => Some(Observation {
             primary: observer.value(&["defaultRequestedLocale"])?,
             related: vec![observer.value(&["requestedLocales"])?],
@@ -471,10 +472,7 @@ fn member(
             LocaleSubject::DefaultRequestedLocale,
             Check::RequestedMember,
         ),
-        both(
-            default.locale.clone(),
-            requested.as_ref().map_err(Causes::clone),
-        ),
+        both(default.clone(), requested.as_ref().map_err(Causes::clone)),
         |(locale, requested)| {
             if requested.contains(&locale) {
                 Ok(())
@@ -1343,7 +1341,7 @@ mod tests {
         fields.default_source_locale = Err(source.clone());
         fields.locale_negotiation = Err(negotiation.clone());
         fields.message_fallback = Err(fallback.clone());
-        fields.coverage = Err(coverage.clone());
+        fields.coverage = Err(coverage);
         fields.target_profiles = Err(targets.clone());
         let mut evaluation = Evaluation::default();
         let resolved = resolve_locales(
@@ -1354,26 +1352,35 @@ mod tests {
             None,
         )
         .unwrap();
-        let every = requested
-            .clone()
-            .union(default.clone())
-            .union(source.clone())
-            .union(negotiation.clone())
-            .union(fallback.clone())
-            .union(coverage)
-            .union(targets.clone());
-        // With nothing to spell, only the two singletons are recorded.
+        // Every spelling is counted apart from the fields, and each singleton
+        // and single-valued field is named and waits on what it reads.
+        let canonical_of = |subject| unit(subject, Check::CanonicalLocale);
         assert_eq!(
             statuses(&evaluation),
             [
-                (occurrence_unit(), Status::NotEvaluated(every)),
+                (occurrence_unit(), Status::Evaluated),
                 (
                     unit(LocaleSubject::RequestedLocales, Check::WithinBound),
                     Status::NotEvaluated(requested.clone())
                 ),
+                (
+                    canonical_of(LocaleSubject::DefaultSourceLocale),
+                    Status::NotEvaluated(source.clone())
+                ),
+                (
+                    canonical_of(LocaleSubject::DefaultRequestedLocale),
+                    Status::NotEvaluated(default.clone())
+                ),
+                (
+                    unit(
+                        LocaleSubject::DefaultRequestedLocale,
+                        Check::RequestedMember
+                    ),
+                    Status::NotEvaluated(default.clone().union(requested.clone()))
+                ),
             ]
         );
-        assert_eq!(resolved.occurrence_total, None);
+        assert_eq!(resolved.occurrence_total, Some(Actual::Exact(3)));
         assert_eq!(resolved.requested_set, Err(requested.clone()));
         assert_eq!(
             resolved.project,

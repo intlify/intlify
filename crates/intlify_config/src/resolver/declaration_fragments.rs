@@ -18,6 +18,7 @@ use crate::structural::{AdmissionInvariant, Member, StructuralAnalysis};
 use super::evaluation::Admitted;
 use super::resource_policy::{PolicySlot, ReferenceField, ReferenceOccurrence};
 use super::structural_admission::StructuralInvariant;
+use super::tally::{total, Tally};
 use super::value_admissions::ValueAdmissions;
 
 /// The declaration `id` of an analysis, with what structural admission left
@@ -93,6 +94,85 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
             Ok(Some(value)) => Ok(Ok(value)),
             Ok(None) => Err(StructuralInvariant::UnreportedFailure),
             Err(causes) => Ok(Err(causes)),
+        }
+    }
+
+    /// Every locale spelling of the declaration, as `maxLocaleOccurrences`
+    /// counts them, whatever structural admission made of the fields that hold
+    /// them: each string at a locale role and each key of a map keyed by
+    /// locale. A value that is no string is no spelling, and an invalid string
+    /// is one (D15:1896, 1907, 2184, 3348).
+    pub(crate) fn locale_spellings(&self) -> Tally {
+        let declaration = self.declaration;
+        let member = |object, name| self.member_value(object, name);
+        let aliases = member(declaration, "localeNegotiation")
+            .and_then(|negotiation| member(negotiation, "aliases"));
+        let rules = member(declaration, "coverage").and_then(|coverage| member(coverage, "rules"));
+        let selectors = match rules.map(|rules| self.document.node(rules).kind()) {
+            Some(NodeKind::Array(rules)) => total(
+                rules
+                    .iter()
+                    .map(|&rule| self.strings_in(member(rule, "requestedLocales"))),
+            ),
+            _ => Tally::of(0),
+        };
+        total([
+            self.strings_in(member(declaration, "requestedLocales")),
+            self.string_at(member(declaration, "defaultRequestedLocale")),
+            self.string_at(member(declaration, "defaultSourceLocale")),
+            total(
+                self.entries(aliases)
+                    .map(|value| Tally::of(1).plus(self.string_at(Some(value)))),
+            ),
+            total(
+                self.entries(member(declaration, "messageFallback"))
+                    .map(|sequence| Tally::of(1).plus(self.strings_in(Some(sequence)))),
+            ),
+            selectors,
+            total(
+                self.entries(member(declaration, "targetProfiles"))
+                    .map(|target| {
+                        self.strings_in(member(target, "requestedLocales"))
+                            .plus(self.string_at(member(target, "defaultRequestedLocale")))
+                    }),
+            ),
+        ])
+    }
+
+    /// One when `value` is a string.
+    fn string_at(&self, value: Option<NodeId>) -> Tally {
+        Tally::of(usize::from(value.is_some_and(|value| {
+            matches!(self.document.node(value).kind(), NodeKind::String(_))
+        })))
+    }
+
+    /// The strings among the elements of `array`, when it is one.
+    fn strings_in(&self, array: Option<NodeId>) -> Tally {
+        match array.map(|array| self.document.node(array).kind()) {
+            Some(NodeKind::Array(items)) => {
+                total(items.iter().map(|&item| self.string_at(Some(item))))
+            }
+            _ => Tally::of(0),
+        }
+    }
+
+    /// The value of each entry of `object`, when it is one.
+    fn entries(&self, object: Option<NodeId>) -> impl Iterator<Item = NodeId> + '_ {
+        object
+            .map(|object| self.document.node(object).kind())
+            .into_iter()
+            .filter_map(|kind| match kind {
+                NodeKind::Object(members) => Some(members),
+                _ => None,
+            })
+            .flat_map(|members| members.values().map(ObjectMember::value))
+    }
+
+    /// The value of the member `name` of `object`, when it holds one.
+    fn member_value(&self, object: NodeId, name: &str) -> Option<NodeId> {
+        match self.document.node(object).kind() {
+            NodeKind::Object(members) => members.get(name).map(ObjectMember::value),
+            _ => None,
         }
     }
 }
@@ -186,14 +266,6 @@ impl DeclarationFragments<'_, PolicyReference, TargetProfileReference> {
         }))
     }
 
-    /// The value of the member `name` of `object`, when it holds one.
-    fn member_value(&self, object: NodeId, name: &str) -> Option<NodeId> {
-        match self.document.node(object).kind() {
-            NodeKind::Object(members) => members.get(name).map(ObjectMember::value),
-            _ => None,
-        }
-    }
-
     /// The admitted value at `node`, as `T`.
     fn decoded<T: DeserializeOwned>(&self, node: NodeId) -> Result<T, StructuralInvariant> {
         self.document
@@ -210,6 +282,8 @@ mod tests {
     use crate::model::ProfileDeclaration;
     use crate::references::{PolicyReference, TargetProfileReference};
     use crate::resolver::evaluation::{Admitted, Evaluation, Subject, Unit};
+    use crate::resolver::locales::fixtures::declaration;
+    use crate::resolver::locales::LocaleFields;
     use crate::resolver::profile_resolution::tests::Inputs;
     use crate::resolver::resource_policy::{
         DeclarationReferences, PolicySlot, ReferenceField, ReferenceOccurrence,
@@ -335,6 +409,21 @@ mod tests {
             DeclarationFragments::new(&values, &analysis, "absent").err(),
             Some(StructuralInvariant::UnreportedFailure)
         );
+    }
+
+    /// What the document holds of a declaration admitted whole is what its
+    /// type counts, every role included (D15:1907).
+    #[test]
+    fn the_spellings_of_a_declaration_admitted_whole_are_those_its_type_counts() {
+        for config in [minimal_config(), complete_config()] {
+            let (_, values, analysis) = structured_in(Evaluation::default(), &config);
+            let fragments = DeclarationFragments::new(&values, &analysis, "app").unwrap();
+            let declared = declaration(&config, |_| {});
+            assert_eq!(
+                LocaleFields::declared(&declared).spellings,
+                Ok(fragments.locale_spellings())
+            );
+        }
     }
 
     type Referencing = StructuralAnalysis<PolicyReference, TargetProfileReference>;
