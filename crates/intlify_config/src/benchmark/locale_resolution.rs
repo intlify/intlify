@@ -19,8 +19,7 @@ use crate::locale::{
 };
 use crate::model::{CoverageMode, ProfileId};
 use crate::resolver::coverage::{
-    resolve_coverage, CoveragePolicy, CoverageSubject, Decision, Domain, RuleContent, RuleMember,
-    SurfaceKey,
+    resolve_coverage, CoveragePolicy, CoverageSubject, Decision, Domain, RuleContent, SurfaceKey,
 };
 use crate::resolver::declaration_observer::DeclarationObserver;
 use crate::resolver::evaluation::{
@@ -31,7 +30,7 @@ use crate::resolver::fallback::{
 };
 use crate::resolver::limits::ConfirmedPolicy;
 use crate::resolver::locales::{
-    resolve_locales, AliasLocales, Content, LocaleFields, LocaleInvariant, LocaleKey, LocaleSet,
+    resolve_locales, AliasLocales, LocaleFields, LocaleInvariant, LocaleKey, LocaleSet,
     LocaleSubject, Location, ProjectLocales, ResolvedLocales, Spelled, TargetLocales,
 };
 use crate::resolver::negotiation::{resolve_negotiation, NegotiationProfile, NegotiationSubject};
@@ -425,34 +424,9 @@ fn mode(frame: &mut Frame, mode: CoverageMode) {
     });
 }
 
-fn contents(frame: &mut Frame, items: &[Content]) -> Result<(), OutputFailure> {
-    frame.uint(count(items.len())?);
-    for item in items {
-        frame.text(item.as_str());
-    }
-    Ok(())
-}
-
 /// A rule as authored, which names it until it has a normalized domain.
-fn rule(frame: &mut Frame, rule: &RuleContent) -> Result<(), OutputFailure> {
-    frame.uint(count(rule.members().len())?);
-    for member in rule.members() {
-        match member {
-            RuleMember::IntentSurfaceClasses(items) => {
-                frame.uint(0);
-                contents(frame, items)?;
-            }
-            RuleMember::Mode(own) => {
-                frame.uint(1);
-                mode(frame, *own);
-            }
-            RuleMember::RequestedLocales(items) => {
-                frame.uint(2);
-                contents(frame, items)?;
-            }
-        }
-    }
-    Ok(())
+fn rule(frame: &mut Frame, rule: &RuleContent) {
+    frame.bytes(rule.as_bytes());
 }
 
 fn domain(frame: &mut Frame, domain: &Domain) -> Result<(), OutputFailure> {
@@ -474,12 +448,12 @@ fn coverage_subject(frame: &mut Frame, subject: &CoverageSubject) -> Result<(), 
         CoverageSubject::SurfaceSelectors => frame.uint(2),
         CoverageSubject::Locale(owner, own) => {
             frame.uint(3);
-            rule(frame, owner)?;
+            rule(frame, owner);
             key(frame, own);
         }
         CoverageSubject::SurfaceClass(owner, own) => {
             frame.uint(4);
-            rule(frame, owner)?;
+            rule(frame, owner);
             match own {
                 SurfaceKey::Member(member) => {
                     frame.uint(0);
@@ -493,7 +467,7 @@ fn coverage_subject(frame: &mut Frame, subject: &CoverageSubject) -> Result<(), 
         }
         CoverageSubject::Rule(own) => {
             frame.uint(9);
-            rule(frame, own)?;
+            rule(frame, own);
         }
         CoverageSubject::Domain(own) => {
             frame.uint(5);
@@ -957,7 +931,7 @@ mod tests {
     use crate::resolver::locales::fixtures::{
         canonical, canonicalizer, content, declaration, key, limits,
     };
-    use crate::resolver::locales::unit as locale_unit;
+    use crate::resolver::locales::{unit as locale_unit, Content};
     use crate::resolver::negotiation::unit as negotiation_unit;
     use crate::resolver::specification::Slot;
 

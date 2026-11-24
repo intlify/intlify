@@ -20,9 +20,10 @@ use crate::model::{
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::StructuralAnalysis;
 
-use super::coverage::CoverageFields;
+use super::coverage::{CoverageFields, RuleField, SelectorField};
 use super::declaration_fragments::{
-    AliasEntries, CoverageEntries, DeclarationFragments, FallbackEntry, TargetEntries,
+    AliasEntries, CoverageEntries, DeclarationFragments, FallbackEntry, SelectorEntry,
+    TargetEntries,
 };
 use super::evaluation::{Admitted, Causes};
 use super::locales::{
@@ -138,7 +139,14 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
                 rules: borrowed(&coverage.rules, |rules| {
                     rules
                         .iter()
-                        .map(|rule| rule.as_ref().map_err(Causes::clone))
+                        .map(|rule| {
+                            borrowed(rule, |rule| RuleField {
+                                content: rule.content.clone(),
+                                requested_locales: selector(&rule.requested_locales),
+                                intent_surface_classes: selector(&rule.intent_surface_classes),
+                                mode: rule.mode.clone(),
+                            })
+                        })
                         .collect()
                 }),
                 locale_items: coverage.locale_items.clone(),
@@ -228,6 +236,18 @@ fn strings(items: &Admitted<Vec<Admitted<String>>>) -> Admitted<Vec<Admitted<&st
             .iter()
             .map(|item| item.as_deref().map_err(Causes::clone))
             .collect()
+    })
+}
+
+/// A coverage selector, item by item, borrowed.
+fn selector(items: &SelectorEntry) -> SelectorField<'_> {
+    borrowed(items, |items| {
+        items.as_ref().map(|items| {
+            items
+                .iter()
+                .map(|item| item.as_deref().map_err(Causes::clone))
+                .collect()
+        })
     })
 }
 
