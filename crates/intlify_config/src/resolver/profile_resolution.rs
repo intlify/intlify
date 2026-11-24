@@ -6779,6 +6779,39 @@ pub(super) mod tests {
         });
     }
 
+    /// Without a confirmed policy an empty collection proves nothing about a
+    /// reference: every unit of Phase 9 waits on what left the policy
+    /// unconfirmed, and the phase adds no Finding (D15:2137, 2365).
+    #[test]
+    fn an_empty_collection_without_a_confirmed_policy_finds_nothing_in_phase_9() {
+        let mut inputs = Inputs::complete();
+        inputs.members.clear();
+        inputs.resolve(|evaluation, state| {
+            assert!(state.policy.confirmed.is_err());
+            let found: BTreeSet<IssueKey> = evaluation.issues().cloned().collect();
+            assert!(!found.is_empty());
+            let later = found
+                .iter()
+                .filter(|key| key.unit().phase >= Phase::ArtifactReferenceResolution);
+            assert_eq!(later.count(), 0);
+            let mut units = PolicySlot::ALL.map(resolved_slot).to_vec();
+            units.extend(
+                ["browser", "server"]
+                    .map(|id| {
+                        ReferenceField::TargetProfile(serde_json::from_value(json!(id)).unwrap())
+                    })
+                    .map(exact_resolution::unit),
+            );
+            for unit in &units {
+                let Some(Status::NotEvaluated(causes)) = evaluation.status(unit) else {
+                    panic!("{unit:?} is not waiting");
+                };
+                assert!(causes.keys().next().is_some(), "{unit:?}");
+                assert!(keys(causes).is_subset(&found), "{unit:?}");
+            }
+        });
+    }
+
     /// One place of the selected declaration made invalid, and what the
     /// invocation must then do.
     struct Broken {
