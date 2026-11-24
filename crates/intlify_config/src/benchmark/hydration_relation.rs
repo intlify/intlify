@@ -138,13 +138,8 @@ impl PreparedHydration {
             (locales.targets.as_deref(), Some(&observer)),
         )
         .ok()?;
-        let targets = resolve_targets(
-            &mut preparation,
-            Ok(()),
-            &locales,
-            (&references, Some(&observer)),
-        )
-        .ok()?;
+        let targets =
+            resolve_targets(&mut preparation, &locales, (&references, Some(&observer))).ok()?;
         let groups = resolve_groups(
             &mut preparation,
             policy,

@@ -638,12 +638,7 @@ where
         fields.delivery(),
     )?;
     own(evaluation, SemanticGroup::Delivery, held(delivery.as_ref()))?;
-    let targets = resolve_targets(
-        evaluation,
-        fields.target_structure(),
-        &locales,
-        (&results, observer.as_ref()),
-    )?;
+    let targets = resolve_targets(evaluation, &locales, (&results, observer.as_ref()))?;
     own(
         evaluation,
         SemanticGroup::Targets,
@@ -657,14 +652,12 @@ where
         &fields.group_fields(),
         (targets.as_ref(), observer.as_ref()),
     )?;
-    // Every relation shares the negotiation profile; none compares it. The
-    // relations still read the targets as one set, which any failure under
-    // the map leaves unavailable (plan 025 decision #343).
+    // Every relation shares the negotiation profile; none compares it.
     let hydration = validate_hydration(
         evaluation,
         confirmed,
         &fields.hydration_fields(),
-        targets.as_ref().and_then(ResolvedTargets::whole),
+        targets.as_ref(),
         (groups.as_ref(), observer.as_ref()),
         negotiation.as_ref().map(|_| ()).map_err(Causes::clone),
     )?;
@@ -3480,8 +3473,11 @@ pub(super) mod tests {
             let groups = state.groups.as_ref().unwrap();
             assert!(groups.get(&group_id("web")).unwrap().is_err());
             assert!(groups.get(&group_id("jobs")).unwrap().is_ok());
-            assert!(groups.named(&group_id("web")).unwrap().is_err());
-            assert!(groups.named(&group_id("jobs")).unwrap().is_ok());
+            let named = groups.named(&group_id("web")).unwrap().as_ref().unwrap();
+            assert_eq!(named.holds(&target_id("browser")), Ok(true));
+            assert!(named.holds(&target_id("worker")).is_err());
+            let jobs = groups.named(&group_id("jobs")).unwrap().as_ref().unwrap();
+            assert_eq!(jobs.holds(&target_id("browser")), Ok(false));
             assert!(groups.partition().is_err());
         });
     }
@@ -4422,6 +4418,135 @@ pub(super) mod tests {
         }
     }
 
+    /// A failure under a target that a relation does not name holds back
+    /// none of that relation's checks (D15:2149, 2367, 3445).
+    #[test]
+    fn a_relation_waits_only_on_the_targets_it_names() {
+        let mut inputs = Inputs::two_groups();
+        inputs.declaration()["targetProfiles"]["worker"]["requestedLocales"] = json!(["ja", 42]);
+        inputs.resolve(|evaluation, state| {
+            let relation = identified("server", "browser");
+            checked_13(&evaluation, &RELATION_CHECKS, &relation);
+            for field in ["client", "server"] {
+                let endpoint = endpoint_of(&relation, field);
+                checked_13(&evaluation, &ENDPOINT_CHECKS, &endpoint);
+            }
+            assert_eq!(issues_13(&evaluation), []);
+            let hydration = state.hydration.as_ref().unwrap();
+            assert_eq!(hydration.complete(), Ok(()));
+            assert!(state.targets.as_ref().unwrap().complete().is_err());
+        });
+    }
+
+    /// A failure under a target a relation names holds back only what
+    /// compares that fact (D15:2149, 2365, 2367).
+    #[test]
+    fn a_relation_beside_a_target_that_failed_waits_only_on_what_it_compares() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["targetProfiles"]["browser"]["requestedLocales"] = json!(["ja", 42]);
+        inputs.resolve(|evaluation, _| {
+            let why = BTreeSet::from([only_issue(&evaluation)]);
+            let relation = identified("server", "browser");
+            checked_13(
+                &evaluation,
+                &[
+                    Check::DistinctEndpoints,
+                    Check::UniqueRelation,
+                    Check::StaticCompatibility,
+                ],
+                &relation,
+            );
+            waiting_13(
+                &evaluation,
+                &[Check::SameRequestedLocales, Check::SameEffectiveDefault],
+                &relation,
+                &why,
+            );
+            for field in ["client", "server"] {
+                let endpoint = endpoint_of(&relation, field);
+                checked_13(&evaluation, &ENDPOINT_CHECKS, &endpoint);
+            }
+        });
+    }
+
+    /// An endpoint naming an admitted Target ID is declared whatever key
+    /// failed; one naming none is unproved while a key failed, and nothing
+    /// is found for it (D15:2365, 2367).
+    #[test]
+    fn an_endpoint_beside_a_target_key_that_failed_is_unproved_only_when_it_names_none() {
+        let mut inputs = Inputs::complete();
+        let copy = inputs.declaration()["targetProfiles"]["server"].clone();
+        inputs.declaration()["targetProfiles"]["Web App"] = copy;
+        relations_of(
+            &mut inputs,
+            "web",
+            json!([
+                {"server": "server", "client": "browser"},
+                {"server": "server", "client": "phone"},
+            ]),
+        );
+        inputs.resolve(|evaluation, _| {
+            let why: BTreeSet<IssueKey> = evaluation
+                .issues()
+                .filter(|key| key.unit().phase == Phase::StructuralAdmission)
+                .cloned()
+                .collect();
+            assert_eq!(why.len(), 1);
+            let named = endpoint_of(&identified("server", "browser"), "client");
+            checked_13(&evaluation, &[Check::KnownEndpoint], &named);
+            let unnamed = endpoint_of(&identified("server", "phone"), "client");
+            waiting_13(&evaluation, &[Check::KnownEndpoint], &unnamed, &why);
+        });
+    }
+
+    /// An endpoint is in its group by the members that can be read: one
+    /// they name passes, and one they do not name is unproved beside a
+    /// member that failed, with no Finding (D15:2098, 2365, 2367).
+    #[test]
+    fn an_endpoint_is_in_its_group_by_the_members_that_can_be_read() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["deploymentGroups"]["web"]["members"] =
+            json!(["browser", 7, "server"]);
+        relations_of(
+            &mut inputs,
+            "web",
+            json!([
+                {"server": "server", "client": "browser"},
+                {"server": "server", "client": "phone"},
+            ]),
+        );
+        inputs.resolve(|evaluation, _| {
+            let member = |client: &str| endpoint_of(&identified("server", client), "client");
+            checked_13(&evaluation, &[Check::SameGroupEndpoint], &member("browser"));
+            assert!(matches!(
+                phase_13(&evaluation, Check::SameGroupEndpoint, &member("phone")),
+                Some(Status::NotEvaluated(_))
+            ));
+            assert!(!issues_13(&evaluation)
+                .iter()
+                .any(|(check, ..)| *check == Check::SameGroupEndpoint));
+        });
+    }
+
+    /// An undeclared member under a target holds back no relation, while
+    /// what needs every target waits on it (D15:2367).
+    #[test]
+    fn what_needs_every_target_waits_on_an_undeclared_member() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["targetProfiles"]["browser"]["undeclared"] = json!(1);
+        inputs.resolve(|evaluation, state| {
+            checked_13(
+                &evaluation,
+                &RELATION_CHECKS,
+                &identified("server", "browser"),
+            );
+            let why = BTreeSet::from([only_issue(&evaluation)]);
+            let targets = state.targets.as_ref().unwrap();
+            assert_eq!(keys(targets.complete().as_ref().unwrap_err()), why);
+        });
+        assert!(inputs.view().is_err());
+    }
+
     /// The phases after Phase 5 classify a locale key by the canonicalizer it
     /// bound: Phase 7 observes a corrected alias key under its non-secret
     /// name and a rejected one redacted (D15:776).
@@ -5290,13 +5415,13 @@ pub(super) mod tests {
         });
     }
 
-    /// The rows that wait on one target's failed `profile`: Phase 13 still
-    /// reads `targetProfiles` as a whole (plan 025 interpretation #219).
-    const WAITING_ON_A_TARGET: &str = "dependency.deployment-groups.established dependency.targets.established hydration.endpoint.known hydration.endpoint.role hydration.relation.same-effective-default hydration.relation.same-requested-locales hydration.relation.static-compatibility";
+    /// The rows that wait on one target's failed `profile`: what needs every
+    /// target, and the one relation comparing that Target Profile.
+    const WAITING_ON_A_TARGET: &str = "dependency.deployment-groups.established dependency.targets.established hydration.relation.static-compatibility";
 
-    /// The rows of the failed reference: its own bounds and the two checks
-    /// that need its Target Profile wait on it, and the other target's run.
-    const PER_TARGET: &str = "artifact.target-profile-reference.resolved resource-policy.target-profile-reference.within-bound resource-policy.target-profile-reference.within-capability target.requested-locales.directed";
+    /// The rows of the failed reference: its own bounds and the checks that
+    /// need its Target Profile wait on it, and the other target's run.
+    const PER_TARGET: &str = "artifact.target-profile-reference.resolved hydration.endpoint.role resource-policy.target-profile-reference.within-bound resource-policy.target-profile-reference.within-capability target.requested-locales.directed";
 
     /// End to end, one target's failed `profile` leaves one Finding, and each
     /// row is evaluated or waits on it alone; only the failed reference's own
@@ -5552,7 +5677,6 @@ pub(super) mod tests {
                 assert!(targets.get(&target("browser")).unwrap().resolved.is_ok());
                 assert!(targets.get(&target("server")).unwrap().resolved.is_err());
                 assert_eq!(keys(targets.complete().as_ref().unwrap_err()), found);
-                assert!(targets.whole().is_err());
             });
         }
     }

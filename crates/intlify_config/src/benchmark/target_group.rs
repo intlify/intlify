@@ -166,7 +166,6 @@ fn phases<'s>(
 ) -> Result<(Admitted<ResolvedTargets<'s>>, Admitted<ResolvedGroups>), ResolverInvariant> {
     let targets = resolve_targets(
         evaluation,
-        Ok(()),
         &inputs.locales,
         (&inputs.references, Some(observer)),
     )?;

@@ -69,7 +69,7 @@ use super::evaluation::{
 };
 use super::evidence::EvidenceProjection;
 use super::evidence_component::ComponentInvariant;
-use super::groups::ResolvedGroups;
+use super::groups::{NamedMembers, ResolvedGroups};
 use super::limits::{BoundId, ConfirmedPolicy, Group};
 use super::targets::{ResolvedTargets, TargetFacts};
 
@@ -501,10 +501,10 @@ impl<'p, 't, 's> Shared<'_, 'p, 't, 's> {
     }
 
     /// What every endpoint of one group reads: the policy once the relations'
-    /// bound and the group's own bounds hold, the Target IDs the group's
-    /// members name, and the declared Target IDs; and where the group's
-    /// members are, once there is an array to observe.
-    fn gate(&self, id: &DeploymentGroupId) -> Result<Gate<'p, 't, 's>, ObserverInvariant> {
+    /// bound and the group's own bounds hold, and the Target IDs the group's
+    /// admitted members name; and where the members are, once there is an
+    /// array to observe.
+    fn gate(&self, id: &DeploymentGroupId) -> Result<Gate<'p, 't>, ObserverInvariant> {
         let bounds = self.groups.clone().and_then(|groups| {
             groups
                 .bounds(id)
@@ -518,7 +518,7 @@ impl<'p, 't, 's> Shared<'_, 'p, 't, 's> {
                 .as_ref()
                 .map_err(Causes::clone)
         });
-        // The members are there to observe once Phase 12 read every one.
+        // The members are there to observe once Phase 12 read the array.
         let at_members = match (self.observer, &named) {
             (Some(observer), Ok(_)) => {
                 Some(observer.value(&["deploymentGroups", id.as_str(), "members"])?)
@@ -529,10 +529,6 @@ impl<'p, 't, 's> Shared<'_, 'p, 't, 's> {
             policy: both(both(self.policy.clone(), self.bounded.clone()), bounds)
                 .map(|((policy, ()), ())| policy),
             named,
-            known: self
-                .targets
-                .clone()
-                .and_then(|targets| targets.bounded().clone().map(|()| targets)),
             at_members,
         })
     }
@@ -547,10 +543,9 @@ impl<'p, 't, 's> Shared<'_, 'p, 't, 's> {
 }
 
 /// What every endpoint of one group reads.
-struct Gate<'p, 't, 's> {
+struct Gate<'p, 't> {
     policy: Admitted<&'p ConfirmedPolicy>,
-    named: Admitted<&'t BTreeSet<TargetId>>,
-    known: Admitted<&'t ResolvedTargets<'s>>,
+    named: Admitted<&'t NamedMembers>,
     /// The group's members, the set an endpoint must belong to, when there
     /// is a declaration to observe.
     at_members: Option<EvidenceProjection>,
@@ -721,7 +716,7 @@ impl Relation<'_> {
         &self,
         evaluation: &mut Evaluation,
         shared: &Shared<'_, '_, 't, 's>,
-        gate: &Gate<'_, 't, 's>,
+        gate: &Gate<'_, 't>,
         field: EndpointField,
     ) -> Result<Endpoint<'t, 's>, HydrationInvariant> {
         let endpoint = match field {
@@ -758,9 +753,15 @@ impl Relation<'_> {
         )?;
         let declared = evaluation.check_found(
             self.endpoint_unit(field, Check::KnownEndpoint),
-            both(bytes.clone(), gate.known.clone()),
-            |((), targets)| {
-                if targets.get(endpoint).is_some() {
+            both(
+                bytes.clone(),
+                shared
+                    .targets
+                    .clone()
+                    .and_then(|targets| targets.declares(endpoint)),
+            ),
+            |((), declared)| {
+                if declared {
                     Ok(())
                 } else {
                     let unknown = invalid(Reason::UnknownEndpoint);
@@ -770,9 +771,12 @@ impl Relation<'_> {
         )?;
         let member = evaluation.check_found(
             self.endpoint_unit(field, Check::SameGroupEndpoint),
-            both(bytes.clone(), gate.named.clone()),
+            both(
+                bytes.clone(),
+                gate.named.clone().and_then(|named| named.holds(endpoint)),
+            ),
             |((), named)| {
-                if named.contains(endpoint) {
+                if named {
                     Ok(())
                 } else {
                     let outside = invalid(Reason::CrossGroup);
@@ -829,7 +833,7 @@ impl Relation<'_> {
         &self,
         evaluation: &mut Evaluation,
         shared: &Shared<'_, '_, '_, '_>,
-        gate: &Gate<'_, '_, '_>,
+        gate: &Gate<'_, '_>,
     ) -> Result<Checked, HydrationInvariant> {
         let client = self.endpoint(evaluation, shared, gate, EndpointField::Client)?;
         let server = self.endpoint(evaluation, shared, gate, EndpointField::Server)?;
@@ -1202,12 +1206,7 @@ mod tests {
                 .unwrap();
             let targets = observed
                 .app(|observer| {
-                    resolve_targets(
-                        &mut evaluation,
-                        Ok(()),
-                        &locales,
-                        (&references, Some(observer)),
-                    )
+                    resolve_targets(&mut evaluation, &locales, (&references, Some(observer)))
                 })
                 .unwrap();
             let groups = observed

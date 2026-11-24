@@ -124,13 +124,13 @@ pub(crate) struct TargetFacts<'s> {
 /// Every target with an admitted Target ID's facts, in Target ID order; the
 /// map's bound as Phase 7 checked it, which a later check over the set of
 /// Target IDs needs; whether every key of the map was admitted; and whether
-/// structural admission admitted the whole map, which a phase that still reads
-/// the targets as one set waits on.
+/// everything at and below the map passed, which what needs every target
+/// waits on.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ResolvedTargets<'s> {
     bounded: Admitted<()>,
     keys: Admitted<()>,
-    structure: Admitted<()>,
+    whole: Admitted<()>,
     facts: BTreeMap<TargetId, TargetFacts<'s>>,
 }
 
@@ -167,19 +167,10 @@ impl<'s> ResolvedTargets<'s> {
         }
     }
 
-    /// These targets, once structural admission admitted the whole map: what
-    /// Phase 13 reads as one set until it reads it by entry.
-    pub(crate) fn whole(&self) -> Result<&Self, &Causes> {
-        match &self.structure {
-            Ok(()) => Ok(self),
-            Err(causes) => Err(causes),
-        }
-    }
-
     /// Whether the whole map was admitted and every target resolved, or the
     /// causes of what was not and of each that did not.
     pub(crate) fn complete(&self) -> Admitted<()> {
-        let mut holds = self.structure.clone();
+        let mut holds = self.whole.clone();
         for facts in self.facts.values() {
             let resolved = facts.resolved.as_ref().map(|_| ()).map_err(Causes::clone);
             holds = and(holds, resolved);
@@ -190,14 +181,13 @@ impl<'s> ResolvedTargets<'s> {
 
 /// Phase 11 over the targets Phase 7 read, each with its locales and bounds,
 /// and the references Phase 9 resolved, observed through `observer`, the
-/// selected declaration's, when there is one. `structure` is whether
-/// structural admission admitted the whole Target ID map. Each check of a
-/// target waits on its Target ID's bounds. The subset, the effective default,
-/// and the directions are checked independently of each other, over the
-/// values of its set that were admitted (D15:2184, 3354); only the directions
-/// wait on the Target Profile, so an invalid one stops what needs it alone
-/// (D15:2367), and the resolved target needs every one. Without a map to read
-/// there is no target, and no unit.
+/// selected declaration's, when there is one. Each check of a target waits on
+/// its Target ID's bounds. The subset, the effective default, and the
+/// directions are checked independently of each other, over the values of its
+/// set that were admitted (D15:2184, 3354); only the directions wait on the
+/// Target Profile, so an invalid one stops what needs it alone (D15:2367), and
+/// the resolved target needs every one. Without a map to read there is no
+/// target, and no unit.
 ///
 /// # Errors
 ///
@@ -205,7 +195,6 @@ impl<'s> ResolvedTargets<'s> {
 /// of a declared value without Evidence.
 pub(crate) fn resolve_targets<'s>(
     evaluation: &mut Evaluation,
-    structure: Admitted<()>,
     locales: &ResolvedLocales,
     (references, observer): (&ReferenceResults<'s>, Option<&DeclarationObserver<'_>>),
 ) -> Result<Admitted<ResolvedTargets<'s>>, TargetInvariant> {
@@ -224,7 +213,7 @@ pub(crate) fn resolve_targets<'s>(
     Ok(Ok(ResolvedTargets {
         bounded: locales.target_bound.clone(),
         keys: locales.target_keys.clone(),
-        structure,
+        whole: locales.target_whole.clone(),
         facts,
     }))
 }
@@ -643,7 +632,11 @@ mod tests {
             let policy = unconfirmed.as_ref().map_or(Ok(&confirmed), Err);
             let declared = self.declared.clone().map(|()| &declaration.target_profiles);
             let mut fields = LocaleFields::declared(&declaration);
-            fields.target_entries = declared.clone().map(locales::TargetMapFields::declared);
+            fields.target_entries = declared.clone().map(|targets| {
+                let mut entries = locales::TargetMapFields::declared(targets);
+                entries.whole = self.structure.clone();
+                entries
+            });
             let mut evaluation = Evaluation::default();
             let observed = Observed::declaration(&self.app);
             let locales = observed
@@ -680,12 +673,7 @@ mod tests {
                 .unwrap();
             let targets = observed
                 .app(|observer| {
-                    resolve_targets(
-                        &mut evaluation,
-                        and(self.declared.clone(), self.structure.clone()),
-                        &locales,
-                        (&references, Some(observer)),
-                    )
+                    resolve_targets(&mut evaluation, &locales, (&references, Some(observer)))
                 })
                 .unwrap();
             inspect(evaluation, targets)
@@ -1433,8 +1421,8 @@ mod tests {
     }
 
     /// Beside a failure under the map, each target keeps its facts, while
-    /// what reads the targets as one set waits on it, and every target's
-    /// own causes join it (D15:2367).
+    /// what needs every target waits on it, and every target's own causes
+    /// join it (D15:2367).
     #[test]
     fn a_map_not_admitted_whole_keeps_each_targets_facts() {
         let mut inputs = Inputs::new();
@@ -1445,7 +1433,6 @@ mod tests {
             let targets = targets.unwrap();
             assert!(facts(&targets, "server").resolved.is_ok());
             assert!(facts(&targets, "browser").requested.is_err());
-            assert_eq!(targets.whole().unwrap_err(), &causes);
             let found: BTreeSet<_> = evaluation.issues().cloned().collect();
             assert!(!found.is_empty());
             let every = found.into_iter().chain(causes.keys().cloned());
@@ -1454,7 +1441,7 @@ mod tests {
                 every.collect::<BTreeSet<_>>()
             );
         });
-        Inputs::new().resolve(|_, targets| assert!(targets.unwrap().whole().is_ok()));
+        Inputs::new().resolve(|_, targets| assert_eq!(targets.unwrap().complete(), Ok(())));
     }
 
     #[test]

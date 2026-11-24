@@ -1543,6 +1543,7 @@ mod tests {
         let (browser, server, worker) = (target("browser"), target("server"), target("worker"));
         let entries = TargetMapFields {
             keys: Ok(()),
+            whole: Ok(()),
             submitted: 3,
             entries: vec![
                 TargetLocaleFields {
