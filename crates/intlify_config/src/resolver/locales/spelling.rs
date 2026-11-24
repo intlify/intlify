@@ -1542,6 +1542,7 @@ mod tests {
         let (failed, bound) = (stand_in(Slot::Coverage), stand_in(Slot::DeliveryGraph));
         let (browser, server, worker) = (target("browser"), target("server"), target("worker"));
         let entries = TargetMapFields {
+            keys: Ok(()),
             submitted: 3,
             entries: vec![
                 TargetLocaleFields {

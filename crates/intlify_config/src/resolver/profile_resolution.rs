@@ -651,21 +651,20 @@ where
             .as_ref()
             .map_or_else(|causes| Err(causes.clone()), ResolvedTargets::complete),
     )?;
-    // The groups and relations still read the targets as one set, which any
-    // failure under the map leaves unavailable (plan 025 decision #343).
-    let whole_targets = targets.as_ref().and_then(ResolvedTargets::whole);
     let groups = resolve_groups(
         evaluation,
         confirmed,
         &fields.group_fields(),
-        (whole_targets, observer.as_ref()),
+        (targets.as_ref(), observer.as_ref()),
     )?;
-    // Every relation shares the negotiation profile; none compares it.
+    // Every relation shares the negotiation profile; none compares it. The
+    // relations still read the targets as one set, which any failure under
+    // the map leaves unavailable (plan 025 decision #343).
     let hydration = validate_hydration(
         evaluation,
         confirmed,
         fields.deployment_groups(),
-        whole_targets,
+        targets.as_ref().and_then(ResolvedTargets::whole),
         (groups.as_ref(), observer.as_ref()),
         negotiation.as_ref().map(|_| ()).map_err(Causes::clone),
     )?;
@@ -3470,13 +3469,6 @@ pub(super) mod tests {
                     ),
                 ]
             );
-            // Each place waits on what could not be read of any group.
-            for target in ["browser", "server", "worker"] {
-                assert!(matches!(
-                    evaluation.status(&group_place(target)),
-                    Some(Status::NotEvaluated(_))
-                ));
-            }
             // A member keeps its position among the elements, the failed one
             // included.
             let phone = group_member("web", "phone", Check::KnownMember);
@@ -3609,6 +3601,178 @@ pub(super) mod tests {
         });
     }
 
+    /// A target's place is found from the groups that can be read: one that
+    /// a group names is placed whatever else failed, and one that none names
+    /// waits on exactly what could not be read, since it may be there
+    /// (D15:2184, 2365, 2438).
+    #[test]
+    fn a_place_is_found_from_the_groups_that_can_be_read() {
+        type Case = (
+            fn(&mut Value),
+            &'static [&'static str],
+            &'static [&'static str],
+        );
+        const ALONE: &[&str] = &["browser", "server"];
+        let cases: [Case; 8] = [
+            (
+                |app| app["deploymentGroups"]["web"] = json!(7),
+                &["worker"],
+                ALONE,
+            ),
+            (
+                |app| app["deploymentGroups"]["web"] = json!({}),
+                &["worker"],
+                ALONE,
+            ),
+            (
+                |app| app["deploymentGroups"]["web"]["members"] = json!(7),
+                &["worker"],
+                ALONE,
+            ),
+            (
+                |app| app["deploymentGroups"]["web"]["members"] = json!([]),
+                &["worker"],
+                ALONE,
+            ),
+            (
+                |app| {
+                    let groups = app["deploymentGroups"].as_object_mut().unwrap();
+                    let web = groups.remove("web").unwrap();
+                    groups.insert("Web App".into(), web);
+                },
+                &["worker"],
+                ALONE,
+            ),
+            (
+                |app| {
+                    app["deploymentGroups"]["web"]["members"] = json!(["browser", 7, "server"]);
+                },
+                &["browser", "server", "worker"],
+                &[],
+            ),
+            // A group whose key failed places nothing, and the partition still
+            // lacks it beside every target placed.
+            (
+                |app| app["deploymentGroups"]["Web App"] = json!({"members": ["browser"]}),
+                &["browser", "server", "worker"],
+                &[],
+            ),
+            (
+                |app| app["deploymentGroups"]["web"]["members"] = json!(["browser", 7]),
+                &["browser", "worker"],
+                &["server"],
+            ),
+        ];
+        for (edit, placed, waiting) in cases {
+            let mut inputs = Inputs::two_groups();
+            edit(inputs.declaration());
+            inputs.resolve(|evaluation, state| {
+                let places: Vec<Unit> = placed.iter().map(|id| group_place(id)).collect();
+                all_evaluated(&evaluation, &places);
+                assert_eq!(group_issues(&evaluation), []);
+                let why: BTreeSet<IssueKey> = evaluation.issues().cloned().collect();
+                for target in waiting {
+                    waits_on_exactly(&evaluation, &group_place(target), &why);
+                }
+                assert!(state.groups.as_ref().unwrap().partition().is_err());
+            });
+        }
+    }
+
+    /// A target that two groups name is found whatever else failed, while
+    /// one that no admitted element names waits on what failed: it cannot be
+    /// proved unassigned (D15:2365, 2438).
+    #[test]
+    fn a_target_two_groups_name_is_found_beside_a_member_that_failed() {
+        let mut inputs = Inputs::two_groups();
+        inputs.declaration()["deploymentGroups"]["web"]["members"] = json!(["browser", 7]);
+        inputs.declaration()["deploymentGroups"]["jobs"]["members"] = json!(["worker", "browser"]);
+        inputs.resolve(|evaluation, _| {
+            assert_eq!(
+                group_issues(&evaluation),
+                [(group_place("browser"), Code::TargetAssignedToMultipleGroups)]
+            );
+            all_evaluated(&evaluation, &[group_place("worker")]);
+            let why = causes_of(&evaluation, &group_place("server"));
+            assert_eq!(why.len(), 1);
+            assert!(why
+                .iter()
+                .all(|key| key.unit().phase == Phase::StructuralAdmission));
+        });
+    }
+
+    /// Beside a Target ID key that failed, a member naming an admitted Target
+    /// ID is known, and one naming none is unproved rather than unknown
+    /// (D15:2184, 2365, 2367).
+    #[test]
+    fn a_member_beside_a_target_key_that_failed_is_unproved_only_when_it_names_none() {
+        let mut inputs = Inputs::two_groups();
+        let target = inputs.declaration()["targetProfiles"]["browser"].clone();
+        inputs.declaration()["targetProfiles"]["Web App"] = target;
+        inputs.declaration()["deploymentGroups"]["web"]["members"] =
+            json!(["browser", "server", "phone"]);
+        inputs.resolve(|evaluation, state| {
+            all_evaluated(
+                &evaluation,
+                &[
+                    group_member("web", "browser", Check::KnownMember),
+                    group_member("web", "server", Check::KnownMember),
+                    group_place("browser"),
+                    group_place("server"),
+                    group_place("worker"),
+                ],
+            );
+            assert_eq!(group_issues(&evaluation), []);
+            let why = causes_of(
+                &evaluation,
+                &group_member("web", "phone", Check::KnownMember),
+            );
+            assert_eq!(why.len(), 1);
+            assert!(why
+                .iter()
+                .all(|key| key.unit().phase == Phase::StructuralAdmission));
+            let groups = state.groups.as_ref().unwrap();
+            assert!(groups.partition().is_err());
+        });
+        // Every admitted target placed, the partition still lacks the entry
+        // whose key failed, and nothing else.
+        let mut inputs = Inputs::two_groups();
+        let target = inputs.declaration()["targetProfiles"]["browser"].clone();
+        inputs.declaration()["targetProfiles"]["Web App"] = target;
+        inputs.resolve(|evaluation, state| {
+            assert_eq!(group_issues(&evaluation), []);
+            let found: BTreeSet<IssueKey> = evaluation.issues().cloned().collect();
+            let groups = state.groups.as_ref().unwrap();
+            assert_eq!(keys(groups.partition().as_ref().unwrap_err()), found);
+        });
+    }
+
+    /// A target that failed in a field other than its key still takes its
+    /// place: Phase 12 reads no more of it than its Target ID (D15:2367,
+    /// 3445).
+    #[test]
+    fn a_target_whose_field_failed_is_still_placed() {
+        use crate::resolver::groups::GroupSubject as G;
+        let mut inputs = Inputs::two_groups();
+        inputs.declaration()["targetProfiles"]["browser"]["requestedLocales"] = json!([7]);
+        inputs.resolve(|evaluation, state| {
+            all_evaluated(&evaluation, &group_checked("jobs", "worker"));
+            all_evaluated(
+                &evaluation,
+                &[
+                    group_bound(G::Members(group_id("web"))),
+                    group_member("web", "browser", Check::KnownMember),
+                    group_member("web", "server", Check::KnownMember),
+                    group_place("browser"),
+                    group_place("server"),
+                    group_place("worker"),
+                ],
+            );
+            assert_eq!(group_issues(&evaluation), []);
+            assert_eq!(state.groups.as_ref().unwrap().partition(), &Ok(()));
+        });
+    }
+
     /// Without a Group ID map to read, each declared target's place is still
     /// recorded, waiting on why there is none (D15:1171, 2184).
     #[test]
@@ -3630,6 +3794,34 @@ pub(super) mod tests {
                 }
             });
         }
+    }
+
+    /// A group past its own bound is left out of what the places read: a
+    /// target another group names is placed, and one only it names waits on
+    /// the bound (D15:1934, 2184, 2365).
+    #[test]
+    fn a_group_past_its_bound_holds_back_only_the_targets_it_alone_could_place() {
+        use crate::resolver::groups::GroupSubject as G;
+        let mut inputs = Inputs::two_groups();
+        let mut limits = policy_limits();
+        limits.target_grouping.max_members_per_group = bound(1);
+        inputs.select_policy(resource_limit_policy(&limits));
+        inputs.resolve(|evaluation, _| {
+            let over = group_bound(G::Members(group_id("web")));
+            assert_eq!(
+                group_issues(&evaluation),
+                [(over.clone(), Code::ResourceLimitExceeded)]
+            );
+            all_evaluated(&evaluation, &[group_place("worker")]);
+            let found = BTreeSet::from([evaluation
+                .issues()
+                .find(|key| key.unit() == &over)
+                .unwrap()
+                .clone()]);
+            for target in ["browser", "server"] {
+                waits_on_exactly(&evaluation, &group_place(target), &found);
+            }
+        });
     }
 
     /// Phase 13 observes through the same observer: a relation's client that
@@ -4597,20 +4789,17 @@ pub(super) mod tests {
         });
     }
 
-    /// The rows that wait on one target's failed `profile`: `targetProfiles`
-    /// is still read as a whole by the rest (plan 025 interpretation #219).
-    const WAITING_ON_A_TARGET: &str = "dependency.deployment-groups.established dependency.targets.established group.member.known hydration.endpoint.known hydration.endpoint.role hydration.relation.same-effective-default hydration.relation.same-requested-locales hydration.relation.static-compatibility";
-
-    /// The rows left without a subject by the same failure.
-    const WITHOUT_A_SUBJECT: &str = "group.target.single-group";
+    /// The rows that wait on one target's failed `profile`: Phase 13 still
+    /// reads `targetProfiles` as a whole (plan 025 interpretation #219).
+    const WAITING_ON_A_TARGET: &str = "dependency.deployment-groups.established dependency.targets.established hydration.endpoint.known hydration.endpoint.role hydration.relation.same-effective-default hydration.relation.same-requested-locales hydration.relation.static-compatibility";
 
     /// The rows of the failed reference: its own bounds and the two checks
     /// that need its Target Profile wait on it, and the other target's run.
     const PER_TARGET: &str = "artifact.target-profile-reference.resolved resource-policy.target-profile-reference.within-bound resource-policy.target-profile-reference.within-capability target.requested-locales.directed";
 
     /// End to end, one target's failed `profile` leaves one Finding, and each
-    /// row is evaluated, waits on it alone, or has no subject; only the failed
-    /// reference's own rows are both (D15:1924, 2149, 2367, 3446).
+    /// row is evaluated or waits on it alone; only the failed reference's own
+    /// rows are both (D15:1924, 2149, 2367, 3446).
     #[test]
     fn a_failed_target_profile_changes_only_what_reads_the_targets() {
         let rows = |evaluation: &Evaluation| {
@@ -4644,11 +4833,7 @@ pub(super) mod tests {
                 names(|[on, off]| *on == 0 && *off > 0),
                 split(WAITING_ON_A_TARGET)
             );
-            let gone = complete.keys().filter(|row| !after.contains_key(*row));
-            assert_eq!(
-                gone.copied().collect::<BTreeSet<_>>(),
-                split(WITHOUT_A_SUBJECT)
-            );
+            assert!(complete.keys().all(|row| after.contains_key(row)));
             assert_eq!(names(|[on, off]| *on > 0 && *off > 0), split(PER_TARGET));
         });
     }

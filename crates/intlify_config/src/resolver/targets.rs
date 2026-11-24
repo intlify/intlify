@@ -123,11 +123,13 @@ pub(crate) struct TargetFacts<'s> {
 
 /// Every target with an admitted Target ID's facts, in Target ID order; the
 /// map's bound as Phase 7 checked it, which a later check over the set of
-/// Target IDs needs; and whether structural admission admitted the whole map,
-/// which a phase that still reads the targets as one set waits on.
+/// Target IDs needs; whether every key of the map was admitted; and whether
+/// structural admission admitted the whole map, which a phase that still reads
+/// the targets as one set waits on.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ResolvedTargets<'s> {
     bounded: Admitted<()>,
+    keys: Admitted<()>,
     structure: Admitted<()>,
     facts: BTreeMap<TargetId, TargetFacts<'s>>,
 }
@@ -146,8 +148,27 @@ impl<'s> ResolvedTargets<'s> {
         self.facts.iter()
     }
 
+    /// Whether every key of the map was admitted, or why not: the set of
+    /// Target IDs is complete only then.
+    pub(crate) const fn keys(&self) -> &Admitted<()> {
+        &self.keys
+    }
+
+    /// Whether `id` names a declared Target ID, once the map is within its
+    /// bound: an admitted key proves it, and naming none is proved only beside
+    /// every key, a value the set lacks being unproved while a key failed
+    /// (D15:2365, 2367).
+    pub(crate) fn declares(&self, id: &TargetId) -> Admitted<bool> {
+        self.bounded.clone()?;
+        if self.facts.contains_key(id) {
+            Ok(true)
+        } else {
+            self.keys.clone().map(|()| false)
+        }
+    }
+
     /// These targets, once structural admission admitted the whole map: what
-    /// Phases 12 and 13 read, each as one set until they read it by entry.
+    /// Phase 13 reads as one set until it reads it by entry.
     pub(crate) fn whole(&self) -> Result<&Self, &Causes> {
         match &self.structure {
             Ok(()) => Ok(self),
@@ -202,6 +223,7 @@ pub(crate) fn resolve_targets<'s>(
     }
     Ok(Ok(ResolvedTargets {
         bounded: locales.target_bound.clone(),
+        keys: locales.target_keys.clone(),
         structure,
         facts,
     }))

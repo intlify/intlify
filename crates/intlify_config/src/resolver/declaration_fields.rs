@@ -172,6 +172,7 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
                         ),
                     })
                     .collect(),
+                keys: targets.keys.clone(),
             }),
         }
     }
