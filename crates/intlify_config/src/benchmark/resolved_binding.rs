@@ -30,7 +30,9 @@ use crate::resolver::exact_resolution::{
 };
 use crate::resolver::limits::ConfirmedPolicy;
 use crate::resolver::locales::{resolve_locales, LocaleFields, TargetLocales};
-use crate::resolver::resource_policy::{DeclarationReferences, ReferenceField, TargetReferences};
+use crate::resolver::resource_policy::{
+    DeclarationReferences, PolicyReferences, ReferenceField, TargetReferences,
+};
 
 use super::observation::{Frame, Observation};
 use super::operation::{observer, Analysis, Config, ConfigFile, OutputFailure};
@@ -93,7 +95,7 @@ impl PreparedBindings {
         let set = admit_collection(&mut preparation, Ok(&self.policy), &self.collection).ok()?;
         Some(BindingInputs {
             references: DeclarationReferences {
-                policies: Ok(&declaration.policies),
+                policies: PolicyReferences::declared(&declaration.policies),
                 target_profiles: Ok(TargetReferences::declared(&declaration.target_profiles)),
             },
             targets: locales.targets,

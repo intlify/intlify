@@ -649,7 +649,9 @@ mod tests {
     use crate::resolver::limits::{fixture_limits, ConfirmedPolicy, ResolutionLimits};
     use crate::resolver::locales::fixtures::{canonicalizer, stand_in, target, waits_on};
     use crate::resolver::locales::{self, resolve_locales, LocaleFields, LocaleSubject};
-    use crate::resolver::resource_policy::{DeclarationReferences, TargetReferences};
+    use crate::resolver::resource_policy::{
+        DeclarationReferences, PolicyReferences, TargetReferences,
+    };
     use crate::resolver::specification::Slot;
     use crate::resolver::targets::{self, resolve_targets, TargetSubject};
 
@@ -773,7 +775,10 @@ mod tests {
                         &mut evaluation,
                         set.as_ref(),
                         &DeclarationReferences {
-                            policies: Err(stand_in(Slot::ProjectProfile)),
+                            policies: PolicyReferences {
+                                slots: Vec::new(),
+                                object: Ok(()),
+                            },
                             target_profiles: Ok(TargetReferences::declared(
                                 &declaration.target_profiles,
                             )),

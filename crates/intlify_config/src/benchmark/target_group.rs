@@ -32,7 +32,7 @@ use crate::resolver::groups::{resolve_groups, GroupFields, GroupSubject, Resolve
 use crate::resolver::limits::ConfirmedPolicy;
 use crate::resolver::locales::{resolve_locales, LocaleFields, ResolvedLocales};
 use crate::resolver::profile_resolution::ResolverInvariant;
-use crate::resolver::resource_policy::{DeclarationReferences, TargetReferences};
+use crate::resolver::resource_policy::{DeclarationReferences, PolicyReferences, TargetReferences};
 use crate::resolver::targets::{resolve_targets, ResolvedTargets, TargetSubject};
 
 use super::observation::{Frame, Observation};
@@ -118,7 +118,7 @@ impl PreparedTargets {
             &mut preparation,
             set.as_ref(),
             &DeclarationReferences {
-                policies: Ok(&declaration.policies),
+                policies: PolicyReferences::declared(&declaration.policies),
                 target_profiles: Ok(TargetReferences::declared(&declaration.target_profiles)),
             },
             (locales.targets.as_deref(), Some(&observer)),

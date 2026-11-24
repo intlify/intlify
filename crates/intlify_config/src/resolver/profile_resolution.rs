@@ -20,11 +20,11 @@
 //! `resourceLimits` reference, whatever else of it or of the root it rejected
 //! (D15:2131, 2367, 3434; plan 025 interpretation #218), and read each of its
 //! fields on its own ([`super::declaration_fields`]), from what each
-//! candidate left at its value ([`super::value_admissions`]): a field
-//! structural admission did not admit holds back only the checks that read
-//! it, with its Findings as their causes (D15:3340), for now the whole field
-//! even where the failure is in one of its entries (plan 025 interpretation
-//! #219).
+//! candidate left at its value ([`super::value_admissions`]): a value
+//! structural admission did not admit, whether a field, a map entry, an array
+//! element, or a `policies` slot, holds back only the checks that read it,
+//! with its Findings as their causes, and its siblings continue (D15:2367,
+//! 3340).
 //! Without a selection, each check that reads the declaration, or the Policy
 //! its reference selects, is not evaluated with what held the selection back,
 //! while Phase 4 still checks the collection under the capability (D15:2131,
@@ -613,18 +613,19 @@ where
         &declared,
         (locales.targets.as_deref(), observer.as_ref()),
     )?;
-    // Both policy groups are the confirmed declaration's, and the required
-    // one also holds the confirmed policy's bounds.
-    let policies = and(held(confirmed), held(declared.policies.as_ref()));
+    // Both policy groups are the confirmed declaration's, and each waits on
+    // the object apart from its slots and only on the slots it holds
+    // (D15:2137, 2365, 3445). The required one also holds the confirmed
+    // policy's bounds.
     own(
         evaluation,
         SemanticGroup::RequiredPolicies,
-        and(policies.clone(), results.policies(&REQUIRED_POLICIES)),
+        and(held(confirmed), results.policies(&REQUIRED_POLICIES)),
     )?;
     own(
         evaluation,
         SemanticGroup::OptionalPolicies,
-        and(policies, results.policies(&OPTIONAL_POLICIES)),
+        and(held(confirmed), results.policies(&OPTIONAL_POLICIES)),
     )?;
     let references = results.all();
     let bindings = references
@@ -6636,5 +6637,145 @@ pub(super) mod tests {
             assert_ne!(bounded, whole, "{programmatic}");
             assert_eq!(primaries(&bounded), primaries(&whole), "{programmatic}");
         }
+    }
+
+    /// Phase 9's unit of the reference at `slot`.
+    fn resolved_slot(slot: PolicySlot) -> Unit {
+        exact_resolution::unit(ReferenceField::Policy(slot))
+    }
+
+    /// One `policies` slot that fails, or is missing, leaves only its own
+    /// reference unresolved, and only the group that holds the slot waits
+    /// (D15:2137, 2365, 2367, 3445).
+    #[test]
+    fn a_policy_slot_that_failed_stops_only_its_reference_and_its_group() {
+        use SemanticGroup::{OptionalPolicies, RequiredPolicies};
+        type Edit = fn(&mut Value);
+        let cases: [(PolicySlot, Edit, SemanticGroup, SemanticGroup); 4] = [
+            (
+                PolicySlot::Trust,
+                |policies| policies["trust"] = json!(42),
+                RequiredPolicies,
+                OptionalPolicies,
+            ),
+            (
+                PolicySlot::Approval,
+                |policies| {
+                    policies.as_object_mut().unwrap().remove("approval");
+                },
+                RequiredPolicies,
+                OptionalPolicies,
+            ),
+            (
+                PolicySlot::GlossarySet,
+                |policies| policies["glossarySet"] = json!(42),
+                OptionalPolicies,
+                RequiredPolicies,
+            ),
+            (
+                PolicySlot::ProviderRouting,
+                |policies| {
+                    policies.as_object_mut().unwrap().remove("providerRouting");
+                },
+                OptionalPolicies,
+                RequiredPolicies,
+            ),
+        ];
+        for (failed, edit, waiting, established) in cases {
+            let mut inputs = Inputs::complete();
+            edit(&mut inputs.declaration()["policies"]);
+            inputs.resolve(|evaluation, state| {
+                let found = BTreeSet::from([only_issue(&evaluation)]);
+                for slot in PolicySlot::ALL {
+                    let unit = resolved_slot(slot);
+                    if slot == failed {
+                        waits_on_exactly(&evaluation, &unit, &found);
+                    } else {
+                        all_evaluated(&evaluation, &[unit]);
+                    }
+                }
+                waits_on_exactly(&evaluation, &dependency::unit(waiting), &found);
+                all_evaluated(&evaluation, &[dependency::unit(established)]);
+                // The bindings need every reference.
+                assert_eq!(state.references.as_ref().err().map(keys), Some(found));
+                assert!(state.bindings.is_err());
+            });
+        }
+    }
+
+    /// A member `policies` does not declare is in no slot, so every reference
+    /// is still resolved, while both groups of the object wait on its Finding,
+    /// as the groups of `localeNegotiation` and `coverage` do (D15:2184, 2367;
+    /// plan 025 interpretations #346, #347).
+    #[test]
+    fn an_undeclared_policies_member_holds_back_no_reference() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["policies"]["extra"] = json!(1);
+        inputs.resolve(|evaluation, state| {
+            let key = only_issue(&evaluation);
+            assert_eq!(key.code(), Code::UnknownField);
+            let units = PolicySlot::ALL.map(resolved_slot);
+            all_evaluated(&evaluation, &units);
+            let found = BTreeSet::from([key]);
+            for group in [
+                SemanticGroup::RequiredPolicies,
+                SemanticGroup::OptionalPolicies,
+            ] {
+                waits_on_exactly(&evaluation, &dependency::unit(group), &found);
+            }
+            assert!(state.references.is_ok() && state.bindings.is_ok());
+            assert!(state.structure.is_err());
+        });
+    }
+
+    /// Without a selection each `policies` slot still names its reference's
+    /// units, which wait on what held the selection back, while no unit is
+    /// made up for a target, whose key only the declaration holds (D15:1171,
+    /// 2131, 2184; plan 025 interpretation #220).
+    #[test]
+    fn without_a_selection_each_slot_records_its_reference_units() {
+        let mut inputs = Inputs::complete();
+        inputs.selected = "absent";
+        inputs.attempt(|evaluation, state| {
+            state.unwrap().expect("entry admits the file");
+            let found = BTreeSet::from([only_issue(&evaluation)]);
+            for slot_id in PolicySlot::ALL {
+                let [capability, recheck] = stages(slot(slot_id));
+                for unit in [capability, recheck, resolved_slot(slot_id)] {
+                    waits_on_exactly(&evaluation, &unit, &found);
+                }
+            }
+            assert!(!evaluation.statuses().any(|(unit, _)| matches!(
+                unit.subject,
+                Subject::ArtifactReference(ReferenceField::TargetProfile(_))
+            )));
+        });
+    }
+
+    /// Both policy groups are the confirmed declaration's: even over an empty
+    /// collection, whose admission has no unit to wait on the policy, each
+    /// waits on what left the policy unconfirmed (D15:2132, 2516).
+    #[test]
+    fn an_empty_collection_leaves_both_policy_groups_waiting_on_the_policy() {
+        let mut inputs = Inputs::complete();
+        inputs.members.clear();
+        inputs.resolve(|evaluation, state| {
+            assert!(state.policy.confirmed.is_err());
+            let decision = evaluation
+                .issues()
+                .find(|key| key.unit().phase == Phase::ResourcePolicyAdmission)
+                .unwrap();
+            for group in [
+                SemanticGroup::RequiredPolicies,
+                SemanticGroup::OptionalPolicies,
+            ] {
+                let Some(Status::NotEvaluated(causes)) =
+                    evaluation.status(&dependency::unit(group))
+                else {
+                    panic!("{group:?} is not waiting");
+                };
+                assert!(keys(causes).contains(decision), "{group:?}");
+            }
+        });
     }
 }

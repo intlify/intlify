@@ -497,7 +497,9 @@ mod tests {
         canonical, canonicalizer, content, key, rejected, stand_in, target, waits_on,
     };
     use crate::resolver::locales::{self, resolve_locales, LocaleFields, LocaleSubject};
-    use crate::resolver::resource_policy::{DeclarationReferences, TargetReferences};
+    use crate::resolver::resource_policy::{
+        DeclarationReferences, PolicyReferences, TargetReferences,
+    };
     use crate::resolver::specification::Slot;
 
     type Declaration = ProfileDeclaration<PolicyReference, TargetProfileReference>;
@@ -662,7 +664,10 @@ mod tests {
                         &mut evaluation,
                         set.as_ref(),
                         &DeclarationReferences {
-                            policies: Err(stand_in(Slot::ProjectProfile)),
+                            policies: PolicyReferences {
+                                slots: Vec::new(),
+                                object: Ok(()),
+                            },
                             target_profiles: Ok(TargetReferences::declared(
                                 &declaration.target_profiles,
                             )),

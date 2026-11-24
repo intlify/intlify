@@ -132,28 +132,30 @@ impl<'s> ArtifactBindings<'s> {
 pub(crate) type Named<'s> = (&'s ExactTuple, &'s AdmittedArtifact<'s>);
 
 /// Phase 9's ordinary exact resolution reference by reference: what each
-/// present reference names or why it names nothing, and the causes of what
-/// structural admission did not admit under the reference fields. A later
-/// phase that needs one reference reads its result alone, so a reference that
-/// failed leaves only what needs it unavailable (D15:2367, 3445).
+/// reference names or why it names nothing, and whether everything at and
+/// below the Target ID map passed. A later phase that needs one reference
+/// reads its result alone, so a reference that failed leaves only what needs
+/// it unavailable (D15:2367, 3445).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ReferenceResults<'s> {
     found: BTreeMap<ReferenceField, Admitted<Named<'s>>>,
-    unavailable: Option<Causes>,
+    target_map: Admitted<()>,
+    /// Whether the `policies` object passed apart from its slots.
+    policy_object: Admitted<()>,
 }
 
 impl<'s> ReferenceResults<'s> {
-    /// The result of the present reference at `field`, or `None` when the
-    /// declaration has none there: an explicit `null`, or a field structural
-    /// admission did not admit.
+    /// The result of the reference at `field`, or `None` when the declaration
+    /// has none there: an explicit `null`, or a target without an admitted
+    /// key or map.
     pub(crate) fn get(&self, field: &ReferenceField) -> Option<&Admitted<Named<'s>>> {
         self.found.get(field)
     }
 
-    /// Every present reference's artifact, when each one resolved and no
-    /// reference field was unavailable: what the bindings need.
+    /// Every reference's artifact, when each one resolved and the Target ID
+    /// map holds no entry without one: what the bindings need.
     pub(crate) fn all(&self) -> Admitted<ResolvedReferences<'s>> {
-        let mut holds: Admitted<()> = self.unavailable.clone().map_or(Ok(()), Err);
+        let mut holds = self.target_map.clone();
         let mut resolved = BTreeMap::new();
         for (field, found) in &self.found {
             match found {
@@ -166,12 +168,13 @@ impl<'s> ReferenceResults<'s> {
         holds.map(|()| ResolvedReferences(resolved))
     }
 
-    /// Whether the present reference at each of the policy `slots` resolved:
-    /// what a semantic group of policies needs of this phase. An explicit
-    /// `null` holds, and so does a field structural admission did not admit,
-    /// whose causes the caller has.
+    /// Whether the `policies` object passed apart from its slots and the
+    /// reference at each of the policy `slots` resolved: what a semantic
+    /// group of policies needs of this phase (D15:2365). An explicit `null`
+    /// holds, a slot that failed waits on why, and another group's slot is
+    /// not read.
     pub(crate) fn policies(&self, slots: &[PolicySlot]) -> Admitted<()> {
-        let mut holds = Ok(());
+        let mut holds = self.policy_object.clone();
         for slot in slots {
             if let Some(found) = self.found.get(&ReferenceField::Policy(*slot)) {
                 holds = and(holds, found.as_ref().map(|_| ()).map_err(Causes::clone));
@@ -181,13 +184,12 @@ impl<'s> ReferenceResults<'s> {
     }
 }
 
-/// Phase 9's ordinary exact resolution. Each present reference is one unit
-/// under the Set; a Target Profile reference also waits on its target's
-/// bounds, which `targets` holds as Phase 7 checked them, and on its own
-/// value. A `policies` field or Target ID map structural admission did not
-/// admit has no references to resolve, and what it did not admit leaves the
-/// whole resolution unavailable. A reference that names nothing is observed
-/// through `observer`, the selected declaration's, when there is one.
+/// Phase 9's ordinary exact resolution. Each reference is one unit under the
+/// Set, which also waits on its own value; a Target Profile reference also
+/// waits on its target's bounds, which `targets` holds as Phase 7 checked
+/// them. A Target ID map structural admission did not admit has no reference
+/// to resolve. A reference that names nothing is observed through `observer`,
+/// the selected declaration's, when there is one.
 ///
 /// # Errors
 ///
@@ -266,8 +268,7 @@ pub(crate) fn resolve_fields<'s>(
         Option<&DeclarationObserver<'_>>,
     ),
 ) -> Result<ReferenceResults<'s>, ReferenceInvariant> {
-    let (present, unavailable) =
-        references.visible(PolicyReference::tuple, TargetProfileReference::tuple);
+    let present = references.visible(PolicyReference::tuple, TargetProfileReference::tuple);
     // What a reference that names nothing is compared with, made before any
     // unit records it, and only with the declaration's file to observe the
     // reference in.
@@ -311,7 +312,11 @@ pub(crate) fn resolve_fields<'s>(
         )?;
         found.insert(field, result);
     }
-    Ok(ReferenceResults { found, unavailable })
+    Ok(ReferenceResults {
+        found,
+        target_map: references.target_map(),
+        policy_object: references.policies.object.clone(),
+    })
 }
 
 /// What the reference at `field` waits on besides the Set: nothing for a
@@ -380,7 +385,7 @@ mod tests {
         self, Approval, GlossarySet, ProviderRouting, ResourceLimits, Selection, SourceAdmission,
         Trust,
     };
-    use crate::resolver::resource_policy::TargetReferences;
+    use crate::resolver::resource_policy::{PolicyReferences, TargetReferences};
     use crate::resolver::specification::Slot;
 
     const ROOM: CollectionLimits = CollectionLimits {
@@ -599,7 +604,13 @@ mod tests {
             };
             let set = admit_collection(&mut evaluation, Ok(&confirmed), &collection).unwrap();
             let references = DeclarationReferences {
-                policies: self.policies.clone().map(|()| &policies),
+                policies: match &self.policies {
+                    Ok(()) => PolicyReferences::declared(&policies),
+                    Err(causes) => PolicyReferences {
+                        slots: PolicySlot::unavailable(causes),
+                        object: Err(causes.clone()),
+                    },
+                },
                 target_profiles: declared.map(TargetReferences::declared),
             };
             let resolved = observed
@@ -1028,19 +1039,21 @@ mod tests {
     }
 
     #[test]
-    fn a_field_structural_admission_did_not_admit_has_no_references() {
+    fn a_slot_or_map_structural_admission_did_not_admit_waits_on_why() {
         let behind = stand_in(Slot::ProjectProfile);
         let mut inputs = Inputs::new();
         inputs.policies = Err(behind.clone());
         let (evaluation, resolved) = inputs.run();
-        // Only the targets' references are resolved, and they hold.
-        assert_eq!(
-            statuses(&evaluation),
-            [
-                (target("app"), Status::Evaluated),
-                (target("web"), Status::Evaluated)
-            ]
-        );
+        // Each slot waits on why it has no value, and the targets' references
+        // are resolved and hold.
+        let mut expected: Vec<(ReferenceField, Status)> = PolicySlot::ALL
+            .map(|slot| (policy(slot), Status::NotEvaluated(behind.clone())))
+            .into();
+        expected.extend([
+            (target("app"), Status::Evaluated),
+            (target("web"), Status::Evaluated),
+        ]);
+        assert_eq!(statuses(&evaluation), expected);
         assert_eq!(resolved, Err(behind.clone()));
         let mut inputs = Inputs::new();
         inputs.targets = Err(behind.clone());

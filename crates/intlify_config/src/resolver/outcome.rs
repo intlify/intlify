@@ -518,11 +518,9 @@ pub(crate) mod tests {
     }
 
     /// `complete`'s profile without its project default and with a target
-    /// locale that is no string. Without the default, the project's locale
-    /// occurrences, which count it, wait on its Finding, and so does every
-    /// check of a locale spelling, a target's among them (D15:1907; plan 025
-    /// interpretations #219 and #252): structural admission finds the target
-    /// locale on its own.
+    /// locale that is no locale. The two are independent: the default's
+    /// Finding holds back what inherits it, and Phase 7 still finds the
+    /// target's locale (D15:2367, 3446; plan 025 interpretation #252).
     pub(crate) fn blocked() -> Inputs {
         let mut inputs = Inputs::complete();
         let declaration = inputs.declaration();
