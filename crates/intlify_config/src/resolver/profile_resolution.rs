@@ -4649,6 +4649,93 @@ pub(super) mod tests {
         );
     }
 
+    /// One alias destination that failed holds back only what names it: the
+    /// map's bound counts it, every key and every other destination is
+    /// checked, and the profile, built from every entry, waits on it
+    /// (D15:1477, 1898, 2367, 2418).
+    #[test]
+    fn an_alias_destination_that_failed_leaves_every_other_alias_check() {
+        use crate::resolver::locales::fixtures::key;
+        use crate::resolver::locales::LocaleSubject as L;
+        use crate::resolver::negotiation::{unit as alias, NegotiationSubject as N};
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["localeNegotiation"]["aliases"] = json!({"de": 42, "fr": "ja"});
+        inputs.resolve(|evaluation, state| {
+            let found = BTreeSet::from([only_issue(&evaluation)]);
+            all_evaluated(
+                &evaluation,
+                &[
+                    phase_7(L::NegotiationAliasKey(key("de")), Check::CanonicalLocale),
+                    phase_7(L::NegotiationAliasKey(key("fr")), Check::CanonicalLocale),
+                    phase_7(
+                        L::NegotiationAliasValue(key("fr"), key("ja")),
+                        Check::CanonicalLocale,
+                    ),
+                    alias(N::Aliases, Check::WithinBound),
+                    alias(N::Key(key("de")), Check::UniqueLocale),
+                    alias(N::Key(key("fr")), Check::UniqueLocale),
+                    alias(N::Destination(key("fr"), key("ja")), Check::RequestedMember),
+                ],
+            );
+            // The destination that failed is no spelling: nothing names it.
+            assert!(!evaluation.statuses().any(|(unit, _)| matches!(
+                &unit.subject,
+                Subject::Locale(L::NegotiationAliasValue(owner, _))
+                    | Subject::Negotiation(N::Destination(owner, _))
+                    if *owner == key("de")
+            )));
+            assert_eq!(keys(state.negotiation.as_ref().unwrap_err()), found);
+        });
+    }
+
+    /// An undeclared member of `localeNegotiation` is a failure of that
+    /// object alone: its aliases are checked, and the profile waits on it
+    /// (D15:2184, 2367, 3354).
+    #[test]
+    fn an_undeclared_negotiation_member_holds_back_only_the_profile() {
+        use crate::resolver::locales::fixtures::key;
+        use crate::resolver::locales::LocaleSubject as L;
+        use crate::resolver::negotiation::{unit as alias, NegotiationSubject as N};
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["localeNegotiation"]["extra"] = json!(1);
+        inputs.resolve(|evaluation, state| {
+            let found = BTreeSet::from([only_issue(&evaluation)]);
+            all_evaluated(
+                &evaluation,
+                &[
+                    phase_7(L::NegotiationAliasKey(key("de")), Check::CanonicalLocale),
+                    phase_7(
+                        L::NegotiationAliasValue(key("de"), key("en")),
+                        Check::CanonicalLocale,
+                    ),
+                    alias(N::Aliases, Check::WithinBound),
+                    alias(N::Key(key("de")), Check::UniqueLocale),
+                    alias(N::Destination(key("de"), key("en")), Check::RequestedMember),
+                ],
+            );
+            assert_eq!(keys(state.negotiation.as_ref().unwrap_err()), found);
+        });
+    }
+
+    /// Entries naming one key beside a destination that failed: its reason
+    /// needs that destination, so the duplicate is unproved rather than
+    /// reported with a reason made up (D15:1477, 2365, 2418).
+    #[test]
+    fn a_duplicate_alias_key_beside_a_failed_destination_waits_on_it() {
+        use crate::resolver::locales::fixtures::key;
+        use crate::resolver::negotiation::{unit as alias, NegotiationSubject as N};
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["localeNegotiation"]["aliases"] = json!({"EN": 7, "en": "ja"});
+        inputs.resolve(|evaluation, _| {
+            let found = BTreeSet::from([only_issue(&evaluation)]);
+            waits_on_exactly(
+                &evaluation,
+                &alias(N::Key(key("en")), Check::UniqueLocale),
+                &found,
+            );
+        });
+    }
+
     /// A declaration whose key lacks the identifier syntax counts under the
     /// policy's `maxProfiles`, while no later phase has a subject for its ID
     /// (D15:1885, 1886, 2184).

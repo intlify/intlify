@@ -571,7 +571,7 @@ mod tests {
                 requested_locales: Err(behind.clone()),
                 default_requested_locale: Err(behind.clone()),
                 default_source_locale: Err(behind.clone()),
-                locale_negotiation: Err(behind.clone()),
+                negotiation_aliases: Err(behind.clone()),
                 message_fallback: Err(behind.clone()),
                 coverage: Err(behind),
                 target_entries: declared.clone().map(TargetMapFields::declared),

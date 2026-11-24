@@ -264,12 +264,49 @@ pub(crate) struct LocaleFields<'a> {
     pub(crate) requested_locales: Admitted<Vec<Admitted<&'a str>>>,
     pub(crate) default_requested_locale: Admitted<&'a str>,
     pub(crate) default_source_locale: Admitted<Option<&'a str>>,
-    pub(crate) locale_negotiation: Admitted<Option<&'a LocaleNegotiation>>,
+    /// The alias map entry by entry, or why it has no entry to read.
+    pub(crate) negotiation_aliases: Admitted<AliasFields<'a>>,
     pub(crate) message_fallback:
         Admitted<Option<&'a BTreeMap<String, NonEmptyVec<FallbackCandidate>>>>,
     pub(crate) coverage: Admitted<Option<&'a Coverage>>,
     /// The Target ID map entry by entry, or why it has no entry to read.
     pub(crate) target_entries: Admitted<TargetMapFields<'a>>,
+}
+
+/// One entry of the alias map: its key, a spelling whatever its value is, and
+/// its destination, or why it has none (D15:1477, 2367).
+#[derive(Debug, Clone)]
+pub(crate) struct AliasField<'a> {
+    pub(crate) key: &'a str,
+    pub(crate) value: Admitted<&'a str>,
+}
+
+/// The alias map's entries as Phase 7 reads them, in the map's order, and
+/// whether everything at and below `localeNegotiation` passed: the profile
+/// built from every entry waits on it (D15:2367, 2418).
+#[derive(Debug, Clone)]
+pub(crate) struct AliasFields<'a> {
+    pub(crate) entries: Vec<AliasField<'a>>,
+    pub(crate) whole: Admitted<()>,
+}
+
+impl<'a> AliasFields<'a> {
+    /// The entries of a `localeNegotiation` structural admission admitted
+    /// whole, or of none.
+    fn declared(negotiation: Option<&'a LocaleNegotiation>) -> Self {
+        let aliases = negotiation.and_then(|negotiation| negotiation.aliases.as_option());
+        Self {
+            entries: aliases
+                .into_iter()
+                .flatten()
+                .map(|(key, value)| AliasField {
+                    key,
+                    value: Ok(value),
+                })
+                .collect(),
+            whole: Ok(()),
+        }
+    }
 }
 
 /// One entry of the Target ID map whose key was admitted: its locale-bearing
@@ -335,7 +372,9 @@ impl<'a> LocaleFields<'a> {
                 .default_source_locale
                 .as_option()
                 .map(String::as_str)),
-            locale_negotiation: Ok(declaration.locale_negotiation.as_option()),
+            negotiation_aliases: Ok(AliasFields::declared(
+                declaration.locale_negotiation.as_option(),
+            )),
             message_fallback: Ok(declaration.message_fallback.as_option()),
             coverage: Ok(declaration.coverage.as_option()),
             target_entries: Ok(TargetMapFields::declared(&declaration.target_profiles)),
@@ -351,11 +390,23 @@ pub(crate) struct Spelled {
     pub(crate) locale: Admitted<CanonicalLocale>,
 }
 
-/// An alias's key and destination as Phase 7 left them.
+/// An alias's key and destination as Phase 7 left them. A destination
+/// structural admission did not admit is no spelling, so it has no subject,
+/// only why it is unavailable (D15:1907, 2367).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AliasLocales {
     pub(crate) key: Spelled,
-    pub(crate) value: Spelled,
+    pub(crate) value: Admitted<Spelled>,
+}
+
+impl AliasLocales {
+    /// The destination's canonical locale, or why it has none.
+    pub(crate) fn destination(&self) -> Result<&CanonicalLocale, &Causes> {
+        match &self.value {
+            Ok(value) => value.locale.as_ref(),
+            Err(causes) => Err(causes),
+        }
+    }
 }
 
 /// One target's locales as Phase 7 left them. The set holds the canonical
@@ -419,6 +470,9 @@ pub(crate) struct ResolvedLocales {
     /// Each alias, in the order the map holds its keys: an entry's position
     /// is its key's rank among them.
     pub(crate) negotiation_aliases: Admitted<Vec<AliasLocales>>,
+    /// Whether everything at and below `localeNegotiation` passed, which the
+    /// checked profile waits on beside its entries.
+    pub(crate) negotiation_structure: Admitted<()>,
     /// Each `messageFallback` key, in the order the map holds them: Phase 8
     /// checks the sequence of each.
     pub(crate) fallback_keys: Admitted<Vec<Spelled>>,
@@ -477,9 +531,9 @@ pub(crate) fn resolve_locales<P: Provider>(
         requested_default,
         project,
     } = project(&mut pass, policy, fields, observer)?;
-    let negotiation_aliases = match fields.locale_negotiation {
-        Ok(negotiation) => Ok(pass.aliases(negotiation.and_then(|n| n.aliases.as_option()))?),
-        Err(ref causes) => Err(causes.clone()),
+    let (negotiation_aliases, negotiation_structure) = match &fields.negotiation_aliases {
+        Ok(aliases) => (Ok(pass.aliases(&aliases.entries)?), aliases.whole.clone()),
+        Err(causes) => (Err(causes.clone()), Err(causes.clone())),
     };
     let fallback_keys = match fields.message_fallback {
         Ok(fallback) => Ok(pass.fallback_keys(fallback)?),
@@ -498,6 +552,7 @@ pub(crate) fn resolve_locales<P: Provider>(
         requested_default,
         project,
         negotiation_aliases,
+        negotiation_structure,
         fallback_keys,
         target_bound: bounds.map,
         targets,
@@ -1060,7 +1115,7 @@ mod tests {
             resolved.negotiation_aliases,
             Ok(vec![AliasLocales {
                 key: spelled("fr"),
-                value: spelled("fr-FR"),
+                value: Ok(spelled("fr-FR")),
             }])
         );
         assert_eq!(resolved.fallback_keys, Ok(vec![spelled("ja")]));
@@ -1489,10 +1544,10 @@ mod tests {
                     key: content("fr"),
                     locale: Err(over.clone()),
                 },
-                value: Spelled {
+                value: Ok(Spelled {
                     key: content("fr-FR"),
                     locale: Err(over),
-                },
+                }),
             }
         );
         let targets = resolved.targets.unwrap();
@@ -1547,7 +1602,7 @@ mod tests {
         fields.requested_locales = Err(requested.clone());
         fields.default_requested_locale = Err(default.clone());
         fields.default_source_locale = Err(source.clone());
-        fields.locale_negotiation = Err(negotiation.clone());
+        fields.negotiation_aliases = Err(negotiation.clone());
         fields.message_fallback = Err(fallback.clone());
         fields.coverage = Err(coverage);
         fields.target_entries = Err(targets.clone());
@@ -1598,7 +1653,8 @@ mod tests {
             resolved.project,
             Err(source.union(requested).union(default))
         );
-        assert_eq!(resolved.negotiation_aliases, Err(negotiation));
+        assert_eq!(resolved.negotiation_aliases, Err(negotiation.clone()));
+        assert_eq!(resolved.negotiation_structure, Err(negotiation));
         assert_eq!(resolved.fallback_keys, Err(fallback));
         assert_eq!(resolved.target_bound, Err(targets.clone()));
         assert_eq!(resolved.targets, Err(targets));

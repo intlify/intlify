@@ -7,6 +7,8 @@
 //! checks decide: a member they admitted and the analysis did not, or a
 //! required one they admitted though it is absent, is a resolver bug.
 
+use std::collections::BTreeMap;
+
 use serde::de::value::{BorrowedStrDeserializer, Error as KeyError};
 use serde::de::{Deserialize, DeserializeOwned};
 
@@ -43,6 +45,24 @@ pub(crate) struct TargetEntry<Target> {
 pub(crate) struct TargetEntries<Target> {
     pub(crate) submitted: usize,
     pub(crate) entries: Vec<TargetEntry<Target>>,
+    pub(crate) whole: Admitted<()>,
+}
+
+/// One entry of `localeNegotiation.aliases`: its key, a spelling whatever its
+/// value is, and its destination or why it has none (D15:1477, 2367).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AliasEntry {
+    pub(crate) key: String,
+    pub(crate) value: Admitted<String>,
+}
+
+/// The alias map entry by entry, in the map's order, and whether everything
+/// at and below `localeNegotiation` passed, which the profile built from
+/// every entry waits on: an undeclared member beside `aliases` holds back no
+/// entry (D15:2184, 2367, 2418).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AliasEntries {
+    pub(crate) entries: Vec<AliasEntry>,
     pub(crate) whole: Admitted<()>,
 }
 
@@ -185,6 +205,72 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
         }))
     }
 
+    /// The alias map, entry by entry, or why it has no entry to read. An
+    /// absent `localeNegotiation` or `aliases` holds none.
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug of a value the checks admitted that is of
+    /// another type than its schema's.
+    pub(crate) fn alias_entries(&self) -> Result<Admitted<AliasEntries>, StructuralInvariant> {
+        let members = match self.member_value(self.declaration, "localeNegotiation") {
+            Some(negotiation) => match self.map_at(negotiation, "aliases")? {
+                Ok(members) => members,
+                Err(causes) => return Ok(Err(causes)),
+            },
+            None => None,
+        };
+        let entries = members
+            .into_iter()
+            .flatten()
+            .map(|(key, member)| {
+                Ok(AliasEntry {
+                    key: key.clone(),
+                    value: self.value_at(member.value())?,
+                })
+            })
+            .collect::<Result<_, StructuralInvariant>>()?;
+        Ok(Ok(AliasEntries {
+            entries,
+            whole: self
+                .values
+                .member(self.document, self.declaration, "localeNegotiation"),
+        }))
+    }
+
+    /// The members of the optional map `name` of `object`: none when it is
+    /// absent, or why it has none to read.
+    fn map_at(
+        &self,
+        object: NodeId,
+        name: &str,
+    ) -> Result<Admitted<Option<&'r BTreeMap<String, ObjectMember>>>, StructuralInvariant> {
+        let document: &'r MaterializedDocument = self.document;
+        let map = self.member_value(object, name);
+        match map.map(|map| (map, document.node(map).kind())) {
+            Some((map, NodeKind::Object(members))) if self.values.value(map).is_ok() => {
+                Ok(Ok(Some(members)))
+            }
+            None if matches!(document.node(object).kind(), NodeKind::Object(_)) => Ok(Ok(None)),
+            _ => match self.values.member(document, object, name) {
+                Err(causes) => Ok(Err(causes)),
+                Ok(()) => Err(StructuralInvariant::UnreportedFailure),
+            },
+        }
+    }
+
+    /// The value at `node` as `T`, or why it has none: only what looked at
+    /// `node` itself decides, so a sibling's failure holds back nothing here.
+    fn value_at<T: DeserializeOwned>(
+        &self,
+        node: NodeId,
+    ) -> Result<Admitted<T>, StructuralInvariant> {
+        match self.values.value(node) {
+            Err(causes) => Ok(Err(causes)),
+            Ok(()) => self.decoded(node).map(Ok),
+        }
+    }
+
     /// The required member `name` of `object` as `T`, or why it has none.
     fn required_at<T: DeserializeOwned>(
         &self,
@@ -247,15 +333,7 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
         };
         items
             .iter()
-            .map(
-                |&item| match (self.values.value(item), self.document.node(item).kind()) {
-                    (Err(causes), _) => Ok(Err(causes)),
-                    (Ok(()), NodeKind::String(text)) => Ok(Ok(text.clone())),
-                    (Ok(()), _) => Err(StructuralInvariant::Admission(
-                        AdmissionInvariant::AuthoringTypeMismatch,
-                    )),
-                },
-            )
+            .map(|&item| self.value_at(item))
             .collect::<Result<Vec<_>, _>>()
             .map(Ok)
     }
@@ -440,7 +518,7 @@ mod tests {
     use crate::fixtures::{complete_config, minimal_config, FixtureTargetReference};
     use crate::model::ProfileDeclaration;
     use crate::references::{PolicyReference, TargetProfileReference};
-    use crate::resolver::evaluation::{Admitted, Evaluation, Subject, Unit};
+    use crate::resolver::evaluation::{Admitted, Check, Evaluation, Subject, Unit};
     use crate::resolver::locales::fixtures::declaration;
     use crate::resolver::locales::LocaleFields;
     use crate::resolver::profile_resolution::tests::Inputs;
@@ -456,7 +534,7 @@ mod tests {
     use crate::resolver::value_admissions::ValueAdmissions;
     use crate::structural::{AdmissionInvariant, StructuralAnalysis};
 
-    use super::{DeclarationFragments, TargetEntries};
+    use super::{AliasEntries, DeclarationFragments, TargetEntries};
 
     /// One way to break the declaration, by its name.
     type Edit = (&'static str, fn(&mut Value));
@@ -742,6 +820,102 @@ mod tests {
                 ))
             );
         }
+    }
+
+    /// The alias map once `edit` changed the declaration.
+    fn aliases(
+        admissions: Option<ValueAdmissions>,
+        edit: fn(&mut Value),
+    ) -> Result<Admitted<AliasEntries>, StructuralInvariant> {
+        let mut config = complete_config();
+        edit(&mut config["profiles"]["app"]);
+        let (_, values, analysis) = structured_in(Evaluation::default(), &config);
+        let values = admissions.unwrap_or(values);
+        DeclarationFragments::new(&values, &analysis, "app")?.alias_entries()
+    }
+
+    /// Each entry is read on its own: a destination that failed holds back
+    /// no other, and an undeclared member beside the map holds back no entry
+    /// while the whole waits on it (D15:1477, 2367, 3354).
+    #[test]
+    fn the_alias_map_is_read_entry_by_entry() {
+        let whole = aliases(None, |_| {}).unwrap().unwrap();
+        assert_eq!(whole.entries[0].key, "fr");
+        assert_eq!(whole.entries[0].value, Ok("fr-FR".to_owned()));
+        assert_eq!(whole.whole, Ok(()));
+
+        let read = aliases(None, |app| {
+            app["localeNegotiation"]["aliases"] = json!({"de": 7, "fr": "ja"});
+        });
+        let read = read.unwrap().unwrap();
+        assert_eq!(read.entries.len(), 2);
+        assert_eq!(read.entries[0].key, "de");
+        assert!(read.entries[0].value.is_err());
+        assert_eq!(read.entries[1].value, Ok("ja".to_owned()));
+        assert!(read.whole.is_err());
+
+        let read = aliases(None, |app| app["localeNegotiation"]["extra"] = json!(1));
+        let read = read.unwrap().unwrap();
+        assert_eq!(read.entries[0].value, Ok("fr-FR".to_owned()));
+        assert!(read.whole.is_err());
+
+        let empty: [fn(&mut Value); 2] = [
+            |app| lacking(app, &[], "localeNegotiation"),
+            |app| app["localeNegotiation"] = json!({}),
+        ];
+        for edit in empty {
+            let read = aliases(None, edit).unwrap().unwrap();
+            assert_eq!((read.entries.len(), read.whole), (0, Ok(())));
+        }
+        let failed: [fn(&mut Value); 2] = [
+            |app| app["localeNegotiation"] = json!(7),
+            |app| app["localeNegotiation"]["aliases"] = json!(7),
+        ];
+        for edit in failed {
+            assert!(aliases(None, edit).unwrap().is_err());
+        }
+    }
+
+    /// The checks decide: a map whose own check did not pass has no entry to
+    /// read, even though the value is an object.
+    #[test]
+    fn an_alias_map_whose_own_check_did_not_pass_has_no_entries() {
+        let config = complete_config();
+        let (complete, _, _) = structured_in(Evaluation::default(), &config);
+        let own = complete
+            .candidates()
+            .map(|(unit, _)| unit)
+            .find(|unit| {
+                unit.check == Check::FieldType
+                    && matches!(&unit.subject, Subject::Structural(S::ProfileField(_, field))
+                        if field.path.iter().map(|step| &**step)
+                            .eq(["localeNegotiation", "aliases"]))
+            })
+            .unwrap();
+        let (_, values, analysis) = structured_in(Evaluation::blocking(own.clone()), &config);
+        let fragments = DeclarationFragments::new(&values, &analysis, "app").unwrap();
+        assert!(fragments.alias_entries().unwrap().is_err());
+    }
+
+    /// What the checks admitted and the document does not hold is a resolver
+    /// bug: an object or a map that is neither, and a destination that is no
+    /// string.
+    #[test]
+    fn an_alias_map_the_checks_admit_and_the_value_lacks_is_a_resolver_bug() {
+        let bug = |edit| aliases(Some(ValueAdmissions::default()), edit).err();
+        let unreported: [fn(&mut Value); 2] = [
+            |app| app["localeNegotiation"] = json!(7),
+            |app| app["localeNegotiation"]["aliases"] = json!(7),
+        ];
+        for edit in unreported {
+            assert_eq!(bug(edit), Some(StructuralInvariant::UnreportedFailure));
+        }
+        assert_eq!(
+            bug(|app| app["localeNegotiation"]["aliases"] = json!({"de": 7})),
+            Some(StructuralInvariant::Admission(
+                AdmissionInvariant::AuthoringTypeMismatch
+            ))
+        );
     }
 
     /// What the document holds of a declaration admitted whole is what its

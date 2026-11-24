@@ -31,7 +31,7 @@ use super::super::evaluation::{
 use super::super::evidence::EvidenceProjection;
 use super::bound::MAX_LOCALE_IDENTIFIER_BYTES;
 use super::{
-    issue, joined, unit, AliasLocales, Content, KnownSet, LocaleInvariant, LocaleKey,
+    issue, joined, unit, AliasField, AliasLocales, Content, KnownSet, LocaleInvariant, LocaleKey,
     LocaleOccurrence, LocaleSubject, Location, Spelled, TargetLocales, TargetMapFields,
 };
 
@@ -421,45 +421,51 @@ impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
         Ok(all)
     }
 
-    /// Alias keys, then each destination under its key's subject key.
+    /// Alias keys, then each destination under its key's subject key. A
+    /// value structural admission left none has no spelling to name a
+    /// subject with, and holds back only its own entry (D15:1477, 2367).
     pub(super) fn aliases(
         &mut self,
-        aliases: Option<&BTreeMap<String, String>>,
+        aliases: &[AliasField<'_>],
     ) -> Result<Vec<AliasLocales>, LocaleInvariant> {
-        let Some(aliases) = aliases else {
-            return Ok(Vec::new());
-        };
         let keys = self.spell(
             aliases
-                .keys()
+                .iter()
                 .enumerate()
-                .map(|(rank, key)| {
+                .map(|(rank, entry)| {
                     (
                         Location::NegotiationAliasKey(rank),
                         Scope::NegotiationAliasKey,
-                        key.as_str(),
+                        entry.key,
                     )
                 })
                 .collect(),
         )?;
-        let values = self.spell(
-            aliases
-                .values()
-                .zip(&keys)
-                .enumerate()
-                .map(|(rank, (value, key))| {
+        let spellings = aliases
+            .iter()
+            .zip(&keys)
+            .enumerate()
+            .filter_map(|(rank, (entry, key))| {
+                entry.value.as_ref().ok().map(|value| {
                     (
                         Location::NegotiationAliasValue(rank),
                         Scope::NegotiationAliasValue(key.key.clone()),
-                        value.as_str(),
+                        *value,
                     )
                 })
-                .collect(),
-        )?;
-        Ok(keys
-            .into_iter()
-            .zip(values)
-            .map(|(key, value)| AliasLocales { key, value })
+            })
+            .collect();
+        let mut values = self.spell(spellings)?.into_iter();
+        Ok(aliases
+            .iter()
+            .zip(keys)
+            .map(|(entry, key)| AliasLocales {
+                key,
+                value: match &entry.value {
+                    Ok(_) => Ok(values.next().expect("one result per spelling")),
+                    Err(causes) => Err(causes.clone()),
+                },
+            })
             .collect())
     }
 
@@ -688,6 +694,17 @@ mod tests {
                 })
                 .collect()
         })
+    }
+
+    /// Alias entries whose destinations structural admission admitted.
+    fn alias_fields<'a>(entries: &[(&'a str, &'a str)]) -> Vec<AliasField<'a>> {
+        entries
+            .iter()
+            .map(|&(key, value)| AliasField {
+                key,
+                value: Ok(value),
+            })
+            .collect()
     }
 
     fn keys(spelled: &[Spelled]) -> Vec<LocaleKey> {
@@ -1145,15 +1162,13 @@ mod tests {
                 Ok(&canonicalizer),
                 (Some(&observer), Some(confirmed.evidence())),
             );
-            let aliases = BTreeMap::from([
-                ("EN".to_string(), "fr-FR".to_string()),
-                ("de".to_string(), "zz".to_string()),
-            ]);
-            let resolved = pass.aliases(Some(&aliases)).unwrap();
+            let resolved = pass
+                .aliases(&alias_fields(&[("EN", "fr-FR"), ("de", "zz")]))
+                .unwrap();
             let sequences: BTreeMap<String, NonEmptyVec<FallbackCandidate>> =
                 serde_json::from_value(fallback.clone()).unwrap();
             let keys = pass.fallback_keys(Some(&sequences)).unwrap();
-            assert_eq!(pass.aliases(None).unwrap(), []);
+            assert_eq!(pass.aliases(&[]).unwrap(), []);
             assert_eq!(pass.fallback_keys(None).unwrap(), []);
             let at = [
                 observer
@@ -1171,7 +1186,7 @@ mod tests {
             [
                 AliasLocales {
                     key: spelled("en"),
-                    value: spelled("fr-FR"),
+                    value: Ok(spelled("fr-FR")),
                 },
                 AliasLocales {
                     key: spelled("de"),
@@ -1180,8 +1195,9 @@ mod tests {
             ]
         );
         // A rejected destination keeps its spelling as its subject key.
-        assert_eq!(resolved[1].value.key, content("zz"));
-        assert!(resolved[1].value.locale.is_err());
+        let rejected = resolved[1].value.as_ref().unwrap();
+        assert_eq!(rejected.key, content("zz"));
+        assert!(rejected.locale.is_err());
         assert_eq!(keys.len(), 2);
         assert_eq!(keys[0], spelled("ja"));
         assert_eq!(keys[1].key, content("zz"));
@@ -1279,11 +1295,9 @@ mod tests {
                 Ok(&canonicalizer),
                 (Some(&observer), Some(confirmed.evidence())),
             );
-            let aliases = BTreeMap::from([
-                ("EN".to_string(), "fr".to_string()),
-                ("en".to_string(), "de".to_string()),
-            ]);
-            let resolved = pass.aliases(Some(&aliases)).unwrap();
+            let resolved = pass
+                .aliases(&alias_fields(&[("EN", "fr"), ("en", "de")]))
+                .unwrap();
             let corrected = observer
                 .ranked_key(&["localeNegotiation", "aliases"], 0)
                 .unwrap();
@@ -1317,6 +1331,53 @@ mod tests {
                 .map(|candidate| candidate.primary.clone())
                 .collect::<Vec<_>>(),
             [corrected]
+        );
+    }
+
+    /// A destination structural admission did not admit keeps its entry:
+    /// the key is spelled, the destination names no subject, and the entry
+    /// beside it keeps its rank (D15:1477, 2367).
+    #[test]
+    fn a_failed_destination_is_no_spelling_beside_its_key() {
+        let canonicalizer = canonicalizer(64);
+        let mut evaluation = Evaluation::default();
+        let failed = stand_in(Slot::Coverage);
+        let mut pass = Pass::new(&mut evaluation, Ok(&canonicalizer), (None, None));
+        let entries = [
+            AliasField {
+                key: "de",
+                value: Err(failed.clone()),
+            },
+            AliasField {
+                key: "fr",
+                value: Ok("en"),
+            },
+        ];
+        let resolved = pass.aliases(&entries).unwrap();
+        let occurrences = pass.into_occurrences();
+        assert_eq!(
+            resolved,
+            [
+                AliasLocales {
+                    key: spelled("de"),
+                    value: Err(failed),
+                },
+                AliasLocales {
+                    key: spelled("fr"),
+                    value: Ok(spelled("en")),
+                },
+            ]
+        );
+        assert_eq!(
+            occurrences
+                .iter()
+                .map(|occurrence| occurrence.location.clone())
+                .collect::<Vec<_>>(),
+            [
+                Location::NegotiationAliasKey(0),
+                Location::NegotiationAliasKey(1),
+                Location::NegotiationAliasValue(1),
+            ]
         );
     }
 

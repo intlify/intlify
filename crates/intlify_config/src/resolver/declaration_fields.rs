@@ -17,15 +17,15 @@ use std::collections::BTreeMap;
 use serde::de::DeserializeOwned;
 
 use crate::model::{
-    Coverage, Delivery, DeploymentGroup, DeploymentGroupId, FallbackCandidate, LocaleNegotiation,
-    NonEmptyMap, NonEmptyVec, Policies, ProjectId, SelectionScope,
+    Coverage, Delivery, DeploymentGroup, DeploymentGroupId, FallbackCandidate, NonEmptyMap,
+    NonEmptyVec, Policies, ProjectId, SelectionScope,
 };
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::StructuralAnalysis;
 
-use super::declaration_fragments::{DeclarationFragments, TargetEntries};
+use super::declaration_fragments::{AliasEntries, DeclarationFragments, TargetEntries};
 use super::evaluation::{Admitted, Causes};
-use super::locales::{LocaleFields, TargetLocaleFields, TargetMapFields};
+use super::locales::{AliasField, AliasFields, LocaleFields, TargetLocaleFields, TargetMapFields};
 use super::resource_policy::{DeclarationReferences, TargetReferences};
 use super::structural_admission::StructuralInvariant;
 use super::tally::Tally;
@@ -47,7 +47,8 @@ pub(crate) struct DeclarationFields<Policy, Target> {
     requested_locales: Admitted<Vec<Admitted<String>>>,
     default_requested_locale: Admitted<String>,
     default_source_locale: Admitted<Option<String>>,
-    locale_negotiation: Admitted<Option<LocaleNegotiation>>,
+    /// The alias map entry by entry, which Phases 7 and 8 read.
+    negotiation_aliases: Admitted<AliasEntries>,
     message_fallback: Admitted<Option<MessageFallback>>,
     coverage: Admitted<Option<Coverage>>,
     policies: Admitted<Policies<Policy>>,
@@ -79,7 +80,7 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
             requested_locales: read.string_items("requestedLocales")?,
             default_requested_locale: read.required("defaultRequestedLocale")?,
             default_source_locale: read.optional("defaultSourceLocale")?,
-            locale_negotiation: read.optional("localeNegotiation")?,
+            negotiation_aliases: read.alias_entries()?,
             message_fallback: read.optional("messageFallback")?,
             coverage: read.optional("coverage")?,
             policies: read.required("policies")?,
@@ -104,7 +105,17 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
             requested_locales: strings(&self.requested_locales),
             default_requested_locale: borrowed(&self.default_requested_locale, String::as_str),
             default_source_locale: borrowed(&self.default_source_locale, Option::as_deref),
-            locale_negotiation: borrowed(&self.locale_negotiation, Option::as_ref),
+            negotiation_aliases: borrowed(&self.negotiation_aliases, |aliases| AliasFields {
+                entries: aliases
+                    .entries
+                    .iter()
+                    .map(|entry| AliasField {
+                        key: &entry.key,
+                        value: entry.value.as_deref().map_err(Causes::clone),
+                    })
+                    .collect(),
+                whole: aliases.whole.clone(),
+            }),
             message_fallback: borrowed(&self.message_fallback, Option::as_ref),
             coverage: borrowed(&self.coverage, Option::as_ref),
             target_entries: borrowed(&self.target_entries, |targets| TargetMapFields {
@@ -155,7 +166,7 @@ impl<Policy, Target> DeclarationFields<Policy, Target> {
             requested_locales: Err(causes.clone()),
             default_requested_locale: Err(causes.clone()),
             default_source_locale: Err(causes.clone()),
-            locale_negotiation: Err(causes.clone()),
+            negotiation_aliases: Err(causes.clone()),
             message_fallback: Err(causes.clone()),
             coverage: Err(causes.clone()),
             policies: Err(causes.clone()),
@@ -272,7 +283,10 @@ mod tests {
         assert!(fields.policies.is_ok());
         assert!(fields.target_structure().is_ok() && fields.deployment_groups.is_ok());
         let complete = read(&complete_config());
-        assert!(matches!(complete.locale_negotiation, Ok(Some(_))));
+        assert_eq!(
+            complete.negotiation_aliases.as_ref().unwrap().entries.len(),
+            1
+        );
         assert!(matches!(complete.message_fallback, Ok(Some(_))));
         assert!(matches!(complete.coverage, Ok(Some(_))));
         // Each accessor hands on the field it reads.
@@ -441,7 +455,7 @@ mod tests {
             fields.requested_locales.as_ref().err(),
             fields.default_requested_locale.as_ref().err(),
             fields.default_source_locale.as_ref().err(),
-            fields.locale_negotiation.as_ref().err(),
+            fields.negotiation_aliases.as_ref().err(),
             fields.message_fallback.as_ref().err(),
             fields.coverage.as_ref().err(),
             fields.policies.as_ref().err(),
