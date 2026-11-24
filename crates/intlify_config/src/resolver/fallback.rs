@@ -33,7 +33,7 @@
 use std::collections::BTreeMap;
 
 use crate::locale::{CanonicalLocale, Canonicalizer, Provider, VersionedIdentity};
-use crate::model::{FallbackCandidate, NonEmptyVec};
+use crate::model::FallbackCandidate;
 
 use super::declaration_observer::{beside, DeclarationObserver, ObserverInvariant};
 use super::evaluation::{
@@ -43,8 +43,8 @@ use super::evaluation::{
 use super::evidence::EvidenceProjection;
 use super::limits::{BoundId, ConfirmedPolicy, Group};
 use super::locales::{
-    canonicalize, Content, KnownSet, LocaleInvariant, LocaleKey, LocaleSet, ResolvedLocales,
-    Spelled,
+    canonicalize, joined, Content, FallbackField, KnownSet, LocaleInvariant, LocaleKey, LocaleSet,
+    ResolvedLocales, Spelled,
 };
 
 const MAX_FALLBACK_SOURCES: BoundId = BoundId {
@@ -129,11 +129,11 @@ impl<Id> MessageFallbackPolicy<Id> {
 }
 
 /// A submitted key as Phase 7 spelled it, with its name in the map and its
-/// sequence as submitted.
+/// sequence as structural admission left it, candidate by candidate.
 struct Entry<'a> {
     key: &'a Spelled,
     name: &'a str,
-    candidates: &'a [FallbackCandidate],
+    sequence: &'a Admitted<Vec<Admitted<&'a FallbackCandidate>>>,
 }
 
 /// Where the mapping sits under the declaration.
@@ -143,16 +143,18 @@ const FALLBACK: &str = "messageFallback";
 /// and the sequences `fallback` holds, with the canonicalizer Phase 5 bound,
 /// observed through `observer` when the declaration's file is there; the
 /// caller hands it what Phase 5 bound. Every unit waits on the mapping's
-/// bound; a sequence's units wait on its key holding alone with an identity,
-/// and its candidates on the sequence's bound. The policy exists only when
-/// every unit passed.
+/// bound, which counts every entry whatever its sequence (D15:1899); a
+/// sequence's units wait on its key holding alone with an identity, and its
+/// candidates on the sequence's bound. A candidate structural admission did
+/// not admit has no unit, and holds back only the policy, which exists only
+/// when every unit passed and every candidate was admitted (D15:2367, 2422).
 pub(crate) fn resolve_fallback<Id: Clone, P: Provider>(
     evaluation: &mut Evaluation,
     confirmed: Result<&ConfirmedPolicy, &Causes>,
     specification: &Admitted<VersionedIdentity<Id>>,
     canonicalizer: Result<&Canonicalizer<P>, &Causes>,
     locales: &ResolvedLocales,
-    fallback: Admitted<Option<&BTreeMap<String, NonEmptyVec<FallbackCandidate>>>>,
+    fallback: &Admitted<Vec<FallbackField<'_>>>,
     observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<Admitted<MessageFallbackPolicy<Id>>, LocaleInvariant> {
     let policy = confirmed.map_err(Causes::clone);
@@ -221,27 +223,41 @@ pub(crate) fn resolve_fallback<Id: Clone, P: Provider>(
 /// the map's order: Phase 7 spelled the keys of this same map.
 fn entries<'a>(
     keys: &'a [Spelled],
-    fallback: Admitted<Option<&'a BTreeMap<String, NonEmptyVec<FallbackCandidate>>>>,
+    fallback: &'a Admitted<Vec<FallbackField<'a>>>,
 ) -> Vec<Entry<'a>> {
-    let sequences: Vec<(&'a str, &'a [FallbackCandidate])> =
-        fallback.ok().flatten().map_or_else(Vec::new, |map| {
-            map.iter()
-                .map(|(name, sequence)| (name.as_str(), sequence.as_slice()))
-                .collect()
-        });
+    let fields = fallback.as_deref().unwrap_or(&[]);
     assert_eq!(
         keys.len(),
-        sequences.len(),
+        fields.len(),
         "Phase 7 spelled every key of the map"
     );
     keys.iter()
-        .zip(sequences)
-        .map(|(key, (name, candidates))| Entry {
+        .zip(fields)
+        .map(|(key, field)| Entry {
             key,
-            name,
-            candidates,
+            name: field.key,
+            sequence: &field.sequence,
         })
         .collect()
+}
+
+/// How many of a sequence's candidates its bound counts: those of an admitted
+/// kind, so that only a sequence with none waits on why (D15:1900, 2184,
+/// 3354).
+fn counted(sequence: &Admitted<Vec<Admitted<&FallbackCandidate>>>) -> Admitted<usize> {
+    let candidates = sequence.as_ref().map_err(Causes::clone)?;
+    let mut held = 0;
+    let mut excluded = None;
+    for candidate in candidates {
+        match candidate {
+            Ok(_) => held += 1,
+            Err(causes) => excluded = Some(joined(excluded, causes)),
+        }
+    }
+    match excluded {
+        Some(causes) if held == 0 => Err(causes),
+        _ => Ok(held),
+    }
 }
 
 /// The submitted entries grouped by their key's subject, in subject order.
@@ -322,8 +338,9 @@ fn source(
 /// A key's sequence under `maxFallbackCandidatesPerSource`, once the key
 /// holds alone: it then has one sequence, the one the bound measures, which
 /// past the bound is observed beside the confirmed policy that supplies the
-/// bound (D15:2249). The key can stand for several sources, so past the
-/// bound the sequence reports only the first-over witness (Decision
+/// bound (D15:2249). It counts the candidates of an admitted kind, the others
+/// being excluded (D15:1900, 3354). The key can stand for several sources, so
+/// past the bound the sequence reports only the first-over witness (Decision
 /// 015-157).
 fn bounded_sequence(
     evaluation: &mut Evaluation,
@@ -335,23 +352,31 @@ fn bounded_sequence(
     sharing: &[&Entry<'_>],
     observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<Admitted<CanonicalLocale>, LocaleInvariant> {
-    let observed = match sharing {
-        [entry] => beside(confirmed, observer, |observer| {
-            observer.value(&[FALLBACK, entry.name])
-        })?,
-        _ => None,
+    // Only a key holding alone has one sequence to count: otherwise its
+    // collision is what the unit waits on (D15:1519).
+    let (observed, submitted) = match sharing {
+        [entry] => (
+            beside(confirmed, observer, |observer| {
+                observer.value(&[FALLBACK, entry.name])
+            })?,
+            counted(entry.sequence),
+        ),
+        _ => (None, Ok(0)),
     };
     Ok(evaluation.check_found(
         unit(FallbackSubject::Sequence(key.clone()), Check::WithinBound),
-        both(alone.clone(), confirmed.map_err(Causes::clone)),
-        |(source, policy)| {
+        both(
+            both(alone.clone(), confirmed.map_err(Causes::clone)),
+            submitted,
+        ),
+        |((source, policy), submitted)| {
             within(
                 MAX_FALLBACK_CANDIDATES_PER_SOURCE,
                 policy
                     .limits()
                     .locale_resolution
                     .max_fallback_candidates_per_source,
-                sharing[0].candidates.len(),
+                submitted,
             )
             .map_err(|blocking| Found::through(Blocking::first_over(blocking), observed))
             .map(|()| source)
@@ -426,10 +451,18 @@ fn candidates<P: Provider>(
     let mut positions: BTreeMap<usize, Vec<&str>> = BTreeMap::new();
     let mut intents = Vec::new();
     for entry in sharing {
-        for (position, candidate) in entry.candidates.iter().enumerate() {
+        let Ok(sequence) = entry.sequence else {
+            continue;
+        };
+        for (position, candidate) in sequence.iter().enumerate() {
             match candidate {
-                FallbackCandidate::Locale(raw) => positions.entry(position).or_default().push(raw),
-                FallbackCandidate::IntentSource(_) => intents.push(position),
+                Ok(FallbackCandidate::Locale(raw)) => {
+                    positions.entry(position).or_default().push(raw);
+                }
+                Ok(FallbackCandidate::IntentSource(_)) => intents.push(position),
+                // A candidate that failed is of no admitted kind: it holds
+                // back the policy alone, and no check names it (D15:2367).
+                Err(_) => {}
             }
         }
     }
@@ -615,11 +648,14 @@ fn resolved(
     entry: &Entry<'_>,
     found: &BTreeMap<usize, Admitted<CanonicalLocale>>,
 ) -> Admitted<Vec<Candidate>> {
-    let mut candidates = Ok(Vec::with_capacity(entry.candidates.len()));
-    for (position, candidate) in entry.candidates.iter().enumerate() {
+    // A sequence that failed has none to read: its bound waits on why.
+    let submitted = entry.sequence.as_deref().unwrap_or(&[]);
+    let mut candidates = Ok(Vec::with_capacity(submitted.len()));
+    for (position, candidate) in submitted.iter().enumerate() {
         let checked = match candidate {
-            FallbackCandidate::Locale(_) => found[&position].clone().map(Candidate::Literal),
-            FallbackCandidate::IntentSource(_) => Ok(Candidate::IntentSource),
+            Ok(FallbackCandidate::Locale(_)) => found[&position].clone().map(Candidate::Literal),
+            Ok(FallbackCandidate::IntentSource(_)) => Ok(Candidate::IntentSource),
+            Err(causes) => Err(causes.clone()),
         };
         candidates = both(candidates, checked).map(|(mut candidates, candidate)| {
             candidates.push(candidate);
@@ -656,7 +692,9 @@ mod tests {
         canonical, canonicalizer, content, declaration, key, limits, notices, rejected, stand_in,
         units, waits_on, Declaration,
     };
-    use crate::resolver::locales::{self, resolve_locales, LocaleFields, LocaleSubject};
+    use crate::resolver::locales::{
+        self, resolve_locales, FallbackField, LocaleFields, LocaleSubject,
+    };
     use crate::resolver::specification::Slot;
 
     type Id = &'static str;
@@ -742,7 +780,7 @@ mod tests {
             specification,
             spelling.unbound.map_or(Ok(&canonicalizer), Err),
             &locales,
-            fields.message_fallback.clone(),
+            &fields.message_fallback,
             observer.as_ref(),
         )
         .unwrap();
@@ -1662,6 +1700,145 @@ mod tests {
             waits_on(&short.evaluation, &literal_unit(key("ja"), key("en"))),
             None
         );
+    }
+
+    /// Phases 7 and 8 over `declaration` with `edit` applied to its fallback
+    /// fields, observed in it, under these two bounds.
+    fn resolve_edited(
+        declaration: &Declaration,
+        (sources, candidates): (u64, u64),
+        edit: impl FnOnce(&mut [FallbackField<'_>]),
+    ) -> Resolved {
+        let mut fields = LocaleFields::declared(declaration);
+        edit(fields.message_fallback.as_mut().unwrap());
+        Observed::declaration(declaration).app(|observer| {
+            resolve_with(
+                &fields,
+                Ok(&policy(sources, candidates)),
+                &Ok(SPECIFICATION),
+                &ROOM,
+                Some(observer),
+            )
+        })
+    }
+
+    /// Leaves the candidate at `position` of the first entry without a value.
+    fn fail(entries: &mut [FallbackField<'_>], position: usize, causes: &Causes) {
+        entries[0].sequence.as_mut().unwrap()[position] = Err(causes.clone());
+    }
+
+    /// The source bound counts every entry, one whose sequence failed too,
+    /// and measures it exactly (D15:1899, 2184).
+    #[test]
+    fn the_source_bound_counts_an_entry_whatever_its_sequence() {
+        let declaration = declared(&["en", "ja"], json!({"en": ["ja"], "ja": ["en"]}));
+        let failed = stand_in(Slot::DeliveryGraph);
+        let resolved = resolve_edited(&declaration, (1, 100), |entries| {
+            entries[0].sequence = Err(failed.clone());
+        });
+        let found = resolved.evaluation.issues().last().unwrap();
+        assert_eq!(found.unit(), &sources_unit());
+        assert_eq!(
+            resolved.evaluation.limit(found),
+            Some(LimitExceeded {
+                bound: MAX_FALLBACK_SOURCES,
+                limit: Bound::new(1).unwrap(),
+                actual: Actual::Exact(2),
+            })
+        );
+    }
+
+    /// The sequence's bound counts the candidates of an admitted kind: one
+    /// that failed neither counts nor names a unit, and the policy, which
+    /// needs every candidate, waits on it (D15:1900, 2184, 2367, 3354).
+    #[test]
+    fn the_candidate_bound_counts_the_candidates_of_an_admitted_kind() {
+        let declaration = declared(&["ja"], json!({"ja": ["en", "de", "fr"]}));
+        let failed = stand_in(Slot::DeliveryGraph);
+        let edit = |entries: &mut [FallbackField<'_>]| fail(entries, 1, &failed);
+        let held = resolve_edited(&declaration, (100, 2), edit);
+        assert_eq!(issues(&held.evaluation), []);
+        assert_eq!(waits_on(&held.evaluation, &sequence_unit(key("ja"))), None);
+        let positions: Vec<usize> = statuses(&held.evaluation)
+            .iter()
+            .filter_map(|(unit, _)| match &unit.subject {
+                Subject::Fallback(FallbackSubject::Candidate(_, position)) => Some(*position),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(positions, [0, 0, 2, 2]);
+        assert_eq!(held.policy, Err(failed.clone()));
+
+        let over = resolve_edited(&declaration, (100, 1), edit);
+        let found = over.evaluation.issues().last().unwrap();
+        assert_eq!(
+            over.evaluation.limit(found),
+            Some(LimitExceeded {
+                bound: MAX_FALLBACK_CANDIDATES_PER_SOURCE,
+                limit: Bound::new(1).unwrap(),
+                actual: Actual::AtLeast(2),
+            })
+        );
+        assert_eq!(
+            waits_on(
+                &over.evaluation,
+                &candidate_unit(key("ja"), 2, Check::CanonicalLocale)
+            ),
+            Some(vec![sequence_unit(key("ja"))])
+        );
+    }
+
+    /// A candidate beside one that failed keeps its position in the sequence
+    /// and is observed there (D15:1519, 2182, 2249).
+    #[test]
+    fn a_candidate_beside_a_failed_one_keeps_its_position() {
+        let declaration = declared(&["ja"], json!({"ja": ["en", "de", "ja"]}));
+        let failed = stand_in(Slot::DeliveryGraph);
+        let resolved = resolve_edited(&declaration, (100, 100), |entries| {
+            fail(entries, 1, &failed);
+        });
+        let naming = candidate_unit(key("ja"), 2, Check::DistinctFromSource);
+        assert_eq!(
+            issues(&resolved.evaluation),
+            [(
+                naming.clone(),
+                "project-profile-message-fallback-sequence-invalid",
+                Some("literal-self-reference")
+            )]
+        );
+        assert_eq!(
+            observed(&resolved.evaluation),
+            [occurrence(
+                naming,
+                &element(&declaration, "ja", 2),
+                &[&at_key(&declaration, "ja")]
+            )]
+        );
+    }
+
+    /// A sequence with no candidate admitted waits on why each failed, while
+    /// its key's own checks are evaluated (D15:2184, 3354).
+    #[test]
+    fn a_sequence_without_an_admitted_candidate_waits_on_every_cause() {
+        let declaration = declared(&["ja"], json!({"ja": ["en", "de"]}));
+        let (one, other) = (stand_in(Slot::DeliveryGraph), stand_in(Slot::Coverage));
+        let resolved = resolve_edited(&declaration, (100, 100), |entries| {
+            fail(entries, 0, &one);
+            fail(entries, 1, &other);
+        });
+        let causes = one.union(other);
+        assert_eq!(
+            waits_on(&resolved.evaluation, &sequence_unit(key("ja"))),
+            Some(units(&causes))
+        );
+        assert_eq!(
+            waits_on(
+                &resolved.evaluation,
+                &source_unit(key("ja"), Check::UniqueLocale)
+            ),
+            None
+        );
+        assert_eq!(resolved.policy, Err(causes));
     }
 
     #[test]

@@ -16,13 +16,12 @@
 //! when it has none, and a single-valued field's subject is its path; where
 //! each spelling sits is kept beside the units, never in their keys.
 
-use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 
 use crate::locale::{CanonicalLocale, CanonicalizationFailure, Canonicalizer, Provider};
 use crate::model::{
-    Coverage, FallbackCandidate, LocaleNegotiation, NonEmptyMap, NonEmptyVec, ProfileDeclaration,
+    Coverage, FallbackCandidate, LocaleNegotiation, NonEmptyMap, ProfileDeclaration,
     TargetDeclaration, TargetId,
 };
 
@@ -247,7 +246,7 @@ impl KnownSet {
 }
 
 /// `causes` added to what `earlier` holds.
-fn joined(earlier: Option<Causes>, causes: &Causes) -> Causes {
+pub(super) fn joined(earlier: Option<Causes>, causes: &Causes) -> Causes {
     match earlier {
         Some(earlier) => earlier.union(causes.clone()),
         None => causes.clone(),
@@ -266,8 +265,8 @@ pub(crate) struct LocaleFields<'a> {
     pub(crate) default_source_locale: Admitted<Option<&'a str>>,
     /// The alias map entry by entry, or why it has no entry to read.
     pub(crate) negotiation_aliases: Admitted<AliasFields<'a>>,
-    pub(crate) message_fallback:
-        Admitted<Option<&'a BTreeMap<String, NonEmptyVec<FallbackCandidate>>>>,
+    /// The fallback map entry by entry, or why it has no entry to read.
+    pub(crate) message_fallback: Admitted<Vec<FallbackField<'a>>>,
     pub(crate) coverage: Admitted<Option<&'a Coverage>>,
     /// The Target ID map entry by entry, or why it has no entry to read.
     pub(crate) target_entries: Admitted<TargetMapFields<'a>>,
@@ -307,6 +306,15 @@ impl<'a> AliasFields<'a> {
             whole: Ok(()),
         }
     }
+}
+
+/// One entry of `messageFallback`: its key, a spelling whatever its sequence
+/// is, and its sequence candidate by candidate, or why it has none (D15:1519,
+/// 2367). Phase 7 spells the key; Phase 8 reads the sequence.
+#[derive(Debug, Clone)]
+pub(crate) struct FallbackField<'a> {
+    pub(crate) key: &'a str,
+    pub(crate) sequence: Admitted<Vec<Admitted<&'a FallbackCandidate>>>,
 }
 
 /// One entry of the Target ID map whose key was admitted: its locale-bearing
@@ -375,7 +383,16 @@ impl<'a> LocaleFields<'a> {
             negotiation_aliases: Ok(AliasFields::declared(
                 declaration.locale_negotiation.as_option(),
             )),
-            message_fallback: Ok(declaration.message_fallback.as_option()),
+            message_fallback: Ok(declaration
+                .message_fallback
+                .as_option()
+                .into_iter()
+                .flatten()
+                .map(|(key, sequence)| FallbackField {
+                    key,
+                    sequence: Ok(sequence.as_slice().iter().map(Ok).collect()),
+                })
+                .collect()),
             coverage: Ok(declaration.coverage.as_option()),
             target_entries: Ok(TargetMapFields::declared(&declaration.target_profiles)),
         }
@@ -535,9 +552,9 @@ pub(crate) fn resolve_locales<P: Provider>(
         Ok(aliases) => (Ok(pass.aliases(&aliases.entries)?), aliases.whole.clone()),
         Err(causes) => (Err(causes.clone()), Err(causes.clone())),
     };
-    let fallback_keys = match fields.message_fallback {
+    let fallback_keys = match &fields.message_fallback {
         Ok(fallback) => Ok(pass.fallback_keys(fallback)?),
-        Err(ref causes) => Err(causes.clone()),
+        Err(causes) => Err(causes.clone()),
     };
     let bounds = bound::targets(pass.evaluation, policy, &fields.target_entries, observer)?;
     let targets = match &fields.target_entries {

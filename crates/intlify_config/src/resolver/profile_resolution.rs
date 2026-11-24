@@ -582,7 +582,7 @@ where
         &admitted.message_locale_fallback,
         canonicalizer,
         &locales,
-        locale_fields.message_fallback.clone(),
+        &locale_fields.message_fallback,
         observer.as_ref(),
     )?;
     own(
@@ -4731,6 +4731,128 @@ pub(super) mod tests {
             waits_on_exactly(
                 &evaluation,
                 &alias(N::Key(key("en")), Check::UniqueLocale),
+                &found,
+            );
+        });
+    }
+
+    /// One fallback candidate that failed holds back only itself: its
+    /// position has no unit, while the sequence's bound counts those
+    /// admitted, every other candidate is checked, and a repeat among them is
+    /// found; the policy, built from every candidate, waits on it (D15:1519,
+    /// 1899, 1900, 2184, 2367, 2422, 3354).
+    #[test]
+    fn a_fallback_candidate_that_failed_leaves_every_other_candidate_checked() {
+        use crate::resolver::fallback::{unit as fallback, FallbackSubject as F};
+        use crate::resolver::locales::fixtures::key;
+        use crate::resolver::locales::LocaleSubject as L;
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["messageFallback"] = json!({
+            "en": ["ja"],
+            "ja": ["en", 42, "en", {"kind": "intent-source-locale"}],
+        });
+        inputs.resolve(|evaluation, state| {
+            let candidate =
+                |source, position, check| fallback(F::Candidate(key(source), position), check);
+            all_evaluated(
+                &evaluation,
+                &[
+                    phase_7(L::MessageFallbackKey(key("en")), Check::CanonicalLocale),
+                    phase_7(L::MessageFallbackKey(key("ja")), Check::CanonicalLocale),
+                    fallback(F::Sources, Check::WithinBound),
+                    fallback(F::Source(key("ja")), Check::UniqueLocale),
+                    fallback(F::Source(key("ja")), Check::RequestedMember),
+                    fallback(F::Sequence(key("ja")), Check::WithinBound),
+                    fallback(F::Sequence(key("en")), Check::WithinBound),
+                    candidate("ja", 0, Check::CanonicalLocale),
+                    candidate("ja", 0, Check::DistinctFromSource),
+                    candidate("ja", 2, Check::CanonicalLocale),
+                    candidate("ja", 2, Check::DistinctFromSource),
+                    candidate("en", 0, Check::CanonicalLocale),
+                    fallback(F::Literal(key("ja"), key("en")), Check::UniqueCandidate),
+                    fallback(F::Literal(key("en"), key("ja")), Check::UniqueCandidate),
+                    fallback(F::IntentSource(key("ja")), Check::UniqueCandidate),
+                ],
+            );
+            assert_eq!(
+                evaluation.status(&candidate("ja", 1, Check::CanonicalLocale)),
+                None
+            );
+            let repeat = fallback(F::Literal(key("ja"), key("en")), Check::UniqueCandidate);
+            let codes: Vec<(Code, bool)> = evaluation
+                .issues()
+                .map(|issue| (issue.code(), *issue.unit() == repeat))
+                .collect();
+            assert_eq!(
+                codes,
+                [
+                    (Code::FieldValueInvalid, false),
+                    (Code::MessageFallbackSequenceInvalid, true)
+                ]
+            );
+            let every: BTreeSet<IssueKey> = evaluation.issues().cloned().collect();
+            assert_eq!(keys(state.fallback.as_ref().unwrap_err()), every);
+        });
+    }
+
+    /// A sequence that failed as a whole holds back only its own checks: its
+    /// key's are evaluated, its bound waits on why, and the other key's
+    /// sequence is checked (D15:1519, 2184, 2367, 3354).
+    #[test]
+    fn a_fallback_sequence_that_failed_leaves_its_key_and_the_others_checked() {
+        use crate::resolver::fallback::{unit as fallback, FallbackSubject as F};
+        use crate::resolver::locales::fixtures::key;
+        for failed in [json!(7), json!([]), json!([42])] {
+            let mut inputs = Inputs::complete();
+            inputs.declaration()["messageFallback"] = json!({"en": ["ja"], "ja": failed});
+            inputs.resolve(|evaluation, state| {
+                let found = BTreeSet::from([only_issue(&evaluation)]);
+                all_evaluated(
+                    &evaluation,
+                    &[
+                        fallback(F::Sources, Check::WithinBound),
+                        fallback(F::Source(key("ja")), Check::UniqueLocale),
+                        fallback(F::Source(key("ja")), Check::RequestedMember),
+                        fallback(F::Sequence(key("en")), Check::WithinBound),
+                        fallback(F::Candidate(key("en"), 0), Check::CanonicalLocale),
+                    ],
+                );
+                waits_on_exactly(
+                    &evaluation,
+                    &fallback(F::Sequence(key("ja")), Check::WithinBound),
+                    &found,
+                );
+                assert_eq!(
+                    evaluation.status(&fallback(
+                        F::Candidate(key("ja"), 0),
+                        Check::CanonicalLocale
+                    )),
+                    None
+                );
+                assert_eq!(keys(state.fallback.as_ref().unwrap_err()), found);
+            });
+        }
+    }
+
+    /// Keys that collide report the collision, and their sequences' checks
+    /// wait on it alone, whatever a sequence's own failure (D15:1519).
+    #[test]
+    fn a_colliding_fallback_key_holds_back_its_sequences_on_the_collision() {
+        use crate::resolver::fallback::{unit as fallback, FallbackSubject as F};
+        use crate::resolver::locales::fixtures::key;
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["messageFallback"] = json!({"EN": [42], "en": ["ja"]});
+        inputs.resolve(|evaluation, _| {
+            let collision = fallback(F::Source(key("en")), Check::UniqueLocale);
+            let found: BTreeSet<IssueKey> = evaluation
+                .issues()
+                .filter(|issue| *issue.unit() == collision)
+                .cloned()
+                .collect();
+            assert_eq!(found.len(), 1);
+            waits_on_exactly(
+                &evaluation,
+                &fallback(F::Sequence(key("en")), Check::WithinBound),
                 &found,
             );
         });

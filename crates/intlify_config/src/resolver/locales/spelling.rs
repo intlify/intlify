@@ -21,7 +21,7 @@ use std::sync::Arc;
 use crate::locale::{
     CanonicalLocale, CanonicalizationFailure, Canonicalizer, Provider, ProviderFailure,
 };
-use crate::model::{FallbackCandidate, NonEmptyVec, TargetId};
+use crate::model::TargetId;
 
 use super::super::declaration_observer::{DeclarationObserver, ObserverInvariant};
 use super::super::evaluation::{
@@ -31,8 +31,9 @@ use super::super::evaluation::{
 use super::super::evidence::EvidenceProjection;
 use super::bound::MAX_LOCALE_IDENTIFIER_BYTES;
 use super::{
-    issue, joined, unit, AliasField, AliasLocales, Content, KnownSet, LocaleInvariant, LocaleKey,
-    LocaleOccurrence, LocaleSubject, Location, Spelled, TargetLocales, TargetMapFields,
+    issue, joined, unit, AliasField, AliasLocales, Content, FallbackField, KnownSet,
+    LocaleInvariant, LocaleKey, LocaleOccurrence, LocaleSubject, Location, Spelled, TargetLocales,
+    TargetMapFields,
 };
 
 /// Where a spelling sits before its own key is known: its subject's kind and
@@ -474,20 +475,17 @@ impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
     /// identity no other key shares.
     pub(super) fn fallback_keys(
         &mut self,
-        fallback: Option<&BTreeMap<String, NonEmptyVec<FallbackCandidate>>>,
+        fallback: &[FallbackField<'_>],
     ) -> Result<Vec<Spelled>, LocaleInvariant> {
-        let Some(fallback) = fallback else {
-            return Ok(Vec::new());
-        };
         self.spell(
             fallback
-                .keys()
+                .iter()
                 .enumerate()
-                .map(|(rank, key)| {
+                .map(|(rank, entry)| {
                     (
                         Location::MessageFallbackKey(rank),
                         Scope::MessageFallbackKey,
-                        key.as_str(),
+                        entry.key,
                     )
                 })
                 .collect(),
@@ -1150,6 +1148,7 @@ mod tests {
             "ja": ["EN", {"kind": "intent-source-locale"}, "de"],
             "zz": ["en"]
         });
+        let failed = stand_in(Slot::Coverage);
         let declared = Observed::declaration(&json!({
             "localeNegotiation": {"aliases": {"EN": "fr-FR", "de": "zz"}},
             "messageFallback": fallback,
@@ -1165,11 +1164,14 @@ mod tests {
             let resolved = pass
                 .aliases(&alias_fields(&[("EN", "fr-FR"), ("de", "zz")]))
                 .unwrap();
-            let sequences: BTreeMap<String, NonEmptyVec<FallbackCandidate>> =
-                serde_json::from_value(fallback.clone()).unwrap();
-            let keys = pass.fallback_keys(Some(&sequences)).unwrap();
+            // A key is spelled whatever its sequence is.
+            let sequences = ["ja", "zz"].map(|key| FallbackField {
+                key,
+                sequence: Err(failed.clone()),
+            });
+            let keys = pass.fallback_keys(&sequences).unwrap();
             assert_eq!(pass.aliases(&[]).unwrap(), []);
-            assert_eq!(pass.fallback_keys(None).unwrap(), []);
+            assert_eq!(pass.fallback_keys(&[]).unwrap(), []);
             let at = [
                 observer
                     .ranked_key(&["localeNegotiation", "aliases"], 0)
