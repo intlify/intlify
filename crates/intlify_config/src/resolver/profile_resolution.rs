@@ -4878,6 +4878,12 @@ pub(super) mod tests {
         )
     }
 
+    /// The logical unit normalizing every rule.
+    fn coverage_rule() -> Unit {
+        use crate::resolver::coverage::{unit, CoverageSubject as C, RuleContent};
+        unit(C::Rule(RuleContent::projected()), Check::NormalizedDomain)
+    }
+
     fn coverage_count(subject: crate::resolver::coverage::CoverageSubject) -> Unit {
         crate::resolver::coverage::unit(subject, Check::WithinBound)
     }
@@ -4983,6 +4989,62 @@ pub(super) mod tests {
         }
     }
 
+    /// One selector item that failed holds back neither its siblings' checks
+    /// nor what they find among themselves; the rule, which needs every item,
+    /// waits (D15:1567, 2367, 2426, 3409).
+    #[test]
+    fn a_selector_item_that_failed_leaves_its_siblings_checked() {
+        use crate::resolver::coverage::{unit, CoverageSubject as C, RuleContent, SurfaceKey};
+        use crate::resolver::locales::Content;
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["coverage"] = json!({"rules": [{
+            "requestedLocales": ["fr", 7, "ja", "ja"],
+            "intentSurfaceClasses": ["nav", 7, "unknown", "nav"],
+            "mode": "fallback-allowed"
+        }]});
+        inputs.resolve(|evaluation, state| {
+            let unknown = unit(
+                C::SurfaceClass(
+                    RuleContent::projected(),
+                    SurfaceKey::Content(Content::projected()),
+                ),
+                Check::VocabularyMember,
+            );
+            let semantic: Vec<_> = issues(&evaluation)
+                .into_iter()
+                .filter(|(unit, _, _)| unit.phase == Phase::LocalePolicyResolution)
+                .collect();
+            assert_eq!(
+                semantic,
+                [
+                    (
+                        coverage_locale("fr", Check::RequestedMember),
+                        Code::CoverageRuleInvalid,
+                        Some(Reason::LocaleNotRequested)
+                    ),
+                    (
+                        coverage_locale("ja", Check::UniqueLocale),
+                        Code::LocaleDuplicate,
+                        None
+                    ),
+                    (
+                        coverage_surface("nav", Check::UniqueSurfaceClass),
+                        Code::CoverageRuleInvalid,
+                        Some(Reason::SurfaceClassDuplicate)
+                    ),
+                    (
+                        unknown,
+                        Code::CoverageRuleInvalid,
+                        Some(Reason::SurfaceClassUnknown)
+                    ),
+                ]
+            );
+            let every: BTreeSet<IssueKey> = evaluation.issues().cloned().collect();
+            waits_on_exactly(&evaluation, &coverage_rule(), &every);
+            assert_eq!(keys(state.coverage.as_ref().unwrap_err()), every);
+        });
+    }
+
     /// Each count takes every occurrence it names, whatever became of its
     /// value: past the bound with a rule or item that failed among them
     /// (D15:1901, 1902, 1903, 1905).
@@ -5080,6 +5142,32 @@ pub(super) mod tests {
         }
     }
 
+    /// A rule whose mode failed still has a domain, which a duplicate is
+    /// found against, while the mode the table needs is missing (D15:2365,
+    /// 2426).
+    #[test]
+    fn a_rule_whose_mode_failed_still_holds_its_domain() {
+        use crate::resolver::coverage::{unit, CoverageSubject as C, Domain};
+        use crate::resolver::locales::fixtures::canonical;
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["coverage"] = json!({"rules": [
+            {"requestedLocales": ["ja"], "mode": 7},
+            {"requestedLocales": ["ja"], "mode": "fallback-allowed"}
+        ]});
+        inputs.resolve(|evaluation, state| {
+            let surfaces = vectors::MEMBERS.map(|member| Token::new(member).unwrap());
+            let domain = Domain::of(vec![canonical("ja")], surfaces.to_vec());
+            let duplicate = unit(C::Domain(domain), Check::UniqueDomain);
+            let found: Vec<_> = issues(&evaluation)
+                .into_iter()
+                .filter(|(unit, _, _)| *unit == duplicate)
+                .map(|(_, code, _)| code)
+                .collect();
+            assert_eq!(found, [Code::CoverageRuleDuplicate]);
+            assert!(state.coverage.is_err());
+        });
+    }
+
     /// A cell no rule matches is what needs the default mode, so a default
     /// that failed holds back only such cells: a conflict between rules is
     /// still found (D15:2365, 2426).
@@ -5156,26 +5244,54 @@ pub(super) mod tests {
         });
     }
 
-    /// No check reads an undeclared member under `coverage`: every cell and
-    /// the table, whose only prerequisite is its cells, are evaluated, and the
-    /// policy built from all of `coverage` waits on it (D15:1609, 2149, 2367).
+    /// A rule whose mode failed still holds its domain, so a cell it matches
+    /// waits on that mode and not on the default (D15:2365).
+    #[test]
+    fn a_cell_a_rule_without_a_mode_matches_waits_on_that_mode_alone() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["coverage"] = json!({
+            "defaultMode": 7,
+            "rules": [{"requestedLocales": ["ja"], "mode": 7}]
+        });
+        inputs.resolve(|evaluation, _| {
+            let every: BTreeSet<IssueKey> = evaluation.issues().cloned().collect();
+            assert_eq!(every.len(), 2);
+            let Some(Status::NotEvaluated(causes)) = evaluation.status(&coverage_cell("ja", "nav"))
+            else {
+                panic!("the cell waits");
+            };
+            assert_eq!(causes.keys().count(), 1);
+            waits_on_exactly(&evaluation, &coverage_cell("en", "nav"), &every);
+        });
+    }
+
+    /// No check reads an undeclared member under `coverage` or a rule: every
+    /// cell and the table, whose only prerequisite is its cells, are
+    /// evaluated, and the policy built from all of `coverage` waits on it
+    /// (D15:1609, 2149, 2367).
     #[test]
     fn an_undeclared_coverage_member_holds_back_only_the_policy() {
-        let mut inputs = Inputs::complete();
-        inputs.declaration()["coverage"]["extra"] = json!(1);
-        inputs.resolve(|evaluation, state| {
-            let found = BTreeSet::from([only_issue(&evaluation)]);
-            all_evaluated(
-                &evaluation,
-                &[
-                    coverage_cell("en", "nav"),
-                    coverage_cell("ja", "checkout"),
-                    coverage_table(),
-                ],
-            );
-            assert_eq!(evaluation.decision_basis().len(), 6);
-            assert_eq!(keys(state.coverage.as_ref().unwrap_err()), found);
-        });
+        for edit in [
+            (|app: &mut Value| app["coverage"]["extra"] = json!(1)) as fn(&mut Value),
+            |app| app["coverage"]["rules"][0]["extra"] = json!(1),
+        ] {
+            let mut inputs = Inputs::complete();
+            edit(inputs.declaration());
+            inputs.resolve(|evaluation, state| {
+                let found = BTreeSet::from([only_issue(&evaluation)]);
+                all_evaluated(
+                    &evaluation,
+                    &[
+                        coverage_rule(),
+                        coverage_cell("en", "nav"),
+                        coverage_cell("ja", "checkout"),
+                        coverage_table(),
+                    ],
+                );
+                assert_eq!(evaluation.decision_basis().len(), 6);
+                assert_eq!(keys(state.coverage.as_ref().unwrap_err()), found);
+            });
+        }
     }
 
     /// A declaration whose key lacks the identifier syntax counts under the

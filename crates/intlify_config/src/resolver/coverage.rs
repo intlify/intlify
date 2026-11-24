@@ -31,19 +31,25 @@
 //! hold, and a cell whose maximally specific rules select two modes, are
 //! observed at each of those rules beside the others (D15:1609, 2387, 2410).
 //!
-//! A rule structural admission did not admit holds back only what needs it
-//! (D15:2365, 2367). The rule count and each selector count take every
-//! occurrence they name, a selector count waiting only when every selector it
-//! would read failed (D15:1901-1903, 2184, 3354). The other rules are checked.
-//! The cells need every rule, the table every cell, and the policy all of
-//! `coverage`, and none of them is ever partial (D15:1609, 2426, 3409).
+//! A rule or item structural admission did not admit holds back only what
+//! needs it (D15:2365, 2367). The rule count and each selector count take
+//! every occurrence they name, a selector count waiting only when every
+//! selector it would read failed (D15:1901-1903, 2184, 3354). An item that
+//! failed has no subject, and its rule's other items are checked. Its rule
+//! has no domain, and a rule that is no object has no subject at all. The
+//! cells need every rule's domain and mode, the table every cell, and the
+//! policy all of `coverage`, and none of them is ever partial (D15:1609,
+//! 2426, 3409).
 
 use std::collections::BTreeMap;
+use std::fmt;
+use std::sync::Arc;
 
 use intlify_shared_json::token::Token;
 
 use crate::input_limits::Bound;
 use crate::locale::{CanonicalLocale, Canonicalizer, Provider, VersionedIdentity};
+use crate::materialize::{MaterializedDocument, NodeId, NodeKind, ObjectMember};
 use crate::model::{Coverage, CoverageMode, CoverageRule};
 use crate::structural::Edge;
 
@@ -57,7 +63,7 @@ use super::evidence::EvidenceProjection;
 use super::evidence_component::ComponentPath;
 use super::limits::{BoundId, ConfirmedPolicy, Group, LocaleResolutionLimits};
 use super::locales::{
-    canonicalize, Content, KnownSet, LocaleInvariant, LocaleKey, LocaleSet, ResolvedLocales,
+    canonicalize, joined, Content, KnownSet, LocaleInvariant, LocaleKey, LocaleSet, ResolvedLocales,
 };
 use super::specification::Slot;
 use super::vocabulary::SurfaceVocabulary;
@@ -79,19 +85,108 @@ const MAX_COVERAGE_RULE_CELL_COMPARISONS: BoundId =
     coverage_bound("maxCoverageRuleCellComparisons");
 
 /// A rule as authored, which names it until it has a normalized domain: 015's
-/// Canonical content identity of the rule object, with its members in the byte
-/// order of their names and each selector's spellings sorted, every repeat
-/// kept. Rules with equal content share it.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct RuleContent(Vec<RuleMember>);
+/// Canonical content identity of the rule object, whatever structural
+/// admission made of it, held as bytes whose unsigned order is that identity's
+/// (D15:2186). Each value starts with its type's tag, in the type order; a
+/// string escapes its zero bytes and ends in one; and an array or object ends
+/// in a zero below every tag, so a shorter exact prefix comes first. A rule's
+/// two selectors are sets, so their elements sort with every repeat kept.
+/// Rules with equal content share it. Its Debug shows only its length:
+/// rejected authoring text never reaches a log.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct RuleContent(Arc<[u8]>);
 
-/// One member of a rule's content. Variants follow the byte order of the
-/// member names, so a sequence of members orders as 015 orders an object.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum RuleMember {
-    IntentSurfaceClasses(Vec<Content>),
-    Mode(CoverageMode),
-    RequestedLocales(Vec<Content>),
+impl fmt::Debug for RuleContent {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "RuleContent({} bytes)", self.0.len())
+    }
+}
+
+const END: u8 = 0;
+const MEMBER: u8 = 1;
+const NULL: u8 = 1;
+const BOOLEAN: u8 = 2;
+const NUMBER: u8 = 3;
+const STRING: u8 = 4;
+const ARRAY: u8 = 5;
+const OBJECT: u8 = 6;
+
+/// `text`, each zero byte followed by the highest byte, ending in a zero byte:
+/// what follows the end is a tag or another end, below the highest byte, so a
+/// string orders before every string it is a prefix of.
+fn text_content(out: &mut Vec<u8>, text: &str) {
+    for &byte in text.as_bytes() {
+        out.push(byte);
+        if byte == 0 {
+            out.push(u8::MAX);
+        }
+    }
+    out.push(END);
+}
+
+fn string_content(text: &str) -> Vec<u8> {
+    let mut out = vec![STRING];
+    text_content(&mut out, text);
+    out
+}
+
+/// An array of `items`, sorted when it is a set.
+fn array_content(mut items: Vec<Vec<u8>>, set: bool) -> Vec<u8> {
+    if set {
+        items.sort_unstable();
+    }
+    let mut out = vec![ARRAY];
+    out.extend(items.into_iter().flatten());
+    out.push(END);
+    out
+}
+
+/// An object of `members`, in the byte order of their names.
+fn object_content<'n>(members: impl Iterator<Item = (&'n str, Vec<u8>)>) -> Arc<[u8]> {
+    let mut out = vec![OBJECT];
+    for (name, value) in members {
+        out.push(MEMBER);
+        text_content(&mut out, name);
+        out.extend(value);
+    }
+    out.push(END);
+    Arc::from(out)
+}
+
+/// The content of the value at `node`, whose arrays are sets when `set` says
+/// so; nested values keep their array order, as no schema declares them sets.
+fn value_content(document: &MaterializedDocument, node: NodeId, set: bool) -> Vec<u8> {
+    match document.node(node).kind() {
+        NodeKind::Null => vec![NULL],
+        NodeKind::Boolean(value) => vec![BOOLEAN, u8::from(*value)],
+        NodeKind::Number(value) => {
+            // Negatives below positives, each in the order of its value.
+            let bits = value.get().to_bits();
+            let order = if bits >> 63 == 1 {
+                !bits
+            } else {
+                bits | 1 << 63
+            };
+            let mut out = vec![NUMBER];
+            out.extend(order.to_be_bytes());
+            out
+        }
+        NodeKind::String(text) => string_content(text),
+        NodeKind::Array(items) => array_content(
+            items
+                .iter()
+                .map(|&item| value_content(document, item, false))
+                .collect(),
+            set,
+        ),
+        NodeKind::Object(members) => object_content(members.iter().map(|(name, member)| {
+            (
+                name.as_str(),
+                value_content(document, member.value(), false),
+            )
+        }))
+        .to_vec(),
+    }
 }
 
 impl RuleContent {
@@ -99,43 +194,73 @@ impl RuleContent {
     /// an object, and `redacted-structure` keeps only that type, so every rule
     /// shares one subject (Decision 015-174).
     pub(crate) fn projected() -> Self {
-        Self(Vec::new())
+        Self(Arc::from([]))
     }
 
-    /// The rule's members, in the byte order of their names.
-    pub(crate) fn members(&self) -> &[RuleMember] {
+    /// The identity's bytes, for a caller that frames it; never for display.
+    pub(crate) fn as_bytes(&self) -> &[u8] {
         &self.0
     }
 
     /// The content identity of `rule`.
     pub(crate) fn of(rule: &CoverageRule) -> Self {
-        let sorted = |spellings: &[String]| {
-            let mut spellings: Vec<Content> = spellings
-                .iter()
-                .map(|spelling| Content::new(spelling))
-                .collect();
-            spellings.sort();
-            spellings
+        let set = |spellings: &[String]| {
+            array_content(
+                spellings
+                    .iter()
+                    .map(|spelling| string_content(spelling))
+                    .collect(),
+                true,
+            )
         };
-        let mut members = Vec::with_capacity(3);
-        if let Some(surfaces) = rule.intent_surface_classes() {
-            members.push(RuleMember::IntentSurfaceClasses(sorted(surfaces)));
-        }
-        members.push(RuleMember::Mode(rule.mode()));
-        if let Some(locales) = rule.requested_locales() {
-            members.push(RuleMember::RequestedLocales(sorted(locales)));
-        }
-        Self(members)
+        let mode = match rule.mode() {
+            CoverageMode::DirectRequired => "direct-required",
+            CoverageMode::FallbackAllowed => "fallback-allowed",
+        };
+        let members = [
+            rule.intent_surface_classes()
+                .map(|surfaces| (INTENT_SURFACE_CLASSES, set(surfaces))),
+            Some(("mode", string_content(mode))),
+            rule.requested_locales()
+                .map(|locales| (REQUESTED_LOCALES, set(locales))),
+        ];
+        Self(object_content(members.into_iter().flatten()))
+    }
+
+    /// The content identity of a rule object as authored, of `members`.
+    pub(crate) fn read(
+        document: &MaterializedDocument,
+        members: &BTreeMap<String, ObjectMember>,
+    ) -> Self {
+        Self(object_content(members.iter().map(|(name, member)| {
+            let set = matches!(name.as_str(), REQUESTED_LOCALES | INTENT_SURFACE_CLASSES);
+            (name.as_str(), value_content(document, member.value(), set))
+        })))
     }
 }
 
+/// A selector as structural admission left it: absent, why it has no item to
+/// read, or each item's spelling or why it has none (D15:2367).
+pub(crate) type SelectorField<'a> = Admitted<Option<Vec<Admitted<&'a str>>>>;
+
+/// One object of `coverage.rules`: the content naming it and what structural
+/// admission left of its members. A rule with no selector has neither, for
+/// the failed alternative that requires one.
+#[derive(Debug, Clone)]
+pub(crate) struct RuleField<'a> {
+    pub(crate) content: RuleContent,
+    pub(crate) requested_locales: SelectorField<'a>,
+    pub(crate) intent_surface_classes: SelectorField<'a>,
+    pub(crate) mode: Admitted<CoverageMode>,
+}
+
 /// The declaration's `coverage` as Phase 8 reads it: the default mode, each
-/// element as a rule or why it is none, the raw items of each selector kind,
+/// rule, or why an element is no rule, the raw items of each selector kind,
 /// and whether all of `coverage` passed, which the policy waits on.
 #[derive(Debug, Clone)]
 pub(crate) struct CoverageFields<'a> {
     pub(crate) default_mode: Admitted<Option<CoverageMode>>,
-    pub(crate) rules: Admitted<Vec<Admitted<&'a CoverageRule>>>,
+    pub(crate) rules: Admitted<Vec<Admitted<RuleField<'a>>>>,
     pub(crate) locale_items: Admitted<usize>,
     pub(crate) surface_items: Admitted<usize>,
     pub(crate) whole: Admitted<()>,
@@ -144,6 +269,9 @@ pub(crate) struct CoverageFields<'a> {
 impl<'a> CoverageFields<'a> {
     /// The fields of a `coverage` admitted whole, or of none.
     pub(crate) fn declared(coverage: Option<&'a Coverage>) -> Self {
+        let items = |items: Option<&'a [String]>| {
+            Ok(items.map(|items| items.iter().map(|item| Ok(item.as_str())).collect()))
+        };
         let rules = coverage.and_then(|coverage| coverage.rules.as_option());
         let held = |selector: fn(&'a CoverageRule) -> Option<&'a [String]>| {
             let items = rules.into_iter().flatten().filter_map(selector);
@@ -153,7 +281,18 @@ impl<'a> CoverageFields<'a> {
             default_mode: Ok(
                 coverage.and_then(|coverage| coverage.default_mode.as_option().copied())
             ),
-            rules: Ok(rules.into_iter().flatten().map(Ok).collect()),
+            rules: Ok(rules
+                .into_iter()
+                .flatten()
+                .map(|rule| {
+                    Ok(RuleField {
+                        content: RuleContent::of(rule),
+                        requested_locales: items(rule.requested_locales()),
+                        intent_surface_classes: items(rule.intent_surface_classes()),
+                        mode: Ok(rule.mode()),
+                    })
+                })
+                .collect()),
             locale_items: held(CoverageRule::requested_locales),
             surface_items: held(CoverageRule::intent_surface_classes),
             whole: Ok(()),
@@ -414,7 +553,11 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
         observer,
         policy: confirmed.ok().map(ConfirmedPolicy::evidence),
     };
-    let (normalized, domains) = normalize(evaluation, &selectors, rules)?;
+    let Normalized {
+        checked: normalized,
+        known,
+        domains,
+    } = normalize(evaluation, &selectors, rules)?;
     let checked = both(
         both(
             both(rules_bounded, locale_items_bounded),
@@ -470,17 +613,16 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
         .clone()
         .and_then(|fields| fields.default_mode.clone())
         .map(|mode| mode.unwrap_or(CoverageMode::DirectRequired));
-    let decidable = both(checked.clone(), compared).map(|_| ());
+    let decidable = both(both(checked.clone(), compared), domains).map(|(_, domains)| domains);
     // A cell is named only once the bound proves the table may be built, and
     // every cell waits on the comparison bound. With no cell to wait on them,
     // the rules' own checks still decide whether the policy exists.
     let cells = match both(span.clone(), sized) {
         Ok(((requested, vocabulary), ())) => decide(
             evaluation,
-            (&decidable, &default, &selectors),
+            (&decidable, &known, &default, &selectors),
             requested,
             vocabulary,
-            &domains,
         )?,
         Err(causes) => Err(causes),
     };
@@ -493,9 +635,9 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
     let table = evaluation.check(owner.clone(), both(cells, default.clone()), |(cells, _)| {
         Ok(cells)
     })?;
-    if let Ok(cells) = &table {
+    if let (Ok(cells), Ok(domains)) = (&table, &decidable) {
         let decisions = match observer {
-            Some(observer) => decision_evidence(cells, &domains, (observer, default_declared))?,
+            Some(observer) => decision_evidence(cells, domains, (observer, default_declared))?,
             None => Vec::new(),
         };
         evaluation.decided(&owner, cells.clone(), decisions)?;
@@ -607,7 +749,7 @@ impl<P: Provider> Selectors<'_, P> {
 
 /// The rules holding one content, each at its position with its selector's
 /// items: equal content holds equal items, each rule in its own order.
-type Holding<'r> = Vec<(usize, &'r [String])>;
+type Holding<'r, 'a> = Vec<(usize, &'r [Admitted<&'a str>])>;
 
 /// Where one item is: its rule's position and its own.
 type ItemAt = (usize, usize);
@@ -620,55 +762,66 @@ fn repeats(at: &[ItemAt]) -> bool {
         .is_some_and(|items| items.len() > 1)
 }
 
+/// What normalizing the rules established.
+struct Normalized {
+    /// Whether every rule normalized with a domain of its own.
+    checked: Admitted<()>,
+    /// Every domain a rule holds, whatever became of its mode.
+    known: Vec<Domain>,
+    /// Each domain with the rules holding it and their mode, once every mode
+    /// is there.
+    domains: Admitted<Domains>,
+}
+
 /// Each distinct rule's selector units and its unit normalizing them to a
 /// domain, then one unit per domain: no two rule occurrences may share one.
-/// An element structural admission did not admit as a rule has no subject and
-/// holds back only what needs every rule. Returns whether every rule
-/// normalized with a domain of its own, and each domain with how many rules
-/// hold it and the mode of the first.
+/// An element that is no object has no subject and holds back only what needs
+/// every rule.
 fn normalize<P: Provider>(
     evaluation: &mut Evaluation,
     selectors: &Selectors<'_, P>,
-    rules: &[Admitted<&CoverageRule>],
-) -> Result<(Admitted<()>, Domains), LocaleInvariant> {
+    rules: &[Admitted<RuleField<'_>>],
+) -> Result<Normalized, LocaleInvariant> {
     // Each distinct rule with the rules holding it, in position order.
-    let mut contents: BTreeMap<RuleContent, Vec<(usize, &CoverageRule)>> = BTreeMap::new();
+    let mut contents: BTreeMap<&RuleContent, Vec<(usize, &RuleField<'_>)>> = BTreeMap::new();
     let mut normalized = Ok(());
     for (position, rule) in rules.iter().enumerate() {
         match rule {
             Ok(rule) => contents
-                .entry(RuleContent::of(rule))
+                .entry(&rule.content)
                 .or_default()
                 .push((position, rule)),
             Err(causes) => normalized = and(normalized, Err(causes.clone())),
         }
     }
-    let mut domains = Domains::new();
-    for (content, holders) in &contents {
+    let mut held: BTreeMap<Domain, (Vec<usize>, Admitted<CoverageMode>)> = BTreeMap::new();
+    for (&content, holders) in &contents {
         let rule = holders[0].1;
-        let locales = match rule.requested_locales() {
-            Some(_) => selected_locales(
+        let locales = match &rule.requested_locales {
+            Ok(Some(_)) => selected_locales(
                 evaluation,
                 selectors,
                 content,
-                &holding(holders, CoverageRule::requested_locales),
+                &holding(holders, |rule| &rule.requested_locales),
             )?,
-            None => selectors
+            Ok(None) => selectors
                 .requested
                 .complete()
                 .map(|requested| requested.as_slice().to_vec()),
+            Err(causes) => Err(causes.clone()),
         };
-        let surfaces = match rule.intent_surface_classes() {
-            Some(_) => selected_surfaces(
+        let surfaces = match &rule.intent_surface_classes {
+            Ok(Some(_)) => selected_surfaces(
                 evaluation,
                 selectors,
                 content,
-                &holding(holders, CoverageRule::intent_surface_classes),
+                &holding(holders, |rule| &rule.intent_surface_classes),
             )?,
-            None => selectors
+            Ok(None) => selectors
                 .vocabulary
                 .clone()
                 .map(|vocabulary| vocabulary.members().to_vec()),
+            Err(causes) => Err(causes.clone()),
         };
         let domain = evaluation.check(
             unit(
@@ -680,14 +833,16 @@ fn normalize<P: Provider>(
         )?;
         match domain {
             Ok(domain) => {
-                let (holding, _) = domains.entry(domain).or_insert((Vec::new(), rule.mode()));
+                let (holding, _) = held
+                    .entry(domain)
+                    .or_insert_with(|| (Vec::new(), rule.mode.clone()));
                 holding.extend(holders.iter().map(|&(position, _)| position));
                 holding.sort_unstable();
             }
             Err(causes) => normalized = and(normalized, Err(causes)),
         }
     }
-    for (domain, (holding, _)) in &domains {
+    for (domain, (holding, _)) in &held {
         // Only a rule that normalized holds a domain, so what the domain waits
         // on, those rules' units, has passed. Rules sharing it are found each
         // at its own rule, beside the others (D15:2387, 2410).
@@ -712,18 +867,33 @@ fn normalize<P: Provider>(
         )?;
         normalized = and(normalized, unique);
     }
-    Ok((normalized, domains))
+    let known = held.keys().cloned().collect();
+    let mut domains = Ok(Domains::new());
+    for (domain, (holding, mode)) in held {
+        domains = both(domains, mode).map(|(mut domains, mode)| {
+            domains.insert(domain, (holding, mode));
+            domains
+        });
+    }
+    Ok(Normalized {
+        checked: normalized,
+        known,
+        domains,
+    })
 }
 
-/// The selector `selector` reads of each rule in `holders` that holds it:
-/// rules of one content all do or none does.
-fn holding<'r>(
-    holders: &[(usize, &'r CoverageRule)],
-    selector: fn(&'r CoverageRule) -> Option<&'r [String]>,
-) -> Holding<'r> {
+/// The selector `selector` reads of each rule in `holders` that holds it as
+/// an array: rules of one content all do or none does.
+fn holding<'r, 'a>(
+    holders: &[(usize, &'r RuleField<'a>)],
+    selector: impl Fn(&'r RuleField<'a>) -> &'r SelectorField<'a>,
+) -> Holding<'r, 'a> {
     holders
         .iter()
-        .filter_map(|&(position, rule)| Some((position, selector(rule)?)))
+        .filter_map(|&(position, rule)| match selector(rule) {
+            Ok(Some(items)) => Some((position, items.as_slice())),
+            _ => None,
+        })
         .collect()
 }
 
@@ -731,22 +901,31 @@ fn holding<'r>(
 const REQUESTED_LOCALES: &str = "requestedLocales";
 
 /// One rule content's locale selector: each item canonicalized, with one unit
-/// per subject as Phase 7 does, and each locale named once and requested.
-/// Returns the selector's canonical locales as a set once every unit passed.
+/// per subject as Phase 7 does, and each locale named once and requested. An
+/// item that failed has no subject and holds back only the rule's domain.
+/// Returns the selector's canonical locales as a set once every item is there
+/// and every unit passed.
 fn selected_locales<P: Provider>(
     evaluation: &mut Evaluation,
     selectors: &Selectors<'_, P>,
     rule: &RuleContent,
-    holding: &Holding<'_>,
+    holding: &Holding<'_, '_>,
 ) -> Result<Admitted<Vec<CanonicalLocale>>, LocaleInvariant> {
     // What each spelling canonicalized to: equal rules hold equal spellings.
     let mut spelled: BTreeMap<&str, (LocaleKey, bool, Attempt)> = BTreeMap::new();
     // Each subject's result and where the items that spell it are, each with
     // whether it differs from the canonical form.
     let mut subjects: BTreeMap<LocaleKey, (Attempt, Vec<(ItemAt, bool)>)> = BTreeMap::new();
+    let mut excluded = None;
     for &(at, items) in holding {
-        for (position, raw) in items.iter().enumerate() {
-            let raw = raw.as_str();
+        for (position, item) in items.iter().enumerate() {
+            let raw = match item {
+                Ok(raw) => *raw,
+                Err(causes) => {
+                    excluded = Some(joined(excluded, causes));
+                    continue;
+                }
+            };
             if !spelled.contains_key(raw) {
                 // An item's key can stand for several spellings, under a rule
                 // keyed by its content: past the byte bound it reports only
@@ -774,7 +953,7 @@ fn selected_locales<P: Provider>(
                 .push(((at, position), *corrected));
         }
     }
-    let mut selected = Ok(Vec::with_capacity(subjects.len()));
+    let mut selected = excluded.map_or_else(|| Ok(Vec::with_capacity(subjects.len())), Err);
     for (key, spellings) in subjects {
         let locale = locale_units(evaluation, selectors, rule, &key, spellings)?;
         selected = both(selected, locale).map(|(mut selected, locale)| {
@@ -906,26 +1085,34 @@ const INTENT_SURFACE_CLASSES: &str = "intentSurfaceClasses";
 
 /// One rule content's surface-class selector: each item a member of the
 /// admitted vocabulary and each member named once. A repeated item that
-/// names no member is unknown, not a duplicate. Each rule holding the
+/// names no member is unknown, not a duplicate. An item that failed has no
+/// subject and holds back only the rule's domain. Each rule holding the
 /// selector is a raw parent of its own, so a unit's candidates are the items
 /// naming its subject in every such rule, each at its token (D15:2190, 2387):
 /// an unknown one beside the vocabulary's root, which it was compared with
 /// (D15:2249), and a repeated one beside the others repeating it in the same
 /// rule (D15:1567, 2410). Returns the selector's surface classes as a set
-/// once every unit passed.
+/// once every item is there and every unit passed.
 fn selected_surfaces<P: Provider>(
     evaluation: &mut Evaluation,
     selectors: &Selectors<'_, P>,
     rule: &RuleContent,
-    holding: &Holding<'_>,
+    holding: &Holding<'_, '_>,
 ) -> Result<Admitted<Vec<Token>>, LocaleInvariant> {
     let naming = &selectors.naming;
     // Each subject with an item that spells it and where the items that do
     // are.
     let mut subjects: BTreeMap<SurfaceKey, (&str, Vec<ItemAt>)> = BTreeMap::new();
+    let mut excluded = None;
     for &(at, items) in holding {
-        for (position, raw) in items.iter().enumerate() {
-            let raw = raw.as_str();
+        for (position, item) in items.iter().enumerate() {
+            let raw = match item {
+                Ok(raw) => *raw,
+                Err(causes) => {
+                    excluded = Some(joined(excluded, causes));
+                    continue;
+                }
+            };
             let key = match naming
                 .as_ref()
                 .ok()
@@ -941,7 +1128,7 @@ fn selected_surfaces<P: Provider>(
                 .push((at, position));
         }
     }
-    let mut selected = Ok(Vec::with_capacity(subjects.len()));
+    let mut selected = excluded.map_or_else(|| Ok(Vec::with_capacity(subjects.len())), Err);
     for (key, (raw, positions)) in subjects {
         let subject = |check| {
             unit(
@@ -999,24 +1186,31 @@ fn selected_surfaces<P: Provider>(
     Ok(selected)
 }
 
-/// One unit per cell, locale first, each waiting on `decidable`: every rule
-/// normalized to a domain of its own and the comparison bound passed. Only a
-/// cell no rule matches takes the default, so only it waits on the default
-/// (D15:2365). A cell whose maximally specific rules select two modes is
-/// found at each of those rules, beside the others (D15:1609, 2410).
+/// One unit per cell, locale first, each waiting on `decidable`: the domains
+/// and their modes, once every rule normalized to a domain of its own and the
+/// comparison bound passed. Only a cell no `known` domain holds takes the
+/// default, so only it waits on the default (D15:2365). A cell whose maximally specific
+/// rules select two modes is found at each of those rules, beside the others
+/// (D15:1609, 2410).
 fn decide<P: Provider>(
     evaluation: &mut Evaluation,
-    (decidable, default, selectors): (&Admitted<()>, &Admitted<CoverageMode>, &Selectors<'_, P>),
+    (decidable, known, default, selectors): (
+        &Admitted<Domains>,
+        &[Domain],
+        &Admitted<CoverageMode>,
+        &Selectors<'_, P>,
+    ),
     requested: &LocaleSet,
     vocabulary: &SurfaceVocabulary,
-    domains: &Domains,
 ) -> Result<Admitted<Cells>, LocaleInvariant> {
+    let ready = decidable.as_ref().map(|_| ()).map_err(Causes::clone);
     let mut cells = Ok(BTreeMap::new());
     for locale in requested.as_slice() {
         for surface in vocabulary.members() {
-            let maximal = maximal(locale, surface, domains);
-            // Every domain is a rule's own once the cell is decidable.
-            let conflicting = if decidable.is_ok() && conflict(&maximal) {
+            let maximal = decidable
+                .as_ref()
+                .map_or_else(|_| Vec::new(), |domains| maximal(locale, surface, domains));
+            let conflicting = if conflict(&maximal) {
                 let positions: Vec<usize> = maximal
                     .iter()
                     .flat_map(|(_, (holding, _))| holding.iter().copied())
@@ -1031,20 +1225,16 @@ fn decide<P: Provider>(
             );
             // A rule known to match keeps the cell from the default, whatever
             // the rules that failed.
-            let decided = if maximal.is_empty() {
-                evaluation.check(
-                    cell,
-                    both(decidable.clone(), default.clone()),
-                    |((), mode)| {
-                        Ok(Basis {
-                            mode,
-                            decision: Decision::Default,
-                        })
-                    },
-                )?
-            } else {
-                evaluation.check_found(cell, decidable.clone(), |()| {
+            let decided = if known.iter().any(|domain| domain.contains(locale, surface)) {
+                evaluation.check_found(cell, ready.clone(), |()| {
                     basis(&maximal).map_err(|blocking| Found::repeated(blocking, &conflicting))
+                })?
+            } else {
+                evaluation.check(cell, both(ready.clone(), default.clone()), |((), mode)| {
+                    Ok(Basis {
+                        mode,
+                        decision: Decision::Default,
+                    })
                 })?
             };
             cells = both(cells, decided).map(|(mut cells, basis)| {
