@@ -31,6 +31,19 @@ use super::value_admissions::ValueAdmissions;
 /// The members of an object, by name.
 type Members = BTreeMap<String, ObjectMember>;
 
+/// The `policies` object slot by slot: each slot's reference or why it has
+/// none, so that one that failed holds back no other, with no entry for an
+/// admitted `null`, the explicit absence of a reference (D15:2137, 2367); and
+/// whether the object itself passed apart from its slots. An undeclared
+/// member is a failure of the object and in no slot, so it stops no
+/// reference, while both semantic groups of the object wait on it (D15:2184,
+/// 2367; plan 025 interpretation #346).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PolicySlots<Policy> {
+    pub(crate) slots: Vec<(PolicySlot, Admitted<Policy>)>,
+    pub(crate) object: Admitted<()>,
+}
+
 /// One entry of `targetProfiles` whose key structural admission admitted:
 /// its reference, and each locale-bearing field's value, element by element,
 /// or why it has none. Its key names the subjects of its fields, so one field
@@ -82,8 +95,9 @@ pub(crate) struct GroupEntry {
 /// The Group ID map entry by entry: how many entries it holds and how many
 /// member and relation occurrences their arrays hold, each counted whatever
 /// its key or its value (D15:1932, 1935, 1936), whether every key was admitted,
-/// and each entry with an admitted key, in the map's order. An entry whose key
-/// failed has no later subject (D15:2184, 3354).
+/// each entry with an admitted key, in the map's order, and whether everything
+/// at and below the map passed, which what needs every relation waits on. An
+/// entry whose key failed has no later subject (D15:2184, 3354).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct GroupEntries {
     pub(crate) submitted: usize,
@@ -91,6 +105,7 @@ pub(crate) struct GroupEntries {
     pub(crate) relations: Admitted<usize>,
     pub(crate) keys: Admitted<()>,
     pub(crate) entries: Vec<GroupEntry>,
+    pub(crate) whole: Admitted<()>,
 }
 
 /// One entry of `localeNegotiation.aliases`: its key, a spelling whatever its
@@ -253,6 +268,57 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
         self.strings_at(self.declaration, name)
     }
 
+    /// The `policies` object slot by slot, and whether it passed apart from
+    /// its slots.
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug of a declaration without the object, of a
+    /// slot the checks admitted that is absent, or of one its type cannot
+    /// read.
+    pub(crate) fn policy_slots(&self) -> Result<PolicySlots<Policy>, StructuralInvariant>
+    where
+        Policy: DeserializeOwned,
+    {
+        let policies = self.policies()?;
+        let mut slots = Vec::with_capacity(PolicySlot::ALL.len());
+        for slot in PolicySlot::ALL {
+            if let Some(reference) = self.slot_reference(policies, slot)? {
+                slots.push((slot, reference));
+            }
+        }
+        Ok(PolicySlots {
+            slots,
+            object: self.values.value(policies),
+        })
+    }
+
+    /// The value of the declaration's `policies`, which a selected declaration
+    /// holds (D15:2131).
+    fn policies(&self) -> Result<NodeId, StructuralInvariant> {
+        self.member_value(self.declaration, "policies")
+            .ok_or(StructuralInvariant::UnreportedFailure)
+    }
+
+    /// The reference at `slot` of the object `policies`, why it has none, or
+    /// nothing for an admitted `null`.
+    fn slot_reference<T: DeserializeOwned>(
+        &self,
+        policies: NodeId,
+        slot: PolicySlot,
+    ) -> Result<Option<Admitted<T>>, StructuralInvariant> {
+        if let Err(causes) = self.values.member(self.document, policies, slot.name()) {
+            return Ok(Some(Err(causes)));
+        }
+        let value = self
+            .member_value(policies, slot.name())
+            .ok_or(StructuralInvariant::UnreportedFailure)?;
+        Ok(match self.decoded::<RequiredNullable<T>>(value)? {
+            RequiredNullable::Reference(reference) => Some(Ok(reference)),
+            RequiredNullable::Null => None,
+        })
+    }
+
     /// The Target ID map, entry by entry, or why it has no entry to read.
     ///
     /// # Errors
@@ -363,6 +429,9 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
             },
             keys,
             entries,
+            whole: self
+                .values
+                .member(self.document, self.declaration, "deploymentGroups"),
         }))
     }
 
@@ -831,20 +900,16 @@ impl DeclarationFragments<'_, PolicyReference, TargetProfileReference> {
     pub(crate) fn reference_occurrences(
         &self,
     ) -> Result<Vec<ReferenceOccurrence>, StructuralInvariant> {
-        let policies = self
-            .member_value(self.declaration, "policies")
-            .ok_or(StructuralInvariant::UnreportedFailure)?;
+        let policies = self.policies()?;
         let mut references = Vec::with_capacity(PolicySlot::ALL.len());
         for slot in PolicySlot::ALL {
-            let value = self.member_value(policies, slot.name());
-            let admission = self.values.member(self.document, policies, slot.name());
-            let Some(bytes) = self.slot_bytes(admission, value)? else {
+            let Some(reference) = self.slot_reference::<PolicyReference>(policies, slot)? else {
                 continue;
             };
             references.push(ReferenceOccurrence {
                 field: Some(ReferenceField::Policy(slot)),
-                occurs: value.is_some(),
-                bytes,
+                occurs: self.member_value(policies, slot.name()).is_some(),
+                bytes: reference.map(|reference| reference.canonical_bytes()),
             });
         }
         if let Some(targets) = self.member_value(self.declaration, "targetProfiles") {
@@ -855,25 +920,6 @@ impl DeclarationFragments<'_, PolicyReference, TargetProfileReference> {
             }
         }
         Ok(references)
-    }
-
-    /// A slot's canonical bytes, why it has none, or nothing for an admitted
-    /// `null`, the explicit absence of a reference.
-    fn slot_bytes(
-        &self,
-        admission: Admitted<()>,
-        value: Option<NodeId>,
-    ) -> Result<Option<Admitted<u64>>, StructuralInvariant> {
-        if let Err(causes) = admission {
-            return Ok(Some(Err(causes)));
-        }
-        let value = value.ok_or(StructuralInvariant::UnreportedFailure)?;
-        Ok(
-            match self.decoded::<RequiredNullable<PolicyReference>>(value)? {
-                RequiredNullable::Reference(reference) => Some(Ok(reference.canonical_bytes())),
-                RequiredNullable::Null => None,
-            },
-        )
     }
 
     /// The `profile` of the entry `key` of `targetProfiles`. An entry whose key
@@ -915,7 +961,9 @@ fn identity<T: DeserializeOwned>(key: &str) -> Result<T, StructuralInvariant> {
 mod tests {
     use serde_json::{json, Value};
 
-    use crate::fixtures::{complete_config, minimal_config, FixtureTargetReference};
+    use crate::fixtures::{
+        complete_config, minimal_config, FixturePolicyReference, FixtureTargetReference,
+    };
     use crate::model::{CoverageMode, CoverageRule, ProfileDeclaration};
     use crate::references::{PolicyReference, TargetProfileReference};
     use crate::resolver::coverage::RuleContent;
@@ -925,7 +973,8 @@ mod tests {
     use crate::resolver::locales::LocaleFields;
     use crate::resolver::profile_resolution::tests::Inputs;
     use crate::resolver::resource_policy::{
-        DeclarationReferences, PolicySlot, ReferenceField, ReferenceOccurrence, TargetReferences,
+        DeclarationReferences, PolicyReferences, PolicySlot, ReferenceField, ReferenceOccurrence,
+        TargetReferences,
     };
     use crate::resolver::structural_admission::{
         EntryKey, StructuralInvariant, StructuralSubject as S,
@@ -1099,6 +1148,107 @@ mod tests {
         }
         assert_eq!(
             bug(|app| app["requestedLocales"] = json!([7])),
+            Some(StructuralInvariant::Admission(
+                AdmissionInvariant::AuthoringTypeMismatch
+            ))
+        );
+    }
+
+    /// The `policies` slots once `edit` changed the declaration.
+    fn slots(
+        admissions: Option<ValueAdmissions>,
+        edit: fn(&mut Value),
+    ) -> Result<Vec<(PolicySlot, Admitted<FixturePolicyReference>)>, StructuralInvariant> {
+        let mut config = complete_config();
+        edit(&mut config["profiles"]["app"]);
+        let (_, values, analysis) = structured_in(Evaluation::default(), &config);
+        let values = admissions.unwrap_or(values);
+        let read = DeclarationFragments::new(&values, &analysis, "app")?.policy_slots()?;
+        Ok(read.slots)
+    }
+
+    /// Each slot is read on its own: one that failed or is missing holds back
+    /// no other, an admitted `null` has no entry, and an object that failed
+    /// leaves every slot with why (D15:2137, 2367).
+    #[test]
+    fn the_policies_are_read_slot_by_slot() {
+        let held =
+            |read: &[(PolicySlot, Admitted<FixturePolicyReference>)]| -> Vec<(PolicySlot, bool)> {
+                read.iter()
+                    .map(|(slot, each)| (*slot, each.is_ok()))
+                    .collect()
+            };
+        let every = |failed: Option<PolicySlot>| -> Vec<(PolicySlot, bool)> {
+            PolicySlot::ALL
+                .map(|slot| (slot, Some(slot) != failed))
+                .into()
+        };
+        assert_eq!(held(&slots(None, |_| {}).unwrap()), every(None));
+        for edit in [
+            (|app| app["policies"]["trust"] = json!(42)) as fn(&mut Value),
+            |app| lacking(app, &["policies"], "trust"),
+        ] {
+            assert_eq!(
+                held(&slots(None, edit).unwrap()),
+                every(Some(PolicySlot::Trust))
+            );
+        }
+        let nulled = slots(None, |app| app["policies"]["glossarySet"] = Value::Null).unwrap();
+        let mut expected = every(None);
+        expected.retain(|(slot, _)| *slot != PolicySlot::GlossarySet);
+        assert_eq!(held(&nulled), expected);
+        let object = slots(None, |app| app["policies"] = json!(7)).unwrap();
+        assert_eq!(object.len(), PolicySlot::ALL.len());
+        assert!(object.iter().all(|(_, each)| each.is_err()));
+    }
+
+    /// Whether the `policies` object passed once `edit` changed the
+    /// declaration.
+    fn policy_object(edit: fn(&mut Value)) -> Admitted<()> {
+        let mut config = complete_config();
+        edit(&mut config["profiles"]["app"]);
+        let (_, values, analysis) = structured_in(Evaluation::default(), &config);
+        DeclarationFragments::<FixturePolicyReference, FixtureTargetReference>::new(
+            &values, &analysis, "app",
+        )
+        .unwrap()
+        .policy_slots()
+        .unwrap()
+        .object
+    }
+
+    /// An undeclared member is the object's own failure, in no slot, while a
+    /// slot that failed or is missing is that slot's alone (D15:2184, 2367).
+    #[test]
+    fn the_policies_object_passes_apart_from_its_slots() {
+        assert_eq!(policy_object(|_| {}), Ok(()));
+        assert!(policy_object(|app| app["policies"]["extra"] = json!(1)).is_err());
+        let undeclared = slots(None, |app| app["policies"]["extra"] = json!(1)).unwrap();
+        assert_eq!(undeclared.len(), PolicySlot::ALL.len());
+        assert!(undeclared.iter().all(|(_, each)| each.is_ok()));
+        let of_a_slot: [fn(&mut Value); 2] = [
+            |app| app["policies"]["trust"] = json!(42),
+            |app| lacking(app, &["policies"], "trust"),
+        ];
+        for edit in of_a_slot {
+            assert_eq!(policy_object(edit), Ok(()));
+        }
+    }
+
+    /// A declaration without `policies`, a slot the checks admitted that is
+    /// absent, and one its type cannot read are resolver bugs.
+    #[test]
+    fn a_slot_the_checks_admit_and_the_value_lacks_is_a_resolver_bug() {
+        let bug = |edit| slots(Some(ValueAdmissions::default()), edit).err();
+        let unreported: [fn(&mut Value); 2] = [
+            |app| lacking(app, &[], "policies"),
+            |app| lacking(app, &["policies"], "trust"),
+        ];
+        for edit in unreported {
+            assert_eq!(bug(edit), Some(StructuralInvariant::UnreportedFailure));
+        }
+        assert_eq!(
+            bug(|app| app["policies"]["trust"] = json!(42)),
             Some(StructuralInvariant::Admission(
                 AdmissionInvariant::AuthoringTypeMismatch
             ))
@@ -1858,7 +2008,7 @@ mod tests {
         let app = Inputs::complete().declaration().clone();
         let declared: ProfileDeclaration<_, _> = serde_json::from_value(app).unwrap();
         let typed = DeclarationReferences {
-            policies: Ok(&declared.policies),
+            policies: PolicyReferences::declared(&declared.policies),
             target_profiles: Ok(TargetReferences::declared(&declared.target_profiles)),
         };
         assert_eq!(Ok(occurrences(|_| {})), typed.occurrences());

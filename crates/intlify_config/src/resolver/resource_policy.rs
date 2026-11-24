@@ -45,8 +45,8 @@ use crate::boundary::capability::ImplementationCapability;
 use crate::boundary::verification::VerificationInput;
 use crate::input_limits::{Bound, ValueCounts};
 #[cfg(any(test, feature = "benchmark"))]
-use crate::model::{NonEmptyMap, TargetDeclaration};
-use crate::model::{Policies, ProfileId, RequiredNullable, TargetId};
+use crate::model::{NonEmptyMap, Policies, RequiredNullable, TargetDeclaration};
+use crate::model::{ProfileId, TargetId};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::selection::{SelectionInvariant, SelectorInput, StringLengthFact};
 
@@ -201,6 +201,11 @@ impl PolicySlot {
         Self::Trust,
     ];
 
+    /// Every slot without a reference to read, for `causes`.
+    pub(crate) fn unavailable<T>(causes: &Causes) -> Vec<(Self, Admitted<T>)> {
+        Self::ALL.map(|slot| (slot, Err(causes.clone()))).into()
+    }
+
     pub(crate) const fn name(self) -> &'static str {
         match self {
             Self::Approval => "approval",
@@ -269,12 +274,38 @@ fn reference_total(references: &[ReferenceOccurrence]) -> Admitted<Tally> {
     }
 }
 
-/// The selected declaration's reference-bearing fields as structural
-/// admission left them, each admitted or unavailable with the causes behind
-/// it.
+/// The selected declaration's references as structural admission left them:
+/// each `policies` slot on its own, and the Target ID map entry by entry, or
+/// why it has no entry to read.
 pub(crate) struct DeclarationReferences<'a> {
-    pub(crate) policies: Admitted<&'a Policies<PolicyReference>>,
+    pub(crate) policies: PolicyReferences<'a>,
     pub(crate) target_profiles: Admitted<TargetReferences<'a>>,
+}
+
+/// Each `policies` slot, in the name order of the slots, with its reference
+/// or why it has none, so that one that failed holds back no other, and
+/// whether the object passed apart from its slots. An admitted `null` is no
+/// reference and has no entry (D15:2137, 2367).
+pub(crate) struct PolicyReferences<'a> {
+    pub(crate) slots: Vec<(PolicySlot, Admitted<&'a PolicyReference>)>,
+    /// The object's own checks: an undeclared member is in no slot, so it
+    /// stops no reference, and both semantic groups wait on it (D15:2184,
+    /// 2367; plan 025 interpretation #346).
+    pub(crate) object: Admitted<()>,
+}
+
+#[cfg(any(test, feature = "benchmark"))]
+impl<'a> PolicyReferences<'a> {
+    /// The references of a `policies` object structural admission admitted
+    /// whole.
+    pub(crate) fn declared(policies: &'a Policies<PolicyReference>) -> Self {
+        Self {
+            slots: present(policies)
+                .map(|(slot, reference)| (slot, Ok(reference)))
+                .collect(),
+            object: Ok(()),
+        }
+    }
 }
 
 /// The `profile` of each Target ID entry whose key was admitted, or why it has
@@ -302,57 +333,64 @@ impl<'a> TargetReferences<'a> {
 
 impl DeclarationReferences<'_> {
     /// Each reference by its field, in the fields' logical order, as `policy`
-    /// or `target` projects it, or why a target's has no value; and the
-    /// causes behind what structural admission did not admit, which a check
-    /// over every reference waits on.
+    /// or `target` projects it, or why it has no value.
     pub(crate) fn visible<T>(
         &self,
         policy: impl Fn(&PolicyReference) -> T,
         target: impl Fn(&TargetProfileReference) -> T,
-    ) -> (Vec<(ReferenceField, Admitted<T>)>, Option<Causes>) {
-        let mut visible = Vec::new();
-        let mut unavailable: Option<Causes> = None;
-        match self.policies {
-            Ok(policies) => visible
-                .extend(present(policies).map(|(slot, reference)| {
-                    (ReferenceField::Policy(slot), Ok(policy(reference)))
-                })),
-            Err(ref causes) => unavailable = Some(join(unavailable, causes)),
-        }
-        match &self.target_profiles {
-            Ok(targets) => {
-                visible.extend(targets.entries.iter().map(|(id, reference)| {
-                    (
-                        ReferenceField::TargetProfile((*id).clone()),
-                        reference
-                            .as_ref()
-                            .map(|reference| target(reference))
-                            .map_err(Causes::clone),
-                    )
-                }));
-                if let Err(causes) = &targets.whole {
-                    unavailable = Some(join(unavailable, causes));
-                }
-            }
-            Err(causes) => unavailable = Some(join(unavailable, causes)),
-        }
-        (visible, unavailable)
+    ) -> Vec<(ReferenceField, Admitted<T>)> {
+        let slots = self.policies.slots.iter().map(|(slot, reference)| {
+            (
+                ReferenceField::Policy(*slot),
+                reference
+                    .as_ref()
+                    .map(|reference| policy(reference))
+                    .map_err(Causes::clone),
+            )
+        });
+        let targets = self
+            .target_profiles
+            .iter()
+            .flat_map(|targets| &targets.entries)
+            .map(|(id, reference)| {
+                (
+                    ReferenceField::TargetProfile((*id).clone()),
+                    reference
+                        .as_ref()
+                        .map(|reference| target(reference))
+                        .map_err(Causes::clone),
+                )
+            });
+        slots.chain(targets).collect()
     }
 
-    /// The references of fields structural admission admitted whole, each
-    /// occurring with its bytes, or the causes of a field it did not.
+    /// Whether everything at and below the Target ID map passed, which what
+    /// needs every reference waits on: an entry whose key failed has no
+    /// reference to read (D15:2184).
+    pub(crate) fn target_map(&self) -> Admitted<()> {
+        self.target_profiles
+            .as_ref()
+            .map_err(Causes::clone)
+            .and_then(|targets| targets.whole.clone())
+    }
+
+    /// The references of a declaration structural admission admitted whole,
+    /// each occurring with its bytes, or the causes of a map it did not.
     #[cfg(any(test, feature = "benchmark"))]
     pub(crate) fn occurrences(&self) -> Admitted<Vec<ReferenceOccurrence>> {
-        let (visible, unavailable) = self.visible(
+        self.target_map()?;
+        let visible = self.visible(
             PolicyReference::canonical_bytes,
             TargetProfileReference::canonical_bytes,
         );
-        let occurrence = |(field, bytes)| ReferenceOccurrence {
-            field: Some(field),
-            occurs: true,
-            bytes,
-        };
-        unavailable.map_or_else(|| Ok(visible.into_iter().map(occurrence).collect()), Err)
+        Ok(visible
+            .into_iter()
+            .map(|(field, bytes)| ReferenceOccurrence {
+                field: Some(field),
+                occurs: true,
+                bytes,
+            })
+            .collect())
     }
 }
 
@@ -1132,7 +1170,7 @@ fn artifact_bounds(
         evaluation,
         stage,
         limits,
-        (resource_limits, references.unwrap_or(&[])),
+        (resource_limits, references),
         observer,
     )?;
     let sum = references.map_err(Causes::clone).and_then(reference_total);
@@ -1252,14 +1290,34 @@ fn body_bounds(
 /// and whether every one that has bytes does. The selected reference is
 /// checked from what selection admitted, even when the rest of `policies` was
 /// not. One without bytes waits on why, and holds nothing back (D15:1924).
-/// The units commit in canonical order whatever order they run in.
+/// Without a selected declaration each slot still names its unit, which waits
+/// on what held the selection back (D15:1171, 2131; plan 025 interpretation
+/// #220). The units commit in canonical order whatever order they run in.
 fn each_reference(
     evaluation: &mut Evaluation,
     stage: Stage<'_>,
     limits: Result<&ArtifactAdmissionLimits, &Causes>,
-    (resource_limits, references): (Result<&PolicyReference, &Causes>, &[ReferenceOccurrence]),
+    (resource_limits, references): (
+        Result<&PolicyReference, &Causes>,
+        Result<&[ReferenceOccurrence], &Causes>,
+    ),
     observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<(Admitted<()>, Admitted<()>), PolicyInvariant> {
+    let unselected: Vec<ReferenceOccurrence>;
+    let references = match references {
+        Ok(references) => references,
+        Err(causes) => {
+            unselected = PolicySlot::unavailable(causes)
+                .into_iter()
+                .map(|(slot, bytes)| ReferenceOccurrence {
+                    field: Some(ReferenceField::Policy(slot)),
+                    occurs: false,
+                    bytes,
+                })
+                .collect();
+            &unselected
+        }
+    };
     let single_limit = limits.map(|limits| limits.max_single_reference_canonical_bytes);
     let selected = ReferenceField::Policy(PolicySlot::ResourceLimits);
     // Each reference is observed at its value (D15:1921).
@@ -1308,6 +1366,7 @@ fn each_reference(
 
 /// The references present in `policies`, in the name order of their slots.
 /// An explicit `null` is no reference.
+#[cfg(any(test, feature = "benchmark"))]
 fn present(
     policies: &Policies<PolicyReference>,
 ) -> impl Iterator<Item = (PolicySlot, &PolicyReference)> {
@@ -1334,13 +1393,6 @@ fn present(
     ]
     .into_iter()
     .filter_map(|(slot, reference)| reference.map(|reference| (slot, reference)))
-}
-
-fn join(earlier: Option<Causes>, causes: &Causes) -> Causes {
-    match earlier {
-        Some(earlier) => earlier.union(causes.clone()),
-        None => causes.clone(),
-    }
 }
 
 /// The first bound, in canonical order, that the policy requires more of than
@@ -1633,7 +1685,9 @@ mod tests {
         /// without bytes, or the causes of no selection.
         fn references(&self) -> Admitted<Vec<ReferenceOccurrence>> {
             let mut references = DeclarationReferences {
-                policies: self.policies.as_ref().map_err(Causes::clone),
+                policies: PolicyReferences::declared(
+                    self.policies.as_ref().map_err(Causes::clone)?,
+                ),
                 target_profiles: self
                     .targets
                     .as_ref()

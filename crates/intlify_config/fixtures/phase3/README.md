@@ -193,7 +193,7 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 | Every present reference names exactly one artifact, in field order, a Target Profile reference like a policy | `every_present_reference_names_its_artifact_in_field_order`, `a_target_profile_reference_is_resolved_like_a_policy` |
 | A failed reference takes the first decision that applies, and the other references go on | `a_failed_reference_takes_the_first_decision_that_applies`, `a_trust_reference_without_its_artifact_is_not_found_and_the_rest_resolve` |
 | An explicit `null` has no unit and names nothing | `an_explicit_null_has_no_unit_and_names_nothing` |
-| Without the Set, no reference is evaluated | `without_the_set_no_reference_is_evaluated`, `a_field_structural_admission_did_not_admit_has_no_references` |
+| Without the Set, no reference is evaluated | `without_the_set_no_reference_is_evaluated`, `a_slot_or_map_structural_admission_did_not_admit_waits_on_why` |
 | One binding per distinct reference, none for an explicit `null` or an unreferenced artifact, and bindings only from a complete resolution | `each_distinct_reference_is_bound_once_to_its_artifact`, `an_explicit_null_and_an_unreferenced_artifact_make_no_binding`, `only_a_complete_resolution_makes_bindings` |
 
 ### Delivery

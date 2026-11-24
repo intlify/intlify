@@ -33,7 +33,7 @@ use crate::resolver::hydration::{
 use crate::resolver::limits::ConfirmedPolicy;
 use crate::resolver::locales::{resolve_locales, LocaleFields};
 use crate::resolver::negotiation::resolve_negotiation;
-use crate::resolver::resource_policy::{DeclarationReferences, TargetReferences};
+use crate::resolver::resource_policy::{DeclarationReferences, PolicyReferences, TargetReferences};
 use crate::resolver::targets::{resolve_targets, ResolvedTargets};
 
 use super::locale_resolution::PolicyInputs;
@@ -132,7 +132,7 @@ impl PreparedHydration {
             &mut preparation,
             set.as_ref(),
             &DeclarationReferences {
-                policies: Ok(&declaration.policies),
+                policies: PolicyReferences::declared(&declaration.policies),
                 target_profiles: Ok(TargetReferences::declared(&declaration.target_profiles)),
             },
             (locales.targets.as_deref(), Some(&observer)),

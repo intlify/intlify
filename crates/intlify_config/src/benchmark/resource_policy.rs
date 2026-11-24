@@ -29,8 +29,8 @@ use crate::resolver::evaluation::{
 use crate::resolver::limits::ResolutionLimits;
 use crate::resolver::resource_policy::{
     admit_resource_policy, ArtifactSubject, ConfigurationMeasures, DeclarationReferences,
-    PolicyInvariant, PolicyOutcome, PolicySubject, ReferenceField, ReferenceOccurrence,
-    TargetReferences,
+    PolicyInvariant, PolicyOutcome, PolicyReferences, PolicySubject, ReferenceField,
+    ReferenceOccurrence, TargetReferences,
 };
 use crate::structural::selection::{SelectorInput, StringLengthFact};
 
@@ -105,7 +105,7 @@ impl PreparedPolicy {
             verification: pinning(&declaration.policies.resource_limits),
             resource_limits: &declaration.policies.resource_limits,
             references: DeclarationReferences {
-                policies: Ok(&declaration.policies),
+                policies: PolicyReferences::declared(&declaration.policies),
                 target_profiles: Ok(TargetReferences::declared(&declaration.target_profiles)),
             }
             .occurrences()

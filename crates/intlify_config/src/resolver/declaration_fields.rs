@@ -1,28 +1,26 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! The selected declaration's fields as the semantic phases read them, each
-//! on its own from its fragment ([`DeclarationFragments`]): the field's value,
-//! absent where an optional field is, or the causes of its absence, the
-//! Findings of the field and of what lies below it. A field structural
-//! admission did not admit suppresses only the work that reads it, while its
-//! independently admitted siblings continue (D15:393, 2367, 3340); an
-//! undeclared member of the declaration belongs to no field.
+//! The selected declaration as the semantic phases read it, from its
+//! fragments ([`DeclarationFragments`]): a single-valued field as one value,
+//! and each `policies` slot, map entry, and array element on its own, with
+//! its value, absent where an optional one is, or the causes of its absence.
+//! What structural admission did not admit suppresses only the work that
+//! reads it, while its independently admitted siblings continue (D15:393,
+//! 2367, 3340); an undeclared member of the declaration belongs to no field.
 //!
 //! The checks decide: a field they admitted and the analysis did not, or a
 //! required one they admitted though it is absent, is a resolver bug.
 
 use serde::de::DeserializeOwned;
 
-use crate::model::{
-    Delivery, DeploymentGroup, DeploymentGroupId, NonEmptyMap, Policies, ProjectId, SelectionScope,
-};
+use crate::model::{Delivery, ProjectId, SelectionScope};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::StructuralAnalysis;
 
 use super::coverage::{CoverageFields, RuleField, SelectorField};
 use super::declaration_fragments::{
-    AliasEntries, CoverageEntries, DeclarationFragments, FallbackEntry, GroupEntries,
+    AliasEntries, CoverageEntries, DeclarationFragments, FallbackEntry, GroupEntries, PolicySlots,
     SelectorEntry, TargetEntries,
 };
 use super::evaluation::{Admitted, Causes};
@@ -31,15 +29,16 @@ use super::hydration::{HydrationFields, RelationField, RelationGroup};
 use super::locales::{
     AliasField, AliasFields, FallbackField, LocaleFields, TargetLocaleFields, TargetMapFields,
 };
-use super::resource_policy::{DeclarationReferences, TargetReferences};
+use super::resource_policy::{
+    DeclarationReferences, PolicyReferences, PolicySlot, TargetReferences,
+};
 use super::structural_admission::StructuralInvariant;
 use super::tally::Tally;
 use super::value_admissions::ValueAdmissions;
 
-type DeploymentGroups = NonEmptyMap<DeploymentGroupId, DeploymentGroup>;
-
 /// The selected declaration's fields, each admitted, with an optional one
-/// possibly absent, or unavailable with the causes behind it.
+/// possibly absent, or unavailable with the causes behind it; a field that
+/// holds several values keeps the result of each.
 #[derive(Debug)]
 pub(crate) struct DeclarationFields<Policy, Target> {
     project_id: Admitted<ProjectId>,
@@ -57,14 +56,14 @@ pub(crate) struct DeclarationFields<Policy, Target> {
     message_fallback: Admitted<Vec<FallbackEntry>>,
     /// The coverage rule by rule, which Phase 8 reads.
     coverage: Admitted<CoverageEntries>,
-    policies: Admitted<Policies<Policy>>,
+    /// Each `policies` slot's reference or why it has none, which Phase 9
+    /// reads, and whether the object passed apart from its slots, which both
+    /// of its semantic groups wait on.
+    policies: PolicySlots<Policy>,
     /// The Target ID map entry by entry, which Phases 7, 9, and 11 read.
     target_entries: Admitted<TargetEntries<Target>>,
-    /// The Group ID map entry by entry, which Phase 12 reads.
+    /// The Group ID map entry by entry, which Phases 12 and 13 read.
     group_entries: Admitted<GroupEntries>,
-    /// The Group ID map as one value, whose admission Phase 13's result
-    /// waits on.
-    deployment_groups: Admitted<DeploymentGroups>,
     delivery: Admitted<Option<Delivery>>,
 }
 
@@ -93,10 +92,9 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
             negotiation_aliases: read.alias_entries()?,
             message_fallback: read.fallback_entries()?,
             coverage: read.coverage_entries()?,
-            policies: read.required("policies")?,
+            policies: read.policy_slots()?,
             target_entries: read.target_entries()?,
             group_entries: read.group_entries()?,
-            deployment_groups: read.required("deploymentGroups")?,
             delivery: read.optional("delivery")?,
         })
     }
@@ -205,7 +203,6 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
     /// The relations of the Group ID map entry by entry, which Phase 13
     /// reads, and whether everything at and below the map passed.
     pub(crate) fn hydration_fields(&self) -> Admitted<HydrationFields<'_>> {
-        let whole = borrowed(&self.deployment_groups, |_| ());
         borrowed(&self.group_entries, |groups| HydrationFields {
             occurrences: groups.relations.clone(),
             groups: groups
@@ -227,7 +224,7 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
                     }),
                 })
                 .collect(),
-            whole,
+            whole: groups.whole.clone(),
         })
     }
 
@@ -251,10 +248,12 @@ impl<Policy, Target> DeclarationFields<Policy, Target> {
             negotiation_aliases: Err(causes.clone()),
             message_fallback: Err(causes.clone()),
             coverage: Err(causes.clone()),
-            policies: Err(causes.clone()),
+            policies: PolicySlots {
+                slots: PolicySlot::unavailable(causes),
+                object: Err(causes.clone()),
+            },
             target_entries: Err(causes.clone()),
             group_entries: Err(causes.clone()),
-            deployment_groups: Err(causes.clone()),
             delivery: Err(causes.clone()),
         }
     }
@@ -264,7 +263,15 @@ impl DeclarationFields<PolicyReference, TargetProfileReference> {
     /// The fields that hold artifact references, which Phases 4 and 9 read.
     pub(crate) fn references(&self) -> DeclarationReferences<'_> {
         DeclarationReferences {
-            policies: borrowed(&self.policies, |policies| policies),
+            policies: PolicyReferences {
+                slots: self
+                    .policies
+                    .slots
+                    .iter()
+                    .map(|(slot, reference)| (*slot, reference.as_ref().map_err(Causes::clone)))
+                    .collect(),
+                object: self.policies.object.clone(),
+            },
             target_profiles: borrowed(&self.target_entries, |targets| TargetReferences {
                 entries: targets
                     .entries
@@ -334,7 +341,6 @@ mod tests {
         Fields::read(&values, &analysis, "app").unwrap()
     }
 
-    /// The checks behind `causes`.
     /// Whether everything at and below the Target ID map passed.
     fn target_structure<Policy, Target>(
         fields: &DeclarationFields<Policy, Target>,
@@ -346,6 +352,21 @@ mod tests {
             .and_then(|targets| targets.whole.clone())
     }
 
+    /// Whether everything at and below the Group ID map passed.
+    fn group_structure<Policy, Target>(fields: &DeclarationFields<Policy, Target>) -> Admitted<()> {
+        fields
+            .group_entries
+            .as_ref()
+            .map_err(super::Causes::clone)
+            .and_then(|groups| groups.whole.clone())
+    }
+
+    /// Whether every slot that holds a reference was admitted.
+    fn policies_held<Policy, Target>(fields: &DeclarationFields<Policy, Target>) -> bool {
+        fields.policies.slots.iter().all(|(_, slot)| slot.is_ok())
+    }
+
+    /// The checks behind `causes`.
     fn checks<T>(field: &Admitted<T>) -> BTreeSet<(Vec<String>, Check)> {
         field
             .as_ref()
@@ -386,8 +407,8 @@ mod tests {
         assert_eq!(fields.default_source_locale, Ok(None));
         assert_eq!(fields.coverage, Ok(CoverageEntries::default()));
         assert_eq!(fields.delivery, Ok(None));
-        assert!(fields.policies.is_ok());
-        assert!(target_structure(&fields).is_ok() && fields.deployment_groups.is_ok());
+        assert!(policies_held(&fields));
+        assert!(target_structure(&fields).is_ok() && group_structure(&fields).is_ok());
         let complete = read(&complete_config());
         assert_eq!(
             complete.negotiation_aliases.as_ref().unwrap().entries.len(),
@@ -433,8 +454,8 @@ mod tests {
         );
         assert!(fields.selection_scope.is_ok());
         assert!(fields.default_requested_locale.is_ok());
-        assert!(fields.policies.is_ok());
-        assert!(target_structure(&fields).is_ok() && fields.deployment_groups.is_ok());
+        assert!(policies_held(&fields));
+        assert!(target_structure(&fields).is_ok() && group_structure(&fields).is_ok());
     }
 
     /// An undeclared member of the declaration belongs to no field.
@@ -444,7 +465,7 @@ mod tests {
         config["profiles"]["app"]["extra"] = json!(true);
         let fields = read(&config);
         assert!(fields.project_id.is_ok() && fields.requested_locales.is_ok());
-        assert!(fields.policies.is_ok() && target_structure(&fields).is_ok());
+        assert!(policies_held(&fields) && target_structure(&fields).is_ok());
     }
 
     /// A Target ID entry's failure holds back `targetProfiles` alone, its key
@@ -461,7 +482,7 @@ mod tests {
                 Check::FieldType
             )])
         );
-        assert!(fields.deployment_groups.is_ok() && fields.requested_locales.is_ok());
+        assert!(group_structure(&fields).is_ok() && fields.requested_locales.is_ok());
         let mut keyed = minimal_config();
         let target = keyed["profiles"]["app"]["targetProfiles"]["browser"].clone();
         keyed["profiles"]["app"]["targetProfiles"]["Web App"] = target;
@@ -515,13 +536,13 @@ mod tests {
         config["profiles"]["app"]["deploymentGroups"]["web"]["members"] = json!("browser");
         let fields = read(&config);
         assert_eq!(
-            checks(&fields.deployment_groups),
+            checks(&group_structure(&fields)),
             BTreeSet::from([(
                 vec!["deploymentGroups".to_owned(), "*".to_owned()],
                 Check::FieldType
             )])
         );
-        assert!(target_structure(&fields).is_ok() && fields.policies.is_ok());
+        assert!(target_structure(&fields).is_ok() && policies_held(&fields));
     }
 
     /// Another declaration's failures hold back none of this one's fields.
@@ -565,12 +586,17 @@ mod tests {
             fields.negotiation_aliases.as_ref().err(),
             fields.message_fallback.as_ref().err(),
             fields.coverage.as_ref().err(),
-            fields.policies.as_ref().err(),
+            fields.policies.object.as_ref().err(),
             fields.target_entries.as_ref().err(),
             fields.group_entries.as_ref().err(),
-            fields.deployment_groups.as_ref().err(),
             fields.delivery.as_ref().err(),
         ];
         assert!(unavailable.iter().all(|field| *field == Some(&causes)));
+        // Each slot is named without a value (D15:1171, 2131).
+        assert_eq!(
+            fields.policies.slots,
+            crate::resolver::resource_policy::PolicySlot::ALL
+                .map(|slot| (slot, Err(causes.clone())))
+        );
     }
 }
