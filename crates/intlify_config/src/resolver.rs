@@ -134,6 +134,39 @@ mod tests {
         code
     }
 
+    /// What reads a file, the network, the environment, or a process, or
+    /// embeds a file.
+    const ACQUIRES: [&str; 17] = [
+        "std::fs",
+        "std::net",
+        "std::env",
+        "std::process",
+        "std::io",
+        "fs::",
+        "net::",
+        "process::",
+        "env::",
+        "io::",
+        "File::",
+        "TcpStream",
+        "UdpSocket",
+        "Command::",
+        "include_bytes!",
+        "include_str!",
+        "env!",
+    ];
+
+    /// What resolves or converts a name, or dereferences a URI.
+    const NAME_WORK: [&str; 7] = [
+        "idna",
+        "punycode",
+        "ToSocketAddrs",
+        "to_socket_addrs",
+        "lookup_host",
+        "reqwest",
+        "hyper",
+    ];
+
     /// The resolver acquires nothing: no module of it reads a file, reaches the
     /// network, the environment, or another process, or embeds a file. Its
     /// inputs are values its caller already acquired, so it can query no Store
@@ -148,25 +181,34 @@ mod tests {
         for file in &files {
             let text = std::fs::read_to_string(file).unwrap();
             let code = code_before_tests(file, &text);
-            for forbidden in [
-                "std::fs",
-                "std::net",
-                "std::env",
-                "std::process",
-                "std::io",
-                "fs::",
-                "net::",
-                "process::",
-                "env::",
-                "io::",
-                "File::",
-                "TcpStream",
-                "UdpSocket",
-                "Command::",
-                "include_bytes!",
-                "include_str!",
-                "env!",
-            ] {
+            for forbidden in ACQUIRES {
+                assert!(
+                    !code.contains(forbidden),
+                    "{} uses `{forbidden}`",
+                    file.display()
+                );
+            }
+        }
+    }
+
+    /// Locator admission only reads the candidate's text: neither it, its URI
+    /// reader, nor a resolver module dereferences a URI, looks a name up,
+    /// converts a host, reaches the network, or touches the filesystem
+    /// (D15:764, 766, 3377).
+    #[test]
+    fn locator_admission_performs_no_uri_dns_idna_network_or_file_operation() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut files = vec![
+            root.join("boundary/locator.rs"),
+            root.join("construction/validator/uri.rs"),
+            root.join("resolver.rs"),
+        ];
+        sources(&root.join("resolver"), &mut files);
+        assert!(files.len() >= 21);
+        for file in &files {
+            let text = std::fs::read_to_string(file).unwrap();
+            let code = code_before_tests(file, &text);
+            for forbidden in ACQUIRES.iter().chain(&NAME_WORK) {
                 assert!(
                     !code.contains(forbidden),
                     "{} uses `{forbidden}`",

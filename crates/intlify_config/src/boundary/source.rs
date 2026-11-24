@@ -333,7 +333,7 @@ fn content_revision(domain: &str, bytes: &[u8]) -> String {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use serde_json::json;
 
     use super::*;
@@ -648,6 +648,138 @@ mod tests {
     }
 
     const ENTRY: &str = "intlify-programmatic-entry.v0:storefront";
+
+    /// Identities outside the form: no `:`, an empty payload, a tag without
+    /// `.v` and a version, an empty name, a name that begins or ends with `.`
+    /// or `-` or holds an uppercase letter or `_`, and a version with a
+    /// leading zero (D15:743, 3389).
+    pub(in crate::boundary) const UNSTABLE: [&str; 21] = [
+        "", "a.v0", "a.v0:", ":", ":p", "a:p", "a.v:p", "a.vx:p", "a.V0:p", ".v0:p", ".a.v0:p",
+        "a..v0:p", "-a.v0:p", "a-.v0:p", "A.v0:p", "aB.v0:p", "a_b.v0:p", "a b.v0:p", "a.v01:p",
+        "a.v00:p", "a.v0x:p",
+    ];
+
+    /// The contrasts: a name with `.` and `-` inside, a longer or zero
+    /// version, and payloads that hold a further `:` (D15:743, 3389).
+    pub(in crate::boundary) const STABLE: [(&str, &str, &str); 7] = [
+        ("x.y-z.v3:p", "x.y-z.v3", "p"),
+        ("a.v12:p", "a.v12", "p"),
+        ("0.v0:p", "0.v0", "p"),
+        ("a.v.v0:p", "a.v.v0", "p"),
+        ("a.v0:x:y", "a.v0", "x:y"),
+        ("a.v0::", "a.v0", ":"),
+        ("a.v0: ", "a.v0", " "),
+    ];
+
+    /// What a host knows of a source, none of which alone establishes a pair:
+    /// a normalized path, a URI, a modification timestamp, filesystem
+    /// metadata, a process-local object address, a stack frame, and a value
+    /// random per invocation (D15:741, 3388).
+    pub(in crate::boundary) const HOST_FACTS: [&str; 14] = [
+        "config/intlify.json",
+        "/repository/intlify.config.json",
+        "C:/repository/intlify.config.json",
+        "https://example.com/intlify.config.json",
+        "file:///repository/intlify.config.json",
+        "2026-11-10T00:00:00Z",
+        "1762732800",
+        "dev:16777220,ino:12345",
+        "mode:0644",
+        "0x7ffee4b2a9c0",
+        "heap:0x7ffee4b2a9c0",
+        "at defineConfig (app.ts:12:3)",
+        "app.ts:12:3",
+        "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    ];
+
+    /// `identity` and `revision` read as each of the three pairs, a `None`
+    /// revision standing for the one each pair's content derives.
+    fn each_pair(
+        identity: &str,
+        revision: Option<&str>,
+    ) -> [(&'static str, Result<SourcePair, SourceRefusal>); 3] {
+        let digest = Node::Null.digest();
+        let source = call_site_source_revision(BYTES);
+        [
+            (
+                "file",
+                read_pair(
+                    Some(identity),
+                    Some(revision.unwrap_or(REVISION)),
+                    BYTES,
+                    roomy(),
+                ),
+            ),
+            (
+                "entry",
+                read_entry_pair(
+                    Some(identity),
+                    Some(revision.unwrap_or(&digest)),
+                    &digest,
+                    roomy(),
+                ),
+            ),
+            (
+                "call-site",
+                read_call_site_pair(
+                    Some(identity),
+                    Some(revision.unwrap_or(&source)),
+                    BYTES,
+                    roomy(),
+                ),
+            ),
+        ]
+    }
+
+    /// Every pair applies one form: each spelling outside it is the row's
+    /// unstable identity, and each contrast is admitted with the first `:`
+    /// as the end of its tag (D15:743, 3389).
+    #[test]
+    fn every_pair_applies_the_identity_form() {
+        for identity in UNSTABLE {
+            for (pair, read) in each_pair(identity, None) {
+                assert_eq!(
+                    read,
+                    Err(SourceRefusal::UnstableIdentity),
+                    "{pair} {identity:?}"
+                );
+            }
+        }
+        assert_eq!(
+            SourceRefusal::UnstableIdentity.reason(),
+            "unstable-source-identity"
+        );
+        assert_eq!(
+            SourceRefusal::UnstableIdentity.entry_reason(),
+            "unstable-entry-identity"
+        );
+        for (identity, tag, payload) in STABLE {
+            for (pair, read) in each_pair(identity, None) {
+                let admitted = read.unwrap_or_else(|_| panic!("{pair} {identity:?}"));
+                assert_eq!(admitted.identity().as_str(), identity, "{pair}");
+                assert_eq!(admitted.identity().tag(), tag, "{pair}");
+                assert_eq!(admitted.identity().payload(), payload, "{pair}");
+            }
+        }
+    }
+
+    /// None of a host's facts establishes any pair, as its identity or as
+    /// its revision, while the content-derived revision of each pair still
+    /// establishes it under a stable identity (D15:741, 743, 3388).
+    #[test]
+    fn no_host_fact_alone_establishes_a_pair() {
+        for fact in HOST_FACTS {
+            for (pair, read) in each_pair(fact, None) {
+                assert_eq!(read, Err(SourceRefusal::UnstableIdentity), "{pair} {fact}");
+            }
+            for (pair, read) in each_pair(IDENTITY, Some(fact)) {
+                assert_eq!(read, Err(SourceRefusal::UnboundRevision), "{pair} {fact}");
+            }
+        }
+        for (pair, read) in each_pair(IDENTITY, None) {
+            assert!(read.is_ok(), "{pair}");
+        }
+    }
 
     /// A Programmatic Entry pair runs the same checks in the same order, its
     /// revision compared with the Snapshot's digest (D15:743, 3147).

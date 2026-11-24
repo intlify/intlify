@@ -449,6 +449,12 @@ mod tests {
             "urn:isbn:0451450523",
             "vscode-remote://ssh-remote%2Bhost/src/app.ts",
             "https://example.com/%2F%C3%A9",
+            // An adapter's A-label host is ASCII text the core keeps as given.
+            "https://xn--bcher-kva.example/x",
+            "https://www.xn--bcher-kva.example:8443/x",
+            "https://xn--r8jz45g.xn--zckzah/",
+            // Revision `"0"` removes only its four defaults, from no registry.
+            "ftp://example.com:21/x",
         ] {
             let locator = programmatic(uri(payload)).unwrap();
             assert_eq!(locator.variant(), LocatorVariant::SafeUri, "{payload}");
@@ -489,8 +495,59 @@ mod tests {
             "https://example.com/é",
             "https://example.com/a b",
             "https://exa%mple.com/",
+            "https://XN--bcher-kva.example/x",
+            "https://bücher.example/x",
+            "https://例え.テスト/",
+            "https://example.com/%zz",
+            "https://example.com/%2",
+            "https://example.com/%",
+            "https://ex%61mple.com/x",
         ] {
             assert_eq!(programmatic(uri(payload)), None, "{payload}");
+        }
+    }
+
+    /// Each spelling an adapter must rewrite, beside the canonical URI its
+    /// rewrite gives: the core admits the canonical one and refuses the other
+    /// without repairing it. RFC 3986's normalization decodes an unreserved
+    /// escape first and then removes the dot segments the decoding spells
+    /// (D15:764, 766, 3376, 3377).
+    #[test]
+    fn a_spelling_the_adapter_must_rewrite_is_refused_and_not_repaired() {
+        for (spelled, canonical) in [
+            ("HTTPS://example.com/x", "https://example.com/x"),
+            ("https://EXAMPLE.com/x", "https://example.com/x"),
+            (
+                "https://XN--BCHER-KVA.example/x",
+                "https://xn--bcher-kva.example/x",
+            ),
+            ("https://example.com/%7Ex", "https://example.com/~x"),
+            ("https://example.com/%41%2d", "https://example.com/A-"),
+            ("https://example.com/%c3%a9", "https://example.com/%C3%A9"),
+            ("https://example.com/%2f", "https://example.com/%2F"),
+            ("https://example.com/a/../b", "https://example.com/b"),
+            ("https://example.com/a/%2E%2E/b", "https://example.com/b"),
+            ("https://example.com/a/%2e/b", "https://example.com/a/b"),
+            ("https://example.com/a/%2E", "https://example.com/a/"),
+        ] {
+            assert_eq!(programmatic(uri(spelled)), None, "{spelled}");
+            let rewritten = Reference::parse(spelled).unwrap().normalize();
+            assert_eq!(rewritten.to_string(), canonical, "{spelled}");
+            let admitted = programmatic(uri(canonical)).unwrap();
+            assert_eq!(admitted.payload(), canonical);
+        }
+        // A default port is the one rewrite no scheme-independent
+        // normalization makes, and a longer spelling of a port is another.
+        for (spelled, canonical) in [
+            ("http://example.com:80/x", "http://example.com/x"),
+            ("ws://example.com:80/", "ws://example.com/"),
+            ("https://example.com:443/x", "https://example.com/x"),
+            ("wss://example.com:443/", "wss://example.com/"),
+            ("https://example.com:08443/x", "https://example.com:8443/x"),
+        ] {
+            assert_eq!(programmatic(uri(spelled)), None, "{spelled}");
+            let admitted = programmatic(uri(canonical)).unwrap();
+            assert_eq!(admitted.payload(), canonical);
         }
     }
 

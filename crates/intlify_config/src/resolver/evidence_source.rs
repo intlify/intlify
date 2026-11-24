@@ -330,6 +330,84 @@ mod tests {
         );
     }
 
+    /// A `safe-opaque` identity is the owner's exact bytes: its domain and
+    /// payload stay apart, and no decoding, normalization, collation, or case
+    /// folding merges or reorders two of them (D15:734, 739, 3369).
+    #[test]
+    fn a_safe_opaque_identity_is_compared_as_exact_bytes() {
+        let safe =
+            |text: &str| retain(&[project(O::ConfigurationFile, text, true)], &Sha256).remove(0);
+        let bytes = |text: &str| PortableSourceIdentity::SafeOpaque(text.as_bytes().into());
+        // In unsigned byte order, each entry before the next: a shorter equal
+        // prefix, uppercase before lowercase, ASCII before `é` although a
+        // collation would put `é` beside `e`, a decomposed `Å` before its
+        // composed form, and U+FF5E before U+10000, which UTF-16 reverses.
+        let ordered = [
+            "a.v0:A",
+            "a.v0:A\u{30a}",
+            "a.v0:a",
+            "a.v0:e",
+            "a.v0:z",
+            "a.v0:\u{c5}",
+            "a.v0:\u{e9}",
+            "a.v0:\u{212a}",
+            "a.v0:\u{ff5e}",
+            "a.v0:\u{10000}",
+            "a.v1:A",
+            "b.v0:A",
+        ];
+        for text in ordered {
+            assert_eq!(safe(text), bytes(text), "{text:?}");
+        }
+        for pair in ordered.windows(2) {
+            assert!(safe(pair[0]) < safe(pair[1]), "{pair:?}");
+        }
+        // A domain tag ends at the first `:`, so a payload that spells
+        // another identity is a different identity in its own domain.
+        for (left, right) in [
+            ("a.v0:b.v0:p", "b.v0:p"),
+            ("a.v0:p", "a.v1:p"),
+            ("a.v0:b:c", "a.v0:b"),
+        ] {
+            assert_ne!(safe(left), safe(right), "{left} {right}");
+        }
+    }
+
+    /// The identity a source keeps does not move with its revision, whatever
+    /// the source's bytes are, those that are no text included (D15:739, 743,
+    /// 3369).
+    #[test]
+    fn a_safe_opaque_identity_is_unchanged_across_source_revisions() {
+        let largest = Bound::new(u64::MAX - 1).unwrap();
+        let limits = SourceLimits {
+            identity_bytes: largest,
+            revision_bytes: largest,
+        };
+        let revisions: [&[u8]; 4] = [
+            b"{}",
+            b"{\"a\":1}",
+            &[0xff, 0xfe, 0x00],
+            &[0xef, 0xbb, 0xbf],
+        ];
+        let mut retained = Vec::new();
+        let mut seen = Vec::new();
+        for source in revisions {
+            let revision = file_source_revision(source);
+            let pair = read_pair(Some(FILE), Some(&revision), source, limits).unwrap();
+            assert_eq!(pair.revision(), revision);
+            seen.push(revision);
+            let projected = SourceIdentity::project(O::ConfigurationFile, pair.identity(), true);
+            retained.push(projected.unwrap());
+        }
+        seen.sort();
+        seen.dedup();
+        assert_eq!(seen.len(), revisions.len());
+        let views = retain(&retained, &Sha256);
+        assert!(views
+            .iter()
+            .all(|view| view.view() == json!({ "safe-opaque": FILE_HEX })));
+    }
+
     #[test]
     fn a_span_is_admitted_only_inside_its_snapshot() {
         let snapshot = b"{\"a\":1}";

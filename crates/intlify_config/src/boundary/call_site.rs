@@ -443,6 +443,7 @@ pub(crate) mod tests {
 
     use super::*;
     use crate::boundary::locator::LocatorVariant;
+    use crate::boundary::source::tests::{HOST_FACTS, STABLE, UNSTABLE};
     use crate::boundary::source::{call_site_source_revision, file_source_revision};
     use crate::construction::capability::{
         IDENTITY as CAPABILITY, REVISION as CAPABILITY_REVISION,
@@ -908,6 +909,33 @@ pub(crate) mod tests {
             submitted.identity = identity;
             submitted.revision = revision;
             assert_eq!(refused(submitted, roomy()), refusal, "{refusal:?}");
+        }
+    }
+
+    /// The whole boundary, not only its pair, applies the identity form and
+    /// takes no host fact for an identity or a revision (D15:743, 3388, 3389).
+    #[test]
+    fn the_sidecar_applies_the_identity_form_and_takes_no_host_fact() {
+        let own = revision();
+        for identity in UNSTABLE.into_iter().chain(HOST_FACTS) {
+            let mut submitted = sidecar(&own, vec![]);
+            submitted.identity = Some(identity);
+            let refusal = refused(submitted, roomy());
+            assert_eq!(refusal, UnstableIdentity, "{identity:?}");
+            assert_eq!(refusal.reason(), "unstable-source-identity");
+        }
+        for fact in HOST_FACTS {
+            assert_eq!(
+                refused(sidecar(fact, vec![]), roomy()),
+                UnboundRevision,
+                "{fact}"
+            );
+        }
+        for (identity, _, payload) in STABLE {
+            let mut submitted = sidecar(&own, vec![]);
+            submitted.identity = Some(identity);
+            let kept = admitted(submitted, roomy());
+            assert_eq!(kept.pair().identity().payload(), payload, "{identity:?}");
         }
     }
 
