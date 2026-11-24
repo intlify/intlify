@@ -339,15 +339,22 @@ fn every_finite_case_prepares_its_exact_result_and_work_including_all_limit_edge
                         );
                     }
                     Output::Hydration(resolved) => {
-                        // Only the bound itself, one past its value.
+                        // Only the bound itself, one past its value: an
+                        // endpoint, whose relation's key can stand for
+                        // several values, keeps only that witness.
+                        use crate::resolver::evaluation::Actual;
+
                         let evaluation = &resolved.evaluation;
                         assert_eq!(evaluation.issues().count(), 1);
                         let issue = evaluation.issues().next().unwrap();
                         let exceeded = evaluation.limit(issue).unwrap();
-                        assert_eq!(
-                            exceeded.actual,
-                            crate::resolver::evaluation::Actual::Exact(exceeded.limit.get() + 1)
-                        );
+                        let witness = exceeded.limit.get() + 1;
+                        let expected = if matches!(kind, LimitKind::HydrationEndpointBytes) {
+                            Actual::AtLeast(witness)
+                        } else {
+                            Actual::Exact(witness)
+                        };
+                        assert_eq!(exceeded.actual, expected);
                     }
                     Output::ResourcePolicy(resolved) => {
                         // Only the bound itself, one past its value; the

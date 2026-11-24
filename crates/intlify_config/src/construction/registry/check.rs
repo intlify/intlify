@@ -153,7 +153,7 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:b9bc95bfb6e19fb18813afeb883e04e1b631e33b1f61c5d2115a113516496443";
+    "sha256:c4c9ce4ed0d2e05aae2e900bd2a2c3c939c600cb130619586975d98cb07ec6a6";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
@@ -2152,8 +2152,9 @@ const fn reasons(kind: SubjectKind, check: Check, code: Code) -> &'static [Reaso
 /// A key stands for distinct raw values when spellings share its canonical
 /// locale or its content projection groups them: a locale's own key, an
 /// artifact's exact tuple or admission key, which bodies share, a coverage
-/// rule's content and what normalizing it gives, and an identity map's key
-/// in structural admission, where a key that fails admission is keyed by its
+/// rule's content and what normalizing it gives, a hydration relation, which
+/// its content keys once an endpoint fails, and an identity map's key in
+/// structural admission, where a key that fails admission is keyed by its
 /// content. So does a structural field path, which holds `*` for elements
 /// and entries and names the object of its undeclared members; a singleton
 /// whose check sees each occurrence on its own (D15:1884, 1895); and a key
@@ -2209,7 +2210,9 @@ const fn derivation(kind: SubjectKind, check: Check) -> Derivation {
         | K::CoverageDomain
         | K::CoverageCell
         | K::CollectionMember
-        | K::CollectionGroup => KeyOnly,
+        | K::CollectionGroup
+        | K::RelationEndpoint
+        | K::Relation => KeyOnly,
         K::ProjectProfileSlot
         | K::EntryDependencies
         | K::MaterializedDependencies
@@ -2289,8 +2292,6 @@ const fn derivation(kind: SubjectKind, check: Check) -> Derivation {
         | K::GroupMember
         | K::Assignment
         | K::Relations
-        | K::RelationEndpoint
-        | K::Relation
         | K::Roles
         | K::DeploymentGroupsDependency
         | K::DiagnosticDomain => Exact,
@@ -2739,7 +2740,7 @@ mod tests {
                 ],
                 "ownedDependencies": [],
                 "findingPayloadStrategy": {
-                    "derivation": "exact",
+                    "derivation": "key-only",
                     "details": [{
                         "code": "project-profile-hydration-relation-invalid",
                         "members": ["reason"],
@@ -3668,6 +3669,8 @@ mod tests {
             K::Artifact,
             K::CollectionMember,
             K::CoverageCell,
+            K::Relation,
+            K::RelationEndpoint,
         ] {
             assert_eq!(derivation_of(kind), KeyOnly, "{kind:?}");
         }
@@ -3721,7 +3724,6 @@ mod tests {
                 K::Group,
                 K::GroupMember,
                 K::Assignment,
-                K::Relation,
                 K::Roles,
             ]
         );
@@ -3731,7 +3733,6 @@ mod tests {
             K::DefaultRequestedLocale,
             K::TargetDefaultRequestedLocale,
             K::GroupMembers,
-            K::RelationEndpoint,
         ] {
             assert_eq!(derivation_of(kind), Exact, "{kind:?}");
         }

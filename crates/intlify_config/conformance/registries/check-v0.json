@@ -7593,7 +7593,7 @@
       ],
       "ownedDependencies": [],
       "findingPayloadStrategy": {
-        "derivation": "exact",
+        "derivation": "key-only",
         "details": [
           {
             "code": "project-profile-resource-limit-exceeded",
@@ -7639,7 +7639,7 @@
       ],
       "ownedDependencies": [],
       "findingPayloadStrategy": {
-        "derivation": "exact",
+        "derivation": "key-only",
         "details": [
           {
             "code": "project-profile-hydration-relation-invalid",
@@ -7682,7 +7682,7 @@
       ],
       "ownedDependencies": [],
       "findingPayloadStrategy": {
-        "derivation": "exact",
+        "derivation": "key-only",
         "details": [
           {
             "code": "project-profile-hydration-relation-invalid",
@@ -7725,7 +7725,7 @@
       ],
       "ownedDependencies": [],
       "findingPayloadStrategy": {
-        "derivation": "exact",
+        "derivation": "key-only",
         "details": [
           {
             "code": "project-profile-hydration-relation-invalid",
@@ -7768,7 +7768,7 @@
       ],
       "ownedDependencies": [],
       "findingPayloadStrategy": {
-        "derivation": "exact",
+        "derivation": "key-only",
         "details": [
           {
             "code": "project-profile-hydration-relation-invalid",
@@ -7810,7 +7810,7 @@
       ],
       "ownedDependencies": [],
       "findingPayloadStrategy": {
-        "derivation": "exact",
+        "derivation": "key-only",
         "details": [
           {
             "code": "project-profile-hydration-relation-invalid",
@@ -7853,7 +7853,7 @@
       ],
       "ownedDependencies": [],
       "findingPayloadStrategy": {
-        "derivation": "exact",
+        "derivation": "key-only",
         "details": [
           {
             "code": "project-profile-hydration-locale-policy-incompatible",
@@ -7896,7 +7896,7 @@
       ],
       "ownedDependencies": [],
       "findingPayloadStrategy": {
-        "derivation": "exact",
+        "derivation": "key-only",
         "details": [
           {
             "code": "project-profile-hydration-locale-policy-incompatible",
@@ -7939,7 +7939,7 @@
       ],
       "ownedDependencies": [],
       "findingPayloadStrategy": {
-        "derivation": "exact",
+        "derivation": "key-only",
         "details": [
           {
             "code": "project-profile-hydration-capability-incompatible",

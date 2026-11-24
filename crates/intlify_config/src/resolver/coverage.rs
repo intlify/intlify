@@ -239,6 +239,20 @@ impl RuleContent {
     }
 }
 
+/// The content identity of an object as authored, of `members`, none of whose
+/// arrays a schema declares a set.
+pub(crate) fn object_identity(
+    document: &MaterializedDocument,
+    members: &BTreeMap<String, ObjectMember>,
+) -> Arc<[u8]> {
+    object_content(members.iter().map(|(name, member)| {
+        (
+            name.as_str(),
+            value_content(document, member.value(), false),
+        )
+    }))
+}
+
 /// A selector as structural admission left it: absent, why it has no item to
 /// read, or each item's spelling or why it has none (D15:2367).
 pub(crate) type SelectorField<'a> = Admitted<Option<Vec<Admitted<&'a str>>>>;

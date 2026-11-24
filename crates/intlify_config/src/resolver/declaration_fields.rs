@@ -226,8 +226,9 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
                             .iter()
                             .map(|relation| {
                                 borrowed(relation, |relation| RelationField {
-                                    server: &relation.server,
-                                    client: &relation.client,
+                                    key: relation.key.clone(),
+                                    server: relation.server.as_ref().map_err(Causes::clone),
+                                    client: relation.client.as_ref().map_err(Causes::clone),
                                 })
                             })
                             .collect()

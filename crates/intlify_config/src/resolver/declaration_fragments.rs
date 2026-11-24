@@ -20,7 +20,8 @@ use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::{AdmissionInvariant, Member, StructuralAnalysis};
 
 use super::coverage::RuleContent;
-use super::evaluation::{and, both, Admitted};
+use super::evaluation::{and, Admitted};
+use super::hydration::{RelationContent, RelationKey};
 use super::locales::joined;
 use super::resource_policy::{PolicySlot, ReferenceField, ReferenceOccurrence};
 use super::structural_admission::StructuralInvariant;
@@ -58,11 +59,14 @@ pub(crate) struct TargetEntries<Target> {
     pub(crate) whole: Admitted<()>,
 }
 
-/// One element of a group's `hydrationRelations` with both endpoints.
+/// One object of a group's `hydrationRelations`: what names it, its identity
+/// once both endpoints were admitted and otherwise its content, and each
+/// endpoint or why it has none (D15:2181, 2367).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct RelationEntry {
-    pub(crate) server: TargetId,
-    pub(crate) client: TargetId,
+    pub(crate) key: RelationKey,
+    pub(crate) server: Admitted<TargetId>,
+    pub(crate) client: Admitted<TargetId>,
 }
 
 /// One entry of `deploymentGroups` whose key structural admission admitted:
@@ -378,14 +382,26 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
     }
 
     /// The element `relation` of a group's `hydrationRelations`, or why it
-    /// has no value for both endpoints.
+    /// is no relation. Both endpoints admitted are its identity; otherwise
+    /// its content keys it (D15:2181, 2190, 2203).
     fn relation_entry(
         &self,
         relation: NodeId,
     ) -> Result<Admitted<RelationEntry>, StructuralInvariant> {
+        let NodeKind::Object(members) = self.document.node(relation).kind() else {
+            return self.failed(relation);
+        };
         let server = self.required_at::<TargetId>(relation, "server")?;
         let client = self.required_at::<TargetId>(relation, "client")?;
-        Ok(both(server, client).map(|(server, client)| RelationEntry { server, client }))
+        let key = match (&server, &client) {
+            (Ok(server), Ok(client)) => RelationKey::Pair(server.clone(), client.clone()),
+            _ => RelationKey::Content(RelationContent::read(self.document, members)),
+        };
+        Ok(Ok(RelationEntry {
+            key,
+            server,
+            client,
+        }))
     }
 
     /// The required map `name` of the declaration and its members, or why it
@@ -905,6 +921,7 @@ mod tests {
     use crate::references::{PolicyReference, TargetProfileReference};
     use crate::resolver::coverage::RuleContent;
     use crate::resolver::evaluation::{Admitted, Check, Evaluation, Subject, Unit};
+    use crate::resolver::hydration::RelationKey;
     use crate::resolver::locales::fixtures::declaration;
     use crate::resolver::locales::LocaleFields;
     use crate::resolver::profile_resolution::tests::Inputs;
@@ -1275,9 +1292,10 @@ mod tests {
         assert_eq!(causes.keys().count(), 2);
     }
 
-    /// Each relation is read on its own: an element without both endpoints
-    /// is no relation here. The total takes every element of every array, of
-    /// an entry whose key failed too (D15:1936, 2184, 2367).
+    /// Each relation is read on its own: an element that is no object has
+    /// no relation, and one with an endpoint that failed keeps the other under
+    /// its content. The total takes every element of every array, of an entry
+    /// whose key failed too (D15:1936, 2181, 2184, 2367).
     #[test]
     fn the_relations_of_a_group_are_read_element_by_element() {
         let read = groups(None, |app| {
@@ -1293,11 +1311,32 @@ mod tests {
         assert_eq!(read.relations, Ok(4));
         let items = read.entries[0].relations.as_ref().unwrap();
         let pair = items[0].as_ref().unwrap();
-        assert_eq!(
-            (pair.server.as_str(), pair.client.as_str()),
-            ("server", "browser")
-        );
-        assert!(items[1].is_err() && items[2].is_err());
+        assert!(matches!(pair.key, RelationKey::Pair(..)));
+        assert!(pair.server.is_ok() && pair.client.is_ok());
+        assert!(items[1].is_err());
+        let partial = items[2].as_ref().unwrap();
+        assert!(matches!(partial.key, RelationKey::Content(_)));
+        assert!(partial.server.is_ok() && partial.client.is_err());
+    }
+
+    /// A relation's content tells raw relations apart, a nested array in its
+    /// order, and is never shown (D15:2186, 2190).
+    #[test]
+    fn a_relation_without_an_identity_is_named_by_its_content() {
+        let read = groups(None, |app| {
+            app["deploymentGroups"]["web"]["hydrationRelations"] = json!([
+                {"server": "secret", "client": 7, "undeclared": [1, 2]},
+                {"server": "secret", "client": 7, "undeclared": [2, 1]},
+                {"server": "secret", "client": 7, "undeclared": [1, 2]},
+            ]);
+        });
+        let read = read.unwrap().unwrap();
+        let items = read.entries[0].relations.as_ref().unwrap();
+        let key = |at: usize| &items[at].as_ref().unwrap().key;
+        assert_ne!(key(0), key(1));
+        assert_eq!(key(0), key(2));
+        let shown = format!("{:?}", key(0));
+        assert!(shown.starts_with("Content(RelationContent(") && shown.ends_with(" bytes))"));
     }
 
     /// The total waits only when no array can be read: an omitted array is

@@ -1047,7 +1047,7 @@ mod tests {
     use crate::model::{CoverageRule, DeploymentGroupId, ProfileId};
     use crate::resolver::artifact_resolution::ConflictKey;
     use crate::resolver::coverage::{RuleContent, SurfaceKey};
-    use crate::resolver::hydration::EndpointField;
+    use crate::resolver::hydration::{EndpointField, RelationKey};
     use crate::resolver::identity::DeclarationField;
     use crate::resolver::locales::fixtures::{canonical, content, key, target};
     use crate::resolver::resource_policy::PolicySlot;
@@ -1224,14 +1224,12 @@ mod tests {
             hydration(HydrationSubject::Relations),
             hydration(HydrationSubject::Endpoint(
                 group.clone(),
-                target("server"),
-                target("browser"),
+                RelationKey::Pair(target("server"), target("browser")),
                 EndpointField::Client,
             )),
             hydration(HydrationSubject::Relation(
                 group.clone(),
-                target("server"),
-                target("browser"),
+                RelationKey::Pair(target("server"), target("browser")),
             )),
             hydration(HydrationSubject::Roles(group, target("browser"))),
             owner(SemanticGroup::DeploymentGroups),

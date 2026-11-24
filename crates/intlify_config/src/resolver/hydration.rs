@@ -40,19 +40,26 @@
 //! Target ID that takes both roles is observed at each of its occurrences in
 //! one role beside those in the other.
 //!
-//! Each relation is read on its own (D15:2149, 2367, 3445). The bound counts
-//! what was submitted, a relation that failed and one under an entry whose key
-//! failed included. An element without a value for both endpoints has no
-//! subject here and holds back no other relation. What a later phase reads
-//! waits on all of it.
+//! Each relation and each endpoint is read on its own (D15:2149, 2367, 3445).
+//! The bound counts what was submitted, a relation that failed and one under
+//! an entry whose key failed included. A relation with an endpoint that failed
+//! has no identity and is keyed by its Subject content projection, so such
+//! relations of one group share a subject, each checked as its own raw parent
+//! (D15:2181, 2190, 2203): the endpoint it still holds is checked, and what
+//! compares the two waits on the one that failed. An element that is no object
+//! has no subject. What a later phase reads waits on all of it.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
+use std::sync::Arc;
 
 use crate::artifacts::content::{Content, HydrationRoles, TargetProfile};
+use crate::materialize::{MaterializedDocument, ObjectMember};
 use crate::model::{DeploymentGroup, DeploymentGroupId, NonEmptyMap, TargetId};
 use crate::structural::Edge;
 
 use super::artifact_resolution::{self, AdmittedArtifact};
+use super::coverage::object_identity;
 use super::declaration_observer::{
     beside, each_beside, each_beside_all, DeclarationObserver, ObserverInvariant,
 };
@@ -139,20 +146,72 @@ pub(crate) enum HydrationSubject {
     /// Every relation occurrence of every group, under
     /// `maxHydrationRelations`.
     Relations,
-    /// One endpoint of one relation, by the relation's server and client
-    /// Target IDs and the field that names it, under `maxTargetIdBytes`.
-    Endpoint(DeploymentGroupId, TargetId, TargetId, EndpointField),
-    /// One relation of one group, by its server and client Target IDs.
-    Relation(DeploymentGroupId, TargetId, TargetId),
+    /// One endpoint of one relation, by the relation's key and the field
+    /// that names it, under `maxTargetIdBytes`.
+    Endpoint(DeploymentGroupId, RelationKey, EndpointField),
+    /// One relation of one group, by its key.
+    Relation(DeploymentGroupId, RelationKey),
     /// A Target ID's roles among one group's relations.
     Roles(DeploymentGroupId, TargetId),
 }
 
-/// One element of a group's `hydrationRelations` with both endpoints.
-#[derive(Debug, Clone, Copy)]
+/// What names a relation: its identity once both endpoints were admitted,
+/// which orders before every content key, and otherwise its content (D15:2181).
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum RelationKey {
+    /// The relation's server and client Target IDs.
+    Pair(TargetId, TargetId),
+    /// The relation object as authored, with an endpoint that failed.
+    Content(RelationContent),
+}
+
+impl RelationKey {
+    /// The key with the content its projection drops replaced.
+    pub(crate) fn logical(&self) -> Self {
+        match self {
+            Self::Pair(..) => self.clone(),
+            Self::Content(_) => Self::Content(RelationContent::projected()),
+        }
+    }
+}
+
+/// Canonical content identity of a relation object with an endpoint that
+/// failed: transient, it orders the raw parents inside their one subject and
+/// is then discarded (D15:2186, 2190, 2203). Its Debug shows only its length:
+/// rejected authoring text never reaches a log.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct RelationContent(Arc<[u8]>);
+
+impl fmt::Debug for RelationContent {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "RelationContent({} bytes)", self.0.len())
+    }
+}
+
+impl RelationContent {
+    /// The content that stands for every such relation in a logical subject:
+    /// a relation is an object, and `redacted-structure` keeps only that type
+    /// (D15:2188).
+    pub(crate) fn projected() -> Self {
+        Self(Arc::from([]))
+    }
+
+    /// The content identity of a relation object as authored, of `members`.
+    pub(crate) fn read(
+        document: &MaterializedDocument,
+        members: &BTreeMap<String, ObjectMember>,
+    ) -> Self {
+        Self(object_identity(document, members))
+    }
+}
+
+/// One object of a group's `hydrationRelations`: its key and each endpoint,
+/// or why it has none (D15:2367).
+#[derive(Debug, Clone)]
 pub(crate) struct RelationField<'a> {
-    pub(crate) server: &'a TargetId,
-    pub(crate) client: &'a TargetId,
+    pub(crate) key: RelationKey,
+    pub(crate) server: Admitted<&'a TargetId>,
+    pub(crate) client: Admitted<&'a TargetId>,
 }
 
 /// One entry of the Group ID map with an admitted key: its relations, each
@@ -193,8 +252,12 @@ impl<'a> HydrationFields<'a> {
                         .iter()
                         .map(|relation| {
                             Ok(RelationField {
-                                server: &relation.server,
-                                client: &relation.client,
+                                key: RelationKey::Pair(
+                                    relation.server.clone(),
+                                    relation.client.clone(),
+                                ),
+                                server: Ok(&relation.server),
+                                client: Ok(&relation.client),
                             })
                         })
                         .collect()),
@@ -281,8 +344,9 @@ impl ResolvedHydration {
 /// bounds. Each endpoint's checks wait on that endpoint alone, and each check
 /// of a relation on just the facts it compares (D15:2365): a relation between
 /// equal endpoints, or with an endpoint outside its group, still compares
-/// their locales and Target Profiles. The checks observe through `observer`,
-/// the selected declaration's, when there is one.
+/// their locales and Target Profiles, and one whose endpoint failed checks
+/// the other. The checks observe through `observer`, the selected
+/// declaration's, when there is one.
 ///
 /// # Errors
 ///
@@ -367,48 +431,57 @@ struct Shared<'a, 'p, 't, 's> {
 }
 
 impl<'p, 't, 's> Shared<'_, 'p, 't, 's> {
-    /// One group's relations, each pair once however often submitted, and
-    /// the roles of each Target ID among them. An element that is no relation
-    /// keeps its position and has no subject. The set exists only when every
-    /// element holds and none failed.
+    /// One group's relations, each key once however often submitted, and the
+    /// roles of each Target ID the endpoints admitted name. An element that
+    /// is no relation keeps its position and has no subject. The set exists
+    /// only when every element holds and none failed.
     fn group(
         &self,
         evaluation: &mut Evaluation,
         group: &RelationGroup<'_>,
     ) -> Result<Admitted<Relations>, HydrationInvariant> {
         let id = group.id;
-        // Each pair's occurrences, by their positions in the group's
-        // relations.
-        let mut occurrences: BTreeMap<(&TargetId, &TargetId), Vec<usize>> = BTreeMap::new();
+        // Each key's relation and occurrences, by their positions in the
+        // group's relations.
+        let mut occurrences: BTreeMap<&RelationKey, (&RelationField<'_>, Vec<usize>)> =
+            BTreeMap::new();
         let mut holds = group.relations.as_ref().map(|_| ()).map_err(Causes::clone);
         for (index, relation) in group.relations.iter().flatten().enumerate() {
             match relation {
-                Ok(relation) => occurrences
-                    .entry((relation.server, relation.client))
-                    .or_default()
-                    .push(index),
+                Ok(relation) => {
+                    occurrences
+                        .entry(&relation.key)
+                        .or_insert_with(|| (relation, Vec::new()))
+                        .1
+                        .push(index);
+                }
                 Err(causes) => holds = and(holds, Err(causes.clone())),
             }
         }
         let gate = self.gate(id)?;
         let mut taken: BTreeMap<&TargetId, Taken> = BTreeMap::new();
-        for (&(server, client), positions) in &occurrences {
+        for (&key, (field, positions)) in &occurrences {
             let relation = Relation {
                 id,
-                server,
-                client,
+                key,
+                server: field.server.clone(),
+                client: field.client.clone(),
                 positions,
             };
             let checked = relation.check(evaluation, self, &gate)?;
             // An equal-endpoint relation is its own failure and takes neither
-            // role.
-            if server != client {
-                let serving = taken.entry(server).or_default();
-                serving.serving.extend(positions);
-                serving.bytes = and(serving.bytes.clone(), checked.server);
-                let hydrating = taken.entry(client).or_default();
-                hydrating.hydrating.extend(positions);
-                hydrating.bytes = and(hydrating.bytes.clone(), checked.client);
+            // role; an endpoint that failed names no Target ID.
+            if !matches!(key, RelationKey::Pair(server, client) if server == client) {
+                if let Ok(server) = field.server {
+                    let serving = taken.entry(server).or_default();
+                    serving.serving.extend(positions);
+                    serving.bytes = and(serving.bytes.clone(), checked.server);
+                }
+                if let Ok(client) = field.client {
+                    let hydrating = taken.entry(client).or_default();
+                    hydrating.hydrating.extend(positions);
+                    hydrating.bytes = and(hydrating.bytes.clone(), checked.client);
+                }
             }
             holds = and(holds, checked.holds);
         }
@@ -419,7 +492,10 @@ impl<'p, 't, 's> Shared<'_, 'p, 't, 's> {
         Ok(holds.map(|()| {
             occurrences
                 .into_keys()
-                .map(|(server, client)| (server.clone(), client.clone()))
+                .filter_map(|key| match key {
+                    RelationKey::Pair(server, client) => Some((server.clone(), client.clone())),
+                    RelationKey::Content(_) => None,
+                })
                 .collect()
         }))
     }
@@ -590,11 +666,12 @@ fn relations_at(
 }
 
 /// One relation's checks, over the positions of its occurrences in the
-/// group's relations.
+/// group's relations: each endpoint, or why it has none.
 struct Relation<'a> {
     id: &'a DeploymentGroupId,
-    server: &'a TargetId,
-    client: &'a TargetId,
+    key: &'a RelationKey,
+    server: Admitted<&'a TargetId>,
+    client: Admitted<&'a TargetId>,
     positions: &'a [usize],
 }
 
@@ -617,19 +694,14 @@ struct Endpoint<'t, 's> {
 impl Relation<'_> {
     fn unit(&self, check: Check) -> Unit {
         unit(
-            HydrationSubject::Relation(self.id.clone(), self.server.clone(), self.client.clone()),
+            HydrationSubject::Relation(self.id.clone(), self.key.clone()),
             check,
         )
     }
 
     fn endpoint_unit(&self, field: EndpointField, check: Check) -> Unit {
         unit(
-            HydrationSubject::Endpoint(
-                self.id.clone(),
-                self.server.clone(),
-                self.client.clone(),
-                field,
-            ),
+            HydrationSubject::Endpoint(self.id.clone(), self.key.clone(), field),
             check,
         )
     }
@@ -638,10 +710,13 @@ impl Relation<'_> {
     /// then whether it names a declared Target ID, and whether the group's
     /// members name it, each after its bytes alone; and whether its Target
     /// Profile takes the role its field names, after what Phase 11 found of
-    /// it. A check that fails observes each occurrence of the endpoint
-    /// (D15:2387): past the bound beside the policy, naming no declared
-    /// Target ID beside the declared Target IDs, naming no member beside the
-    /// group's members, and without its role beside its Target Profile.
+    /// it. An endpoint that failed has no subject, so it records no unit
+    /// (D15:1931, 2184). A check that fails observes each occurrence of the
+    /// endpoint (D15:2387): past the bound beside the policy, with the
+    /// first-over witness of a key that can stand for several values
+    /// (D15:2203), naming no declared Target ID beside the declared Target
+    /// IDs, naming no member beside the group's members, and without its role
+    /// beside its Target Profile.
     fn endpoint<'t, 's>(
         &self,
         evaluation: &mut Evaluation,
@@ -650,8 +725,18 @@ impl Relation<'_> {
         field: EndpointField,
     ) -> Result<Endpoint<'t, 's>, HydrationInvariant> {
         let endpoint = match field {
-            EndpointField::Client => self.client,
-            EndpointField::Server => self.server,
+            EndpointField::Client => &self.client,
+            EndpointField::Server => &self.server,
+        };
+        let endpoint = match endpoint {
+            Ok(endpoint) => *endpoint,
+            Err(causes) => {
+                return Ok(Endpoint {
+                    bytes: Err(causes.clone()),
+                    facts: Err(causes.clone()),
+                    holds: Err(causes.clone()),
+                })
+            }
         };
         let at = relations_at(shared.observer, self.id, self.positions, Some(field))?;
         let bytes = evaluation.check_found(
@@ -664,7 +749,10 @@ impl Relation<'_> {
                     endpoint.as_str().len(),
                 )
                 .map_err(|blocking| {
-                    Found::each(blocking, each_beside(&at, Some(policy.evidence())))
+                    Found::each(
+                        blocking.first_over(),
+                        each_beside(&at, Some(policy.evidence())),
+                    )
                 })
             },
         )?;
@@ -747,9 +835,13 @@ impl Relation<'_> {
         let server = self.endpoint(evaluation, shared, gate, EndpointField::Server)?;
         let at = relations_at(shared.observer, self.id, self.positions, None)?;
         let bytes = and(server.bytes.clone(), client.bytes.clone());
-        let distinct =
-            evaluation.check_found(self.unit(Check::DistinctEndpoints), bytes.clone(), |()| {
-                if self.server == self.client {
+        // Both endpoints, once each was admitted.
+        let named = both(self.server.clone(), self.client.clone());
+        let distinct = evaluation.check_found(
+            self.unit(Check::DistinctEndpoints),
+            both(bytes.clone(), named.clone()),
+            |((), (server, client))| {
+                if server == client {
                     // The relation compares its own two fields, no other
                     // location.
                     let equal = invalid(Reason::EqualEndpoint);
@@ -757,7 +849,8 @@ impl Relation<'_> {
                 } else {
                     Ok(())
                 }
-            })?;
+            },
+        )?;
         let once = evaluation.check_found(self.unit(Check::UniqueRelation), bytes, |()| {
             if self.positions.len() == 1 {
                 Ok(())
@@ -770,9 +863,9 @@ impl Relation<'_> {
             .clone()
             .and_then(|(server, client)| both(server.requested.clone(), client.requested.clone()));
         // Where each endpoint requests its locales, once both are resolved.
-        let at_requested = match (shared.observer, &requested_input) {
-            (Some(observer), Ok(_)) => Some(
-                [self.server, self.client]
+        let at_requested = match (shared.observer, &named, &requested_input) {
+            (Some(observer), Ok((server, client)), Ok(_)) => Some(
+                [*server, *client]
                     .map(|id| observer.value(&["targetProfiles", id.as_str(), "requestedLocales"]))
                     .into_iter()
                     .collect::<Result<Vec<_>, _>>()?,
@@ -802,11 +895,13 @@ impl Relation<'_> {
         });
         // Where each endpoint's effective default is declared, once both are
         // resolved.
-        let at_defaults = match (shared.observer, &facts, &default_input) {
-            (Some(observer), Ok((server, client)), Ok(_)) => Some(vec![
-                default_at(observer, self.server, server)?,
-                default_at(observer, self.client, client)?,
-            ]),
+        let at_defaults = match (shared.observer, &named, &facts, &default_input) {
+            (Some(observer), Ok((server, client)), Ok((of_server, of_client)), Ok(_)) => {
+                Some(vec![
+                    default_at(observer, server, of_server)?,
+                    default_at(observer, client, of_client)?,
+                ])
+            }
             _ => None,
         };
         let default = evaluation.check_found(
@@ -1219,7 +1314,10 @@ mod tests {
 
     fn relation(group_id: &str, server: &str, client: &str, check: Check) -> Unit {
         unit(
-            HydrationSubject::Relation(group(group_id), target(server), target(client)),
+            HydrationSubject::Relation(
+                group(group_id),
+                RelationKey::Pair(target(server), target(client)),
+            ),
             check,
         )
     }
@@ -1240,7 +1338,11 @@ mod tests {
         check: Check,
     ) -> Unit {
         unit(
-            HydrationSubject::Endpoint(group(group_id), target(server), target(client), field),
+            HydrationSubject::Endpoint(
+                group(group_id),
+                RelationKey::Pair(target(server), target(client)),
+                field,
+            ),
             check,
         )
     }
@@ -1938,13 +2040,15 @@ mod tests {
     fn each_endpoint_holds_at_the_target_id_bound_on_its_own_and_one_byte_more_blocks_its_relation()
     {
         // `browser` is seven bytes and `ssr` three: at 6 only the client's
-        // endpoint is over, at 2 both are, each its own result.
+        // endpoint is over, at 2 both are, each its own result, with the
+        // first-over witness of a key that can stand for several values
+        // (D15:2203).
         let client = endpoint("web", "ssr", "browser", EndpointField::Client);
         let server = endpoint("web", "ssr", "browser", EndpointField::Server);
         for (limit, over) in [
             (7, vec![]),
-            (6, vec![(client.clone(), 7)]),
-            (2, vec![(client.clone(), 7), (server.clone(), 3)]),
+            (6, vec![client.clone()]),
+            (2, vec![client.clone(), server.clone()]),
         ] {
             let mut inputs = Inputs::new();
             inputs.limits.target_grouping.max_target_id_bytes = bound(limit);
@@ -1953,9 +2057,8 @@ mod tests {
                     .into_iter()
                     .map(|(unit, _, _)| unit)
                     .collect();
-                let blocked: Vec<Unit> = over.iter().map(|(unit, _)| unit.clone()).collect();
-                assert_eq!(found, blocked, "{limit}");
-                for (unit, actual) in &over {
+                assert_eq!(found, over, "{limit}");
+                for unit in &over {
                     let key = evaluation
                         .issues()
                         .find(|key| key.unit() == unit)
@@ -1966,7 +2069,7 @@ mod tests {
                         Some(LimitExceeded {
                             bound: MAX_TARGET_ID_BYTES,
                             limit: bound(limit),
-                            actual: Actual::Exact(*actual),
+                            actual: Actual::AtLeast(limit + 1),
                         })
                     );
                 }
@@ -1977,7 +2080,7 @@ mod tests {
                 // policy.
                 let at: Vec<_> = over
                     .iter()
-                    .map(|(unit, _)| {
+                    .map(|unit| {
                         let field = if *unit == client { "client" } else { "server" };
                         (
                             unit.clone(),
@@ -1992,7 +2095,7 @@ mod tests {
                 for check in [Check::DistinctEndpoints, Check::UniqueRelation] {
                     assert_eq!(
                         waits_on(&evaluation, &relation("web", "ssr", "browser", check)),
-                        Some(blocked.clone()),
+                        Some(over.clone()),
                         "{limit} {check:?}"
                     );
                 }
