@@ -34,8 +34,10 @@
 //! Each group and each member occurrence is read on its own (D15:2149, 2367,
 //! 3445). The counts take what was submitted, an entry whose key failed and a
 //! member that failed included. A value that failed has no subject here, and
-//! holds back only what needs it: a group's members, each target's place, and
-//! the partition wait on every occurrence (D15:2184, 2365, 3354).
+//! holds back only what needs it: a group's members and the partition wait on
+//! every occurrence, while a target's place is found from the groups that can
+//! be read and waits on the others only when none of those names it
+//! (D15:2184, 2365, 3354).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -220,10 +222,11 @@ impl ResolvedGroups {
 /// first; each group's checks wait on the map's bound, its member count on its
 /// ID's bytes, and its members on the group's own bounds and the total. A
 /// member's other checks wait on its bytes, and whether it names a Target ID
-/// also on the set of declared Target IDs Phase 11 admitted. A Target ID's
-/// place waits on its own admission, the total, and every group's own bounds
-/// and elements, never on another member's checks. The checks observe
-/// through `observer`, the selected declaration's, when there is one.
+/// also on the Target IDs Phase 11 admitted. A Target ID's place waits on its
+/// own admission and on the total, and is found from the groups whose own
+/// bounds hold; it waits on what could not be read only when none of them
+/// names it. The checks observe through `observer`, the selected declaration's,
+/// when there is one.
 ///
 /// # Errors
 ///
@@ -278,12 +281,8 @@ pub(crate) fn resolve_groups(
         },
     )?;
     let targets = targets.map_err(Causes::clone);
-    let known = targets
-        .clone()
-        .and_then(|targets| targets.bounded().clone().map(|()| targets));
-    // The declared Target IDs are there to observe only once Phase 11
-    // admitted them.
-    let at_targets = match (observer, &known) {
+    // The declared Target IDs are there to observe once Phase 11 read them.
+    let at_targets = match (observer, &targets) {
         (Some(observer), Ok(_)) => Some(observer.value(&["targetProfiles"])?),
         _ => None,
     };
@@ -291,7 +290,7 @@ pub(crate) fn resolve_groups(
     let mut bounds = BTreeMap::new();
     let mut named = BTreeMap::new();
     let mut read = Vec::new();
-    // What could not be read of any group, which every place waits on.
+    // Why a target that no group is seen to name may still be in one.
     let mut unseen = fields.clone().and_then(|fields| fields.keys.clone());
     let entries = declared
         .as_ref()
@@ -314,18 +313,27 @@ pub(crate) fn resolve_groups(
             members(
                 evaluation,
                 (&gate, observer),
-                (&known, at_targets.as_ref()),
+                (&targets, at_targets.as_ref()),
                 (id, &occurrences, lacking),
             )?,
         );
-        read.push((id, occurrences));
+        if own.is_ok() {
+            read.push((id, occurrences));
+        }
     }
-    let every_group = and(memberships, unseen);
     let assignments = match &targets {
-        Ok(targets) => assignments(evaluation, (&every_group, observer), &read, targets)?,
+        Ok(targets) => and(
+            assignments(
+                evaluation,
+                (&memberships, &unseen, observer),
+                &read,
+                targets,
+            )?,
+            targets.keys().clone(),
+        ),
         Err(causes) => Err(causes.clone()),
     };
-    let mut partition = assignments;
+    let mut partition = and(assignments, unseen);
     for members in groups.values() {
         partition = and(
             partition,
@@ -455,9 +463,12 @@ fn members(
         )?;
         let declared = evaluation.check_found(
             unit(subject(), Check::KnownMember),
-            both(bytes.clone(), known.clone()),
-            |((), targets)| {
-                if targets.get(member).is_some() {
+            both(
+                bytes.clone(),
+                known.clone().and_then(|targets| targets.declares(member)),
+            ),
+            |((), declared)| {
+                if declared {
                     Ok(())
                 } else {
                     let unknown = issue(Code::GroupMemberUnknown);
@@ -478,12 +489,18 @@ fn members(
 }
 
 /// Each declared Target ID's place: in exactly one group, counting a group
-/// once however often it names the target, among the groups in `read`, once
-/// `every_group` holds. A target out of place is observed through `observer`,
-/// when there is one.
+/// once however often it names the target, among the groups in `read`. Two of
+/// them naming it prove the overlap, and one proves it placed, whatever else
+/// failed; none proves it unassigned only when nothing is `unseen`, and it
+/// waits on that otherwise (D15:2184, 2365). A target out of place is observed
+/// through `observer`, when there is one.
 fn assignments(
     evaluation: &mut Evaluation,
-    (every_group, observer): (&Admitted<()>, Option<&DeclarationObserver<'_>>),
+    (memberships, unseen, observer): (
+        &Admitted<()>,
+        &Admitted<()>,
+        Option<&DeclarationObserver<'_>>,
+    ),
     read: &[(&DeploymentGroupId, Occurrences<'_>)],
     targets: &ResolvedTargets<'_>,
 ) -> Result<Admitted<()>, GroupInvariant> {
@@ -505,14 +522,15 @@ fn assignments(
         // occurrence to the other groups' grows with their square, so it
         // waits until the check runs.
         let (key, at) = match groups {
-            0 if every_group.is_ok() => (unassigned(observer, target)?, Vec::new()),
+            0 if unseen.is_ok() => (unassigned(observer, target)?, Vec::new()),
             0 | 1 => (None, Vec::new()),
             _ => (None, located(observer, found)?),
         };
+        let lacking = if groups == 0 { unseen.clone() } else { Ok(()) };
         let placed = evaluation.check_found(
             unit(GroupSubject::Assignment(target.clone()), Check::SingleGroup),
-            both(facts.admitted.clone(), every_group.clone()),
-            |((), ())| match groups {
+            both(both(facts.admitted.clone(), memberships.clone()), lacking),
+            |_| match groups {
                 1 => Ok(()),
                 0 => Err(Found::each(issue(Code::TargetUnassigned), vec![key])),
                 _ => Err(Found::each(
@@ -1261,12 +1279,15 @@ mod tests {
                 let groups = groups.unwrap();
                 assert!(groups.get(&group(blocked)).unwrap().is_err());
                 assert!(groups.get(&group(other)).unwrap().is_ok());
-                // Every place waits on every group's bounds.
+                // Only the places the blocked group alone could give wait on
+                // its bounds (D15:2184, 2365).
+                let alone: &[&str] = match blocked {
+                    "jobs" => &["worker"],
+                    _ => &["browser", "server"],
+                };
                 for id in ["browser", "server", "worker"] {
-                    assert_eq!(
-                        waits_on(&evaluation, &assignment(id)),
-                        Some(vec![own.clone()])
-                    );
+                    let waits = alone.contains(&id).then(|| vec![own.clone()]);
+                    assert_eq!(waits_on(&evaluation, &assignment(id)), waits, "{id}");
                 }
             });
         }

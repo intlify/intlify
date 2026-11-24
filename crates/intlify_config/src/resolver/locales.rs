@@ -329,12 +329,14 @@ pub(crate) struct TargetLocaleFields<'a> {
 }
 
 /// The Target ID map's entries as Phase 7 reads them: how many it holds, one
-/// whose key failed included (D15:1930), and each with an admitted key, in
-/// Target ID order. An entry whose key failed has no subject here (D15:2184).
+/// whose key failed included (D15:1930), each with an admitted key, in Target
+/// ID order, and whether every key was admitted. An entry whose key failed has
+/// no subject here (D15:2184).
 #[derive(Debug, Clone)]
 pub(crate) struct TargetMapFields<'a> {
     pub(crate) submitted: usize,
     pub(crate) entries: Vec<TargetLocaleFields<'a>>,
+    pub(crate) keys: Admitted<()>,
 }
 
 impl<'a> TargetMapFields<'a> {
@@ -360,6 +362,7 @@ impl<'a> TargetMapFields<'a> {
                         .map(String::as_str)),
                 })
                 .collect(),
+            keys: Ok(()),
         }
     }
 }
@@ -498,6 +501,9 @@ pub(crate) struct ResolvedLocales {
     /// The Target ID map within `maxTargetProfiles`: a later check over the
     /// set of Target IDs waits on it.
     pub(crate) target_bound: Admitted<()>,
+    /// Whether every key of the Target ID map was admitted: a value naming
+    /// none of them names no declared Target ID only then.
+    pub(crate) target_keys: Admitted<()>,
     pub(crate) targets: Admitted<Vec<TargetLocales>>,
 }
 
@@ -559,6 +565,11 @@ pub(crate) fn resolve_locales<P: Provider>(
         Err(causes) => Err(causes.clone()),
     };
     let bounds = bound::targets(pass.evaluation, policy, &fields.target_entries, observer)?;
+    let target_keys = fields
+        .target_entries
+        .as_ref()
+        .map_err(Causes::clone)
+        .and_then(|entries| entries.keys.clone());
     let targets = match &fields.target_entries {
         Ok(entries) => Ok(pass.targets(entries, &bounds.targets)?),
         Err(causes) => Err(causes.clone()),
@@ -574,6 +585,7 @@ pub(crate) fn resolve_locales<P: Provider>(
         negotiation_structure,
         fallback_keys,
         target_bound: bounds.map,
+        target_keys,
         targets,
     })
 }

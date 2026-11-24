@@ -45,13 +45,16 @@ pub(crate) struct TargetEntry<Target> {
 
 /// The Target ID map entry by entry: how many entries it holds, every one
 /// counted whatever its key (D15:1930), each entry with an admitted key, in
-/// the map's order, and whether everything at and below the map passed, which
-/// a later phase that still reads the targets as one set waits on. An entry
-/// whose key failed has no later subject (D15:2184, 3354).
+/// the map's order, whether every key was admitted, which decides that a value
+/// naming none of them names no declared Target ID, and whether everything at
+/// and below the map passed, which a later phase that still reads the targets
+/// as one set waits on. An entry whose key failed has no later subject
+/// (D15:2184, 3354).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TargetEntries<Target> {
     pub(crate) submitted: usize,
     pub(crate) entries: Vec<TargetEntry<Target>>,
+    pub(crate) keys: Admitted<()>,
     pub(crate) whole: Admitted<()>,
 }
 
@@ -255,21 +258,24 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
             Err(causes) => return Ok(Err(causes)),
         };
         let mut entries = Vec::with_capacity(members.len());
+        let mut keys = Ok(());
         for (key, member) in members {
             let entry = member.value();
-            if self.values.key(entry).is_ok() {
-                entries.push(TargetEntry {
+            match self.values.key(entry) {
+                Ok(()) => entries.push(TargetEntry {
                     id: identity(key)?,
                     profile: self.required_at(entry, "profile")?,
                     requested_locales: self.strings_at(entry, "requestedLocales")?,
                     default_requested_locale: self
                         .string_at_member(entry, "defaultRequestedLocale")?,
-                });
+                }),
+                Err(causes) => keys = and(keys, Err(causes)),
             }
         }
         Ok(Ok(TargetEntries {
             submitted: members.len(),
             entries,
+            keys,
             whole: self
                 .values
                 .member(self.document, self.declaration, "targetProfiles"),
@@ -1055,7 +1061,7 @@ mod tests {
         );
         assert_eq!(whole.entries[1].default_requested_locale, Ok(None));
         assert!(whole.entries.iter().all(|each| each.profile.is_ok()));
-        assert_eq!(whole.whole, Ok(()));
+        assert_eq!((whole.keys, whole.whole), (Ok(()), Ok(())));
 
         let read = entries(None, |app| {
             app["targetProfiles"]["browser"]["requestedLocales"] = json!(["ja", 7]);
@@ -1098,6 +1104,7 @@ mod tests {
         assert_eq!(read.submitted, 3);
         let ids: Vec<&str> = read.entries.iter().map(|each| each.id.as_str()).collect();
         assert_eq!(ids, ["browser", "server"]);
+        assert!(read.keys.is_err());
     }
 
     /// A map that failed itself, or is missing, has no entry to read.
