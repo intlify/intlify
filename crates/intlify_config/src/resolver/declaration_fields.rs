@@ -12,27 +12,28 @@
 //! The checks decide: a field they admitted and the analysis did not, or a
 //! required one they admitted though it is absent, is a resolver bug.
 
-use std::collections::BTreeMap;
-
 use serde::de::DeserializeOwned;
 
 use crate::model::{
-    Coverage, Delivery, DeploymentGroup, DeploymentGroupId, FallbackCandidate, NonEmptyMap,
-    NonEmptyVec, Policies, ProjectId, SelectionScope,
+    Coverage, Delivery, DeploymentGroup, DeploymentGroupId, NonEmptyMap, Policies, ProjectId,
+    SelectionScope,
 };
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::StructuralAnalysis;
 
-use super::declaration_fragments::{AliasEntries, DeclarationFragments, TargetEntries};
+use super::declaration_fragments::{
+    AliasEntries, DeclarationFragments, FallbackEntry, TargetEntries,
+};
 use super::evaluation::{Admitted, Causes};
-use super::locales::{AliasField, AliasFields, LocaleFields, TargetLocaleFields, TargetMapFields};
+use super::locales::{
+    AliasField, AliasFields, FallbackField, LocaleFields, TargetLocaleFields, TargetMapFields,
+};
 use super::resource_policy::{DeclarationReferences, TargetReferences};
 use super::structural_admission::StructuralInvariant;
 use super::tally::Tally;
 use super::value_admissions::ValueAdmissions;
 
 type DeploymentGroups = NonEmptyMap<DeploymentGroupId, DeploymentGroup>;
-type MessageFallback = BTreeMap<String, NonEmptyVec<FallbackCandidate>>;
 
 /// The selected declaration's fields, each admitted, with an optional one
 /// possibly absent, or unavailable with the causes behind it.
@@ -49,7 +50,8 @@ pub(crate) struct DeclarationFields<Policy, Target> {
     default_source_locale: Admitted<Option<String>>,
     /// The alias map entry by entry, which Phases 7 and 8 read.
     negotiation_aliases: Admitted<AliasEntries>,
-    message_fallback: Admitted<Option<MessageFallback>>,
+    /// The fallback map entry by entry, which Phases 7 and 8 read.
+    message_fallback: Admitted<Vec<FallbackEntry>>,
     coverage: Admitted<Option<Coverage>>,
     policies: Admitted<Policies<Policy>>,
     /// The Target ID map entry by entry, which Phases 7, 9, and 11 read.
@@ -81,7 +83,7 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
             default_requested_locale: read.required("defaultRequestedLocale")?,
             default_source_locale: read.optional("defaultSourceLocale")?,
             negotiation_aliases: read.alias_entries()?,
-            message_fallback: read.optional("messageFallback")?,
+            message_fallback: read.fallback_entries()?,
             coverage: read.optional("coverage")?,
             policies: read.required("policies")?,
             target_entries: read.target_entries()?,
@@ -116,7 +118,20 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
                     .collect(),
                 whole: aliases.whole.clone(),
             }),
-            message_fallback: borrowed(&self.message_fallback, Option::as_ref),
+            message_fallback: borrowed(&self.message_fallback, |entries| {
+                entries
+                    .iter()
+                    .map(|entry| FallbackField {
+                        key: &entry.key,
+                        sequence: borrowed(&entry.sequence, |candidates| {
+                            candidates
+                                .iter()
+                                .map(|candidate| candidate.as_ref().map_err(Causes::clone))
+                                .collect()
+                        }),
+                    })
+                    .collect()
+            }),
             coverage: borrowed(&self.coverage, Option::as_ref),
             target_entries: borrowed(&self.target_entries, |targets| TargetMapFields {
                 submitted: targets.submitted,
@@ -287,7 +302,7 @@ mod tests {
             complete.negotiation_aliases.as_ref().unwrap().entries.len(),
             1
         );
-        assert!(matches!(complete.message_fallback, Ok(Some(_))));
+        assert_eq!(complete.message_fallback.as_ref().unwrap().len(), 1);
         assert!(matches!(complete.coverage, Ok(Some(_))));
         // Each accessor hands on the field it reads.
         assert!(matches!(complete.delivery(), Ok(Some(_))));

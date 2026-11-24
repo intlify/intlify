@@ -13,7 +13,7 @@ use serde::de::value::{BorrowedStrDeserializer, Error as KeyError};
 use serde::de::{Deserialize, DeserializeOwned};
 
 use crate::materialize::{MaterializedDocument, NodeId, NodeKind, ObjectMember};
-use crate::model::{RequiredNullable, TargetId};
+use crate::model::{FallbackCandidate, RequiredNullable, TargetId};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::{AdmissionInvariant, Member, StructuralAnalysis};
 
@@ -22,6 +22,9 @@ use super::resource_policy::{PolicySlot, ReferenceField, ReferenceOccurrence};
 use super::structural_admission::StructuralInvariant;
 use super::tally::{total, Tally};
 use super::value_admissions::ValueAdmissions;
+
+/// The members of an object, by name.
+type Members = BTreeMap<String, ObjectMember>;
 
 /// One entry of `targetProfiles` whose key structural admission admitted:
 /// its reference, and each locale-bearing field's value, element by element,
@@ -64,6 +67,15 @@ pub(crate) struct AliasEntry {
 pub(crate) struct AliasEntries {
     pub(crate) entries: Vec<AliasEntry>,
     pub(crate) whole: Admitted<()>,
+}
+
+/// One entry of `messageFallback`: its key, a spelling whatever its sequence
+/// is, and its sequence candidate by candidate, or why it has none (D15:1519,
+/// 2367).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FallbackEntry {
+    pub(crate) key: String,
+    pub(crate) sequence: Admitted<Vec<Admitted<FallbackCandidate>>>,
 }
 
 /// The declaration `id` of an analysis, with what structural admission left
@@ -215,7 +227,7 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
     pub(crate) fn alias_entries(&self) -> Result<Admitted<AliasEntries>, StructuralInvariant> {
         let members = match self.member_value(self.declaration, "localeNegotiation") {
             Some(negotiation) => match self.map_at(negotiation, "aliases")? {
-                Ok(members) => members,
+                Ok(map) => map.map(|(_, members)| members),
                 Err(causes) => return Ok(Err(causes)),
             },
             None => None,
@@ -238,18 +250,44 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
         }))
     }
 
-    /// The members of the optional map `name` of `object`: none when it is
+    /// The fallback map, entry by entry, or why it has no entry to read. An
+    /// absent `messageFallback` holds none.
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug of a value the checks admitted that is of
+    /// another type than its schema's.
+    pub(crate) fn fallback_entries(
+        &self,
+    ) -> Result<Admitted<Vec<FallbackEntry>>, StructuralInvariant> {
+        let map = match self.map_at(self.declaration, "messageFallback")? {
+            Ok(map) => map,
+            Err(causes) => return Ok(Err(causes)),
+        };
+        map.into_iter()
+            .flat_map(|(map, members)| members.keys().map(move |key| (map, key)))
+            .map(|(map, key)| {
+                Ok(FallbackEntry {
+                    key: key.clone(),
+                    sequence: self.items_at(map, key)?,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(Ok)
+    }
+
+    /// The optional map `name` of `object` and its members: none when it is
     /// absent, or why it has none to read.
     fn map_at(
         &self,
         object: NodeId,
         name: &str,
-    ) -> Result<Admitted<Option<&'r BTreeMap<String, ObjectMember>>>, StructuralInvariant> {
+    ) -> Result<Admitted<Option<(NodeId, &'r Members)>>, StructuralInvariant> {
         let document: &'r MaterializedDocument = self.document;
         let map = self.member_value(object, name);
         match map.map(|map| (map, document.node(map).kind())) {
             Some((map, NodeKind::Object(members))) if self.values.value(map).is_ok() => {
-                Ok(Ok(Some(members)))
+                Ok(Ok(Some((map, members))))
             }
             None if matches!(document.node(object).kind(), NodeKind::Object(_)) => Ok(Ok(None)),
             _ => match self.values.member(document, object, name) {
@@ -321,6 +359,16 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
         object: NodeId,
         name: &str,
     ) -> Result<Admitted<Vec<Admitted<String>>>, StructuralInvariant> {
+        self.items_at(object, name)
+    }
+
+    /// The required array `name` of `object`, each element as `T` or why it
+    /// has none. The array itself failing leaves no element to read.
+    fn items_at<T: DeserializeOwned>(
+        &self,
+        object: NodeId,
+        name: &str,
+    ) -> Result<Admitted<Vec<Admitted<T>>>, StructuralInvariant> {
         let value = self.member_value(object, name);
         let items = match value.map(|array| (array, self.document.node(array).kind())) {
             Some((array, NodeKind::Array(items))) if self.values.value(array).is_ok() => items,
@@ -534,7 +582,7 @@ mod tests {
     use crate::resolver::value_admissions::ValueAdmissions;
     use crate::structural::{AdmissionInvariant, StructuralAnalysis};
 
-    use super::{AliasEntries, DeclarationFragments, TargetEntries};
+    use super::{AliasEntries, DeclarationFragments, FallbackEntry, TargetEntries};
 
     /// One way to break the declaration, by its name.
     type Edit = (&'static str, fn(&mut Value));
@@ -912,6 +960,65 @@ mod tests {
         }
         assert_eq!(
             bug(|app| app["localeNegotiation"]["aliases"] = json!({"de": 7})),
+            Some(StructuralInvariant::Admission(
+                AdmissionInvariant::AuthoringTypeMismatch
+            ))
+        );
+    }
+
+    /// The fallback map once `edit` changed the declaration.
+    fn fallback(
+        admissions: Option<ValueAdmissions>,
+        edit: fn(&mut Value),
+    ) -> Result<Admitted<Vec<FallbackEntry>>, StructuralInvariant> {
+        let mut config = complete_config();
+        edit(&mut config["profiles"]["app"]);
+        let (_, values, analysis) = structured_in(Evaluation::default(), &config);
+        let values = admissions.unwrap_or(values);
+        DeclarationFragments::new(&values, &analysis, "app")?.fallback_entries()
+    }
+
+    /// Each entry and each candidate is read on its own: a sequence that
+    /// failed holds back no other, and a candidate that failed none beside it
+    /// (D15:1519, 2367).
+    #[test]
+    fn the_fallback_map_is_read_entry_by_entry() {
+        let whole = fallback(None, |_| {}).unwrap().unwrap();
+        assert_eq!(whole[0].key, "ja");
+        let candidates = whole[0].sequence.as_ref().unwrap();
+        assert_eq!(candidates.len(), 2);
+        assert!(candidates.iter().all(Result::is_ok));
+
+        let read = fallback(None, |app| {
+            app["messageFallback"] = json!({"de": 7, "en": [], "ja": ["en", 42]});
+        });
+        let read = read.unwrap().unwrap();
+        assert_eq!(read.len(), 3);
+        assert!(read[0].sequence.is_err() && read[1].sequence.is_err());
+        let candidates = read[2].sequence.as_ref().unwrap();
+        assert!(candidates[0].is_ok() && candidates[1].is_err());
+
+        let absent = fallback(None, |app| lacking(app, &[], "messageFallback"));
+        assert_eq!(absent, Ok(Ok(Vec::new())));
+        let failed = fallback(None, |app| app["messageFallback"] = json!(7));
+        assert!(failed.unwrap().is_err());
+    }
+
+    /// What the checks admitted and the document does not hold is a resolver
+    /// bug: a map or a sequence of another type, and a candidate of neither
+    /// kind.
+    #[test]
+    fn a_fallback_map_the_checks_admit_and_the_value_lacks_is_a_resolver_bug() {
+        let bug = |edit| fallback(Some(ValueAdmissions::default()), edit).err();
+        let unreported: [fn(&mut Value); 2] = [
+            |app| app["messageFallback"] = json!(7),
+            |app| app["messageFallback"]["ja"] = json!(7),
+        ];
+        for edit in unreported {
+            assert_eq!(bug(edit), Some(StructuralInvariant::UnreportedFailure));
+        }
+        assert_eq!(
+            bug(|app| app["messageFallback"]["ja"] = json!([7])),
             Some(StructuralInvariant::Admission(
                 AdmissionInvariant::AuthoringTypeMismatch
             ))
