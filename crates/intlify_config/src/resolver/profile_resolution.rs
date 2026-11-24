@@ -663,7 +663,7 @@ where
     let hydration = validate_hydration(
         evaluation,
         confirmed,
-        fields.deployment_groups(),
+        &fields.hydration_fields(),
         targets.as_ref().and_then(ResolvedTargets::whole),
         (groups.as_ref(), observer.as_ref()),
         negotiation.as_ref().map(|_| ()).map_err(Causes::clone),
@@ -3914,6 +3914,281 @@ pub(super) mod tests {
                 evaluation.status(&default),
                 Some(Status::NotEvaluated(_))
             ));
+        });
+    }
+
+    /// A subject of the group `web` as 015 projects it (D15:2190).
+    fn of_web(subject: &Value) -> Value {
+        json!({ "parent": { "identity": "web" }, "subject": subject })
+    }
+
+    /// The relation of `web` with both endpoints admitted.
+    fn identified(server: &str, client: &str) -> Value {
+        of_web(&json!({ "identity": { "server": server, "client": client } }))
+    }
+
+    /// The one subject of `web`'s relations without an identity: their
+    /// Subject content projection (D15:2181, 2188, 2203).
+    fn unidentified() -> Value {
+        of_web(&json!({ "content": { "type": "object" } }))
+    }
+
+    /// The endpoint `field` names in `relation`.
+    fn endpoint_of(relation: &Value, field: &str) -> Value {
+        json!({ "parent": relation, "subject": [field] })
+    }
+
+    /// The roles of `target` among `web`'s relations.
+    fn roles_of(target: &str) -> Value {
+        of_web(&json!({ "identity": target }))
+    }
+
+    const ENDPOINT_CHECKS: [Check; 4] = [
+        Check::WithinBound,
+        Check::KnownEndpoint,
+        Check::SameGroupEndpoint,
+        Check::EndpointRole,
+    ];
+
+    const RELATION_CHECKS: [Check; 5] = [
+        Check::DistinctEndpoints,
+        Check::UniqueRelation,
+        Check::SameRequestedLocales,
+        Check::SameEffectiveDefault,
+        Check::StaticCompatibility,
+    ];
+
+    /// The status of `check` over the Phase 13 subject projected as `subject`.
+    fn phase_13(evaluation: &Evaluation, check: Check, subject: &Value) -> Option<Status> {
+        evaluation
+            .statuses()
+            .find(|(unit, _)| {
+                unit.phase == Phase::HydrationValidation
+                    && unit.check == check
+                    && crate::resolver::token::projected(&unit.subject) == *subject
+            })
+            .map(|(_, status)| status.clone())
+    }
+
+    /// Each of `checks` over `subject` was evaluated.
+    fn checked_13(evaluation: &Evaluation, checks: &[Check], subject: &Value) {
+        for &check in checks {
+            assert_eq!(
+                phase_13(evaluation, check, subject),
+                Some(Status::Evaluated),
+                "{check:?} {subject}"
+            );
+        }
+    }
+
+    /// Phase 13's Findings, by check, projected subject, code, and reason.
+    fn issues_13(evaluation: &Evaluation) -> Vec<(Check, Value, Code, Option<Reason>)> {
+        evaluation
+            .issues()
+            .filter(|key| key.unit().phase == Phase::HydrationValidation)
+            .map(|key| {
+                (
+                    key.unit().check,
+                    crate::resolver::token::projected(&key.unit().subject),
+                    key.code(),
+                    key.reason(),
+                )
+            })
+            .collect()
+    }
+
+    fn relations_of(inputs: &mut Inputs, group: &str, relations: Value) {
+        inputs.declaration()["deploymentGroups"][group]["hydrationRelations"] = relations;
+    }
+
+    /// A relation that failed holds back no other: the other's checks run,
+    /// nothing is found for it, and it has no subject, since no object holds
+    /// endpoints to key; what needs every relation waits on it (D15:2149,
+    /// 2184, 2365, 2367, 3445).
+    #[test]
+    fn a_relation_that_failed_leaves_the_others_checked() {
+        for failed in [json!(7), json!("relation"), json!(null), json!([])] {
+            let mut inputs = Inputs::complete();
+            relations_of(
+                &mut inputs,
+                "web",
+                json!([{"server": "server", "client": "browser"}, failed.clone()]),
+            );
+            inputs.resolve(|evaluation, state| {
+                let relation = identified("server", "browser");
+                checked_13(&evaluation, &RELATION_CHECKS, &relation);
+                for field in ["client", "server"] {
+                    let endpoint = endpoint_of(&relation, field);
+                    checked_13(&evaluation, &ENDPOINT_CHECKS, &endpoint);
+                }
+                for target in ["browser", "server"] {
+                    checked_13(&evaluation, &[Check::SingleRole], &roles_of(target));
+                }
+                assert_eq!(issues_13(&evaluation), [], "{failed}");
+                let none = unidentified();
+                assert_eq!(phase_13(&evaluation, Check::UniqueRelation, &none), None);
+                let why = BTreeSet::from([only_issue(&evaluation)]);
+                let hydration = state.hydration.as_ref().unwrap();
+                let web = hydration.get(&group_id("web")).unwrap();
+                assert_eq!(keys(web.as_ref().unwrap_err()), why, "{failed}");
+                assert_eq!(keys(hydration.complete().as_ref().unwrap_err()), why);
+            });
+        }
+    }
+
+    /// A relation beside members that failed checks all but whether the
+    /// group names its endpoints, and observes no array the group lacks
+    /// (D15:2184, 2365).
+    #[test]
+    fn a_relation_beside_members_that_failed_waits_only_on_them() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["deploymentGroups"]["web"]
+            .as_object_mut()
+            .unwrap()
+            .remove("members");
+        inputs.resolve(|evaluation, _| {
+            let why = BTreeSet::from([only_issue(&evaluation)]);
+            let relation = identified("server", "browser");
+            checked_13(&evaluation, &RELATION_CHECKS, &relation);
+            for field in ["client", "server"] {
+                let endpoint = endpoint_of(&relation, field);
+                let others = [
+                    Check::WithinBound,
+                    Check::KnownEndpoint,
+                    Check::EndpointRole,
+                ];
+                checked_13(&evaluation, &others, &endpoint);
+                let Some(Status::NotEvaluated(found)) =
+                    phase_13(&evaluation, Check::SameGroupEndpoint, &endpoint)
+                else {
+                    panic!("{endpoint} is not waiting");
+                };
+                assert_eq!(keys(&found), why);
+            }
+        });
+    }
+
+    /// Every occurrence counts: a relation that failed, and one in an entry
+    /// whose key failed (D15:1936).
+    #[test]
+    fn the_relation_count_takes_every_occurrence_beside_what_failed() {
+        use crate::resolver::evaluation::{Actual, LimitExceeded};
+        let edits: [fn(&mut Value); 2] = [
+            |app| {
+                app["deploymentGroups"]["web"]["hydrationRelations"] =
+                    json!([{"server": "server", "client": "browser"}, 7, {"server": 1}]);
+            },
+            |app| {
+                app["deploymentGroups"]["Web App"] =
+                    json!({"members": ["browser"], "hydrationRelations": [7, 7]});
+            },
+        ];
+        for edit in edits {
+            let mut inputs = Inputs::complete();
+            edit(inputs.declaration());
+            let mut limits = policy_limits();
+            limits.target_grouping.max_hydration_relations = bound(2);
+            inputs.select_policy(resource_limit_policy(&limits));
+            inputs.resolve(|evaluation, _| {
+                let over = hydration::unit(HydrationSubject::Relations, Check::WithinBound);
+                let key = evaluation
+                    .issues()
+                    .find(|key| key.unit() == &over)
+                    .expect("the count is past its bound")
+                    .clone();
+                assert!(matches!(
+                    evaluation.limit(&key),
+                    Some(LimitExceeded {
+                        actual: Actual::Exact(3),
+                        ..
+                    })
+                ));
+            });
+        }
+    }
+
+    /// The total waits only when no array can be read: an empty array is one
+    /// that holds no occurrence, while an omitted one is no value at all
+    /// (D15:569, 1936, 2184, 3354).
+    #[test]
+    fn the_relation_total_waits_only_when_every_array_failed() {
+        let total = hydration::unit(HydrationSubject::Relations, Check::WithinBound);
+        let mut inputs = Inputs::two_groups();
+        relations_of(&mut inputs, "web", json!(7));
+        relations_of(&mut inputs, "jobs", json!("relations"));
+        inputs.resolve(|evaluation, _| {
+            let why = causes_of(&evaluation, &total);
+            assert_eq!(why.len(), 2);
+            assert!(why
+                .iter()
+                .all(|key| key.unit().phase == Phase::StructuralAdmission));
+        });
+        let mut inputs = Inputs::two_groups();
+        relations_of(&mut inputs, "web", json!(7));
+        inputs.resolve(|evaluation, state| {
+            all_evaluated(&evaluation, std::slice::from_ref(&total));
+            // The array that failed holds back its own group alone.
+            let hydration = state.hydration.as_ref().unwrap();
+            assert!(hydration.get(&group_id("web")).unwrap().is_err());
+            assert!(hydration.get(&group_id("jobs")).unwrap().is_ok());
+        });
+        let mut inputs = Inputs::two_groups();
+        relations_of(&mut inputs, "web", json!(7));
+        inputs.declaration()["deploymentGroups"]["jobs"]
+            .as_object_mut()
+            .unwrap()
+            .remove("hydrationRelations");
+        inputs.resolve(|evaluation, _| {
+            assert_eq!(causes_of(&evaluation, &total).len(), 1);
+        });
+    }
+
+    /// An undeclared member holds back no relation, while what needs the
+    /// whole map waits on it, so no profile leaves a problem unseen inside
+    /// what it could not read (D15:2367).
+    #[test]
+    fn what_needs_every_relation_waits_on_what_could_not_be_read() {
+        let edits: [fn(&mut Value); 2] = [
+            |web| web["hydrationRelations"][0]["undeclared"] = json!(1),
+            |web| web["undeclared"] = json!(1),
+        ];
+        for edit in edits {
+            let mut inputs = Inputs::complete();
+            edit(&mut inputs.declaration()["deploymentGroups"]["web"]);
+            inputs.resolve(|evaluation, state| {
+                let relation = identified("server", "browser");
+                checked_13(&evaluation, &RELATION_CHECKS, &relation);
+                assert_eq!(issues_13(&evaluation), []);
+                let why = BTreeSet::from([only_issue(&evaluation)]);
+                let hydration = state.hydration.as_ref().unwrap();
+                assert_eq!(keys(hydration.complete().as_ref().unwrap_err()), why);
+            });
+            assert!(inputs.view().is_err());
+        }
+    }
+
+    /// A group whose key failed has no subject here, its relations still
+    /// count, and what needs every group waits on it (D15:1936, 2184).
+    #[test]
+    fn a_group_whose_key_failed_has_no_relation_subject() {
+        let mut inputs = Inputs::two_groups();
+        let groups = inputs.declaration()["deploymentGroups"]
+            .as_object_mut()
+            .unwrap();
+        let web = groups.remove("web").unwrap();
+        groups.insert("Web App".into(), web);
+        inputs.resolve(|evaluation, state| {
+            let bound = hydration::unit(HydrationSubject::Relations, Check::WithinBound);
+            all_evaluated(&evaluation, std::slice::from_ref(&bound));
+            let units: Vec<_> = evaluation
+                .statuses()
+                .filter(|(unit, _)| matches!(unit.subject, Subject::Hydration(_)))
+                .map(|(unit, _)| unit.clone())
+                .collect();
+            assert_eq!(units, [bound]);
+            let hydration = state.hydration.as_ref().unwrap();
+            assert!(hydration.get(&group_id("jobs")).unwrap().is_ok());
+            assert!(hydration.complete().is_err());
         });
     }
 

@@ -7514,10 +7514,7 @@
       "subjectKindRank": "0",
       "checkRank": "0",
       "prerequisiteCheckIds": [
-        "structural.group-key.field-value",
-        "structural.group.required-field",
-        "structural.group.field-value",
-        "structural.group.known-field",
+        "structural.group.field-type",
         "resource-policy.root-nodes.within-bound",
         "resource-policy.root-depth.within-bound",
         "resource-policy.root-collection-entries.within-bound",
@@ -7580,6 +7577,8 @@
       "subjectKindRank": "1",
       "checkRank": "0",
       "prerequisiteCheckIds": [
+        "structural.group.required-field",
+        "structural.group.field-value",
         "group.group-id.within-bound",
         "hydration.relations.within-bound"
       ],
@@ -8003,6 +8002,7 @@
       "subjectKindRank": "4",
       "checkRank": "0",
       "prerequisiteCheckIds": [
+        "structural.group.known-field",
         "group.member.known",
         "group.member.unique",
         "group.target.single-group",

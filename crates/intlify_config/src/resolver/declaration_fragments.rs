@@ -20,7 +20,7 @@ use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::{AdmissionInvariant, Member, StructuralAnalysis};
 
 use super::coverage::RuleContent;
-use super::evaluation::{and, Admitted};
+use super::evaluation::{and, both, Admitted};
 use super::locales::joined;
 use super::resource_policy::{PolicySlot, ReferenceField, ReferenceOccurrence};
 use super::structural_admission::StructuralInvariant;
@@ -58,24 +58,34 @@ pub(crate) struct TargetEntries<Target> {
     pub(crate) whole: Admitted<()>,
 }
 
+/// One element of a group's `hydrationRelations` with both endpoints.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RelationEntry {
+    pub(crate) server: TargetId,
+    pub(crate) client: TargetId,
+}
+
 /// One entry of `deploymentGroups` whose key structural admission admitted:
-/// its `members`, element by element, or why it has none to read (D15:2184,
-/// 2367).
+/// its `members`, element by element, and its `hydrationRelations`, each
+/// element a relation or why it is none, each or why it has none to read
+/// (D15:2184, 2367).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct GroupEntry {
     pub(crate) id: DeploymentGroupId,
     pub(crate) members: Admitted<Vec<Admitted<TargetId>>>,
+    pub(crate) relations: Admitted<Vec<Admitted<RelationEntry>>>,
 }
 
 /// The Group ID map entry by entry: how many entries it holds and how many
-/// member occurrences their arrays hold, each counted whatever its key or its
-/// value (D15:1932, 1935), whether every key was admitted, and each entry with
-/// an admitted key, in the map's order. An entry whose key failed has no later
-/// subject (D15:2184, 3354).
+/// member and relation occurrences their arrays hold, each counted whatever
+/// its key or its value (D15:1932, 1935, 1936), whether every key was admitted,
+/// and each entry with an admitted key, in the map's order. An entry whose key
+/// failed has no later subject (D15:2184, 3354).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct GroupEntries {
     pub(crate) submitted: usize,
     pub(crate) memberships: Admitted<usize>,
+    pub(crate) relations: Admitted<usize>,
     pub(crate) keys: Admitted<()>,
     pub(crate) entries: Vec<GroupEntry>,
 }
@@ -282,17 +292,18 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
         }))
     }
 
-    /// The Group ID map, entry by entry, or why it has no entry to read. The
-    /// total counts the elements of every `members` that is an array, of an
-    /// entry whose key failed too, since a value that is none holds no
-    /// occurrence; it waits on why only when no entry holds one (D15:1935,
-    /// 2184, 3354).
+    /// The Group ID map, entry by entry, or why it has no entry to read. Each
+    /// total counts the elements of every array of its member, of an entry
+    /// whose key failed too, since a value that is none holds no occurrence;
+    /// it waits on why only when no entry holds one (D15:1935, 1936, 2184,
+    /// 3354). An omitted `hydrationRelations` is no value, while an empty one
+    /// is a value that holds no occurrence.
     ///
     /// # Errors
     ///
     /// Returns the resolver bug of a map the checks admitted that is absent
     /// or no object, of a key they admitted that is no Group ID, or of a
-    /// member they admitted that is no Target ID.
+    /// member or endpoint they admitted that is no Target ID.
     pub(crate) fn group_entries(&self) -> Result<Admitted<GroupEntries>, StructuralInvariant> {
         let members = match self.required_map("deploymentGroups")? {
             Ok(members) => members,
@@ -302,6 +313,9 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
         let mut keys = Ok(());
         let mut held = 0;
         let mut excluded = None;
+        let mut relations = 0;
+        let mut relation_array = false;
+        let mut unread = None;
         for (key, member) in members {
             let entry = member.value();
             let items = self.items_at::<TargetId>(entry, "members")?;
@@ -309,10 +323,27 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
                 Ok(items) => held += items.len(),
                 Err(causes) => excluded = Some(joined(excluded, causes)),
             }
+            let nodes = self.relation_nodes(entry)?;
+            match &nodes {
+                Ok(Some(nodes)) => {
+                    relations += nodes.len();
+                    relation_array = true;
+                }
+                Ok(None) => {}
+                Err(causes) => unread = Some(joined(unread, causes)),
+            }
             match self.values.key(entry) {
                 Ok(()) => entries.push(GroupEntry {
                     id: identity(key)?,
                     members: items,
+                    relations: match nodes {
+                        Ok(nodes) => Ok(nodes
+                            .unwrap_or_default()
+                            .iter()
+                            .map(|&relation| self.relation_entry(relation))
+                            .collect::<Result<_, _>>()?),
+                        Err(causes) => Err(causes),
+                    },
                 }),
                 Err(causes) => keys = and(keys, Err(causes)),
             }
@@ -323,9 +354,38 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
                 Some(causes) if held == 0 => Err(causes),
                 _ => Ok(held),
             },
+            relations: match unread {
+                Some(causes) if !relation_array => Err(causes),
+                _ => Ok(relations),
+            },
             keys,
             entries,
         }))
+    }
+
+    /// The elements of the `hydrationRelations` of the group value `entry`:
+    /// none when it is omitted, or why it has none to read. A value that is
+    /// no object has no member to read.
+    fn relation_nodes(
+        &self,
+        entry: NodeId,
+    ) -> Result<Admitted<Option<&'r [NodeId]>>, StructuralInvariant> {
+        if matches!(self.document.node(entry).kind(), NodeKind::Object(_)) {
+            self.array_at(entry, "hydrationRelations")
+        } else {
+            self.failed(entry)
+        }
+    }
+
+    /// The element `relation` of a group's `hydrationRelations`, or why it
+    /// has no value for both endpoints.
+    fn relation_entry(
+        &self,
+        relation: NodeId,
+    ) -> Result<Admitted<RelationEntry>, StructuralInvariant> {
+        let server = self.required_at::<TargetId>(relation, "server")?;
+        let client = self.required_at::<TargetId>(relation, "client")?;
+        Ok(both(server, client).map(|(server, client)| RelationEntry { server, client }))
     }
 
     /// The required map `name` of the declaration and its members, or why it
@@ -1215,6 +1275,58 @@ mod tests {
         assert_eq!(causes.keys().count(), 2);
     }
 
+    /// Each relation is read on its own: an element without both endpoints
+    /// is no relation here. The total takes every element of every array, of
+    /// an entry whose key failed too (D15:1936, 2184, 2367).
+    #[test]
+    fn the_relations_of_a_group_are_read_element_by_element() {
+        let read = groups(None, |app| {
+            app["deploymentGroups"]["web"]["hydrationRelations"] = json!([
+                {"server": "server", "client": "browser"},
+                7,
+                {"server": "server", "client": 8},
+            ]);
+            app["deploymentGroups"]["Web App"] =
+                json!({"members": ["browser"], "hydrationRelations": [7]});
+        });
+        let read = read.unwrap().unwrap();
+        assert_eq!(read.relations, Ok(4));
+        let items = read.entries[0].relations.as_ref().unwrap();
+        let pair = items[0].as_ref().unwrap();
+        assert_eq!(
+            (pair.server.as_str(), pair.client.as_str()),
+            ("server", "browser")
+        );
+        assert!(items[1].is_err() && items[2].is_err());
+    }
+
+    /// The total waits only when no array can be read: an omitted array is
+    /// no value, an empty one holds no occurrence, and a group that is no
+    /// object has none to read (D15:569, 1936, 2184, 3354).
+    #[test]
+    fn the_relation_total_waits_only_when_no_array_can_be_read() {
+        let total = |edit| groups(None, edit).unwrap().unwrap().relations;
+        assert_eq!(
+            total(|app| lacking(app, &["deploymentGroups", "web"], "hydrationRelations")),
+            Ok(0)
+        );
+        let failed: fn(&mut Value) = |app| {
+            app["deploymentGroups"]["web"]["hydrationRelations"] = json!(7);
+        };
+        assert!(total(failed).is_err());
+        let read = groups(None, failed).unwrap().unwrap();
+        assert!(read.entries[0].relations.is_err());
+        assert_eq!(
+            total(|app| {
+                app["deploymentGroups"]["web"]["hydrationRelations"] = json!(7);
+                app["deploymentGroups"]["jobs"] =
+                    json!({"members": ["worker"], "hydrationRelations": []});
+            }),
+            Ok(0)
+        );
+        assert!(total(|app| app["deploymentGroups"]["web"] = json!(7)).is_err());
+    }
+
     /// A map that failed itself, or is missing, has no entry to read.
     #[test]
     fn a_group_map_that_failed_has_no_entries() {
@@ -1234,21 +1346,36 @@ mod tests {
     #[test]
     fn a_group_map_the_checks_admit_and_the_value_lacks_is_a_resolver_bug() {
         let bug = |edit| groups(Some(ValueAdmissions::default()), edit).err();
-        let unreported: [fn(&mut Value); 4] = [
+        let unreported: [fn(&mut Value); 7] = [
             |app| app["deploymentGroups"] = json!(7),
             |app| lacking(app, &[], "deploymentGroups"),
             |app| app["deploymentGroups"]["Web App"] = json!({"members": ["browser"]}),
             |app| lacking(app, &["deploymentGroups", "web"], "members"),
+            |app| app["deploymentGroups"]["web"]["hydrationRelations"] = json!(7),
+            |app| app["deploymentGroups"]["web"]["hydrationRelations"] = json!([7]),
+            |app| {
+                app["deploymentGroups"]["web"]["hydrationRelations"] =
+                    json!([{"server": "server"}]);
+            },
         ];
         for edit in unreported {
             assert_eq!(bug(edit), Some(StructuralInvariant::UnreportedFailure));
         }
-        assert_eq!(
-            bug(|app| app["deploymentGroups"]["web"]["members"] = json!([7])),
-            Some(StructuralInvariant::Admission(
-                AdmissionInvariant::AuthoringTypeMismatch
-            ))
-        );
+        let mistyped: [fn(&mut Value); 2] = [
+            |app| app["deploymentGroups"]["web"]["members"] = json!([7]),
+            |app| {
+                app["deploymentGroups"]["web"]["hydrationRelations"] =
+                    json!([{"server": 7, "client": "browser"}]);
+            },
+        ];
+        for edit in mistyped {
+            assert_eq!(
+                bug(edit),
+                Some(StructuralInvariant::Admission(
+                    AdmissionInvariant::AuthoringTypeMismatch
+                ))
+            );
+        }
     }
 
     /// The alias map once `edit` changed the declaration.

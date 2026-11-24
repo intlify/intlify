@@ -153,7 +153,7 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:937a7e3ecd390da537f9de633c37de265fef43f3472d3392370adf62a0f8e4c5";
+    "sha256:b9bc95bfb6e19fb18813afeb883e04e1b631e33b1f61c5d2115a113516496443";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
@@ -1197,15 +1197,12 @@ const MEMBER_ARRAYS_UNDER_POLICY: &[&str] = &[
     "resource-policy.reference-bytes.within-bound",
 ];
 
-/// What a check over the relations of the Group ID map as one value waits on
-/// under the admitted Resource Limit Policy: the structural checks of the
-/// `deploymentGroups` entries it reads, then every Policy recheck, in row
-/// order.
-const GROUPS_UNDER_POLICY: &[&str] = &[
-    "structural.group-key.field-value",
-    "structural.group.required-field",
-    "structural.group.field-value",
-    "structural.group.known-field",
+/// What the total of the relation occurrences waits on: the structural check
+/// that leaves a group without a `hydrationRelations` array to count, which it
+/// waits on when no group has one (D15:1936, 2184), then every Policy recheck,
+/// in row order.
+const RELATION_ARRAYS_UNDER_POLICY: &[&str] = &[
+    "structural.group.field-type",
     "resource-policy.root-nodes.within-bound",
     "resource-policy.root-depth.within-bound",
     "resource-policy.root-collection-entries.within-bound",
@@ -1421,7 +1418,7 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         | K::CollectionGroup
         | K::Groups => &[CONFIRMED_POLICY],
         K::Memberships => &[MEMBER_ARRAYS_UNDER_POLICY],
-        K::Relations => &[GROUPS_UNDER_POLICY],
+        K::Relations => &[RELATION_ARRAYS_UNDER_POLICY],
         K::Vocabulary => &[
             CONFIRMED_POLICY,
             &[
@@ -1657,8 +1654,12 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
             "group.memberships.within-bound",
             "group.members.within-bound",
         ]],
+        // An endpoint needs its admitted value, and its relation's key both
+        // endpoints (D15:1931, 2181, 2184).
         K::RelationEndpoint => &[
             &[
+                "structural.group.required-field",
+                "structural.group.field-value",
                 "group.group-id.within-bound",
                 "hydration.relations.within-bound",
             ],
@@ -1693,6 +1694,7 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         ],
         K::Roles => &[&["hydration.endpoint.within-bound"]],
         K::DeploymentGroupsDependency => &[&[
+            "structural.group.known-field",
             "group.member.known",
             "group.member.unique",
             "group.target.single-group",

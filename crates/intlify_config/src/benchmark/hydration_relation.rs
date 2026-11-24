@@ -27,7 +27,8 @@ use crate::resolver::evaluation::{
 use crate::resolver::exact_resolution::resolve_fields;
 use crate::resolver::groups::{resolve_groups, GroupFields, ResolvedGroups};
 use crate::resolver::hydration::{
-    validate_hydration, EndpointField, HydrationInvariant, HydrationSubject, ResolvedHydration,
+    validate_hydration, EndpointField, HydrationFields, HydrationInvariant, HydrationSubject,
+    ResolvedHydration,
 };
 use crate::resolver::limits::ConfirmedPolicy;
 use crate::resolver::locales::{resolve_locales, LocaleFields};
@@ -186,7 +187,9 @@ pub(super) fn construct(
     let result = validate_hydration(
         &mut evaluation,
         Ok(inputs.policy),
-        Ok(&inputs.declaration.deployment_groups),
+        &Ok(HydrationFields::declared(
+            &inputs.declaration.deployment_groups,
+        )),
         inputs.targets.as_ref(),
         (inputs.groups.as_ref(), Some(observer)),
         inputs.negotiation.clone(),
