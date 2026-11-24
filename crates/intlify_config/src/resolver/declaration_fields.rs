@@ -175,17 +175,9 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
                     })
                     .collect(),
                 keys: targets.keys.clone(),
+                whole: targets.whole.clone(),
             }),
         }
-    }
-
-    /// Whether everything at and below the Target ID map passed, or why not:
-    /// what a phase that still reads the targets as one set waits on.
-    pub(crate) fn target_structure(&self) -> Admitted<()> {
-        self.target_entries
-            .as_ref()
-            .map_err(Causes::clone)
-            .and_then(|targets| targets.whole.clone())
     }
 
     /// The Group ID map entry by entry, which Phase 12 reads.
@@ -343,6 +335,17 @@ mod tests {
     }
 
     /// The checks behind `causes`.
+    /// Whether everything at and below the Target ID map passed.
+    fn target_structure<Policy, Target>(
+        fields: &DeclarationFields<Policy, Target>,
+    ) -> Admitted<()> {
+        fields
+            .target_entries
+            .as_ref()
+            .map_err(super::Causes::clone)
+            .and_then(|targets| targets.whole.clone())
+    }
+
     fn checks<T>(field: &Admitted<T>) -> BTreeSet<(Vec<String>, Check)> {
         field
             .as_ref()
@@ -384,7 +387,7 @@ mod tests {
         assert_eq!(fields.coverage, Ok(CoverageEntries::default()));
         assert_eq!(fields.delivery, Ok(None));
         assert!(fields.policies.is_ok());
-        assert!(fields.target_structure().is_ok() && fields.deployment_groups.is_ok());
+        assert!(target_structure(&fields).is_ok() && fields.deployment_groups.is_ok());
         let complete = read(&complete_config());
         assert_eq!(
             complete.negotiation_aliases.as_ref().unwrap().entries.len(),
@@ -431,7 +434,7 @@ mod tests {
         assert!(fields.selection_scope.is_ok());
         assert!(fields.default_requested_locale.is_ok());
         assert!(fields.policies.is_ok());
-        assert!(fields.target_structure().is_ok() && fields.deployment_groups.is_ok());
+        assert!(target_structure(&fields).is_ok() && fields.deployment_groups.is_ok());
     }
 
     /// An undeclared member of the declaration belongs to no field.
@@ -441,7 +444,7 @@ mod tests {
         config["profiles"]["app"]["extra"] = json!(true);
         let fields = read(&config);
         assert!(fields.project_id.is_ok() && fields.requested_locales.is_ok());
-        assert!(fields.policies.is_ok() && fields.target_structure().is_ok());
+        assert!(fields.policies.is_ok() && target_structure(&fields).is_ok());
     }
 
     /// A Target ID entry's failure holds back `targetProfiles` alone, its key
@@ -452,7 +455,7 @@ mod tests {
         config["profiles"]["app"]["targetProfiles"]["browser"]["requestedLocales"] = json!("en");
         let fields = read(&config);
         assert_eq!(
-            checks(&fields.target_structure()),
+            checks(&target_structure(&fields)),
             BTreeSet::from([(
                 vec!["targetProfiles".to_owned(), "*".to_owned()],
                 Check::FieldType
@@ -464,7 +467,7 @@ mod tests {
         keyed["profiles"]["app"]["targetProfiles"]["Web App"] = target;
         let fields = read(&keyed);
         assert_eq!(
-            checks(&fields.target_structure()),
+            checks(&target_structure(&fields)),
             BTreeSet::from([(
                 vec!["targetProfiles".to_owned(), "*".to_owned()],
                 Check::FieldValue
@@ -518,7 +521,7 @@ mod tests {
                 Check::FieldType
             )])
         );
-        assert!(fields.target_structure().is_ok() && fields.policies.is_ok());
+        assert!(target_structure(&fields).is_ok() && fields.policies.is_ok());
     }
 
     /// Another declaration's failures hold back none of this one's fields.

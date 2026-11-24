@@ -330,13 +330,15 @@ pub(crate) struct TargetLocaleFields<'a> {
 
 /// The Target ID map's entries as Phase 7 reads them: how many it holds, one
 /// whose key failed included (D15:1930), each with an admitted key, in Target
-/// ID order, and whether every key was admitted. An entry whose key failed has
-/// no subject here (D15:2184).
+/// ID order, whether every key was admitted, and whether everything at and
+/// below the map passed, which what needs every target waits on. An entry
+/// whose key failed has no subject here (D15:2184).
 #[derive(Debug, Clone)]
 pub(crate) struct TargetMapFields<'a> {
     pub(crate) submitted: usize,
     pub(crate) entries: Vec<TargetLocaleFields<'a>>,
     pub(crate) keys: Admitted<()>,
+    pub(crate) whole: Admitted<()>,
 }
 
 impl<'a> TargetMapFields<'a> {
@@ -363,6 +365,7 @@ impl<'a> TargetMapFields<'a> {
                 })
                 .collect(),
             keys: Ok(()),
+            whole: Ok(()),
         }
     }
 }
@@ -504,6 +507,9 @@ pub(crate) struct ResolvedLocales {
     /// Whether every key of the Target ID map was admitted: a value naming
     /// none of them names no declared Target ID only then.
     pub(crate) target_keys: Admitted<()>,
+    /// Whether everything at and below the Target ID map passed, which what
+    /// needs every target waits on.
+    pub(crate) target_whole: Admitted<()>,
     pub(crate) targets: Admitted<Vec<TargetLocales>>,
 }
 
@@ -570,6 +576,11 @@ pub(crate) fn resolve_locales<P: Provider>(
         .as_ref()
         .map_err(Causes::clone)
         .and_then(|entries| entries.keys.clone());
+    let target_whole = fields
+        .target_entries
+        .as_ref()
+        .map_err(Causes::clone)
+        .and_then(|entries| entries.whole.clone());
     let targets = match &fields.target_entries {
         Ok(entries) => Ok(pass.targets(entries, &bounds.targets)?),
         Err(causes) => Err(causes.clone()),
@@ -586,6 +597,7 @@ pub(crate) fn resolve_locales<P: Provider>(
         fallback_keys,
         target_bound: bounds.map,
         target_keys,
+        target_whole,
         targets,
     })
 }

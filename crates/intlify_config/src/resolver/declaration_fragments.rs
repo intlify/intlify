@@ -48,9 +48,8 @@ pub(crate) struct TargetEntry<Target> {
 /// counted whatever its key (D15:1930), each entry with an admitted key, in
 /// the map's order, whether every key was admitted, which decides that a value
 /// naming none of them names no declared Target ID, and whether everything at
-/// and below the map passed, which a later phase that still reads the targets
-/// as one set waits on. An entry whose key failed has no later subject
-/// (D15:2184, 3354).
+/// and below the map passed, which what needs every target waits on. An entry
+/// whose key failed has no later subject (D15:2184, 3354).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TargetEntries<Target> {
     pub(crate) submitted: usize,

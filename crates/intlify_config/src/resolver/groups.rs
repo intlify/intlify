@@ -173,6 +173,27 @@ impl<'a> GroupFields<'a> {
 /// group's elements.
 type Occurrences<'a> = BTreeMap<&'a TargetId, Vec<usize>>;
 
+/// The Target IDs a group's admitted members name, and whether every element
+/// was read: what a later membership check reads, whatever each member's own
+/// checks found.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NamedMembers {
+    known: BTreeSet<TargetId>,
+    lacking: Admitted<()>,
+}
+
+impl NamedMembers {
+    /// Whether the group names `id`: an admitted member proves it, and naming
+    /// none is proved only once every element was read (D15:2365, 2367).
+    pub(crate) fn holds(&self, id: &TargetId) -> Admitted<bool> {
+        if self.known.contains(id) {
+            Ok(true)
+        } else {
+            self.lacking.clone().map(|()| false)
+        }
+    }
+}
+
 /// What Phase 12 established for later phases: each group's own bounds, the
 /// Target IDs its members name, its members once the group's own checks held,
 /// and whether the groups partition the targets.
@@ -180,7 +201,7 @@ type Occurrences<'a> = BTreeMap<&'a TargetId, Vec<usize>>;
 pub(crate) struct ResolvedGroups {
     groups: BTreeMap<DeploymentGroupId, Admitted<BTreeSet<TargetId>>>,
     bounds: BTreeMap<DeploymentGroupId, Admitted<()>>,
-    named: BTreeMap<DeploymentGroupId, Admitted<BTreeSet<TargetId>>>,
+    named: BTreeMap<DeploymentGroupId, Admitted<NamedMembers>>,
     partition: Admitted<()>,
 }
 
@@ -191,10 +212,9 @@ impl ResolvedGroups {
         self.bounds.get(id)
     }
 
-    /// The Target IDs one group's members name, once its member count holds
-    /// and every element was read: what a later membership check reads,
-    /// whatever each member's own checks found.
-    pub(crate) fn named(&self, id: &DeploymentGroupId) -> Option<&Admitted<BTreeSet<TargetId>>> {
+    /// The Target IDs one group's admitted members name, once its member
+    /// count holds.
+    pub(crate) fn named(&self, id: &DeploymentGroupId) -> Option<&Admitted<NamedMembers>> {
         self.named.get(id)
     }
 
@@ -302,8 +322,10 @@ pub(crate) fn resolve_groups(
         let (occurrences, lacking) = occurrences_of(field);
         named.insert(
             id.clone(),
-            and(own.clone(), lacking.clone())
-                .map(|()| occurrences.keys().map(|&member| member.clone()).collect()),
+            own.clone().map(|()| NamedMembers {
+                known: occurrences.keys().map(|&member| member.clone()).collect(),
+                lacking: lacking.clone(),
+            }),
         );
         unseen = and(unseen, and(own.clone(), lacking.clone()));
         let gate =
@@ -762,12 +784,7 @@ mod tests {
                 .unwrap();
             let targets = observed
                 .app(|observer| {
-                    resolve_targets(
-                        &mut evaluation,
-                        Ok(()),
-                        &locales,
-                        (&references, Some(observer)),
-                    )
+                    resolve_targets(&mut evaluation, &locales, (&references, Some(observer)))
                 })
                 .unwrap();
             let declared = self
