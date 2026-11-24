@@ -6778,4 +6778,447 @@ pub(super) mod tests {
             }
         });
     }
+
+    /// One place of the selected declaration made invalid, and what the
+    /// invocation must then do.
+    struct Broken {
+        /// The field, map entry, array element, or `policies` slot.
+        place: &'static str,
+        edit: fn(&mut Value),
+        /// The row and code of the one Finding it causes.
+        found: (&'static str, Code),
+        /// Each row of a semantic phase with a unit that waits on the Finding.
+        waiting: &'static str,
+        /// Each row of a semantic phase that lost a unit and keeps some, with
+        /// how many stay evaluated: the independent siblings.
+        kept: &'static str,
+    }
+
+    /// Every place the matrix breaks: each field of the declaration but
+    /// `policies`, which holds the selected reference and has a test of its
+    /// own, and a representative map entry, array element, and slot of each
+    /// field that holds several values.
+    fn broken_places() -> Vec<Broken> {
+        vec![
+            Broken {
+                place: "projectId",
+                edit: |app| app["projectId"] = json!(1),
+                found: ("structural.profile.field-type", Code::FieldTypeInvalid),
+                waiting: "dependency.project-identity.established identity.declaration-field.opaque",
+                kept: "identity.declaration-field.opaque=1",
+            },
+            Broken {
+                place: "selectionScope",
+                edit: |app| app["selectionScope"] = json!(1),
+                found: ("structural.profile.field-type", Code::FieldTypeInvalid),
+                waiting: "dependency.project-identity.established identity.declaration-field.opaque",
+                kept: "identity.declaration-field.opaque=1",
+            },
+            Broken {
+                place: "requestedLocales",
+                edit: |app| app["requestedLocales"] = json!("en"),
+                found: ("structural.profile.field-type", Code::FieldTypeInvalid),
+                waiting: "coverage.cells.within-bound coverage.comparisons.within-bound coverage.locale.member coverage.rule.normalized-domain coverage.table.complete dependency.coverage.established dependency.deployment-groups.established dependency.locale-negotiation.established dependency.message-fallback.established dependency.project-locales.established dependency.targets.established fallback.source.member hydration.relation.same-requested-locales locale.default-requested.member locale.requested-set.within-bound negotiation.destination.member target.requested-locales.project-subset",
+                kept: "",
+            },
+            Broken {
+                place: "requestedLocales element",
+                edit: |app| app["requestedLocales"] = json!(["ja", 7]),
+                found: ("structural.profile.field-type", Code::FieldTypeInvalid),
+                waiting: "coverage.cells.within-bound coverage.comparisons.within-bound coverage.table.complete dependency.coverage.established dependency.deployment-groups.established dependency.locale-negotiation.established dependency.project-locales.established dependency.targets.established hydration.relation.same-requested-locales locale.default-requested.member negotiation.destination.member target.requested-locales.project-subset",
+                kept: "coverage.domain.unique=2 locale.requested.canonical=1 locale.requested.unique=1",
+            },
+            Broken {
+                place: "requestedLocales invalid locale",
+                edit: |app| app["requestedLocales"] = json!(["ja", "zz"]),
+                found: ("locale.requested.canonical", Code::LocaleInvalid),
+                waiting: "coverage.cells.within-bound coverage.comparisons.within-bound coverage.table.complete dependency.coverage.established dependency.deployment-groups.established dependency.locale-negotiation.established dependency.project-locales.established dependency.targets.established hydration.relation.same-requested-locales locale.default-requested.member locale.requested.unique negotiation.destination.member target.requested-locales.project-subset",
+                kept: "coverage.domain.unique=2 locale.requested.unique=1",
+            },
+            Broken {
+                place: "defaultRequestedLocale",
+                edit: |app| app["defaultRequestedLocale"] = json!(7),
+                found: ("structural.profile.field-type", Code::FieldTypeInvalid),
+                waiting: "dependency.deployment-groups.established dependency.project-locales.established dependency.targets.established hydration.relation.same-effective-default locale.default-requested.canonical locale.default-requested.member target.effective-default.supported",
+                kept: "target.effective-default.supported=1",
+            },
+            Broken {
+                place: "defaultSourceLocale",
+                edit: |app| app["defaultSourceLocale"] = json!(7),
+                found: ("structural.profile.field-type", Code::FieldTypeInvalid),
+                waiting: "dependency.project-locales.established locale.default-source.canonical",
+                kept: "",
+            },
+            Broken {
+                place: "localeNegotiation",
+                edit: |app| app["localeNegotiation"] = json!(7),
+                found: ("structural.profile.field-type", Code::FieldTypeInvalid),
+                waiting: "dependency.locale-negotiation.established negotiation.aliases.within-bound",
+                kept: "",
+            },
+            Broken {
+                place: "alias entry",
+                edit: |app| app["localeNegotiation"]["aliases"]["de"] = json!(7),
+                found: ("structural.profile.field-type", Code::FieldTypeInvalid),
+                waiting: "dependency.locale-negotiation.established",
+                kept: "",
+            },
+            Broken {
+                place: "messageFallback",
+                edit: |app| app["messageFallback"] = json!(7),
+                found: ("structural.profile.field-type", Code::FieldTypeInvalid),
+                waiting: "dependency.message-fallback.established fallback.sources.within-bound",
+                kept: "",
+            },
+            Broken {
+                place: "fallback entry",
+                edit: |app| app["messageFallback"]["ja"] = json!(7),
+                found: ("structural.profile.field-type", Code::FieldTypeInvalid),
+                waiting: "dependency.message-fallback.established fallback.sequence.within-bound",
+                kept: "",
+            },
+            Broken {
+                place: "fallback candidate",
+                edit: |app| app["messageFallback"]["ja"] = json!(["en", 7]),
+                found: ("structural.profile.field-value", Code::FieldValueInvalid),
+                waiting: "dependency.message-fallback.established",
+                kept: "",
+            },
+            Broken {
+                place: "coverage",
+                edit: |app| app["coverage"] = json!(7),
+                found: ("structural.profile.field-type", Code::FieldTypeInvalid),
+                waiting: "coverage.cell.effective-mode coverage.comparisons.within-bound coverage.locale-selectors.within-bound coverage.rules.within-bound coverage.surface-selectors.within-bound coverage.table.complete dependency.coverage.established",
+                kept: "",
+            },
+            Broken {
+                place: "coverage rule",
+                edit: |app| app["coverage"]["rules"][1] = json!(7),
+                found: ("structural.profile.field-type", Code::FieldTypeInvalid),
+                waiting: "coverage.cell.effective-mode coverage.table.complete dependency.coverage.established",
+                kept: "coverage.domain.unique=2",
+            },
+            Broken {
+                place: "coverage rule mode",
+                edit: |app| app["coverage"]["rules"][0]["mode"] = json!("x"),
+                found: ("structural.profile.field-value", Code::FieldValueInvalid),
+                waiting: "coverage.cell.effective-mode coverage.table.complete dependency.coverage.established",
+                kept: "",
+            },
+            Broken {
+                place: "coverage selector item",
+                edit: |app| app["coverage"]["rules"][0]["requestedLocales"] = json!(["ja", 7]),
+                found: ("structural.profile.field-type", Code::FieldTypeInvalid),
+                waiting: "coverage.cell.effective-mode coverage.table.complete dependency.coverage.established",
+                kept: "coverage.domain.unique=2",
+            },
+            Broken {
+                place: "required policy slot",
+                edit: |app| app["policies"]["trust"] = json!(42),
+                found: ("structural.profile.field-type", Code::FieldTypeInvalid),
+                waiting: "artifact.policy-reference.resolved dependency.required-policies.established resource-policy.policy-reference.within-bound resource-policy.policy-reference.within-capability",
+                kept: "artifact.policy-reference.resolved=6 resource-policy.policy-reference.within-bound=6 resource-policy.policy-reference.within-capability=6",
+            },
+            Broken {
+                place: "missing policy slot",
+                edit: |app| {
+                    app["policies"].as_object_mut().unwrap().remove("approval");
+                },
+                found: ("structural.profile.required-field", Code::RequiredFieldMissing),
+                waiting: "artifact.policy-reference.resolved dependency.required-policies.established resource-policy.policy-reference.within-bound resource-policy.policy-reference.within-capability",
+                kept: "artifact.policy-reference.resolved=6 resource-policy.policy-reference.within-bound=6 resource-policy.policy-reference.within-capability=6",
+            },
+            Broken {
+                place: "optional policy slot",
+                edit: |app| app["policies"]["glossarySet"] = json!(42),
+                found: ("structural.profile.field-value", Code::FieldValueInvalid),
+                waiting: "artifact.policy-reference.resolved dependency.optional-policies.established resource-policy.policy-reference.within-bound resource-policy.policy-reference.within-capability",
+                kept: "artifact.policy-reference.resolved=6 resource-policy.policy-reference.within-bound=6 resource-policy.policy-reference.within-capability=6",
+            },
+            Broken {
+                place: "undeclared policies member",
+                edit: |app| app["policies"]["extra"] = json!(1),
+                found: ("structural.profile.known-field", Code::UnknownField),
+                waiting: "dependency.optional-policies.established dependency.required-policies.established",
+                kept: "",
+            },
+            Broken {
+                place: "unresolved policy reference",
+                edit: |app| app["policies"]["trust"]["revision"] = json!("2"),
+                found: ("artifact.policy-reference.resolved", Code::ArtifactReferenceNotAdmitted),
+                waiting: "dependency.required-policies.established",
+                kept: "",
+            },
+            Broken {
+                place: "targetProfiles",
+                edit: |app| app["targetProfiles"] = json!(7),
+                found: ("structural.profile.field-type", Code::FieldTypeInvalid),
+                waiting: "dependency.deployment-groups.established dependency.targets.established group.member.known hydration.endpoint.known hydration.endpoint.role hydration.relation.same-effective-default hydration.relation.same-requested-locales hydration.relation.static-compatibility locale.target-profiles.within-bound",
+                kept: "",
+            },
+            Broken {
+                place: "target entry",
+                edit: |app| app["targetProfiles"]["server"] = json!(7),
+                found: ("structural.target.field-type", Code::FieldTypeInvalid),
+                waiting: "artifact.target-profile-reference.resolved dependency.deployment-groups.established dependency.targets.established hydration.endpoint.role hydration.relation.same-effective-default hydration.relation.same-requested-locales hydration.relation.static-compatibility locale.target-default-requested.canonical resource-policy.target-profile-reference.within-bound resource-policy.target-profile-reference.within-capability target.effective-default.supported target.requested-locales.directed target.requested-locales.project-subset",
+                kept: "artifact.target-profile-reference.resolved=1 hydration.endpoint.role=1 locale.target-requested.canonical=2 locale.target-requested.unique=2 resource-policy.target-profile-reference.within-bound=1 resource-policy.target-profile-reference.within-capability=1 target.effective-default.supported=1 target.requested-locales.directed=1 target.requested-locales.project-subset=1",
+            },
+            Broken {
+                place: "target key",
+                edit: |app| app["targetProfiles"]["Web App"] = app["targetProfiles"]["server"].clone(),
+                found: ("structural.target-key.field-value", Code::FieldValueInvalid),
+                waiting: "dependency.deployment-groups.established dependency.targets.established",
+                kept: "",
+            },
+            Broken {
+                place: "target locale element",
+                edit: |app| app["targetProfiles"]["server"]["requestedLocales"] = json!(["en", 42]),
+                found: ("structural.target.field-type", Code::FieldTypeInvalid),
+                waiting: "dependency.deployment-groups.established dependency.targets.established hydration.relation.same-effective-default hydration.relation.same-requested-locales",
+                kept: "locale.target-requested.canonical=3 locale.target-requested.unique=3",
+            },
+            Broken {
+                place: "target invalid locale",
+                edit: |app| app["targetProfiles"]["server"]["requestedLocales"] = json!(["en", "zz"]),
+                found: ("locale.target-requested.canonical", Code::LocaleInvalid),
+                waiting: "dependency.deployment-groups.established dependency.targets.established hydration.relation.same-effective-default hydration.relation.same-requested-locales locale.target-requested.unique",
+                kept: "locale.target-requested.unique=3",
+            },
+            Broken {
+                place: "target profile",
+                edit: |app| app["targetProfiles"]["server"]["profile"] = json!(42),
+                found: ("structural.target.field-type", Code::FieldTypeInvalid),
+                waiting: "artifact.target-profile-reference.resolved dependency.deployment-groups.established dependency.targets.established hydration.endpoint.role hydration.relation.static-compatibility resource-policy.target-profile-reference.within-bound resource-policy.target-profile-reference.within-capability target.requested-locales.directed",
+                kept: "artifact.target-profile-reference.resolved=1 hydration.endpoint.role=1 resource-policy.target-profile-reference.within-bound=1 resource-policy.target-profile-reference.within-capability=1 target.requested-locales.directed=1",
+            },
+            Broken {
+                place: "unresolved target profile",
+                edit: |app| app["targetProfiles"]["server"]["profile"]["revision"] = json!("2"),
+                found: ("artifact.target-profile-reference.resolved", Code::ArtifactReferenceNotAdmitted),
+                waiting: "dependency.deployment-groups.established dependency.targets.established hydration.endpoint.role hydration.relation.static-compatibility target.requested-locales.directed",
+                kept: "hydration.endpoint.role=1 target.requested-locales.directed=1",
+            },
+            Broken {
+                place: "deploymentGroups",
+                edit: |app| app["deploymentGroups"] = json!(7),
+                found: ("structural.profile.field-type", Code::FieldTypeInvalid),
+                waiting: "dependency.deployment-groups.established group.groups.within-bound group.memberships.within-bound group.target.single-group hydration.relations.within-bound",
+                kept: "",
+            },
+            Broken {
+                place: "group entry",
+                edit: |app| app["deploymentGroups"]["web"] = json!(7),
+                found: ("structural.group.field-type", Code::FieldTypeInvalid),
+                waiting: "dependency.deployment-groups.established group.members.within-bound group.memberships.within-bound group.target.single-group hydration.relations.within-bound",
+                kept: "",
+            },
+            Broken {
+                place: "group key",
+                edit: |app| app["deploymentGroups"]["Bad Key"] = app["deploymentGroups"]["web"].clone(),
+                found: ("structural.group-key.field-value", Code::FieldValueInvalid),
+                waiting: "dependency.deployment-groups.established",
+                kept: "",
+            },
+            Broken {
+                place: "group member",
+                edit: |app| app["deploymentGroups"]["web"]["members"] = json!(["browser", 7]),
+                found: ("structural.group.field-type", Code::FieldTypeInvalid),
+                waiting: "dependency.deployment-groups.established group.target.single-group hydration.endpoint.same-group",
+                kept: "group.member.known=1 group.member.unique=1 group.member.within-bound=1 group.target.single-group=1 hydration.endpoint.same-group=1",
+            },
+            Broken {
+                place: "hydration relation",
+                edit: |app| app["deploymentGroups"]["web"]["hydrationRelations"] = json!([7]),
+                found: ("structural.group.field-type", Code::FieldTypeInvalid),
+                waiting: "dependency.deployment-groups.established",
+                kept: "",
+            },
+            Broken {
+                place: "hydration endpoint",
+                edit: |app| app["deploymentGroups"]["web"]["hydrationRelations"][0]["client"] = json!(7),
+                found: ("structural.group.field-type", Code::FieldTypeInvalid),
+                waiting: "dependency.deployment-groups.established hydration.relation.distinct-endpoints hydration.relation.same-effective-default hydration.relation.same-requested-locales hydration.relation.static-compatibility hydration.relation.unique",
+                kept: "hydration.endpoint.known=1 hydration.endpoint.role=1 hydration.endpoint.same-group=1 hydration.endpoint.within-bound=1 hydration.target.single-role=1",
+            },
+            Broken {
+                place: "delivery",
+                edit: |app| app["delivery"] = json!({"placement": "hoist"}),
+                found: ("structural.profile.field-value", Code::FieldValueInvalid),
+                waiting: "delivery.placement.effective-mode dependency.delivery.established",
+                kept: "",
+            },
+        ]
+    }
+
+    /// The rows each row waits on through the Check Registry's prerequisites.
+    type Requirements<'r> = BTreeMap<&'r str, BTreeSet<&'r str>>;
+
+    /// What `evaluation` recorded, once it is checked against the Check
+    /// Registry: a unit waits only on a Finding of the invocation whose row
+    /// its row requires, and each semantic unit of `complete` whose row needs
+    /// no Finding's row is still evaluated.
+    fn only_dependents_wait(
+        evaluation: &Evaluation,
+        complete: &BTreeMap<Unit, Status>,
+        requires: &Requirements<'_>,
+        place: &str,
+    ) -> BTreeMap<Unit, Status> {
+        let found: BTreeSet<&IssueKey> = evaluation.issues().collect();
+        let after = statuses(evaluation);
+        for (unit, status) in &after {
+            let Status::NotEvaluated(causes) = status else {
+                continue;
+            };
+            for cause in causes.keys() {
+                assert!(
+                    found.contains(cause),
+                    "{place}: {unit:?} waits on {cause:?}"
+                );
+                assert!(
+                    requires[row_of(unit)].contains(row_of(cause.unit())),
+                    "{place}: {} does not require {}",
+                    row_of(unit),
+                    row_of(cause.unit())
+                );
+            }
+        }
+        // Structural admission has units only where a value occurs (plan 025
+        // interpretation #207), so an edit moves those of its own value.
+        let semantic = complete
+            .keys()
+            .filter(|unit| unit.phase > Phase::ProfileSelection);
+        for unit in semantic {
+            let row = row_of(unit);
+            let dependent = found.iter().any(|key| {
+                let cause = row_of(key.unit());
+                row == cause || requires[row].contains(cause)
+            });
+            if !dependent {
+                assert_eq!(
+                    after.get(unit),
+                    Some(&Status::Evaluated),
+                    "{place}: {unit:?} needs no Finding"
+                );
+            }
+        }
+        after
+    }
+
+    /// The Conformance rows that one invalid value stops only what needs it
+    /// (D15:3340, 3445, 3446), over a whole invocation. Breaking each place
+    /// in turn must report exactly its one Finding, leave not evaluated
+    /// exactly the rows the case lists, each unit waiting on that Finding
+    /// through the Check Registry's prerequisites, and keep the sibling units
+    /// the case counts evaluated: what is independent of the value continues,
+    /// and every row the registry does not make dependent on the Finding's
+    /// row keeps every unit of the complete invocation.
+    #[test]
+    fn each_invalid_value_stops_only_the_checks_that_need_it() {
+        let registry = CheckRegistry::revision_zero();
+        let requires = requirements(&registry);
+        let complete = Inputs::complete().resolve(|evaluation, _| statuses(&evaluation));
+        let mut evaluated: BTreeMap<&str, usize> = BTreeMap::new();
+        for unit in complete.keys() {
+            *evaluated.entry(row_of(unit)).or_default() += 1;
+        }
+        for case in broken_places() {
+            let place = case.place;
+            let mut inputs = Inputs::complete();
+            (case.edit)(inputs.declaration());
+            inputs.resolve(|evaluation, _| {
+                let key = only_issue(&evaluation);
+                assert_eq!((row_of(key.unit()), key.code()), case.found, "{place}");
+                let after = only_dependents_wait(&evaluation, &complete, &requires, place);
+                let semantic = || {
+                    after
+                        .iter()
+                        .filter(|(unit, _)| unit.phase > Phase::ProfileSelection)
+                };
+                let waiting: BTreeSet<&str> = semantic()
+                    .filter(|(_, status)| matches!(status, Status::NotEvaluated(_)))
+                    .map(|(unit, _)| row_of(unit))
+                    .collect();
+                assert_eq!(
+                    waiting,
+                    case.waiting.split_whitespace().collect(),
+                    "{place}"
+                );
+                let mut kept: BTreeMap<&str, usize> = BTreeMap::new();
+                for (unit, _) in semantic().filter(|(_, status)| **status == Status::Evaluated) {
+                    *kept.entry(row_of(unit)).or_default() += 1;
+                }
+                kept.retain(|row, count| *count < evaluated[row]);
+                let listed: BTreeMap<&str, usize> = case
+                    .kept
+                    .split_whitespace()
+                    .map(|each| {
+                        let (row, count) = each.split_once('=').unwrap();
+                        (row, count.parse().unwrap())
+                    })
+                    .collect();
+                assert_eq!(kept, listed, "{place}");
+            });
+        }
+    }
+
+    /// The `policies` object itself holds the selected reference, so without
+    /// it no declaration is selected: the wide stop 015 allows for the
+    /// selected declaration's boundary (D15:2131, 2367). Each slot still names
+    /// its reference's units, which wait on that Finding.
+    #[test]
+    fn a_policies_object_that_failed_holds_the_selection_back() {
+        let registry = CheckRegistry::revision_zero();
+        let requires = requirements(&registry);
+        let complete = Inputs::complete().resolve(|evaluation, _| statuses(&evaluation));
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["policies"] = json!(7);
+        inputs.attempt(|evaluation, state| {
+            let state = state.unwrap().expect("entry admits the file");
+            assert!(state.policy.confirmed.is_err());
+            let found = BTreeSet::from([only_issue(&evaluation)]);
+            only_dependents_wait(&evaluation, &complete, &requires, "policies");
+            for unit in PolicySlot::ALL.map(resolved_slot) {
+                waits_on_exactly(&evaluation, &unit, &found);
+            }
+        });
+    }
+
+    /// Independent values that fail together are all reported in the one
+    /// invocation, each with the Finding it has alone, rather than stopping
+    /// at the first (D15:2149, 3445).
+    #[test]
+    fn independent_failures_are_all_found_in_one_invocation() {
+        let independent = [
+            "projectId",
+            "requestedLocales invalid locale",
+            "defaultSourceLocale",
+            "alias entry",
+            "fallback candidate",
+            "coverage rule mode",
+            "required policy slot",
+            "optional policy slot",
+            "target locale element",
+            "unresolved target profile",
+            "group member",
+            "hydration endpoint",
+            "delivery",
+        ];
+        let cases = broken_places();
+        let edits: Vec<&Broken> = independent
+            .iter()
+            .map(|place| cases.iter().find(|case| case.place == *place).unwrap())
+            .collect();
+        let mut alone = BTreeSet::new();
+        let mut together = Inputs::complete();
+        for case in &edits {
+            let mut inputs = Inputs::complete();
+            (case.edit)(inputs.declaration());
+            alone.insert(inputs.resolve(|evaluation, _| only_issue(&evaluation)));
+            (case.edit)(together.declaration());
+        }
+        assert_eq!(alone.len(), independent.len());
+        let found = together
+            .resolve(|evaluation, _| evaluation.issues().cloned().collect::<BTreeSet<IssueKey>>());
+        assert_eq!(found, alone);
+    }
 }
