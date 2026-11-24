@@ -21,10 +21,11 @@ use std::sync::Arc;
 
 use crate::locale::{CanonicalLocale, CanonicalizationFailure, Canonicalizer, Provider};
 use crate::model::{
-    Coverage, FallbackCandidate, LocaleNegotiation, NonEmptyMap, ProfileDeclaration,
-    TargetDeclaration, TargetId,
+    FallbackCandidate, LocaleNegotiation, NonEmptyMap, ProfileDeclaration, TargetDeclaration,
+    TargetId,
 };
 
+use super::coverage::CoverageFields;
 use super::declaration_observer::{DeclarationObserver, ObserverInvariant};
 use super::evaluation::{
     both, Actual, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant, Found,
@@ -267,7 +268,8 @@ pub(crate) struct LocaleFields<'a> {
     pub(crate) negotiation_aliases: Admitted<AliasFields<'a>>,
     /// The fallback map entry by entry, or why it has no entry to read.
     pub(crate) message_fallback: Admitted<Vec<FallbackField<'a>>>,
-    pub(crate) coverage: Admitted<Option<&'a Coverage>>,
+    /// The coverage rule by rule, or why it has no member to read.
+    pub(crate) coverage: Admitted<CoverageFields<'a>>,
     /// The Target ID map entry by entry, or why it has no entry to read.
     pub(crate) target_entries: Admitted<TargetMapFields<'a>>,
 }
@@ -393,7 +395,7 @@ impl<'a> LocaleFields<'a> {
                     sequence: Ok(sequence.as_slice().iter().map(Ok).collect()),
                 })
                 .collect()),
-            coverage: Ok(declaration.coverage.as_option()),
+            coverage: Ok(CoverageFields::declared(declaration.coverage.as_option())),
             target_entries: Ok(TargetMapFields::declared(&declaration.target_profiles)),
         }
     }

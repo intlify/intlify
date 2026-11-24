@@ -596,7 +596,7 @@ where
         &admitted.coverage,
         (admitted.vocabulary.as_ref(), canonicalizer),
         &locales,
-        locale_fields.coverage.clone(),
+        &locale_fields.coverage,
         observer.as_ref(),
     )?;
     own(evaluation, SemanticGroup::Coverage, held(coverage.as_ref()))?;
@@ -4855,6 +4855,326 @@ pub(super) mod tests {
                 &fallback(F::Sequence(key("en")), Check::WithinBound),
                 &found,
             );
+        });
+    }
+
+    /// The logical unit of `check` over a locale item of any rule.
+    fn coverage_locale(spelling: &str, check: Check) -> Unit {
+        use crate::resolver::coverage::{unit, CoverageSubject as C, RuleContent};
+        use crate::resolver::locales::fixtures::key;
+        unit(C::Locale(RuleContent::projected(), key(spelling)), check)
+    }
+
+    /// The logical unit of `check` over a surface item of any rule naming the
+    /// vocabulary member `member`.
+    fn coverage_surface(member: &str, check: Check) -> Unit {
+        use crate::resolver::coverage::{unit, CoverageSubject as C, RuleContent, SurfaceKey};
+        unit(
+            C::SurfaceClass(
+                RuleContent::projected(),
+                SurfaceKey::Member(Token::new(member).unwrap()),
+            ),
+            check,
+        )
+    }
+
+    fn coverage_count(subject: crate::resolver::coverage::CoverageSubject) -> Unit {
+        crate::resolver::coverage::unit(subject, Check::WithinBound)
+    }
+
+    fn coverage_cell(locale: &str, surface: &str) -> Unit {
+        use crate::resolver::coverage::{unit, CoverageSubject as C};
+        use crate::resolver::locales::fixtures::canonical;
+        unit(
+            C::Cell(canonical(locale), Token::new(surface).unwrap()),
+            Check::EffectiveMode,
+        )
+    }
+
+    fn coverage_table() -> Unit {
+        use crate::resolver::coverage::{unit, CoverageSubject as C};
+        unit(C::Table, Check::CompleteTable)
+    }
+
+    /// With every count able to read an admitted selector, a rule that failed
+    /// still holds back every cell and the table, which need every rule
+    /// (D15:2426, 3409).
+    #[test]
+    fn a_rule_that_failed_holds_back_every_cell_beside_an_admitted_rule() {
+        for failed in [
+            json!(7),
+            json!({"requestedLocales": 7, "intentSurfaceClasses": ["nav"], "mode": "direct-required"}),
+            json!({"requestedLocales": ["ja"], "intentSurfaceClasses": 7, "mode": "direct-required"}),
+        ] {
+            let mut inputs = Inputs::complete();
+            inputs.declaration()["coverage"] = json!({"rules": [failed, {
+                "requestedLocales": ["ja"],
+                "intentSurfaceClasses": ["nav"],
+                "mode": "fallback-allowed"
+            }]});
+            inputs.resolve(|evaluation, state| {
+                let found = BTreeSet::from([only_issue(&evaluation)]);
+                for unit in [
+                    coverage_cell("en", "nav"),
+                    coverage_cell("ja", "nav"),
+                    coverage_table(),
+                ] {
+                    waits_on_exactly(&evaluation, &unit, &found);
+                }
+                assert_eq!(keys(state.coverage.as_ref().unwrap_err()), found);
+            });
+        }
+    }
+
+    /// One rule that failed, in whatever way, holds back no other rule's
+    /// items, no count, and no bound over the table's size: only what needs
+    /// every rule waits, and no Finding is made up for the rule that failed
+    /// (D15:1901, 1902, 1903, 1905, 2190, 2365, 2367, 2426).
+    #[test]
+    fn a_coverage_rule_that_failed_leaves_the_other_rules_checked() {
+        use crate::resolver::coverage::CoverageSubject as C;
+        for failed in [
+            json!(7),
+            json!({"mode": "direct-required"}),
+            json!({"requestedLocales": 7, "mode": "direct-required"}),
+            json!({"requestedLocales": [], "mode": "direct-required"}),
+            json!({"requestedLocales": ["ja", 7], "mode": "direct-required"}),
+            json!({"intentSurfaceClasses": [7], "mode": "direct-required"}),
+            json!({"requestedLocales": ["ja"], "mode": 7}),
+            json!({"requestedLocales": ["ja"]}),
+        ] {
+            let mut inputs = Inputs::complete();
+            inputs.declaration()["coverage"] = json!({"rules": [failed, {
+                "requestedLocales": ["fr"],
+                "intentSurfaceClasses": ["nav"],
+                "mode": "fallback-allowed"
+            }]});
+            inputs.resolve(|evaluation, state| {
+                all_evaluated(
+                    &evaluation,
+                    &[
+                        coverage_count(C::Rules),
+                        coverage_count(C::LocaleSelectors),
+                        coverage_count(C::SurfaceSelectors),
+                        coverage_count(C::Cells),
+                        coverage_count(C::Comparisons),
+                        coverage_locale("fr", Check::CanonicalLocale),
+                        coverage_locale("fr", Check::UniqueLocale),
+                        coverage_locale("fr", Check::RequestedMember),
+                        coverage_surface("nav", Check::VocabularyMember),
+                        coverage_surface("nav", Check::UniqueSurfaceClass),
+                    ],
+                );
+                let outside: Vec<_> = issues(&evaluation)
+                    .into_iter()
+                    .filter(|(unit, _, _)| unit.phase == Phase::LocalePolicyResolution)
+                    .collect();
+                assert_eq!(
+                    outside,
+                    [(
+                        coverage_locale("fr", Check::RequestedMember),
+                        Code::CoverageRuleInvalid,
+                        Some(Reason::LocaleNotRequested)
+                    )]
+                );
+                assert_eq!(evaluation.issues().count(), 2);
+                assert!(state.coverage.is_err());
+            });
+        }
+    }
+
+    /// Each count takes every occurrence it names, whatever became of its
+    /// value: past the bound with a rule or item that failed among them
+    /// (D15:1901, 1902, 1903, 1905).
+    #[test]
+    fn the_coverage_counts_take_every_occurrence_beside_what_failed() {
+        use crate::resolver::coverage::CoverageSubject as C;
+        use crate::resolver::evaluation::Actual;
+        use crate::resolver::limits::LocaleResolutionLimits as Limits;
+        type Tighten = fn(&mut Limits);
+        let cases: [(Tighten, Value, C, u64); 4] = [
+            (
+                |limits| limits.max_coverage_rules = bound(2),
+                json!([7, {"requestedLocales": ["ja"], "mode": "direct-required"}, {"mode": 7}]),
+                C::Rules,
+                3,
+            ),
+            (
+                |limits| limits.max_coverage_locale_selector_occurrences = bound(2),
+                json!([7, {"requestedLocales": ["ja", 7, true], "mode": "direct-required"}]),
+                C::LocaleSelectors,
+                3,
+            ),
+            (
+                |limits| limits.max_coverage_surface_selector_occurrences = bound(1),
+                json!([{"intentSurfaceClasses": ["nav", 7], "mode": "direct-required"}]),
+                C::SurfaceSelectors,
+                2,
+            ),
+            (
+                |limits| limits.max_coverage_rule_cell_comparisons = bound(11),
+                json!([7, {"requestedLocales": ["ja"], "mode": "direct-required"}]),
+                C::Comparisons,
+                12,
+            ),
+        ];
+        for (tighten, rules, subject, total) in cases {
+            let mut inputs = Inputs::complete();
+            let mut limits = policy_limits();
+            tighten(&mut limits.locale_resolution);
+            inputs.select_policy(resource_limit_policy(&limits));
+            inputs.declaration()["coverage"] = json!({ "rules": rules });
+            inputs.resolve(|evaluation, _| {
+                let unit = coverage_count(subject);
+                let key = evaluation
+                    .issues()
+                    .find(|key| *key.unit() == unit)
+                    .unwrap_or_else(|| panic!("{unit:?} found nothing"));
+                assert_eq!(
+                    evaluation.limit(key).unwrap().actual,
+                    Actual::Exact(total),
+                    "{unit:?}"
+                );
+            });
+        }
+    }
+
+    /// A selector count waits only when every selector it would read failed:
+    /// a rule or selector that failed has no item to count, and one beside it
+    /// that was admitted is counted (D15:1902, 1903, 2184, 3354).
+    #[test]
+    fn a_selector_count_waits_only_when_every_selector_failed() {
+        use crate::resolver::coverage::CoverageSubject as C;
+        for (rules, locale_waits, surface_waits) in [
+            (json!([7]), true, true),
+            (
+                json!([{"requestedLocales": 7, "mode": "direct-required"}]),
+                true,
+                false,
+            ),
+            (
+                json!([
+                    {"requestedLocales": 7, "mode": "direct-required"},
+                    {"requestedLocales": ["ja"], "mode": "direct-required"}
+                ]),
+                false,
+                false,
+            ),
+        ] {
+            let mut inputs = Inputs::complete();
+            inputs.declaration()["coverage"] = json!({ "rules": rules });
+            inputs.resolve(|evaluation, _| {
+                let every: BTreeSet<IssueKey> = evaluation.issues().cloned().collect();
+                for (subject, waits) in [
+                    (C::LocaleSelectors, locale_waits),
+                    (C::SurfaceSelectors, surface_waits),
+                ] {
+                    let unit = coverage_count(subject);
+                    if waits {
+                        waits_on_exactly(&evaluation, &unit, &every);
+                    } else {
+                        all_evaluated(&evaluation, &[unit]);
+                    }
+                }
+            });
+        }
+    }
+
+    /// A cell no rule matches is what needs the default mode, so a default
+    /// that failed holds back only such cells: a conflict between rules is
+    /// still found (D15:2365, 2426).
+    #[test]
+    fn a_default_mode_that_failed_holds_back_only_the_cells_taking_it() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["coverage"] = json!({
+            "defaultMode": 7,
+            "rules": [
+                {"requestedLocales": ["ja"], "mode": "fallback-allowed"},
+                {"intentSurfaceClasses": ["checkout"], "mode": "direct-required"}
+            ]
+        });
+        inputs.resolve(|evaluation, state| {
+            let conflict = coverage_cell("ja", "checkout");
+            let cause = evaluation
+                .issues()
+                .find(|key| key.unit().phase == Phase::StructuralAdmission)
+                .expect("the default mode failed")
+                .clone();
+            let found: Vec<_> = issues(&evaluation)
+                .into_iter()
+                .filter(|(unit, _, _)| *unit == conflict)
+                .map(|(_, code, _)| code)
+                .collect();
+            assert_eq!(found, [Code::CoverageRuleConflict]);
+            all_evaluated(&evaluation, &[conflict, coverage_cell("ja", "nav")]);
+            waits_on_exactly(
+                &evaluation,
+                &coverage_cell("en", "nav"),
+                &BTreeSet::from([cause]),
+            );
+            let every: BTreeSet<IssueKey> = evaluation.issues().cloned().collect();
+            waits_on_exactly(&evaluation, &coverage_table(), &every);
+            assert_eq!(keys(state.coverage.as_ref().unwrap_err()), every);
+        });
+    }
+
+    /// An unknown default mode blocks coverage, so the table keeps no Basis
+    /// even when a rule decides every cell (D15:2426, 3607).
+    #[test]
+    fn a_default_mode_that_failed_holds_back_the_table() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["coverage"] = json!({
+            "defaultMode": 7,
+            "rules": [{"requestedLocales": ["ja", "en"], "mode": "fallback-allowed"}]
+        });
+        inputs.resolve(|evaluation, _| {
+            let found = BTreeSet::from([only_issue(&evaluation)]);
+            waits_on_exactly(&evaluation, &coverage_table(), &found);
+            assert!(evaluation.decision_basis().is_empty());
+        });
+    }
+
+    /// A cell a rule known to match never takes the default, so beside a rule
+    /// that failed it waits on that rule alone, and only a cell no such rule
+    /// matches waits on the default as well (D15:2365).
+    #[test]
+    fn a_cell_waits_on_the_default_only_when_no_known_rule_matches_it() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["coverage"] = json!({
+            "defaultMode": 7,
+            "rules": [7, {"requestedLocales": ["ja"], "mode": "fallback-allowed"}]
+        });
+        inputs.resolve(|evaluation, _| {
+            let every: BTreeSet<IssueKey> = evaluation.issues().cloned().collect();
+            assert_eq!(every.len(), 2);
+            let Some(Status::NotEvaluated(causes)) = evaluation.status(&coverage_cell("ja", "nav"))
+            else {
+                panic!("the cell waits");
+            };
+            assert_eq!(causes.keys().count(), 1);
+            waits_on_exactly(&evaluation, &coverage_cell("en", "nav"), &every);
+        });
+    }
+
+    /// No check reads an undeclared member under `coverage`: every cell and
+    /// the table, whose only prerequisite is its cells, are evaluated, and the
+    /// policy built from all of `coverage` waits on it (D15:1609, 2149, 2367).
+    #[test]
+    fn an_undeclared_coverage_member_holds_back_only_the_policy() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["coverage"]["extra"] = json!(1);
+        inputs.resolve(|evaluation, state| {
+            let found = BTreeSet::from([only_issue(&evaluation)]);
+            all_evaluated(
+                &evaluation,
+                &[
+                    coverage_cell("en", "nav"),
+                    coverage_cell("ja", "checkout"),
+                    coverage_table(),
+                ],
+            );
+            assert_eq!(evaluation.decision_basis().len(), 6);
+            assert_eq!(keys(state.coverage.as_ref().unwrap_err()), found);
         });
     }
 

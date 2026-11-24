@@ -30,6 +30,13 @@
 //! their subject in every such rule (D15:2190, 2387). A domain several rules
 //! hold, and a cell whose maximally specific rules select two modes, are
 //! observed at each of those rules beside the others (D15:1609, 2387, 2410).
+//!
+//! A rule structural admission did not admit holds back only what needs it
+//! (D15:2365, 2367). The rule count and each selector count take every
+//! occurrence they name, a selector count waiting only when every selector it
+//! would read failed (D15:1901-1903, 2184, 3354). The other rules are checked.
+//! The cells need every rule, the table every cell, and the policy all of
+//! `coverage`, and none of them is ever partial (D15:1609, 2426, 3409).
 
 use std::collections::BTreeMap;
 
@@ -43,8 +50,8 @@ use crate::structural::Edge;
 use super::decision_evidence::DecisionEvidence;
 use super::declaration_observer::{beside, DeclarationObserver, ObserverInvariant};
 use super::evaluation::{
-    both, within, Actual, Admitted, Blocking, Causes, Check, Code, Evaluation, EvaluationInvariant,
-    Found, LimitExceeded, Notice, Observation, Phase, Reason, Subject, Unit,
+    and, both, within, Actual, Admitted, Blocking, Causes, Check, Code, Evaluation,
+    EvaluationInvariant, Found, LimitExceeded, Notice, Observation, Phase, Reason, Subject, Unit,
 };
 use super::evidence::EvidenceProjection;
 use super::evidence_component::ComponentPath;
@@ -119,6 +126,38 @@ impl RuleContent {
             members.push(RuleMember::RequestedLocales(sorted(locales)));
         }
         Self(members)
+    }
+}
+
+/// The declaration's `coverage` as Phase 8 reads it: the default mode, each
+/// element as a rule or why it is none, the raw items of each selector kind,
+/// and whether all of `coverage` passed, which the policy waits on.
+#[derive(Debug, Clone)]
+pub(crate) struct CoverageFields<'a> {
+    pub(crate) default_mode: Admitted<Option<CoverageMode>>,
+    pub(crate) rules: Admitted<Vec<Admitted<&'a CoverageRule>>>,
+    pub(crate) locale_items: Admitted<usize>,
+    pub(crate) surface_items: Admitted<usize>,
+    pub(crate) whole: Admitted<()>,
+}
+
+impl<'a> CoverageFields<'a> {
+    /// The fields of a `coverage` admitted whole, or of none.
+    pub(crate) fn declared(coverage: Option<&'a Coverage>) -> Self {
+        let rules = coverage.and_then(|coverage| coverage.rules.as_option());
+        let held = |selector: fn(&'a CoverageRule) -> Option<&'a [String]>| {
+            let items = rules.into_iter().flatten().filter_map(selector);
+            Ok(items.map(<[String]>::len).sum())
+        };
+        Self {
+            default_mode: Ok(
+                coverage.and_then(|coverage| coverage.default_mode.as_option().copied())
+            ),
+            rules: Ok(rules.into_iter().flatten().map(Ok).collect()),
+            locale_items: held(CoverageRule::requested_locales),
+            surface_items: held(CoverageRule::intent_surface_classes),
+            whole: Ok(()),
+        }
     }
 }
 
@@ -294,7 +333,7 @@ impl<Id> CoveragePolicy<Id> {
 /// observed through `observer` when the declaration's file is there; the
 /// caller hands it what Phase 5 bound. Every unit waits on the
 /// specification, through a count or through the cells' bound; the policy
-/// exists only when every unit passed.
+/// exists only when every unit passed and all of `coverage` was admitted.
 pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
     evaluation: &mut Evaluation,
     confirmed: Result<&ConfirmedPolicy, &Causes>,
@@ -304,30 +343,21 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
         Result<&Canonicalizer<P>, &Causes>,
     ),
     locales: &ResolvedLocales,
-    coverage: Admitted<Option<&Coverage>>,
+    coverage: &Admitted<CoverageFields<'_>>,
     observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<Admitted<CoveragePolicy<Id>>, LocaleInvariant> {
     let policy = confirmed.map_err(Causes::clone);
     let vocabulary = vocabulary.map_err(Causes::clone);
     let requested = locales.requested_set.complete();
-    let rules = coverage
-        .as_ref()
-        .ok()
-        .copied()
-        .flatten()
-        .and_then(|coverage| coverage.rules.as_option())
-        .map_or(&[][..], Vec::as_slice);
-    let default_declared = coverage
-        .as_ref()
-        .ok()
-        .copied()
-        .flatten()
-        .is_some_and(|coverage| coverage.default_mode.as_option().is_some());
-    let declared = both(
-        both(policy.clone(), specification.clone()),
-        coverage.clone(),
-    )
-    .map(|((policy, _), _)| policy);
+    let fields = coverage.as_ref().map_err(Causes::clone);
+    let submitted = fields
+        .clone()
+        .and_then(|fields| fields.rules.as_deref().map_err(Causes::clone));
+    let rules = submitted.clone().unwrap_or(&[]);
+    let default_declared =
+        matches!(&fields, Ok(fields) if matches!(fields.default_mode, Ok(Some(_))));
+    let declared =
+        both(both(policy.clone(), specification.clone()), submitted).map(|((policy, _), _)| policy);
     // The rules are in the declaration once one is submitted, and no count
     // over none is past its bound.
     let at_rules = if rules.is_empty() {
@@ -343,7 +373,7 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
         CoverageSubject::Rules,
         MAX_COVERAGE_RULES,
         |limits| limits.max_coverage_rules,
-        rules.len(),
+        Ok(rules.len()),
     )?;
     let locale_items_bounded = count(
         evaluation,
@@ -351,10 +381,9 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
         CoverageSubject::LocaleSelectors,
         MAX_COVERAGE_LOCALE_SELECTOR_OCCURRENCES,
         |limits| limits.max_coverage_locale_selector_occurrences,
-        rules
-            .iter()
-            .map(|rule| rule.requested_locales().map_or(0, <[String]>::len))
-            .sum(),
+        fields
+            .clone()
+            .and_then(|fields| fields.locale_items.clone()),
     )?;
     let surface_items_bounded = count(
         evaluation,
@@ -362,10 +391,9 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
         CoverageSubject::SurfaceSelectors,
         MAX_COVERAGE_SURFACE_SELECTOR_OCCURRENCES,
         |limits| limits.max_coverage_surface_selector_occurrences,
-        rules
-            .iter()
-            .map(|rule| rule.intent_surface_classes().map_or(0, <[String]>::len))
-            .sum(),
+        fields
+            .clone()
+            .and_then(|fields| fields.surface_items.clone()),
     )?;
     let selectors = Selectors {
         spelling: both(
@@ -438,20 +466,18 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
             .map_err(|blocking| Found::through(blocking, at_rules))
         },
     )?;
-    let default = coverage.map(|coverage| {
-        coverage
-            .and_then(|coverage| coverage.default_mode.as_option().copied())
-            .unwrap_or(CoverageMode::DirectRequired)
-    });
-    let decidable =
-        both(default.clone(), both(checked.clone(), compared)).map(|(default, _)| default);
+    let default = fields
+        .clone()
+        .and_then(|fields| fields.default_mode.clone())
+        .map(|mode| mode.unwrap_or(CoverageMode::DirectRequired));
+    let decidable = both(checked.clone(), compared).map(|_| ());
     // A cell is named only once the bound proves the table may be built, and
     // every cell waits on the comparison bound. With no cell to wait on them,
     // the rules' own checks still decide whether the policy exists.
     let cells = match both(span.clone(), sized) {
         Ok(((requested, vocabulary), ())) => decide(
             evaluation,
-            (&decidable, &selectors),
+            (&decidable, &default, &selectors),
             requested,
             vocabulary,
             &domains,
@@ -463,7 +489,10 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
     // decision #225). The Evidence observes the decision sources in the
     // declaration's file.
     let owner = unit(CoverageSubject::Table, Check::CompleteTable);
-    let table = evaluation.check(owner.clone(), cells, Ok)?;
+    // An unknown mode blocks the table whichever cells take it (D15:2426, 3607).
+    let table = evaluation.check(owner.clone(), both(cells, default.clone()), |(cells, _)| {
+        Ok(cells)
+    })?;
     if let Ok(cells) = &table {
         let decisions = match observer {
             Some(observer) => decision_evidence(cells, &domains, (observer, default_declared))?,
@@ -471,38 +500,43 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
         };
         evaluation.decided(&owner, cells.clone(), decisions)?;
     }
-    // The default mode exists whenever the declared coverage does, which the
-    // rule counts wait on too, and the span whenever the table does, so
-    // neither adds a cause of its own.
+    // The policy needs all of `coverage`, an undeclared member included, as
+    // the checks above do not (D15:2367). The default mode exists whenever
+    // all of it does, and the span whenever the table does, so neither adds a
+    // cause of its own.
+    let whole = fields.and_then(|fields| fields.whole.clone());
     Ok(both(
-        both(both(specification.clone(), checked), table),
+        both(both(specification.clone(), checked), both(table, whole)),
         both(default, span),
     )
     .map(
-        |(((specification, ()), cells), (default_mode, (requested, vocabulary)))| CoveragePolicy {
-            specification,
-            vocabulary: vocabulary.clone(),
-            requested: requested.clone(),
-            default_mode,
-            cells,
+        |(((specification, ()), (cells, ())), (default_mode, (requested, vocabulary)))| {
+            CoveragePolicy {
+                specification,
+                vocabulary: vocabulary.clone(),
+                requested: requested.clone(),
+                default_mode,
+                cells,
+            }
         },
     ))
 }
 
 /// A count's unit: every submitted item counts, within its bound, and past
-/// it what the count observed is found.
+/// it what the count observed is found. `total` is why there is nothing to
+/// count when every value it would read was excluded.
 fn count(
     evaluation: &mut Evaluation,
     (declared, observed): (&Admitted<&ConfirmedPolicy>, Option<Observation>),
     subject: CoverageSubject,
     bound: BoundId,
     limit: fn(&LocaleResolutionLimits) -> Bound,
-    total: usize,
+    total: Admitted<usize>,
 ) -> Result<Admitted<()>, EvaluationInvariant> {
     evaluation.check_found(
         unit(subject, Check::WithinBound),
-        declared.clone(),
-        |policy| {
+        both(declared.clone(), total),
+        |(policy, total)| {
             within(bound, limit(&policy.limits().locale_resolution), total)
                 .map_err(|blocking| Found::through(blocking, observed))
         },
@@ -575,23 +609,28 @@ impl<P: Provider> Selectors<'_, P> {
 
 /// Each distinct rule's selector units and its unit normalizing them to a
 /// domain, then one unit per domain: no two rule occurrences may share one.
-/// Returns whether every rule normalized with a domain of its own, and each
-/// domain with how many rules hold it and the mode of the first.
+/// An element structural admission did not admit as a rule has no subject and
+/// holds back only what needs every rule. Returns whether every rule
+/// normalized with a domain of its own, and each domain with how many rules
+/// hold it and the mode of the first.
 fn normalize<P: Provider>(
     evaluation: &mut Evaluation,
     selectors: &Selectors<'_, P>,
-    rules: &[CoverageRule],
+    rules: &[Admitted<&CoverageRule>],
 ) -> Result<(Admitted<()>, Domains), LocaleInvariant> {
     // Each distinct rule with the positions of the rules holding it.
     let mut contents: BTreeMap<RuleContent, (Vec<usize>, &CoverageRule)> = BTreeMap::new();
-    for (position, rule) in rules.iter().enumerate() {
-        contents
-            .entry(RuleContent::of(rule))
-            .or_insert((Vec::new(), rule))
-            .0
-            .push(position);
-    }
     let mut normalized = Ok(());
+    for (position, rule) in rules.iter().enumerate() {
+        match rule {
+            Ok(rule) => contents
+                .entry(RuleContent::of(rule))
+                .or_insert((Vec::new(), rule))
+                .0
+                .push(position),
+            Err(causes) => normalized = and(normalized, Err(causes.clone())),
+        }
+    }
     let mut domains = Domains::new();
     for (content, (raws, rule)) in &contents {
         let locales = match rule.requested_locales() {
@@ -622,7 +661,7 @@ fn normalize<P: Provider>(
                 holding.extend(raws);
                 holding.sort_unstable();
             }
-            Err(causes) => normalized = both(normalized, Err::<(), _>(causes)).map(|_| ()),
+            Err(causes) => normalized = and(normalized, Err(causes)),
         }
     }
     for (domain, (holding, _)) in &domains {
@@ -648,7 +687,7 @@ fn normalize<P: Provider>(
                 }
             },
         )?;
-        normalized = both(normalized, unique).map(|_| ());
+        normalized = and(normalized, unique);
     }
     Ok((normalized, domains))
 }
@@ -912,13 +951,14 @@ fn selected_surfaces<P: Provider>(
     Ok(selected)
 }
 
-/// One unit per cell, locale first, each waiting on `decidable`: the default
-/// mode, once every rule normalized to a domain of its own and the comparison
-/// bound passed. A cell whose maximally specific rules select two modes is
+/// One unit per cell, locale first, each waiting on `decidable`: every rule
+/// normalized to a domain of its own and the comparison bound passed. Only a
+/// cell no rule matches takes the default, so only it waits on the default
+/// (D15:2365). A cell whose maximally specific rules select two modes is
 /// found at each of those rules, beside the others (D15:1609, 2410).
 fn decide<P: Provider>(
     evaluation: &mut Evaluation,
-    (decidable, selectors): (&Admitted<CoverageMode>, &Selectors<'_, P>),
+    (decidable, default, selectors): (&Admitted<()>, &Admitted<CoverageMode>, &Selectors<'_, P>),
     requested: &LocaleSet,
     vocabulary: &SurfaceVocabulary,
     domains: &Domains,
@@ -937,17 +977,28 @@ fn decide<P: Provider>(
             } else {
                 Vec::new()
             };
-            let decided = evaluation.check_found(
-                unit(
-                    CoverageSubject::Cell(locale.clone(), surface.clone()),
-                    Check::EffectiveMode,
-                ),
-                decidable.clone(),
-                |default| {
-                    basis(default, &maximal)
-                        .map_err(|blocking| Found::repeated(blocking, &conflicting))
-                },
-            )?;
+            let cell = unit(
+                CoverageSubject::Cell(locale.clone(), surface.clone()),
+                Check::EffectiveMode,
+            );
+            // A rule known to match keeps the cell from the default, whatever
+            // the rules that failed.
+            let decided = if maximal.is_empty() {
+                evaluation.check(
+                    cell,
+                    both(decidable.clone(), default.clone()),
+                    |((), mode)| {
+                        Ok(Basis {
+                            mode,
+                            decision: Decision::Default,
+                        })
+                    },
+                )?
+            } else {
+                evaluation.check_found(cell, decidable.clone(), |()| {
+                    basis(&maximal).map_err(|blocking| Found::repeated(blocking, &conflicting))
+                })?
+            };
             cells = both(cells, decided).map(|(mut cells, basis)| {
                 cells.insert((locale.clone(), surface.clone()), basis);
                 cells
@@ -984,24 +1035,15 @@ fn conflict(maximal: &[(&Domain, &(Vec<usize>, CoverageMode))]) -> bool {
     maximal.windows(2).any(|pair| pair[0].1 .1 != pair[1].1 .1)
 }
 
-/// One cell's decision from its maximally specific rules. None is the
-/// default; rules of one mode decide it together; two modes conflict,
+/// One cell's decision from the maximally specific rules matching it, at
+/// least one: rules of one mode decide it together; two modes conflict,
 /// whatever order the rules were authored in.
-fn basis(
-    default: CoverageMode,
-    maximal: &[(&Domain, &(Vec<usize>, CoverageMode))],
-) -> Result<Basis, Blocking> {
-    let Some(&(_, &(_, mode))) = maximal.first() else {
-        return Ok(Basis {
-            mode: default,
-            decision: Decision::Default,
-        });
-    };
+fn basis(maximal: &[(&Domain, &(Vec<usize>, CoverageMode))]) -> Result<Basis, Blocking> {
     if conflict(maximal) {
         Err(issue(Code::CoverageRuleConflict, None))
     } else {
         Ok(Basis {
-            mode,
+            mode: maximal[0].1 .1,
             decision: Decision::Rules(
                 maximal
                     .iter()
@@ -1236,7 +1278,7 @@ mod tests {
             &setup.specification,
             (setup.vocabulary, Ok(&canonicalizer)),
             &locales,
-            fields.coverage.clone(),
+            &fields.coverage,
             observer.as_ref(),
         )
         .unwrap();
@@ -2277,6 +2319,28 @@ mod tests {
             ),
             None
         );
+    }
+
+    /// Each selector bound counts the items of its own kind alone.
+    #[test]
+    fn each_selector_bound_counts_only_its_own_kind_of_item() {
+        let declaration = declared(json!({"rules": [{
+            "requestedLocales": ["ja"],
+            "intentSurfaceClasses": ["nav", "checkout"],
+            "mode": "direct-required"
+        }]}));
+        let bounds = Bounds {
+            locale_items: 1,
+            surface_items: 1,
+            ..ROOM
+        };
+        let over = resolve_under(&declaration, bounds, &vocabulary());
+        let surface_items = count_unit(CoverageSubject::SurfaceSelectors);
+        assert_eq!(
+            exceeded(&over.evaluation, &surface_items),
+            exactly(MAX_COVERAGE_SURFACE_SELECTOR_OCCURRENCES, 1, 2)
+        );
+        assert_eq!(issues(&over.evaluation).len(), 1);
     }
 
     #[test]
