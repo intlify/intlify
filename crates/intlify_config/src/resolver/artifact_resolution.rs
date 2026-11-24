@@ -220,8 +220,10 @@ fn admit_member<'a>(
 /// Phase 9's complete collection admission. Each member key is checked once,
 /// over every distinct body under it: whether its bodies are admissible
 /// members, and, for a tuple, whether each was submitted only once. Each
-/// conflict group is checked for one body. The Set exists only when every
-/// unit holds, so it then has one body for each tuple.
+/// conflict group is checked for one body. The Set exists only under a
+/// confirmed policy, which a collection without a member has no unit to wait
+/// on (D15:2365), and when every unit holds, so it then has one body for each
+/// tuple.
 ///
 /// # Errors
 ///
@@ -251,7 +253,7 @@ pub(crate) fn admit_collection<'a>(
     // envelope, a JSON object.
     let envelope = ComponentPath::artifact_member(Key::Unsafe(JsonType::Object))
         .map(EvidenceProjection::resolver_input)?;
-    let mut holds: Admitted<()> = Ok(());
+    let mut holds = prerequisite.clone();
     let mut set = BTreeMap::new();
     let mut groups: BTreeMap<ConflictKey, BTreeMap<&[u8], usize>> = BTreeMap::new();
     for (key, bodies) in &keyed {
@@ -936,14 +938,13 @@ mod tests {
         assert!(body("0") < valid_body && valid_body < body("f"));
     }
 
-    #[test]
-    fn without_a_confirmed_policy_nothing_is_admitted() {
+    /// What Phase 4 leaves when no submitted artifact is the policy, made up
+    /// without what its check observed.
+    fn unconfirmed() -> Causes {
         use crate::resolver::resource_policy::{unit as policy_unit, PolicySubject};
 
-        // What Phase 4 leaves when no submitted artifact is the policy, made
-        // up without what its check observed.
         let mut other = Evaluation::fabricated();
-        let causes = other
+        other
             .check(
                 policy_unit(PolicySubject::ResourceLimits, Check::BootstrapCandidate),
                 Ok(()),
@@ -956,7 +957,12 @@ mod tests {
                 },
             )
             .unwrap()
-            .unwrap_err();
+            .unwrap_err()
+    }
+
+    #[test]
+    fn without_a_confirmed_policy_nothing_is_admitted() {
+        let causes = unconfirmed();
         let collection = collection(&[
             valid(ArtifactKind::TrustPolicy, "storefront-trust"),
             json!({"schemaRevision": "0"}),
@@ -969,6 +975,32 @@ mod tests {
         assert!(evaluation
             .statuses()
             .all(|(_, status)| *status == Status::NotEvaluated(causes.clone())));
+    }
+
+    /// A confirmed policy over a collection without a member admits an empty
+    /// Set, with no unit to record (D15:2137).
+    #[test]
+    fn an_empty_collection_under_a_confirmed_policy_is_an_empty_set() {
+        let empty = collection(&[]);
+        let mut evaluation = Evaluation::default();
+        let set = admit_collection(&mut evaluation, Ok(&confirmed()), &empty)
+            .unwrap()
+            .unwrap();
+        assert_eq!(set.len(), 0);
+        assert_eq!(evaluation.statuses().count(), 0);
+    }
+
+    /// Without a confirmed policy a collection without a member has no unit
+    /// to wait on it, so the Set itself waits on why, and nothing that reads
+    /// the Set can report what the collection lacks (D15:2132, 2137, 2365).
+    #[test]
+    fn an_empty_collection_without_a_confirmed_policy_has_no_set() {
+        let causes = unconfirmed();
+        let empty = collection(&[]);
+        let mut evaluation = Evaluation::default();
+        let set = admit_collection(&mut evaluation, Err(&causes), &empty).unwrap();
+        assert_eq!(set, Err(causes));
+        assert_eq!(evaluation.statuses().count(), 0);
     }
 
     #[test]
