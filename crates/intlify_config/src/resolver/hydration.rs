@@ -39,11 +39,17 @@
 //! incompatible Target Profiles beside where it found both endpoints'. A
 //! Target ID that takes both roles is observed at each of its occurrences in
 //! one role beside those in the other.
+//!
+//! Each relation is read on its own (D15:2149, 2367, 3445). The bound counts
+//! what was submitted, a relation that failed and one under an entry whose key
+//! failed included. An element without a value for both endpoints has no
+//! subject here and holds back no other relation. What a later phase reads
+//! waits on all of it.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::artifacts::content::{Content, HydrationRoles, TargetProfile};
-use crate::model::{DeploymentGroup, DeploymentGroupId, HydrationRelation, NonEmptyMap, TargetId};
+use crate::model::{DeploymentGroup, DeploymentGroupId, NonEmptyMap, TargetId};
 use crate::structural::Edge;
 
 use super::artifact_resolution::{self, AdmittedArtifact};
@@ -142,6 +148,63 @@ pub(crate) enum HydrationSubject {
     Roles(DeploymentGroupId, TargetId),
 }
 
+/// One element of a group's `hydrationRelations` with both endpoints.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct RelationField<'a> {
+    pub(crate) server: &'a TargetId,
+    pub(crate) client: &'a TargetId,
+}
+
+/// One entry of the Group ID map with an admitted key: its relations, each
+/// one's element or why it is none, or why it has none to read.
+#[derive(Debug, Clone)]
+pub(crate) struct RelationGroup<'a> {
+    pub(crate) id: &'a DeploymentGroupId,
+    pub(crate) relations: Admitted<Vec<Admitted<RelationField<'a>>>>,
+}
+
+/// The Group ID map as Phase 13 reads it: how many relation occurrences its
+/// arrays hold, whatever their entries' keys and values (D15:1936), each entry
+/// with an admitted key, and whether everything at and below the map passed,
+/// which what needs every relation waits on.
+#[derive(Debug, Clone)]
+pub(crate) struct HydrationFields<'a> {
+    pub(crate) occurrences: Admitted<usize>,
+    pub(crate) groups: Vec<RelationGroup<'a>>,
+    pub(crate) whole: Admitted<()>,
+}
+
+impl<'a> HydrationFields<'a> {
+    /// The fields of a map structural admission admitted whole.
+    pub(crate) fn declared(groups: &'a NonEmptyMap<DeploymentGroupId, DeploymentGroup>) -> Self {
+        let relations = |group: &'a DeploymentGroup| {
+            group
+                .hydration_relations
+                .as_option()
+                .map_or(&[][..], Vec::as_slice)
+        };
+        Self {
+            occurrences: Ok(groups.values().map(|group| relations(group).len()).sum()),
+            groups: groups
+                .iter()
+                .map(|(id, group)| RelationGroup {
+                    id,
+                    relations: Ok(relations(group)
+                        .iter()
+                        .map(|relation| {
+                            Ok(RelationField {
+                                server: &relation.server,
+                                client: &relation.client,
+                            })
+                        })
+                        .collect()),
+                })
+                .collect(),
+            whole: Ok(()),
+        }
+    }
+}
+
 /// The field of a relation that names an endpoint, in the byte order of the
 /// field names: `client` before `server`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -173,11 +236,13 @@ pub(crate) fn unit(subject: HydrationSubject, check: Check) -> Unit {
 /// client)` pairs in that order.
 pub(crate) type Relations = BTreeSet<(TargetId, TargetId)>;
 
-/// What Phase 13 established: each group's checked relations, and the Locale
-/// Negotiation Profile every relation shares.
+/// What Phase 13 established: each group's checked relations, whether
+/// everything at and below the Group ID map passed, and the Locale Negotiation
+/// Profile every relation shares.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ResolvedHydration {
     relations: BTreeMap<DeploymentGroupId, Admitted<Relations>>,
+    whole: Admitted<()>,
     negotiation: Admitted<()>,
 }
 
@@ -198,10 +263,11 @@ impl ResolvedHydration {
         &self.negotiation
     }
 
-    /// Whether every group's relations were checked and held, or the causes
-    /// of each that did not.
+    /// Whether the whole map was read and every group's relations were
+    /// checked and held, or the causes of what was not and of each that did
+    /// not.
     pub(crate) fn complete(&self) -> Admitted<()> {
-        let mut holds = Ok(());
+        let mut holds = self.whole.clone();
         for relations in self.relations.values() {
             holds = and(holds, relations.as_ref().map(|_| ()).map_err(Causes::clone));
         }
@@ -226,7 +292,7 @@ impl ResolvedHydration {
 pub(crate) fn validate_hydration(
     evaluation: &mut Evaluation,
     policy: Result<&ConfirmedPolicy, &Causes>,
-    declared: Admitted<&NonEmptyMap<DeploymentGroupId, DeploymentGroup>>,
+    declared: &Admitted<HydrationFields<'_>>,
     targets: Result<&ResolvedTargets<'_>, &Causes>,
     (groups, observer): (
         Result<&ResolvedGroups, &Causes>,
@@ -234,9 +300,8 @@ pub(crate) fn validate_hydration(
     ),
     negotiation: Admitted<()>,
 ) -> Result<Admitted<ResolvedHydration>, HydrationInvariant> {
-    // The map is there to observe only once structural admission admitted
-    // it.
-    let at_map = match &declared {
+    // The map is there to observe only once it can be read.
+    let at_map = match declared {
         Ok(_) => beside(policy, observer, |observer| {
             observer.value(&["deploymentGroups"])
         })?,
@@ -245,22 +310,25 @@ pub(crate) fn validate_hydration(
     let policy = policy.map_err(Causes::clone);
     let bounded = evaluation.check_found(
         unit(HydrationSubject::Relations, Check::WithinBound),
-        both(policy.clone(), declared.clone()),
-        |(policy, declared)| {
+        both(
+            policy.clone(),
+            declared
+                .as_ref()
+                .map_err(Causes::clone)
+                .and_then(|fields| fields.occurrences.clone()),
+        ),
+        |(policy, total)| {
             within(
                 MAX_HYDRATION_RELATIONS,
                 policy.limits().target_grouping.max_hydration_relations,
-                declared
-                    .values()
-                    .map(|group| relations_of(group).len())
-                    .sum(),
+                total,
             )
             .map_err(|blocking| Found::through(blocking, at_map))
         },
     )?;
-    let declared = match declared {
-        Ok(declared) => declared,
-        Err(causes) => return Ok(Err(causes)),
+    let fields = match declared {
+        Ok(fields) => fields,
+        Err(causes) => return Ok(Err(causes.clone())),
     };
     // The declared Target IDs are there to observe only once Phase 11
     // resolved them.
@@ -277,21 +345,14 @@ pub(crate) fn validate_hydration(
         at_targets: at_targets.as_ref(),
     };
     let mut relations = BTreeMap::new();
-    for (id, group) in declared.iter() {
-        relations.insert(id.clone(), shared.group(evaluation, id, group)?);
+    for group in &fields.groups {
+        relations.insert(group.id.clone(), shared.group(evaluation, group)?);
     }
     Ok(Ok(ResolvedHydration {
         relations,
+        whole: fields.whole.clone(),
         negotiation,
     }))
-}
-
-/// A group's submitted relations; omission declares none.
-fn relations_of(group: &DeploymentGroup) -> &[HydrationRelation] {
-    group
-        .hydration_relations
-        .as_option()
-        .map_or(&[], Vec::as_slice)
 }
 
 /// What every relation's checks share: what they wait on, the declaration's
@@ -307,24 +368,29 @@ struct Shared<'a, 'p, 't, 's> {
 
 impl<'p, 't, 's> Shared<'_, 'p, 't, 's> {
     /// One group's relations, each pair once however often submitted, and
-    /// the roles of each Target ID among them.
+    /// the roles of each Target ID among them. An element that is no relation
+    /// keeps its position and has no subject. The set exists only when every
+    /// element holds and none failed.
     fn group(
         &self,
         evaluation: &mut Evaluation,
-        id: &DeploymentGroupId,
-        group: &DeploymentGroup,
+        group: &RelationGroup<'_>,
     ) -> Result<Admitted<Relations>, HydrationInvariant> {
+        let id = group.id;
         // Each pair's occurrences, by their positions in the group's
         // relations.
         let mut occurrences: BTreeMap<(&TargetId, &TargetId), Vec<usize>> = BTreeMap::new();
-        for (index, relation) in relations_of(group).iter().enumerate() {
-            occurrences
-                .entry((&relation.server, &relation.client))
-                .or_default()
-                .push(index);
+        let mut holds = group.relations.as_ref().map(|_| ()).map_err(Causes::clone);
+        for (index, relation) in group.relations.iter().flatten().enumerate() {
+            match relation {
+                Ok(relation) => occurrences
+                    .entry((relation.server, relation.client))
+                    .or_default()
+                    .push(index),
+                Err(causes) => holds = and(holds, Err(causes.clone())),
+            }
         }
         let gate = self.gate(id)?;
-        let mut holds = Ok(());
         let mut taken: BTreeMap<&TargetId, Taken> = BTreeMap::new();
         for (&(server, client), positions) in &occurrences {
             let relation = Relation {
@@ -361,7 +427,7 @@ impl<'p, 't, 's> Shared<'_, 'p, 't, 's> {
     /// What every endpoint of one group reads: the policy once the relations'
     /// bound and the group's own bounds hold, the Target IDs the group's
     /// members name, and the declared Target IDs; and where the group's
-    /// members are, which the declaration has whenever the group is checked.
+    /// members are, once there is an array to observe.
     fn gate(&self, id: &DeploymentGroupId) -> Result<Gate<'p, 't, 's>, ObserverInvariant> {
         let bounds = self.groups.clone().and_then(|groups| {
             groups
@@ -376,10 +442,13 @@ impl<'p, 't, 's> Shared<'_, 'p, 't, 's> {
                 .as_ref()
                 .map_err(Causes::clone)
         });
-        let at_members = self
-            .observer
-            .map(|observer| observer.value(&["deploymentGroups", id.as_str(), "members"]))
-            .transpose()?;
+        // The members are there to observe once Phase 12 read every one.
+        let at_members = match (self.observer, &named) {
+            (Some(observer), Ok(_)) => {
+                Some(observer.value(&["deploymentGroups", id.as_str(), "members"])?)
+            }
+            _ => None,
+        };
         Ok(Gate {
             policy: both(both(self.policy.clone(), self.bounded.clone()), bounds)
                 .map(|((policy, ()), ())| policy),
@@ -1059,13 +1128,13 @@ mod tests {
             let declared = self
                 .declared
                 .clone()
-                .map(|()| &declaration.deployment_groups);
+                .map(|()| HydrationFields::declared(&declaration.deployment_groups));
             let hydration = observed
                 .app(|observer| {
                     validate_hydration(
                         &mut evaluation,
                         policy,
-                        declared,
+                        &declared,
                         targets.as_ref(),
                         (groups.as_ref(), Some(observer)),
                         self.negotiation.clone(),

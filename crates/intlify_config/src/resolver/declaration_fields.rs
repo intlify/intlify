@@ -27,6 +27,7 @@ use super::declaration_fragments::{
 };
 use super::evaluation::{Admitted, Causes};
 use super::groups::{GroupField, GroupFields};
+use super::hydration::{HydrationFields, RelationField, RelationGroup};
 use super::locales::{
     AliasField, AliasFields, FallbackField, LocaleFields, TargetLocaleFields, TargetMapFields,
 };
@@ -61,7 +62,8 @@ pub(crate) struct DeclarationFields<Policy, Target> {
     target_entries: Admitted<TargetEntries<Target>>,
     /// The Group ID map entry by entry, which Phase 12 reads.
     group_entries: Admitted<GroupEntries>,
-    /// The Group ID map as one value, which Phase 13 reads.
+    /// The Group ID map as one value, whose admission Phase 13's result
+    /// waits on.
     deployment_groups: Admitted<DeploymentGroups>,
     delivery: Admitted<Option<Delivery>>,
 }
@@ -208,9 +210,32 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
         })
     }
 
-    /// The Group ID map as one value, which Phase 13 reads.
-    pub(crate) fn deployment_groups(&self) -> Admitted<&DeploymentGroups> {
-        borrowed(&self.deployment_groups, |groups| groups)
+    /// The relations of the Group ID map entry by entry, which Phase 13
+    /// reads, and whether everything at and below the map passed.
+    pub(crate) fn hydration_fields(&self) -> Admitted<HydrationFields<'_>> {
+        let whole = borrowed(&self.deployment_groups, |_| ());
+        borrowed(&self.group_entries, |groups| HydrationFields {
+            occurrences: groups.relations.clone(),
+            groups: groups
+                .entries
+                .iter()
+                .map(|entry| RelationGroup {
+                    id: &entry.id,
+                    relations: borrowed(&entry.relations, |relations| {
+                        relations
+                            .iter()
+                            .map(|relation| {
+                                borrowed(relation, |relation| RelationField {
+                                    server: &relation.server,
+                                    client: &relation.client,
+                                })
+                            })
+                            .collect()
+                    }),
+                })
+                .collect(),
+            whole,
+        })
     }
 
     pub(crate) fn delivery(&self) -> Admitted<Option<&Delivery>> {
