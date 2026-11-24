@@ -512,6 +512,34 @@ pub(crate) mod tests {
         }
     }
 
+    /// A stable configuration-root identity plus a logical source slot
+    /// establishes the file's identity with no locator, and the same pair
+    /// under any locator: the locator takes no part in it (D15:741, 788,
+    /// 3388).
+    #[test]
+    fn a_root_identity_and_slot_establish_the_file_identity_without_a_locator() {
+        const ROOTED: &str = "intlify-file-source.v0:root-7f3a#intlify.config";
+        let revision = file_source_revision(BYTES);
+        let capability = roomy();
+        let mut pairs = Vec::new();
+        for candidate in [
+            None,
+            Some(locator("intlify.config.json")),
+            Some(locator("packages/web/intlify.config.json")),
+            Some(locator("C:/not/a/relative/path")),
+        ] {
+            let mut entry = submitted(&revision, "app");
+            entry.file.value.identity = Some(ROOTED);
+            entry.file.value.locator = candidate;
+            let Ok(admitted) = admit(entry, Some(&capability)) else {
+                panic!("the entry is admitted: {candidate:?}");
+            };
+            assert_eq!(admitted.source.identity().as_str(), ROOTED);
+            pairs.push(admitted.source);
+        }
+        assert!(pairs.windows(2).all(|pair| pair[0] == pair[1]));
+    }
+
     /// Each value is read under its own bounds of the capability.
     #[test]
     fn each_value_is_read_under_its_own_capability_bounds() {
