@@ -52,7 +52,7 @@ use super::coverage::{CoverageSubject, Domain, RuleContent, SurfaceKey};
 use super::evaluation::Subject;
 use super::fallback::FallbackSubject;
 use super::groups::GroupSubject;
-use super::hydration::{EndpointField, HydrationSubject};
+use super::hydration::{EndpointField, HydrationSubject, RelationKey};
 use super::locales::{Content, LocaleKey, LocaleSubject};
 use super::negotiation::NegotiationSubject;
 use super::profile_selection::SelectionSubject;
@@ -128,11 +128,19 @@ pub(crate) fn logical(subject: &Subject) -> Subject {
         | Subject::DeliveryPlacement
         | Subject::Target(_)
         | Subject::Group(_)
-        | Subject::Hydration(_)
         | Subject::SemanticDependency(_)
         | Subject::DiagnosticDomain
         | Subject::ArtifactCollection(CollectionSubject::Group(_)) => subject.clone(),
         Subject::Structural(structural) => Subject::Structural(structural.logical()),
+        Subject::Hydration(hydration) => Subject::Hydration(match hydration {
+            HydrationSubject::Endpoint(group, key, field) => {
+                HydrationSubject::Endpoint(group.clone(), key.logical(), *field)
+            }
+            HydrationSubject::Relation(group, key) => {
+                HydrationSubject::Relation(group.clone(), key.logical())
+            }
+            HydrationSubject::Relations | HydrationSubject::Roles(..) => hydration.clone(),
+        }),
         Subject::ResourcePolicy(policy) => Subject::ResourcePolicy(match policy {
             PolicySubject::Capability(ArtifactSubject::Artifact(key)) => {
                 PolicySubject::Capability(ArtifactSubject::Artifact(logical_member(key)))
@@ -601,21 +609,23 @@ fn hydration_subject(subject: &HydrationSubject) -> (Own<'_>, Option<Subject>) {
         |group: &DeploymentGroupId| Some(Subject::Group(GroupSubject::Group(group.clone())));
     match subject {
         HydrationSubject::Relations => (Own::Singleton, None),
-        HydrationSubject::Endpoint(group, server, client, field) => (
+        HydrationSubject::Endpoint(group, key, field) => (
             Own::Field(vec![match field {
                 EndpointField::Client => "client",
                 EndpointField::Server => "server",
             }]),
             Some(Subject::Hydration(HydrationSubject::Relation(
                 group.clone(),
-                server.clone(),
-                client.clone(),
+                key.clone(),
             ))),
         ),
-        HydrationSubject::Relation(group, server, client) => (
+        HydrationSubject::Relation(group, RelationKey::Pair(server, client)) => (
             Own::Identity(json!({ "server": server.as_str(), "client": client.as_str() })),
             under(group),
         ),
+        HydrationSubject::Relation(group, RelationKey::Content(_)) => {
+            (Own::Content("object"), under(group))
+        }
         HydrationSubject::Roles(group, target) => (identity(target.as_str()), under(group)),
     }
 }
@@ -699,7 +709,9 @@ mod tests {
     use crate::resolver::evaluation::Subject;
     use crate::resolver::fallback::FallbackSubject;
     use crate::resolver::groups::GroupSubject;
-    use crate::resolver::hydration::{EndpointField, HydrationSubject};
+    use crate::resolver::hydration::{
+        EndpointField, HydrationSubject, RelationContent, RelationKey,
+    };
     use crate::resolver::identity::DeclarationField;
     use crate::resolver::locales::fixtures::{canonical, content, key, target};
     use crate::resolver::locales::{Content, LocaleSubject};
@@ -953,11 +965,22 @@ mod tests {
                 HydrationSubject::Relations,
                 HydrationSubject::Endpoint(
                     group("site"),
-                    target("ssr"),
-                    target("web"),
+                    RelationKey::Pair(target("ssr"), target("web")),
                     EndpointField::Server,
                 ),
-                HydrationSubject::Relation(group("site"), target("ssr"), target("web")),
+                HydrationSubject::Relation(
+                    group("site"),
+                    RelationKey::Pair(target("ssr"), target("web")),
+                ),
+                HydrationSubject::Endpoint(
+                    group("site"),
+                    RelationKey::Content(RelationContent::projected()),
+                    EndpointField::Server,
+                ),
+                HydrationSubject::Relation(
+                    group("site"),
+                    RelationKey::Content(RelationContent::projected()),
+                ),
                 HydrationSubject::Roles(group("site"), target("web")),
             ]
             .map(Subject::Hydration),
@@ -1340,8 +1363,7 @@ mod tests {
             (
                 Subject::Hydration(HydrationSubject::Endpoint(
                     group("site"),
-                    target("ssr"),
-                    target("web"),
+                    RelationKey::Pair(target("ssr"), target("web")),
                     EndpointField::Server,
                 )),
                 parent(parent(site.clone(), relation.clone()), json!(["server"])),
@@ -1349,8 +1371,7 @@ mod tests {
             (
                 Subject::Hydration(HydrationSubject::Endpoint(
                     group("site"),
-                    target("ssr"),
-                    target("web"),
+                    RelationKey::Pair(target("ssr"), target("web")),
                     EndpointField::Client,
                 )),
                 parent(parent(site.clone(), relation.clone()), json!(["client"])),
@@ -1358,10 +1379,28 @@ mod tests {
             (
                 Subject::Hydration(HydrationSubject::Relation(
                     group("site"),
-                    target("ssr"),
-                    target("web"),
+                    RelationKey::Pair(target("ssr"), target("web")),
                 )),
                 parent(site.clone(), relation),
+            ),
+            // A relation without an identity is keyed by its content.
+            (
+                Subject::Hydration(HydrationSubject::Relation(
+                    group("site"),
+                    RelationKey::Content(RelationContent::projected()),
+                )),
+                parent(site.clone(), json!({ "content": { "type": "object" } })),
+            ),
+            (
+                Subject::Hydration(HydrationSubject::Endpoint(
+                    group("site"),
+                    RelationKey::Content(RelationContent::projected()),
+                    EndpointField::Server,
+                )),
+                parent(
+                    parent(site.clone(), json!({ "content": { "type": "object" } })),
+                    json!(["server"]),
+                ),
             ),
             (
                 Subject::Hydration(HydrationSubject::Roles(group("site"), target("web"))),

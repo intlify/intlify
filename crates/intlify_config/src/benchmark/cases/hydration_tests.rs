@@ -10,7 +10,9 @@ use crate::benchmark::operation::{Output, Prepared};
 use crate::benchmark::work::LogicalWork;
 use crate::model::{DeploymentGroupId, TargetId};
 use crate::resolver::evaluation::{Actual, Check, Code, Reason, Status, Subject, Unit};
-use crate::resolver::hydration::{unit as hydration_unit, EndpointField, HydrationSubject};
+use crate::resolver::hydration::{
+    unit as hydration_unit, EndpointField, HydrationSubject, RelationKey,
+};
 use crate::resolver::limits::{BoundId, Group};
 
 use HydrationRecipe as R;
@@ -54,7 +56,10 @@ fn group(id: &str) -> DeploymentGroupId {
 
 fn relation(server: &str, client: &str, check: Check) -> Unit {
     hydration_unit(
-        HydrationSubject::Relation(group("web"), target(server), target(client)),
+        HydrationSubject::Relation(
+            group("web"),
+            RelationKey::Pair(target(server), target(client)),
+        ),
         check,
     )
 }
@@ -62,7 +67,11 @@ fn relation(server: &str, client: &str, check: Check) -> Unit {
 /// One check of the endpoint `field` names in a relation of `web`.
 fn on_endpoint(server: &str, client: &str, field: EndpointField, check: Check) -> Unit {
     hydration_unit(
-        HydrationSubject::Endpoint(group("web"), target(server), target(client), field),
+        HydrationSubject::Endpoint(
+            group("web"),
+            RelationKey::Pair(target(server), target(client)),
+            field,
+        ),
         check,
     )
 }
@@ -437,7 +446,14 @@ fn each_bound_holds_at_its_count_and_one_less_blocks_its_unit() {
         let exceeded = over.evaluation.limit(key).unwrap();
         assert_eq!(exceeded.bound, bound(name), "{limit:?}");
         assert_eq!(exceeded.limit.get(), count - 1, "{limit:?}");
-        assert_eq!(exceeded.actual, Actual::Exact(count), "{limit:?}");
+        // A relation's key can stand for several values, so an endpoint
+        // reports the first-over witness (D15:2203).
+        let actual = if matches!(limit, LimitKind::HydrationEndpointBytes) {
+            Actual::AtLeast(count)
+        } else {
+            Actual::Exact(count)
+        };
+        assert_eq!(exceeded.actual, actual, "{limit:?}");
         // Only the relations' bound, the blocked unit, and what does not
         // need it were checked, and every other unit waits on the blocked one.
         let relations = hydration_unit(HydrationSubject::Relations, Check::WithinBound);

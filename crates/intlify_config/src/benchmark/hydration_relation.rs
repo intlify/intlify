@@ -28,7 +28,7 @@ use crate::resolver::exact_resolution::resolve_fields;
 use crate::resolver::groups::{resolve_groups, GroupFields, ResolvedGroups};
 use crate::resolver::hydration::{
     validate_hydration, EndpointField, HydrationFields, HydrationInvariant, HydrationSubject,
-    ResolvedHydration,
+    RelationKey, ResolvedHydration,
 };
 use crate::resolver::limits::ConfirmedPolicy;
 use crate::resolver::locales::{resolve_locales, LocaleFields};
@@ -326,12 +326,17 @@ fn count(value: usize) -> Result<u64, OutputFailure> {
 }
 
 /// Only Phase 13's own units run in the interval: the bound, an endpoint, a
-/// relation, or a Target ID's roles, under one of its ten checks.
+/// relation, or a Target ID's roles, under one of its ten checks. Its
+/// declaration is admitted whole, so no relation is keyed by its content.
 fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
     frame.text(unit.phase.id());
     match &unit.subject {
         Subject::Hydration(HydrationSubject::Relations) => frame.uint(0),
-        Subject::Hydration(HydrationSubject::Endpoint(group, server, client, field)) => {
+        Subject::Hydration(HydrationSubject::Endpoint(
+            group,
+            RelationKey::Pair(server, client),
+            field,
+        )) => {
             frame.uint(3);
             frame.text(group.as_str());
             frame.text(server.as_str());
@@ -341,7 +346,10 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
                 EndpointField::Server => 1,
             });
         }
-        Subject::Hydration(HydrationSubject::Relation(group, server, client)) => {
+        Subject::Hydration(HydrationSubject::Relation(
+            group,
+            RelationKey::Pair(server, client),
+        )) => {
             frame.uint(1);
             frame.text(group.as_str());
             frame.text(server.as_str());
@@ -352,7 +360,11 @@ fn unit(frame: &mut Frame, unit: &Unit) -> Result<(), OutputFailure> {
             frame.text(group.as_str());
             frame.text(target.as_str());
         }
-        Subject::Slot(_)
+        Subject::Hydration(
+            HydrationSubject::Endpoint(_, RelationKey::Content(_), _)
+            | HydrationSubject::Relation(_, RelationKey::Content(_)),
+        )
+        | Subject::Slot(_)
         | Subject::EntryDependencies
         | Subject::CompleteInput
         | Subject::MaterializedDependencies
@@ -700,7 +712,10 @@ mod tests {
 
     fn relation(group_id: &str, server: &str, client: &str, check: Check) -> Unit {
         hydration_unit(
-            HydrationSubject::Relation(group(group_id), target(server), target(client)),
+            HydrationSubject::Relation(
+                group(group_id),
+                RelationKey::Pair(target(server), target(client)),
+            ),
             check,
         )
     }
@@ -714,8 +729,7 @@ mod tests {
         hydration_unit(
             HydrationSubject::Endpoint(
                 group("web"),
-                target("ssr"),
-                target("browser"),
+                RelationKey::Pair(target("ssr"), target("browser")),
                 EndpointField::Client,
             ),
             check,
@@ -931,7 +945,11 @@ mod tests {
     fn the_interval_observes_an_endpoint_that_fails() {
         let endpoint = |client: &str, field, check| {
             hydration_unit(
-                HydrationSubject::Endpoint(group("web"), target("ssr"), target(client), field),
+                HydrationSubject::Endpoint(
+                    group("web"),
+                    RelationKey::Pair(target("ssr"), target(client)),
+                    field,
+                ),
                 check,
             )
         };
@@ -1151,7 +1169,11 @@ mod tests {
         };
         let endpoint = |server: &str, client: &str, field| {
             hydration_unit(
-                HydrationSubject::Endpoint(group("web"), target(server), target(client), field),
+                HydrationSubject::Endpoint(
+                    group("web"),
+                    RelationKey::Pair(target(server), target(client)),
+                    field,
+                ),
                 Check::WithinBound,
             )
         };

@@ -1004,7 +1004,7 @@ pub(super) mod tests {
     use crate::resolver::evidence_token::EvidenceTokens;
     use crate::resolver::exact_resolution;
     use crate::resolver::groups::{self, GroupSubject};
-    use crate::resolver::hydration::{self, HydrationSubject};
+    use crate::resolver::hydration::{self, HydrationSubject, RelationKey};
     use crate::resolver::limits::{fixture_limits, BoundId, Group, ResolutionLimits, SECTION};
     use crate::resolver::locales::fixtures::canonical;
     use crate::resolver::locales::{self, LocaleKey, LocaleSubject, Location};
@@ -3835,9 +3835,8 @@ pub(super) mod tests {
             json!([{"server": "server", "client": "phone"}]);
         inputs.resolve(|evaluation, _| {
             let endpoint = HydrationSubject::Endpoint(
-                serde_json::from_value(json!("web")).unwrap(),
-                serde_json::from_value(json!("server")).unwrap(),
-                serde_json::from_value(json!("phone")).unwrap(),
+                group_id("web"),
+                RelationKey::Pair(target_id("server"), target_id("phone")),
                 EndpointField::Client,
             );
             let known = hydration::unit(endpoint, Check::KnownEndpoint);
@@ -3876,9 +3875,8 @@ pub(super) mod tests {
         inputs.resolve(|evaluation, _| {
             for field in [EndpointField::Client, EndpointField::Server] {
                 let endpoint = HydrationSubject::Endpoint(
-                    serde_json::from_value(json!("web")).unwrap(),
-                    serde_json::from_value(json!("server")).unwrap(),
-                    serde_json::from_value(json!("browser")).unwrap(),
+                    group_id("web"),
+                    RelationKey::Pair(target_id("server"), target_id("browser")),
                     field,
                 );
                 let known = hydration::unit(endpoint, Check::KnownEndpoint);
@@ -3905,9 +3903,8 @@ pub(super) mod tests {
         inputs.resolve(|evaluation, _| {
             // `server` inherits the default; `browser` declares its own.
             let relation = HydrationSubject::Relation(
-                serde_json::from_value(json!("web")).unwrap(),
-                serde_json::from_value(json!("server")).unwrap(),
-                serde_json::from_value(json!("browser")).unwrap(),
+                group_id("web"),
+                RelationKey::Pair(target_id("server"), target_id("browser")),
             );
             let default = hydration::unit(relation, Check::SameEffectiveDefault);
             assert!(matches!(
@@ -4192,6 +4189,239 @@ pub(super) mod tests {
         });
     }
 
+    /// Each of `checks` over `subject` waits on exactly `causes`.
+    fn waiting_13(
+        evaluation: &Evaluation,
+        checks: &[Check],
+        subject: &Value,
+        causes: &BTreeSet<IssueKey>,
+    ) {
+        for &check in checks {
+            let Some(Status::NotEvaluated(found)) = phase_13(evaluation, check, subject) else {
+                panic!("{check:?} {subject} is not waiting");
+            };
+            assert_eq!(&keys(&found), causes, "{check:?} {subject}");
+        }
+    }
+
+    /// Where each occurrence of the Finding of `check` over `subject` is.
+    fn pointers_13(evaluation: &Evaluation, check: Check, subject: &Value) -> Vec<Value> {
+        use crate::resolver::declaration_observer::fixtures::view;
+        let mut pointers: Vec<Value> = evaluation
+            .occurrence_candidates()
+            .iter()
+            .filter(|candidate| {
+                let unit = candidate.finding.unit();
+                unit.check == check && crate::resolver::token::projected(&unit.subject) == *subject
+            })
+            .map(|candidate| view(&candidate.primary)["value"]["exact-json-pointer"].clone())
+            .collect();
+        pointers.sort_by_key(ToString::to_string);
+        pointers
+    }
+
+    /// One endpoint that failed leaves the other checked: the relation has
+    /// no identity, so it is keyed by its content; the endpoint that failed
+    /// has no subject, and what compares the two waits on it (D15:1931, 2181,
+    /// 2184, 2190, 2203, 2367).
+    #[test]
+    fn an_endpoint_that_failed_leaves_the_other_checked() {
+        for failed in [
+            json!({"server": "server", "client": 7}),
+            json!({"server": "server"}),
+            json!({"server": "server", "client": "Not An Id"}),
+        ] {
+            let mut inputs = Inputs::complete();
+            relations_of(&mut inputs, "web", json!([failed.clone()]));
+            inputs.resolve(|evaluation, state| {
+                let relation = unidentified();
+                let server = endpoint_of(&relation, "server");
+                checked_13(&evaluation, &ENDPOINT_CHECKS, &server);
+                let client = endpoint_of(&relation, "client");
+                assert_eq!(phase_13(&evaluation, Check::WithinBound, &client), None);
+                let why = BTreeSet::from([only_issue(&evaluation)]);
+                waiting_13(&evaluation, &RELATION_CHECKS, &relation, &why);
+                checked_13(&evaluation, &[Check::SingleRole], &roles_of("server"));
+                let browser = roles_of("browser");
+                assert_eq!(phase_13(&evaluation, Check::SingleRole, &browser), None);
+                assert_eq!(issues_13(&evaluation), [], "{failed}");
+                let hydration = state.hydration.as_ref().unwrap();
+                assert_eq!(keys(hydration.complete().as_ref().unwrap_err()), why);
+            });
+        }
+    }
+
+    /// A relation with neither endpoint keeps its subject, whose checks wait
+    /// on both failures, and has no endpoint or role to check (D15:2184,
+    /// 2190).
+    #[test]
+    fn a_relation_with_neither_endpoint_waits_on_both() {
+        let mut inputs = Inputs::complete();
+        relations_of(
+            &mut inputs,
+            "web",
+            json!([{"server": 7, "client": "No Id"}]),
+        );
+        inputs.resolve(|evaluation, _| {
+            let why: BTreeSet<IssueKey> = evaluation.issues().cloned().collect();
+            assert_eq!(why.len(), 2);
+            let relation = unidentified();
+            waiting_13(&evaluation, &RELATION_CHECKS, &relation, &why);
+            for field in ["client", "server"] {
+                let endpoint = endpoint_of(&relation, field);
+                assert_eq!(phase_13(&evaluation, Check::WithinBound, &endpoint), None);
+            }
+            let roles = evaluation
+                .statuses()
+                .filter(|(unit, _)| unit.check == Check::SingleRole);
+            assert_eq!(roles.count(), 0);
+        });
+    }
+
+    /// The endpoint left reports what it alone proves, under the relation's
+    /// content, and an endpoint that fails holds back only what needs it
+    /// (D15:2190, 2365, 2367).
+    #[test]
+    fn the_endpoint_left_reports_what_it_alone_proves() {
+        let found = |server: &str| {
+            let mut inputs = Inputs::complete();
+            let relation = json!([{"server": server, "client": 7}]);
+            relations_of(&mut inputs, "web", relation);
+            inputs.resolve(|evaluation, _| issues_13(&evaluation))
+        };
+        let at = endpoint_of(&unidentified(), "server");
+        let invalid = |check, reason| (check, at.clone(), Code::HydrationRelationInvalid, reason);
+        assert_eq!(
+            found("phone"),
+            [
+                invalid(Check::KnownEndpoint, Some(Reason::UnknownEndpoint)),
+                invalid(Check::SameGroupEndpoint, Some(Reason::CrossGroup)),
+            ]
+        );
+        assert_eq!(
+            found("browser"),
+            [invalid(
+                Check::EndpointRole,
+                Some(Reason::ServerCapabilityMissing)
+            )]
+        );
+    }
+
+    /// A Target ID's two roles are proved from the endpoints admitted, and
+    /// one role among them passes: a unit over several values evaluates what
+    /// is admitted (D15:2098, 2184, 2365).
+    #[test]
+    fn a_target_two_relations_give_both_roles_is_found_beside_an_endpoint_that_failed() {
+        for relations in [
+            json!([
+                {"server": "server", "client": 7},
+                {"server": "browser", "client": "server"},
+            ]),
+            json!([
+                {"server": 7, "client": "server"},
+                {"server": "server", "client": "browser"},
+            ]),
+        ] {
+            let mut inputs = Inputs::complete();
+            relations_of(&mut inputs, "web", relations.clone());
+            inputs.resolve(|evaluation, _| {
+                let dual = (
+                    Check::SingleRole,
+                    roles_of("server"),
+                    Code::HydrationRelationInvalid,
+                    Some(Reason::DualRole),
+                );
+                assert!(issues_13(&evaluation).contains(&dual), "{relations}");
+                checked_13(&evaluation, &[Check::SingleRole], &roles_of("browser"));
+            });
+        }
+    }
+
+    /// Relations without an identity share one subject, each checked on its
+    /// own: a check of the endpoint under it finds each raw parent at its
+    /// occurrences (D15:2190, 2203).
+    #[test]
+    fn relations_without_an_identity_share_a_subject_and_are_checked_apart() {
+        let mut inputs = Inputs::complete();
+        relations_of(
+            &mut inputs,
+            "web",
+            json!([
+                {"server": "phone", "client": 7},
+                {"server": "server", "client": 8},
+                {"server": "tablet", "client": 7},
+                {"server": "phone", "client": 7},
+            ]),
+        );
+        inputs.resolve(|evaluation, _| {
+            let server = endpoint_of(&unidentified(), "server");
+            let at = |index: usize| {
+                json!(format!(
+                    "/profiles/web/deploymentGroups/web/hydrationRelations/{index}/server"
+                ))
+            };
+            assert_eq!(
+                pointers_13(&evaluation, Check::KnownEndpoint, &server),
+                [at(0), at(2), at(3)]
+            );
+            // Every raw parent joins one unit of each subject.
+            for (check, subject) in [
+                (Check::KnownEndpoint, server.clone()),
+                (Check::UniqueRelation, unidentified()),
+            ] {
+                let units = evaluation.statuses().filter(|(unit, _)| {
+                    unit.phase == Phase::HydrationValidation
+                        && unit.check == check
+                        && crate::resolver::token::projected(&unit.subject) == subject
+                });
+                assert_eq!(units.count(), 1, "{check:?}");
+            }
+            // The endpoint a raw parent spells that is declared passes on
+            // its own, whatever another parent under the key found.
+            checked_13(&evaluation, &[Check::SingleRole], &roles_of("server"));
+        });
+    }
+
+    /// A relation's key can stand for distinct raw parents, so past
+    /// `maxTargetIdBytes` an endpoint reports the first-over witness, even
+    /// under an identity and for one value (D15:2203, 3355, Decision 015-157).
+    #[test]
+    fn an_endpoint_past_its_bound_reports_the_first_over_witness() {
+        use crate::resolver::evaluation::{Actual, LimitExceeded};
+        for (relation, parent) in [
+            (
+                json!({"server": "server", "client": "browser"}),
+                identified("server", "browser"),
+            ),
+            (json!({"server": "server", "client": 7}), unidentified()),
+        ] {
+            let mut inputs = Inputs::complete();
+            relations_of(&mut inputs, "web", json!([relation]));
+            let mut limits = policy_limits();
+            limits.target_grouping.max_target_id_bytes = bound(5);
+            inputs.select_policy(resource_limit_policy(&limits));
+            inputs.resolve(|evaluation, _| {
+                let over = endpoint_of(&parent, "server");
+                let key = evaluation
+                    .issues()
+                    .find(|key| {
+                        key.unit().phase == Phase::HydrationValidation
+                            && key.unit().check == Check::WithinBound
+                            && crate::resolver::token::projected(&key.unit().subject) == over
+                    })
+                    .unwrap_or_else(|| panic!("{over} found nothing"))
+                    .clone();
+                assert!(matches!(
+                    evaluation.limit(&key),
+                    Some(LimitExceeded {
+                        actual: Actual::AtLeast(6),
+                        ..
+                    })
+                ));
+            });
+        }
+    }
+
     /// The phases after Phase 5 classify a locale key by the canonicalizer it
     /// bound: Phase 7 observes a corrected alias key under its non-secret
     /// name and a rejected one redacted (D15:776).
@@ -4320,11 +4550,7 @@ pub(super) mod tests {
             // Only the relation's comparison of the two locale sets waits, and
             // the owners of the two groups the target belongs to.
             let compared = hydration::unit(
-                HydrationSubject::Relation(
-                    serde_json::from_value(json!("web")).unwrap(),
-                    server,
-                    browser,
-                ),
+                HydrationSubject::Relation(group_id("web"), RelationKey::Pair(server, browser)),
                 Check::SameRequestedLocales,
             );
             let waiting: Vec<&Unit> = evaluation
