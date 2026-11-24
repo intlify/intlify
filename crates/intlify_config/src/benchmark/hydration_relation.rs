@@ -25,7 +25,7 @@ use crate::resolver::evaluation::{
     Actual, Admitted, Causes, Check, Evaluation, IssueKey, LimitExceeded, Status, Subject, Unit,
 };
 use crate::resolver::exact_resolution::resolve_fields;
-use crate::resolver::groups::{resolve_groups, ResolvedGroups};
+use crate::resolver::groups::{resolve_groups, GroupFields, ResolvedGroups};
 use crate::resolver::hydration::{
     validate_hydration, EndpointField, HydrationInvariant, HydrationSubject, ResolvedHydration,
 };
@@ -147,7 +147,7 @@ impl PreparedHydration {
         let groups = resolve_groups(
             &mut preparation,
             policy,
-            Ok(&declaration.deployment_groups),
+            &Ok(GroupFields::declared(&declaration.deployment_groups)),
             (targets.as_ref(), Some(&observer)),
         )
         .ok()?;

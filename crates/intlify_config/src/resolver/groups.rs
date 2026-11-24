@@ -30,6 +30,12 @@
 //! groups, the set it must belong to; one that several groups name, at each
 //! of its occurrences beside those in the other groups, the conflicting
 //! group/member evidence (D15:2438).
+//!
+//! Each group and each member occurrence is read on its own (D15:2149, 2367,
+//! 3445). The counts take what was submitted, an entry whose key failed and a
+//! member that failed included. A value that failed has no subject here, and
+//! holds back only what needs it: a group's members, each target's place, and
+//! the partition wait on every occurrence (D15:2184, 2365, 3354).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -119,6 +125,52 @@ pub(crate) fn unit(subject: GroupSubject, check: Check) -> Unit {
     }
 }
 
+/// One entry of the Group ID map with an admitted key: its Group ID and its
+/// members, element by element, or why it has none to read.
+#[derive(Debug, Clone)]
+pub(crate) struct GroupField<'a> {
+    pub(crate) id: &'a DeploymentGroupId,
+    pub(crate) members: Admitted<Vec<Admitted<&'a TargetId>>>,
+}
+
+/// The Group ID map as Phase 12 reads it: how many entries it holds and how
+/// many member occurrences their arrays hold, whatever their keys and values
+/// (D15:1932, 1935), whether every key was admitted, and each entry with an
+/// admitted key, in Group ID order. An entry whose key failed has no subject
+/// here (D15:2184).
+#[derive(Debug, Clone)]
+pub(crate) struct GroupFields<'a> {
+    pub(crate) submitted: usize,
+    pub(crate) memberships: Admitted<usize>,
+    pub(crate) keys: Admitted<()>,
+    pub(crate) entries: Vec<GroupField<'a>>,
+}
+
+impl<'a> GroupFields<'a> {
+    /// The fields of a map structural admission admitted whole.
+    pub(crate) fn declared(groups: &'a NonEmptyMap<DeploymentGroupId, DeploymentGroup>) -> Self {
+        Self {
+            submitted: groups.len(),
+            memberships: Ok(groups
+                .values()
+                .map(|group| group.members.as_slice().len())
+                .sum()),
+            keys: Ok(()),
+            entries: groups
+                .iter()
+                .map(|(id, group)| GroupField {
+                    id,
+                    members: Ok(group.members.as_slice().iter().map(Ok).collect()),
+                })
+                .collect(),
+        }
+    }
+}
+
+/// Each member a group's admitted elements spell, by its positions among the
+/// group's elements.
+type Occurrences<'a> = BTreeMap<&'a TargetId, Vec<usize>>;
+
 /// What Phase 12 established for later phases: each group's own bounds, the
 /// Target IDs its members name, its members once the group's own checks held,
 /// and whether the groups partition the targets.
@@ -137,9 +189,9 @@ impl ResolvedGroups {
         self.bounds.get(id)
     }
 
-    /// The Target IDs one group's members name, once its member count holds:
-    /// what a later membership check reads, whatever each member's own checks
-    /// found.
+    /// The Target IDs one group's members name, once its member count holds
+    /// and every element was read: what a later membership check reads,
+    /// whatever each member's own checks found.
     pub(crate) fn named(&self, id: &DeploymentGroupId) -> Option<&Admitted<BTreeSet<TargetId>>> {
         self.named.get(id)
     }
@@ -169,9 +221,9 @@ impl ResolvedGroups {
 /// ID's bytes, and its members on the group's own bounds and the total. A
 /// member's other checks wait on its bytes, and whether it names a Target ID
 /// also on the set of declared Target IDs Phase 11 admitted. A Target ID's
-/// place waits on its own admission and on every group's bounds, never on
-/// another group's members. The checks observe through `observer`, the
-/// selected declaration's, when there is one.
+/// place waits on its own admission, the total, and every group's own bounds
+/// and elements, never on another member's checks. The checks observe
+/// through `observer`, the selected declaration's, when there is one.
 ///
 /// # Errors
 ///
@@ -180,52 +232,51 @@ impl ResolvedGroups {
 pub(crate) fn resolve_groups(
     evaluation: &mut Evaluation,
     policy: Result<&ConfirmedPolicy, &Causes>,
-    declared: Admitted<&NonEmptyMap<DeploymentGroupId, DeploymentGroup>>,
+    declared: &Admitted<GroupFields<'_>>,
     (targets, observer): (
         Result<&ResolvedTargets<'_>, &Causes>,
         Option<&DeclarationObserver<'_>>,
     ),
 ) -> Result<Admitted<ResolvedGroups>, GroupInvariant> {
-    // The map is there to observe only once structural admission admitted
-    // it.
-    let at_map = match &declared {
+    // The map is there to observe only once it can be read.
+    let at_map = match declared {
         Ok(_) => beside(policy, observer, |observer| {
             observer.value(&["deploymentGroups"])
         })?,
         Err(_) => None,
     };
     let policy = policy.map_err(Causes::clone);
+    let fields = declared.as_ref().map_err(Causes::clone);
     let bounded = evaluation.check_found(
         unit(GroupSubject::Groups, Check::WithinBound),
-        both(policy.clone(), declared.clone()),
-        |(policy, declared)| {
+        both(
+            policy.clone(),
+            fields.clone().map(|fields| fields.submitted),
+        ),
+        |(policy, submitted)| {
             within(
                 MAX_DEPLOYMENT_GROUPS,
                 policy.limits().target_grouping.max_deployment_groups,
-                declared.len(),
+                submitted,
             )
             .map_err(|blocking| Found::through(blocking, at_map.clone()))
         },
     )?;
     let memberships = evaluation.check_found(
         unit(GroupSubject::Memberships, Check::WithinBound),
-        both(policy.clone(), declared.clone()),
-        |(policy, declared)| {
+        both(
+            policy.clone(),
+            fields.clone().and_then(|fields| fields.memberships.clone()),
+        ),
+        |(policy, total)| {
             within(
                 MAX_MEMBERSHIP_OCCURRENCES,
                 policy.limits().target_grouping.max_membership_occurrences,
-                declared
-                    .values()
-                    .map(|group| group.members.as_slice().len())
-                    .sum(),
+                total,
             )
             .map_err(|blocking| Found::through(blocking, at_map.clone()))
         },
     )?;
-    let declared = match declared {
-        Ok(declared) => declared,
-        Err(causes) => return Ok(Err(causes)),
-    };
     let targets = targets.map_err(Causes::clone);
     let known = targets
         .clone()
@@ -239,30 +290,40 @@ pub(crate) fn resolve_groups(
     let mut groups = BTreeMap::new();
     let mut bounds = BTreeMap::new();
     let mut named = BTreeMap::new();
-    let mut every_group = memberships.clone();
-    for (id, group) in declared.iter() {
-        let (identified, own) = own_bounds(evaluation, (&policy, observer), &bounded, (id, group))?;
+    let mut read = Vec::new();
+    // What could not be read of any group, which every place waits on.
+    let mut unseen = fields.clone().and_then(|fields| fields.keys.clone());
+    let entries = declared
+        .as_ref()
+        .map_or(&[][..], |fields| fields.entries.as_slice());
+    for field in entries {
+        let id = field.id;
+        let (identified, own) = own_bounds(evaluation, (&policy, observer), &bounded, field)?;
         bounds.insert(id.clone(), identified);
+        let (occurrences, lacking) = occurrences_of(field);
         named.insert(
             id.clone(),
-            own.clone()
-                .map(|()| group.members.as_slice().iter().cloned().collect()),
+            and(own.clone(), lacking.clone())
+                .map(|()| occurrences.keys().map(|&member| member.clone()).collect()),
         );
-        every_group = and(every_group, own.clone());
-        let gate = both(policy.clone(), and(own, memberships.clone())).map(|(policy, ())| policy);
+        unseen = and(unseen, and(own.clone(), lacking.clone()));
+        let gate =
+            both(policy.clone(), and(own.clone(), memberships.clone())).map(|(policy, ())| policy);
         groups.insert(
             id.clone(),
             members(
                 evaluation,
                 (&gate, observer),
                 (&known, at_targets.as_ref()),
-                (id, group),
+                (id, &occurrences, lacking),
             )?,
         );
+        read.push((id, occurrences));
     }
-    let assignments = match targets {
-        Ok(targets) => assignments(evaluation, (&every_group, observer), declared, targets)?,
-        Err(causes) => Err(causes),
+    let every_group = and(memberships, unseen);
+    let assignments = match &targets {
+        Ok(targets) => assignments(evaluation, (&every_group, observer), &read, targets)?,
+        Err(causes) => Err(causes.clone()),
     };
     let mut partition = assignments;
     for members in groups.values() {
@@ -271,7 +332,7 @@ pub(crate) fn resolve_groups(
             members.as_ref().map(|_| ()).map_err(Causes::clone),
         );
     }
-    Ok(Ok(ResolvedGroups {
+    Ok(fields.map(|_| ResolvedGroups {
         groups,
         bounds,
         named,
@@ -281,7 +342,7 @@ pub(crate) fn resolve_groups(
 
 /// One group's two bounds, after the map's: its ID's bytes, which every later
 /// check of the group waits on, and then its member occurrences, which wait
-/// on them too.
+/// on them too and on an array to count.
 fn own_bounds(
     evaluation: &mut Evaluation,
     (policy, observer): (
@@ -289,15 +350,20 @@ fn own_bounds(
         Option<&DeclarationObserver<'_>>,
     ),
     bounded: &Admitted<()>,
-    (id, group): (&DeploymentGroupId, &DeploymentGroup),
+    field: &GroupField<'_>,
 ) -> Result<(Admitted<()>, Admitted<()>), GroupInvariant> {
+    let id = field.id;
     let confirmed = policy.as_ref().map(|policy| *policy);
     let at_key = beside(confirmed, observer, |observer| {
         observer.member_key(&["deploymentGroups"], id.as_str())
     })?;
-    let at_members = beside(confirmed, observer, |observer| {
-        observer.value(&["deploymentGroups", id.as_str(), "members"])
-    })?;
+    // The array is there to observe only once it can be read.
+    let at_members = match &field.members {
+        Ok(_) => beside(confirmed, observer, |observer| {
+            observer.value(&["deploymentGroups", id.as_str(), "members"])
+        })?,
+        Err(_) => None,
+    };
     let prerequisite = both(policy.clone(), bounded.clone());
     let bytes = evaluation.check_found(
         unit(GroupSubject::Group(id.clone()), Check::WithinBound),
@@ -311,14 +377,15 @@ fn own_bounds(
             .map_err(|blocking| Found::through(blocking, at_key))
         },
     )?;
+    let count = field.members.as_ref().map(Vec::len).map_err(Causes::clone);
     let occurrences = evaluation.check_found(
         unit(GroupSubject::Members(id.clone()), Check::WithinBound),
-        both(prerequisite, bytes.clone()),
-        |((policy, ()), ())| {
+        both(both(prerequisite, bytes.clone()), count),
+        |(((policy, ()), ()), count)| {
             within(
                 MAX_MEMBERS_PER_GROUP,
                 policy.limits().target_grouping.max_members_per_group,
-                group.members.as_slice().len(),
+                count,
             )
             .map_err(|blocking| Found::through(blocking, at_members))
         },
@@ -326,13 +393,28 @@ fn own_bounds(
     Ok((bytes, occurrences))
 }
 
+/// Each member the group's admitted elements spell, by its positions among
+/// them, and why the group lacks the others: an element that failed keeps its
+/// position and has no subject (D15:1931, 2184).
+fn occurrences_of<'a>(field: &GroupField<'a>) -> (Occurrences<'a>, Admitted<()>) {
+    let mut occurrences: Occurrences<'a> = BTreeMap::new();
+    let mut lacking = field.members.as_ref().map(|_| ()).map_err(Causes::clone);
+    for (index, item) in field.members.iter().flatten().enumerate() {
+        match item {
+            Ok(member) => occurrences.entry(*member).or_default().push(index),
+            Err(causes) => lacking = and(lacking, Err(causes.clone())),
+        }
+    }
+    (occurrences, lacking)
+}
+
 /// The group's members by the Target ID each spells. Each must be within
 /// `maxTargetIdBytes`, name a declared Target ID, and occur once; repeated
 /// occurrences are one subject, all spelling the same bytes. The set exists
-/// only when every member holds. A check that fails observes each occurrence
-/// of the member (D15:2387): past the bound beside the policy, naming no
-/// Target ID beside the declared Target IDs at `at_targets`, and repeated
-/// beside the other occurrences.
+/// only when every member holds and none is `lacking`. A check that fails
+/// observes each occurrence of the member (D15:2387): past the bound beside
+/// the policy, naming no Target ID beside the declared Target IDs at
+/// `at_targets`, and repeated beside the other occurrences.
 fn members(
     evaluation: &mut Evaluation,
     (gate, observer): (
@@ -340,15 +422,10 @@ fn members(
         Option<&DeclarationObserver<'_>>,
     ),
     (known, at_targets): (&Admitted<&ResolvedTargets<'_>>, Option<&EvidenceProjection>),
-    (id, group): (&DeploymentGroupId, &DeploymentGroup),
+    (id, occurrences, lacking): (&DeploymentGroupId, &Occurrences<'_>, Admitted<()>),
 ) -> Result<Admitted<BTreeSet<TargetId>>, GroupInvariant> {
-    // Each member's occurrences, by their positions in the group's members.
-    let mut occurrences: BTreeMap<&TargetId, Vec<usize>> = BTreeMap::new();
-    for (index, member) in group.members.as_slice().iter().enumerate() {
-        occurrences.entry(member).or_default().push(index);
-    }
-    let mut holds = Ok(());
-    for (&member, positions) in &occurrences {
+    let mut holds = lacking;
+    for (&member, positions) in occurrences {
         let subject = || GroupSubject::Member(id.clone(), member.clone());
         // Each occurrence at its token, when there is a declaration to
         // observe.
@@ -397,24 +474,26 @@ fn members(
         })?;
         holds = and(holds, and(declared, once));
     }
-    Ok(holds.map(|()| occurrences.into_keys().cloned().collect()))
+    Ok(holds.map(|()| occurrences.keys().map(|&member| member.clone()).collect()))
 }
 
 /// Each declared Target ID's place: in exactly one group, counting a group
-/// once however often it names the target. A target out of place is
-/// observed through `observer`, when there is one.
+/// once however often it names the target, among the groups in `read`, once
+/// `every_group` holds. A target out of place is observed through `observer`,
+/// when there is one.
 fn assignments(
     evaluation: &mut Evaluation,
     (every_group, observer): (&Admitted<()>, Option<&DeclarationObserver<'_>>),
-    declared: &NonEmptyMap<DeploymentGroupId, DeploymentGroup>,
+    read: &[(&DeploymentGroupId, Occurrences<'_>)],
     targets: &ResolvedTargets<'_>,
 ) -> Result<Admitted<()>, GroupInvariant> {
     // Every occurrence of each Target ID among the groups, by its group and
     // position. A group's occurrences are adjacent, so each run is a group.
     let mut occurrences: BTreeMap<&TargetId, Vec<(&DeploymentGroupId, usize)>> = BTreeMap::new();
-    for (id, group) in declared.iter() {
-        for (index, member) in group.members.as_slice().iter().enumerate() {
-            occurrences.entry(member).or_default().push((id, index));
+    for (id, members) in read {
+        for (&member, positions) in members {
+            let found = occurrences.entry(member).or_default();
+            found.extend(positions.iter().map(|&index| (*id, index)));
         }
     }
     let mut holds = Ok(());
@@ -426,8 +505,8 @@ fn assignments(
         // occurrence to the other groups' grows with their square, so it
         // waits until the check runs.
         let (key, at) = match groups {
-            0 => (unassigned(observer, target)?, Vec::new()),
-            1 => (None, Vec::new()),
+            0 if every_group.is_ok() => (unassigned(observer, target)?, Vec::new()),
+            0 | 1 => (None, Vec::new()),
             _ => (None, located(observer, found)?),
         };
         let placed = evaluation.check_found(
@@ -676,13 +755,13 @@ mod tests {
             let declared = self
                 .declared
                 .clone()
-                .map(|()| &declaration.deployment_groups);
+                .map(|()| GroupFields::declared(&declaration.deployment_groups));
             let groups = observed
                 .app(|observer| {
                     resolve_groups(
                         &mut evaluation,
                         policy,
-                        declared,
+                        &declared,
                         (targets.as_ref(), Some(observer)),
                     )
                 })
@@ -1344,25 +1423,23 @@ mod tests {
     }
 
     #[test]
-    fn a_group_map_structural_admission_did_not_admit_records_only_its_two_bounds() {
+    fn a_group_map_structural_admission_did_not_admit_records_its_bounds_and_each_place() {
         let mut inputs = Inputs::new();
         let causes = stand_in(Slot::DeliveryGraph);
         inputs.declared = Err(causes.clone());
         inputs.resolve(|evaluation, groups| {
+            let waiting = |unit| (unit, Status::NotEvaluated(causes.clone()));
             assert_eq!(
                 statuses(&evaluation),
                 [
-                    (
-                        group_unit(GroupSubject::Groups, Check::WithinBound),
-                        Status::NotEvaluated(causes.clone())
-                    ),
-                    (
-                        group_unit(GroupSubject::Memberships, Check::WithinBound),
-                        Status::NotEvaluated(causes.clone())
-                    ),
+                    waiting(group_unit(GroupSubject::Groups, Check::WithinBound)),
+                    waiting(group_unit(GroupSubject::Memberships, Check::WithinBound)),
+                    waiting(assignment("browser")),
+                    waiting(assignment("server")),
+                    waiting(assignment("worker")),
                 ]
             );
-            assert_eq!(groups, Err(causes));
+            assert_eq!(groups, Err(causes.clone()));
         });
     }
 

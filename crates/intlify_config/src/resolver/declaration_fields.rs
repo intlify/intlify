@@ -22,10 +22,11 @@ use crate::structural::StructuralAnalysis;
 
 use super::coverage::{CoverageFields, RuleField, SelectorField};
 use super::declaration_fragments::{
-    AliasEntries, CoverageEntries, DeclarationFragments, FallbackEntry, SelectorEntry,
-    TargetEntries,
+    AliasEntries, CoverageEntries, DeclarationFragments, FallbackEntry, GroupEntries,
+    SelectorEntry, TargetEntries,
 };
 use super::evaluation::{Admitted, Causes};
+use super::groups::{GroupField, GroupFields};
 use super::locales::{
     AliasField, AliasFields, FallbackField, LocaleFields, TargetLocaleFields, TargetMapFields,
 };
@@ -58,6 +59,9 @@ pub(crate) struct DeclarationFields<Policy, Target> {
     policies: Admitted<Policies<Policy>>,
     /// The Target ID map entry by entry, which Phases 7, 9, and 11 read.
     target_entries: Admitted<TargetEntries<Target>>,
+    /// The Group ID map entry by entry, which Phase 12 reads.
+    group_entries: Admitted<GroupEntries>,
+    /// The Group ID map as one value, which Phase 13 reads.
     deployment_groups: Admitted<DeploymentGroups>,
     delivery: Admitted<Option<Delivery>>,
 }
@@ -89,6 +93,7 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
             coverage: read.coverage_entries()?,
             policies: read.required("policies")?,
             target_entries: read.target_entries()?,
+            group_entries: read.group_entries()?,
             deployment_groups: read.required("deploymentGroups")?,
             delivery: read.optional("delivery")?,
         })
@@ -180,6 +185,29 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
             .and_then(|targets| targets.whole.clone())
     }
 
+    /// The Group ID map entry by entry, which Phase 12 reads.
+    pub(crate) fn group_fields(&self) -> Admitted<GroupFields<'_>> {
+        borrowed(&self.group_entries, |groups| GroupFields {
+            submitted: groups.submitted,
+            memberships: groups.memberships.clone(),
+            keys: groups.keys.clone(),
+            entries: groups
+                .entries
+                .iter()
+                .map(|entry| GroupField {
+                    id: &entry.id,
+                    members: borrowed(&entry.members, |members| {
+                        members
+                            .iter()
+                            .map(|member| member.as_ref().map_err(Causes::clone))
+                            .collect()
+                    }),
+                })
+                .collect(),
+        })
+    }
+
+    /// The Group ID map as one value, which Phase 13 reads.
     pub(crate) fn deployment_groups(&self) -> Admitted<&DeploymentGroups> {
         borrowed(&self.deployment_groups, |groups| groups)
     }
@@ -206,6 +234,7 @@ impl<Policy, Target> DeclarationFields<Policy, Target> {
             coverage: Err(causes.clone()),
             policies: Err(causes.clone()),
             target_entries: Err(causes.clone()),
+            group_entries: Err(causes.clone()),
             deployment_groups: Err(causes.clone()),
             delivery: Err(causes.clone()),
         }
@@ -508,6 +537,7 @@ mod tests {
             fields.coverage.as_ref().err(),
             fields.policies.as_ref().err(),
             fields.target_entries.as_ref().err(),
+            fields.group_entries.as_ref().err(),
             fields.deployment_groups.as_ref().err(),
             fields.delivery.as_ref().err(),
         ];

@@ -657,7 +657,7 @@ where
     let groups = resolve_groups(
         evaluation,
         confirmed,
-        fields.deployment_groups(),
+        &fields.group_fields(),
         (whole_targets, observer.as_ref()),
     )?;
     // Every relation shares the negotiation profile; none compares it.
@@ -3337,6 +3337,299 @@ pub(super) mod tests {
                 );
             }
         });
+    }
+
+    fn group_id(id: &str) -> crate::model::DeploymentGroupId {
+        serde_json::from_value(json!(id)).unwrap()
+    }
+
+    fn target_id(id: &str) -> crate::model::TargetId {
+        serde_json::from_value(json!(id)).unwrap()
+    }
+
+    /// The bound's unit over a Phase 12 `subject`.
+    fn group_bound(subject: crate::resolver::groups::GroupSubject) -> Unit {
+        crate::resolver::groups::unit(subject, Check::WithinBound)
+    }
+
+    fn group_member(group: &str, member: &str, check: Check) -> Unit {
+        use crate::resolver::groups::{unit, GroupSubject};
+        unit(
+            GroupSubject::Member(group_id(group), target_id(member)),
+            check,
+        )
+    }
+
+    fn group_place(target: &str) -> Unit {
+        use crate::resolver::groups::{unit, GroupSubject};
+        unit(
+            GroupSubject::Assignment(target_id(target)),
+            Check::SingleGroup,
+        )
+    }
+
+    /// Every blocking result of Phase 12, as its unit and code.
+    fn group_issues(evaluation: &Evaluation) -> Vec<(Unit, Code)> {
+        issues(evaluation)
+            .into_iter()
+            .filter(|(unit, _, _)| unit.phase == Phase::GroupResolution)
+            .map(|(unit, code, _)| (unit, code))
+            .collect()
+    }
+
+    /// What `unit` waits on.
+    fn causes_of(evaluation: &Evaluation, unit: &Unit) -> BTreeSet<IssueKey> {
+        let Some(Status::NotEvaluated(causes)) = evaluation.status(unit) else {
+            panic!("{unit:?} is not waiting");
+        };
+        keys(causes)
+    }
+
+    /// Every check of the group `id` with the one member `member`.
+    fn group_checked(id: &str, member: &str) -> [Unit; 5] {
+        use crate::resolver::groups::GroupSubject as G;
+        [
+            group_bound(G::Group(group_id(id))),
+            group_bound(G::Members(group_id(id))),
+            group_member(id, member, Check::WithinBound),
+            group_member(id, member, Check::KnownMember),
+            group_member(id, member, Check::UniqueMember),
+        ]
+    }
+
+    /// A group that failed holds back no other group: both counts and the
+    /// other group's checks run, with no Finding made up for it, and the
+    /// partition waits on what failed (D15:2149, 2184, 2365, 2367, 3445).
+    #[test]
+    fn a_group_that_failed_leaves_the_other_groups_checked() {
+        use crate::resolver::groups::GroupSubject as G;
+        for failed in [
+            json!(7),
+            json!({}),
+            json!({"members": 7}),
+            json!({"members": []}),
+        ] {
+            let mut inputs = Inputs::two_groups();
+            inputs.declaration()["deploymentGroups"]["web"] = failed.clone();
+            inputs.resolve(|evaluation, state| {
+                all_evaluated(
+                    &evaluation,
+                    &[
+                        group_bound(G::Groups),
+                        group_bound(G::Memberships),
+                        group_bound(G::Group(group_id("web"))),
+                    ],
+                );
+                all_evaluated(&evaluation, &group_checked("jobs", "worker"));
+                assert_eq!(group_issues(&evaluation), [], "{failed}");
+                let members = group_bound(G::Members(group_id("web")));
+                let why = causes_of(&evaluation, &members);
+                assert!(why
+                    .iter()
+                    .all(|key| key.unit().phase == Phase::StructuralAdmission));
+                let groups = state.groups.as_ref().unwrap();
+                assert!(groups.get(&group_id("jobs")).unwrap().is_ok(), "{failed}");
+                assert!(groups.get(&group_id("web")).unwrap().is_err(), "{failed}");
+                assert_eq!(keys(groups.partition().as_ref().unwrap_err()), why);
+            });
+        }
+    }
+
+    /// A member that failed holds back none of its siblings: the group's
+    /// count takes it, each other member is checked, and what they find
+    /// among themselves is found; the group, which needs every member, waits
+    /// (D15:1934, 2184, 2190, 2367, 2438).
+    #[test]
+    fn a_member_that_failed_leaves_its_siblings_checked() {
+        use crate::resolver::groups::GroupSubject as G;
+        let mut inputs = Inputs::two_groups();
+        inputs.declaration()["deploymentGroups"]["web"]["members"] =
+            json!(["browser", 7, "server", "phone", "server"]);
+        inputs.resolve(|evaluation, state| {
+            all_evaluated(
+                &evaluation,
+                &[
+                    group_bound(G::Memberships),
+                    group_bound(G::Members(group_id("web"))),
+                    group_member("web", "browser", Check::WithinBound),
+                    group_member("web", "browser", Check::KnownMember),
+                    group_member("web", "browser", Check::UniqueMember),
+                    group_member("web", "server", Check::KnownMember),
+                ],
+            );
+            assert_eq!(
+                group_issues(&evaluation),
+                [
+                    (
+                        group_member("web", "phone", Check::KnownMember),
+                        Code::GroupMemberUnknown
+                    ),
+                    (
+                        group_member("web", "server", Check::UniqueMember),
+                        Code::GroupMemberDuplicate
+                    ),
+                ]
+            );
+            // Each place waits on what could not be read of any group.
+            for target in ["browser", "server", "worker"] {
+                assert!(matches!(
+                    evaluation.status(&group_place(target)),
+                    Some(Status::NotEvaluated(_))
+                ));
+            }
+            // A member keeps its position among the elements, the failed one
+            // included.
+            let phone = group_member("web", "phone", Check::KnownMember);
+            let (primary, _) = &observed_views(&evaluation, &phone)[0];
+            assert_eq!(
+                primary["value"],
+                json!({ "exact-json-pointer": "/profiles/web/deploymentGroups/web/members/3" })
+            );
+            let groups = state.groups.as_ref().unwrap();
+            assert!(groups.get(&group_id("web")).unwrap().is_err());
+            assert!(groups.get(&group_id("jobs")).unwrap().is_ok());
+            assert!(groups.named(&group_id("web")).unwrap().is_err());
+            assert!(groups.named(&group_id("jobs")).unwrap().is_ok());
+            assert!(groups.partition().is_err());
+        });
+    }
+
+    /// The group bounds count what was submitted: a member that failed is
+    /// an occurrence of its array and of the total, and an entry whose key
+    /// failed is a group of the map whose members the total still takes
+    /// (D15:1932, 1934, 1935).
+    #[test]
+    fn the_group_counts_take_every_occurrence_beside_what_failed() {
+        use crate::resolver::evaluation::{Actual, LimitExceeded};
+        use crate::resolver::groups::GroupSubject as G;
+        let found = |edit: fn(&mut Value), limit: fn(&mut ResolutionLimits), over: G, total| {
+            let mut inputs = Inputs::two_groups();
+            edit(inputs.declaration());
+            let mut limits = policy_limits();
+            limit(&mut limits);
+            inputs.select_policy(resource_limit_policy(&limits));
+            inputs.resolve(|evaluation, _| {
+                let over = group_bound(over);
+                let key = evaluation
+                    .issues()
+                    .find(|key| key.unit() == &over)
+                    .unwrap_or_else(|| panic!("{over:?} found nothing"))
+                    .clone();
+                assert!(matches!(
+                    evaluation.limit(&key),
+                    Some(LimitExceeded { actual: Actual::Exact(actual), .. }) if actual == total
+                ));
+            });
+        };
+        let failed_member: fn(&mut Value) = |app| {
+            app["deploymentGroups"]["web"]["members"] = json!(["browser", 7, "server"]);
+        };
+        found(
+            failed_member,
+            |limits| limits.target_grouping.max_members_per_group = bound(2),
+            G::Members(group_id("web")),
+            3,
+        );
+        found(
+            failed_member,
+            |limits| limits.target_grouping.max_membership_occurrences = bound(3),
+            G::Memberships,
+            4,
+        );
+        let failed_key: fn(&mut Value) = |app| {
+            app["deploymentGroups"]["Web App"] = json!({"members": ["browser", "server"]});
+        };
+        found(
+            failed_key,
+            |limits| limits.target_grouping.max_deployment_groups = bound(2),
+            G::Groups,
+            3,
+        );
+        found(
+            failed_key,
+            |limits| limits.target_grouping.max_membership_occurrences = bound(4),
+            G::Memberships,
+            5,
+        );
+    }
+
+    /// The total waits only once no group's members can be read, since a
+    /// unit over several values evaluates what is admitted (D15:2184, 3354).
+    #[test]
+    fn the_membership_total_waits_only_when_every_array_failed() {
+        use crate::resolver::groups::GroupSubject as G;
+        let mut inputs = Inputs::two_groups();
+        inputs.declaration()["deploymentGroups"]["web"]["members"] = json!(7);
+        inputs.declaration()["deploymentGroups"]["jobs"]["members"] = json!(7);
+        inputs.resolve(|evaluation, _| {
+            let why = causes_of(&evaluation, &group_bound(G::Memberships));
+            assert_eq!(why.len(), 2);
+            assert!(why
+                .iter()
+                .all(|key| key.unit().phase == Phase::StructuralAdmission));
+            all_evaluated(&evaluation, &[group_bound(G::Groups)]);
+        });
+    }
+
+    /// An entry whose key failed has no subject in Phase 12, and the targets
+    /// it might hold cannot be proved placed or unplaced; the other group
+    /// goes on (D15:2184, 2365, 3354).
+    #[test]
+    fn a_group_whose_key_failed_has_no_subject() {
+        use crate::resolver::groups::GroupSubject as G;
+        let mut inputs = Inputs::two_groups();
+        let groups = inputs.declaration()["deploymentGroups"]
+            .as_object_mut()
+            .unwrap();
+        let web = groups.remove("web").unwrap();
+        groups.insert("Web App".into(), web);
+        inputs.resolve(|evaluation, state| {
+            all_evaluated(
+                &evaluation,
+                &[group_bound(G::Groups), group_bound(G::Memberships)],
+            );
+            all_evaluated(&evaluation, &group_checked("jobs", "worker"));
+            assert_eq!(group_issues(&evaluation), []);
+            let named: Vec<_> = evaluation
+                .statuses()
+                .filter_map(|(unit, _)| match &unit.subject {
+                    Subject::Group(G::Group(id)) => Some(id.as_str().to_owned()),
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(named, ["jobs"]);
+            let key = causes_of(&evaluation, &group_place("browser"));
+            assert_eq!(key.len(), 1);
+            assert!(key
+                .iter()
+                .all(|key| key.unit().phase == Phase::StructuralAdmission));
+            waits_on_exactly(&evaluation, &group_place("server"), &key);
+            let groups = state.groups.as_ref().unwrap();
+            assert_eq!(keys(groups.partition().as_ref().unwrap_err()), key);
+        });
+    }
+
+    /// Without a Group ID map to read, each declared target's place is still
+    /// recorded, waiting on why there is none (D15:1171, 2184).
+    #[test]
+    fn a_place_beside_no_group_map_waits_on_the_map() {
+        use crate::resolver::groups::GroupSubject as G;
+        let edits: [fn(&mut Value); 2] = [
+            |app| app["deploymentGroups"] = json!(7),
+            |app| {
+                app.as_object_mut().unwrap().remove("deploymentGroups");
+            },
+        ];
+        for edit in edits {
+            let mut inputs = Inputs::complete();
+            edit(inputs.declaration());
+            inputs.resolve(|evaluation, _| {
+                let why = causes_of(&evaluation, &group_bound(G::Groups));
+                for target in ["browser", "server"] {
+                    waits_on_exactly(&evaluation, &group_place(target), &why);
+                }
+            });
+        }
     }
 
     /// Phase 13 observes through the same observer: a relation's client that
