@@ -195,7 +195,7 @@ fn policies<P: Provider>(
         &inputs.coverage,
         (Ok(&inputs.vocabulary), Ok(canonicalizer)),
         &locales,
-        fields.coverage.clone(),
+        &fields.coverage,
         Some(&observer),
     )?;
     Ok(Policies {

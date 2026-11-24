@@ -13,11 +13,12 @@ use serde::de::value::{BorrowedStrDeserializer, Error as KeyError};
 use serde::de::{Deserialize, DeserializeOwned};
 
 use crate::materialize::{MaterializedDocument, NodeId, NodeKind, ObjectMember};
-use crate::model::{FallbackCandidate, RequiredNullable, TargetId};
+use crate::model::{CoverageMode, CoverageRule, FallbackCandidate, RequiredNullable, TargetId};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::{AdmissionInvariant, Member, StructuralAnalysis};
 
-use super::evaluation::Admitted;
+use super::evaluation::{and, Admitted};
+use super::locales::joined;
 use super::resource_policy::{PolicySlot, ReferenceField, ReferenceOccurrence};
 use super::structural_admission::StructuralInvariant;
 use super::tally::{total, Tally};
@@ -76,6 +77,32 @@ pub(crate) struct AliasEntries {
 pub(crate) struct FallbackEntry {
     pub(crate) key: String,
     pub(crate) sequence: Admitted<Vec<Admitted<FallbackCandidate>>>,
+}
+
+/// The declaration's `coverage`, rule by rule: its default mode, each element
+/// as a rule or why it is none, the raw items of each selector kind, and
+/// whether everything at and below `coverage` passed, which the policy built
+/// from all of it waits on (D15:1902, 1903, 2426).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct CoverageEntries {
+    pub(crate) default_mode: Admitted<Option<CoverageMode>>,
+    pub(crate) rules: Admitted<Vec<Admitted<CoverageRule>>>,
+    pub(crate) locale_items: Admitted<usize>,
+    pub(crate) surface_items: Admitted<usize>,
+    pub(crate) whole: Admitted<()>,
+}
+
+impl Default for CoverageEntries {
+    /// The `coverage` of a declaration that omits it: no rule, no default.
+    fn default() -> Self {
+        Self {
+            default_mode: Ok(None),
+            rules: Ok(Vec::new()),
+            locale_items: Ok(0),
+            surface_items: Ok(0),
+            whole: Ok(()),
+        }
+    }
 }
 
 /// The declaration `id` of an analysis, with what structural admission left
@@ -274,6 +301,128 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
             })
             .collect::<Result<Vec<_>, _>>()
             .map(Ok)
+    }
+
+    /// The declaration's `coverage`, rule by rule, or why it has no member to
+    /// read. An absent `coverage` holds no rule.
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug of a value the checks admitted that is of
+    /// another type than its schema's.
+    pub(crate) fn coverage_entries(
+        &self,
+    ) -> Result<Admitted<CoverageEntries>, StructuralInvariant> {
+        let Some(coverage) = self.member_value(self.declaration, "coverage") else {
+            return Ok(Ok(CoverageEntries::default()));
+        };
+        if !matches!(self.document.node(coverage).kind(), NodeKind::Object(_)) {
+            return self.failed(coverage);
+        }
+        let default_mode = match self.member_value(coverage, "defaultMode") {
+            Some(mode) => self.value_at(mode)?.map(Some),
+            None => Ok(None),
+        };
+        let elements = self.array_at(coverage, "rules")?;
+        let (rules, locale_items, surface_items) = match elements {
+            Ok(rules) => {
+                let rules = rules.unwrap_or_default();
+                (
+                    Ok(rules
+                        .iter()
+                        .map(|&rule| self.rule_entry(rule))
+                        .collect::<Result<Vec<_>, _>>()?),
+                    self.selector_items(rules, "requestedLocales")?,
+                    self.selector_items(rules, "intentSurfaceClasses")?,
+                )
+            }
+            Err(causes) => (Err(causes.clone()), Err(causes.clone()), Err(causes)),
+        };
+        Ok(Ok(CoverageEntries {
+            default_mode,
+            rules,
+            locale_items,
+            surface_items,
+            whole: self
+                .values
+                .member(self.document, self.declaration, "coverage"),
+        }))
+    }
+
+    /// How many raw items the selectors `name` of `rules` hold: every element
+    /// of a selector that is an array, whatever the element is (D15:1902,
+    /// 1903). A rule that is no object, or a selector that failed, has no item
+    /// to count, so the count waits on why only when no selector holds one
+    /// (D15:2184, 3354).
+    fn selector_items(
+        &self,
+        rules: &[NodeId],
+        name: &str,
+    ) -> Result<Admitted<usize>, StructuralInvariant> {
+        let mut held = 0;
+        let mut excluded = None;
+        for &rule in rules {
+            let items = if matches!(self.document.node(rule).kind(), NodeKind::Object(_)) {
+                self.array_at(rule, name)?
+            } else {
+                self.failed(rule)?
+            };
+            match items {
+                Ok(Some(items)) => held += items.len(),
+                Ok(None) => {}
+                Err(causes) => excluded = Some(joined(excluded, &causes)),
+            }
+        }
+        Ok(match excluded {
+            Some(causes) if held == 0 => Err(causes),
+            _ => Ok(held),
+        })
+    }
+
+    /// The element `rule` of `coverage.rules`, once every candidate at and
+    /// below it passed, or why it is no rule (D15:2184, 2367).
+    fn rule_entry(&self, rule: NodeId) -> Result<Admitted<CoverageRule>, StructuralInvariant> {
+        if !matches!(self.document.node(rule).kind(), NodeKind::Object(_)) {
+            return self.failed(rule);
+        }
+        let mut admitted = self.values.value(rule);
+        for name in ["requestedLocales", "intentSurfaceClasses", "mode"] {
+            admitted = and(admitted, self.values.member(self.document, rule, name));
+        }
+        match admitted {
+            Ok(()) => self.decoded(rule).map(Ok),
+            Err(causes) => Ok(Err(causes)),
+        }
+    }
+
+    /// Why the value at `node`, of another type than its schema's, has nothing
+    /// to read.
+    fn failed<T>(&self, node: NodeId) -> Result<Admitted<T>, StructuralInvariant> {
+        match self.values.value(node) {
+            Err(causes) => Ok(Err(causes)),
+            Ok(()) => Err(StructuralInvariant::UnreportedFailure),
+        }
+    }
+
+    /// The optional array `name` of `object` and its elements: none when it
+    /// is absent, or why it has none to read.
+    fn array_at(
+        &self,
+        object: NodeId,
+        name: &str,
+    ) -> Result<Admitted<Option<&'r [NodeId]>>, StructuralInvariant> {
+        let document: &'r MaterializedDocument = self.document;
+        let array = self.member_value(object, name);
+        match array.map(|array| (array, document.node(array).kind())) {
+            None => Ok(Ok(None)),
+            Some((array, NodeKind::Array(items))) if self.values.value(array).is_ok() => {
+                Ok(Ok(Some(items)))
+            }
+            _ => match self.values.member(document, object, name) {
+                Err(causes) => Ok(Err(causes)),
+                Ok(()) => Err(StructuralInvariant::UnreportedFailure),
+            },
+        }
     }
 
     /// The optional map `name` of `object` and its members: none when it is
@@ -564,7 +713,7 @@ mod tests {
     use serde_json::{json, Value};
 
     use crate::fixtures::{complete_config, minimal_config, FixtureTargetReference};
-    use crate::model::ProfileDeclaration;
+    use crate::model::{CoverageMode, ProfileDeclaration};
     use crate::references::{PolicyReference, TargetProfileReference};
     use crate::resolver::evaluation::{Admitted, Check, Evaluation, Subject, Unit};
     use crate::resolver::locales::fixtures::declaration;
@@ -582,7 +731,9 @@ mod tests {
     use crate::resolver::value_admissions::ValueAdmissions;
     use crate::structural::{AdmissionInvariant, StructuralAnalysis};
 
-    use super::{AliasEntries, DeclarationFragments, FallbackEntry, TargetEntries};
+    use super::{
+        AliasEntries, CoverageEntries, DeclarationFragments, FallbackEntry, TargetEntries,
+    };
 
     /// One way to break the declaration, by its name.
     type Edit = (&'static str, fn(&mut Value));
@@ -1023,6 +1174,127 @@ mod tests {
                 AdmissionInvariant::AuthoringTypeMismatch
             ))
         );
+    }
+
+    fn coverage(
+        admissions: Option<ValueAdmissions>,
+        edit: impl FnOnce(&mut Value),
+    ) -> Result<Admitted<CoverageEntries>, StructuralInvariant> {
+        let mut config = complete_config();
+        edit(&mut config["profiles"]["app"]);
+        let (_, values, analysis) = structured_in(Evaluation::default(), &config);
+        let values = admissions.unwrap_or(values);
+        DeclarationFragments::new(&values, &analysis, "app")?.coverage_entries()
+    }
+
+    /// The entries of `rules` under `coverage`.
+    fn rules(rules: &Value) -> CoverageEntries {
+        coverage(None, |app| app["coverage"] = json!({ "rules": rules }))
+            .unwrap()
+            .unwrap()
+    }
+
+    /// Each rule is read on its own: an element with any failure at or below
+    /// it holds back no other, and only what is at or below `coverage` holds
+    /// back the whole (D15:2184, 2367, 2426).
+    #[test]
+    fn the_coverage_is_read_rule_by_rule() {
+        let whole = coverage(None, |_| {}).unwrap().unwrap();
+        assert_eq!(whole.default_mode, Ok(Some(CoverageMode::DirectRequired)));
+        assert_eq!(whole.rules.as_ref().unwrap().len(), 3);
+        assert_eq!((whole.locale_items, whole.surface_items), (Ok(2), Ok(2)));
+        assert_eq!(whole.whole, Ok(()));
+        assert_eq!(
+            coverage(None, |app| lacking(app, &[], "coverage")),
+            Ok(Ok(CoverageEntries::default()))
+        );
+        let omitted = coverage(None, |app| app["coverage"] = json!({})).unwrap();
+        assert_eq!(omitted, Ok(CoverageEntries::default()));
+        assert!(coverage(None, |app| app["coverage"] = json!(7))
+            .unwrap()
+            .is_err());
+
+        let unread = coverage(None, |app| {
+            app["coverage"] = json!({"defaultMode": "fallback-allowed", "rules": 7});
+        });
+        let unread = unread.unwrap().unwrap();
+        assert_eq!(unread.default_mode, Ok(Some(CoverageMode::FallbackAllowed)));
+        assert!(unread.rules.is_err() && unread.whole.is_err());
+        assert!(unread.locale_items.is_err() && unread.surface_items.is_err());
+
+        let failed = coverage(None, |app| app["coverage"]["defaultMode"] = json!(7));
+        let failed = failed.unwrap().unwrap();
+        assert!(failed.default_mode.is_err() && failed.whole.is_err());
+        assert_eq!(failed.rules.as_ref().unwrap().len(), 3);
+
+        let read = rules(&json!([
+            7,
+            {"requestedLocales": ["ja", 7], "mode": "direct-required"},
+            {"intentSurfaceClasses": 7, "mode": "direct-required"},
+            {"requestedLocales": ["ja"], "mode": 7},
+            {"requestedLocales": ["ja"]},
+            {"mode": "direct-required"},
+            {"intentSurfaceClasses": ["nav"], "mode": "direct-required", "extra": 1},
+            {"intentSurfaceClasses": ["nav"], "mode": "direct-required"},
+        ]));
+        let rules = read.rules.as_ref().unwrap();
+        let held = rules.iter().filter(|rule| rule.is_ok()).count();
+        assert!(rules[7].is_ok() && held == 1);
+        assert!(read.whole.is_err());
+    }
+
+    /// A selector count takes every element of a selector that is an array,
+    /// and waits only when no selector holds one (D15:1902, 1903, 2184, 3354).
+    #[test]
+    fn a_selector_count_takes_every_item_of_what_is_an_array() {
+        let read = rules(&json!([
+            7,
+            {"requestedLocales": ["ja", 7, true], "intentSurfaceClasses": 7, "mode": 7},
+            {"requestedLocales": "ja", "intentSurfaceClasses": ["nav"], "mode": 7},
+        ]));
+        assert_eq!((read.locale_items, read.surface_items), (Ok(3), Ok(1)));
+        let none = rules(&json!([7, {"requestedLocales": 7, "mode": 7}]));
+        assert!(none.locale_items.is_err());
+        assert!(none.surface_items.is_err());
+        let beside = rules(&json!([{"requestedLocales": 7, "mode": 7}]));
+        assert!(beside.locale_items.is_err());
+        assert_eq!(beside.surface_items, Ok(0));
+        // An empty selector failed its own check, so it has no item to count.
+        let empty = rules(&json!([{"intentSurfaceClasses": [], "mode": 7}]));
+        assert!(empty.surface_items.is_err());
+        // The causes join every value excluded.
+        let distinct = rules(&json!([7, {"requestedLocales": 7, "mode": "direct-required"}]));
+        assert_eq!(distinct.locale_items.unwrap_err().keys().count(), 2);
+    }
+
+    /// What the checks admitted and the document does not hold is a resolver
+    /// bug: a `coverage`, rule, or selector of another type, and an item or a
+    /// mode that its type cannot read.
+    #[test]
+    fn a_coverage_the_checks_admit_and_the_value_lacks_is_a_resolver_bug() {
+        let bug = |edit: fn(&mut Value)| coverage(Some(ValueAdmissions::default()), edit).err();
+        let unreported: [fn(&mut Value); 3] = [
+            |app| app["coverage"] = json!(7),
+            |app| app["coverage"]["rules"] = json!(7),
+            |app| app["coverage"]["rules"][0] = json!(7),
+        ];
+        for edit in unreported {
+            assert_eq!(bug(edit), Some(StructuralInvariant::UnreportedFailure));
+        }
+        let mismatched: [fn(&mut Value); 4] = [
+            |app| app["coverage"]["defaultMode"] = json!(7),
+            |app| app["coverage"]["rules"][0]["requestedLocales"] = json!(7),
+            |app| app["coverage"]["rules"][0]["requestedLocales"] = json!([7]),
+            |app| app["coverage"]["rules"][0]["mode"] = json!(7),
+        ];
+        for edit in mismatched {
+            assert_eq!(
+                bug(edit),
+                Some(StructuralInvariant::Admission(
+                    AdmissionInvariant::AuthoringTypeMismatch
+                ))
+            );
+        }
     }
 
     /// What the document holds of a declaration admitted whole is what its

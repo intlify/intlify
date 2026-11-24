@@ -15,14 +15,14 @@
 use serde::de::DeserializeOwned;
 
 use crate::model::{
-    Coverage, Delivery, DeploymentGroup, DeploymentGroupId, NonEmptyMap, Policies, ProjectId,
-    SelectionScope,
+    Delivery, DeploymentGroup, DeploymentGroupId, NonEmptyMap, Policies, ProjectId, SelectionScope,
 };
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::StructuralAnalysis;
 
+use super::coverage::CoverageFields;
 use super::declaration_fragments::{
-    AliasEntries, DeclarationFragments, FallbackEntry, TargetEntries,
+    AliasEntries, CoverageEntries, DeclarationFragments, FallbackEntry, TargetEntries,
 };
 use super::evaluation::{Admitted, Causes};
 use super::locales::{
@@ -52,7 +52,8 @@ pub(crate) struct DeclarationFields<Policy, Target> {
     negotiation_aliases: Admitted<AliasEntries>,
     /// The fallback map entry by entry, which Phases 7 and 8 read.
     message_fallback: Admitted<Vec<FallbackEntry>>,
-    coverage: Admitted<Option<Coverage>>,
+    /// The coverage rule by rule, which Phase 8 reads.
+    coverage: Admitted<CoverageEntries>,
     policies: Admitted<Policies<Policy>>,
     /// The Target ID map entry by entry, which Phases 7, 9, and 11 read.
     target_entries: Admitted<TargetEntries<Target>>,
@@ -84,7 +85,7 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
             default_source_locale: read.optional("defaultSourceLocale")?,
             negotiation_aliases: read.alias_entries()?,
             message_fallback: read.fallback_entries()?,
-            coverage: read.optional("coverage")?,
+            coverage: read.coverage_entries()?,
             policies: read.required("policies")?,
             target_entries: read.target_entries()?,
             deployment_groups: read.required("deploymentGroups")?,
@@ -132,7 +133,18 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
                     })
                     .collect()
             }),
-            coverage: borrowed(&self.coverage, Option::as_ref),
+            coverage: borrowed(&self.coverage, |coverage| CoverageFields {
+                default_mode: coverage.default_mode.clone(),
+                rules: borrowed(&coverage.rules, |rules| {
+                    rules
+                        .iter()
+                        .map(|rule| rule.as_ref().map_err(Causes::clone))
+                        .collect()
+                }),
+                locale_items: coverage.locale_items.clone(),
+                surface_items: coverage.surface_items.clone(),
+                whole: coverage.whole.clone(),
+            }),
             target_entries: borrowed(&self.target_entries, |targets| TargetMapFields {
                 submitted: targets.submitted,
                 entries: targets
@@ -238,7 +250,7 @@ mod tests {
     use crate::resolver::value_admissions::tests::{structured_in, Analysis};
     use crate::resolver::value_admissions::ValueAdmissions;
 
-    use super::DeclarationFields;
+    use super::{CoverageEntries, DeclarationFields};
 
     type Fields = DeclarationFields<FixturePolicyReference, FixtureTargetReference>;
 
@@ -293,7 +305,7 @@ mod tests {
         assert!(fields.project_id.is_ok() && fields.selection_scope.is_ok());
         assert_eq!(fields.requested_locales, Ok(vec![Ok("en".to_owned())]));
         assert_eq!(fields.default_source_locale, Ok(None));
-        assert_eq!(fields.coverage, Ok(None));
+        assert_eq!(fields.coverage, Ok(CoverageEntries::default()));
         assert_eq!(fields.delivery, Ok(None));
         assert!(fields.policies.is_ok());
         assert!(fields.target_structure().is_ok() && fields.deployment_groups.is_ok());
@@ -303,7 +315,8 @@ mod tests {
             1
         );
         assert_eq!(complete.message_fallback.as_ref().unwrap().len(), 1);
-        assert!(matches!(complete.coverage, Ok(Some(_))));
+        let rules = complete.coverage.as_ref().unwrap().rules.as_ref();
+        assert_eq!(rules.unwrap().len(), 3);
         // Each accessor hands on the field it reads.
         assert!(matches!(complete.delivery(), Ok(Some(_))));
         assert_eq!(fields.delivery(), Ok(None));
@@ -440,7 +453,7 @@ mod tests {
         web["coverage"] = json!(false);
         config["profiles"]["web"] = web;
         let fields = read(&config);
-        assert_eq!(fields.coverage, Ok(None));
+        assert_eq!(fields.coverage, Ok(CoverageEntries::default()));
         assert!(fields.project_id.is_ok() && fields.requested_locales.is_ok());
     }
 
