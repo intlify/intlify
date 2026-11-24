@@ -10,15 +10,17 @@
 use std::collections::BTreeMap;
 
 use serde::de::value::{BorrowedStrDeserializer, Error as KeyError};
-use serde::de::{Deserialize, DeserializeOwned};
+use serde::de::DeserializeOwned;
 
 use crate::materialize::{MaterializedDocument, NodeId, NodeKind, ObjectMember};
-use crate::model::{CoverageMode, FallbackCandidate, RequiredNullable, TargetId};
+use crate::model::{
+    CoverageMode, DeploymentGroupId, FallbackCandidate, RequiredNullable, TargetId,
+};
 use crate::references::{PolicyReference, TargetProfileReference};
 use crate::structural::{AdmissionInvariant, Member, StructuralAnalysis};
 
 use super::coverage::RuleContent;
-use super::evaluation::Admitted;
+use super::evaluation::{and, Admitted};
 use super::locales::joined;
 use super::resource_policy::{PolicySlot, ReferenceField, ReferenceOccurrence};
 use super::structural_admission::StructuralInvariant;
@@ -51,6 +53,28 @@ pub(crate) struct TargetEntries<Target> {
     pub(crate) submitted: usize,
     pub(crate) entries: Vec<TargetEntry<Target>>,
     pub(crate) whole: Admitted<()>,
+}
+
+/// One entry of `deploymentGroups` whose key structural admission admitted:
+/// its `members`, element by element, or why it has none to read (D15:2184,
+/// 2367).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct GroupEntry {
+    pub(crate) id: DeploymentGroupId,
+    pub(crate) members: Admitted<Vec<Admitted<TargetId>>>,
+}
+
+/// The Group ID map entry by entry: how many entries it holds and how many
+/// member occurrences their arrays hold, each counted whatever its key or its
+/// value (D15:1932, 1935), whether every key was admitted, and each entry with
+/// an admitted key, in the map's order. An entry whose key failed has no later
+/// subject (D15:2184, 3354).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct GroupEntries {
+    pub(crate) submitted: usize,
+    pub(crate) memberships: Admitted<usize>,
+    pub(crate) keys: Admitted<()>,
+    pub(crate) entries: Vec<GroupEntry>,
 }
 
 /// One entry of `localeNegotiation.aliases`: its key, a spelling whatever its
@@ -226,25 +250,16 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
     where
         Target: DeserializeOwned,
     {
-        let map = self.member_value(self.declaration, "targetProfiles");
-        let members = match map.map(|map| (map, self.document.node(map).kind())) {
-            Some((map, NodeKind::Object(members))) if self.values.value(map).is_ok() => members,
-            _ => {
-                return match self
-                    .values
-                    .member(self.document, self.declaration, "targetProfiles")
-                {
-                    Err(causes) => Ok(Err(causes)),
-                    Ok(()) => Err(StructuralInvariant::UnreportedFailure),
-                };
-            }
+        let members = match self.required_map("targetProfiles")? {
+            Ok(members) => members,
+            Err(causes) => return Ok(Err(causes)),
         };
         let mut entries = Vec::with_capacity(members.len());
         for (key, member) in members {
             let entry = member.value();
             if self.values.key(entry).is_ok() {
                 entries.push(TargetEntry {
-                    id: target_id(key)?,
+                    id: identity(key)?,
                     profile: self.required_at(entry, "profile")?,
                     requested_locales: self.strings_at(entry, "requestedLocales")?,
                     default_requested_locale: self
@@ -259,6 +274,68 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
                 .values
                 .member(self.document, self.declaration, "targetProfiles"),
         }))
+    }
+
+    /// The Group ID map, entry by entry, or why it has no entry to read. The
+    /// total counts the elements of every `members` that is an array, of an
+    /// entry whose key failed too, since a value that is none holds no
+    /// occurrence; it waits on why only when no entry holds one (D15:1935,
+    /// 2184, 3354).
+    ///
+    /// # Errors
+    ///
+    /// Returns the resolver bug of a map the checks admitted that is absent
+    /// or no object, of a key they admitted that is no Group ID, or of a
+    /// member they admitted that is no Target ID.
+    pub(crate) fn group_entries(&self) -> Result<Admitted<GroupEntries>, StructuralInvariant> {
+        let members = match self.required_map("deploymentGroups")? {
+            Ok(members) => members,
+            Err(causes) => return Ok(Err(causes)),
+        };
+        let mut entries = Vec::with_capacity(members.len());
+        let mut keys = Ok(());
+        let mut held = 0;
+        let mut excluded = None;
+        for (key, member) in members {
+            let entry = member.value();
+            let items = self.items_at::<TargetId>(entry, "members")?;
+            match &items {
+                Ok(items) => held += items.len(),
+                Err(causes) => excluded = Some(joined(excluded, causes)),
+            }
+            match self.values.key(entry) {
+                Ok(()) => entries.push(GroupEntry {
+                    id: identity(key)?,
+                    members: items,
+                }),
+                Err(causes) => keys = and(keys, Err(causes)),
+            }
+        }
+        Ok(Ok(GroupEntries {
+            submitted: members.len(),
+            memberships: match excluded {
+                Some(causes) if held == 0 => Err(causes),
+                _ => Ok(held),
+            },
+            keys,
+            entries,
+        }))
+    }
+
+    /// The required map `name` of the declaration and its members, or why it
+    /// has none to read.
+    fn required_map(&self, name: &str) -> Result<Admitted<&'r Members>, StructuralInvariant> {
+        let document: &'r MaterializedDocument = self.document;
+        let map = self.member_value(self.declaration, name);
+        match map.map(|map| (map, document.node(map).kind())) {
+            Some((map, NodeKind::Object(members))) if self.values.value(map).is_ok() => {
+                Ok(Ok(members))
+            }
+            _ => match self.values.member(document, self.declaration, name) {
+                Err(causes) => Ok(Err(causes)),
+                Ok(()) => Err(StructuralInvariant::UnreportedFailure),
+            },
+        }
     }
 
     /// The alias map, entry by entry, or why it has no entry to read. An
@@ -727,7 +804,7 @@ impl DeclarationFragments<'_, PolicyReference, TargetProfileReference> {
         entry: NodeId,
     ) -> Result<Option<ReferenceOccurrence>, StructuralInvariant> {
         let field = match self.values.key(entry) {
-            Ok(()) => Some(ReferenceField::TargetProfile(target_id(key)?)),
+            Ok(()) => Some(ReferenceField::TargetProfile(identity(key)?)),
             Err(_) => None,
         };
         let value = self.member_value(entry, "profile");
@@ -747,9 +824,9 @@ impl DeclarationFragments<'_, PolicyReference, TargetProfileReference> {
     }
 }
 
-/// The Target ID an admitted key spells.
-fn target_id(key: &str) -> Result<TargetId, StructuralInvariant> {
-    TargetId::deserialize(BorrowedStrDeserializer::<KeyError>::new(key))
+/// The identity an admitted key spells.
+fn identity<T: DeserializeOwned>(key: &str) -> Result<T, StructuralInvariant> {
+    T::deserialize(BorrowedStrDeserializer::<KeyError>::new(key))
         .map_err(|_| StructuralInvariant::UnreportedFailure)
 }
 
@@ -778,8 +855,8 @@ mod tests {
     use crate::structural::{AdmissionInvariant, StructuralAnalysis};
 
     use super::{
-        AliasEntries, CoverageEntries, DeclarationFragments, FallbackEntry, RuleEntry,
-        TargetEntries,
+        AliasEntries, CoverageEntries, DeclarationFragments, FallbackEntry, GroupEntries,
+        RuleEntry, TargetEntries,
     };
 
     /// One way to break the declaration, by its name.
@@ -1066,6 +1143,105 @@ mod tests {
                 ))
             );
         }
+    }
+
+    /// The Group ID map once `edit` changed the declaration.
+    fn groups(
+        admissions: Option<ValueAdmissions>,
+        edit: fn(&mut Value),
+    ) -> Result<Admitted<GroupEntries>, StructuralInvariant> {
+        let mut config = complete_config();
+        edit(&mut config["profiles"]["app"]);
+        let (_, values, analysis) = structured_in(Evaluation::default(), &config);
+        let values = admissions.unwrap_or(values);
+        DeclarationFragments::new(&values, &analysis, "app")?.group_entries()
+    }
+
+    /// Each entry is read on its own, and each element of its `members`: the
+    /// counts take what was submitted, an entry whose key failed has no
+    /// subject, and the total waits only when no entry holds an array
+    /// (D15:1932, 1935, 2184, 2367, 3354).
+    #[test]
+    fn the_group_map_is_read_entry_by_entry() {
+        let whole = groups(None, |_| {}).unwrap().unwrap();
+        assert_eq!(
+            (whole.submitted, whole.memberships, whole.keys),
+            (1, Ok(2), Ok(()))
+        );
+        assert_eq!(whole.entries[0].id.as_str(), "web");
+        let members = whole.entries[0].members.as_ref().unwrap();
+        let spelled: Vec<&str> = members
+            .iter()
+            .map(|each| each.as_ref().unwrap().as_str())
+            .collect();
+        assert_eq!(spelled, ["browser", "server"]);
+
+        let read = groups(None, |app| {
+            app["deploymentGroups"]["web"]["members"] = json!(["browser", 7, "server"]);
+        });
+        let read = read.unwrap().unwrap();
+        assert_eq!(read.memberships, Ok(3));
+        let items = read.entries[0].members.as_ref().unwrap();
+        assert!(items[0].is_ok() && items[1].is_err() && items[2].is_ok());
+
+        let read = groups(None, |app| {
+            app["deploymentGroups"]["Web App"] = json!({"members": ["worker"]});
+        });
+        let read = read.unwrap().unwrap();
+        assert_eq!((read.submitted, read.memberships), (2, Ok(3)));
+        assert!(read.keys.is_err());
+        let ids: Vec<&str> = read.entries.iter().map(|each| each.id.as_str()).collect();
+        assert_eq!(ids, ["web"]);
+
+        let read = groups(None, |app| {
+            app["deploymentGroups"]["jobs"] = json!({"members": 7});
+        });
+        let read = read.unwrap().unwrap();
+        assert_eq!(read.memberships, Ok(2));
+        assert!(read.entries[0].members.is_err() && read.entries[1].members.is_ok());
+
+        let read = groups(None, |app| {
+            app["deploymentGroups"]["web"]["members"] = json!(7);
+            app["deploymentGroups"]["jobs"] = json!({"members": []});
+        });
+        let causes = read.unwrap().unwrap().memberships.unwrap_err();
+        assert_eq!(causes.keys().count(), 2);
+    }
+
+    /// A map that failed itself, or is missing, has no entry to read.
+    #[test]
+    fn a_group_map_that_failed_has_no_entries() {
+        let whole: [fn(&mut Value); 3] = [
+            |app| app["deploymentGroups"] = json!(7),
+            |app| app["deploymentGroups"] = json!({}),
+            |app| lacking(app, &[], "deploymentGroups"),
+        ];
+        for edit in whole {
+            assert!(groups(None, edit).unwrap().is_err());
+        }
+    }
+
+    /// What the checks admitted and the document does not hold is a resolver
+    /// bug: a map that is no object or is absent, a key that is no Group ID,
+    /// members that are absent, and a member that is no Target ID.
+    #[test]
+    fn a_group_map_the_checks_admit_and_the_value_lacks_is_a_resolver_bug() {
+        let bug = |edit| groups(Some(ValueAdmissions::default()), edit).err();
+        let unreported: [fn(&mut Value); 4] = [
+            |app| app["deploymentGroups"] = json!(7),
+            |app| lacking(app, &[], "deploymentGroups"),
+            |app| app["deploymentGroups"]["Web App"] = json!({"members": ["browser"]}),
+            |app| lacking(app, &["deploymentGroups", "web"], "members"),
+        ];
+        for edit in unreported {
+            assert_eq!(bug(edit), Some(StructuralInvariant::UnreportedFailure));
+        }
+        assert_eq!(
+            bug(|app| app["deploymentGroups"]["web"]["members"] = json!([7])),
+            Some(StructuralInvariant::Admission(
+                AdmissionInvariant::AuthoringTypeMismatch
+            ))
+        );
     }
 
     /// The alias map once `edit` changed the declaration.

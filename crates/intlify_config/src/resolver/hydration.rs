@@ -830,7 +830,7 @@ mod tests {
     use crate::resolver::declaration_observer::fixtures::{view, Observed};
     use crate::resolver::evaluation::{Actual, LimitExceeded, Status};
     use crate::resolver::exact_resolution::resolve_fields;
-    use crate::resolver::groups::{self, resolve_groups, GroupSubject};
+    use crate::resolver::groups::{self, resolve_groups, GroupFields, GroupSubject};
     use crate::resolver::limits::{fixture_limits, ResolutionLimits};
     use crate::resolver::locales::fixtures::{canonicalizer, stand_in, target, waits_on};
     use crate::resolver::locales::{self, resolve_locales, LocaleFields, LocaleSubject};
@@ -1051,7 +1051,7 @@ mod tests {
                     resolve_groups(
                         &mut evaluation,
                         policy,
-                        Ok(&declaration.deployment_groups),
+                        &Ok(GroupFields::declared(&declaration.deployment_groups)),
                         (targets.as_ref(), Some(observer)),
                     )
                 })

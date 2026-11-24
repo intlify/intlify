@@ -153,7 +153,7 @@ pub(crate) const SCHEMA_PATH: &str = "registries/check-v0.schema.json";
 
 /// The registry's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:509fd27c5eb25481ea659a4516abc216ebde9aa313a4b88ba303ccaf87f84572";
+    "sha256:937a7e3ecd390da537f9de633c37de265fef43f3472d3392370adf62a0f8e4c5";
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
@@ -1170,8 +1170,35 @@ const CONFIRMED_POLICY: &[&str] = &[
     "resource-policy.reference-bytes.within-bound",
 ];
 
-/// What a check over the selected declaration's groups under the admitted
-/// Resource Limit Policy waits on: the structural checks of the
+/// What the total of the member occurrences waits on: the structural checks
+/// that leave a group's `members` without an array to count, which it waits on
+/// when no group has one (D15:1935, 2184), then every Policy recheck, in row
+/// order.
+const MEMBER_ARRAYS_UNDER_POLICY: &[&str] = &[
+    "structural.group.required-field",
+    "structural.group.field-value",
+    "resource-policy.root-nodes.within-bound",
+    "resource-policy.root-depth.within-bound",
+    "resource-policy.root-collection-entries.within-bound",
+    "resource-policy.root-string-bytes.within-bound",
+    "resource-policy.root-longest-string.within-bound",
+    "resource-policy.profiles.within-bound",
+    "resource-policy.profile-id.within-bound",
+    "resource-policy.selector.within-bound",
+    "resource-policy.structural-analysis.within-bound",
+    "resource-policy.artifacts.within-bound",
+    "resource-policy.policy-artifacts.within-bound",
+    "resource-policy.target-profile-artifacts.within-bound",
+    "resource-policy.references.within-bound",
+    "resource-policy.artifact.within-bound",
+    "resource-policy.artifact-bytes.within-bound",
+    "resource-policy.policy-reference.within-bound",
+    "resource-policy.target-profile-reference.within-bound",
+    "resource-policy.reference-bytes.within-bound",
+];
+
+/// What a check over the relations of the Group ID map as one value waits on
+/// under the admitted Resource Limit Policy: the structural checks of the
 /// `deploymentGroups` entries it reads, then every Policy recheck, in row
 /// order.
 const GROUPS_UNDER_POLICY: &[&str] = &[
@@ -1391,8 +1418,10 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         | K::DeclarationField
         | K::LocaleOccurrences
         | K::TargetProfiles
-        | K::CollectionGroup => &[CONFIRMED_POLICY],
-        K::Groups | K::Memberships | K::Relations => &[GROUPS_UNDER_POLICY],
+        | K::CollectionGroup
+        | K::Groups => &[CONFIRMED_POLICY],
+        K::Memberships => &[MEMBER_ARRAYS_UNDER_POLICY],
+        K::Relations => &[GROUPS_UNDER_POLICY],
         K::Vocabulary => &[
             CONFIRMED_POLICY,
             &[
@@ -1601,8 +1630,17 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
             "target.effective-default.supported",
             "target.requested-locales.directed",
         ]],
-        K::Group => &[&["group.groups.within-bound"]],
-        K::GroupMembers => &[&["group.group-id.within-bound"]],
+        // A Group ID's checks need its admitted key, and its member count an
+        // array to count (D15:2184, 3354).
+        K::Group => &[&[
+            "structural.group-key.field-value",
+            "group.groups.within-bound",
+        ]],
+        K::GroupMembers => &[&[
+            "structural.group.required-field",
+            "structural.group.field-value",
+            "group.group-id.within-bound",
+        ]],
         K::GroupMember => &[
             &[
                 "group.memberships.within-bound",

@@ -28,7 +28,7 @@ use crate::resolver::evaluation::{
     Unit,
 };
 use crate::resolver::exact_resolution::{resolve_fields, ReferenceResults};
-use crate::resolver::groups::{resolve_groups, GroupSubject, ResolvedGroups};
+use crate::resolver::groups::{resolve_groups, GroupFields, GroupSubject, ResolvedGroups};
 use crate::resolver::limits::ConfirmedPolicy;
 use crate::resolver::locales::{resolve_locales, LocaleFields, ResolvedLocales};
 use crate::resolver::profile_resolution::ResolverInvariant;
@@ -173,7 +173,7 @@ fn phases<'s>(
     let groups = resolve_groups(
         evaluation,
         Ok(inputs.policy),
-        Ok(&inputs.declaration.deployment_groups),
+        &Ok(GroupFields::declared(&inputs.declaration.deployment_groups)),
         (targets.as_ref(), Some(observer)),
     )?;
     Ok((targets, groups))
