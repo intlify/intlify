@@ -559,25 +559,23 @@ struct Selectors<'a, P: Provider> {
 }
 
 impl<P: Provider> Selectors<'_, P> {
-    /// The items at `positions` of the selector `selector` of each rule at
-    /// `raws`, rule by rule, each at its token, or none without the
-    /// declaration's file: each raw rule is a parent of its own (D15:790,
-    /// 2190).
+    /// The items at `at`, each a rule's position and an item's, rule by rule,
+    /// each at its token, or none without the declaration's file: each raw
+    /// rule is a parent of its own (D15:790, 2190).
     fn items(
         &self,
-        raws: &[usize],
         selector: &str,
-        positions: &[usize],
+        at: &[(usize, usize)],
     ) -> Result<Vec<Vec<EvidenceProjection>>, ObserverInvariant> {
         let Some(observer) = self.observer else {
             return Ok(Vec::new());
         };
         let index = |at: usize| u64::try_from(at).map_err(|_| ObserverInvariant::Missing);
-        raws.iter()
-            .map(|&rule| {
-                positions
+        at.chunk_by(|left, right| left.0 == right.0)
+            .map(|items| {
+                items
                     .iter()
-                    .map(|&position| {
+                    .map(|&(rule, position)| {
                         observer.nested(&[
                             Edge::Member("coverage"),
                             Edge::Member("rules"),
@@ -607,6 +605,21 @@ impl<P: Provider> Selectors<'_, P> {
     }
 }
 
+/// The rules holding one content, each at its position with its selector's
+/// items: equal content holds equal items, each rule in its own order.
+type Holding<'r> = Vec<(usize, &'r [String])>;
+
+/// Where one item is: its rule's position and its own.
+type ItemAt = (usize, usize);
+
+/// Whether a rule repeats what `at` names: equal rules repeat it alike, so
+/// the first tells.
+fn repeats(at: &[ItemAt]) -> bool {
+    at.chunk_by(|left, right| left.0 == right.0)
+        .next()
+        .is_some_and(|items| items.len() > 1)
+}
+
 /// Each distinct rule's selector units and its unit normalizing them to a
 /// domain, then one unit per domain: no two rule occurrences may share one.
 /// An element structural admission did not admit as a rule has no subject and
@@ -618,30 +631,40 @@ fn normalize<P: Provider>(
     selectors: &Selectors<'_, P>,
     rules: &[Admitted<&CoverageRule>],
 ) -> Result<(Admitted<()>, Domains), LocaleInvariant> {
-    // Each distinct rule with the positions of the rules holding it.
-    let mut contents: BTreeMap<RuleContent, (Vec<usize>, &CoverageRule)> = BTreeMap::new();
+    // Each distinct rule with the rules holding it, in position order.
+    let mut contents: BTreeMap<RuleContent, Vec<(usize, &CoverageRule)>> = BTreeMap::new();
     let mut normalized = Ok(());
     for (position, rule) in rules.iter().enumerate() {
         match rule {
             Ok(rule) => contents
                 .entry(RuleContent::of(rule))
-                .or_insert((Vec::new(), rule))
-                .0
-                .push(position),
+                .or_default()
+                .push((position, rule)),
             Err(causes) => normalized = and(normalized, Err(causes.clone())),
         }
     }
     let mut domains = Domains::new();
-    for (content, (raws, rule)) in &contents {
+    for (content, holders) in &contents {
+        let rule = holders[0].1;
         let locales = match rule.requested_locales() {
-            Some(items) => selected_locales(evaluation, selectors, (content, raws), items)?,
+            Some(_) => selected_locales(
+                evaluation,
+                selectors,
+                content,
+                &holding(holders, CoverageRule::requested_locales),
+            )?,
             None => selectors
                 .requested
                 .complete()
                 .map(|requested| requested.as_slice().to_vec()),
         };
         let surfaces = match rule.intent_surface_classes() {
-            Some(items) => selected_surfaces(evaluation, selectors, (content, raws), items)?,
+            Some(_) => selected_surfaces(
+                evaluation,
+                selectors,
+                content,
+                &holding(holders, CoverageRule::intent_surface_classes),
+            )?,
             None => selectors
                 .vocabulary
                 .clone()
@@ -658,7 +681,7 @@ fn normalize<P: Provider>(
         match domain {
             Ok(domain) => {
                 let (holding, _) = domains.entry(domain).or_insert((Vec::new(), rule.mode()));
-                holding.extend(raws);
+                holding.extend(holders.iter().map(|&(position, _)| position));
                 holding.sort_unstable();
             }
             Err(causes) => normalized = and(normalized, Err(causes)),
@@ -692,45 +715,68 @@ fn normalize<P: Provider>(
     Ok((normalized, domains))
 }
 
+/// The selector `selector` reads of each rule in `holders` that holds it:
+/// rules of one content all do or none does.
+fn holding<'r>(
+    holders: &[(usize, &'r CoverageRule)],
+    selector: fn(&'r CoverageRule) -> Option<&'r [String]>,
+) -> Holding<'r> {
+    holders
+        .iter()
+        .filter_map(|&(position, rule)| Some((position, selector(rule)?)))
+        .collect()
+}
+
 /// The member a rule names its locale selector by.
 const REQUESTED_LOCALES: &str = "requestedLocales";
 
-/// One rule's locale selector: each item canonicalized, with one unit per
-/// subject as Phase 7 does, and each locale named once and requested. Returns
-/// the selector's canonical locales as a set once every unit passed.
+/// One rule content's locale selector: each item canonicalized, with one unit
+/// per subject as Phase 7 does, and each locale named once and requested.
+/// Returns the selector's canonical locales as a set once every unit passed.
 fn selected_locales<P: Provider>(
     evaluation: &mut Evaluation,
     selectors: &Selectors<'_, P>,
-    (rule, raws): (&RuleContent, &[usize]),
-    items: &[String],
+    rule: &RuleContent,
+    holding: &Holding<'_>,
 ) -> Result<Admitted<Vec<CanonicalLocale>>, LocaleInvariant> {
-    // Each subject's result and the positions of the items that spell it,
-    // each with whether it differs from the canonical form.
-    let mut subjects: BTreeMap<LocaleKey, (Attempt, Vec<(usize, bool)>)> = BTreeMap::new();
-    for (position, raw) in items.iter().enumerate() {
-        // An item's key can stand for several spellings, under a rule keyed
-        // by its content: past the byte bound it reports only the first-over
-        // witness (Decision 015-157).
-        let attempt = match selectors.spelling {
-            Ok(canonicalizer) => {
-                Ok(canonicalize(canonicalizer, raw)?.map_err(Blocking::first_over))
+    // What each spelling canonicalized to: equal rules hold equal spellings.
+    let mut spelled: BTreeMap<&str, (LocaleKey, bool, Attempt)> = BTreeMap::new();
+    // Each subject's result and where the items that spell it are, each with
+    // whether it differs from the canonical form.
+    let mut subjects: BTreeMap<LocaleKey, (Attempt, Vec<(ItemAt, bool)>)> = BTreeMap::new();
+    for &(at, items) in holding {
+        for (position, raw) in items.iter().enumerate() {
+            let raw = raw.as_str();
+            if !spelled.contains_key(raw) {
+                // An item's key can stand for several spellings, under a rule
+                // keyed by its content: past the byte bound it reports only
+                // the first-over witness (Decision 015-157).
+                let attempt = match selectors.spelling {
+                    Ok(canonicalizer) => {
+                        Ok(canonicalize(canonicalizer, raw)?.map_err(Blocking::first_over))
+                    }
+                    Err(ref causes) => Err(causes.clone()),
+                };
+                let (key, corrected) = match &attempt {
+                    Ok(Ok((locale, corrected))) => {
+                        (LocaleKey::Canonical(locale.clone()), *corrected)
+                    }
+                    _ => (LocaleKey::Content(Content::new(raw)), false),
+                };
+                let attempt = attempt.map(|attempt| attempt.map(|(locale, _)| locale));
+                spelled.insert(raw, (key, corrected, attempt));
             }
-            Err(ref causes) => Err(causes.clone()),
-        };
-        let (key, corrected) = match &attempt {
-            Ok(Ok((locale, corrected))) => (LocaleKey::Canonical(locale.clone()), *corrected),
-            _ => (LocaleKey::Content(Content::new(raw)), false),
-        };
-        let attempt = attempt.map(|attempt| attempt.map(|(locale, _)| locale));
-        subjects
-            .entry(key)
-            .or_insert((attempt, Vec::new()))
-            .1
-            .push((position, corrected));
+            let (key, corrected, attempt) = &spelled[raw];
+            subjects
+                .entry(key.clone())
+                .or_insert_with(|| (attempt.clone(), Vec::new()))
+                .1
+                .push(((at, position), *corrected));
+        }
     }
     let mut selected = Ok(Vec::with_capacity(subjects.len()));
-    for (key, spelled) in subjects {
-        let locale = locale_units(evaluation, selectors, (rule, raws), &key, spelled)?;
+    for (key, spellings) in subjects {
+        let locale = locale_units(evaluation, selectors, rule, &key, spellings)?;
         selected = both(selected, locale).map(|(mut selected, locale)| {
             selected.push(locale);
             selected
@@ -754,22 +800,19 @@ type Attempt = Admitted<Result<CanonicalLocale, Blocking>>;
 fn locale_units<P: Provider>(
     evaluation: &mut Evaluation,
     selectors: &Selectors<'_, P>,
-    (rule, raws): (&RuleContent, &[usize]),
+    rule: &RuleContent,
     key: &LocaleKey,
-    (attempt, spellings): (Attempt, Vec<(usize, bool)>),
+    (attempt, spellings): (Attempt, Vec<(ItemAt, bool)>),
 ) -> Result<Admitted<CanonicalLocale>, LocaleInvariant> {
     let subject = |check| unit(CoverageSubject::Locale(rule.clone(), key.clone()), check);
-    let positions: Vec<usize> = spellings.iter().map(|&(position, _)| position).collect();
+    let positions: Vec<ItemAt> = spellings.iter().map(|&(at, _)| at).collect();
     let failed = match &attempt {
         Ok(Err(blocking)) => {
             let related = match (blocking.code, selectors.policy) {
                 (Code::ResourceLimitExceeded, Some(policy)) => vec![policy.clone()],
                 _ => Vec::new(),
             };
-            observed(
-                selectors.items(raws, REQUESTED_LOCALES, &positions)?,
-                &related,
-            )
+            observed(selectors.items(REQUESTED_LOCALES, &positions)?, &related)
         }
         _ => Vec::new(),
     };
@@ -777,12 +820,12 @@ fn locale_units<P: Provider>(
         attempt.map_err(|blocking| Found::each(blocking, failed))
     })?;
     if let Ok(canonical) = &locale {
-        let corrected: Vec<usize> = spellings
+        let corrected: Vec<ItemAt> = spellings
             .iter()
             .filter(|&&(_, corrected)| corrected)
-            .map(|&(position, _)| position)
+            .map(|&(at, _)| at)
             .collect();
-        let mut notices = observed(selectors.items(raws, REQUESTED_LOCALES, &corrected)?, &[]);
+        let mut notices = observed(selectors.items(REQUESTED_LOCALES, &corrected)?, &[]);
         // Without the declaration's file, the subject's one notice.
         if notices.is_empty() && !corrected.is_empty() {
             notices.push(None);
@@ -796,22 +839,23 @@ fn locale_units<P: Provider>(
         }
     }
     // Each rule compares only its own items.
-    let repeated = if positions.len() > 1 {
-        selectors.items(raws, REQUESTED_LOCALES, &positions)?
+    let repeated = repeats(&positions);
+    let repeating = if repeated {
+        selectors.items(REQUESTED_LOCALES, &positions)?
     } else {
         Vec::new()
     };
     let once = evaluation.check_found(subject(Check::UniqueLocale), locale.clone(), |_| {
-        if positions.len() == 1 {
-            Ok(())
+        if repeated {
+            Err(each_rule(issue(Code::LocaleDuplicate, None), repeating))
         } else {
-            Err(each_rule(issue(Code::LocaleDuplicate, None), repeated))
+            Ok(())
         }
     })?;
     let held = selectors.requested.holds(&locale);
     let outside = match (selectors.observer, &held) {
         (Some(observer), Ok(false)) => observed(
-            selectors.items(raws, REQUESTED_LOCALES, &positions)?,
+            selectors.items(REQUESTED_LOCALES, &positions)?,
             &[observer.value(&[REQUESTED_LOCALES])?],
         ),
         _ => Vec::new(),
@@ -860,39 +904,42 @@ fn each_rule(blocking: Blocking, rules: Vec<Vec<EvidenceProjection>>) -> Found {
 /// The member a rule names its surface-class selector by.
 const INTENT_SURFACE_CLASSES: &str = "intentSurfaceClasses";
 
-/// One rule's surface-class selector: each item a member of the admitted
-/// vocabulary and each member named once. A repeated item that names no
-/// member is unknown, not a duplicate. Each rule holding the selector is a
-/// raw parent of its own, so a unit's candidates are the items naming its
-/// subject in every such rule, each at its token (D15:2190, 2387): an
-/// unknown one beside the vocabulary's root, which it was compared with
+/// One rule content's surface-class selector: each item a member of the
+/// admitted vocabulary and each member named once. A repeated item that
+/// names no member is unknown, not a duplicate. Each rule holding the
+/// selector is a raw parent of its own, so a unit's candidates are the items
+/// naming its subject in every such rule, each at its token (D15:2190, 2387):
+/// an unknown one beside the vocabulary's root, which it was compared with
 /// (D15:2249), and a repeated one beside the others repeating it in the same
 /// rule (D15:1567, 2410). Returns the selector's surface classes as a set
 /// once every unit passed.
 fn selected_surfaces<P: Provider>(
     evaluation: &mut Evaluation,
     selectors: &Selectors<'_, P>,
-    (rule, raws): (&RuleContent, &[usize]),
-    items: &[String],
+    rule: &RuleContent,
+    holding: &Holding<'_>,
 ) -> Result<Admitted<Vec<Token>>, LocaleInvariant> {
     let naming = &selectors.naming;
-    // Each subject with an item that spells it and the positions of the
-    // items that do.
-    let mut subjects: BTreeMap<SurfaceKey, (&str, Vec<usize>)> = BTreeMap::new();
-    for (position, raw) in items.iter().enumerate() {
-        let key = match naming
-            .as_ref()
-            .ok()
-            .and_then(|vocabulary| vocabulary.member(raw))
-        {
-            Some(member) => SurfaceKey::Member(member.clone()),
-            None => SurfaceKey::Content(Content::new(raw)),
-        };
-        subjects
-            .entry(key)
-            .or_insert((raw, Vec::new()))
-            .1
-            .push(position);
+    // Each subject with an item that spells it and where the items that do
+    // are.
+    let mut subjects: BTreeMap<SurfaceKey, (&str, Vec<ItemAt>)> = BTreeMap::new();
+    for &(at, items) in holding {
+        for (position, raw) in items.iter().enumerate() {
+            let raw = raw.as_str();
+            let key = match naming
+                .as_ref()
+                .ok()
+                .and_then(|vocabulary| vocabulary.member(raw))
+            {
+                Some(member) => SurfaceKey::Member(member.clone()),
+                None => SurfaceKey::Content(Content::new(raw)),
+            };
+            subjects
+                .entry(key)
+                .or_insert((raw, Vec::new()))
+                .1
+                .push((at, position));
+        }
     }
     let mut selected = Ok(Vec::with_capacity(subjects.len()));
     for (key, (raw, positions)) in subjects {
@@ -904,7 +951,7 @@ fn selected_surfaces<P: Provider>(
         };
         let unknown = match naming {
             Ok(vocabulary) if vocabulary.member(raw).is_none() => observed(
-                selectors.items(raws, INTENT_SURFACE_CLASSES, &positions)?,
+                selectors.items(INTENT_SURFACE_CLASSES, &positions)?,
                 &[EvidenceProjection::resolver_input(
                     ComponentPath::vocabulary_root(),
                 )],
@@ -924,23 +971,24 @@ fn selected_surfaces<P: Provider>(
             },
         )?;
         // Each rule compares only its own items.
-        let repeated = if positions.len() > 1 {
-            selectors.items(raws, INTENT_SURFACE_CLASSES, &positions)?
+        let repeated = repeats(&positions);
+        let repeating = if repeated {
+            selectors.items(INTENT_SURFACE_CLASSES, &positions)?
         } else {
             Vec::new()
         };
         let once =
             evaluation.check_found(subject(Check::UniqueSurfaceClass), member.clone(), |_| {
-                if positions.len() == 1 {
-                    Ok(())
-                } else {
+                if repeated {
                     Err(each_rule(
                         issue(
                             Code::CoverageRuleInvalid,
                             Some(Reason::SurfaceClassDuplicate),
                         ),
-                        repeated,
+                        repeating,
                     ))
+                } else {
+                    Ok(())
                 }
             })?;
         selected = both(selected, both(member, once)).map(|(mut selected, (member, ()))| {
@@ -1983,6 +2031,64 @@ mod tests {
                 beside(0, 1, 0),
                 beside(1, 0, 1),
                 beside(1, 1, 0)
+            ]
+        );
+    }
+
+    /// Identical rules can spell their sets in different orders, so each
+    /// rule's own items locate a subject's Findings, not the first rule's
+    /// positions (D15:516, 2190, 2387, 3353).
+    #[test]
+    fn identical_rules_in_different_orders_are_found_at_their_own_items() {
+        let declaration = declared(json!({"rules": [
+            {
+                "requestedLocales": ["fr", "zz"],
+                "intentSurfaceClasses": ["nav", "help"],
+                "mode": "fallback-allowed"
+            },
+            {
+                "requestedLocales": ["zz", "fr"],
+                "intentSurfaceClasses": ["help", "nav"],
+                "mode": "fallback-allowed"
+            }
+        ]}));
+        let resolved = resolve(&declaration);
+        let primaries: Vec<EvidenceProjection> = observed(&resolved.evaluation)
+            .into_iter()
+            .map(|(_, observation)| observation.primary)
+            .collect();
+        let surface =
+            |rule, position| selector_item(&declaration, "intentSurfaceClasses", rule, position);
+        assert_eq!(
+            primaries,
+            [
+                locale_item(&declaration, 0, 1),
+                locale_item(&declaration, 1, 0),
+                surface(0, 1),
+                surface(1, 0),
+            ]
+        );
+        // A repeat is found at each rule's own repeating items.
+        let declaration = declared(json!({"rules": [
+            {"requestedLocales": ["fr", "ja", "fr"], "mode": "fallback-allowed"},
+            {"requestedLocales": ["ja", "fr", "fr"], "mode": "fallback-allowed"}
+        ]}));
+        let resolved = resolve(&declaration);
+        let repeat = |rule, position, other| Observation {
+            primary: locale_item(&declaration, rule, position),
+            related: vec![locale_item(&declaration, rule, other)],
+        };
+        let found: Vec<Observation> = observed(&resolved.evaluation)
+            .into_iter()
+            .map(|(_, observation)| observation)
+            .collect();
+        assert_eq!(
+            found,
+            [
+                repeat(0, 0, 2),
+                repeat(0, 2, 0),
+                repeat(1, 1, 2),
+                repeat(1, 2, 1)
             ]
         );
     }
