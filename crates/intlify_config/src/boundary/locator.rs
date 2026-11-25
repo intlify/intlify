@@ -15,9 +15,10 @@
 //! letter and `:` at the start. A programmatic locator is a `safe-label`, a
 //! non-empty string, or a `safe-uri`, an absolute ASCII URI already in
 //! RFC 3986's syntax-based normal form, with no query, fragment, or user
-//! information, a scheme other than `file`, and a port only when it is the
-//! shortest decimal of one that is not its scheme's default: `80` for `http`
-//! and `ws`, `443` for `https` and `wss`.
+//! information, a scheme other than `file`, a host that escapes no byte past
+//! ASCII, since a Unicode host must already be in its A-label form, and a port
+//! only when it is the shortest decimal of one that is not its scheme's
+//! default: `80` for `http` and `ws`, `443` for `https` and `wss`.
 //! `bootstrapOnly.evidenceMetadata.maxLocatorBytes` bounds the payload's
 //! UTF-8 bytes. A candidate that is missing, of another variant, unclassified,
 //! over the bound, or malformed is absence: it never fails the entry, emits no
@@ -174,7 +175,7 @@ fn relative_path(payload: &str) -> bool {
 /// Whether `payload` is a canonical `safe-uri` (D15:764): an absolute URI,
 /// with no query or fragment, that RFC 3986's syntax-based normalization
 /// leaves as it is, whose scheme is not `file`, and whose authority, when
-/// present, has no user information and a canonical port.
+/// present, has no user information, an ASCII host, and a canonical port.
 fn safe_uri(payload: &str) -> bool {
     let Some(uri) = Reference::parse(payload) else {
         return false;
@@ -186,9 +187,23 @@ fn safe_uri(payload: &str) -> bool {
         && uri.fragment().is_none()
         && scheme != "file"
         && uri.authority().is_none_or(|authority| {
-            !authority.contains('@') && canonical_port(scheme, port(authority))
+            !authority.contains('@')
+                && ascii_host(authority)
+                && canonical_port(scheme, port(authority))
         })
         && uri == uri.normalize()
+}
+
+/// Whether an authority with no user information escapes no byte past ASCII.
+/// RFC 3986 spells a non-ASCII registered name as its escaped UTF-8 bytes, so
+/// such a host is a Unicode one, which the adapter must already have converted
+/// to its A-label form (D15:764, 3377). The grammar makes every `%` the start
+/// of an escape, and a port holds none.
+fn ascii_host(authority: &str) -> bool {
+    !authority
+        .as_bytes()
+        .windows(2)
+        .any(|pair| pair[0] == b'%' && !matches!(pair[1], b'0'..=b'7'))
 }
 
 /// The port of an authority with no user information, `None` when no `:`
@@ -502,8 +517,24 @@ mod tests {
             "https://example.com/%2",
             "https://example.com/%",
             "https://ex%61mple.com/x",
+            "https://b%C3%BCcher.example/x",
+            "https://b%C3%BCcher.example:8443/x",
+            "vscode-remote://ssh-remote%2B%E8%A8%AD%E5%AE%9A/src/app.ts",
+            "https://%FF.example/x",
         ] {
             assert_eq!(programmatic(uri(payload)), None, "{payload}");
+        }
+    }
+
+    /// `%7F` is the last ASCII byte and `%80` the first past it. An escape of
+    /// another ASCII byte stays in a host, as `%2B` does (D15:764, 3377).
+    #[test]
+    fn a_host_may_escape_only_ascii_bytes() {
+        for authority in ["ssh-remote%2Bhost", "a%7Fb", "example.com:8443"] {
+            assert!(ascii_host(authority), "{authority}");
+        }
+        for authority in ["a%80b", "%FF", "b%C3%BCcher.example:8443"] {
+            assert!(!ascii_host(authority), "{authority}");
         }
     }
 
