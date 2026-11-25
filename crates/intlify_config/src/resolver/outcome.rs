@@ -414,6 +414,7 @@ pub(crate) mod tests {
     use crate::construction::registry::check::RecordKind;
     use crate::construction::root::ConstructionRoot;
     use crate::input_limits::Bound;
+    use crate::locale::VersionedIdentity;
     use crate::resolver::call_site_span::fixtures::CALL_SITE;
     use crate::resolver::coverage::{self, CoverageSubject};
     use crate::resolver::dependency::{self, MaterializedSlot, SemanticGroup};
@@ -663,6 +664,50 @@ pub(crate) mod tests {
             };
             assert!(causes.keys().eq([phase_0]));
         });
+    }
+
+    /// D15:2298, 2299, 3427: a missing `project-profile` assertion is the
+    /// blocking `project-profile-specification-input-incomplete` Finding,
+    /// whose details name the slot, and another Profile Specification
+    /// identity or revision is the blocking
+    /// `project-profile-specification-not-admitted` Finding, `unsupported`
+    /// or `incompatible`. Each is the outcome's one Finding.
+    #[test]
+    fn a_project_profile_slot_finding_names_its_slot_or_its_reason() {
+        let other = |identity, revision| Some(VersionedIdentity { identity, revision });
+        for (asserted, code, details) in [
+            (
+                None,
+                "project-profile-specification-input-incomplete",
+                json!({"reason": "missing-required-slot", "slot": "project-profile"}),
+            ),
+            (
+                other("test-only-other-profile-specification", ACTIVE.revision),
+                "project-profile-specification-not-admitted",
+                json!({"reason": "unsupported"}),
+            ),
+            (
+                other(ACTIVE.identity, "1"),
+                "project-profile-specification-not-admitted",
+                json!({"reason": "incompatible"}),
+            ),
+        ] {
+            let mut inputs = Inputs::complete();
+            inputs.specifications().project_profile = asserted;
+            reporting(&inputs, &[], &[]).outcome(None, identity(), |_, _, outcome| {
+                assert!(outcome.checked.is_none(), "{code}");
+                let findings = views(&outcome.evidence.entry, RecordKind::EntryFinding);
+                let [finding] = findings[..] else {
+                    panic!("{findings:?}");
+                };
+                assert_eq!(finding["key"]["code"], code);
+                assert_eq!(finding["severity"], "error", "{code}");
+                assert_eq!(finding["blocking"], true, "{code}");
+                assert_eq!(finding["details"], details, "{code}");
+                let shared = outcome.evidence.shared.as_ref().unwrap();
+                assert!(views(shared, RecordKind::SharedFinding).is_empty());
+            });
+        }
     }
 
     /// The views of `projection`'s records with their owners and kinds, in

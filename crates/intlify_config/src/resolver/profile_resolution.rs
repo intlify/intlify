@@ -1227,7 +1227,7 @@ pub(super) mod tests {
     }
 
     /// Reverses the member order of every object in `value`.
-    fn reverse_objects(value: &mut Value) {
+    pub(crate) fn reverse_objects(value: &mut Value) {
         match value {
             Value::Object(map) => {
                 let mut members: Vec<(String, Value)> = std::mem::take(map).into_iter().collect();
@@ -1881,6 +1881,68 @@ pub(super) mod tests {
         /// the causes of the semantic results it needs and does not have.
         pub(crate) fn view(&self) -> Admitted<ProfileView> {
             self.viewed(|_, view| view)
+        }
+
+        /// The specification input, which a test edits before resolving.
+        pub(crate) fn specifications(&mut self) -> &mut SpecificationInput<Id> {
+            &mut self.specifications
+        }
+
+        /// Phase 14 over the semantic state of an invocation on a resolver
+        /// supporting `supported`, beside the vocabulary artifact
+        /// `vocabulary` and the canonicalization data `data` in place of the
+        /// fixture's.
+        pub(crate) fn view_under<P, D>(
+            &self,
+            supported: &SupportedSpecifications<Id>,
+            vocabulary: &FormalVocabulary,
+            data: &D,
+        ) -> Admitted<ProfileView>
+        where
+            P: Provider<Identity = Id>,
+            D: FormalData<Provider = P>,
+        {
+            self.prepared(|configuration, invocation| {
+                let invocation = Invocation {
+                    supported,
+                    vocabulary,
+                    ..*invocation
+                };
+                let mut evaluation = Evaluation::default();
+                let mut set = None;
+                let state =
+                    invoke(&mut evaluation, configuration, &invocation, data, &mut set).unwrap();
+                project(&state, supported)
+            })
+        }
+
+        /// Seals again, after `edit` to its body, the artifact the reference
+        /// at `pointer` in the declaration names, submits it in its place, and
+        /// makes the reference name it; the Verification Input pins it when it
+        /// is the selected policy.
+        pub(crate) fn reseal(&mut self, pointer: &str, edit: impl FnOnce(&mut Value)) {
+            let reference = self.declaration().pointer(pointer).unwrap().clone();
+            let index = self
+                .members
+                .iter()
+                .position(|member| reference_value(&tuple_of(member)) == reference)
+                .expect("the reference names a submitted artifact");
+            let earlier = tuple_of(&self.members[index]);
+            let mut body = self.members[index]["body"].clone();
+            edit(&mut body);
+            let content = body["content"].take();
+            let member = envelope_of(
+                earlier.kind,
+                body["identity"].as_str().unwrap(),
+                body["revision"].as_str().unwrap(),
+                content,
+            );
+            let tuple = tuple_of(&member);
+            if earlier == self.pinned {
+                self.pinned = tuple.clone();
+            }
+            *self.declaration().pointer_mut(pointer).unwrap() = reference_value(&tuple);
+            self.members[index] = member;
         }
     }
 

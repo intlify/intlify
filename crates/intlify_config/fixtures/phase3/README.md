@@ -82,7 +82,7 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 | Requirement | Checked by |
 | --- | --- |
 | One typed Profile Resolution Specification Input with eight fixed slots in 015's order, forming one Set only when every slot is present and compatible | `slots_are_named_and_ordered_as_015_lists_them`, `a_complete_input_admits_every_slot_and_forms_the_set`, `a_set_missing_several_members_names_every_cause` |
-| A missing slot, `project-profile` and `locale-canonicalization` included, is `missing-required-slot` and names its slot | `a_missing_slot_is_incomplete_and_names_its_slot`, `a_missing_project_profile_slot_leaves_only_its_groups_owner_waiting` |
+| A missing slot, `project-profile` and `locale-canonicalization` included, is `missing-required-slot` and names its slot | `a_missing_slot_is_incomplete_and_names_its_slot`, `a_missing_project_profile_slot_leaves_only_its_groups_owner_waiting`, `a_project_profile_slot_finding_names_its_slot_or_its_reason` |
 | Another identity is unsupported and another revision incompatible in every slot, with no host fallback for canonicalization | `another_identity_is_unsupported_and_another_revision_incompatible_in_every_specification_slot`, `data_naming_another_specification_or_dataset_is_not_admitted` |
 | The configuration `schemaVersion` and the specification revisions are separate version domains | `the_configuration_version_and_the_specification_revisions_are_separate_domains` |
 | Phase 0 suppresses nothing itself; a unit needing a slot waits on it | `phase_0_suppresses_nothing_but_keeps_the_set_from_forming`, `only_the_data_match_waits_for_its_slot`, `a_missing_slot_hides_only_the_comparison` |
