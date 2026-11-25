@@ -245,6 +245,32 @@ pub(crate) mod fixtures {
         label: Option<&str>,
         mappings: Vec<SubmittedMapping>,
     ) -> AdmittedCallSite {
+        let locator = label.map(|payload| LocatorCandidate {
+            variant: LocatorVariant::SafeLabel,
+            payload,
+            non_secret: true,
+        });
+        admitted(identity, marked, source, locator, mappings)
+    }
+
+    /// The sidecar over `source` holding `mappings`, under the marked
+    /// identity [`CALL_SITE`], with the locator candidate `locator` of either
+    /// variant.
+    pub(crate) fn sidecar_at(
+        source: &str,
+        locator: Option<LocatorCandidate<'_>>,
+        mappings: Vec<SubmittedMapping>,
+    ) -> AdmittedCallSite {
+        admitted(CALL_SITE, true, source, locator, mappings)
+    }
+
+    fn admitted(
+        identity: &str,
+        marked: bool,
+        source: &str,
+        locator: Option<LocatorCandidate<'_>>,
+        mappings: Vec<SubmittedMapping>,
+    ) -> AdmittedCallSite {
         let largest = Bound::new(u64::MAX - 1).unwrap();
         let limits = CallSiteLimits {
             pair: SourceLimits {
@@ -260,11 +286,7 @@ pub(crate) mod fixtures {
             identity: Some(identity),
             marked,
             revision: Some(&revision),
-            locator: label.map(|payload| LocatorCandidate {
-                variant: LocatorVariant::SafeLabel,
-                payload,
-                non_secret: true,
-            }),
+            locator,
             source: source.as_bytes().to_vec(),
             mappings,
         };
@@ -339,23 +361,25 @@ pub(crate) mod fixtures {
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::sync::Arc;
 
     use serde_json::{json, Value};
 
-    use crate::boundary::call_site::{LocationRole, SpanCandidate};
+    use crate::boundary::call_site::{LocationRole, SpanCandidate, StructuralEdge};
     use crate::boundary::locator::{
         read_programmatic_locator, Locator, LocatorCandidate, LocatorVariant,
     };
     use crate::boundary::source::{read_entry_pair, SourceLimits};
     use crate::input_limits::Bound;
-    use crate::materialize::{Locus, MaterializedDocument, NodeId, NodeKind};
+    use crate::materialize::{materialize_file, Locus, MaterializedDocument, NodeId, NodeKind};
+    use crate::materialize_tests::limits;
     use crate::resolver::evidence::Source;
     use crate::resolver::evidence_source::SourceSpan;
     use crate::snapshot::{from_json, Node};
     use crate::structural::Edge;
 
     use super::fixtures::{mapping, sidecar, CALL_SITE};
-    use super::{admit, mapped, named, CallSiteSpans, Located};
+    use super::{admit, locus, mapped, named, CallSiteSpans, Located};
 
     /// A source longer than every test span, whose bytes outnumber its
     /// characters.
@@ -455,6 +479,32 @@ mod tests {
         assert_eq!(at(&member("e"), Located::Value), None);
         // Nothing locates a key at the root, whatever the sidecar maps there.
         assert_eq!(at(&[], Located::Key), None);
+    }
+
+    /// D15:771, 3381: an array edge is a checked integer that keeps no
+    /// spelling: a number read from `1.0` or `1e0` is the index 1, and a key
+    /// spelled like an index names no element of an array.
+    #[test]
+    fn a_spelled_index_is_a_key_and_names_no_element() {
+        let text = r#"{"a":["x","y"]}"#;
+        let document = materialize_file(Arc::from(text.as_bytes()), limits()).unwrap();
+        let element = |edge| {
+            let path = [StructuralEdge::Key("a".to_owned()), edge];
+            locus(&document, &path, LocationRole::Node)
+        };
+        assert!(element(StructuralEdge::Index(1)).is_some());
+        for read in [1.0, 1e0] {
+            let path = json!(["a", read]);
+            let call_site = sidecar(text, None, vec![mapping(&path, "node", 9.0, 12.0)]);
+            let (admitted, _, _) = call_site.mappings().next().unwrap();
+            assert!(matches!(admitted[1], StructuralEdge::Index(1)));
+        }
+        for spelled in ["1", "01", "+1", "1.0", "1e0"] {
+            assert!(
+                element(StructuralEdge::Key(spelled.to_owned())).is_none(),
+                "{spelled}"
+            );
+        }
     }
 
     /// D15:795, 796, 800: a span selects the call-site identity and only its

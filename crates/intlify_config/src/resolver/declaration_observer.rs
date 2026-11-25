@@ -640,11 +640,12 @@ mod tests {
     /// A key of `localeNegotiation.aliases` or `messageFallback`, at its rank
     /// among the map's keys, is non-secret in a record constructed once
     /// `specification-admission` bound a canonicalizer that returns a canonical
-    /// identifier for it, and redacted otherwise, and before (D15:776).
+    /// identifier for it, and redacted otherwise, and before (D15:776, 3380).
     #[test]
     fn a_locale_key_is_classified_by_the_bound_canonicalizer() {
         let mut config = complete_config();
         config["profiles"]["app"]["messageFallback"]["zz"] = json!(["en"]);
+        config["profiles"]["app"]["localeNegotiation"]["aliases"]["zz"] = json!("en");
         let (bytes, document, profiles) = materialized(&config);
         let fixture = FileFixture::new(&fixture_limits(10_000));
         let file = fixture.file(Arc::clone(&bytes));
@@ -658,9 +659,16 @@ mod tests {
             pointer(after.ranked_key(&["messageFallback"], 0).unwrap()),
             exact("/profiles/app/messageFallback/ja")
         );
+        let aliases = ["localeNegotiation", "aliases"];
+        assert_eq!(
+            pointer(after.ranked_key(&aliases, 0).unwrap()),
+            exact("/profiles/app/localeNegotiation/aliases/fr")
+        );
         for unsafe_key in [
             before.ranked_key(&["messageFallback"], 0).unwrap(),
             after.ranked_key(&["messageFallback"], 1).unwrap(),
+            before.ranked_key(&aliases, 0).unwrap(),
+            after.ranked_key(&aliases, 1).unwrap(),
         ] {
             assert!(pointer(unsafe_key).get("exact-json-pointer").is_none());
         }

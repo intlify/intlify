@@ -828,12 +828,13 @@ mod tests {
     };
     use crate::resolver::evidence::Evidence;
     use crate::resolver::evidence_component::ComponentPath;
+    use crate::resolver::evidence_source::hex;
     use crate::resolver::evidence_token::EvidenceTokens;
     use crate::resolver::limits::{fixture_limits, BoundId, Group};
     use crate::resolver::occurrence::{occurrences, redacted, FindingOccurrence};
     use crate::resolver::specification::Slot;
     use crate::resolver::subject::SubjectKind;
-    use crate::resolver::token::{Sha256, Specification};
+    use crate::resolver::token::{Digest, Sha256, Specification};
     use crate::structural::{AuthoringSchema, StructuralLimits};
 
     use super::{
@@ -1581,6 +1582,199 @@ mod tests {
                 .unwrap_or_else(|| panic!("{at} is observed"));
             assert!(redacted_path(path, safe), "{path}");
         }
+    }
+
+    /// The token 015's vectors pin for a `value-path-member` of
+    /// `configuration-file`, computed apart from this crate.
+    const VALUE_MEMBER: &str =
+        "sha256:663eb6254e94a3289fce71ce1f181e96c1aa4152eaa2a82784966b55d5ce8b43";
+
+    /// A value under two unsafe keys is located by a path that keeps every
+    /// safe member and takes the pinned `value-path-member` token for each
+    /// unsafe one. The locator is no RFC 6901 pointer, and its span still
+    /// finds the value (D15:756, 790, 3395).
+    #[test]
+    fn a_locator_takes_the_pinned_token_for_each_unsafe_member() {
+        let mut value = minimal_config();
+        let mut declaration = value["profiles"]["app"].clone();
+        let mut target = declaration["targetProfiles"]["browser"].clone();
+        target["requestedLocales"] = json!("only");
+        declaration["targetProfiles"]["Bad Target"] = target;
+        value["profiles"]["Bad Profile"] = declaration;
+        let (source, found) = observed(&value, 1_000_000);
+        let at = span(&source, br#""only""#);
+        let (path, _) = found
+            .iter()
+            .map(|occurrence| located(occurrence.primary()))
+            .find(|(_, span)| *span == at)
+            .expect("the value is observed at its token");
+        let redacted = json!({ "redacted-member": { "token": VALUE_MEMBER } });
+        assert_eq!(
+            path,
+            json!({ "redacted-logical-path": [
+                { "safe-member": "profiles" },
+                redacted,
+                { "safe-member": "targetProfiles" },
+                redacted,
+                { "safe-member": "requestedLocales" },
+            ] })
+        );
+        assert!(path.get("exact-json-pointer").is_none());
+        assert!(path["redacted-logical-path"].is_array());
+        // Neither the view nor a pointer joined from its safe members reaches
+        // the value.
+        assert_eq!(value.pointer(&path.to_string()), None);
+        assert_eq!(
+            value.pointer("/profiles//targetProfiles//requestedLocales"),
+            None
+        );
+    }
+
+    /// The direct digests and spellings of `name` that a retained text must
+    /// not hold.
+    fn traces(name: &str) -> [String; 3] {
+        let digest = Sha256.digest(name.as_bytes());
+        [name.to_owned(), hex(name.as_bytes()), hex(&digest)]
+    }
+
+    /// A member missing under an unsafe key is observed at its nearest
+    /// locatable owner, the redacted entry, followed by its schema-defined
+    /// name. The key's own Finding keeps its span while neither the key nor
+    /// its direct digest is retained (D15:790, 3396).
+    #[test]
+    fn a_member_missing_under_an_unsafe_key_keeps_its_field_name() {
+        let mut value = minimal_config();
+        let mut profile = value["profiles"]["app"].clone();
+        let mut target = profile["targetProfiles"]["browser"].clone();
+        target.as_object_mut().unwrap().remove("profile");
+        let mut group = profile["deploymentGroups"]["web"].clone();
+        group.as_object_mut().unwrap().remove("members");
+        profile.as_object_mut().unwrap().remove("projectId");
+        profile["targetProfiles"]["Bad Target"] = target;
+        profile["deploymentGroups"]["Bad Group"] = group;
+        value["profiles"]["Bad Profile"] = profile;
+        let (source, found) = observed(&value, 1_000_000);
+        let views: Vec<(Value, Value)> = found
+            .iter()
+            .map(|occurrence| located(occurrence.primary()))
+            .collect();
+        let owner = &value["profiles"]["Bad Profile"];
+        let bytes = |owner: &Value| serde_json::to_vec(owner).unwrap();
+        for (at, safe) in [
+            (
+                span(&source, &bytes(owner)),
+                &[Some("profiles"), None, Some("projectId")][..],
+            ),
+            (
+                span(&source, &bytes(&owner["targetProfiles"]["Bad Target"])),
+                &[
+                    Some("profiles"),
+                    None,
+                    Some("targetProfiles"),
+                    None,
+                    Some("profile"),
+                ],
+            ),
+            (
+                span(&source, &bytes(&owner["deploymentGroups"]["Bad Group"])),
+                &[
+                    Some("profiles"),
+                    None,
+                    Some("deploymentGroups"),
+                    None,
+                    Some("members"),
+                ],
+            ),
+        ] {
+            assert!(
+                views
+                    .iter()
+                    .any(|(path, span)| *span == at && redacted_path(path, safe)),
+                "{safe:?} at {at}"
+            );
+        }
+        let text: String = found
+            .iter()
+            .map(|occurrence| occurrence.primary().view().to_string())
+            .collect();
+        for (key, safe) in [
+            ("Bad Profile", &[Some("profiles"), None][..]),
+            (
+                "Bad Target",
+                &[Some("profiles"), None, Some("targetProfiles"), None],
+            ),
+            (
+                "Bad Group",
+                &[Some("profiles"), None, Some("deploymentGroups"), None],
+            ),
+        ] {
+            let at = span(&source, format!("{key:?}").as_bytes());
+            assert!(
+                views
+                    .iter()
+                    .any(|(path, span)| *span == at && redacted_path(path, safe)),
+                "{key}"
+            );
+            for trace in traces(key) {
+                assert!(!text.contains(&trace), "{trace}");
+            }
+        }
+    }
+
+    /// An unknown member is observed at its own key at every depth, the
+    /// members above it kept as their classes allow and its own name
+    /// redacted: 015 classifies every unknown member as unsafe, so no exact
+    /// pointer can name one (D15:776, 790, 3414).
+    #[test]
+    fn an_unknown_member_is_redacted_at_its_key_at_every_depth() {
+        let mut value = minimal_config();
+        let declaration = value["profiles"]["app"].clone();
+        value["extra-root"] = json!(true);
+        value["profiles"]["Bad Key"] = declaration;
+        value["profiles"]["Bad Key"]["extra-under-unsafe"] = json!(true);
+        let app = &mut value["profiles"]["app"];
+        app["extra-profile"] = json!({ "schemaVersion": "0" });
+        app["targetProfiles"]["browser"]["extra-target"] = json!(true);
+        app["deploymentGroups"]["web"]["extra-group"] = json!(true);
+        let (source, found) = observed(&value, 1_000_000);
+        let views: Vec<(Value, Value)> = found
+            .iter()
+            .map(|occurrence| located(occurrence.primary()))
+            .collect();
+        for (key, safe) in [
+            ("extra-root", &[None][..]),
+            ("extra-profile", &[Some("profiles"), Some("app"), None]),
+            (
+                "extra-target",
+                &[
+                    Some("profiles"),
+                    Some("app"),
+                    Some("targetProfiles"),
+                    Some("browser"),
+                    None,
+                ],
+            ),
+            (
+                "extra-group",
+                &[
+                    Some("profiles"),
+                    Some("app"),
+                    Some("deploymentGroups"),
+                    Some("web"),
+                    None,
+                ],
+            ),
+            ("extra-under-unsafe", &[Some("profiles"), None, None]),
+        ] {
+            let at = span(&source, format!("{key:?}").as_bytes());
+            let (path, _) = views
+                .iter()
+                .find(|(_, span)| *span == at)
+                .unwrap_or_else(|| panic!("{key} is observed at its key"));
+            assert!(redacted_path(path, safe), "{key}: {path}");
+        }
+        let text: String = views.iter().map(|(path, _)| path.to_string()).collect();
+        assert!(!text.contains("extra-"), "{text}");
     }
 
     /// The schema selection observes the root, or its `schemaVersion` member

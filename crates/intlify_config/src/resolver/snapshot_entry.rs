@@ -601,7 +601,9 @@ mod tests {
     use crate::materialize::{materialize_file, MaterializedDocument};
     use crate::materialize_tests::limits as file_limits;
     use crate::model::IntlifyConfig;
-    use crate::resolver::call_site_span::fixtures::{mapping, mirrored, sidecar, CALL_SITE};
+    use crate::resolver::call_site_span::fixtures::{
+        mapping, mirrored, sidecar, sidecar_at, CALL_SITE,
+    };
     use crate::resolver::call_site_span::Located;
     use crate::resolver::capability::{CapabilityBound, EvidenceMetadataLimits, SnapshotLimits};
     use crate::resolver::entry::fixtures::FileFixture;
@@ -1641,6 +1643,159 @@ mod tests {
         );
     }
 
+    /// D15:776, 792-798, 3416: programmatic Entry Source Evidence holds the
+    /// present empty path for a marker at the root, the complete path to a
+    /// marker inside the value, the longest safely established prefix when a
+    /// further edge would need dynamic behavior, an unsafe member of that
+    /// prefix redacted, and no path past a path bound.
+    #[test]
+    fn programmatic_entry_source_evidence_takes_each_form_of_logical_input_path() {
+        let path = |value: &Value, bound: &EvidenceMetadataLimits| {
+            let (evaluation, _) = entered_under(&tree(value), None, bound);
+            let found = observed(&evaluation);
+            let [occurrence] = &found[..] else {
+                panic!("one marker: {value}");
+            };
+            let view = occurrence.primary().view();
+            assert_eq!(view["kind"], "entry-source");
+            assert_eq!(view["origin"], "configuration-programmatic");
+            view.get("path").cloned()
+        };
+        let every = unbounded();
+        assert_eq!(path(&json!("!cycle"), &every), Some(json!([])));
+        assert_eq!(
+            path(
+                &json!({ "profiles": { "app": { "requestedLocales": ["en", "!cycle"] } } }),
+                &every
+            ),
+            Some(json!([
+                { "safe-member": "profiles" },
+                { "safe-member": "app" },
+                { "safe-member": "requestedLocales" },
+                { "array-index": "1" },
+            ]))
+        );
+        assert_eq!(
+            path(
+                &json!({ "profiles": { "app": "!dynamic-container" } }),
+                &every
+            ),
+            Some(json!([
+                { "safe-member": "profiles" },
+                { "safe-member": "app" },
+            ]))
+        );
+        let unsafe_prefix = path(
+            &json!({ "profiles": { "Bad Key": "!dynamic-container" } }),
+            &every,
+        )
+        .unwrap();
+        assert_eq!(unsafe_prefix[0], json!({ "safe-member": "profiles" }));
+        assert!(unsafe_prefix[1].get("redacted-member").is_some());
+        assert_eq!(unsafe_prefix.as_array().unwrap().len(), 2);
+        let bound = with(MetadataBound::LogicalPathSegments, 1);
+        assert_eq!(
+            path(&json!({ "profiles": { "app": "!cycle" } }), &bound),
+            None
+        );
+    }
+
+    /// D15:796, 800, 3416: Materialized Value Evidence names one source with
+    /// that source's own admitted locator, `safe-label`, `safe-uri`, or none,
+    /// and its required Portable Value Locator, exact or redacted, with the
+    /// span where the sidecar maps one and without it where it does not.
+    #[test]
+    fn materialized_value_evidence_keeps_the_locator_of_the_source_it_names() {
+        fn candidate(variant: Option<LocatorVariant>) -> Option<LocatorCandidate<'static>> {
+            variant.map(|variant| LocatorCandidate {
+                variant,
+                payload: match variant {
+                    LocatorVariant::SafeUri => "https://example.com/storefront",
+                    _ => "storefront label",
+                },
+                non_secret: true,
+            })
+        }
+        let view_of = |candidate: Option<LocatorCandidate<'static>>| {
+            candidate.map_or(Value::Null, |at| json!({ at.variant.id(): at.payload }))
+        };
+        let mut value = minimal_config();
+        value["extra"] = json!(true);
+        value["profiles"]["app"]["requestedLocales"] = json!("only");
+        let text = serde_json::to_string(&value).unwrap();
+        let key = spot(&text, r#""extra""#, 0);
+        let locales = spot(&text, r#""only""#, 0);
+        let exact = json!({ "exact-json-pointer": "/profiles/app/requestedLocales" });
+        let mappings = [
+            (
+                "exact",
+                spanning(
+                    &json!(["profiles", "app", "requestedLocales"]),
+                    "member-value",
+                    locales,
+                ),
+            ),
+            ("redacted", spanning(&json!(["extra"]), "member-key", key)),
+        ];
+        let variants = [
+            None,
+            Some(LocatorVariant::SafeLabel),
+            Some(LocatorVariant::SafeUri),
+        ];
+        let mut seen = BTreeSet::new();
+        for entry_variant in variants {
+            let entry_locator = candidate(entry_variant)
+                .map(|at| read_programmatic_locator(Some(at), Bound::new(64).unwrap()).unwrap());
+            for site_variant in variants {
+                for (mapped, mapping) in &mappings {
+                    let call_site =
+                        sidecar_at(&text, candidate(site_variant), vec![mapping.clone()]);
+                    let found =
+                        later_in_snapshot(&value, Some(&call_site), entry_locator.as_ref(), "app");
+                    assert_eq!(found.len(), 2, "{text}");
+                    for occurrence in &found {
+                        let view = occurrence.primary().view();
+                        assert_eq!(view["kind"], "configuration-value");
+                        let variant = if view["value"] == exact {
+                            "exact"
+                        } else {
+                            let first = &view["value"]["redacted-logical-path"][0];
+                            assert!(first.get("redacted-member").is_some(), "{view}");
+                            "redacted"
+                        };
+                        let (source, locator, span) = if variant == *mapped {
+                            let at = if variant == "exact" { locales } else { key };
+                            (
+                                call_site_source(),
+                                view_of(candidate(site_variant)),
+                                span_view(at),
+                            )
+                        } else {
+                            (
+                                entry_source(),
+                                view_of(candidate(entry_variant)),
+                                Value::Null,
+                            )
+                        };
+                        assert_eq!(view["source"], source, "{view}");
+                        assert_eq!(view["locator"], locator, "{view}");
+                        assert_eq!(view["span"], span, "{view}");
+                        seen.insert((variant, variant == *mapped));
+                    }
+                }
+            }
+        }
+        assert_eq!(
+            seen,
+            BTreeSet::from([
+                ("exact", false),
+                ("exact", true),
+                ("redacted", false),
+                ("redacted", true),
+            ])
+        );
+    }
+
     /// The byte offsets of the `nth` occurrence of `part` in `text`.
     fn spot(text: &str, part: &str, nth: usize) -> (usize, usize) {
         let (start, _) = text.match_indices(part).nth(nth).unwrap();
@@ -1966,7 +2121,8 @@ mod tests {
     /// kind of location, each with the selector it is resolved under: the
     /// root of another type, a missing member of the root and of a
     /// declaration, a member's value, an array element, an undeclared
-    /// member's key, a malformed Profile ID's key, and a selector no
+    /// member's key at the root and nested in a declaration, a target, and a
+    /// group (D15:3414), a malformed Profile ID's key, and a selector no
     /// declaration has, beside the declarations.
     fn locations() -> Vec<(Value, &'static str)> {
         let mut unversioned = minimal_config();
@@ -1979,6 +2135,9 @@ mod tests {
         let app = &mut mixed["profiles"]["app"];
         app.as_object_mut().unwrap().remove("projectId");
         app["requestedLocales"] = json!(["en", 7]);
+        app["extra"] = json!({ "schemaVersion": "0" });
+        app["targetProfiles"]["browser"]["extra"] = json!(true);
+        app["deploymentGroups"]["web"]["extra"] = json!(true);
         let mut malformed = declaration.clone();
         malformed["requestedLocales"] = json!("only");
         mixed["profiles"]["app key"] = malformed;

@@ -904,13 +904,16 @@ pub(crate) mod tests {
         }
     }
 
-    /// D15:3228: a file and a Snapshot of its value, beside a mirroring
+    /// D15:3228, 3414: a file and a Snapshot of its value, beside a mirroring
     /// sidecar or not, share the identity, the checked profile, and the Shared
-    /// projection, whether the outcome is checked or blocked.
+    /// projection, whether the outcome is checked or blocked, and blocked on
+    /// an unknown member nested in the declaration too.
     #[test]
     fn a_file_and_a_snapshot_of_its_value_share_the_shared_projection() {
         let resolver = resolver();
-        for raw in [example(|inputs| inputs), Raw::new(&blocked())] {
+        let mut unknown = example(|inputs| inputs);
+        unknown.config["profiles"]["web"]["extra"] = json!({ "deep": true });
+        for raw in [example(|inputs| inputs), Raw::new(&blocked()), unknown] {
             let file = resolved(&resolver, &raw.file(&resolver, true));
             assert!(file.shared.is_some());
             for mirror in [false, true] {
