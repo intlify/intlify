@@ -23,6 +23,7 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
 
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
@@ -121,8 +122,12 @@ impl Phase {
 
 /// What one unit checks: a Logical subject key of one subject kind, which
 /// [`Subject::kind`] names ([`SubjectKind`](super::subject::SubjectKind)).
-/// Subjects order by their kind's rank, then by key.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Subjects order by their kind's rank, then by key. Its `Debug` names only
+/// the kind: a key can hold what a rejected input spelled, such as the tuple of
+/// an envelope not admitted or an identifier past its bound, and debug
+/// formatting follows the exclusion that keeps it out of every record
+/// (D15:776, 824, 2697).
+#[derive(Clone, PartialEq, Eq)]
 pub(crate) enum Subject {
     /// One slot of the Profile Resolution Specification Input.
     Slot(Slot),
@@ -399,6 +404,12 @@ pub(crate) enum Check {
     /// Each diagnostic domain's reporting stays within its bounds. The check's
     /// status is a domain's terminal state, which its Finding's reason names.
     CompleteReporting,
+}
+
+impl fmt::Debug for Subject {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "Subject({:?})", self.kind())
+    }
 }
 
 /// One atomic evaluation unit. Units order as 015 evaluates and commits them:
@@ -1897,7 +1908,10 @@ impl Evaluation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::artifacts::envelope::{envelope_of, ArtifactKind, FormalMember, MemberKey};
+    use crate::resolver::artifact_resolution::ConflictKey;
     use crate::resolver::locales::fixtures::canonical;
+    use crate::resolver::structural_admission::EntryKey;
 
     const MISSING: Blocking = Blocking {
         code: Code::SpecificationInputIncomplete,
@@ -3582,5 +3596,45 @@ mod tests {
     #[should_panic(expected = "without what it observed")]
     fn a_candidate_without_an_observation_fails_the_test() {
         let _ = Evaluation::default().check(BOOTSTRAP, Ok(()), |()| Err::<(), _>(MISSING));
+    }
+
+    /// A subject's `Debug` names its kind and nothing of its key, whether the
+    /// key is an identifier or the tuple of an envelope, so a unit in a record
+    /// or a cursor shows neither (D15:776, 824, 2697).
+    #[test]
+    fn a_subjects_debug_names_its_kind_and_no_key() {
+        let member = FormalMember::new(envelope_of(
+            ArtifactKind::TrustPolicy,
+            "secret-tuple",
+            "1",
+            serde_json::json!({}),
+        ))
+        .unwrap();
+        let key = member.key();
+        let MemberKey::Tuple(tuple) = &key else {
+            panic!("the envelope establishes a tuple");
+        };
+        let group = ConflictKey::of(tuple);
+        let identifier = StructuralSubject::ProfileKey(EntryKey::identity("secret-key"));
+        for (subject, kind) in [
+            (Subject::Structural(identifier), "ProfileKey"),
+            (
+                Subject::ArtifactCollection(CollectionSubject::Member(key.clone())),
+                "CollectionMember",
+            ),
+            (
+                Subject::ArtifactCollection(CollectionSubject::Group(group)),
+                "CollectionGroup",
+            ),
+        ] {
+            let unit = Unit {
+                phase: Phase::StructuralAdmission,
+                subject,
+                check: Check::FieldValue,
+            };
+            let text = format!("{unit:?}");
+            assert!(text.contains(kind), "{text}");
+            assert!(!text.contains("secret"), "{text}");
+        }
     }
 }

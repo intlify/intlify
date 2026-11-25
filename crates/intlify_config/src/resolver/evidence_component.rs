@@ -402,6 +402,7 @@ mod tests {
     use crate::resolver::limits::{BoundId, Group};
     use crate::resolver::origin::SafeOriginKind as O;
     use crate::resolver::specification::Slot;
+    use crate::resolver::token::fixtures::LastByte;
     use crate::resolver::token::{Sha256, Specification};
     use intlify_shared_json::encoding::{encode, encoded_length};
 
@@ -702,6 +703,50 @@ mod tests {
         });
         let early_key = PathComponent::SafeKey(Arc::from(&[0_u8][..]));
         assert!(late_role < early_key && early_key < token);
+    }
+
+    /// Rejected keys of one JSON type are one `redacted-key`. Unequal
+    /// projections stay apart under one digest with ordinals in record byte
+    /// order, and otherwise the complete digest decides, against that order
+    /// (D15:825, 838, 3367).
+    #[test]
+    fn redacted_keys_group_and_order_by_digest_then_ordinal() {
+        let key = |source| ComponentPath::artifact_member(Key::Unsafe(source)).unwrap();
+        assert_eq!(key(JsonType::Object), key(JsonType::Object));
+        let paths = [
+            key(JsonType::String),
+            key(JsonType::Object),
+            key(JsonType::Null),
+        ];
+        let under = |digest: &LastByte<'_>| {
+            let tokens = EvidenceTokens::assign(
+                PROFILE,
+                paths.iter().flat_map(ComponentPath::redacted),
+                digest,
+            );
+            paths
+                .iter()
+                .map(|path| path.retained(PROFILE, &tokens).unwrap())
+                .collect::<Vec<_>>()
+        };
+        let colliding = under(&LastByte(&[]));
+        let ordinal =
+            |path: &ResolverInputComponentPath| path.view()[1]["redacted-key"]["collision"].clone();
+        assert_ne!(colliding[0], colliding[1]);
+        // A shorter projection frames first.
+        assert_eq!(ordinal(&colliding[2]), json!("0"));
+        assert_eq!(ordinal(&colliding[1]), json!("1"));
+        assert_eq!(ordinal(&colliding[0]), json!("2"));
+        assert!(colliding[2] < colliding[1] && colliding[1] < colliding[0]);
+        // A token without an ordinal precedes the same digest with one.
+        let tokens = EvidenceTokens::assign(PROFILE, paths[1].redacted(), &LastByte(&[]));
+        assert!(paths[1].retained(PROFILE, &tokens).unwrap() < colliding[1]);
+        // The digest decides before the ordinal: the second ordinal of the
+        // lower digest precedes the higher digest, which has none.
+        let digests = under(&LastByte(&[("object", 2), ("string", 1), ("null", 1)]));
+        assert_eq!(ordinal(&digests[0]), json!("1"));
+        assert_eq!(ordinal(&digests[1]), json!(null));
+        assert!(digests[0] < digests[1]);
     }
 
     #[test]

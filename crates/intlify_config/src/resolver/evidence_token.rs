@@ -363,11 +363,15 @@ impl EvidenceTokens {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use serde_json::json;
 
     use crate::boundary::source::{file_source_revision, read_pair, ExactIdentity, SourceLimits};
+    use crate::construction::profile::EVIDENCE_TOKEN_DOMAIN;
     use crate::input_limits::Bound;
     use crate::resolver::evaluation::Subject;
+    use crate::resolver::evidence_source::hex;
     use crate::resolver::origin::SafeOriginKind as O;
     use crate::resolver::token::{Digest, Sha256, Specification, Tokens};
     use crate::structural::selection::StringLengthFact;
@@ -473,6 +477,92 @@ mod tests {
             );
         }
         assert_eq!(tokens.comparisons(), 0);
+    }
+
+    /// The component of one row of the frozen vectors, through the
+    /// constructor of its kind.
+    fn frozen_component(row: &serde_json::Value) -> Redacted {
+        let origin = O::ALL
+            .into_iter()
+            .find(|origin| row["origin"] == origin.id())
+            .unwrap();
+        let projected = &row["projected"];
+        let json_type = || {
+            [
+                JsonType::Null,
+                JsonType::Boolean,
+                JsonType::Number,
+                JsonType::String,
+                JsonType::Array,
+                JsonType::Object,
+            ]
+            .into_iter()
+            .find(|kind| projected["type"] == kind.id())
+            .unwrap()
+        };
+        match row["evidenceKind"].as_str().unwrap() {
+            "source-identity" => {
+                let tag = projected["domain"].as_str().unwrap();
+                Redacted::source_identity(origin, &exact(&format!("{tag}:payload")))
+            }
+            "logical-input-path-member" => Redacted::input_path_member(origin),
+            "value-path-member" => Redacted::value_path_member(origin),
+            "resolver-input-component-key" => Redacted::component_key(origin, json_type()),
+            "profile-selector" => {
+                let length = match &projected["length"] {
+                    serde_json::Value::Null => None,
+                    serde_json::Value::String(_) => Some(StringLengthFact::OverLimit),
+                    exact => Some(StringLengthFact::Exact(
+                        exact["exact"].as_str().unwrap().parse().unwrap(),
+                    )),
+                };
+                Redacted::selector(origin, json_type(), length)
+            }
+            other => panic!("no such token kind: {other}"),
+        }
+        .unwrap()
+    }
+
+    /// Every pair of a token kind and a Safe Origin Kind that can carry it
+    /// has a frozen preimage and token, written apart from this crate from
+    /// D15:722 and 2454-2468 (`.plans/drafts/025-pr7/t2-vectors.py`; D15:3319,
+    /// 3362).
+    #[test]
+    fn every_kind_and_origin_that_carries_a_token_is_frozen() {
+        let vectors: serde_json::Value =
+            serde_json::from_str(include_str!("../../fixtures/evidence-records/vectors.json"))
+                .unwrap();
+        let mut frozen = BTreeSet::new();
+        for row in vectors["evidenceTokens"].as_array().unwrap() {
+            let component = frozen_component(row);
+            assert_eq!(component.projected(), row["projected"], "{row}");
+            let mut preimage = EVIDENCE_TOKEN_DOMAIN.as_bytes().to_vec();
+            preimage.extend(super::record(PROFILE, &component));
+            assert_eq!(hex(&preimage), row["preimage"].as_str().unwrap(), "{row}");
+            let tokens = EvidenceTokens::assign(PROFILE, [&component], &Sha256);
+            assert_eq!(
+                tokens.token(PROFILE, &component).unwrap().view(),
+                json!({ "token": row["token"] }),
+                "{row}"
+            );
+            frozen.insert((component.kind.id(), component.origin.id()));
+        }
+        let carried: BTreeSet<_> = [
+            TokenKind::SourceIdentity,
+            TokenKind::InputPathMember,
+            TokenKind::ValuePathMember,
+            TokenKind::ComponentKey,
+            TokenKind::ProfileSelector,
+        ]
+        .into_iter()
+        .flat_map(|kind| {
+            O::ALL
+                .into_iter()
+                .filter(move |origin| kind.admits(*origin))
+                .map(move |origin| (kind.id(), origin.id()))
+        })
+        .collect();
+        assert_eq!(frozen, carried);
     }
 
     /// The Finding Registry names a kind by the ID its records frame.

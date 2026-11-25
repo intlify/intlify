@@ -1411,6 +1411,16 @@ pub(super) mod tests {
             self.metadata = limits;
         }
 
+        /// The collection with `member` submitted after its other members.
+        pub(crate) fn submit(&mut self, member: Value) {
+            self.members.push(member);
+        }
+
+        /// The vocabulary with `surfaces` as its submitted members.
+        pub(crate) fn submit_surfaces(&mut self, surfaces: &'static [&'static str]) {
+            self.surfaces = surfaces;
+        }
+
         /// The specification input without its `project-profile` assertion,
         /// which Phase 0 then finds missing (D15:1125).
         pub(crate) fn unasserted(&mut self) {

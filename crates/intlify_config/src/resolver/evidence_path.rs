@@ -423,8 +423,12 @@ fn pointer(steps: &[Step<'_>]) -> Option<String> {
 mod tests {
     use serde_json::json;
 
-    use crate::resolver::evidence_token::{EvidenceTokenInvariant, EvidenceTokens, TokenKind};
+    use crate::resolver::evidence_source::hex;
+    use crate::resolver::evidence_token::{
+        record, EvidenceTokenInvariant, EvidenceTokens, TokenKind,
+    };
     use crate::resolver::origin::SafeOriginKind as O;
+    use crate::resolver::token::fixtures::LastByte;
     use crate::resolver::token::{Digest, Sha256, Specification};
 
     use crate::construction::committed::CONFIGURATION_SCHEMA;
@@ -696,6 +700,90 @@ mod tests {
         );
     }
 
+    /// Redacted members compare by every digest byte and then by the ordinal,
+    /// whichever path holds them: the digests differ only in their last byte,
+    /// and the second ordinal of the lower digest precedes the first of the
+    /// higher (D15:772, 774, 3379, 3382).
+    #[test]
+    fn redacted_members_order_by_every_digest_byte_then_the_ordinal() {
+        let digest = LastByte(&[("configuration-file", 1), ("configuration-programmatic", 2)]);
+        let unsafe_member = [Step::Unsafe];
+        let inputs = [
+            input(O::ConfigurationFile, &unsafe_member),
+            input(O::ConfigurationProgrammatic, &unsafe_member),
+        ];
+        let values = [
+            value(O::ConfigurationFile, &unsafe_member),
+            value(O::ConfigurationProgrammatic, &unsafe_member),
+        ];
+        let tokens = EvidenceTokens::assign(
+            PROFILE,
+            inputs
+                .iter()
+                .flat_map(InputPath::redacted)
+                .chain(values.iter().flat_map(ValueLocation::redacted)),
+            &digest,
+        );
+        let held = |path: &InputPath| path.retained(PROFILE, &tokens).unwrap().0.remove(0);
+        let located = |location: &ValueLocation| match location.retained(PROFILE, &tokens) {
+            Some(PortableValueLocator::RedactedLogicalPath(mut segments)) => segments.remove(0),
+            other => panic!("{other:?}"),
+        };
+        // A shorter kind ID frames first, so the value member takes ordinal 0.
+        let (low_0, low_1) = (located(&values[0]), held(&inputs[0]));
+        let (high_0, high_1) = (located(&values[1]), held(&inputs[1]));
+        let mut sorted = vec![high_1.clone(), low_1.clone(), high_0.clone(), low_0.clone()];
+        sorted.sort();
+        assert_eq!(sorted, [low_0, low_1.clone(), high_0.clone(), high_1]);
+        assert_eq!(low_1.view()["redacted-member"]["collision"], json!("1"));
+        assert_eq!(high_0.view()["redacted-member"]["collision"], json!("0"));
+        // The digest also decides between two paths, against their origins.
+        let paths = retain_inputs(
+            &inputs,
+            &LastByte(&[("configuration-programmatic", 1), ("configuration-file", 2)]),
+        );
+        assert!(paths[1] < paths[0]);
+    }
+
+    /// A name that classification finds unsafe reaches a token only as the
+    /// `logical-input-path-member` projection: unequal names are one segment,
+    /// and neither a name nor its direct digest is in the record or the view
+    /// (D15:772, 774, 3382).
+    #[test]
+    fn an_unsafe_name_and_its_digest_stay_out_of_its_token() {
+        let comparable = comparable();
+        let names = ["t2-canary-member", "t2-other-canary"];
+        let paths = names.map(|name| {
+            let steps = before_data(&comparable).steps(&schema(), &[Edge::Member(name)]);
+            input(O::ConfigurationFile, &steps)
+        });
+        assert_eq!(paths[0], paths[1]);
+        let component = paths[0].redacted().next().unwrap();
+        assert_eq!(component.projected(), json!({ "type": "string" }));
+        let record = record(PROFILE, component);
+        let view = retain_inputs(&paths[..1], &Sha256)[0].view();
+        assert_eq!(
+            view,
+            json!([{ "redacted-member": {
+                "token": "sha256:1e80da6392cbba2e0ab1c5925a0e8f7138b714d3361ebc9c0731686a649652ff",
+            } }])
+        );
+        let text = view.to_string();
+        let holds = |needle: &[u8]| {
+            record.windows(needle.len()).any(|window| window == needle)
+                || text
+                    .as_bytes()
+                    .windows(needle.len())
+                    .any(|window| window == needle)
+        };
+        for name in names {
+            let digest = Sha256.digest(name.as_bytes());
+            assert!(!holds(name.as_bytes()), "{name}");
+            assert!(!holds(&digest), "{name}");
+            assert!(!holds(hex(&digest).as_bytes()), "{name}");
+        }
+    }
+
     /// `exact-json-pointer` first, compared by its UTF-8 bytes, then
     /// `redacted-logical-path`, compared segment by segment.
     #[test]
@@ -812,7 +900,7 @@ mod tests {
     /// Each ID key is kept when it matches the identifier syntax and is within
     /// the capability's bound for its own identifier; the schema goes on below
     /// a key over the bound, and below one outside the syntax, whose entry
-    /// structural admission evaluates (D15:2184).
+    /// structural admission evaluates (D15:2184, 3380).
     #[test]
     fn an_id_key_is_kept_within_its_identifiers_bound() {
         let comparable = comparable();
@@ -835,6 +923,7 @@ mod tests {
         };
         assert_eq!(key(&target("browser"))[3], Step::Safe("browser"));
         assert_eq!(key(&target("browsers"))[3], Step::Unsafe, "over 7 bytes");
+        assert_eq!(key(&target("Br"))[3], Step::Unsafe, "outside the syntax");
         let group = |id| {
             [
                 profiles("app"),
@@ -844,6 +933,7 @@ mod tests {
         };
         assert_eq!(key(&group("jobs"))[3], Step::Safe("jobs"));
         assert_eq!(key(&group("batch"))[3], Step::Unsafe, "over 4 bytes");
+        assert_eq!(key(&group("Jo"))[3], Step::Unsafe, "outside the syntax");
     }
 
     /// A locale key is kept only once the data is admitted, and only when the
@@ -896,6 +986,122 @@ mod tests {
         ];
         assert_eq!(after.steps(&schema, &alias)[4], Step::Safe("iw-IL"));
         assert_eq!(before.steps(&schema, &alias)[4], Step::Unsafe);
+        let alias = |key| {
+            [
+                Edge::Member("profiles"),
+                Edge::Member("app"),
+                Edge::Member("localeNegotiation"),
+                Edge::Member("aliases"),
+                Edge::Member(key),
+            ]
+        };
+        for key in ["en_US", "xx-YY", "zh-Hant-TW"] {
+            assert_eq!(after.steps(&schema, &alias(key))[4], Step::Unsafe, "{key}");
+            assert_eq!(before.steps(&schema, &alias(key))[4], Step::Unsafe, "{key}");
+            assert_eq!(
+                before.steps(&schema, &fallback(key))[3],
+                Step::Unsafe,
+                "{key}"
+            );
+        }
+    }
+
+    /// Safe members order by their exact UTF-8 bytes in either path kind: a
+    /// decomposed spelling before its composed one, and a supplementary
+    /// character after U+FF5E, which UTF-16 code units would put first
+    /// (D15:770, 3381).
+    #[test]
+    fn safe_members_compare_by_their_exact_utf8_bytes() {
+        let names = ["Z", "a", "e\u{301}", "\u{e9}", "\u{ff5e}", "\u{1f600}"];
+        let inputs: Vec<InputPath> = names
+            .iter()
+            .map(|name| input(O::ConfigurationFile, &[Step::Safe(name)]))
+            .collect();
+        let paths = retain_inputs(&inputs, &Sha256);
+        assert!(paths.windows(2).all(|pair| pair[0] < pair[1]), "{paths:?}");
+        let locations: Vec<ValueLocation> = names
+            .iter()
+            .map(|name| value(O::ConfigurationFile, &[Step::Safe(name)]))
+            .collect();
+        let located = retain_values(&locations, &Sha256);
+        assert!(
+            located.windows(2).all(|pair| pair[0] < pair[1]),
+            "{located:?}"
+        );
+    }
+
+    /// The empty name and canonically equivalent spellings are never
+    /// classified non-secret, at any place that holds dynamic keys, before
+    /// or after the data is admitted. No name reaches the segment, so such
+    /// spellings of one name project alike (D15:770, 774, 3381).
+    #[test]
+    fn an_empty_name_and_equivalent_spellings_are_never_non_secret() {
+        let comparable = comparable();
+        let schema = schema();
+        let bound = canonicalizer(64);
+        let after = KeyFacts {
+            comparable: &comparable,
+            locales: Some(&bound),
+        };
+        let before = before_data(&comparable);
+        let app = [Edge::Member("profiles"), Edge::Member("app")];
+        let under = |field: &'static str| [app[0], app[1], Edge::Member(field)];
+        let aliases = [
+            app[0],
+            app[1],
+            Edge::Member("localeNegotiation"),
+            Edge::Member("aliases"),
+        ];
+        let places: [&[Edge<'_>]; 6] = [
+            &[],
+            &app[..1],
+            &under("targetProfiles"),
+            &under("deploymentGroups"),
+            &aliases,
+            &under("messageFallback"),
+        ];
+        let names = ["", "\u{c5}", "A\u{30a}", "\u{212b}", "\u{e9}", "e\u{301}"];
+        for name in names {
+            for place in places {
+                let edges = [place, &[Edge::Member(name)]].concat();
+                for facts in [&before, &after] {
+                    assert_eq!(
+                        facts.steps(&schema, &edges).last(),
+                        Some(&Step::Unsafe),
+                        "{name:?} under {} edges",
+                        place.len()
+                    );
+                }
+            }
+        }
+        let spelled = |name| before.steps(&schema, &[Edge::Member(name)]);
+        assert_eq!(spelled("\u{e9}"), spelled("e\u{301}"));
+    }
+
+    /// Indices ascend numerically over the whole unsigned 64-bit range in
+    /// either path kind, where their decimal text would not, and each keeps
+    /// only its decimal digits (D15:771, 3381).
+    #[test]
+    fn array_indices_ascend_over_the_unsigned_64_bit_range() {
+        let indices = [0, 1, 9, 10, u64::from(u32::MAX) + 1, u64::MAX - 1, u64::MAX];
+        let inputs: Vec<InputPath> = indices
+            .iter()
+            .map(|&at| input(O::ConfigurationFile, &[Step::Index(at)]))
+            .collect();
+        let paths = retain_inputs(&inputs, &Sha256);
+        assert!(paths.windows(2).all(|pair| pair[0] < pair[1]), "{paths:?}");
+        for (path, at) in paths.iter().zip(indices) {
+            assert_eq!(path.view(), json!([{ "array-index": at.to_string() }]));
+        }
+        let locations: Vec<ValueLocation> = indices
+            .iter()
+            .map(|&at| value(O::ConfigurationFile, &[Step::Unsafe, Step::Index(at)]))
+            .collect();
+        let located = retain_values(&locations, &Sha256);
+        assert!(
+            located.windows(2).all(|pair| pair[0] < pair[1]),
+            "{located:?}"
+        );
     }
 
     /// A path's size is its segments and the length of `C` of its retained
