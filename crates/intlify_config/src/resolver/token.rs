@@ -691,9 +691,36 @@ fn json_type(content: &AdmissionKey) -> &'static str {
     }
 }
 
+/// A digest for the tests of token order.
+#[cfg(test)]
+pub(crate) mod fixtures {
+    use super::Digest;
+
+    /// A digest of 31 bytes of `7` and a last byte, the one of the first mark
+    /// the preimage contains, or `0`: records that only the last byte of
+    /// their digests tells apart, and records that collide (D15:2194).
+    pub(crate) struct LastByte<'a>(pub(crate) &'a [(&'a str, u8)]);
+
+    impl Digest for LastByte<'_> {
+        fn digest(&self, preimage: &[u8]) -> [u8; 32] {
+            let mut digest = [7; 32];
+            digest[31] = self
+                .0
+                .iter()
+                .find(|(mark, _)| {
+                    preimage
+                        .windows(mark.len())
+                        .any(|window| window == mark.as_bytes())
+                })
+                .map_or(0, |(_, byte)| *byte);
+            digest
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
+    use std::collections::{BTreeMap, BTreeSet};
     use std::sync::Arc;
 
     use intlify_shared_json::token::Token;
@@ -727,8 +754,8 @@ mod tests {
     use crate::resolver::targets::TargetSubject;
 
     use super::{
-        logical, own, projected, record, Digest, Own, Sha256, Specification, Tokens,
-        SUBJECT_TOKEN_DOMAIN,
+        logical, number, own, projected, record, Digest, Own, RedactedToken, Sha256, Specification,
+        Tokens, SUBJECT_TOKEN_DOMAIN,
     };
 
     const PROFILE: Specification<'static> = Specification {
@@ -1706,6 +1733,43 @@ mod tests {
             assert_eq!(view.as_object().unwrap().len(), 1, "{subject:?}");
         }
         assert_eq!(tokens.comparisons(), 0);
+    }
+
+    /// A token compares by all 32 digest bytes and then by its ordinal,
+    /// absence first: the higher ordinal of the lower digest precedes the
+    /// lower ordinal of a digest that differs only in its last byte (D15:735,
+    /// 772, 812, 825).
+    #[test]
+    fn tokens_compare_by_every_digest_byte_then_the_ordinal() {
+        let digest = |last| {
+            let mut digest = [7; 32];
+            digest[31] = last;
+            digest
+        };
+        let (tokens, comparisons) = number(BTreeMap::from([
+            (
+                ((), digest(1)),
+                BTreeSet::from([b"a".to_vec(), b"b".to_vec()]),
+            ),
+            (
+                ((), digest(2)),
+                BTreeSet::from([b"c".to_vec(), b"d".to_vec()]),
+            ),
+        ]));
+        assert_eq!(comparisons, 2);
+        let token = |record: &[u8]| tokens[record];
+        let alone = RedactedToken {
+            digest: digest(1),
+            collision: None,
+        };
+        let mut sorted = vec![token(b"d"), token(b"b"), token(b"c"), alone, token(b"a")];
+        sorted.sort();
+        assert_eq!(
+            sorted,
+            [alone, token(b"a"), token(b"b"), token(b"c"), token(b"d")]
+        );
+        assert_eq!(token(b"b").collision, Some(1));
+        assert_eq!(token(b"c").collision, Some(0));
     }
 
     #[test]

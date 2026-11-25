@@ -154,12 +154,13 @@ mod tests {
     use crate::boundary::source::{file_source_revision, read_pair, ExactIdentity, SourceLimits};
     use crate::input_limits::Bound;
     use crate::resolver::evidence_token::{
-        EvidenceTokenInvariant, EvidenceTokens, Redacted, TokenKind,
+        record, EvidenceTokenInvariant, EvidenceTokens, Redacted, TokenKind,
     };
     use crate::resolver::origin::SafeOriginKind as O;
+    use crate::resolver::token::fixtures::LastByte;
     use crate::resolver::token::{Digest, Sha256, Specification};
 
-    use super::{PortableSourceIdentity, SourceIdentity, SourceSpan};
+    use super::{hex, PortableSourceIdentity, SourceIdentity, SourceSpan};
 
     const PROFILE: Specification<'static> = Specification {
         identity: "intlify-project-profile",
@@ -328,6 +329,81 @@ mod tests {
                 json!({ "redacted": { "token": format!("sha256:{}", "07".repeat(32)), "collision": "1" } }),
             ]
         );
+    }
+
+    /// Unmarked identities compare by every digest byte and then by the
+    /// ordinal: the digests here differ only in their last byte and run
+    /// against the origins' order, and the second ordinal of the lower digest
+    /// precedes the first of the higher (D15:735, 3370).
+    #[test]
+    fn redacted_identities_order_by_every_digest_byte_then_the_ordinal() {
+        let digest = LastByte(&[("configuration-programmatic", 1), ("configuration-file", 2)]);
+        let projected = [
+            project(O::ConfigurationFile, "b.v0:x", false),
+            project(O::ConfigurationFile, "a.v0:x", false),
+            project(O::ConfigurationProgrammatic, "b.v0:x", false),
+            project(O::ConfigurationProgrammatic, "a.v0:x", false),
+        ];
+        let retained = retain(&projected, &digest);
+        let mut sorted = retained.clone();
+        sorted.sort();
+        assert_eq!(
+            sorted,
+            [
+                retained[3].clone(),
+                retained[2].clone(),
+                retained[1].clone(),
+                retained[0].clone(),
+            ]
+        );
+        let token = |at: usize| sorted[at].view()["redacted"].clone();
+        let last = |at: usize| token(at)["token"].as_str().unwrap().to_owned();
+        assert_eq!(&last(1)[..70], &last(2)[..70]);
+        assert_ne!(last(1), last(2));
+        assert_eq!(
+            (token(1)["collision"].clone(), token(2)["collision"].clone()),
+            (json!("1"), json!("0"))
+        );
+        // Unequal safe projections stay apart under one digest, and equal
+        // ones are one identity whatever their payloads.
+        let colliding = retain(
+            &[
+                project(O::ConfigurationFile, "a.v0:x", false),
+                project(O::ConfigurationFile, "b.v0:x", false),
+                project(O::ConfigurationFile, "a.v0:y", false),
+            ],
+            &LastByte(&[]),
+        );
+        assert_ne!(colliding[0], colliding[1]);
+        assert_eq!(colliding[0], colliding[2]);
+    }
+
+    /// An unmarked identity's payload and the direct digest of it or of the
+    /// whole identity reach neither the token's record nor its view
+    /// (D15:722, 735, 3370).
+    #[test]
+    fn an_unmarked_identity_keeps_no_payload_or_digest_of_it() {
+        let payload = "t2-canary-source-payload";
+        let identity = format!("intlify-file-source.v0:{payload}");
+        let projected = project(O::ConfigurationFile, &identity, false);
+        let record = record(PROFILE, projected.redacted().unwrap());
+        let view = retain(&[projected], &Sha256)[0].view().to_string();
+        let digests = [
+            Sha256.digest(payload.as_bytes()),
+            Sha256.digest(identity.as_bytes()),
+        ];
+        let holds = |needle: &[u8]| {
+            record.windows(needle.len()).any(|window| window == needle)
+                || view
+                    .as_bytes()
+                    .windows(needle.len())
+                    .any(|window| window == needle)
+        };
+        assert!(!holds(payload.as_bytes()));
+        for digest in digests {
+            assert!(!holds(&digest));
+            assert!(!holds(hex(&digest).as_bytes()));
+        }
     }
 
     /// A `safe-opaque` identity is the owner's exact bytes: its domain and

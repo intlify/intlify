@@ -185,10 +185,15 @@ mod tests {
 
     use crate::input_limits::Bound;
     use crate::model::ProfileId;
-    use crate::resolver::evidence_token::{EvidenceTokenInvariant, EvidenceTokens, TokenKind};
+    use crate::resolver::evidence_token::{
+        EvidenceTokenInvariant, EvidenceTokens, JsonType, TokenKind,
+    };
     use crate::resolver::origin::SafeOriginKind as O;
-    use crate::resolver::token::{Sha256, Specification};
-    use crate::structural::selection::{InvalidSelectorType, SelectionInvariant, SelectorInput};
+    use crate::resolver::token::fixtures::LastByte;
+    use crate::resolver::token::{RedactedToken, Sha256, Specification};
+    use crate::structural::selection::{
+        InvalidSelectorType, SelectionInvariant, SelectorInput, StringLengthFact,
+    };
 
     use super::{SelectorEvidence, SelectorEvidenceInvariant, SelectorProjection};
 
@@ -401,6 +406,175 @@ mod tests {
         assert_eq!(
             absent.retained(PROFILE, &tokens),
             Some(SelectorEvidence::Absent)
+        );
+    }
+
+    /// Safe IDs compare by their exact unsigned ASCII bytes: not by length,
+    /// which would put `b` first, and with `-`, `.`, digits, and `_` where
+    /// their bytes put them (D15:286, 812, 3363).
+    #[test]
+    fn safe_ids_compare_by_their_exact_ascii_bytes() {
+        let names = ["b", "aa", "a_b", "a0", "a.b", "a-b"];
+        let declared = ids(&names);
+        let none = EvidenceTokens::assign(PROFILE, [], &Sha256);
+        let mut retained: Vec<_> = names
+            .iter()
+            .map(|name| {
+                SelectorProjection::project(
+                    O::ProfileSelectorCli,
+                    &SelectorInput::string(name, bound(64)),
+                    bound(64),
+                    &declared,
+                )
+                .unwrap()
+                .retained(PROFILE, &none)
+                .unwrap()
+            })
+            .collect();
+        retained.sort();
+        let sorted: Vec<_> = retained.iter().map(SelectorEvidence::view).collect();
+        assert_eq!(
+            sorted,
+            ["a-b", "a.b", "a0", "a_b", "aa", "b"].map(|id| json!({ "safe-profile-id": id }))
+        );
+    }
+
+    /// Redacted values rank by all six JSON types, a string's facts by
+    /// ascending exact length, numerically, and then `over-limit`, and a value
+    /// without a fact before any with one (D15:810, 812, 3364).
+    #[test]
+    fn redacted_values_rank_by_type_then_string_length_fact() {
+        use InvalidSelectorType::{Array, Boolean, Null, Number, Object};
+        let cli = |input: SelectorInput| project(O::ProfileSelectorCli, &input, 64);
+        let invalid = |kind| cli(SelectorInput::invalid_type(kind, bound(64)));
+        let mut retained = retain(&[
+            invalid(Object),
+            invalid(Array),
+            cli(SelectorInput::over_limit(bound(64))),
+            cli(SelectorInput::string("abcdefghij", bound(64))),
+            cli(SelectorInput::string("ab", bound(64))),
+            invalid(Number),
+            invalid(Boolean),
+            invalid(Null),
+        ]);
+        retained.sort();
+        let facts: Vec<_> = retained
+            .iter()
+            .map(|evidence| {
+                let view = evidence.view();
+                json!([
+                    view["redacted-value"]["type"],
+                    view["redacted-value"]["length"]
+                ])
+            })
+            .collect();
+        assert_eq!(
+            facts,
+            [
+                json!(["null", null]),
+                json!(["boolean", null]),
+                json!(["number", null]),
+                json!(["string", { "exact": "2" }]),
+                json!(["string", { "exact": "10" }]),
+                json!(["string", "over-limit"]),
+                json!(["array", null]),
+                json!(["object", null]),
+            ]
+        );
+        // No admitted string lacks a fact, so absence is compared directly.
+        let with = |length| SelectorEvidence::RedactedValue {
+            kind: JsonType::String,
+            length,
+            token: RedactedToken::measuring(),
+        };
+        assert!(with(None) < with(Some(StringLengthFact::Exact(0))));
+        assert!(
+            with(Some(StringLengthFact::Exact(u64::MAX))) < with(Some(StringLengthFact::OverLimit))
+        );
+    }
+
+    /// Selectors with equal facts share one projection and token, an
+    /// over-limit one whatever its final length; across origins they compare
+    /// by every digest byte and then by the ordinal (D15:808, 810, 812, 3364).
+    #[test]
+    fn equal_facts_group_and_then_order_by_digest_and_ordinal() {
+        let string = |value: &str, authority| {
+            project(
+                O::ProfileSelectorCli,
+                &SelectorInput::string(value, bound(1024)),
+                authority,
+            )
+        };
+        assert_eq!(string("unknown-aaaa", 64), string("unknown-bbbb", 64));
+        let long = "x".repeat(1000);
+        assert_eq!(string("0123456789", 9), string(&long, 9));
+        let view = views(&[string(&long, 9)]).remove(0);
+        assert_eq!(view["redacted-value"]["length"], json!("over-limit"));
+        assert!(!view.to_string().contains("1000"), "{view}");
+        let of = |origin| {
+            project(
+                origin,
+                &SelectorInput::string("unknown-aaaa", bound(64)),
+                64,
+            )
+        };
+        let (cli, programmatic) = (
+            of(O::ProfileSelectorCli),
+            of(O::ProfileSelectorProgrammatic),
+        );
+        let under = |digest: &LastByte<'_>| {
+            let tokens = EvidenceTokens::assign(
+                PROFILE,
+                [&cli, &programmatic].map(|p| p.redacted().unwrap()),
+                digest,
+            );
+            (
+                cli.retained(PROFILE, &tokens).unwrap(),
+                programmatic.retained(PROFILE, &tokens).unwrap(),
+            )
+        };
+        // The digest decides, against the order of the records.
+        let (first, second) = under(&LastByte(&[
+            ("profile-selector-programmatic", 1),
+            ("profile-selector-cli", 2),
+        ]));
+        assert!(second < first);
+        // The digest decides before the ordinal: the second ordinal of the
+        // lower digest precedes the higher digest, which has none.
+        let null = project(
+            O::ProfileSelectorCli,
+            &SelectorInput::invalid_type(InvalidSelectorType::Null, bound(64)),
+            64,
+        );
+        let tokens = EvidenceTokens::assign(
+            PROFILE,
+            [&null, &cli, &programmatic].map(|p| p.redacted().unwrap()),
+            &LastByte(&[
+                ("profile-selector-programmatic", 1),
+                ("null", 1),
+                ("profile-selector-cli", 2),
+            ]),
+        );
+        let lower = programmatic.retained(PROFILE, &tokens).unwrap();
+        let higher = cli.retained(PROFILE, &tokens).unwrap();
+        assert_eq!(
+            lower.view()["redacted-value"]["token"]["collision"],
+            json!("1")
+        );
+        assert!(lower < higher);
+        // One digest: the ordinals, in the order of the records, and a token
+        // without an ordinal before them.
+        let (first, second) = under(&LastByte(&[]));
+        assert!(first < second);
+        let tokens = EvidenceTokens::assign(PROFILE, cli.redacted(), &LastByte(&[]));
+        assert!(cli.retained(PROFILE, &tokens).unwrap() < first);
+        assert_eq!(
+            first.view()["redacted-value"]["token"]["collision"],
+            json!("0")
+        );
+        assert_eq!(
+            second.view()["redacted-value"]["token"]["collision"],
+            json!("1")
         );
     }
 

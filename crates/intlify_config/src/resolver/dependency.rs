@@ -1061,6 +1061,31 @@ mod tests {
         assert!(expected.view()["redacted-value"]["token"]["token"].is_string());
     }
 
+    /// The owner's mark classifies a source identity and nothing else: with
+    /// or without it, a declared selector stays `safe-profile-id` and any
+    /// other stays what it was, so no caller overrides the selector's
+    /// classification (D15:807, 3363).
+    #[test]
+    fn a_callers_mark_leaves_the_selector_evidence_unchanged() {
+        let fixture = FileFixture::new(&fixture_limits(100));
+        let selector_view = |marked: bool, text: Option<&str>| {
+            let mut file = fixture.file(Arc::from(&b"{}"[..]));
+            file.source.marked = marked;
+            record_views(&inputs(&file, text))[1]["selector"].clone()
+        };
+        assert_eq!(
+            selector_view(false, Some("app")),
+            json!({ "safe-profile-id": "app" })
+        );
+        for text in [Some("app"), Some("other"), None] {
+            assert_eq!(
+                selector_view(true, text),
+                selector_view(false, text),
+                "{text:?}"
+            );
+        }
+    }
+
     /// The views of `entry`'s records, its redacted components' tokens
     /// assigned on their own.
     fn record_views(entry: &EntryInputs) -> Vec<Value> {

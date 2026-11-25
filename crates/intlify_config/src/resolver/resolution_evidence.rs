@@ -122,7 +122,7 @@ mod tests {
     use std::collections::BTreeSet;
 
     use intlify_shared_json::encoding::{digest_bytes, encode, encoded_length};
-    use serde_json::Value;
+    use serde_json::{json, Value};
 
     use crate::construction::registry::check::RecordKind;
     use crate::resolver::dependency::fixtures::file_entry;
@@ -136,7 +136,8 @@ mod tests {
     use crate::resolver::reporting::{Record, Reporting, ReportingDomain, Retained};
     use crate::resolver::reporting_plan::tests::{entered, failing, limits_with, PROFILE};
     use crate::resolver::reporting_plan::{report, Committed};
-    use crate::resolver::token::Sha256;
+    use crate::resolver::token::fixtures::LastByte;
+    use crate::resolver::token::{Digest, Sha256};
 
     use super::{indexed, Projection, Terminal};
 
@@ -300,6 +301,128 @@ mod tests {
             }
         });
         assert_eq!(matched.len(), 12, "{matched:?}");
+    }
+
+    /// The view of every record `inputs` retains in either domain, its
+    /// tokens assigned under `digest`.
+    fn retained_views(inputs: &Inputs, digest: &impl Digest) -> Vec<Value> {
+        inputs.resolve(|evaluation, _| {
+            let reporting = Reporting::new(
+                &evaluation,
+                PROFILE,
+                (None, file_entry()),
+                &unbounded(),
+                digest,
+            );
+            let reported = report(&reporting, &limits_with(None), None).unwrap();
+            [reported.entry, reported.shared]
+                .into_iter()
+                .flat_map(|committed| committed.slices)
+                .flat_map(|slice| slice.records)
+                .map(|retained| retained.view)
+                .collect()
+        })
+    }
+
+    /// The `redacted-key` token of each occurrence's primary Evidence.
+    fn redacted_keys(views: &[Value]) -> BTreeSet<String> {
+        views
+            .iter()
+            .filter_map(|view| view.get("primary")?.get("component")?.get(1))
+            .filter_map(|key| key.get("redacted-key"))
+            .map(Value::to_string)
+            .collect()
+    }
+
+    /// Rejected envelopes and an unsafe vocabulary member reach retained
+    /// records and Finding Occurrence Keys only as the `redacted-key` of their
+    /// JSON type, whose frozen tokens the vectors hold (D15:2468). Their raw
+    /// bodies, keys, secret-resolving locators, and direct digests are absent,
+    /// the position each was submitted at changes nothing, and an injected
+    /// collision keeps the two keys apart by their ordinals (D15:825, 827,
+    /// 834, 3367).
+    #[test]
+    fn rejected_inputs_leave_nothing_raw_in_retained_records() {
+        const CANARIES: [&str; 5] = [
+            "t2-canary-kind",
+            "vault://t2-canary-locator",
+            "t2-canary-key",
+            "t2-canary-body",
+            "T2-CANARY-SURFACE",
+        ];
+        let vectors: Value =
+            serde_json::from_str(include_str!("../../fixtures/evidence-records/vectors.json"))
+                .unwrap();
+        let frozen = |origin: &str, json_type: &str| {
+            let row = vectors["evidenceTokens"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| {
+                    row["evidenceKind"] == "resolver-input-component-key"
+                        && row["origin"] == origin
+                        && row["projected"]["type"] == json_type
+                })
+                .unwrap();
+            json!({ "token": row["token"] }).to_string()
+        };
+        let envelope = json!({
+            "kind": "t2-canary-kind",
+            "schemaRevision": "0",
+            "secretLocator": "vault://t2-canary-locator",
+            "t2-canary-key": "t2-canary-body",
+        });
+        let string = json!("t2-canary-body");
+        let (mut first, mut second) = (Inputs::complete(), Inputs::complete());
+        first.submit(envelope.clone());
+        first.submit(string.clone());
+        second.submit(string.clone());
+        second.submit(envelope.clone());
+        let views = retained_views(&first, &Sha256);
+        assert_eq!(
+            views,
+            retained_views(&second, &Sha256),
+            "a submitted index reached a record"
+        );
+        let collection = "profile-resolution-artifact-collection";
+        assert_eq!(
+            redacted_keys(&views),
+            BTreeSet::from([frozen(collection, "object"), frozen(collection, "string")])
+        );
+        let colliding = retained_views(&first, &LastByte(&[]));
+        let ordinals: BTreeSet<String> = redacted_keys(&colliding)
+            .iter()
+            .map(|key| serde_json::from_str::<Value>(key).unwrap()["collision"].to_string())
+            .collect();
+        assert_eq!(
+            ordinals,
+            BTreeSet::from([json!("0").to_string(), json!("1").to_string()])
+        );
+        let mut vocabulary = Inputs::complete();
+        vocabulary.submit_surfaces(&["nav", "T2-CANARY-SURFACE"]);
+        let surface = retained_views(&vocabulary, &Sha256);
+        assert_eq!(
+            redacted_keys(&surface),
+            BTreeSet::from([frozen("intent-surface-class-vocabulary", "string")])
+        );
+        let text: String = views
+            .iter()
+            .chain(&colliding)
+            .chain(&surface)
+            .map(Value::to_string)
+            .collect();
+        for canary in CANARIES {
+            assert!(!text.contains(canary), "{canary}");
+            assert!(
+                !text.contains(&hex(&digest_bytes(canary.as_bytes()))),
+                "{canary}"
+            );
+        }
+        for body in [&envelope, &string] {
+            let bytes = encode(body).unwrap();
+            assert!(!text.contains(&hex(&bytes)));
+            assert!(!text.contains(&hex(&digest_bytes(&bytes))));
+        }
     }
 
     /// The index takes the Evidence comparisons, not the order of the slices
