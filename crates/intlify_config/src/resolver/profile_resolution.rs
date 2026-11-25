@@ -6871,6 +6871,33 @@ pub(super) mod tests {
         });
     }
 
+    /// The table needs the mode of every rule it reads, a rule's whose
+    /// selector failed and so holds no domain included: under a vocabulary
+    /// with no surface class, where no cell waits on the selector, the table
+    /// waits on that mode alone, and with cells it waits on the mode beside
+    /// the selector (D15:2365, 2426, 3607).
+    #[test]
+    fn the_table_waits_on_the_mode_of_a_rule_whose_selector_failed() {
+        let rule = json!({"intentSurfaceClasses": ["nowhere"], "mode": 7});
+        for mut inputs in [Inputs::without_surface_classes(), Inputs::complete()] {
+            let empty = inputs.surfaces.is_empty();
+            inputs.declaration()["coverage"]["rules"] = json!([rule]);
+            inputs.resolve(|evaluation, state| {
+                let found: BTreeSet<IssueKey> = evaluation.issues().cloned().collect();
+                let mode: BTreeSet<IssueKey> = found
+                    .iter()
+                    .filter(|key| key.code() == Code::FieldTypeInvalid)
+                    .cloned()
+                    .collect();
+                assert_eq!((found.len(), mode.len()), (2, 1));
+                let table = if empty { &mode } else { &found };
+                waits_on_exactly(&evaluation, &coverage_table(), table);
+                assert!(evaluation.decision_basis().is_empty());
+                assert_eq!(keys(state.coverage.as_ref().unwrap_err()), found);
+            });
+        }
+    }
+
     /// No check reads an undeclared member under `coverage` or a rule: every
     /// cell and the table, whose only prerequisite is its cells, are
     /// evaluated, and the policy built from all of `coverage` waits on it

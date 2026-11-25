@@ -646,10 +646,17 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
     // declaration's file.
     let owner = unit(CoverageSubject::Table, Check::CompleteTable);
     // An unknown mode blocks the table whichever cells take it, a rule's even
-    // where narrower rules decide all its cells (D15:2426, 3607).
+    // where narrower rules decide all its cells, or where its selector failed
+    // and it holds no domain (D15:2426, 3607).
+    let modes = modes_of(
+        rules
+            .iter()
+            .filter_map(|rule| rule.as_ref().ok())
+            .map(|rule| &rule.mode),
+    );
     let table = evaluation.check(
         owner.clone(),
-        both(both(cells, default.clone()), modes_of(domains.values())),
+        both(both(cells, default.clone()), modes),
         |((cells, _), ())| Ok(cells),
     )?;
     if let Ok(cells) = &table {
@@ -1236,7 +1243,7 @@ fn decide<P: Provider>(
                 let modes = if conflicts {
                     Ok(())
                 } else {
-                    modes_of(maximal.iter().map(|&(_, held)| held))
+                    modes_of(maximal.iter().map(|&(_, (_, mode))| mode))
                 };
                 evaluation.check_found(cell, both(decidable.clone(), modes), |_| {
                     basis(&maximal).map_err(|blocking| Found::repeated(blocking, &conflicting))
@@ -1262,14 +1269,14 @@ fn decide<P: Provider>(
     Ok(cells)
 }
 
-/// Why a mode of `rules` is missing, if one is.
-fn modes_of<'d>(rules: impl Iterator<Item = &'d Held>) -> Admitted<()> {
+/// Why one of `modes` is missing, if one is.
+fn modes_of<'m>(modes: impl Iterator<Item = &'m Admitted<CoverageMode>>) -> Admitted<()> {
     // Every cause, not the first: a fold that stops at one would lose the rest.
-    let mut modes = Ok(());
-    for (_, mode) in rules {
-        modes = and(modes, mode.as_ref().map(|_| ()).map_err(Causes::clone));
+    let mut every = Ok(());
+    for mode in modes {
+        every = and(every, mode.as_ref().map(|_| ()).map_err(Causes::clone));
     }
-    modes
+    every
 }
 
 /// The rules matching one cell that no narrower matching rule outranks, each
