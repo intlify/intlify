@@ -1055,6 +1055,30 @@ mod tests {
         );
     }
 
+    /// Reciprocal mappings are finite independent sequences rather than graph
+    /// cycles: two sources naming each other, or three naming one another in
+    /// a ring, are admitted, and each keeps exactly the candidates it declares
+    /// (D15:1517, 3591).
+    #[test]
+    fn reciprocal_sequences_are_admitted_and_stay_independent() {
+        for (requested, fallback, expected) in [
+            (
+                &["en", "ja"][..],
+                json!({"ja": ["en"], "en": ["ja"]}),
+                vec![("en", vec!["ja"]), ("ja", vec!["en"])],
+            ),
+            (
+                &["en", "fr", "ja"][..],
+                json!({"ja": ["en"], "en": ["fr"], "fr": ["ja"]}),
+                vec![("en", vec!["fr"]), ("fr", vec!["ja"]), ("ja", vec!["en"])],
+            ),
+        ] {
+            let resolved = resolve(&declared(requested, fallback));
+            assert_eq!(issues(&resolved.evaluation), []);
+            assert_eq!(sequences(&resolved.policy.unwrap()), expected);
+        }
+    }
+
     #[test]
     fn a_literal_may_name_any_locale_but_a_source_must_be_requested() {
         let declaration = declared(&["en"], json!({"fr": ["de"]}));

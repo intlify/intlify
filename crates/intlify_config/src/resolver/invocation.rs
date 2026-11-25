@@ -303,13 +303,16 @@ pub(crate) mod tests {
     use crate::resolver::call_site_span::fixtures::{mirrored, CALL_SITE};
     use crate::resolver::entry::fixtures::FILE;
     use crate::resolver::evaluation::Check;
+    use crate::resolver::evidence_metadata::fixtures::with;
+    use crate::resolver::evidence_metadata::MetadataBound;
     use crate::resolver::evidence_source::hex;
     use crate::resolver::limits::{BoundId, Group};
     use crate::resolver::origin::SafeOriginKind as Kind;
     use crate::resolver::outcome::tests::{
-        blocked, entry, entry_views, no_json, reporting, shared, shown, Shown,
+        blocked, entry, entry_views, identity, no_json, reporting, shared, shown, Shown,
     };
     use crate::resolver::profile_resolution::tests::Inputs;
+    use crate::resolver::profile_resolution::Invocation;
     use crate::resolver::snapshot_entry::fixtures::ENTRY;
     use crate::resolver::token::Digest;
     use crate::snapshot::{from_json, Marker, MarkerReason, Node, SnapshotBound};
@@ -1041,6 +1044,133 @@ pub(crate) mod tests {
                 assert!(resolution.materialized.is_some());
             }
         }
+    }
+
+    /// D15:183, 2385, 3352: an occurrence's ordinal is assigned after
+    /// candidate-level admission. Two markers of one Finding at their own
+    /// Logical input paths are two groups, each at ordinal 0; past the path
+    /// bound both have no path, so their primary Evidence is equal and they
+    /// are one group with the ordinals 0 and 1. Phase 1 reads that bound
+    /// too, so the second part records every path under no bound and leaves
+    /// the reporting stage's path admission alone to make them equal.
+    #[test]
+    fn ordinals_count_the_candidates_admission_leaves_with_one_primary() {
+        let resolver = resolver();
+        let occurrences = |segments: u64| {
+            let raw = example(|inputs| inputs)
+                .bounded("evidenceMetadata.maxLogicalPathSegments", segments);
+            let mut root = from_json(&raw.config);
+            let Node::Object(members) = &mut root else {
+                panic!("the root is an object");
+            };
+            let Some(Node::Object(profiles)) = members.get_mut("profiles") else {
+                panic!("the example declares its profiles");
+            };
+            let Some(Node::Object(web)) = profiles.get_mut("web") else {
+                panic!("the example declares `web`");
+            };
+            let Some(Node::Array(locales)) = web.get_mut("requestedLocales") else {
+                panic!("the example requests locales");
+            };
+            for locale in locales.iter_mut().take(2) {
+                *locale = Node::Marker(Marker::Rejected(MarkerReason::Cycle));
+            }
+            let shown = resolved(&resolver, &raw.snapshot(&resolver, &root, true, false));
+            entry_views(&shown, RecordKind::FindingOccurrence)
+                .into_iter()
+                .map(|view| (view["primary"].clone(), view["ordinal"].clone()))
+                .collect::<Vec<_>>()
+        };
+        let within = occurrences(4);
+        assert_eq!(within.len(), 2);
+        assert_ne!(within[0].0, within[1].0);
+        assert!(within[0].0.get("path").is_some());
+        assert_eq!((&within[0].1, &within[1].1), (&json!("0"), &json!("0")));
+        let past = occurrences(3);
+        assert_eq!(past.len(), 2);
+        assert_eq!(past[0].0, past[1].0);
+        assert!(past[0].0.get("path").is_none());
+        assert_eq!((&past[0].1, &past[1].1), (&json!("0"), &json!("1")));
+        let single = input_bound("maxSingleStringBytes");
+        let inputs = reporting(&Inputs::complete().bounding(&[(single, 2)], &[]), &[], &[]);
+        inputs.programmatic_under(None, |invocation, evaluation, invoked| {
+            // The primaries admission changes, which differ before it.
+            let limits = with(MetadataBound::LogicalPathSegments, 3);
+            let cut: Vec<_> = evaluation
+                .occurrence_candidates()
+                .iter()
+                .map(|candidate| &candidate.primary)
+                .filter(|primary| primary.admitted(&limits).unwrap() != **primary)
+                .collect();
+            assert!(cut.iter().any(|primary| *primary != cut[0]));
+            let capability = invocation.capability.clone().with_evidence_metadata(limits);
+            let tight = Invocation {
+                capability: &capability,
+                ..*invocation
+            };
+            let outcome = outcome(&evaluation, &invoked, identity(), &tight, &Sha256).unwrap();
+            let shown = shown(&outcome);
+            let ordinals: Vec<String> = entry_views(&shown, RecordKind::FindingOccurrence)
+                .into_iter()
+                .filter(|view| view["primary"].get("path").is_none())
+                .map(|view| view["ordinal"].as_str().unwrap().to_owned())
+                .collect();
+            let counted: Vec<String> = (0..cut.len()).map(|at| at.to_string()).collect();
+            assert_eq!(ordinals, counted);
+        });
+    }
+
+    /// D15:2756, 3449: callers on several threads share one resolver, each
+    /// with its own storage, and each gets the outcome a call alone gets for
+    /// its input, checked, blocked, or stopped at entry, from a file or a
+    /// Snapshot. The core schedules nothing itself, so what can vary is when
+    /// each caller runs; the inputs written in another order, members and
+    /// submitted artifacts included, keep the same Shared projection.
+    #[test]
+    #[cfg(not(target_family = "wasm"))]
+    fn concurrent_callers_of_one_resolver_each_get_the_outcome_of_a_call_alone() {
+        let resolver = resolver();
+        let nodes = input_bound("maxNodes");
+        let raws = [
+            example(|inputs| inputs),
+            Raw::new(&blocked()),
+            Raw::new(&blocked().permuted()),
+            example(|inputs| inputs.bounding(&[(nodes, 10)], &[])),
+        ];
+        let inputs: Vec<InvocationInputs<PinnedFixture>> = raws
+            .iter()
+            .flat_map(|raw| {
+                [
+                    raw.file(&resolver, true),
+                    raw.programmatic(&resolver, true, false),
+                ]
+            })
+            .collect();
+        let alone: Vec<Shown> = inputs
+            .iter()
+            .map(|inputs| resolved(&resolver, inputs))
+            .collect();
+        assert_eq!(alone[2].shared, alone[4].shared);
+        assert!(alone[2].shared.is_some());
+        let callers = inputs.len() * 2;
+        let start = std::sync::Barrier::new(callers);
+        std::thread::scope(|scope| {
+            let (resolver, start) = (&resolver, &start);
+            let workers: Vec<_> = inputs
+                .iter()
+                .zip(&alone)
+                .chain(inputs.iter().rev().zip(alone.iter().rev()))
+                .map(|(inputs, expected)| {
+                    scope.spawn(move || {
+                        start.wait();
+                        assert_eq!(resolved(resolver, inputs), *expected);
+                    })
+                })
+                .collect();
+            for worker in workers {
+                worker.join().unwrap();
+            }
+        });
     }
 
     /// D15:3155, 3321: a report without a formal container is one typed

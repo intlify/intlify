@@ -936,6 +936,252 @@ pub(crate) mod tests {
         assert_eq!(original, reported(&inputs.reordered()));
     }
 
+    /// What no order of an unordered collection may change: the Shared
+    /// projection whole, whose Findings and statuses carry the Redacted
+    /// subject tokens and suppression causes, the Entry Findings, statuses,
+    /// and unavailability causes, and how many Entry records of each kind
+    /// each unit owns. An Entry locator, an occurrence key, and the source's
+    /// revision may change, so no other part of an Entry record is compared
+    /// (D15:2389, 3353).
+    #[derive(Debug, PartialEq)]
+    struct Unmoved {
+        shared: Option<(Owned, Option<(Value, Value)>)>,
+        entry: Owned,
+        owners: Vec<(Unit, RecordKind)>,
+    }
+
+    fn unmoved(outcome: &Outcome<'_, '_>) -> Unmoved {
+        let shown = shown(outcome);
+        // Index records order by their Evidence, which a reordering moves,
+        // so the owners are compared as a multiset.
+        let mut owners: Vec<(Unit, RecordKind)> = shown
+            .entry
+            .iter()
+            .map(|(unit, kind, _)| (unit.clone(), *kind))
+            .collect();
+        owners.sort_by(|(left, one), (right, other)| (left, one.id()).cmp(&(right, other.id())));
+        let kept = [
+            RecordKind::EntryFinding,
+            RecordKind::EntryEvaluationStatus,
+            RecordKind::SharedUnavailabilityCause,
+        ];
+        let entry = shown
+            .entry
+            .into_iter()
+            .filter(|(_, kind, _)| kept.contains(kind))
+            .collect();
+        Unmoved {
+            shared: shown.shared,
+            entry,
+            owners,
+        }
+    }
+
+    /// Reversing every schema-declared unordered collection, whatever its
+    /// members, keeps every Logical subject in order, every Redacted subject
+    /// token, the Shared Findings and statuses in their order, the suppression
+    /// causes, and the owner of every Evidence record: the requested locales,
+    /// a target's, the Profile, Target, and Group ID maps, a group's members
+    /// and relations, the coverage rules and their selectors, the alias and
+    /// fallback maps, and the artifact collection, each holding invalid or
+    /// not yet identifiable members (D15:2184, 2389, 3353).
+    #[test]
+    fn permuting_any_unordered_collection_keeps_subjects_tokens_causes_and_owners() {
+        type Edit = fn(&mut Inputs);
+        let edits: [Edit; 12] = [
+            |_| {},
+            |inputs| *inputs = inputs.selecting("shop"),
+            |inputs| {
+                inputs.declaration()["requestedLocales"] = json!(["ja", "zz", 7, "en", "EN"]);
+            },
+            |inputs| {
+                inputs.declaration()["targetProfiles"]["browser"]["requestedLocales"] =
+                    json!(["en", "zz", 7, "ja", "ja"]);
+            },
+            |inputs| {
+                let targets = &mut inputs.declaration()["targetProfiles"];
+                targets["Bad Target"] = json!({ "profile": 1 });
+                targets["Other Target"] = json!(7);
+            },
+            |inputs| {
+                let groups = &mut inputs.declaration()["deploymentGroups"];
+                groups["Bad Group"] = json!({ "members": ["browser"] });
+                groups["Other Group"] = json!(7);
+            },
+            |inputs| {
+                inputs.declaration()["deploymentGroups"]["web"]["members"] =
+                    json!(["browser", "phantom", 7, "server", "browser"]);
+            },
+            |inputs| {
+                inputs.declaration()["deploymentGroups"]["web"]["hydrationRelations"] = json!([
+                    { "server": "server", "client": "browser" },
+                    { "server": "absent", "client": "browser" },
+                    9,
+                    { "server": "server", "client": "browser" },
+                ]);
+            },
+            |inputs| {
+                let fr = json!({ "requestedLocales": ["ja"], "mode": "fallback-allowed" });
+                inputs.declaration()["coverage"]["rules"] = json!([
+                    fr,
+                    7,
+                    {
+                        "requestedLocales": ["ja", "ja", "zz"],
+                        "intentSurfaceClasses": ["nav", "nav", "help"],
+                        "mode": "fallback-allowed",
+                    },
+                    fr,
+                    { "requestedLocales": [7], "mode": "direct-required" },
+                ]);
+            },
+            |inputs| {
+                inputs.declaration()["localeNegotiation"]["aliases"] =
+                    json!({ "de": "en", "fr": "ja", "zz": "ja", "iw-IL": 7 });
+            },
+            |inputs| {
+                inputs.declaration()["messageFallback"] =
+                    json!({ "ja": ["en"], "zz": ["en"], "fr": 7 });
+            },
+            |inputs| {
+                let first = inputs.submitted().2[0].clone();
+                inputs.submit(json!("no envelope"));
+                inputs.submit(json!({ "kind": "unsupported" }));
+                inputs.submit(first);
+            },
+        ];
+        for (index, edit) in edits.into_iter().enumerate() {
+            let mut edited = Inputs::complete();
+            edit(&mut edited);
+            let inputs = reporting(&edited, &[], &[]);
+            let permuted = inputs.permuted();
+            assert_ne!(
+                inputs.submitted().0.to_string(),
+                permuted.submitted().0.to_string()
+            );
+            let held = inputs.outcome(None, identity(), |_, _, outcome| unmoved(&outcome));
+            assert!(held.shared.is_some(), "{index}");
+            assert_eq!(
+                permuted.outcome(None, identity(), |_, _, outcome| unmoved(&outcome)),
+                held,
+                "{index}"
+            );
+        }
+    }
+
+    /// Every Finding of the outcome of `inputs` as its view, the Entry domain
+    /// first, in 015's order.
+    fn ordered_findings(inputs: &Inputs) -> Vec<Value> {
+        inputs.outcome(None, identity(), |_, _, outcome| {
+            let shown = shown(&outcome);
+            let mut found: Vec<Value> = entry_views(&shown, RecordKind::EntryFinding)
+                .into_iter()
+                .cloned()
+                .collect();
+            if let Some((records, _)) = &shown.shared {
+                found.extend(
+                    records
+                        .iter()
+                        .filter(|(_, kind, _)| *kind == RecordKind::SharedFinding)
+                        .map(|(_, _, view)| view.clone()),
+                );
+            }
+            found
+        })
+    }
+
+    /// Several independently provable resource violations give the same
+    /// ordered Findings, each with its bound, limit, and actual, whatever
+    /// order the input is written in: past two root-value bounds of the
+    /// capability in Phase 1, past three of the collection's bounds in Phase
+    /// 4 whatever order its members were submitted in, and past bounds of the
+    /// locales, coverage rules, and group members in the phases after it
+    /// (D15:1999, 2006, 2008, 3351).
+    #[test]
+    fn several_resource_violations_give_the_same_findings_in_any_order() {
+        let bound = |group, name| BoundId { group, name };
+        let input = |name| bound(Group::ConfigurationInput, name);
+        let artifact = |name| bound(Group::ArtifactAdmission, name);
+        let locale = |name| bound(Group::LocaleResolution, name);
+        let grouping = |name| bound(Group::TargetGrouping, name);
+        let complete = Inputs::complete();
+        let policy = [
+            diagnostics(&[]),
+            vec![
+                (locale("maxRequestedLocales"), 1),
+                (locale("maxCoverageRules"), 1),
+                (grouping("maxMembersPerGroup"), 1),
+                (grouping("maxMembershipOccurrences"), 1),
+            ],
+        ]
+        .concat();
+        let cases: [(Inputs, &[&str]); 3] = [
+            (
+                reporting(
+                    &complete.bounding(
+                        &[(input("maxNodes"), 10), (input("maxSingleStringBytes"), 2)],
+                        &[],
+                    ),
+                    &[],
+                    &[],
+                ),
+                &["maxNodes", "maxSingleStringBytes"],
+            ),
+            (
+                reporting(
+                    &complete.bounding(
+                        &[
+                            (artifact("maxArtifacts"), 2),
+                            (artifact("maxPolicyArtifacts"), 1),
+                            (artifact("maxSingleArtifactCanonicalBytes"), 2),
+                        ],
+                        &[],
+                    ),
+                    &[],
+                    &[],
+                ),
+                // The third bound is checked of each of the nine artifacts.
+                &[
+                    "maxArtifacts",
+                    "maxPolicyArtifacts",
+                    "maxSingleArtifactCanonicalBytes",
+                    "maxSingleArtifactCanonicalBytes",
+                    "maxSingleArtifactCanonicalBytes",
+                    "maxSingleArtifactCanonicalBytes",
+                    "maxSingleArtifactCanonicalBytes",
+                    "maxSingleArtifactCanonicalBytes",
+                    "maxSingleArtifactCanonicalBytes",
+                    "maxSingleArtifactCanonicalBytes",
+                    "maxSingleArtifactCanonicalBytes",
+                ],
+            ),
+            (
+                complete.bounding(&diagnostics(&[]), &policy),
+                &[
+                    "maxRequestedLocales",
+                    "maxCoverageRules",
+                    "maxMembershipOccurrences",
+                    "maxMembersPerGroup",
+                ],
+            ),
+        ];
+        for (inputs, bounds) in cases {
+            let findings = ordered_findings(&inputs);
+            let named: Vec<&str> = findings
+                .iter()
+                .map(|finding| finding["details"]["bound"].as_str().unwrap())
+                .collect();
+            assert_eq!(named, bounds);
+            for finding in &findings {
+                assert_eq!(
+                    finding["key"]["code"],
+                    "project-profile-resource-limit-exceeded"
+                );
+                assert!(finding["details"]["limit"].is_string(), "{finding}");
+            }
+            assert_eq!(ordered_findings(&inputs.permuted()), findings);
+        }
+    }
+
     /// A projection's records with their owners and kinds, as `owned` gives
     /// them.
     pub(crate) type Owned = Vec<(Unit, RecordKind, Value)>;

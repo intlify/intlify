@@ -1242,6 +1242,38 @@ pub(super) mod tests {
         }
     }
 
+    /// Reverses every array under a member whose schema declares it a set:
+    /// the requested locales and coverage selectors, the rules, and each
+    /// group's members and hydration relations. A fallback sequence's order
+    /// is semantic, so it stays, and nothing under `messageFallback` is read
+    /// by name: a source locale there may spell a set's name (D15:516, 1519,
+    /// 2184).
+    fn reverse_sets(value: &mut Value) {
+        match value {
+            Value::Object(members) => {
+                for (name, member) in members.iter_mut() {
+                    if name == "messageFallback" {
+                        continue;
+                    }
+                    if let (
+                        "requestedLocales"
+                        | "intentSurfaceClasses"
+                        | "rules"
+                        | "members"
+                        | "hydrationRelations",
+                        Value::Array(items),
+                    ) = (name.as_str(), &mut *member)
+                    {
+                        items.reverse();
+                    }
+                    reverse_sets(member);
+                }
+            }
+            Value::Array(values) => values.iter_mut().for_each(reverse_sets),
+            _ => {}
+        }
+    }
+
     /// One invocation's inputs, which a test edits before resolving them.
     pub(crate) struct Inputs {
         config: Value,
@@ -1638,6 +1670,27 @@ pub(super) mod tests {
                     .unwrap()
                     .reverse();
             }
+            reverse_objects(&mut config);
+            let mut members = self.members.clone();
+            members.reverse();
+            Self {
+                config,
+                selected: self.selected,
+                members,
+                specifications: self.specifications.clone(),
+                surfaces: self.surfaces,
+                capability: self.capability.clone(),
+                pinned: self.pinned.clone(),
+                metadata: self.metadata,
+            }
+        }
+
+        /// The same inputs with every schema-declared unordered collection
+        /// in another order, whatever its members: each set, every object's
+        /// members, and the artifact collection (D15:3353).
+        pub(crate) fn permuted(&self) -> Self {
+            let mut config = self.config.clone();
+            reverse_sets(&mut config);
             reverse_objects(&mut config);
             let mut members = self.members.clone();
             members.reverse();
@@ -2325,6 +2378,395 @@ pub(super) mod tests {
                 }
             }
         });
+    }
+
+    /// The rows after Phase 3 whose units wait when no declaration is
+    /// selected, with how many units of each, in unit order: the units whose
+    /// subject needs no declared Profile ID.
+    const WAITING_AFTER_SELECTION: [(&str, usize); 83] = [
+        ("resource-policy.references.within-capability", 1),
+        ("resource-policy.policy-reference.within-capability", 7),
+        ("resource-policy.reference-bytes.within-capability", 1),
+        ("resource-policy.resource-limits.within-metadata-scan", 1),
+        ("resource-policy.resource-limits.bootstrap-candidate", 1),
+        ("resource-policy.resource-limits.within-envelope-depth", 1),
+        (
+            "resource-policy.resource-limits.within-decoded-allocation",
+            1,
+        ),
+        ("resource-policy.resource-limits.within-validation-work", 1),
+        ("resource-policy.resource-limits.candidate-body", 1),
+        ("resource-policy.resource-limits.compatible", 1),
+        ("resource-policy.root-nodes.within-bound", 1),
+        ("resource-policy.root-depth.within-bound", 1),
+        ("resource-policy.root-collection-entries.within-bound", 1),
+        ("resource-policy.root-string-bytes.within-bound", 1),
+        ("resource-policy.root-longest-string.within-bound", 1),
+        ("resource-policy.profiles.within-bound", 1),
+        ("resource-policy.selector.within-bound", 1),
+        ("resource-policy.structural-analysis.within-bound", 1),
+        ("resource-policy.artifacts.within-bound", 1),
+        ("resource-policy.policy-artifacts.within-bound", 1),
+        ("resource-policy.target-profile-artifacts.within-bound", 1),
+        ("resource-policy.references.within-bound", 1),
+        ("resource-policy.artifact.within-bound", 9),
+        ("resource-policy.artifact-bytes.within-bound", 1),
+        ("resource-policy.policy-reference.within-bound", 7),
+        ("resource-policy.reference-bytes.within-bound", 1),
+        ("specification.locale-canonicalization.supported", 1),
+        ("specification.locale-negotiation.supported", 1),
+        ("specification.message-locale-fallback.supported", 1),
+        ("specification.coverage.supported", 1),
+        ("specification.intent-surface-class-vocabulary.supported", 1),
+        ("specification.delivery-graph.supported", 1),
+        ("specification.delivery-placement.supported", 1),
+        ("specification.vocabulary.intact", 1),
+        ("specification.vocabulary.asserted", 1),
+        ("specification.locale-data.within-payloads", 1),
+        ("specification.locale-data.within-payload-bytes", 1),
+        ("specification.locale-data.manifest-intact", 1),
+        ("specification.locale-data.markers-readable", 1),
+        ("specification.locale-data.within-marker-bytes", 1),
+        ("specification.locale-data.conformance-readable", 1),
+        ("specification.locale-data.within-validity-groups", 1),
+        ("specification.locale-data.within-codes", 1),
+        ("specification.locale-data.within-extension-keys", 1),
+        ("specification.locale-data.within-types", 1),
+        ("specification.locale-data.within-corrections", 1),
+        ("specification.locale-data.within-validation-work", 1),
+        ("specification.locale-data.dataset-intact", 1),
+        ("specification.locale-data.matching", 1),
+        ("dependency.locale-canonicalization.established", 1),
+        ("identity.declaration-field.opaque", 2),
+        ("dependency.project-identity.established", 1),
+        ("locale.occurrences.within-bound", 1),
+        ("locale.requested-set.within-bound", 1),
+        ("locale.default-source.canonical", 1),
+        ("locale.default-requested.canonical", 1),
+        ("locale.default-requested.member", 1),
+        ("locale.target-profiles.within-bound", 1),
+        ("dependency.project-locales.established", 1),
+        ("negotiation.aliases.within-bound", 1),
+        ("fallback.sources.within-bound", 1),
+        ("coverage.rules.within-bound", 1),
+        ("coverage.locale-selectors.within-bound", 1),
+        ("coverage.surface-selectors.within-bound", 1),
+        ("coverage.cells.within-bound", 1),
+        ("coverage.comparisons.within-bound", 1),
+        ("coverage.table.complete", 1),
+        ("dependency.locale-negotiation.established", 1),
+        ("dependency.message-fallback.established", 1),
+        ("dependency.coverage.established", 1),
+        ("artifact.member.admissible", 9),
+        ("artifact.member.single-occurrence", 9),
+        ("artifact.conflict-group.consistent-content", 9),
+        ("artifact.policy-reference.resolved", 7),
+        ("dependency.required-policies.established", 1),
+        ("dependency.optional-policies.established", 1),
+        ("delivery.placement.effective-mode", 1),
+        ("dependency.delivery.established", 1),
+        ("dependency.targets.established", 1),
+        ("group.groups.within-bound", 1),
+        ("group.memberships.within-bound", 1),
+        ("hydration.relations.within-bound", 1),
+        ("dependency.deployment-groups.established", 1),
+    ];
+
+    /// That `evaluation` holds one Finding, of `code`, that `waiting` are the
+    /// rows through Phase 3 that wait, and that every unit that waits, in any
+    /// phase, waits on that Finding alone, while after Phase 3 only Phase 4's
+    /// checks of the collection under the capability are evaluated and each
+    /// unit of `WAITING_AFTER_SELECTION` waits, beside the recheck of each
+    /// Profile ID structural admission admitted.
+    fn assert_each_later_check_waits_on_its_finding(
+        evaluation: &Evaluation,
+        code: Code,
+        waiting: &[&str],
+    ) {
+        let found = only_issue(evaluation);
+        assert_eq!(found.code(), code);
+        let through_selection: Vec<&str> = evaluation
+            .statuses()
+            .filter(|(unit, status)| {
+                unit.phase <= Phase::ProfileSelection && matches!(status, Status::NotEvaluated(_))
+            })
+            .map(|(unit, _)| row_of(unit))
+            .collect();
+        assert_eq!(through_selection, waiting);
+        assert_eq!(
+            evaluated_after_selection(evaluation),
+            BTreeSet::from(COLLECTION_UNDER_CAPABILITY)
+        );
+        let mut after_selection: BTreeMap<&str, usize> = BTreeMap::new();
+        for (unit, status) in evaluation.statuses() {
+            if let Status::NotEvaluated(causes) = status {
+                assert_eq!(keys(causes), BTreeSet::from([found.clone()]), "{unit:?}");
+                if unit.phase > Phase::ProfileSelection {
+                    *after_selection.entry(row_of(unit)).or_default() += 1;
+                }
+            }
+        }
+        let mut expected = BTreeMap::from(WAITING_AFTER_SELECTION);
+        let ids = rechecked_ids(evaluation).len();
+        if ids > 0 {
+            expected.insert("resource-policy.profile-id.within-bound", ids);
+        }
+        assert_eq!(after_selection, expected);
+    }
+
+    /// The rows of the schema selection's four checks, in rank order.
+    const SCHEMA_SELECTION: [&str; 4] = [
+        "structural.schema-selection.object-root",
+        "structural.schema-selection.present-schema-version",
+        "structural.schema-selection.string-schema-version",
+        "structural.schema-selection.supported-schema-version",
+    ];
+
+    /// A root that is no object, and a version missing, of another type, or
+    /// unsupported, leave no schema to read the value under: each later
+    /// selection or semantic check waits on that one Finding, with no
+    /// synthetic Finding of its own, and only the collection is still checked
+    /// under the capability (D15:2130, 2151, 3341, 3447).
+    #[test]
+    fn without_a_schema_every_later_check_waits_on_what_held_it_back() {
+        type Edit = fn(&mut Value);
+        let cases: [(Edit, usize, Code); 8] = [
+            (|root| *root = json!([]), 0, Code::FieldTypeInvalid),
+            (|root| *root = json!(42), 0, Code::FieldTypeInvalid),
+            (|root| *root = json!("root"), 0, Code::FieldTypeInvalid),
+            (|root| *root = json!(true), 0, Code::FieldTypeInvalid),
+            (|root| *root = Value::Null, 0, Code::FieldTypeInvalid),
+            (
+                |root| {
+                    root.as_object_mut().unwrap().remove("schemaVersion");
+                },
+                1,
+                Code::RequiredFieldMissing,
+            ),
+            (
+                |root| root["schemaVersion"] = json!(0),
+                2,
+                Code::FieldTypeInvalid,
+            ),
+            (
+                |root| root["schemaVersion"] = json!("1"),
+                3,
+                Code::SchemaVersionUnsupported,
+            ),
+        ];
+        for (edit, failed, code) in cases {
+            let mut inputs = Inputs::complete();
+            edit(&mut inputs.config);
+            inputs.attempt(|evaluation, state| {
+                let state = state.unwrap().expect("entry admits the file");
+                assert!(state.structure.is_err() && state.policy.confirmed.is_err());
+                assert_eq!(
+                    row_of(only_issue(&evaluation).unit()),
+                    SCHEMA_SELECTION[failed]
+                );
+                let mut waiting = SCHEMA_SELECTION[failed + 1..].to_vec();
+                waiting.extend([
+                    "structural.analysis.within-capability",
+                    "selection.profiles.within-capability",
+                    "selection.selector.required",
+                    "selection.selector.declared",
+                ]);
+                assert_each_later_check_waits_on_its_finding(&evaluation, code, &waiting);
+                assert_eq!(rechecked_ids(&evaluation), []);
+            });
+        }
+    }
+
+    /// A `profiles` member of another type or with no declaration, and a
+    /// selected declaration that is no object, hold the selection back: each
+    /// later check waits on that one structural Finding (D15:2131, 2184,
+    /// 3341). A declaration that is no object keeps its admitted key, so its
+    /// Profile ID still names a recheck, which waits too.
+    #[test]
+    fn without_a_selectable_declaration_every_later_check_waits_on_its_boundary() {
+        type Edit = fn(&mut Value);
+        let root_field = "structural.root.field-value";
+        let count = "selection.profiles.within-capability";
+        let required = "selection.selector.required";
+        let declared = "selection.selector.declared";
+        let cases: [(Edit, Code, &[&str], bool); 7] = [
+            (
+                |root| root["profiles"] = json!([]),
+                Code::FieldTypeInvalid,
+                &[root_field, count, required, declared],
+                false,
+            ),
+            (
+                |root| root["profiles"] = json!(42),
+                Code::FieldTypeInvalid,
+                &[root_field, count, required, declared],
+                false,
+            ),
+            (
+                |root| root["profiles"] = json!({}),
+                Code::FieldValueInvalid,
+                &[required, declared],
+                false,
+            ),
+            (
+                |root| root["profiles"]["web"] = json!(42),
+                Code::FieldTypeInvalid,
+                &["structural.profile.known-field"],
+                true,
+            ),
+            (
+                |root| root["profiles"]["web"] = json!([]),
+                Code::FieldTypeInvalid,
+                &["structural.profile.known-field"],
+                true,
+            ),
+            (
+                |root| root["profiles"]["web"] = json!("web"),
+                Code::FieldTypeInvalid,
+                &["structural.profile.known-field"],
+                true,
+            ),
+            (
+                |root| root["profiles"]["web"] = Value::Null,
+                Code::FieldTypeInvalid,
+                &["structural.profile.known-field"],
+                true,
+            ),
+        ];
+        for (edit, code, waiting, named) in cases {
+            let mut inputs = Inputs::complete();
+            edit(&mut inputs.config);
+            inputs.attempt(|evaluation, state| {
+                let state = state.unwrap().expect("entry admits the file");
+                assert!(state.structure.is_err() && state.policy.confirmed.is_err());
+                assert_each_later_check_waits_on_its_finding(&evaluation, code, waiting);
+                assert_eq!(rechecked_ids(&evaluation).len(), usize::from(named));
+            });
+        }
+    }
+
+    /// Without the canonicalization slot no locale can be interpreted: every
+    /// check that needs a canonical locale, through the locale, policy,
+    /// target, and hydration phases, waits on that one Finding, while a phase
+    /// that compares only Target IDs still runs (D15:2133, 2151, 2365, 3447).
+    #[test]
+    fn without_canonicalization_semantics_each_locale_check_waits_on_the_slot() {
+        let mut inputs = Inputs::complete();
+        inputs.specifications.locale_canonicalization = None;
+        inputs.attempt(|evaluation, state| {
+            let state = state.unwrap().expect("entry admits the file");
+            let found = only_issue(&evaluation);
+            assert_eq!(
+                (found.code(), found.reason()),
+                (
+                    Code::SpecificationInputIncomplete,
+                    Some(Reason::MissingRequiredSlot)
+                )
+            );
+            assert_eq!(
+                suppressed(&evaluation),
+                (
+                    BTreeSet::from([
+                        Phase::SpecificationAdmission,
+                        Phase::LocaleResolution,
+                        Phase::LocalePolicyResolution,
+                        Phase::TargetResolution,
+                        Phase::HydrationValidation,
+                    ]),
+                    BTreeSet::from([found])
+                )
+            );
+            assert_eq!(
+                absent(&state),
+                [
+                    "specifications",
+                    "canonicalization",
+                    "locales",
+                    "negotiation",
+                    "fallback",
+                    "coverage",
+                    "targets",
+                    "hydration"
+                ]
+            );
+        });
+    }
+
+    /// A missing or empty `deploymentGroups` and a group with no members are
+    /// blocking Findings of the fields they name, and a Group ID a file names
+    /// twice is Phase 1's duplicate-member Finding, which leaves no value at
+    /// all. No group is inferred for the targets: Phase 12 has no partition
+    /// and no such group, and the outcome no profile (D15:2438, 3530).
+    #[test]
+    fn a_missing_or_empty_group_is_a_finding_and_no_group_is_inferred() {
+        use crate::resolver::outcome::tests::{identity, reporting};
+        use crate::resolver::structural_admission::{EntryKey, Field, StructuralSubject as S};
+        type Edit = fn(&mut Value);
+        let web = || EntryKey::identity("web");
+        let declared = |path: &[&str]| S::ProfileField(web(), Field::of(path));
+        let cases: [(Edit, S, Check, Code); 3] = [
+            (
+                |app| {
+                    app.as_object_mut().unwrap().remove("deploymentGroups");
+                },
+                declared(&["deploymentGroups"]),
+                Check::RequiredField,
+                Code::RequiredFieldMissing,
+            ),
+            (
+                |app| app["deploymentGroups"] = json!({}),
+                declared(&["deploymentGroups"]),
+                Check::FieldValue,
+                Code::FieldValueInvalid,
+            ),
+            (
+                |app| app["deploymentGroups"]["web"]["members"] = json!([]),
+                S::GroupField(web(), web(), Field::of(&["members"])),
+                Check::FieldValue,
+                Code::FieldValueInvalid,
+            ),
+        ];
+        for (edit, subject, check, code) in cases {
+            let mut inputs = Inputs::complete();
+            edit(inputs.declaration());
+            let found = Unit {
+                phase: Phase::StructuralAdmission,
+                subject: Subject::Structural(subject),
+                check,
+            };
+            reporting(&inputs, &[], &[]).outcome(
+                None,
+                identity(),
+                |evaluation, invoked, outcome| {
+                    assert!(outcome.checked.is_none());
+                    assert_eq!(issues(evaluation), [(found.clone(), code, None)]);
+                    let groups = invoked.state.as_ref().unwrap().groups.as_ref();
+                    assert!(groups.map_or(true, |groups| groups.partition().is_err()));
+                    let id = serde_json::from_value(json!("web")).unwrap();
+                    let members = groups.ok().and_then(|groups| groups.get(&id));
+                    assert!(matches!(members, None | Some(Err(_))), "{found:?}");
+                },
+            );
+        }
+        let inputs = Inputs::complete();
+        let text = serde_json::to_string(&inputs.config).unwrap();
+        let map = r#""deploymentGroups":{"#;
+        let at = text.find(map).unwrap() + map.len();
+        let twice = format!(
+            r#"{}"web":{{"members":["browser"]}},{}"#,
+            &text[..at],
+            &text[at..]
+        );
+        inputs.entered(
+            Some(Arc::from(twice.into_bytes())),
+            |evaluation, invoked| {
+                assert_eq!(
+                    issues(&evaluation),
+                    [(input(Check::UniqueMembers), Code::JsonMemberDuplicate, None)]
+                );
+                assert!(invoked.state.is_err());
+            },
+        );
     }
 
     /// Phase 4 observes a bound over the selected declaration's references at
@@ -6359,24 +6801,210 @@ pub(super) mod tests {
     }
 
     /// A rule whose mode failed still holds its domain, so a cell it matches
-    /// waits on that mode and not on the default (D15:2365).
+    /// waits on that mode and not on the default, and a cell no rule matches
+    /// on the default and not on that mode (D15:2365).
     #[test]
     fn a_cell_a_rule_without_a_mode_matches_waits_on_that_mode_alone() {
+        let only = |coverage: Value| {
+            let mut inputs = Inputs::complete();
+            inputs.declaration()["coverage"] = coverage;
+            inputs.resolve(|evaluation, _| only_issue(&evaluation))
+        };
+        let rule = json!([{"requestedLocales": ["ja"], "mode": 7}]);
+        let default = BTreeSet::from([only(json!({"defaultMode": 7}))]);
+        let mode = BTreeSet::from([only(json!({"rules": rule}))]);
         let mut inputs = Inputs::complete();
-        inputs.declaration()["coverage"] = json!({
-            "defaultMode": 7,
-            "rules": [{"requestedLocales": ["ja"], "mode": 7}]
-        });
+        inputs.declaration()["coverage"] = json!({"defaultMode": 7, "rules": rule});
         inputs.resolve(|evaluation, _| {
-            let every: BTreeSet<IssueKey> = evaluation.issues().cloned().collect();
-            assert_eq!(every.len(), 2);
-            let Some(Status::NotEvaluated(causes)) = evaluation.status(&coverage_cell("ja", "nav"))
-            else {
-                panic!("the cell waits");
-            };
-            assert_eq!(causes.keys().count(), 1);
-            waits_on_exactly(&evaluation, &coverage_cell("en", "nav"), &every);
+            waits_on_exactly(&evaluation, &coverage_cell("ja", "nav"), &mode);
+            waits_on_exactly(&evaluation, &coverage_cell("en", "nav"), &default);
         });
+    }
+
+    /// A conflict needs only the modes of the rules that conflict: a mode
+    /// that failed in a rule outside the cell, or in a third maximally
+    /// specific rule, leaves it found, while the table waits (D15:2365, 2410,
+    /// 2426).
+    #[test]
+    fn a_conflict_is_found_beside_a_mode_that_failed() {
+        for rules in [
+            json!([
+                {"requestedLocales": ["en"], "intentSurfaceClasses": ["nav"], "mode": 7},
+                {"requestedLocales": ["ja"], "mode": "direct-required"},
+                {"intentSurfaceClasses": ["nav"], "mode": "fallback-allowed"}
+            ]),
+            json!([
+                {
+                    "requestedLocales": ["ja"],
+                    "intentSurfaceClasses": ["nav", "internal-tool"],
+                    "mode": 7
+                },
+                {
+                    "requestedLocales": ["ja"],
+                    "intentSurfaceClasses": ["nav", "checkout"],
+                    "mode": "direct-required"
+                },
+                {
+                    "requestedLocales": ["en", "ja"],
+                    "intentSurfaceClasses": ["nav"],
+                    "mode": "fallback-allowed"
+                }
+            ]),
+        ] {
+            let mut inputs = Inputs::complete();
+            inputs.declaration()["coverage"] = json!({"rules": rules});
+            inputs.resolve(|evaluation, state| {
+                let conflicts: Vec<Unit> = issues(&evaluation)
+                    .into_iter()
+                    .filter(|(_, code, _)| *code == Code::CoverageRuleConflict)
+                    .map(|(unit, _, _)| unit)
+                    .collect();
+                assert_eq!(conflicts, [coverage_cell("ja", "nav")]);
+                assert!(matches!(
+                    evaluation.status(&coverage_table()),
+                    Some(Status::NotEvaluated(_))
+                ));
+                assert!(state.coverage.is_err());
+            });
+        }
+    }
+
+    /// A maximally specific rule whose mode failed holds back the cells it
+    /// could decide, even beside a rule with a mode, and no other cell
+    /// (D15:2365).
+    #[test]
+    fn a_maximal_rule_without_a_mode_holds_back_only_its_cells() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["coverage"] = json!({"rules": [
+            {
+                "requestedLocales": ["ja"],
+                "intentSurfaceClasses": ["nav", "internal-tool"],
+                "mode": 7
+            },
+            {
+                "requestedLocales": ["ja"],
+                "intentSurfaceClasses": ["nav", "checkout"],
+                "mode": "direct-required"
+            }
+        ]});
+        inputs.resolve(|evaluation, _| {
+            let mode = BTreeSet::from([only_issue(&evaluation)]);
+            for surface in ["nav", "internal-tool"] {
+                waits_on_exactly(&evaluation, &coverage_cell("ja", surface), &mode);
+            }
+            for (locale, surface) in [("ja", "checkout"), ("en", "nav")] {
+                assert_eq!(
+                    evaluation.status(&coverage_cell(locale, surface)),
+                    Some(&Status::Evaluated)
+                );
+            }
+        });
+    }
+
+    /// Each mode that failed is a cause of what needs it: a cell both rules
+    /// decide waits on the two, a cell one rule decides on that rule's alone,
+    /// and the table on both (D15:2365, 2426).
+    #[test]
+    fn each_mode_that_failed_is_a_cause_of_what_needs_it() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["coverage"] = json!({"rules": [
+            {
+                "requestedLocales": ["ja"],
+                "intentSurfaceClasses": ["nav", "internal-tool"],
+                "mode": 7
+            },
+            {
+                "requestedLocales": ["ja"],
+                "intentSurfaceClasses": ["nav", "checkout"],
+                "mode": "x"
+            }
+        ]});
+        inputs.resolve(|evaluation, _| {
+            let of = |code| {
+                evaluation
+                    .issues()
+                    .filter(|key| key.code() == code)
+                    .cloned()
+                    .collect::<BTreeSet<IssueKey>>()
+            };
+            let (typed, valued) = (of(Code::FieldTypeInvalid), of(Code::FieldValueInvalid));
+            assert_eq!((typed.len(), valued.len()), (1, 1));
+            let both: BTreeSet<IssueKey> = typed.union(&valued).cloned().collect();
+            waits_on_exactly(&evaluation, &coverage_cell("ja", "internal-tool"), &typed);
+            waits_on_exactly(&evaluation, &coverage_cell("ja", "checkout"), &valued);
+            waits_on_exactly(&evaluation, &coverage_cell("ja", "nav"), &both);
+            waits_on_exactly(&evaluation, &coverage_table(), &both);
+        });
+    }
+
+    /// A domain two rules hold keeps the mode of each as a cause of the table,
+    /// though the rule whose mode failed orders after the other (D15:2365,
+    /// 2426).
+    #[test]
+    fn a_domain_held_twice_keeps_each_rules_mode_as_a_cause() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["coverage"] = json!({"rules": [
+            {"requestedLocales": ["ja"], "mode": "fallback-allowed"},
+            {"requestedLocales": ["ja"], "mode": []}
+        ]});
+        inputs.resolve(|evaluation, _| {
+            let codes: BTreeSet<&str> =
+                evaluation.issues().map(|key| key.code().as_str()).collect();
+            let expected = [Code::CoverageRuleDuplicate, Code::FieldTypeInvalid];
+            assert_eq!(codes, expected.map(Code::as_str).into());
+            let every: BTreeSet<IssueKey> = evaluation.issues().cloned().collect();
+            waits_on_exactly(&evaluation, &coverage_table(), &every);
+        });
+    }
+
+    /// A rule narrower rules outrank at every cell it matches holds back no
+    /// cell, and its unknown mode still blocks the table (D15:2426, 3607).
+    #[test]
+    fn a_rule_outranked_at_every_cell_holds_back_only_the_table() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["coverage"] = json!({"rules": [
+            {"requestedLocales": ["en", "ja"], "intentSurfaceClasses": ["nav"], "mode": 7},
+            {"requestedLocales": ["en"], "intentSurfaceClasses": ["nav"], "mode": "direct-required"},
+            {"requestedLocales": ["ja"], "intentSurfaceClasses": ["nav"], "mode": "fallback-allowed"}
+        ]});
+        inputs.resolve(|evaluation, state| {
+            let mode = BTreeSet::from([only_issue(&evaluation)]);
+            for locale in ["en", "ja"] {
+                assert_eq!(
+                    evaluation.status(&coverage_cell(locale, "nav")),
+                    Some(&Status::Evaluated)
+                );
+            }
+            waits_on_exactly(&evaluation, &coverage_table(), &mode);
+            assert_eq!(keys(state.coverage.as_ref().unwrap_err()), mode);
+        });
+    }
+
+    /// The table needs the mode of every rule it reads, a rule's whose
+    /// selector failed and so holds no domain included: under a vocabulary
+    /// with no surface class, where no cell waits on the selector, the table
+    /// waits on that mode alone, and with cells it waits on the mode beside
+    /// the selector (D15:2365, 2426, 3607).
+    #[test]
+    fn the_table_waits_on_the_mode_of_a_rule_whose_selector_failed() {
+        let rule = json!({"intentSurfaceClasses": ["nowhere"], "mode": 7});
+        for mut inputs in [Inputs::without_surface_classes(), Inputs::complete()] {
+            let empty = inputs.surfaces.is_empty();
+            inputs.declaration()["coverage"]["rules"] = json!([rule]);
+            inputs.resolve(|evaluation, state| {
+                let found: BTreeSet<IssueKey> = evaluation.issues().cloned().collect();
+                let mode: BTreeSet<IssueKey> = found
+                    .iter()
+                    .filter(|key| key.code() == Code::FieldTypeInvalid)
+                    .cloned()
+                    .collect();
+                assert_eq!((found.len(), mode.len()), (2, 1));
+                let table = if empty { &mode } else { &found };
+                waits_on_exactly(&evaluation, &coverage_table(), table);
+                assert!(evaluation.decision_basis().is_empty());
+                assert_eq!(keys(state.coverage.as_ref().unwrap_err()), found);
+            });
+        }
     }
 
     /// No check reads an undeclared member under `coverage` or a rule: every
@@ -6946,7 +7574,7 @@ pub(super) mod tests {
                 edit: |app| app["coverage"]["rules"][0]["mode"] = json!("x"),
                 found: ("structural.profile.field-value", Code::FieldValueInvalid),
                 waiting: "coverage.cell.effective-mode coverage.table.complete dependency.coverage.established",
-                kept: "",
+                kept: "coverage.cell.effective-mode=4",
             },
             Broken {
                 place: "coverage selector item",

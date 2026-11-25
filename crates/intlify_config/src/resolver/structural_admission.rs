@@ -1268,6 +1268,114 @@ mod tests {
         assert_eq!(candidates(&evaluation, &element), 3);
     }
 
+    /// The minimal configuration with `entries` as its `messageFallback`, or
+    /// as its `localeNegotiation.aliases`.
+    fn with_map(fallback: bool, entries: &[(&str, Value)]) -> Value {
+        let map: serde_json::Map<String, Value> = entries
+            .iter()
+            .map(|(key, value)| ((*key).to_owned(), value.clone()))
+            .collect();
+        let mut value = minimal_config();
+        let declaration = &mut value["profiles"]["app"];
+        if fallback {
+            declaration["messageFallback"] = Value::Object(map);
+        } else {
+            declaration["localeNegotiation"] = json!({ "aliases": map });
+        }
+        value
+    }
+
+    /// The entries of `messageFallback` and of `localeNegotiation.aliases`
+    /// are keyed by the path with `*`. Every value occurrence counts toward
+    /// `maxStructuralAnalysisUnits`: a sequence of one literal is nine schema
+    /// keywords (its reference, type, minimum, and items, and the element's
+    /// reference, `anyOf`, and its branches' three), and an alias is one. Each
+    /// failing entry is a separate occurrence of one Finding, each at its own
+    /// value, and the entry that passes beside them is a candidate with no
+    /// occurrence (D15:1887, 2184, 3354).
+    #[test]
+    fn the_entries_of_a_map_without_identity_keys_count_and_join_one_finding() {
+        for (fallback, path, valid, each, safe) in [
+            (
+                true,
+                &["messageFallback", "*"][..],
+                json!(["en"]),
+                9,
+                &[Some("profiles"), Some("app"), Some("messageFallback"), None][..],
+            ),
+            (
+                false,
+                &["localeNegotiation", "aliases", "*"][..],
+                json!("en"),
+                1,
+                &[
+                    Some("profiles"),
+                    Some("app"),
+                    Some("localeNegotiation"),
+                    Some("aliases"),
+                    None,
+                ][..],
+            ),
+        ] {
+            let count = |keys: &[&str]| {
+                let entries: Vec<(&str, Value)> =
+                    keys.iter().map(|key| (*key, valid.clone())).collect();
+                admitted(&with_map(fallback, &entries), 1_000_000)
+                    .1
+                    .unwrap()
+            };
+            let (one, two, three) = (
+                count(&["de"]),
+                count(&["de", "fr"]),
+                count(&["de", "fr", "ja"]),
+            );
+            assert_eq!((two - one, three - two), (each, each), "{path:?}");
+            let value = with_map(
+                fallback,
+                &[("de", valid.clone()), ("fr", json!(7)), ("ja", json!(8))],
+            );
+            let (evaluation, _) = admitted(&value, 1_000_000);
+            let entry = app(path, Check::FieldType);
+            assert_eq!(
+                issues(&evaluation),
+                [(entry.clone(), Code::FieldTypeInvalid)]
+            );
+            assert_eq!(candidates(&evaluation, &entry), 3, "{path:?}");
+            let (source, occurrences) = observed(&value, 1_000_000);
+            // A key before Phase 5 is redacted, so the two share a locator
+            // and each entry's value is told apart by its span, the span of
+            // that value's token.
+            let primaries: Vec<(Value, Value)> = occurrences
+                .iter()
+                .filter(|occurrence| *occurrence.finding().unit() == entry)
+                .map(|occurrence| {
+                    assert_eq!(occurrence.ordinal(), 0);
+                    located(occurrence.primary())
+                })
+                .collect();
+            assert_eq!(primaries.len(), 2, "{path:?}");
+            assert_eq!(primaries[0].0, primaries[1].0, "{path:?}");
+            assert!(redacted_path(&primaries[0].0, safe), "{}", primaries[0].0);
+            let token = |key: &str, value: &str| {
+                let entry = format!("\"{key}\":{value}");
+                let start = source
+                    .windows(entry.len())
+                    .position(|window| window == entry.as_bytes())
+                    .unwrap()
+                    + entry.len()
+                    - value.len();
+                json!({ "start": start.to_string(), "end": (start + value.len()).to_string() })
+                    .to_string()
+            };
+            let mut spans: Vec<String> =
+                primaries.iter().map(|(_, span)| span.to_string()).collect();
+            spans.sort();
+            let mut values = vec![token("fr", "7"), token("ja", "8")];
+            values.sort();
+            assert_eq!(spans, values, "{path:?}");
+        }
+    }
+
     /// Every undeclared member of the root is a candidate of the one unit of
     /// the root's known members, which reports one Finding (D15:2184).
     #[test]
