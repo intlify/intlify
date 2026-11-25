@@ -6692,23 +6692,182 @@ pub(super) mod tests {
     }
 
     /// A rule whose mode failed still holds its domain, so a cell it matches
-    /// waits on that mode and not on the default (D15:2365).
+    /// waits on that mode and not on the default, and a cell no rule matches
+    /// on the default and not on that mode (D15:2365).
     #[test]
     fn a_cell_a_rule_without_a_mode_matches_waits_on_that_mode_alone() {
+        let only = |coverage: Value| {
+            let mut inputs = Inputs::complete();
+            inputs.declaration()["coverage"] = coverage;
+            inputs.resolve(|evaluation, _| only_issue(&evaluation))
+        };
+        let rule = json!([{"requestedLocales": ["ja"], "mode": 7}]);
+        let default = BTreeSet::from([only(json!({"defaultMode": 7}))]);
+        let mode = BTreeSet::from([only(json!({"rules": rule}))]);
         let mut inputs = Inputs::complete();
-        inputs.declaration()["coverage"] = json!({
-            "defaultMode": 7,
-            "rules": [{"requestedLocales": ["ja"], "mode": 7}]
-        });
+        inputs.declaration()["coverage"] = json!({"defaultMode": 7, "rules": rule});
         inputs.resolve(|evaluation, _| {
-            let every: BTreeSet<IssueKey> = evaluation.issues().cloned().collect();
-            assert_eq!(every.len(), 2);
-            let Some(Status::NotEvaluated(causes)) = evaluation.status(&coverage_cell("ja", "nav"))
-            else {
-                panic!("the cell waits");
+            waits_on_exactly(&evaluation, &coverage_cell("ja", "nav"), &mode);
+            waits_on_exactly(&evaluation, &coverage_cell("en", "nav"), &default);
+        });
+    }
+
+    /// A conflict needs only the modes of the rules that conflict: a mode
+    /// that failed in a rule outside the cell, or in a third maximally
+    /// specific rule, leaves it found, while the table waits (D15:2365, 2410,
+    /// 2426).
+    #[test]
+    fn a_conflict_is_found_beside_a_mode_that_failed() {
+        for rules in [
+            json!([
+                {"requestedLocales": ["en"], "intentSurfaceClasses": ["nav"], "mode": 7},
+                {"requestedLocales": ["ja"], "mode": "direct-required"},
+                {"intentSurfaceClasses": ["nav"], "mode": "fallback-allowed"}
+            ]),
+            json!([
+                {
+                    "requestedLocales": ["ja"],
+                    "intentSurfaceClasses": ["nav", "internal-tool"],
+                    "mode": 7
+                },
+                {
+                    "requestedLocales": ["ja"],
+                    "intentSurfaceClasses": ["nav", "checkout"],
+                    "mode": "direct-required"
+                },
+                {
+                    "requestedLocales": ["en", "ja"],
+                    "intentSurfaceClasses": ["nav"],
+                    "mode": "fallback-allowed"
+                }
+            ]),
+        ] {
+            let mut inputs = Inputs::complete();
+            inputs.declaration()["coverage"] = json!({"rules": rules});
+            inputs.resolve(|evaluation, state| {
+                let conflicts: Vec<Unit> = issues(&evaluation)
+                    .into_iter()
+                    .filter(|(_, code, _)| *code == Code::CoverageRuleConflict)
+                    .map(|(unit, _, _)| unit)
+                    .collect();
+                assert_eq!(conflicts, [coverage_cell("ja", "nav")]);
+                assert!(matches!(
+                    evaluation.status(&coverage_table()),
+                    Some(Status::NotEvaluated(_))
+                ));
+                assert!(state.coverage.is_err());
+            });
+        }
+    }
+
+    /// A maximally specific rule whose mode failed holds back the cells it
+    /// could decide, even beside a rule with a mode, and no other cell
+    /// (D15:2365).
+    #[test]
+    fn a_maximal_rule_without_a_mode_holds_back_only_its_cells() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["coverage"] = json!({"rules": [
+            {
+                "requestedLocales": ["ja"],
+                "intentSurfaceClasses": ["nav", "internal-tool"],
+                "mode": 7
+            },
+            {
+                "requestedLocales": ["ja"],
+                "intentSurfaceClasses": ["nav", "checkout"],
+                "mode": "direct-required"
+            }
+        ]});
+        inputs.resolve(|evaluation, _| {
+            let mode = BTreeSet::from([only_issue(&evaluation)]);
+            for surface in ["nav", "internal-tool"] {
+                waits_on_exactly(&evaluation, &coverage_cell("ja", surface), &mode);
+            }
+            for (locale, surface) in [("ja", "checkout"), ("en", "nav")] {
+                assert_eq!(
+                    evaluation.status(&coverage_cell(locale, surface)),
+                    Some(&Status::Evaluated)
+                );
+            }
+        });
+    }
+
+    /// Each mode that failed is a cause of what needs it: a cell both rules
+    /// decide waits on the two, a cell one rule decides on that rule's alone,
+    /// and the table on both (D15:2365, 2426).
+    #[test]
+    fn each_mode_that_failed_is_a_cause_of_what_needs_it() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["coverage"] = json!({"rules": [
+            {
+                "requestedLocales": ["ja"],
+                "intentSurfaceClasses": ["nav", "internal-tool"],
+                "mode": 7
+            },
+            {
+                "requestedLocales": ["ja"],
+                "intentSurfaceClasses": ["nav", "checkout"],
+                "mode": "x"
+            }
+        ]});
+        inputs.resolve(|evaluation, _| {
+            let of = |code| {
+                evaluation
+                    .issues()
+                    .filter(|key| key.code() == code)
+                    .cloned()
+                    .collect::<BTreeSet<IssueKey>>()
             };
-            assert_eq!(causes.keys().count(), 1);
-            waits_on_exactly(&evaluation, &coverage_cell("en", "nav"), &every);
+            let (typed, valued) = (of(Code::FieldTypeInvalid), of(Code::FieldValueInvalid));
+            assert_eq!((typed.len(), valued.len()), (1, 1));
+            let both: BTreeSet<IssueKey> = typed.union(&valued).cloned().collect();
+            waits_on_exactly(&evaluation, &coverage_cell("ja", "internal-tool"), &typed);
+            waits_on_exactly(&evaluation, &coverage_cell("ja", "checkout"), &valued);
+            waits_on_exactly(&evaluation, &coverage_cell("ja", "nav"), &both);
+            waits_on_exactly(&evaluation, &coverage_table(), &both);
+        });
+    }
+
+    /// A domain two rules hold keeps the mode of each as a cause of the table,
+    /// though the rule whose mode failed orders after the other (D15:2365,
+    /// 2426).
+    #[test]
+    fn a_domain_held_twice_keeps_each_rules_mode_as_a_cause() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["coverage"] = json!({"rules": [
+            {"requestedLocales": ["ja"], "mode": "fallback-allowed"},
+            {"requestedLocales": ["ja"], "mode": []}
+        ]});
+        inputs.resolve(|evaluation, _| {
+            let codes: BTreeSet<&str> =
+                evaluation.issues().map(|key| key.code().as_str()).collect();
+            let expected = [Code::CoverageRuleDuplicate, Code::FieldTypeInvalid];
+            assert_eq!(codes, expected.map(Code::as_str).into());
+            let every: BTreeSet<IssueKey> = evaluation.issues().cloned().collect();
+            waits_on_exactly(&evaluation, &coverage_table(), &every);
+        });
+    }
+
+    /// A rule narrower rules outrank at every cell it matches holds back no
+    /// cell, and its unknown mode still blocks the table (D15:2426, 3607).
+    #[test]
+    fn a_rule_outranked_at_every_cell_holds_back_only_the_table() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["coverage"] = json!({"rules": [
+            {"requestedLocales": ["en", "ja"], "intentSurfaceClasses": ["nav"], "mode": 7},
+            {"requestedLocales": ["en"], "intentSurfaceClasses": ["nav"], "mode": "direct-required"},
+            {"requestedLocales": ["ja"], "intentSurfaceClasses": ["nav"], "mode": "fallback-allowed"}
+        ]});
+        inputs.resolve(|evaluation, state| {
+            let mode = BTreeSet::from([only_issue(&evaluation)]);
+            for locale in ["en", "ja"] {
+                assert_eq!(
+                    evaluation.status(&coverage_cell(locale, "nav")),
+                    Some(&Status::Evaluated)
+                );
+            }
+            waits_on_exactly(&evaluation, &coverage_table(), &mode);
+            assert_eq!(keys(state.coverage.as_ref().unwrap_err()), mode);
         });
     }
 
@@ -7279,7 +7438,7 @@ pub(super) mod tests {
                 edit: |app| app["coverage"]["rules"][0]["mode"] = json!("x"),
                 found: ("structural.profile.field-value", Code::FieldValueInvalid),
                 waiting: "coverage.cell.effective-mode coverage.table.complete dependency.coverage.established",
-                kept: "",
+                kept: "coverage.cell.effective-mode=4",
             },
             Broken {
                 place: "coverage selector item",
