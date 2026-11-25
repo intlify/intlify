@@ -395,6 +395,50 @@ pub(super) mod tests {
         }
     }
 
+    /// Both source-revision domains, each over a one-field record of the
+    /// exact bytes: frozen preimages and digests that a Python script computed
+    /// apart from this crate from D15:743 and the field framing
+    /// (`.plans/drafts/025-pr7/t2-vectors.py`; D15:3319).
+    #[test]
+    fn both_revision_domains_digest_their_frozen_preimages() {
+        let vectors: serde_json::Value =
+            serde_json::from_str(include_str!("../../fixtures/evidence-records/vectors.json"))
+                .unwrap();
+        let unhex = |text: &str| -> Vec<u8> {
+            (0..text.len())
+                .step_by(2)
+                .map(|at| u8::from_str_radix(&text[at..at + 2], 16).unwrap())
+                .collect()
+        };
+        let rows = vectors["sourceRevisions"].as_array().unwrap();
+        assert_eq!(rows.len(), 6);
+        for row in rows {
+            let domain = row["domain"].as_str().unwrap();
+            let bytes = unhex(row["bytes"].as_str().unwrap());
+            let preimage = unhex(row["preimage"].as_str().unwrap());
+            let revision = row["revision"].as_str().unwrap();
+            let length = u64::try_from(bytes.len()).unwrap().to_be_bytes();
+            assert_eq!(
+                preimage,
+                [domain.as_bytes(), &[0x01], &length, &bytes].concat(),
+                "{domain}"
+            );
+            assert_eq!(
+                format!("sha256:{}", hex(digest_bytes(&preimage))),
+                revision,
+                "{domain}"
+            );
+            let computed = match domain {
+                "intlify.project-profile.file-source-revision.v0" => file_source_revision(&bytes),
+                "intlify.project-profile.call-site-source-revision.v0" => {
+                    call_site_source_revision(&bytes)
+                }
+                other => panic!("no such domain: {other}"),
+            };
+            assert_eq!(computed, revision, "{domain}");
+        }
+    }
+
     /// Call-Site Source revisions computed the same way outside this crate,
     /// over the call-site domain: the same bytes have a different revision in
     /// each domain.

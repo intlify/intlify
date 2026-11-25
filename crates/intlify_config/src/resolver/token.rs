@@ -707,6 +707,7 @@ mod tests {
     use crate::resolver::coverage::{CoverageSubject, Domain, RuleContent, SurfaceKey};
     use crate::resolver::dependency::SemanticGroup;
     use crate::resolver::evaluation::Subject;
+    use crate::resolver::evidence_source::hex;
     use crate::resolver::fallback::FallbackSubject;
     use crate::resolver::groups::GroupSubject;
     use crate::resolver::hydration::{
@@ -725,7 +726,10 @@ mod tests {
     use crate::resolver::subject::SubjectKind;
     use crate::resolver::targets::TargetSubject;
 
-    use super::{logical, own, projected, record, Digest, Own, Sha256, Specification, Tokens};
+    use super::{
+        logical, own, projected, record, Digest, Own, Sha256, Specification, Tokens,
+        SUBJECT_TOKEN_DOMAIN,
+    };
 
     const PROFILE: Specification<'static> = Specification {
         identity: "intlify-project-profile",
@@ -1449,6 +1453,171 @@ mod tests {
                 "{subject:?}"
             );
         }
+    }
+
+    /// One subject of each name in the frozen token vectors: every key
+    /// strategy, every compound identity view of D15:2468, and a content key
+    /// of each JSON type a collection member can have.
+    fn frozen_subjects() -> Vec<(&'static str, Subject)> {
+        let member = |key| Subject::ArtifactCollection(CollectionSubject::Member(key));
+        let pair = || RelationKey::Pair(target("ssr"), target("web"));
+        let hydration = Subject::Hydration;
+        vec![
+            ("singleton", Subject::Vocabulary),
+            (
+                "logical-field",
+                Subject::DeclarationField(DeclarationField::ProjectId),
+            ),
+            ("identity", requested(key("en"))),
+            ("content", requested(content("x!"))),
+            (
+                "semantic-position",
+                Subject::Fallback(FallbackSubject::Candidate(key("ja"), 0)),
+            ),
+            (
+                "fallback-literal",
+                Subject::Fallback(FallbackSubject::Literal(key("ja"), key("en"))),
+            ),
+            (
+                "fallback-intent-source",
+                Subject::Fallback(FallbackSubject::IntentSource(key("ja"))),
+            ),
+            (
+                "negotiation-destination",
+                Subject::Negotiation(NegotiationSubject::Destination(key("en"), key("fr"))),
+            ),
+            (
+                "coverage-domain",
+                Subject::Coverage(CoverageSubject::Domain(Domain::of(
+                    vec![canonical("en"), canonical("fr")],
+                    vec![token("nav")],
+                ))),
+            ),
+            (
+                "coverage-cell",
+                Subject::Coverage(CoverageSubject::Cell(canonical("en"), token("nav"))),
+            ),
+            ("collection-member", member(tuple(1))),
+            (
+                "collection-group",
+                Subject::ArtifactCollection(CollectionSubject::Group(conflict())),
+            ),
+            (
+                "group-member",
+                Subject::Group(GroupSubject::Member(group("site"), target("web"))),
+            ),
+            (
+                "hydration-relation",
+                hydration(HydrationSubject::Relation(group("site"), pair())),
+            ),
+            (
+                "hydration-relation-content",
+                hydration(HydrationSubject::Relation(
+                    group("site"),
+                    RelationKey::Content(RelationContent::projected()),
+                )),
+            ),
+            (
+                "hydration-endpoint",
+                hydration(HydrationSubject::Endpoint(
+                    group("site"),
+                    pair(),
+                    EndpointField::Server,
+                )),
+            ),
+            (
+                "hydration-roles",
+                hydration(HydrationSubject::Roles(group("site"), target("web"))),
+            ),
+            ("member-null", member(untupled(json!(null)))),
+            ("member-boolean", member(untupled(json!(true)))),
+            ("member-string", member(untupled(json!("x")))),
+            ("member-array", member(untupled(json!(["x"])))),
+            ("member-object", member(untupled(json!({ "a": "b" })))),
+        ]
+    }
+
+    /// Every strategy and projection, and every compound identity view, is
+    /// a frozen preimage and token that a Python script wrote from D15:2454
+    /// and 2468 apart from this crate (`.plans/drafts/025-pr7/t2-vectors.py`;
+    /// D15:3319, 3358). Equal projected subjects in different owning scopes
+    /// keep different tokens.
+    #[test]
+    fn every_strategy_and_compound_view_is_its_frozen_preimage_and_token() {
+        let vectors: Value =
+            serde_json::from_str(include_str!("../../fixtures/evidence-records/vectors.json"))
+                .unwrap();
+        let rows = vectors["subjectTokens"].as_array().unwrap();
+        let subjects = frozen_subjects();
+        assert_eq!(rows.len(), subjects.len());
+        for ((name, subject), row) in subjects.iter().zip(rows) {
+            assert_eq!(row["name"], *name);
+            let mut preimage = SUBJECT_TOKEN_DOMAIN.as_bytes().to_vec();
+            preimage.extend(record(PROFILE, subject));
+            assert_eq!(hex(&preimage), row["preimage"].as_str().unwrap(), "{name}");
+            assert_eq!(alone(subject), json!({ "token": row["token"] }), "{name}");
+        }
+        let mut separated = 0;
+        for (at, (_, first)) in subjects.iter().enumerate() {
+            for (_, second) in &subjects[at + 1..] {
+                if projected(first) == projected(second) {
+                    assert_ne!(alone(first), alone(second), "{first:?} {second:?}");
+                    separated += 1;
+                }
+            }
+        }
+        assert_eq!(separated, 3, "pairs of one projected subject in two scopes");
+        // The vectors hold every strategy and projection the registry names.
+        let combination = |kind| {
+            let shape = key_shape(kind);
+            (shape.strategy.id(), shape.projection.id())
+        };
+        let frozen: BTreeSet<_> = subjects
+            .iter()
+            .map(|(_, subject)| combination(subject.kind()))
+            .collect();
+        let registered: BTreeSet<_> = SubjectKind::ALL.into_iter().map(combination).collect();
+        assert_eq!(frozen, registered);
+    }
+
+    /// Every identity key orders before every content key, and content keys
+    /// order by their JSON type in the type order of Canonical content
+    /// identity, not by the bytes of the type's name (D15:2181, 2186, 3358).
+    #[test]
+    fn content_keys_follow_the_type_order_after_every_identity() {
+        let member = |key| logical(&Subject::ArtifactCollection(CollectionSubject::Member(key)));
+        let mut subjects: Vec<Subject> = [
+            json!({ "a": "b" }),
+            json!(["x"]),
+            json!("x"),
+            json!(true),
+            json!(false),
+            json!(null),
+        ]
+        .into_iter()
+        .map(|value| member(untupled(value)))
+        .collect();
+        subjects.push(member(tuple(9)));
+        subjects.sort();
+        subjects.dedup();
+        let keys: Vec<Value> = subjects.iter().map(projected).collect();
+        let content = |json_type| json!({ "content": { "type": json_type } });
+        assert_eq!(
+            keys,
+            [
+                json!({ "identity": {
+                    "kind": "trust-policy",
+                    "identity": "trust",
+                    "revision": "1",
+                    "specificationRevision": "0",
+                } }),
+                content("null"),
+                content("boolean"),
+                content("string"),
+                content("array"),
+                content("object"),
+            ]
+        );
     }
 
     #[test]

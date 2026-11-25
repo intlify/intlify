@@ -121,13 +121,15 @@ fn indexed<'r>(retained: &'r Retained<'_>) -> Option<&'r Evidence> {
 mod tests {
     use std::collections::BTreeSet;
 
-    use intlify_shared_json::encoding::encoded_length;
+    use intlify_shared_json::encoding::{digest_bytes, encode, encoded_length};
+    use serde_json::Value;
 
     use crate::construction::registry::check::RecordKind;
     use crate::resolver::dependency::fixtures::file_entry;
     use crate::resolver::evaluation::{IssueKey, Reason, Unit};
     use crate::resolver::evidence::Evidence;
     use crate::resolver::evidence_metadata::fixtures::unbounded;
+    use crate::resolver::evidence_source::hex;
     use crate::resolver::limits::{BoundId, Group};
     use crate::resolver::profile_resolution::tests::Inputs;
     use crate::resolver::record_view::RecordViews;
@@ -172,6 +174,14 @@ mod tests {
     /// complete one, `failing`'s, and `entered`'s, which materializes no value.
     /// Each record's view is the one its bytes count (D15:2518).
     fn each_projection(mut check: impl FnMut(&Projection<'_>, &[(&Unit, Retained<'_>)])) {
+        each_viewed_projection(|projection, records, _| check(projection, records));
+    }
+
+    /// `each_projection`, with the views each projection's records were
+    /// charged under.
+    fn each_viewed_projection(
+        mut check: impl FnMut(&Projection<'_>, &[(&Unit, Retained<'_>)], &RecordViews<'_>),
+    ) {
         let mut project = |reporting: &Reporting<'_, '_>, views: &RecordViews<'_>| {
             let reported = report(reporting, &limits_with(None), None).unwrap();
             for (domain, committed) in [
@@ -189,7 +199,7 @@ mod tests {
                         .unwrap();
                     assert_eq!(encoded_length(&accounting).unwrap(), retained.bytes);
                 }
-                check(&projection, &records);
+                check(&projection, &records, views);
             }
         };
         for inputs in [Inputs::complete(), failing()] {
@@ -246,6 +256,50 @@ mod tests {
             }
         });
         assert_eq!(kinds.len(), 12, "{kinds:?}");
+    }
+
+    /// One record of each of the twelve kinds is charged the frozen `C` of
+    /// its accounting view. A Python script wrote each view from D15:2472-2518
+    /// and framed it apart from this crate, reading only each row's strategy,
+    /// scope, projection, severity, and blocking state from the committed
+    /// registries (`.plans/drafts/025-pr7/t2-vectors.py`; D15:3319).
+    #[test]
+    fn each_record_kinds_accounting_view_is_its_frozen_vector() {
+        let vectors: Value =
+            serde_json::from_str(include_str!("../../fixtures/evidence-records/vectors.json"))
+                .unwrap();
+        let vectors = vectors["accountingViews"].as_array().unwrap();
+        assert_eq!(vectors.len(), 12);
+        let mut matched = BTreeSet::new();
+        each_viewed_projection(|projection, _, views| {
+            for (owner, retained) in &projection.records {
+                let accounting = views
+                    .accounting(owner, retained.kind, retained.view.clone())
+                    .unwrap();
+                let Some(vector) = vectors
+                    .iter()
+                    .find(|vector| vector["accounting"] == accounting)
+                else {
+                    continue;
+                };
+                let kind = retained.kind.id();
+                assert_eq!(vector["recordKind"], kind);
+                let bytes = encode(&accounting).unwrap();
+                assert_eq!(hex(&bytes), vector["preimage"].as_str().unwrap(), "{kind}");
+                assert_eq!(
+                    format!("sha256:{}", hex(&digest_bytes(&bytes))),
+                    vector["digest"].as_str().unwrap(),
+                    "{kind}"
+                );
+                assert_eq!(
+                    retained.bytes,
+                    u64::try_from(bytes.len()).unwrap(),
+                    "{kind}"
+                );
+                matched.insert(kind);
+            }
+        });
+        assert_eq!(matched.len(), 12, "{matched:?}");
     }
 
     /// The index takes the Evidence comparisons, not the order of the slices
