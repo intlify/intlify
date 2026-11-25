@@ -271,11 +271,14 @@ impl<'r> Resolver<'r> {
 // `materialized`'s tests resolve the same inputs.
 #[cfg(test)]
 pub(crate) mod tests {
+    use std::collections::BTreeSet;
+
+    use intlify_shared_json::encoding::encode;
     use serde_json::{json, Value};
 
     use super::*;
     use crate::artifacts::collection::{CollectionFailure, CollectionReport};
-    use crate::artifacts::envelope::{ExactTuple, FormalMember};
+    use crate::artifacts::envelope::{envelope_of, ArtifactKind, ExactTuple, FormalMember};
     use crate::artifacts::vectors::vocabulary as vectors;
     use crate::artifacts::verification::{sealed, unsealed, VerificationInputArtifact};
     use crate::artifacts::vocabulary::IntentSurfaceClassVocabularyArtifact;
@@ -286,6 +289,7 @@ pub(crate) mod tests {
     };
     use crate::boundary::invocation::{InvocationFailures, SubmittedEntry};
     use crate::boundary::locator::{LocatorCandidate, LocatorVariant};
+    use crate::boundary::origin::OriginRefusal;
     use crate::boundary::selector::SelectorReport;
     use crate::boundary::snapshot::{submitted, SnapshotReport};
     use crate::boundary::source::{call_site_source_revision, file_source_revision};
@@ -302,13 +306,20 @@ pub(crate) mod tests {
     use crate::resolver::evidence_source::hex;
     use crate::resolver::limits::{BoundId, Group};
     use crate::resolver::origin::SafeOriginKind as Kind;
-    use crate::resolver::outcome::tests::{blocked, entry_views, no_json, reporting, shown, Shown};
+    use crate::resolver::outcome::tests::{
+        blocked, entry, entry_views, no_json, reporting, shared, shown, Shown,
+    };
     use crate::resolver::profile_resolution::tests::Inputs;
     use crate::resolver::snapshot_entry::fixtures::ENTRY;
+    use crate::resolver::token::Digest;
     use crate::snapshot::{from_json, Marker, MarkerReason, Node, SnapshotBound};
 
     /// A bound no invocation here reaches.
     pub(crate) const ROOM: u64 = 1 << 30;
+
+    /// What every secret canary of D15:3393's sweep starts with: it has no
+    /// identifier, token, or locale syntax, so no field can admit it.
+    const CANARY: &str = "T3 CANARY";
 
     /// The finite fixture's rows, bound under the pins the constructed
     /// resolver supports: CLDR 48.2.0's dataset at the semantic digest
@@ -352,6 +363,11 @@ pub(crate) mod tests {
         }
 
         fn canonicalize(&self, input: &str) -> Result<Arc<str>, ProviderFailure> {
+            // The finite rows do not list a secret canary; a real provider
+            // answers that it is no locale.
+            if input.starts_with(CANARY) {
+                return Err(ProviderFailure::InvalidIdentifier);
+            }
             self.rows.canonicalize(input)
         }
     }
@@ -406,7 +422,7 @@ pub(crate) mod tests {
         })
     }
 
-    fn candidate(variant: LocatorVariant, payload: &str) -> LocatorCandidate<'_> {
+    const fn candidate(variant: LocatorVariant, payload: &str) -> LocatorCandidate<'_> {
         LocatorCandidate {
             variant,
             payload,
@@ -417,6 +433,35 @@ pub(crate) mod tests {
     /// The file entries' locator, and the Programmatic Entries'.
     const FILE_LOCATOR: &str = "storefront/intlify.config.json";
     const ENTRY_LOCATOR: &str = "storefront-app";
+
+    /// The source identities and locator candidates an entry submits, and
+    /// whether the call-site source's frontend marks its identity non-secret.
+    #[derive(Clone, Copy)]
+    struct Sources {
+        file: &'static str,
+        file_locator: LocatorCandidate<'static>,
+        entry: &'static str,
+        entry_locator: LocatorCandidate<'static>,
+        call_site: &'static str,
+        call_site_marked: bool,
+        call_site_locator: Option<LocatorCandidate<'static>>,
+    }
+
+    impl Sources {
+        /// The identities and locators of the fixtures, each marked and
+        /// classified non-secret.
+        const fn fixture() -> Self {
+            Self {
+                file: FILE,
+                file_locator: candidate(LocatorVariant::RelativePath, FILE_LOCATOR),
+                entry: ENTRY,
+                entry_locator: candidate(LocatorVariant::SafeLabel, ENTRY_LOCATOR),
+                call_site: CALL_SITE,
+                call_site_marked: true,
+                call_site_locator: None,
+            }
+        }
+    }
 
     /// What a binding submits for one of `Inputs`' invocations, as the raw
     /// values the boundaries read: the capability's every `rawInput`,
@@ -432,6 +477,9 @@ pub(crate) mod tests {
         pub(crate) verification: Vec<u8>,
         pub(crate) assertion: VerificationAssertion,
         capability: Value,
+        sources: Sources,
+        /// Every slot's Safe Origin Kind candidate in place of its own.
+        origin_candidate: Option<&'static str>,
     }
 
     impl Raw {
@@ -463,7 +511,14 @@ pub(crate) mod tests {
                 verification,
                 assertion,
                 capability,
+                sources: Sources::fixture(),
+                origin_candidate: None,
             }
+        }
+
+        /// The Safe Origin Kind candidate submitted beside `slot`'s value.
+        fn origin(&self, slot: Kind) -> &str {
+            self.origin_candidate.unwrap_or(slot.id())
         }
 
         /// The same, with the capability's `bootstrapOnly` bound `path` at
@@ -482,7 +537,7 @@ pub(crate) mod tests {
         fn selector(&self, slot: Kind) -> Component<'_, SelectorReport<'_>> {
             Component {
                 value: SelectorReport::String(&self.selected),
-                origin: Some(slot.id()),
+                origin: Some(self.origin(slot)),
             }
         }
 
@@ -521,17 +576,17 @@ pub(crate) mod tests {
             let revision = file_source_revision(&bytes);
             let file = FileValue {
                 bytes,
-                identity: Some(FILE),
+                identity: Some(self.sources.file),
                 marked,
                 revision: Some(&revision),
-                locator: Some(candidate(LocatorVariant::RelativePath, FILE_LOCATOR)),
+                locator: Some(self.sources.file_locator),
             };
             self.submit(
                 resolver,
                 SubmittedEntry::File(SubmittedFileEntry {
                     file: Component {
                         value: file,
-                        origin: Some(Kind::ConfigurationFile.id()),
+                        origin: Some(self.origin(Kind::ConfigurationFile)),
                     },
                     selector: self.selector(Kind::ProfileSelectorCli),
                 }),
@@ -554,10 +609,10 @@ pub(crate) mod tests {
             let revision = call_site_source_revision(text.as_bytes());
             let call_site = mirror.then(|| {
                 CallSiteReport::Formal(SubmittedCallSite {
-                    identity: Some(CALL_SITE),
-                    marked: true,
+                    identity: Some(self.sources.call_site),
+                    marked: self.sources.call_site_marked,
                     revision: Some(&revision),
-                    locator: None,
+                    locator: self.sources.call_site_locator,
                     source: text.clone().into_bytes(),
                     mappings: mirrored(&text),
                 })
@@ -568,10 +623,10 @@ pub(crate) mod tests {
             };
             let programmatic = ProgrammaticValue {
                 snapshot: Some(&report),
-                identity: Some(ENTRY),
+                identity: Some(self.sources.entry),
                 marked,
                 revision: Some(&digest),
-                locator: Some(candidate(LocatorVariant::SafeLabel, ENTRY_LOCATOR)),
+                locator: Some(self.sources.entry_locator),
                 call_site,
             };
             self.admit(
@@ -579,7 +634,7 @@ pub(crate) mod tests {
                 SubmittedEntry::Programmatic(SubmittedProgrammaticEntry {
                     programmatic: Component {
                         value: programmatic,
-                        origin: Some(Kind::ConfigurationProgrammatic.id()),
+                        origin: Some(self.origin(Kind::ConfigurationProgrammatic)),
                     },
                     selector: self.selector(Kind::ProfileSelectorProgrammatic),
                 }),
@@ -621,7 +676,7 @@ pub(crate) mod tests {
             entry: SubmittedEntry<'_>,
             report: CollectionReport<'_>,
         ) -> Result<InvocationInputs<PinnedFixture>, InvocationFailures> {
-            let own = |slot: Kind| Some(slot.id());
+            let own = |slot: Kind| Some(self.origin(slot));
             let provider = self.provider.clone();
             let common = Submitted {
                 specification: Component {
@@ -1063,5 +1118,578 @@ pub(crate) mod tests {
         let report = CollectionReport::MalformedContainer;
         let refused = raw.submit_file(&resolver, raw.bytes(), true, report);
         assert!(refused.is_err());
+    }
+
+    /// Where each member key and string value of `value` is, a key as its
+    /// path with `true` beside it.
+    fn string_leaves(value: &Value) -> Vec<(Vec<Value>, bool)> {
+        fn walk(value: &Value, at: &[Value], leaves: &mut Vec<(Vec<Value>, bool)>) {
+            let step = |edge: Value| [at, &[edge]].concat();
+            match value {
+                Value::Object(members) => {
+                    for (key, member) in members {
+                        let here = step(json!(key));
+                        leaves.push((here.clone(), true));
+                        walk(member, &here, leaves);
+                    }
+                }
+                Value::Array(items) => {
+                    for (index, item) in items.iter().enumerate() {
+                        walk(item, &step(json!(index)), leaves);
+                    }
+                }
+                Value::String(_) => leaves.push((at.to_vec(), false)),
+                _ => {}
+            }
+        }
+        let mut leaves = Vec::new();
+        walk(value, &[], &mut leaves);
+        leaves
+    }
+
+    /// `config` with the key or the string at `path` replaced by `canary`.
+    fn place(config: &mut Value, path: &[Value], is_key: bool, canary: &str) {
+        fn child<'v>(node: &'v mut Value, edge: &Value) -> &'v mut Value {
+            match edge {
+                Value::String(key) => &mut node[key.as_str()],
+                index => &mut node[usize::try_from(index.as_u64().unwrap()).unwrap()],
+            }
+        }
+        let (last, parents) = path.split_last().unwrap();
+        let node = parents.iter().fold(config, child);
+        if is_key {
+            let members = node.as_object_mut().unwrap();
+            let moved = members.remove(last.as_str().unwrap()).unwrap();
+            members.insert(canary.to_owned(), moved);
+        } else {
+            *child(node, last) = json!(canary);
+        }
+    }
+
+    /// What retained text must not hold for `canary`: its bytes, their
+    /// hexadecimal spelling, and their direct digest and that of their
+    /// canonical framing, in hexadecimal and as a digest's `Debug` lists its
+    /// bytes (D15:2693, 3393).
+    fn traces(canary: &str) -> Vec<String> {
+        let framed = encode(&json!(canary)).unwrap();
+        let mut traces = vec![canary.to_owned(), hex(canary.as_bytes())];
+        for digest in [Sha256.digest(canary.as_bytes()), Sha256.digest(&framed)] {
+            traces.push(hex(&digest));
+            traces.push(format!("{digest:?}"));
+        }
+        traces
+    }
+
+    /// Every representation `outcome` retains, as one text: the `Debug` of
+    /// the outcome, which holds every record, its owner, the terminal cursors,
+    /// and a checked profile, and of the unavailability causes; and the view
+    /// of every record and terminal Finding, state, and cause (D15:2697).
+    fn retained(outcome: &Outcome<'_, '_>) -> String {
+        let evidence = &outcome.evidence;
+        let mut text = format!("{outcome:?}{:?}", evidence.unavailable());
+        for projection in std::iter::once(&evidence.entry).chain(&evidence.shared) {
+            for (_, record) in &projection.records {
+                text.push_str(&record.view.to_string());
+            }
+            if let Some(terminal) = &projection.terminal {
+                text.push_str(&terminal.finding.to_string());
+                text.push_str(&terminal.state.to_string());
+                if let Some(cause) = &terminal.cause {
+                    text.push_str(&cause.to_string());
+                }
+            }
+        }
+        text
+    }
+
+    /// What D15:3393's sweep has scanned: each record kind, and each exhausted
+    /// domain's terminal record.
+    #[derive(Default)]
+    struct Sweep {
+        kinds: BTreeSet<RecordKind>,
+        terminals: usize,
+    }
+
+    impl Sweep {
+        /// What the outcome of `inputs` shows, once none of what it retains
+        /// holds a trace of any of `canaries`.
+        fn scan(
+            &mut self,
+            resolver: &Resolver<'_>,
+            inputs: &InvocationInputs<PinnedFixture>,
+            canaries: &[&str],
+        ) -> Shown {
+            let mut storage = OutcomeStorage::default();
+            let resolution = resolver.resolve(inputs, &mut storage).unwrap();
+            let outcome = &resolution.outcome;
+            let text = retained(outcome);
+            for canary in canaries {
+                for trace in traces(canary) {
+                    assert!(!text.contains(&trace), "{canary} left {trace}");
+                }
+            }
+            let evidence = &outcome.evidence;
+            for projection in std::iter::once(&evidence.entry).chain(&evidence.shared) {
+                let kinds = projection.records.iter().map(|(_, record)| record.kind);
+                self.kinds.extend(kinds);
+                self.terminals += usize::from(projection.terminal.is_some());
+            }
+            shown(outcome)
+        }
+    }
+
+    /// Whether an Evidence of `shown`'s occurrences holds a span over the
+    /// bytes `[start, end)`, one no wider than `within` bytes.
+    fn locates(shown: &Shown, (start, end): (usize, usize), within: usize) -> bool {
+        let coordinate = |at: &Value| at.as_str().and_then(|text| text.parse::<usize>().ok());
+        entry_views(shown, RecordKind::FindingOccurrence)
+            .iter()
+            .flat_map(|view| {
+                let related = view["related"].as_array().into_iter().flatten();
+                std::iter::once(&view["primary"]).chain(related)
+            })
+            .filter_map(|evidence| {
+                let span = &evidence["span"];
+                Some((coordinate(&span["start"])?, coordinate(&span["end"])?))
+            })
+            .any(|(from, to)| from <= start && end <= to && to - from <= within)
+    }
+
+    /// D15:3393 over the configuration: each member key and each string of
+    /// the example, replaced in turn by a canary, through either entry. The
+    /// canary is admitted nowhere, so the outcome is blocked and a Finding's
+    /// span holds it, narrower than the root's but for a renamed
+    /// `schemaVersion`, whose absence stops selection first. Only `$schema`,
+    /// which no check reads, leaves the outcome checked.
+    fn sweep_configuration(sweep: &mut Sweep, resolver: &Resolver<'_>) {
+        let mut raw = example(|inputs| inputs);
+        let base = raw.config.clone();
+        let leaves = string_leaves(&base);
+        assert_eq!(leaves.len(), 168);
+        for (n, (path, is_key)) in leaves.iter().enumerate() {
+            let canary = format!("{CANARY} {n}");
+            raw.config = base.clone();
+            place(&mut raw.config, path, *is_key, &canary);
+            let bytes = serde_json::to_vec(&raw.config).unwrap();
+            let token = serde_json::to_vec(&canary).unwrap();
+            let start = bytes
+                .windows(token.len())
+                .position(|window| window == token)
+                .unwrap();
+            let renamed = *is_key && path[..] == [json!("schemaVersion")];
+            let within = bytes.len() - usize::from(!renamed);
+            for inputs in [
+                raw.file(resolver, false),
+                raw.programmatic(resolver, false, true),
+            ] {
+                let shown = sweep.scan(resolver, &inputs, &[&canary]);
+                if shown.checked.is_some() {
+                    assert_eq!(path[..], [json!("$schema")]);
+                } else {
+                    let at = (start, start + token.len());
+                    assert!(locates(&shown, at, within), "{path:?}");
+                }
+            }
+        }
+    }
+
+    const FILE_IDENTITY: &str = "intlify-file-source.v0:T3 CANARY file identity";
+    const ENTRY_IDENTITY: &str = "intlify-programmatic-entry.v0:T3 CANARY entry identity";
+    const SITE_IDENTITY: &str = "intlify-call-site.v0:T3 CANARY site identity";
+
+    /// Locator candidates no source admits, each with the canary it carries
+    /// in what 015 excludes: an unclassified label and path, a path that
+    /// climbs its root, and a URI with user information, a query, a fragment,
+    /// the `file` scheme, an escaped unreserved byte, or an uppercase scheme
+    /// (D15:762-766).
+    const LOCATORS: [(LocatorVariant, &str, bool, &str); 9] = [
+        (
+            LocatorVariant::SafeLabel,
+            "T3 CANARY label",
+            false,
+            "T3 CANARY label",
+        ),
+        (
+            LocatorVariant::RelativePath,
+            "t3canarypath/intlify.json",
+            false,
+            "t3canarypath",
+        ),
+        (
+            LocatorVariant::RelativePath,
+            "../t3canarydots.json",
+            true,
+            "t3canarydots",
+        ),
+        (
+            LocatorVariant::SafeUri,
+            "https://t3canaryuser@example.com/a",
+            true,
+            "t3canaryuser",
+        ),
+        (
+            LocatorVariant::SafeUri,
+            "https://example.com/a?t3canaryquery",
+            true,
+            "t3canaryquery",
+        ),
+        (
+            LocatorVariant::SafeUri,
+            "https://example.com/a#t3canaryfragment",
+            true,
+            "t3canaryfragment",
+        ),
+        (
+            LocatorVariant::SafeUri,
+            "file:///t3canaryfile",
+            true,
+            "t3canaryfile",
+        ),
+        (
+            LocatorVariant::SafeUri,
+            "https://example.com/%7Et3canaryescape",
+            true,
+            "t3canaryescape",
+        ),
+        (
+            LocatorVariant::SafeUri,
+            "HTTPS://example.com/t3canaryscheme",
+            true,
+            "t3canaryscheme",
+        ),
+    ];
+
+    /// D15:3393 over the sources: unmarked identities, each locator candidate
+    /// a source does not admit, through a file and a Snapshot beside a sidecar
+    /// or none. Every configuration Evidence names its source by a redacted
+    /// token and has no locator.
+    fn sweep_sources(sweep: &mut Sweep, resolver: &Resolver<'_>) {
+        let mut raw = example(|inputs| inputs);
+        raw.config["extra"] = json!(true);
+        let clean = example(|inputs| inputs);
+        for (variant, payload, non_secret, canary) in LOCATORS {
+            let submitted = LocatorCandidate {
+                variant,
+                payload,
+                non_secret,
+            };
+            let sources = Sources {
+                file: FILE_IDENTITY,
+                file_locator: submitted,
+                entry: ENTRY_IDENTITY,
+                entry_locator: submitted,
+                call_site: SITE_IDENTITY,
+                call_site_marked: false,
+                call_site_locator: Some(submitted),
+            };
+            raw.sources = sources;
+            let canaries = [
+                canary,
+                FILE_IDENTITY,
+                ENTRY_IDENTITY,
+                SITE_IDENTITY,
+                payload,
+            ];
+            for inputs in [
+                raw.file(resolver, false),
+                raw.programmatic(resolver, false, false),
+                raw.programmatic(resolver, false, true),
+            ] {
+                let shown = sweep.scan(resolver, &inputs, &canaries);
+                assert!(shown.checked.is_none());
+                for view in configuration_evidence(&shown) {
+                    assert!(view["source"].get("redacted").is_some(), "{view}");
+                    assert!(view.get("locator").is_none(), "{view}");
+                }
+            }
+        }
+        let mut checked = clean;
+        checked.sources = raw.sources;
+        for inputs in [
+            checked.file(resolver, false),
+            checked.programmatic(resolver, false, true),
+        ] {
+            let shown = sweep.scan(
+                resolver,
+                &inputs,
+                &[FILE_IDENTITY, ENTRY_IDENTITY, SITE_IDENTITY],
+            );
+            assert!(shown.checked.is_some());
+        }
+    }
+
+    /// D15:3393 over a selector no declaration has, which its Evidence keeps
+    /// only as a redacted string with its length.
+    fn sweep_selector(sweep: &mut Sweep, resolver: &Resolver<'_>) {
+        let mut raw = example(|inputs| inputs);
+        raw.selected = format!("{CANARY} selector");
+        for inputs in [
+            raw.file(resolver, false),
+            raw.programmatic(resolver, false, false),
+        ] {
+            let shown = sweep.scan(resolver, &inputs, &[&raw.selected]);
+            let occurrences = entry_views(&shown, RecordKind::FindingOccurrence);
+            let found = occurrences
+                .iter()
+                .find_map(|view| view["primary"].get("selector"))
+                .expect("the selector is the Finding's Evidence");
+            let value = &found["redacted-value"];
+            assert_eq!(value["type"], "string", "{found}");
+            assert!(value.get("length").is_some(), "{found}");
+        }
+    }
+
+    /// D15:3393, 3367 over the collection and the vocabulary: a member of
+    /// each way to be rejected, every occurrence's Evidence a redacted key.
+    fn sweep_artifacts(sweep: &mut Sweep, resolver: &Resolver<'_>) {
+        const CANARIES: [&str; 9] = [
+            "T3 CANARY member",
+            "T3 CANARY key",
+            "T3 CANARY value",
+            "T3 CANARY kind",
+            "t3canarytuple",
+            "t3canaryduplicate",
+            "t3canaryconflict",
+            "t3canarybody",
+            "t3canaryother",
+        ];
+        let sealed = |identity: &str, content: Value| {
+            envelope_of(ArtifactKind::TrustPolicy, identity, "1", content)
+        };
+        let mut broken = sealed("t3canarytuple", json!({ "t3canarybody": true }));
+        broken["integrityDigest"] = json!(format!("sha256:{}", "0".repeat(64)));
+        let twice = sealed("t3canaryduplicate", json!({ "t3canarybody": true }));
+        let mut raw = example(|inputs| inputs);
+        for member in [
+            json!("T3 CANARY member"),
+            json!({ "T3 CANARY key": "T3 CANARY value" }),
+            json!({ "kind": "T3 CANARY kind", "schemaRevision": "0" }),
+            broken,
+            twice.clone(),
+            twice,
+            sealed("t3canaryconflict", json!({ "t3canarybody": true })),
+            sealed("t3canaryconflict", json!({ "t3canaryother": true })),
+        ] {
+            raw.members.push(serde_json::to_vec(&member).unwrap());
+        }
+        let shown = sweep.scan(resolver, &raw.file(resolver, false), &CANARIES);
+        let occurrences = entry_views(&shown, RecordKind::FindingOccurrence);
+        let reasons: BTreeSet<&str> = occurrences
+            .iter()
+            .filter(|view| view["primary"]["kind"] == "artifact-input")
+            .inspect(|view| {
+                let key = &view["primary"]["component"][1];
+                assert!(key.get("redacted-key").is_some(), "{view}");
+            })
+            .filter_map(|view| view["finding"]["reason"].as_str())
+            .collect();
+        assert_eq!(
+            reasons,
+            BTreeSet::from([
+                "conflicting-content",
+                "duplicate-envelope",
+                "envelope-invalid",
+                "kind-unsupported",
+            ])
+        );
+        let surface = "T3 CANARY surface";
+        let raw = example(|mut inputs| {
+            inputs.submit_surfaces(&["nav", "T3 CANARY surface"]);
+            inputs
+        });
+        let shown = sweep.scan(resolver, &raw.file(resolver, false), &[surface]);
+        let occurrences = entry_views(&shown, RecordKind::FindingOccurrence);
+        assert!(occurrences.iter().any(|view| {
+            view["primary"]["origin"] == "intent-surface-class-vocabulary"
+                && view["primary"]["component"][1]
+                    .get("redacted-key")
+                    .is_some()
+        }));
+    }
+
+    /// D15:3393 over what Phase 1 rejects: a repeated key and a truncated
+    /// file, and a Snapshot's marker under a canary key, each observed with
+    /// the key redacted and no value built.
+    fn sweep_entries(sweep: &mut Sweep, resolver: &Resolver<'_>) {
+        let raw = example(|inputs| inputs);
+        let key = "T3 CANARY duplicate";
+        let repeated = format!(r#"{{"{key}":true,"{key}":false}}"#);
+        let cut = r#"{"T3 CANARY truncated":"T3 CANARY value"#;
+        let files: [(&str, &[&str]); 2] = [
+            (&repeated, &[key]),
+            (cut, &["T3 CANARY truncated", "T3 CANARY value"]),
+        ];
+        for (text, canaries) in files {
+            let inputs = raw.file_of(resolver, Arc::from(text.as_bytes()), false);
+            let shown = sweep.scan(resolver, &inputs, canaries);
+            assert!(shown.shared.is_none());
+            let occurrences = entry_views(&shown, RecordKind::FindingOccurrence);
+            assert!(!occurrences.is_empty());
+            for view in occurrences {
+                assert!(view["primary"].get("span").is_some(), "{view}");
+            }
+        }
+        let marker = "T3 CANARY marker";
+        let mut root = from_json(&raw.config);
+        let Node::Object(members) = &mut root else {
+            panic!("the root is an object");
+        };
+        members.insert(
+            marker.to_owned(),
+            Node::Marker(Marker::Rejected(MarkerReason::DynamicProperty)),
+        );
+        let inputs = raw.snapshot(resolver, &root, false, false);
+        let shown = sweep.scan(resolver, &inputs, &[marker]);
+        assert!(entry_views(&shown, RecordKind::FindingOccurrence)
+            .iter()
+            .any(|view| view["primary"]["path"][0].get("redacted-member").is_some()));
+    }
+
+    /// D15:776, 3393 over identifiers past the capability's byte bound for
+    /// them: a key is then unsafe whatever its syntax, and a member or an
+    /// endpoint naming one is no admitted identity.
+    fn sweep_over_bound_identifiers(sweep: &mut Sweep, resolver: &Resolver<'_>) {
+        type Edit = fn(&mut Value, &str);
+        let target = |name| BoundId {
+            group: Group::TargetGrouping,
+            name,
+        };
+        let tight = [
+            (input_bound("maxProfileIdBytes"), 8),
+            (target("maxTargetIdBytes"), 8),
+            (target("maxGroupIdBytes"), 8),
+        ];
+        let edits: [(&str, Edit); 5] = [
+            ("t3canaryprofile", |config, id| {
+                config["profiles"][id] = config["profiles"]["web"].clone();
+            }),
+            ("t3canarytarget", |config, id| {
+                let targets = &mut config["profiles"]["web"]["targetProfiles"];
+                targets[id] = targets["server"].clone();
+            }),
+            ("t3canarygroup", |config, id| {
+                let groups = &mut config["profiles"]["web"]["deploymentGroups"];
+                groups[id] = groups["web"].clone();
+            }),
+            ("t3canarymember", |config, id| {
+                config["profiles"]["web"]["deploymentGroups"]["web"]["members"][0] = json!(id);
+            }),
+            ("t3canaryendpoint", |config, id| {
+                let group = &mut config["profiles"]["web"]["deploymentGroups"]["web"];
+                group["hydrationRelations"][0]["client"] = json!(id);
+            }),
+        ];
+        for (canary, edit) in edits {
+            let mut raw = example(|inputs| inputs.bounding(&tight, &tight));
+            edit(&mut raw.config, canary);
+            for inputs in [
+                raw.file(resolver, false),
+                raw.programmatic(resolver, false, true),
+            ] {
+                let shown = sweep.scan(resolver, &inputs, &[canary]);
+                assert!(shown.checked.is_none(), "{canary}");
+            }
+        }
+    }
+
+    /// D15:3393 over the terminal records: a domain exhausted by canary keys
+    /// names its cursor by tokens alone.
+    fn sweep_terminals(sweep: &mut Sweep, resolver: &Resolver<'_>) {
+        let tight = [(entry("maxRecords"), 3), (shared("maxRecords"), 3)];
+        let mut raw = Raw::new(&reporting(&Inputs::complete(), &tight, &tight));
+        let canaries = ["T3 CANARY one", "T3 CANARY two"];
+        for canary in canaries {
+            raw.config[canary] = json!(canary);
+        }
+        let before = sweep.terminals;
+        sweep.scan(resolver, &raw.file(resolver, false), &canaries);
+        assert!(sweep.terminals > before);
+    }
+
+    /// D15:3393, 3144: what no resolver reads is refused before invocation,
+    /// each failure typed with nothing of the input: an origin candidate
+    /// beside every slot, and an unreadable specification input, vocabulary,
+    /// Verification Input, and capability.
+    fn sweep_refusals(resolver: &Resolver<'_>) {
+        let refused = |raw: &Raw, canary: &str| {
+            let members = raw.member_bytes();
+            let report = CollectionReport::Formal(&members);
+            let failures = raw
+                .submit_file(resolver, raw.bytes(), false, report)
+                .err()
+                .expect("the invocation is refused");
+            let text = format!("{failures:?}");
+            for trace in traces(canary) {
+                assert!(!text.contains(&trace), "{canary} left {trace}");
+            }
+            failures
+        };
+        let mut raw = example(|inputs| inputs);
+        raw.origin_candidate = Some("T3 CANARY origin");
+        let failures = refused(&raw, "T3 CANARY origin");
+        let origins = failures.common.iter().chain(&failures.entry).flatten();
+        let unknown = Refusal::Origin(OriginRefusal::Unknown);
+        assert_eq!(
+            origins.filter(|failure| failure.refusal == unknown).count(),
+            8
+        );
+        let body = br#"{"T3 CANARY input":"T3 CANARY input"}"#;
+        for edit in [
+            (|raw, body| raw.specification = body) as fn(&mut Raw, Vec<u8>),
+            |raw, body| raw.vocabulary = body,
+            |raw, body| raw.verification = body,
+            |raw, body| raw.capability = serde_json::from_slice(&body).unwrap(),
+        ] {
+            let mut raw = example(|inputs| inputs);
+            edit(&mut raw, body.to_vec());
+            refused(&raw, "T3 CANARY input");
+        }
+    }
+
+    /// No fixture holds what the sweep's inputs carry (D15:3393).
+    fn assert_no_fixture_holds_a_canary() {
+        fn walk(dir: &std::path::Path, files: &mut usize) {
+            for entry in std::fs::read_dir(dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    walk(&path, files);
+                } else {
+                    *files += 1;
+                    let bytes = std::fs::read(&path).unwrap();
+                    for canary in [CANARY.as_bytes(), b"t3canary"] {
+                        let held = bytes.windows(canary.len()).any(|window| window == canary);
+                        assert!(!held, "{}", path.display());
+                    }
+                }
+            }
+        }
+        let mut files = 0;
+        walk(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures"),
+            &mut files,
+        );
+        assert!(files > 0);
+    }
+
+    /// D15:2693, 2697, 3393: secret canaries in every input kind that reaches
+    /// analysis produce Findings that locate them, while neither the bytes nor
+    /// a direct digest of them is in any record of any of the twelve kinds,
+    /// a terminal record, an owner, or the `Debug` of the outcome, of a
+    /// refusal, or of a fixture. The crate has no log, cache, or telemetry
+    /// channel for them to reach.
+    #[test]
+    fn a_secret_canary_leaves_no_trace_in_anything_an_outcome_retains() {
+        let resolver = resolver();
+        let mut sweep = Sweep::default();
+        sweep_configuration(&mut sweep, &resolver);
+        sweep_sources(&mut sweep, &resolver);
+        sweep_selector(&mut sweep, &resolver);
+        sweep_artifacts(&mut sweep, &resolver);
+        sweep_entries(&mut sweep, &resolver);
+        sweep_over_bound_identifiers(&mut sweep, &resolver);
+        sweep_terminals(&mut sweep, &resolver);
+        assert_eq!(sweep.kinds.len(), 12, "{:?}", sweep.kinds);
+        sweep_refusals(&resolver);
+        assert_no_fixture_holds_a_canary();
     }
 }
