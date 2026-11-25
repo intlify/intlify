@@ -1245,11 +1245,16 @@ pub(super) mod tests {
     /// Reverses every array under a member whose schema declares it a set:
     /// the requested locales and coverage selectors, the rules, and each
     /// group's members and hydration relations. A fallback sequence's order
-    /// is semantic, so it stays (D15:516, 1519, 2184).
+    /// is semantic, so it stays, and nothing under `messageFallback` is read
+    /// by name: a source locale there may spell a set's name (D15:516, 1519,
+    /// 2184).
     fn reverse_sets(value: &mut Value) {
         match value {
             Value::Object(members) => {
                 for (name, member) in members.iter_mut() {
+                    if name == "messageFallback" {
+                        continue;
+                    }
                     if let (
                         "requestedLocales"
                         | "intentSurfaceClasses"
@@ -2375,10 +2380,104 @@ pub(super) mod tests {
         });
     }
 
+    /// The rows after Phase 3 whose units wait when no declaration is
+    /// selected, with how many units of each, in unit order: the units whose
+    /// subject needs no declared Profile ID.
+    const WAITING_AFTER_SELECTION: [(&str, usize); 83] = [
+        ("resource-policy.references.within-capability", 1),
+        ("resource-policy.policy-reference.within-capability", 7),
+        ("resource-policy.reference-bytes.within-capability", 1),
+        ("resource-policy.resource-limits.within-metadata-scan", 1),
+        ("resource-policy.resource-limits.bootstrap-candidate", 1),
+        ("resource-policy.resource-limits.within-envelope-depth", 1),
+        (
+            "resource-policy.resource-limits.within-decoded-allocation",
+            1,
+        ),
+        ("resource-policy.resource-limits.within-validation-work", 1),
+        ("resource-policy.resource-limits.candidate-body", 1),
+        ("resource-policy.resource-limits.compatible", 1),
+        ("resource-policy.root-nodes.within-bound", 1),
+        ("resource-policy.root-depth.within-bound", 1),
+        ("resource-policy.root-collection-entries.within-bound", 1),
+        ("resource-policy.root-string-bytes.within-bound", 1),
+        ("resource-policy.root-longest-string.within-bound", 1),
+        ("resource-policy.profiles.within-bound", 1),
+        ("resource-policy.selector.within-bound", 1),
+        ("resource-policy.structural-analysis.within-bound", 1),
+        ("resource-policy.artifacts.within-bound", 1),
+        ("resource-policy.policy-artifacts.within-bound", 1),
+        ("resource-policy.target-profile-artifacts.within-bound", 1),
+        ("resource-policy.references.within-bound", 1),
+        ("resource-policy.artifact.within-bound", 9),
+        ("resource-policy.artifact-bytes.within-bound", 1),
+        ("resource-policy.policy-reference.within-bound", 7),
+        ("resource-policy.reference-bytes.within-bound", 1),
+        ("specification.locale-canonicalization.supported", 1),
+        ("specification.locale-negotiation.supported", 1),
+        ("specification.message-locale-fallback.supported", 1),
+        ("specification.coverage.supported", 1),
+        ("specification.intent-surface-class-vocabulary.supported", 1),
+        ("specification.delivery-graph.supported", 1),
+        ("specification.delivery-placement.supported", 1),
+        ("specification.vocabulary.intact", 1),
+        ("specification.vocabulary.asserted", 1),
+        ("specification.locale-data.within-payloads", 1),
+        ("specification.locale-data.within-payload-bytes", 1),
+        ("specification.locale-data.manifest-intact", 1),
+        ("specification.locale-data.markers-readable", 1),
+        ("specification.locale-data.within-marker-bytes", 1),
+        ("specification.locale-data.conformance-readable", 1),
+        ("specification.locale-data.within-validity-groups", 1),
+        ("specification.locale-data.within-codes", 1),
+        ("specification.locale-data.within-extension-keys", 1),
+        ("specification.locale-data.within-types", 1),
+        ("specification.locale-data.within-corrections", 1),
+        ("specification.locale-data.within-validation-work", 1),
+        ("specification.locale-data.dataset-intact", 1),
+        ("specification.locale-data.matching", 1),
+        ("dependency.locale-canonicalization.established", 1),
+        ("identity.declaration-field.opaque", 2),
+        ("dependency.project-identity.established", 1),
+        ("locale.occurrences.within-bound", 1),
+        ("locale.requested-set.within-bound", 1),
+        ("locale.default-source.canonical", 1),
+        ("locale.default-requested.canonical", 1),
+        ("locale.default-requested.member", 1),
+        ("locale.target-profiles.within-bound", 1),
+        ("dependency.project-locales.established", 1),
+        ("negotiation.aliases.within-bound", 1),
+        ("fallback.sources.within-bound", 1),
+        ("coverage.rules.within-bound", 1),
+        ("coverage.locale-selectors.within-bound", 1),
+        ("coverage.surface-selectors.within-bound", 1),
+        ("coverage.cells.within-bound", 1),
+        ("coverage.comparisons.within-bound", 1),
+        ("coverage.table.complete", 1),
+        ("dependency.locale-negotiation.established", 1),
+        ("dependency.message-fallback.established", 1),
+        ("dependency.coverage.established", 1),
+        ("artifact.member.admissible", 9),
+        ("artifact.member.single-occurrence", 9),
+        ("artifact.conflict-group.consistent-content", 9),
+        ("artifact.policy-reference.resolved", 7),
+        ("dependency.required-policies.established", 1),
+        ("dependency.optional-policies.established", 1),
+        ("delivery.placement.effective-mode", 1),
+        ("dependency.delivery.established", 1),
+        ("dependency.targets.established", 1),
+        ("group.groups.within-bound", 1),
+        ("group.memberships.within-bound", 1),
+        ("hydration.relations.within-bound", 1),
+        ("dependency.deployment-groups.established", 1),
+    ];
+
     /// That `evaluation` holds one Finding, of `code`, that `waiting` are the
     /// rows through Phase 3 that wait, and that every unit that waits, in any
     /// phase, waits on that Finding alone, while after Phase 3 only Phase 4's
-    /// checks of the collection under the capability are evaluated.
+    /// checks of the collection under the capability are evaluated and each
+    /// unit of `WAITING_AFTER_SELECTION` waits, beside the recheck of each
+    /// Profile ID structural admission admitted.
     fn assert_each_later_check_waits_on_its_finding(
         evaluation: &Evaluation,
         code: Code,
@@ -2398,11 +2497,21 @@ pub(super) mod tests {
             evaluated_after_selection(evaluation),
             BTreeSet::from(COLLECTION_UNDER_CAPABILITY)
         );
+        let mut after_selection: BTreeMap<&str, usize> = BTreeMap::new();
         for (unit, status) in evaluation.statuses() {
             if let Status::NotEvaluated(causes) = status {
                 assert_eq!(keys(causes), BTreeSet::from([found.clone()]), "{unit:?}");
+                if unit.phase > Phase::ProfileSelection {
+                    *after_selection.entry(row_of(unit)).or_default() += 1;
+                }
             }
         }
+        let mut expected = BTreeMap::from(WAITING_AFTER_SELECTION);
+        let ids = rechecked_ids(evaluation).len();
+        if ids > 0 {
+            expected.insert("resource-policy.profile-id.within-bound", ids);
+        }
+        assert_eq!(after_selection, expected);
     }
 
     /// The rows of the schema selection's four checks, in rank order.

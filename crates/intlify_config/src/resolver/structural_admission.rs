@@ -1295,13 +1295,26 @@ mod tests {
     /// occurrence (D15:1887, 2184, 3354).
     #[test]
     fn the_entries_of_a_map_without_identity_keys_count_and_join_one_finding() {
-        for (fallback, path, valid, each) in [
-            (true, &["messageFallback", "*"][..], json!(["en"]), 9),
+        for (fallback, path, valid, each, safe) in [
+            (
+                true,
+                &["messageFallback", "*"][..],
+                json!(["en"]),
+                9,
+                &[Some("profiles"), Some("app"), Some("messageFallback"), None][..],
+            ),
             (
                 false,
                 &["localeNegotiation", "aliases", "*"][..],
                 json!("en"),
                 1,
+                &[
+                    Some("profiles"),
+                    Some("app"),
+                    Some("localeNegotiation"),
+                    Some("aliases"),
+                    None,
+                ][..],
             ),
         ] {
             let count = |keys: &[&str]| {
@@ -1328,20 +1341,38 @@ mod tests {
                 [(entry.clone(), Code::FieldTypeInvalid)]
             );
             assert_eq!(candidates(&evaluation, &entry), 3, "{path:?}");
-            let (_, occurrences) = observed(&value, 1_000_000);
+            let (source, occurrences) = observed(&value, 1_000_000);
             // A key before Phase 5 is redacted, so the two share a locator
-            // and each entry's value is told apart by its span.
-            let primaries: Vec<Value> = occurrences
+            // and each entry's value is told apart by its span, the span of
+            // that value's token.
+            let primaries: Vec<(Value, Value)> = occurrences
                 .iter()
                 .filter(|occurrence| *occurrence.finding().unit() == entry)
                 .map(|occurrence| {
                     assert_eq!(occurrence.ordinal(), 0);
-                    occurrence.primary().view()
+                    located(occurrence.primary())
                 })
                 .collect();
             assert_eq!(primaries.len(), 2, "{path:?}");
-            assert_eq!(primaries[0]["value"], primaries[1]["value"], "{path:?}");
-            assert_ne!(primaries[0]["span"], primaries[1]["span"], "{path:?}");
+            assert_eq!(primaries[0].0, primaries[1].0, "{path:?}");
+            assert!(redacted_path(&primaries[0].0, safe), "{}", primaries[0].0);
+            let token = |key: &str, value: &str| {
+                let entry = format!("\"{key}\":{value}");
+                let start = source
+                    .windows(entry.len())
+                    .position(|window| window == entry.as_bytes())
+                    .unwrap()
+                    + entry.len()
+                    - value.len();
+                json!({ "start": start.to_string(), "end": (start + value.len()).to_string() })
+                    .to_string()
+            };
+            let mut spans: Vec<String> =
+                primaries.iter().map(|(_, span)| span.to_string()).collect();
+            spans.sort();
+            let mut values = vec![token("fr", "7"), token("ja", "8")];
+            values.sort();
+            assert_eq!(spans, values, "{path:?}");
         }
     }
 
