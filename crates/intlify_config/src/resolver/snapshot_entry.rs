@@ -600,6 +600,7 @@ mod tests {
     use crate::input_limits::{Bound, InputLimits, ValueLimits};
     use crate::materialize::{materialize_file, MaterializedDocument};
     use crate::materialize_tests::limits as file_limits;
+    use crate::model::IntlifyConfig;
     use crate::resolver::call_site_span::fixtures::{mapping, mirrored, sidecar, CALL_SITE};
     use crate::resolver::call_site_span::Located;
     use crate::resolver::capability::{CapabilityBound, EvidenceMetadataLimits, SnapshotLimits};
@@ -609,8 +610,8 @@ mod tests {
         ROOT_VALUE_BOUNDS,
     };
     use crate::resolver::evaluation::{
-        Actual, Admitted, BootstrapLimitExceeded, Check, Code, Evaluation, IssueKey, Reason,
-        Status, Unit,
+        Actual, Admitted, BootstrapLimitExceeded, Causes, Check, Code, Evaluation, IssueKey,
+        Reason, Status, Unit,
     };
     use crate::resolver::evidence::Evidence;
     use crate::resolver::evidence_metadata::fixtures::{unbounded, with};
@@ -625,12 +626,12 @@ mod tests {
     use crate::resolver::origin::SafeOriginKind;
     use crate::resolver::profile_selection::select_profile;
     use crate::resolver::record_view::RecordViews;
-    use crate::resolver::structural_admission::admit_structure;
+    use crate::resolver::structural_admission::{admit_structure, whole};
     use crate::resolver::subject::{EntryPath, SubjectKind};
     use crate::resolver::token::{Sha256, Specification};
     use crate::snapshot::{from_json, Marker, MarkerReason, Node, SnapshotBound};
     use crate::structural::selection::SelectorInput;
-    use crate::structural::{AuthoringSchema, Edge, StructuralLimits};
+    use crate::structural::{AuthoringSchema, Edge, StructuralAnalysis, StructuralLimits};
 
     use super::fixtures::{SnapshotFixture, ENTRY};
     use super::{
@@ -639,6 +640,8 @@ mod tests {
     };
 
     type Schema = AuthoringSchema<FixturePolicyReference, FixtureTargetReference>;
+    type Analysis = StructuralAnalysis<FixturePolicyReference, FixtureTargetReference>;
+    type Typed = IntlifyConfig<FixturePolicyReference, FixtureTargetReference>;
 
     const PROFILE: Specification<'static> = Specification {
         identity: "intlify-project-profile",
@@ -954,6 +957,31 @@ mod tests {
                 assert_eq!(causes, [key]);
             }
         }
+    }
+
+    /// Under the largest bound the terminal marker's Finding reports the
+    /// witness `u64::MAX`, the bound's limit plus one (D15:889, 2356, 3323).
+    #[test]
+    fn the_terminal_marker_reports_u64_max_under_the_largest_bound() {
+        let mut limits = limits();
+        let largest = Bound::new(u64::MAX - 1).unwrap();
+        limits.snapshot.max_nodes = largest;
+        let root = Node::Array(vec![Node::Marker(Marker::BootstrapLimitExceeded {
+            bound: SnapshotBound::Nodes,
+            witness: u64::MAX,
+        })]);
+        let (evaluation, document) = entered(&root, limits);
+        assert!(document.is_err());
+        let key = evaluation.issues().next().unwrap().clone();
+        assert_eq!(key.code(), Code::BootstrapLimitExceeded);
+        assert_eq!(
+            evaluation.bootstrap_limit(&key),
+            Some(BootstrapLimitExceeded {
+                bound: SnapshotBound::Nodes.id(),
+                limit: largest,
+                actual: Actual::AtLeast(u64::MAX),
+            })
+        );
     }
 
     /// The ordinary markers of a Snapshot that ends at a terminal marker,
@@ -1827,6 +1855,111 @@ mod tests {
         };
         let programmatic = ProgrammaticEntry::new(&entry, &document);
         later(&programmatic, document, selector)
+    }
+
+    /// What Phase 2 left: the typed root its analysis constructs, `None`
+    /// without a complete root, beside whether its checks admitted the whole
+    /// root.
+    fn typed_root(evaluation: &Evaluation, analysis: Admitted<&Analysis>) -> (Option<Typed>, bool) {
+        let typed = analysis
+            .ok()
+            .and_then(|analysis| analysis.construct().unwrap());
+        (typed, whole(evaluation).is_ok())
+    }
+
+    /// What Phase 2 leaves of `value` through the file entry.
+    fn structural_of_file(value: &Value) -> (Option<Typed>, bool) {
+        let bytes: Arc<[u8]> = Arc::from(serde_json::to_vec(value).unwrap());
+        let document = materialize_file(Arc::clone(&bytes), file_limits()).unwrap();
+        let fixture = FileFixture::new(&comparable());
+        let mut evaluation = Evaluation::default();
+        let schema = Schema::for_model().unwrap();
+        let admission = admit_structure(
+            &mut evaluation,
+            &fixture.file(bytes),
+            document,
+            &schema,
+            structural(),
+            Ok(()),
+        )
+        .unwrap();
+        typed_root(
+            &evaluation,
+            admission.analysis.as_ref().map_err(Causes::clone),
+        )
+    }
+
+    /// What Phase 2 leaves of `value` through the programmatic entry.
+    fn structural_of_snapshot(value: &Value) -> (Option<Typed>, bool) {
+        let limits = limits();
+        let snapshot = admitted(&from_json(value), &limits.snapshot);
+        let fixture = SnapshotFixture::new(&comparable());
+        let entry = fixture.entry(&snapshot);
+        let mut evaluation = Evaluation::default();
+        let Ok(document) =
+            admit_snapshot_entry(&mut evaluation, &entry, limits, &unbounded()).unwrap()
+        else {
+            panic!("Phase 1 admits the document");
+        };
+        let programmatic = ProgrammaticEntry::new(&entry, &document);
+        let schema = Schema::for_model().unwrap();
+        let admission = admit_structure(
+            &mut evaluation,
+            &programmatic,
+            document,
+            &schema,
+            structural(),
+            Ok(()),
+        )
+        .unwrap();
+        typed_root(
+            &evaluation,
+            admission.analysis.as_ref().map_err(Causes::clone),
+        )
+    }
+
+    /// `value` with every object's members in reverse order, at every depth.
+    fn reversed(value: &Value) -> Value {
+        match value {
+            Value::Object(members) => Value::Object(
+                members
+                    .iter()
+                    .rev()
+                    .map(|(key, member)| (key.clone(), reversed(member)))
+                    .collect(),
+            ),
+            Value::Array(items) => Value::Array(items.iter().map(reversed).collect()),
+            other => other.clone(),
+        }
+    }
+
+    /// The file and the Snapshot of one value, whatever the file's member
+    /// order, construct one `IntlifyConfig`, and exactly when the checks that
+    /// gate profile projection admitted the whole root; a value with a
+    /// structural failure constructs none through either entry (D15:395,
+    /// 2130, 2142, 3329, 3339).
+    #[test]
+    fn both_entries_converge_on_one_intlify_config_only_after_structural_admission() {
+        for value in [minimal_config(), complete_config()] {
+            let (file, whole_file) = structural_of_file(&value);
+            let typed = file.expect("the file's root is complete");
+            assert!(whole_file);
+            assert_eq!(serde_json::to_value(&typed).unwrap(), value);
+            let (snapshot, whole_snapshot) = structural_of_snapshot(&value);
+            assert_eq!(snapshot.as_ref(), Some(&typed));
+            assert!(whole_snapshot);
+            let (permuted, whole_permuted) = structural_of_file(&reversed(&value));
+            assert_eq!(permuted.as_ref(), Some(&typed));
+            assert!(whole_permuted);
+        }
+        let mut invalid = complete_config();
+        invalid["profiles"]["app"]["defaultRequestedLocale"] = json!(false);
+        let mut unknown = minimal_config();
+        unknown["extra"] = json!(true);
+        for value in [invalid, unknown, json!({ "schemaVersion": 0 }), json!([])] {
+            assert_eq!(structural_of_file(&value), (None, false), "{value}");
+            assert_eq!(structural_of_snapshot(&value), (None, false), "{value}");
+        }
     }
 
     /// Configurations whose Findings in Phases 2 and 3 are observed at each

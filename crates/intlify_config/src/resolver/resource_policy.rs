@@ -1992,6 +1992,111 @@ mod tests {
         }
     }
 
+    /// A candidate without the section counts only the four rules of its
+    /// body: at that total its body is admitted as far as the missing
+    /// section, and one below it the body is not evaluated (D15:3343).
+    #[test]
+    fn the_validation_total_without_the_section_is_bounded_at_four() {
+        let sectionless = envelope_of(
+            ArtifactKind::ResourceLimitPolicy,
+            "storefront-limits",
+            "1",
+            json!({}),
+        );
+        let under = |limit| {
+            let mut inputs = Inputs::selecting(&sectionless);
+            inputs.capability = inputs
+                .capability
+                .clone()
+                .with_artifact_bootstrap(bootstrap_limits(WorkBound::ValidationWork, limit));
+            inputs
+        };
+        let (evaluation, decided) = under(4).run();
+        assert!(decided.is_err());
+        assert_eq!(
+            issues(&evaluation),
+            [(
+                bootstrap_unit(Check::CandidateBody),
+                Code::ResourcePolicyNotAdmitted,
+                Some(Reason::ProjectProfileResolutionMissing)
+            )]
+        );
+        let (evaluation, decided) = under(3).run();
+        assert!(decided.is_err());
+        let check = bootstrap_unit(Check::WithinValidationWork);
+        let key = key_of(&evaluation, &check);
+        assert_eq!(issues(&evaluation).len(), 1);
+        assert_eq!(key.code(), Code::BootstrapLimitExceeded);
+        assert_eq!(
+            evaluation.bootstrap_limit(&key),
+            Some(BootstrapLimitExceeded {
+                bound: WorkBound::ValidationWork.id(),
+                limit: bound(3),
+                actual: Actual::Exact(4),
+            })
+        );
+        for later in [Check::CandidateBody, Check::CompatiblePolicy] {
+            assert_eq!(
+                waits_on(&evaluation, &bootstrap_unit(later)),
+                std::slice::from_ref(&key),
+                "{later:?}"
+            );
+        }
+    }
+
+    /// Several candidates of the closest mismatch tier are one reason whose
+    /// related Evidence is the same in every submission order: no candidate
+    /// is chosen, and a farther tier is not used (D15:1734, 2249, 3343).
+    #[test]
+    fn several_candidates_of_one_tier_are_related_evidence_of_one_reason() {
+        let policy = |identity: &str, revision: &str| {
+            envelope_of(
+                ArtifactKind::ResourceLimitPolicy,
+                identity,
+                revision,
+                json!({ SECTION: policy_limits().section() }),
+            )
+        };
+        let candidates = [
+            policy("storefront-limits", "2"),
+            policy("storefront-limits", "3"),
+            policy("other-limits", "1"),
+        ];
+        let rest = Inputs::new().members.split_off(1);
+        for order in [
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ] {
+            let mut inputs = Inputs::new();
+            inputs.members = order
+                .iter()
+                .map(|&index| candidates[index].clone())
+                .chain(rest.iter().cloned())
+                .collect();
+            let (evaluation, admitted) = inputs.run();
+            assert!(admitted.is_err(), "{order:?}");
+            let key = key_of(&evaluation, &decision());
+            assert_eq!(
+                (key.code(), key.reason()),
+                (
+                    Code::ArtifactReferenceNotAdmitted,
+                    Some(Reason::RevisionMismatch)
+                ),
+                "{order:?}"
+            );
+            let (found, tokens) = occurrences_of(&evaluation);
+            let [(unit, primary, related, ordinal)] = <[Observed; 1]>::try_from(found).unwrap();
+            assert_eq!(unit, decision(), "{order:?}");
+            assert_selected_reference(&primary);
+            assert_eq!(related, [chosen_view(&tokens)], "{order:?}");
+            assert_eq!(ordinal, 0, "{order:?}");
+        }
+    }
+
     #[test]
     fn candidate_selection_with_its_reference_checks_waits_on_the_scan() {
         // A reference to the Trust Policy fails the role-kind check, which

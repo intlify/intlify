@@ -856,6 +856,27 @@ mod tests {
         );
     }
 
+    /// Under each bound at its largest value, `limit + 1` is `u64::MAX`: the
+    /// marker's witness is representable, framed as its `U64`, and admitted,
+    /// and the value below it is not the witness (D15:869, 889, 3323).
+    #[test]
+    fn the_largest_bound_admits_the_witness_u64_max() {
+        for bound in SnapshotBound::ALL {
+            let limits = under(bound, u64::MAX - 1);
+            let array = |witness| Node::Array(vec![overrun(bound, witness)]);
+            admits(submitted(&array(u64::MAX)), &array(u64::MAX), &limits);
+            assert!(
+                array(u64::MAX).framed().ends_with(&u64::MAX.to_be_bytes()),
+                "{bound:?}"
+            );
+            assert_eq!(
+                refusal(submitted(&array(u64::MAX - 1)), &limits),
+                EnvelopeOverBound,
+                "{bound:?}"
+            );
+        }
+    }
+
     /// A repeated key, a number that is not portable, and a string or key
     /// that is not a sequence of Unicode scalar values are model values that
     /// are not finite and canonical (015-200).
