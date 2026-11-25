@@ -2327,6 +2327,214 @@ pub(super) mod tests {
         });
     }
 
+    /// That `evaluation` holds one Finding, of `code`, that `waiting` are the
+    /// rows through Phase 3 that wait, and that every unit that waits, in any
+    /// phase, waits on that Finding alone, while after Phase 3 only Phase 4's
+    /// checks of the collection under the capability are evaluated.
+    fn assert_each_later_check_waits_on_its_finding(
+        evaluation: &Evaluation,
+        code: Code,
+        waiting: &[&str],
+    ) {
+        let found = only_issue(evaluation);
+        assert_eq!(found.code(), code);
+        let through_selection: Vec<&str> = evaluation
+            .statuses()
+            .filter(|(unit, status)| {
+                unit.phase <= Phase::ProfileSelection && matches!(status, Status::NotEvaluated(_))
+            })
+            .map(|(unit, _)| row_of(unit))
+            .collect();
+        assert_eq!(through_selection, waiting);
+        assert_eq!(
+            evaluated_after_selection(evaluation),
+            BTreeSet::from(COLLECTION_UNDER_CAPABILITY)
+        );
+        for (unit, status) in evaluation.statuses() {
+            if let Status::NotEvaluated(causes) = status {
+                assert_eq!(keys(causes), BTreeSet::from([found.clone()]), "{unit:?}");
+            }
+        }
+    }
+
+    /// The rows of the schema selection's four checks, in rank order.
+    const SCHEMA_SELECTION: [&str; 4] = [
+        "structural.schema-selection.object-root",
+        "structural.schema-selection.present-schema-version",
+        "structural.schema-selection.string-schema-version",
+        "structural.schema-selection.supported-schema-version",
+    ];
+
+    /// A root that is no object, and a version missing, of another type, or
+    /// unsupported, leave no schema to read the value under: each later
+    /// selection or semantic check waits on that one Finding, with no
+    /// synthetic Finding of its own, and only the collection is still checked
+    /// under the capability (D15:2130, 2151, 3341, 3447).
+    #[test]
+    fn without_a_schema_every_later_check_waits_on_what_held_it_back() {
+        type Edit = fn(&mut Value);
+        let cases: [(Edit, usize, Code); 8] = [
+            (|root| *root = json!([]), 0, Code::FieldTypeInvalid),
+            (|root| *root = json!(42), 0, Code::FieldTypeInvalid),
+            (|root| *root = json!("root"), 0, Code::FieldTypeInvalid),
+            (|root| *root = json!(true), 0, Code::FieldTypeInvalid),
+            (|root| *root = Value::Null, 0, Code::FieldTypeInvalid),
+            (
+                |root| {
+                    root.as_object_mut().unwrap().remove("schemaVersion");
+                },
+                1,
+                Code::RequiredFieldMissing,
+            ),
+            (
+                |root| root["schemaVersion"] = json!(0),
+                2,
+                Code::FieldTypeInvalid,
+            ),
+            (
+                |root| root["schemaVersion"] = json!("1"),
+                3,
+                Code::SchemaVersionUnsupported,
+            ),
+        ];
+        for (edit, failed, code) in cases {
+            let mut inputs = Inputs::complete();
+            edit(&mut inputs.config);
+            inputs.attempt(|evaluation, state| {
+                let state = state.unwrap().expect("entry admits the file");
+                assert!(state.structure.is_err() && state.policy.confirmed.is_err());
+                assert_eq!(
+                    row_of(only_issue(&evaluation).unit()),
+                    SCHEMA_SELECTION[failed]
+                );
+                let mut waiting = SCHEMA_SELECTION[failed + 1..].to_vec();
+                waiting.extend([
+                    "structural.analysis.within-capability",
+                    "selection.profiles.within-capability",
+                    "selection.selector.required",
+                    "selection.selector.declared",
+                ]);
+                assert_each_later_check_waits_on_its_finding(&evaluation, code, &waiting);
+                assert_eq!(rechecked_ids(&evaluation), []);
+            });
+        }
+    }
+
+    /// A `profiles` member of another type or with no declaration, and a
+    /// selected declaration that is no object, hold the selection back: each
+    /// later check waits on that one structural Finding (D15:2131, 2184,
+    /// 3341). A declaration that is no object keeps its admitted key, so its
+    /// Profile ID still names a recheck, which waits too.
+    #[test]
+    fn without_a_selectable_declaration_every_later_check_waits_on_its_boundary() {
+        type Edit = fn(&mut Value);
+        let root_field = "structural.root.field-value";
+        let count = "selection.profiles.within-capability";
+        let required = "selection.selector.required";
+        let declared = "selection.selector.declared";
+        let cases: [(Edit, Code, &[&str], bool); 7] = [
+            (
+                |root| root["profiles"] = json!([]),
+                Code::FieldTypeInvalid,
+                &[root_field, count, required, declared],
+                false,
+            ),
+            (
+                |root| root["profiles"] = json!(42),
+                Code::FieldTypeInvalid,
+                &[root_field, count, required, declared],
+                false,
+            ),
+            (
+                |root| root["profiles"] = json!({}),
+                Code::FieldValueInvalid,
+                &[required, declared],
+                false,
+            ),
+            (
+                |root| root["profiles"]["web"] = json!(42),
+                Code::FieldTypeInvalid,
+                &["structural.profile.known-field"],
+                true,
+            ),
+            (
+                |root| root["profiles"]["web"] = json!([]),
+                Code::FieldTypeInvalid,
+                &["structural.profile.known-field"],
+                true,
+            ),
+            (
+                |root| root["profiles"]["web"] = json!("web"),
+                Code::FieldTypeInvalid,
+                &["structural.profile.known-field"],
+                true,
+            ),
+            (
+                |root| root["profiles"]["web"] = Value::Null,
+                Code::FieldTypeInvalid,
+                &["structural.profile.known-field"],
+                true,
+            ),
+        ];
+        for (edit, code, waiting, named) in cases {
+            let mut inputs = Inputs::complete();
+            edit(&mut inputs.config);
+            inputs.attempt(|evaluation, state| {
+                let state = state.unwrap().expect("entry admits the file");
+                assert!(state.structure.is_err() && state.policy.confirmed.is_err());
+                assert_each_later_check_waits_on_its_finding(&evaluation, code, waiting);
+                assert_eq!(rechecked_ids(&evaluation).len(), usize::from(named));
+            });
+        }
+    }
+
+    /// Without the canonicalization slot no locale can be interpreted: every
+    /// check that needs a canonical locale, through the locale, policy,
+    /// target, and hydration phases, waits on that one Finding, while a phase
+    /// that compares only Target IDs still runs (D15:2133, 2151, 2365, 3447).
+    #[test]
+    fn without_canonicalization_semantics_each_locale_check_waits_on_the_slot() {
+        let mut inputs = Inputs::complete();
+        inputs.specifications.locale_canonicalization = None;
+        inputs.attempt(|evaluation, state| {
+            let state = state.unwrap().expect("entry admits the file");
+            let found = only_issue(&evaluation);
+            assert_eq!(
+                (found.code(), found.reason()),
+                (
+                    Code::SpecificationInputIncomplete,
+                    Some(Reason::MissingRequiredSlot)
+                )
+            );
+            assert_eq!(
+                suppressed(&evaluation),
+                (
+                    BTreeSet::from([
+                        Phase::SpecificationAdmission,
+                        Phase::LocaleResolution,
+                        Phase::LocalePolicyResolution,
+                        Phase::TargetResolution,
+                        Phase::HydrationValidation,
+                    ]),
+                    BTreeSet::from([found])
+                )
+            );
+            assert_eq!(
+                absent(&state),
+                [
+                    "specifications",
+                    "canonicalization",
+                    "locales",
+                    "negotiation",
+                    "fallback",
+                    "coverage",
+                    "targets",
+                    "hydration"
+                ]
+            );
+        });
+    }
+
     /// A missing or empty `deploymentGroups` and a group with no members are
     /// blocking Findings of the fields they name, and a Group ID a file names
     /// twice is Phase 1's duplicate-member Finding, which leaves no value at
