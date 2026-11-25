@@ -1242,6 +1242,33 @@ pub(super) mod tests {
         }
     }
 
+    /// Reverses every array under a member whose schema declares it a set:
+    /// the requested locales and coverage selectors, the rules, and each
+    /// group's members and hydration relations. A fallback sequence's order
+    /// is semantic, so it stays (D15:516, 1519, 2184).
+    fn reverse_sets(value: &mut Value) {
+        match value {
+            Value::Object(members) => {
+                for (name, member) in members.iter_mut() {
+                    if let (
+                        "requestedLocales"
+                        | "intentSurfaceClasses"
+                        | "rules"
+                        | "members"
+                        | "hydrationRelations",
+                        Value::Array(items),
+                    ) = (name.as_str(), &mut *member)
+                    {
+                        items.reverse();
+                    }
+                    reverse_sets(member);
+                }
+            }
+            Value::Array(values) => values.iter_mut().for_each(reverse_sets),
+            _ => {}
+        }
+    }
+
     /// One invocation's inputs, which a test edits before resolving them.
     pub(crate) struct Inputs {
         config: Value,
@@ -1638,6 +1665,27 @@ pub(super) mod tests {
                     .unwrap()
                     .reverse();
             }
+            reverse_objects(&mut config);
+            let mut members = self.members.clone();
+            members.reverse();
+            Self {
+                config,
+                selected: self.selected,
+                members,
+                specifications: self.specifications.clone(),
+                surfaces: self.surfaces,
+                capability: self.capability.clone(),
+                pinned: self.pinned.clone(),
+                metadata: self.metadata,
+            }
+        }
+
+        /// The same inputs with every schema-declared unordered collection
+        /// in another order, whatever its members: each set, every object's
+        /// members, and the artifact collection (D15:3353).
+        pub(crate) fn permuted(&self) -> Self {
+            let mut config = self.config.clone();
+            reverse_sets(&mut config);
             reverse_objects(&mut config);
             let mut members = self.members.clone();
             members.reverse();

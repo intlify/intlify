@@ -1980,8 +1980,16 @@ mod tests {
                 }),
                 "{check:?}"
             );
-            // The work it protects, and every check after it, waits on it.
+            // The work it protects, and every check after it, waits on it,
+            // while what was proved before it stands (D15:2006, 3351).
             let rank = BOOTSTRAP.iter().position(|each| *each == check).unwrap();
+            for earlier in &BOOTSTRAP[..rank] {
+                assert_eq!(
+                    evaluation.status(&bootstrap_unit(*earlier)),
+                    Some(&Status::Evaluated),
+                    "{check:?} {earlier:?}"
+                );
+            }
             for later in &BOOTSTRAP[rank + 1..] {
                 assert_eq!(
                     waits_on(&evaluation, &bootstrap_unit(*later)),

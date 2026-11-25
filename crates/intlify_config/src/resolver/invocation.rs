@@ -1120,6 +1120,59 @@ pub(crate) mod tests {
         });
     }
 
+    /// D15:2756, 3449: callers on several threads share one resolver, each
+    /// with its own storage, and each gets the outcome a call alone gets for
+    /// its input, checked, blocked, or stopped at entry, from a file or a
+    /// Snapshot. The core schedules nothing itself, so what can vary is when
+    /// each caller runs; the inputs written in another order, members and
+    /// submitted artifacts included, keep the same Shared projection.
+    #[test]
+    #[cfg(not(target_family = "wasm"))]
+    fn concurrent_callers_of_one_resolver_each_get_the_outcome_of_a_call_alone() {
+        let resolver = resolver();
+        let nodes = input_bound("maxNodes");
+        let raws = [
+            example(|inputs| inputs),
+            Raw::new(&blocked()),
+            Raw::new(&blocked().permuted()),
+            example(|inputs| inputs.bounding(&[(nodes, 10)], &[])),
+        ];
+        let inputs: Vec<InvocationInputs<PinnedFixture>> = raws
+            .iter()
+            .flat_map(|raw| {
+                [
+                    raw.file(&resolver, true),
+                    raw.programmatic(&resolver, true, false),
+                ]
+            })
+            .collect();
+        let alone: Vec<Shown> = inputs
+            .iter()
+            .map(|inputs| resolved(&resolver, inputs))
+            .collect();
+        assert_eq!(alone[2].shared, alone[4].shared);
+        assert!(alone[2].shared.is_some());
+        let callers = inputs.len() * 2;
+        let start = std::sync::Barrier::new(callers);
+        std::thread::scope(|scope| {
+            let (resolver, start) = (&resolver, &start);
+            let workers: Vec<_> = inputs
+                .iter()
+                .zip(&alone)
+                .chain(inputs.iter().rev().zip(alone.iter().rev()))
+                .map(|(inputs, expected)| {
+                    scope.spawn(move || {
+                        start.wait();
+                        assert_eq!(resolved(resolver, inputs), *expected);
+                    })
+                })
+                .collect();
+            for worker in workers {
+                worker.join().unwrap();
+            }
+        });
+    }
+
     /// D15:3155, 3321: a report without a formal container is one typed
     /// failure of the collection's slot. The pattern names every field of the
     /// refused set, so nothing resolver-shaped can come beside it.
