@@ -360,7 +360,9 @@ mod tests {
     use crate::input_limits::Bound;
     use crate::resolver::capability::{BootstrapLimits, MandatoryReserveLimits};
     use crate::resolver::coverage::{self, CoverageSubject};
+    use crate::resolver::decision_evidence::{records, redacted, DecisionEvidence};
     use crate::resolver::evaluation::{Blocking, Check, Code, Evaluation, Notice, Phase};
+    use crate::resolver::evidence_token::EvidenceTokens;
     use crate::resolver::locales::fixtures::canonical;
     use crate::resolver::outcome::tests::{blocked, entry, identity, no_json, reporting};
     use crate::resolver::outcome::{outcome, replayed, ResolutionEvidence};
@@ -369,7 +371,7 @@ mod tests {
     use crate::resolver::reporting::{Record, ReportingDomain};
     use crate::resolver::resolution_evidence::Projection;
     use crate::resolver::resource_policy::{self, PolicySubject};
-    use crate::resolver::token::Sha256;
+    use crate::resolver::token::{Sha256, Specification};
 
     use std::collections::{BTreeMap, BTreeSet};
 
@@ -379,6 +381,12 @@ mod tests {
     use super::{
         cover, observed, ordinals, owners, references, referred_evidence, reserve, resolved,
         verify_shared, FinalizationInvariant as F,
+    };
+
+    /// The specification the records' Evidence names.
+    const PROFILE: Specification<'static> = Specification {
+        identity: "intlify-project-profile",
+        revision: "0",
     };
 
     /// The position of the first record of `kind` in `projection`.
@@ -794,6 +802,66 @@ mod tests {
                 assert_eq!(cover(evidence), Err(F::Cover));
             },
         );
+    }
+
+    /// A Coverage Decision Evidence record whose source its Basis does not
+    /// admit, beside or in place of the cell's own, and one for a cell with
+    /// no Basis are resolver bugs: each mapping references one retained Basis
+    /// and one decision source that Basis admits (D15:1611, 2143, 3410).
+    #[test]
+    fn decision_evidence_with_an_extra_source_or_no_basis_is_a_resolver_bug() {
+        let mut inputs = reporting(&Inputs::complete(), &[], &[]);
+        inputs.declaration()["coverage"] = json!({"rules": [
+            {"requestedLocales": ["ja"], "mode": "fallback-allowed"},
+        ]});
+        inputs.outcome(None, identity(), |evaluation, _, outcome| {
+            let evidence = &outcome.evidence;
+            assert_eq!(cover(evidence), Ok(()));
+            let mappings = evaluation.decision_evidence();
+            let matched = mappings
+                .iter()
+                .find_map(|mapping| mapping.source.clone())
+                .unwrap();
+            let at = mappings
+                .iter()
+                .position(|mapping| mapping.source.is_none())
+                .unwrap();
+            let tokens = EvidenceTokens::assign(PROFILE, redacted(mappings), &Sha256);
+            let positions = each(&evidence.entry, RecordKind::CoverageDecisionEvidence);
+            let edited = |mapping: DecisionEvidence| {
+                let index = positions[at];
+                let mut retained = evidence.entry.records[index].1.clone();
+                let [record] = &records(&[mapping], PROFILE, &tokens).unwrap()[..] else {
+                    panic!("one candidate gives one record");
+                };
+                retained.record = Record::DecisionEvidence(record.clone());
+                (index, evidence.entry.records[index].0, retained)
+            };
+            // A rule's source on a cell whose Basis is the default.
+            let extra = DecisionEvidence {
+                source: Some(matched),
+                ..mappings[at].clone()
+            };
+            let (index, owner, retained) = edited(extra);
+            let mut beside = evidence.clone();
+            beside
+                .entry
+                .records
+                .insert(index, (owner, retained.clone()));
+            assert_eq!(cover(&beside), Err(F::Cover));
+            let mut replaced = evidence.clone();
+            replaced.entry.records[index] = (owner, retained);
+            assert_eq!(cover(&replaced), Err(F::Cover));
+            // A cell of a locale the project does not request has no Basis.
+            let orphan = DecisionEvidence {
+                cell: (canonical("de"), mappings[at].cell.1.clone()),
+                ..mappings[at].clone()
+            };
+            let (index, owner, retained) = edited(orphan);
+            let mut orphaned = evidence.clone();
+            orphaned.entry.records.insert(index, (owner, retained));
+            assert_eq!(cover(&orphaned), Err(F::Cover));
+        });
     }
 
     /// The mandatory reserve counts the outcome envelope, each exhausted

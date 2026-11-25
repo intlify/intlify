@@ -2417,6 +2417,101 @@ mod tests {
         );
     }
 
+    /// An exact or canonical-alias locale repeated in one selector is the
+    /// common locale-duplicate Finding, and a repeated surface class is
+    /// `surface-class-duplicate`. Every raw item counts before either is
+    /// rejected; the rule has no normalized domain, though the rule beside it
+    /// has one; and every cell and the table wait on the Finding, so no cell,
+    /// Basis, or mapping is left (D15:516, 1567, 2426, 3409).
+    #[test]
+    fn a_selector_repeating_a_member_leaves_no_rule_domain_or_partial_table() {
+        type Repeat = fn(&RuleContent) -> Unit;
+        let locale: Repeat = |owner| locale_unit(owner, key("en"), Check::UniqueLocale);
+        let surface: Repeat = |owner| member_unit(owner, "nav", Check::UniqueSurfaceClass);
+        let beside = json!({"requestedLocales": ["ja"], "mode": "fallback-allowed"});
+        let duplicate = "project-profile-locale-duplicate";
+        let invalid = "project-profile-coverage-rule-invalid";
+        let cases = [
+            (json!({"requestedLocales": ["en", "en"]}), locale, duplicate),
+            (json!({"requestedLocales": ["EN", "en"]}), locale, duplicate),
+            (
+                json!({"intentSurfaceClasses": ["nav", "nav"]}),
+                surface,
+                invalid,
+            ),
+        ];
+        for (mut selector, repeat, code) in cases {
+            selector["mode"] = json!("direct-required");
+            let declaration = declared(json!({"rules": [selector, beside]}));
+            let resolved = resolve(&declaration);
+            let owner = rule(&selector);
+            let repeated = repeat(&owner);
+            let reason = (code == invalid).then_some("surface-class-duplicate");
+            assert_eq!(
+                issues(&resolved.evaluation),
+                [(repeated.clone(), code, reason)]
+            );
+            let waiting = Some(vec![repeated.clone()]);
+            // The rules share one logical unit, which the rule beside this
+            // one evaluates: this rule's own candidate is the one that waits
+            // (D15:2184).
+            let candidate = unit(
+                CoverageSubject::Rule(owner.clone()),
+                Check::NormalizedDomain,
+            );
+            let (_, status) = resolved
+                .evaluation
+                .candidates()
+                .find(|(raw, _)| **raw == candidate)
+                .unwrap();
+            let Status::NotEvaluated(causes) = status else {
+                panic!("{status:?}");
+            };
+            assert_eq!(Some(units(causes)), waiting);
+            let domains: Vec<Unit> = statuses(&resolved.evaluation)
+                .into_iter()
+                .map(|(unit, _)| unit)
+                .filter(|unit| {
+                    matches!(unit.subject, Subject::Coverage(CoverageSubject::Domain(_)))
+                })
+                .collect();
+            assert_eq!(domains, [domain_unit(domain(&["ja"], &EVERY_SURFACE))]);
+            for cell in cell_units().iter().chain([&table_unit()]) {
+                assert_eq!(waits_on(&resolved.evaluation, cell), waiting);
+            }
+            assert!(resolved.evaluation.decision_basis().is_empty());
+            assert_eq!(decisions(&resolved), []);
+            assert_eq!(units(&resolved.policy.unwrap_err()), [repeated]);
+            // The bound of the repeated selector's kind reads every raw item.
+            let (tight, subject, bound, total) = if code == invalid {
+                (
+                    Bounds {
+                        surface_items: 1,
+                        ..ROOM
+                    },
+                    CoverageSubject::SurfaceSelectors,
+                    MAX_COVERAGE_SURFACE_SELECTOR_OCCURRENCES,
+                    2,
+                )
+            } else {
+                (
+                    Bounds {
+                        locale_items: 2,
+                        ..ROOM
+                    },
+                    CoverageSubject::LocaleSelectors,
+                    MAX_COVERAGE_LOCALE_SELECTOR_OCCURRENCES,
+                    3,
+                )
+            };
+            let over = resolve_under(&declaration, tight, &vocabulary());
+            assert_eq!(
+                exceeded(&over.evaluation, &count_unit(subject)),
+                exactly(bound, total - 1, total)
+            );
+        }
+    }
+
     #[test]
     fn incomparable_maximal_rules_of_two_modes_conflict_only_where_they_overlap() {
         let locale_only = json!({"requestedLocales": ["fr"], "mode": "fallback-allowed"});
@@ -2850,6 +2945,69 @@ mod tests {
         assert!(unobserved.policy.is_ok());
         assert_eq!(unobserved.evaluation.decision_basis(), basis);
         assert_eq!(decisions(&unobserved), []);
+    }
+
+    /// Reordering the rules changes neither the decision table nor any
+    /// Basis, and a cell two rules decide keeps them in domain order. The
+    /// Coverage Decision Evidence keeps every mapping in its order, and only
+    /// a moved rule's mappings follow it to the new index; the rule that
+    /// stays in place, and the default, keep their Evidence (D15:1605, 1607,
+    /// 1609, 1611, 3406).
+    #[test]
+    fn reordering_rules_moves_only_the_mappings_of_the_rules_that_moved() {
+        let stays = json!({
+            "requestedLocales": ["en"],
+            "intentSurfaceClasses": ["nav"],
+            "mode": "direct-required"
+        });
+        let locales = json!({"requestedLocales": ["ja"], "mode": "fallback-allowed"});
+        let surfaces = json!({"intentSurfaceClasses": ["checkout"], "mode": "fallback-allowed"});
+        let authored = declared(json!({"rules": [stays, locales, surfaces]}));
+        let moved = declared(json!({"rules": [stays, surfaces, locales]}));
+        let (before, after) = (resolve(&authored), resolve(&moved));
+        assert_eq!(issues(&before.evaluation), []);
+        assert_eq!(issues(&after.evaluation), []);
+        let (first, second) = (
+            before.policy.as_ref().unwrap(),
+            after.policy.as_ref().unwrap(),
+        );
+        assert_eq!(table(first), table(second));
+        assert_eq!(first.basis(), second.basis());
+        assert_eq!(
+            before.evaluation.decision_basis(),
+            after.evaluation.decision_basis()
+        );
+        let by_locale = domain(&["ja"], &EVERY_SURFACE);
+        let by_surface = domain(&EVERY_LOCALE, &["checkout"]);
+        assert_eq!(
+            basis_of(first, "ja", "checkout").decision,
+            Decision::Rules(vec![by_surface.clone(), by_locale.clone()])
+        );
+        let (mapped, remapped) = (decisions(&before), decisions(&after));
+        assert_eq!(mapped.len(), remapped.len());
+        let specification =
+            EvidenceProjection::resolver_input(ComponentPath::specification(Slot::Coverage));
+        for (one, other) in mapped.iter().zip(&remapped) {
+            assert_eq!(one.0, other.0);
+            assert_eq!(one.1, other.1);
+            assert_eq!(one.2, other.2);
+            let (from, to) = match &one.2 {
+                None => {
+                    assert_eq!((&one.3, &other.3), (&specification, &specification));
+                    continue;
+                }
+                Some(domain) if *domain == by_locale => (1, 2),
+                Some(domain) if *domain == by_surface => (2, 1),
+                Some(_) => {
+                    let unmoved = rule_at(&authored, 0);
+                    assert_eq!((&one.3, &other.3), (&unmoved, &unmoved));
+                    continue;
+                }
+            };
+            assert_eq!(one.3, rule_at(&authored, from));
+            assert_eq!(other.3, rule_at(&moved, to));
+            assert_ne!(one.3, other.3);
+        }
     }
 
     /// The recorded mappings become Coverage Decision Evidence records under

@@ -2327,6 +2327,83 @@ pub(super) mod tests {
         });
     }
 
+    /// A missing or empty `deploymentGroups` and a group with no members are
+    /// blocking Findings of the fields they name, and a Group ID a file names
+    /// twice is Phase 1's duplicate-member Finding, which leaves no value at
+    /// all. No group is inferred for the targets: Phase 12 has no partition
+    /// and no such group, and the outcome no profile (D15:2438, 3530).
+    #[test]
+    fn a_missing_or_empty_group_is_a_finding_and_no_group_is_inferred() {
+        use crate::resolver::outcome::tests::{identity, reporting};
+        use crate::resolver::structural_admission::{EntryKey, Field, StructuralSubject as S};
+        type Edit = fn(&mut Value);
+        let web = || EntryKey::identity("web");
+        let declared = |path: &[&str]| S::ProfileField(web(), Field::of(path));
+        let cases: [(Edit, S, Check, Code); 3] = [
+            (
+                |app| {
+                    app.as_object_mut().unwrap().remove("deploymentGroups");
+                },
+                declared(&["deploymentGroups"]),
+                Check::RequiredField,
+                Code::RequiredFieldMissing,
+            ),
+            (
+                |app| app["deploymentGroups"] = json!({}),
+                declared(&["deploymentGroups"]),
+                Check::FieldValue,
+                Code::FieldValueInvalid,
+            ),
+            (
+                |app| app["deploymentGroups"]["web"]["members"] = json!([]),
+                S::GroupField(web(), web(), Field::of(&["members"])),
+                Check::FieldValue,
+                Code::FieldValueInvalid,
+            ),
+        ];
+        for (edit, subject, check, code) in cases {
+            let mut inputs = Inputs::complete();
+            edit(inputs.declaration());
+            let found = Unit {
+                phase: Phase::StructuralAdmission,
+                subject: Subject::Structural(subject),
+                check,
+            };
+            reporting(&inputs, &[], &[]).outcome(
+                None,
+                identity(),
+                |evaluation, invoked, outcome| {
+                    assert!(outcome.checked.is_none());
+                    assert_eq!(issues(evaluation), [(found.clone(), code, None)]);
+                    let groups = invoked.state.as_ref().unwrap().groups.as_ref();
+                    assert!(groups.map_or(true, |groups| groups.partition().is_err()));
+                    let id = serde_json::from_value(json!("web")).unwrap();
+                    let members = groups.ok().and_then(|groups| groups.get(&id));
+                    assert!(matches!(members, None | Some(Err(_))), "{found:?}");
+                },
+            );
+        }
+        let inputs = Inputs::complete();
+        let text = serde_json::to_string(&inputs.config).unwrap();
+        let map = r#""deploymentGroups":{"#;
+        let at = text.find(map).unwrap() + map.len();
+        let twice = format!(
+            r#"{}"web":{{"members":["browser"]}},{}"#,
+            &text[..at],
+            &text[at..]
+        );
+        inputs.entered(
+            Some(Arc::from(twice.into_bytes())),
+            |evaluation, invoked| {
+                assert_eq!(
+                    issues(&evaluation),
+                    [(input(Check::UniqueMembers), Code::JsonMemberDuplicate, None)]
+                );
+                assert!(invoked.state.is_err());
+            },
+        );
+    }
+
     /// Phase 4 observes a bound over the selected declaration's references at
     /// the declaration, in the file entry admitted (D15:790, 1918).
     #[test]
