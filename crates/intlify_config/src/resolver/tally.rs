@@ -123,6 +123,32 @@ mod tests {
         }
     }
 
+    /// At the largest bound the first-over witness is `u64::MAX`, which is
+    /// representable, and a count there or past `u64` reports it (D15:3323).
+    #[test]
+    fn the_largest_bound_has_a_representable_first_over_witness() {
+        let largest = bound(u64::MAX - 1);
+        let exact = Tally(Some(u64::MAX - 1));
+        assert!(!exact.exceeds(largest));
+        assert_eq!(actual(exact, largest), Actual::Exact(u64::MAX - 1));
+        assert_eq!(first_over(exact, largest), Actual::Exact(u64::MAX - 1));
+        assert_eq!(within(BOUND, largest, Actual::Exact(u64::MAX - 1)), Ok(()));
+        assert_eq!(actual(Tally(None), largest), Actual::AtLeast(u64::MAX));
+        for tally in [Tally(Some(u64::MAX)), Tally(None)] {
+            assert!(tally.exceeds(largest));
+            let witness = first_over(tally, largest);
+            assert_eq!(witness, Actual::AtLeast(u64::MAX));
+            assert_eq!(
+                within(BOUND, largest, witness),
+                Err(Blocking::limit(LimitExceeded {
+                    bound: BOUND,
+                    limit: largest,
+                    actual: Actual::AtLeast(u64::MAX),
+                }))
+            );
+        }
+    }
+
     #[test]
     fn a_bound_admits_its_exact_value_and_reports_the_first_over() {
         assert_eq!(within(BOUND, bound(5), Actual::Exact(5)), Ok(()));

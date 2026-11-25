@@ -758,6 +758,71 @@ mod tests {
         assert!(deep(Node::Null) != deep(Node::Boolean(false)));
     }
 
+    /// Canonical equality is that of the complete typed tree, which is that
+    /// of `S(root)`: each variant only ever equals itself, an array compares
+    /// in order and a string by its scalars, and a marker through its reason,
+    /// its bound, and its witness (D15:871, 889, 3337).
+    #[test]
+    fn canonical_equality_is_the_complete_typed_tree() {
+        let overrun =
+            |bound, witness| Node::Marker(Marker::BootstrapLimitExceeded { bound, witness });
+        let distinct = [
+            Node::Null,
+            Node::Boolean(false),
+            Node::Boolean(true),
+            number(0.0),
+            number(1.0),
+            Node::String(String::new()),
+            Node::String("0".to_owned()),
+            Node::String("\u{c5}".to_owned()),
+            Node::String("A\u{30a}".to_owned()),
+            Node::Array(Vec::new()),
+            Node::Array(vec![number(1.0), number(2.0)]),
+            Node::Array(vec![number(2.0), number(1.0)]),
+            from_json(&json!({})),
+            from_json(&json!({ "a": 1 })),
+            from_json(&json!({ "b": 1 })),
+            from_json(&json!({ "a": 2 })),
+            Node::Marker(Marker::Rejected(MarkerReason::Cycle)),
+            Node::Marker(Marker::Rejected(MarkerReason::SparseArray)),
+            overrun(SnapshotBound::Nodes, 5),
+            overrun(SnapshotBound::Depth, 5),
+            overrun(SnapshotBound::Nodes, 6),
+        ];
+        for (index, left) in distinct.iter().enumerate() {
+            for (other, right) in distinct.iter().enumerate() {
+                assert_eq!(left == right, index == other, "{index} {other}");
+                assert_eq!(
+                    left.framed() == right.framed(),
+                    index == other,
+                    "{index} {other}"
+                );
+            }
+        }
+        assert!(number(-0.0) == number(0.0));
+        assert!(from_json(&json!({ "a": 1, "b": [2] })) == from_json(&json!({ "b": [2], "a": 1 })));
+    }
+
+    /// A shared acyclic value is written out where it occurs, so it compares
+    /// and counts as the independent copies it expands to, and an ancestor
+    /// cycle compares as its canonical marker at its position (D15:859, 867,
+    /// 871, 3337).
+    #[test]
+    fn a_shared_value_compares_expanded_and_a_cycle_as_its_marker() {
+        let shared = from_json(&json!({ "k": [1, "x"] }));
+        let aliased = Node::Array(vec![shared.clone(), shared.clone()]);
+        let copies = from_json(&json!([{ "k": [1, "x"] }, { "k": [1, "x"] }]));
+        assert!(aliased == copies);
+        assert_eq!(aliased.digest(), copies.digest());
+        let (once, twice) = (SnapshotCounts::of(&shared), SnapshotCounts::of(&aliased));
+        assert_eq!(twice.nodes, 2 * once.nodes + 1);
+        assert_eq!(twice.total_string_bytes, 2 * once.total_string_bytes);
+        let cycle = || Node::Marker(Marker::Rejected(MarkerReason::Cycle));
+        assert!(Node::Array(vec![cycle()]) == Node::Array(vec![cycle()]));
+        assert!(Node::Array(vec![cycle(), Node::Null]) != Node::Array(vec![Node::Null, cycle()]));
+        assert!(Node::Array(vec![cycle()]) != Node::Array(vec![shared]));
+    }
+
     /// Without a marker, the five counts the root-value bounds share are
     /// those the file entry counts for the same JSON value (D15:1889).
     #[test]

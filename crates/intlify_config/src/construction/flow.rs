@@ -515,6 +515,252 @@ mod tests {
         );
     }
 
+    /// `value` with every object's members in reverse order, at every depth.
+    fn members_reversed(value: &Value) -> Value {
+        match value {
+            Value::Object(members) => Value::Object(
+                members
+                    .iter()
+                    .rev()
+                    .map(|(key, member)| (key.clone(), members_reversed(member)))
+                    .collect(),
+            ),
+            Value::Array(items) => Value::Array(items.iter().map(members_reversed).collect()),
+            other => other.clone(),
+        }
+    }
+
+    /// `artifact` with its members in reverse order, and `declaring`, the
+    /// record that declares its digest, moved to the new bytes when it
+    /// declared the old ones. Bytes that are no JSON stay as they are.
+    fn reversed_artifact(artifact: &Artifact, declaring: &mut Value) -> Artifact {
+        let Some(body) = artifact.value() else {
+            return artifact.clone();
+        };
+        let bytes = compact(&members_reversed(body));
+        if declaring["digest"] == component::file_digest(artifact.bytes()).as_str() {
+            declaring["digest"] = json!(component::file_digest(&bytes).as_str());
+        }
+        Artifact::read(bytes)
+    }
+
+    /// `members` with each body's members reversed, each redeclared in the
+    /// container `component`, whose own keys keep their order as its form, and
+    /// the container's tuple with its members reversed.
+    fn reversed_members<K: Ord + Clone>(
+        component: &mut component::Submitted,
+        members: &std::collections::BTreeMap<K, Artifact>,
+        name: impl Fn(&K) -> String,
+    ) -> std::collections::BTreeMap<K, Artifact> {
+        let mut container = component.artifact.value().cloned().unwrap_or(Value::Null);
+        // Written from the last entry to the first, as a discovery might.
+        let mut reversed = std::collections::BTreeMap::new();
+        for (key, artifact) in members.iter().rev() {
+            let mut record = container["members"][name(key)].take();
+            let body = reversed_artifact(artifact, &mut record);
+            if !record.is_null() {
+                container["members"][name(key)] = record;
+            }
+            reversed.insert(key.clone(), body);
+        }
+        if component.artifact.value().is_some() {
+            let bytes = compact(&container);
+            if component.tuple["digest"]
+                == component::file_digest(component.artifact.bytes()).as_str()
+            {
+                component.tuple["digest"] = json!(component::file_digest(&bytes).as_str());
+            }
+            component.artifact = Artifact::read(bytes);
+        }
+        component.tuple = members_reversed(&component.tuple);
+        reversed
+    }
+
+    /// `input` in another order: every declared tuple's members, every
+    /// body's members, and the order its members were found in. A container's
+    /// own keys keep their order, which is part of its form (D15:1011, 3073).
+    fn in_another_order(input: &ConstructionInput) -> ConstructionInput {
+        let mut input = input.clone();
+        for submitted in [
+            input.profile_specification_schema.as_mut(),
+            input.profile_specification.as_mut(),
+            input.resolver_capability_specification.as_mut(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            let mut tuple = members_reversed(&submitted.tuple);
+            submitted.artifact = reversed_artifact(&submitted.artifact, &mut tuple);
+            submitted.tuple = tuple;
+        }
+        if let Some(set) = &mut input.configuration_schema_authority_set {
+            set.members = reversed_members(&mut set.component, &set.members, Clone::clone);
+        }
+        if let Some(package) = &mut input.registry_package {
+            package.members = reversed_members(&mut package.component, &package.members, |role| {
+                role.name().to_owned()
+            });
+        }
+        input
+    }
+
+    /// Inputs with several invalid authorities, each with the row that alone
+    /// is reported.
+    fn several_invalid() -> Vec<(usize, ConstructionInput)> {
+        let mut unrelated = committed();
+        unrelated.resolver_capability_specification = None;
+        unrelated.registry_package = Some(package(PACKAGE, {
+            let mut members = REGISTRY_MEMBERS;
+            members[4] = b"{}";
+            members
+        }));
+        let mut association = committed();
+        association.configuration_schema_authority_set = Some(authority_set(&set_bytes(|set| {
+            set["profileSpecification"]["semanticDigest"] =
+                json!(format!("sha256:{}", "0".repeat(64)));
+        })));
+        let mut later = REGISTRY_MEMBERS;
+        later[3] = b"{}";
+        association.registry_package = Some(package(PACKAGE, later));
+        let mut first = committed();
+        first.profile_specification_schema = None;
+        first.resolver_capability_specification = Some(submitted("other", "0", b"{}"));
+        // The mapped schemas in `schemaVersion` order: "0" fails its last
+        // row, and "1" its first.
+        let broken = b"{";
+        let mut mapped = committed();
+        let mut set = authority_set(&set_bytes(|set| {
+            let mut record = set["members"]["0"].clone();
+            record["digest"] = json!(component::file_digest(broken).as_str());
+            set["members"]["0"] = record.clone();
+            record["identity"] = json!("another");
+            record["digest"] = json!(component::file_digest(CONFIGURATION_SCHEMA).as_str());
+            set["members"]["1"] = record;
+        }));
+        set.members
+            .insert("0".to_owned(), Artifact::read(broken.to_vec()));
+        set.members.insert(
+            "1".to_owned(),
+            Artifact::read(CONFIGURATION_SCHEMA.to_vec()),
+        );
+        mapped.configuration_schema_authority_set = Some(set);
+        // The registry members in logical-role order: the first fails its
+        // last row, and the second its first.
+        let schema_for_nothing = br#"{"type": "object"}"#;
+        let mut members = REGISTRY_MEMBERS;
+        members[0] = schema_for_nothing;
+        let mut container = value(PACKAGE);
+        container["members"][RegistryRole::ALL[0].name()]["digest"] =
+            json!(component::file_digest(schema_for_nothing).as_str());
+        container["members"][RegistryRole::ALL[1].name()]["identity"] = json!("another");
+        let mut roles = committed();
+        roles.registry_package = Some(package(&compact(&container), members));
+        vec![
+            (25, unrelated),
+            (39, association),
+            (2, first),
+            (24, mapped),
+            (40, roles),
+        ]
+    }
+
+    /// One failure is reported of several, the first in the precedence's
+    /// order, whatever order their tuples', bodies', and mappings' members
+    /// come in and whichever worker finishes first (D15:3100, 3317).
+    #[test]
+    fn several_invalid_authorities_select_one_reason_in_any_order() {
+        // The order alone refuses nothing: the committed authorities, every
+        // body in other bytes, pass every row up to the implemented one.
+        let reordered = in_another_order(&committed());
+        assert_ne!(reordered, committed());
+        assert_eq!(constructed(&reordered), Some(43));
+        let cases = several_invalid();
+        for (row, input) in &cases {
+            let reported = construct(root(), input).err();
+            assert_eq!(reported.map(Refusal::number), Some(*row));
+            let other = in_another_order(input);
+            assert_ne!(other, *input, "row {row}");
+            assert_eq!(
+                construct(root(), &other).err(),
+                reported,
+                "row {row} in another order"
+            );
+        }
+        // Constructing in parallel, each worker reports its input's row
+        // whichever finishes first.
+        let reported = std::thread::scope(|scope| {
+            let workers: Vec<_> = cases
+                .iter()
+                .rev()
+                .map(|(_, input)| scope.spawn(|| construct(root(), input).err()))
+                .collect();
+            workers
+                .into_iter()
+                .map(|worker| worker.join().unwrap().map(Refusal::number))
+                .collect::<Vec<_>>()
+        });
+        let rows: Vec<_> = cases.iter().rev().map(|(row, _)| Some(*row)).collect();
+        assert_eq!(reported, rows);
+    }
+
+    /// The committed input with a set that maps a second schema, `second`,
+    /// to `schemaVersion` `"1"`, after `change` to the set's value.
+    fn mapping_two(second: &[u8], change: impl FnOnce(&mut Value)) -> ConstructionInput {
+        let mut mapped = authority_set(&set_bytes(|set| {
+            let mut record = set["members"]["0"].clone();
+            record["digest"] = json!(component::file_digest(second).as_str());
+            set["members"]["1"] = record;
+            change(set);
+        }));
+        mapped
+            .members
+            .insert("1".to_owned(), Artifact::read(second.to_vec()));
+        let mut input = committed();
+        input.configuration_schema_authority_set = Some(mapped);
+        input
+    }
+
+    /// Several mapped schemas share their set's one association, which must
+    /// equal the Active Profile Specification's: they pass the rule together,
+    /// and fail only at the implemented authority, which maps one. No mapped
+    /// schema can name a Profile Specification of its own, in its record or
+    /// in its bytes (D15:1017-1020, 3073, 3320).
+    #[test]
+    fn several_mapped_schemas_target_the_one_association() {
+        let second = compact(&value(CONFIGURATION_SCHEMA));
+        let input = mapping_two(&second, |_| {});
+        let set = input.configuration_schema_authority_set.as_ref();
+        let admitted = authority_set::admit(root(), set).unwrap();
+        assert_eq!(admitted.members.keys().collect::<Vec<_>>(), ["0", "1"]);
+        assert_eq!(constructed(&input), Some(43));
+        let changes: [fn(&mut Value); 3] = [
+            |association| association["identity"] = json!("another-profile"),
+            |association| association["revision"] = json!("1"),
+            |association| {
+                association["semanticDigest"] = json!(format!("sha256:{}", "0".repeat(64)));
+            },
+        ];
+        for (index, change) in changes.into_iter().enumerate() {
+            let other = mapping_two(&second, |set| change(&mut set["profileSpecification"]));
+            assert_eq!(constructed(&other), Some(42), "change {index}");
+        }
+        let own_record = mapping_two(&second, |set| {
+            let association = set["profileSpecification"].clone();
+            set["members"]["1"]["profileSpecification"] = association;
+        });
+        assert_eq!(constructed(&own_record), Some(16));
+        let mut naming = value(CONFIGURATION_SCHEMA);
+        naming["profileSpecification"] = json!({
+            "identity": "another-profile",
+            "revision": "1",
+            "semanticDigest": format!("sha256:{}", "0".repeat(64)),
+        });
+        assert_eq!(
+            constructed(&mapping_two(&compact(&naming), |_| {})),
+            Some(43)
+        );
+    }
+
     #[test]
     fn a_byte_different_profile_specification_with_an_equal_semantic_digest_constructs() {
         let bytes = compact(&value(PROFILE_SPECIFICATION));
