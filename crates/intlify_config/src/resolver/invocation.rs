@@ -302,7 +302,8 @@ pub(crate) mod tests {
     use crate::locale::{AdmissionFacts, ProviderBinding, ProviderFailure, VersionedIdentity};
     use crate::resolver::call_site_span::fixtures::{mirrored, CALL_SITE};
     use crate::resolver::entry::fixtures::FILE;
-    use crate::resolver::evaluation::Check;
+    use crate::resolver::entry::ROOT_VALUE_BOUNDS;
+    use crate::resolver::evaluation::{Check, IssueKey, Phase};
     use crate::resolver::evidence_metadata::fixtures::with;
     use crate::resolver::evidence_metadata::MetadataBound;
     use crate::resolver::evidence_source::hex;
@@ -313,6 +314,7 @@ pub(crate) mod tests {
     };
     use crate::resolver::profile_resolution::tests::Inputs;
     use crate::resolver::profile_resolution::Invocation;
+    use crate::resolver::reporting::Record;
     use crate::resolver::snapshot_entry::fixtures::ENTRY;
     use crate::resolver::token::Digest;
     use crate::snapshot::{from_json, Marker, MarkerReason, Node, SnapshotBound};
@@ -983,39 +985,111 @@ pub(crate) mod tests {
         }
     }
 
-    /// D15:2657, 3440: Phase 1 blocking before a complete JSON-compatible
-    /// value exists, over a file that is no JSON, one with a duplicate
-    /// member, one past a root-value bound, or a Snapshot with an ordinary or
-    /// a bootstrap-limit marker, returns no Materialized Resolution Input Set
-    /// beside the blocked outcome.
+    /// D15:1165, 2369, 2657, 3440: Phase 1 blocking before a complete
+    /// JSON-compatible value exists, over a file that is no JSON, one with a
+    /// duplicate member, one past each root-value bound, or a Snapshot with a
+    /// marker of each ordinary reason, the ancestor cycle's among them, or a
+    /// bootstrap-limit marker, blocks under the resolver's identity with a
+    /// complete bundle and no Shared projection. Its Entry projection holds
+    /// the statuses of Phases 0 and 1 and the blocking Findings of Phase 1,
+    /// one of the check that failed, a marker's naming its reason, whose keys
+    /// are the shared-unavailability causes in Finding order; a Phase 0
+    /// Finding beside them is no cause. No Materialized Resolution Input Set
+    /// is returned beside the outcome.
     #[test]
     fn no_set_is_returned_without_a_materialized_value() {
         let resolver = resolver();
         let raw = example(|inputs| inputs);
         let duplicate = Arc::from(&br#"{"schemaVersion":"0","schemaVersion":"0"}"#[..]);
-        let bounded = example(|inputs| inputs.bounding(&[(input_bound("maxNodes"), 10)], &[]));
+        // A specification input without its `project-profile` slot.
+        let mut unasserted = example(|inputs| inputs);
+        let mut slots: Value = serde_json::from_slice(&unasserted.specification).unwrap();
+        slots.as_object_mut().unwrap().remove("project-profile");
+        unasserted.specification = serde_json::to_vec(&slots).unwrap();
+        // Each entry, the check one of its Findings names with its reason, if
+        // any, and whether Phase 0 finds the slot missing too.
         let mut entries = vec![
-            raw.file_of(&resolver, no_json(), true),
-            raw.file_of(&resolver, duplicate, true),
-            bounded.file(&resolver, true),
+            (
+                raw.file_of(&resolver, no_json(), true),
+                Check::WellFormedJson,
+                None,
+                false,
+            ),
+            (
+                raw.file_of(&resolver, duplicate, true),
+                Check::UniqueMembers,
+                None,
+                false,
+            ),
+            (
+                unasserted.file_of(&resolver, no_json(), true),
+                Check::WellFormedJson,
+                None,
+                true,
+            ),
         ];
+        for (check, _, name) in ROOT_VALUE_BOUNDS {
+            let bounded = example(|inputs| inputs.bounding(&[(input_bound(name), 2)], &[]));
+            entries.push((bounded.file(&resolver, true), check, None, false));
+        }
         let terminal = Marker::BootstrapLimitExceeded {
             bound: SnapshotBound::Nodes,
             witness: ROOM + 1,
         };
-        for marker in [Marker::Rejected(MarkerReason::Cycle), terminal] {
+        for marker in MarkerReason::ALL
+            .map(Marker::Rejected)
+            .into_iter()
+            .chain([terminal])
+        {
+            let (check, reason) = match marker {
+                Marker::Rejected(reason) => (Check::JsonCompatible, Some(reason.id())),
+                Marker::BootstrapLimitExceeded { .. } => (Check::WithinSnapshotNodes, None),
+            };
             let mut root = from_json(&raw.config);
             let Node::Object(members) = &mut root else {
                 panic!("the root is an object");
             };
             // Last in canonical order, after every key the example writes.
             members.insert("~".to_owned(), Node::Marker(marker));
-            entries.push(raw.snapshot(&resolver, &root, true, false));
+            let snapshot = raw.snapshot(&resolver, &root, true, false);
+            entries.push((snapshot, check, reason, false));
         }
-        for inputs in &entries {
+        for (inputs, check, reason, bootstrap) in &entries {
             let mut storage = OutcomeStorage::default();
             let resolution = resolver.resolve(inputs, &mut storage).unwrap();
-            assert!(shown(&resolution.outcome).shared.is_none());
+            let outcome = &resolution.outcome;
+            assert_eq!(outcome.identity, *resolver.identity());
+            assert!(outcome.checked.is_none());
+            let evidence = &outcome.evidence;
+            assert!(evidence.complete() && evidence.shared.is_none());
+            let records = &evidence.entry.records;
+            let statuses: BTreeSet<Phase> = records
+                .iter()
+                .filter(|(_, retained)| retained.kind == RecordKind::EntryEvaluationStatus)
+                .map(|(owner, _)| owner.phase)
+                .collect();
+            let entered = [Phase::ResolverBootstrapAdmission, Phase::EntryAdmission];
+            assert_eq!(statuses, BTreeSet::from(entered));
+            let (phase_0, found): (Vec<_>, Vec<_>) = records
+                .iter()
+                .filter_map(|(_, retained)| match retained.record {
+                    Record::Finding(finding) => Some((finding.key, &retained.view)),
+                    _ => None,
+                })
+                .partition(|(key, _)| key.unit().phase == Phase::ResolverBootstrapAdmission);
+            assert_eq!(phase_0.len(), usize::from(*bootstrap), "{check:?}");
+            assert!(!found.is_empty());
+            for (key, view) in &found {
+                assert_eq!(key.unit().phase, Phase::EntryAdmission);
+                assert_eq!(view["blocking"], true);
+            }
+            let causes: Vec<IssueKey> = found.iter().map(|(key, _)| (*key).clone()).collect();
+            assert_eq!(evidence.unavailable(), causes);
+            assert!(
+                found.iter().any(|(key, view)| key.unit().check == *check
+                    && reason.is_none_or(|reason| view["key"]["reason"] == reason)),
+                "{check:?} {reason:?}"
+            );
             assert!(resolution.materialized.is_none());
         }
     }

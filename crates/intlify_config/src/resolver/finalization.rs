@@ -364,7 +364,7 @@ mod tests {
     use crate::resolver::evaluation::{Blocking, Check, Code, Evaluation, Notice, Phase};
     use crate::resolver::evidence_token::EvidenceTokens;
     use crate::resolver::locales::fixtures::canonical;
-    use crate::resolver::outcome::tests::{blocked, entry, identity, no_json, reporting};
+    use crate::resolver::outcome::tests::{blocked, entry, identity, no_json, reporting, shared};
     use crate::resolver::outcome::{outcome, replayed, ResolutionEvidence};
     use crate::resolver::profile_resolution::tests::Inputs;
     use crate::resolver::profile_resolution::{Invocation, ResolverInvariant};
@@ -760,8 +760,12 @@ mod tests {
     }
 
     /// When both domains are complete, Coverage Decision Evidence that leaves
-    /// a Basis without its record, or maps one twice, is a resolver bug; an
-    /// incomplete bundle may hold the Basis without the Evidence (D15:1611).
+    /// a Basis without its record, or maps one twice, is a resolver bug. An
+    /// incomplete bundle passes finalization holding one table without the
+    /// other only when the domain that omits it ends at the decision table,
+    /// which owns both: past the Entry domain alone the Basis stays, past the
+    /// Shared domain alone the Evidence stays, and past both neither does
+    /// (D15:1185, 1609, 1611, 2143, 3458).
     #[test]
     fn decision_evidence_covers_each_basis_exactly_once_both_domains_are_complete() {
         let inputs = reporting(&Inputs::complete(), &[], &[]);
@@ -777,31 +781,47 @@ mod tests {
             let mut twice = evidence.clone();
             twice.entry.records.insert(index, removed);
             assert_eq!(cover(&twice), Err(F::Cover));
-            evidence
-                .entry
-                .records
-                .iter()
-                .filter(|(owner, _)| **owner < table)
-                .count()
+            let before = |projection: &Projection<'_>| {
+                let records = projection.records.iter();
+                crate::artifacts::count(records.filter(|(owner, _)| **owner < table).count())
+            };
+            (
+                before(&evidence.entry),
+                before(evidence.shared.as_ref().unwrap()),
+            )
         });
-        // The Entry domain refuses the table's slice; the Shared one keeps
-        // the Basis.
-        let room = (entry("maxRecords"), crate::artifacts::count(before));
-        reporting(&Inputs::complete(), &[room], &[room]).outcome(
-            None,
-            identity(),
-            |_, _, outcome| {
-                let evidence = &outcome.evidence;
-                assert_eq!(
-                    evidence.entry.terminal.as_ref().unwrap().exhausted.cursor,
-                    &table
-                );
-                assert!(each(&evidence.entry, RecordKind::CoverageDecisionEvidence).is_empty());
-                let shared = evidence.shared.as_ref().unwrap();
-                assert!(!each(shared, RecordKind::CoverageDecisionBasis).is_empty());
-                assert_eq!(cover(evidence), Err(F::Cover));
-            },
-        );
+        // Each domain whose `maxRecords` leaves room for the records before
+        // the table's refuses the table's slice.
+        let entry_room = (entry("maxRecords"), before.0);
+        let shared_room = (shared("maxRecords"), before.1);
+        for (room, entry_ends, shared_ends) in [
+            (vec![entry_room], true, false),
+            (vec![shared_room], false, true),
+            (vec![entry_room, shared_room], true, true),
+        ] {
+            reporting(&Inputs::complete(), &room, &room).outcome(
+                None,
+                identity(),
+                |_, _, outcome| {
+                    let evidence = &outcome.evidence;
+                    let shared = evidence.shared.as_ref().unwrap();
+                    for (projection, kind, ends) in [
+                        (
+                            &evidence.entry,
+                            RecordKind::CoverageDecisionEvidence,
+                            entry_ends,
+                        ),
+                        (shared, RecordKind::CoverageDecisionBasis, shared_ends),
+                    ] {
+                        let cursor = projection.terminal.as_ref().map(|end| end.exhausted.cursor);
+                        assert_eq!(cursor, ends.then_some(&table), "{room:?}");
+                        assert_eq!(each(projection, kind).is_empty(), ends, "{room:?}");
+                    }
+                    let matched = entry_ends == shared_ends;
+                    assert_eq!(cover(evidence).is_ok(), matched, "{room:?}");
+                },
+            );
+        }
     }
 
     /// A Coverage Decision Evidence record whose source its Basis does not

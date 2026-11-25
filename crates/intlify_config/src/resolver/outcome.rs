@@ -415,7 +415,8 @@ pub(crate) mod tests {
     use crate::construction::root::ConstructionRoot;
     use crate::input_limits::Bound;
     use crate::resolver::call_site_span::fixtures::CALL_SITE;
-    use crate::resolver::dependency::{self, SemanticGroup};
+    use crate::resolver::coverage::{self, CoverageSubject};
+    use crate::resolver::dependency::{self, MaterializedSlot, SemanticGroup};
     use crate::resolver::entry::fixtures::FILE;
     use crate::resolver::evaluation::{
         Check, Code, ExhaustedBound, IssueKey, Phase, Reason, Status, Unit,
@@ -427,8 +428,10 @@ pub(crate) mod tests {
     use crate::resolver::profile_resolution::tests::{Inputs, ACTIVE};
     use crate::resolver::profile_view::ProfileView;
     use crate::resolver::reporting::{Record, ReportingDomain};
+    use crate::resolver::reporting_plan::Exhausted;
     use crate::resolver::resolution_evidence::Projection;
     use crate::resolver::snapshot_entry::fixtures::ENTRY;
+    use crate::resolver::structural_admission::OWNER as MATERIALIZED_OWNER;
     use crate::resolver::subject::{EntryPath, SubjectKind};
 
     use super::{Checked, Outcome};
@@ -750,8 +753,9 @@ pub(crate) mod tests {
     /// Blocking Findings after materialization block the outcome beside a
     /// complete Shared projection, which holds both Findings and the status of
     /// every unit after entry; those waiting on the missing default are not
-    /// evaluated, with its key among their causes (D15:1153, 1185, 2369,
-    /// 3442).
+    /// evaluated, with its key among their causes. The projection retains only
+    /// the dependencies and decision records admission established (D15:1153,
+    /// 1185, 2369, 3442, 3444).
     #[test]
     fn findings_after_materialization_block_the_outcome_beside_a_shared_projection() {
         blocked().outcome(None, identity(), |evaluation, _, outcome| {
@@ -784,6 +788,44 @@ pub(crate) mod tests {
                 status,
                 Status::NotEvaluated(causes) if causes.keys().any(|cause| cause == *missing)
             )));
+            // Only what admission established is retained: the materialized
+            // dependency of every slot, each established group's semantic
+            // dependency while the owners of the others wait, and the
+            // decision table's records once the table is complete (D15:1185,
+            // 1609, 2516, 3444).
+            let retained = |kind| -> Vec<(Unit, Value)> {
+                let records = shared.records.iter();
+                records
+                    .filter(|(_, retained)| retained.kind == kind)
+                    .map(|(owner, retained)| ((*owner).clone(), retained.view.clone()))
+                    .collect()
+            };
+            assert_eq!(
+                retained(RecordKind::MaterializedDependency),
+                MaterializedSlot::ALL.map(|slot| (MATERIALIZED_OWNER, slot.view()))
+            );
+            let mut groups = SemanticGroup::ALL.to_vec();
+            groups.sort_by_key(|group| dependency::unit(*group));
+            let (established, waiting): (Vec<_>, Vec<_>) = groups.into_iter().partition(|group| {
+                evaluation.status(&dependency::unit(*group)) == Some(&Status::Evaluated)
+            });
+            assert!(!waiting.is_empty());
+            for group in waiting {
+                let status = evaluation.status(&dependency::unit(group));
+                assert!(matches!(status, Some(Status::NotEvaluated(_))), "{group:?}");
+            }
+            let semantic: Vec<(Unit, Value)> = established
+                .into_iter()
+                .map(|group| (dependency::unit(group), group.view()))
+                .collect();
+            assert_eq!(retained(RecordKind::SemanticDependency), semantic);
+            let table = coverage::unit(CoverageSubject::Table, Check::CompleteTable);
+            assert_eq!(evaluation.status(&table), Some(&Status::Evaluated));
+            let basis = retained(RecordKind::CoverageDecisionBasis);
+            assert_eq!(basis.len(), evaluation.decision_basis().len());
+            assert!(basis.iter().all(|(owner, _)| *owner == table));
+            let mapped = views(&evidence.entry, RecordKind::CoverageDecisionEvidence);
+            assert_eq!(mapped.len(), evaluation.decision_evidence().len());
         });
     }
 
@@ -863,6 +905,92 @@ pub(crate) mod tests {
                     views(&evidence.entry, RecordKind::FindingOccurrence).len(),
                     kept
                 );
+            });
+        }
+    }
+
+    /// Each domain counts every Finding candidate of a unit against its own
+    /// `maxFindingOccurrences` before equal Finding Keys merge, whatever the
+    /// other domain's count gives. Three spellings no locale has, two of them
+    /// equal, are one Shared Finding with three Shared candidates and three
+    /// Entry occurrences: either domain holds at three, a Shared `maxFindings`
+    /// of one holding the merged Finding, and refuses the Finding's slice at
+    /// two, keeping only what the units before it committed, while the other
+    /// domain keeps its whole projection (D15:1946, 1962, 1970, 2211, 3450,
+    /// 3452).
+    #[test]
+    fn each_domain_counts_every_finding_candidate_before_equal_keys_merge() {
+        let mut inputs = Inputs::complete();
+        inputs.declaration()["requestedLocales"] = json!(["ja", "en", "zz", "en-x-brand", "zz"]);
+        let (within, key) =
+            reporting(&inputs, &[], &[]).outcome(None, identity(), |evaluation, _, outcome| {
+                let blocking: Vec<&IssueKey> = evaluation.issues().collect();
+                let [key] = blocking[..] else {
+                    panic!("{blocking:?}");
+                };
+                assert_eq!(key.code(), Code::LocaleInvalid);
+                let evidence = &outcome.evidence;
+                assert!(evidence.complete());
+                assert_eq!(findings(evidence.shared.as_ref().unwrap()), [key]);
+                let occurrences = views(&evidence.entry, RecordKind::FindingOccurrence);
+                assert_eq!(occurrences.len(), 3);
+                (shown(&outcome), key.clone())
+            });
+        let (shared_candidates, entry_candidates) = (
+            shared("maxFindingOccurrences"),
+            entry("maxFindingOccurrences"),
+        );
+        let merged = (shared("maxFindings"), 1);
+        for (tight, ended) in [
+            (
+                vec![(shared_candidates, 3), merged, (entry_candidates, 3)],
+                vec![],
+            ),
+            (
+                vec![(shared_candidates, 2), (entry_candidates, 3)],
+                vec![shared_candidates],
+            ),
+            (
+                vec![(shared_candidates, 3), (entry_candidates, 2)],
+                vec![entry_candidates],
+            ),
+            (
+                vec![(shared_candidates, 2), (entry_candidates, 2)],
+                vec![entry_candidates, shared_candidates],
+            ),
+        ] {
+            reporting(&inputs, &[], &tight).outcome(None, identity(), |_, _, outcome| {
+                assert!(outcome.checked.is_none());
+                let exhausted: Vec<Exhausted<'_>> = outcome
+                    .evidence
+                    .terminal_states()
+                    .map(|terminal| terminal.exhausted)
+                    .collect();
+                let expected: Vec<Exhausted<'_>> = ended
+                    .iter()
+                    .map(|bound| Exhausted {
+                        cursor: key.unit(),
+                        bound: ExhaustedBound::Domain(*bound),
+                    })
+                    .collect();
+                assert_eq!(exhausted, expected, "{tight:?}");
+                // An exhausted domain keeps what the units before the
+                // Finding's committed, and the other its whole projection.
+                let kept = |records: &Owned, group| -> Owned {
+                    let before = |(owner, ..): &&(Unit, RecordKind, Value)| owner < key.unit();
+                    let cut = ended.iter().any(|bound| bound.group == group);
+                    let records = records.iter();
+                    records
+                        .filter(|record| !cut || before(record))
+                        .cloned()
+                        .collect()
+                };
+                let bounded = shown(&outcome);
+                let entry = kept(&within.entry, Group::DiagnosticsEntry);
+                assert_eq!(unrevised(&bounded.entry), unrevised(&entry), "{tight:?}");
+                let (records, _) = bounded.shared.unwrap();
+                let (all, _) = within.shared.as_ref().unwrap();
+                assert_eq!(records, kept(all, Group::DiagnosticsShared), "{tight:?}");
             });
         }
     }
@@ -1366,6 +1494,85 @@ pub(crate) mod tests {
                 );
                 assert_entry_statuses_agree(&file, &snapshot);
                 assert_programmatic_dependencies(&file, &snapshot, call_site.is_some());
+            }
+        }
+    }
+
+    /// `records` without the revision of each entry dependency: a bound set
+    /// in the selected Policy changes its digest, which the configuration's
+    /// reference names, and so the entry's revision.
+    fn unrevised(records: &Owned) -> Owned {
+        let mut records = records.clone();
+        for (_, kind, view) in &mut records {
+            if *kind == RecordKind::EntryDependency {
+                view.as_object_mut().unwrap().remove("revision");
+            }
+        }
+        records
+    }
+
+    /// What an outcome shows, the length of `C` of its Entry records
+    /// together, and whether a bound exhausted its Entry domain.
+    type Sized = (Shown, u64, bool);
+
+    /// What `outcome` shows, its Entry records' bytes, and its Entry end.
+    fn sized(outcome: &Outcome<'_, '_>) -> Sized {
+        let entry = &outcome.evidence.entry;
+        let charged = entry.records.iter().map(|(_, retained)| retained.bytes);
+        (shown(outcome), charged.sum(), entry.terminal.is_some())
+    }
+
+    /// D15:2211, 3228, 3456: a file and a Snapshot of its value charge their
+    /// Entry projections differently, so an Entry `maxTotalCanonicalBytes` at
+    /// the smaller total holds that entry's whole Entry projection and its
+    /// profile, and refuses a slice of the other's, while each keeps the
+    /// Shared projection both have within every bound. A Shared `maxRecords`
+    /// one under the Shared projection's records refuses its last slice under
+    /// either entry, and each keeps its whole Entry projection. The outcome
+    /// is checked or blocked after materialization.
+    #[test]
+    fn an_entry_bound_between_a_file_and_its_snapshot_keeps_their_shared_projection() {
+        let file =
+            |inputs: &Inputs| inputs.outcome(None, identity(), |_, _, outcome| sized(&outcome));
+        let snapshot = |inputs: &Inputs| {
+            inputs.programmatic_outcome(None, identity(), |_, _, outcome| sized(&outcome))
+        };
+        for (name, inputs) in [("checked", Inputs::complete()), ("blocked", blocked())] {
+            let within = reporting(&inputs, &[], &[]);
+            let whole = [file(&within), snapshot(&within)];
+            let common = whole[0].0.shared.clone();
+            assert_eq!(whole[1].0.shared, common, "{name}");
+            assert_ne!(whole[0].1, whole[1].1, "{name}");
+            let smaller = whole[0].1.min(whole[1].1);
+            let bytes = (entry("maxTotalCanonicalBytes"), smaller);
+            let bounded = reporting(&inputs, &[bytes], &[bytes]);
+            for ((shown, _, ended), (unbounded, charged, _)) in
+                [file(&bounded), snapshot(&bounded)].into_iter().zip(&whole)
+            {
+                assert_eq!(shown.shared, common, "{name}");
+                assert_eq!(ended, *charged > smaller, "{name}");
+                if ended {
+                    assert!(shown.checked.is_none());
+                    assert!(shown.entry.len() < unbounded.entry.len());
+                } else {
+                    let checked = shown.checked.is_some();
+                    assert_eq!(checked, unbounded.checked.is_some(), "{name}");
+                    assert_eq!(unrevised(&shown.entry), unrevised(&unbounded.entry));
+                }
+            }
+            let (records, _) = common.as_ref().unwrap();
+            let last = (
+                shared("maxRecords"),
+                crate::artifacts::count(records.len()) - 1,
+            );
+            let bounded = reporting(&inputs, &[last], &[last]);
+            for ((shown, _, ended), (unbounded, ..)) in
+                [file(&bounded), snapshot(&bounded)].into_iter().zip(&whole)
+            {
+                assert!(shown.checked.is_none());
+                assert!(shown.shared.unwrap().1.is_some(), "{name}");
+                assert!(!ended, "{name}");
+                assert_eq!(unrevised(&shown.entry), unrevised(&unbounded.entry));
             }
         }
     }

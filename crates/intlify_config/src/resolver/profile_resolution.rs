@@ -1279,6 +1279,9 @@ pub(super) mod tests {
         config: Value,
         /// The Profile ID the selector names.
         selected: &'static str,
+        /// Whether no selector is submitted, in place of one naming
+        /// `selected`.
+        unnamed: bool,
         members: Vec<Value>,
         specifications: SpecificationInput<Id>,
         /// The members of the vocabulary submitted against its slot.
@@ -1317,6 +1320,7 @@ pub(super) mod tests {
             let mut inputs = Self {
                 config,
                 selected: "web",
+                unnamed: false,
                 members: vec![policy.clone()],
                 specifications: specifications(),
                 surfaces: &vectors::MEMBERS,
@@ -1468,6 +1472,7 @@ pub(super) mod tests {
             Self {
                 config,
                 selected: id,
+                unnamed: self.unnamed,
                 members: self.members.clone(),
                 specifications: self.specifications.clone(),
                 surfaces: self.surfaces,
@@ -1515,6 +1520,7 @@ pub(super) mod tests {
             let mut inputs = Self {
                 config: self.config.clone(),
                 selected: self.selected,
+                unnamed: self.unnamed,
                 members: self.members.clone(),
                 specifications: self.specifications.clone(),
                 surfaces: self.surfaces,
@@ -1676,6 +1682,7 @@ pub(super) mod tests {
             Self {
                 config,
                 selected: self.selected,
+                unnamed: self.unnamed,
                 members,
                 specifications: self.specifications.clone(),
                 surfaces: self.surfaces,
@@ -1697,6 +1704,7 @@ pub(super) mod tests {
             Self {
                 config,
                 selected: self.selected,
+                unnamed: self.unnamed,
                 members,
                 specifications: self.specifications.clone(),
                 surfaces: self.surfaces,
@@ -1706,15 +1714,18 @@ pub(super) mod tests {
             }
         }
 
-        /// The selector that names the declaration `selected`.
+        /// The selector that names the declaration `selected`, or none.
         fn selector(&self) -> SelectorInput {
-            SelectorInput::string(
-                self.selected,
-                self.capability
-                    .configuration_input
-                    .structural
-                    .max_profile_id_bytes,
-            )
+            let bound = self
+                .capability
+                .configuration_input
+                .structural
+                .max_profile_id_bytes;
+            if self.unnamed {
+                SelectorInput::absent(bound)
+            } else {
+                SelectorInput::string(self.selected, bound)
+            }
         }
 
         /// Phases 1 to 3 over the configuration outside any evaluation,
@@ -2348,6 +2359,66 @@ pub(super) mod tests {
                 assert_eq!(units, [&declared], "{unit:?}");
             }
         });
+    }
+
+    /// A missing or unknown selection gives no profile, whole or partial:
+    /// with two declarations and no selector, or a selector naming neither,
+    /// the outcome is blocked on the selector's one Finding, with a complete
+    /// bundle whose every later status waits on it, no Policy confirmed, and
+    /// no semantic result. A Profile ID a file writes twice is Phase 1's
+    /// duplicate member, so no value exists to select from (D15:802, 2129,
+    /// 2131, 2295, 2297, 3463).
+    #[test]
+    fn a_missing_or_unknown_selection_leaves_no_partial_profile() {
+        use crate::resolver::outcome::tests::{identity, reporting};
+        use crate::resolver::reporting::Record;
+        // Named after the Policy is selected, which edits the declaration
+        // the selector names.
+        let mut unnamed = reporting(&Inputs::complete().selecting("shop"), &[], &[]);
+        unnamed.unnamed = true;
+        let mut unknown = reporting(&Inputs::complete(), &[], &[]);
+        unknown.selected = "absent";
+        for (inputs, check, code) in [
+            (unnamed, Check::RequiredSelector, Code::SelectorRequired),
+            (unknown, Check::DeclaredSelector, Code::SelectorUnknown),
+        ] {
+            let held = selector(check);
+            inputs.outcome(None, identity(), |evaluation, invoked, outcome| {
+                assert_eq!(issues(evaluation), [(held.clone(), code, None)]);
+                let state = invoked.state.as_ref().unwrap();
+                assert_eq!(absent(state), EVERY);
+                assert!(outcome.checked.is_none());
+                let evidence = &outcome.evidence;
+                assert!(evidence.complete() && evidence.unavailable().is_empty());
+                let shared = evidence.shared.as_ref().unwrap();
+                let mut waiting = 0;
+                for (owner, retained) in &shared.records {
+                    if let Record::Status(Status::NotEvaluated(causes)) = retained.record {
+                        let units: Vec<&Unit> = causes.keys().map(IssueKey::unit).collect();
+                        assert_eq!(units, [&held], "{owner:?}");
+                        waiting += 1;
+                    }
+                }
+                assert!(waiting > 0);
+            });
+        }
+        let inputs = Inputs::complete().selecting("shop");
+        let text = serde_json::to_string(&inputs.config).unwrap();
+        let map = r#""profiles":{"#;
+        let at = text.find(map).unwrap() + map.len();
+        let twice = format!(r#"{}"shop":{{}},{}"#, &text[..at], &text[at..]);
+        reporting(&inputs, &[], &[]).outcome(
+            Some(Arc::from(twice.into_bytes())),
+            identity(),
+            |evaluation, _, outcome| {
+                let duplicate = (input(Check::UniqueMembers), Code::JsonMemberDuplicate, None);
+                assert_eq!(issues(evaluation), [duplicate]);
+                assert!(evaluation
+                    .statuses()
+                    .all(|(unit, _)| unit.phase <= Phase::EntryAdmission));
+                assert!(outcome.checked.is_none() && outcome.evidence.shared.is_none());
+            },
+        );
     }
 
     /// Without a `profiles` object no declaration is counted or selected:
@@ -3526,6 +3597,88 @@ pub(super) mod tests {
                 )
             );
         });
+    }
+
+    /// When the selected Resource Limit Policy cannot be admitted, because it
+    /// needs more than the capability allows or is not submitted, the
+    /// invocation gives one outcome, blocked on that failure alone, with no
+    /// Policy confirmed and every domain bounded by the capability alone:
+    /// neither the failed Policy's own diagnostic bounds nor those of the
+    /// admissible Policy another declaration names, submitted beside it, end
+    /// a domain the capability leaves room for, while the capability's Shared
+    /// `maxRecords` one under the Shared records refuses the last Shared
+    /// slice, after Phase 4 (D15:1940, 2132, 2391, 3467).
+    #[test]
+    fn a_selected_policy_that_cannot_be_admitted_leaves_one_outcome_under_the_capability() {
+        use crate::resolver::evaluation::ExhaustedBound;
+        use crate::resolver::outcome::tests::{entry, identity, reporting, shared};
+        type Fail<'f> = &'f dyn Fn(&mut Inputs);
+        // Bounds that would end both domains at their first records.
+        let narrow = |limits: &ResolutionLimits| {
+            tightened(
+                limits,
+                &[(entry("maxRecords"), 1), (shared("maxRecords"), 1)],
+            )
+        };
+        let incompatible = |inputs: &mut Inputs| {
+            let mut limits = narrow(&policy_limits());
+            let capability = inputs.capability.locale_resolution.max_requested_locales;
+            limits.locale_resolution.max_requested_locales = bound(capability.get() + 1);
+            inputs.select_policy(resource_limit_policy(&limits));
+        };
+        let unsubmitted = |inputs: &mut Inputs| {
+            let pinned = inputs.pinned.clone();
+            inputs.members.retain(|member| tuple_of(member) != pinned);
+        };
+        let compared =
+            resource_policy::unit(PolicySubject::ResourceLimits, Check::CompatiblePolicy);
+        let decided =
+            resource_policy::unit(PolicySubject::ResourceLimits, Check::BootstrapCandidate);
+        let cases: [(Fail<'_>, &Unit); 2] = [(&incompatible, &compared), (&unsubmitted, &decided)];
+        for (fail, failed) in cases {
+            let failing = |capability: &[(BoundId, u64)]| {
+                let mut inputs = reporting(&Inputs::complete(), capability, &[]);
+                let other = envelope_of(
+                    ArtifactKind::ResourceLimitPolicy,
+                    "admin-limits",
+                    "1",
+                    json!({ SECTION: narrow(&policy_limits()).section() }),
+                );
+                let mut admin = inputs.declaration().clone();
+                admin["policies"]["resourceLimits"] = reference_value(&tuple_of(&other));
+                inputs.config["profiles"]["admin"] = admin;
+                inputs.members.push(other);
+                fail(&mut inputs);
+                inputs
+            };
+            let (records, last) =
+                failing(&[]).outcome(None, identity(), |evaluation, invoked, outcome| {
+                    let found = issues(evaluation);
+                    let [(unit, ..)] = &found[..] else {
+                        panic!("{found:?}");
+                    };
+                    assert_eq!(unit, failed);
+                    let policy = &invoked.state.as_ref().unwrap().policy;
+                    assert!(policy.confirmed.is_err() && policy.diagnostics.is_none());
+                    assert_eq!(outcome.identity, identity());
+                    assert!(outcome.checked.is_none());
+                    let evidence = &outcome.evidence;
+                    assert!(evidence.complete());
+                    let shared = &evidence.shared.as_ref().unwrap().records;
+                    let last = shared.iter().map(|(owner, _)| *owner).max().unwrap();
+                    assert!(*last > compared);
+                    (crate::artifacts::count(shared.len()), last.clone())
+                });
+            let room = (shared("maxRecords"), records - 1);
+            failing(&[room]).outcome(None, identity(), |_, _, outcome| {
+                let evidence = &outcome.evidence;
+                assert!(evidence.entry.terminal.is_none(), "{failed:?}");
+                let shared = evidence.shared.as_ref().unwrap();
+                let exhausted = shared.terminal.as_ref().unwrap().exhausted;
+                assert_eq!(exhausted.cursor, &last, "{failed:?}");
+                assert_eq!(exhausted.bound, ExhaustedBound::Domain(room.0));
+            });
+        }
     }
 
     #[test]
@@ -5487,6 +5640,53 @@ pub(super) mod tests {
                     .all(|(unit, _, _)| unit.phase == Phase::StructuralAdmission));
             });
         }
+    }
+
+    /// An edit that breaks the structure of a declaration the selector does
+    /// not select gives a new outcome, blocked on that declaration's one
+    /// structural Finding with a complete bundle, and composes nothing of it
+    /// into the selected declaration: every Shared record of the checks after
+    /// structural admission is the one the configuration gives while the
+    /// other declaration is valid (D15:2131, 2142, 2367, 2587, 3434; plan 025
+    /// decision #212).
+    #[test]
+    fn breaking_an_unselected_declaration_blocks_without_composing_it() {
+        use crate::resolver::outcome::tests::{identity, reporting, shown, Owned};
+        use crate::resolver::structural_admission::{EntryKey, Field, StructuralSubject as S};
+        let with_admin = |locales: Value| {
+            let mut inputs = Inputs::complete();
+            let mut admin = inputs.declaration().clone();
+            admin["requestedLocales"] = locales;
+            inputs.config["profiles"]["admin"] = admin;
+            reporting(&inputs, &[], &[]).outcome(None, identity(), |evaluation, _, outcome| {
+                assert_eq!(outcome.identity, identity());
+                let evidence = &outcome.evidence;
+                assert!(evidence.complete() && evidence.unavailable().is_empty());
+                let shown = shown(&outcome);
+                let (records, _) = shown.shared.unwrap();
+                let later: Owned = records
+                    .into_iter()
+                    .filter(|(owner, ..)| owner.phase > Phase::StructuralAdmission)
+                    .collect();
+                (issues(evaluation), shown.checked.is_some(), later)
+            })
+        };
+        let (none, checked, valid) = with_admin(json!(["ja", "en"]));
+        assert!(none.is_empty() && checked);
+        let (found, checked, broken) = with_admin(json!("en"));
+        let admin = S::ProfileField(
+            EntryKey::identity("admin"),
+            Field::of(&["requestedLocales"]),
+        );
+        let unit = Unit {
+            phase: Phase::StructuralAdmission,
+            subject: Subject::Structural(admin),
+            check: Check::FieldType,
+        };
+        assert_eq!(found, [(unit, Code::FieldTypeInvalid, None)]);
+        assert!(!checked);
+        assert!(!broken.is_empty());
+        assert_eq!(broken, valid);
     }
 
     /// A structural failure inside the selected declaration holds back only
