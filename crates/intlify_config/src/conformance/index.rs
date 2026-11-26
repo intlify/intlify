@@ -11,7 +11,7 @@
 //! `sha256:` presentation, a path is suite-root-relative, and each object
 //! holds exactly its members. Which identity, revision, and digests an entry
 //! carries, and the order of the roles, which a JSON Schema cannot express,
-//! are the runner's to compare.
+//! are the runner's to compare ([`super::runner`]).
 //!
 //! A suite-root-relative path is one or more segments joined by `/`, each
 //! starting with an ASCII letter or digit and holding only ASCII letters,

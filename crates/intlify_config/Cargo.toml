@@ -27,7 +27,8 @@ benchmark = ["dep:blake3", "dep:getrandom", "dep:intlify_measurement", "dep:serd
 # artifacts. No codec, reader, or admission becomes public.
 vectors = []
 # Developer-only conformance suite: the committed Suite Index and its schema,
-# written from this crate's values like the construction artifacts.
+# written from this crate's values like the construction artifacts, and the
+# runner that opens a suite at an explicit Suite Index path.
 conformance = ["vectors"]
 
 [dependencies]
@@ -76,6 +77,10 @@ required-features = ["vectors"]
 
 [[example]]
 name = "generate_conformance_suite"
+required-features = ["conformance"]
+
+[[example]]
+name = "run_conformance_suite"
 required-features = ["conformance"]
 
 [[example]]

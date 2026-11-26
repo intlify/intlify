@@ -91,7 +91,7 @@ pub use artifacts::vectors as vector_support;
 pub use construction::generate as construction_support;
 
 // Developer-only conformance suite: writing the committed Suite Index and its
-// schema.
+// schema, and opening a suite at an explicit Suite Index path.
 #[cfg(feature = "conformance")]
 #[doc(hidden)]
 pub use conformance::support as conformance_support;
@@ -116,10 +116,9 @@ mod artifacts;
 #[allow(dead_code)]
 mod construction;
 
-// 015's Conformance Suite: its Suite Index and schema. Only tests and the
-// developer examples build it, and nothing reads the pinned digest yet.
+// 015's Conformance Suite: the Suite Index and the runner that opens a suite
+// from it. It reads files, so only tests and the developer examples build it.
 #[cfg(any(test, feature = "conformance"))]
-#[allow(dead_code)]
 mod conformance;
 
 // 015's typed-record framing and the Resolver Construction Identity's text.
