@@ -219,25 +219,38 @@ mod tests {
     }
 
     /// A module's code without the top-level items behind `#[cfg(test)]`,
-    /// wherever they are: rustfmt ends each at a line in column 0 that closes
-    /// a block or ends with `;`.
+    /// wherever they are. Each item is skipped through its attributes, its
+    /// first line, and the lines that continue it; the first other line ends
+    /// the skip, so a form this does not know leaves more code to scan, not
+    /// less.
     fn code_outside_tests(text: &str) -> String {
         let mut code = String::new();
-        let mut lines = text.lines();
+        let mut lines = text.lines().peekable();
         while let Some(line) = lines.next() {
             if line != "#[cfg(test)]" {
                 code.push_str(line);
                 code.push('\n');
                 continue;
             }
-            for item in lines.by_ref() {
-                let top = !item.starts_with([' ', '\t']);
-                if top && !item.starts_with("#[") && (item.ends_with(';') || item == "}") {
-                    break;
-                }
-            }
+            while lines
+                .next_if(|line| line.starts_with("#[") || line.starts_with("///"))
+                .is_some()
+            {}
+            lines.next();
+            while lines.next_if(|line| continues_an_item(line)).is_some() {}
         }
         code
+    }
+
+    /// Whether a line can be part of a top-level item past its first line:
+    /// rustfmt indents the rest of an item and leaves in column 0 only blank
+    /// lines, the lines that close a bracket, and `where` or `{` after a
+    /// signature.
+    fn continues_an_item(line: &str) -> bool {
+        line.is_empty()
+            || line.starts_with([' ', '}', ')', ']', '>'])
+            || line == "where"
+            || line == "{"
     }
 
     /// Nothing a resolution runs through discovers its inputs: beside the
@@ -283,5 +296,30 @@ mod tests {
             scanned += 1;
         }
         assert!(scanned >= 130, "{scanned}");
+    }
+
+    /// Skipping a test-only item hides none of the code after it: not after
+    /// one that fits on its first line, one that ends on an indented line, or
+    /// one whose signature spreads over several lines.
+    #[test]
+    fn a_test_only_item_hides_no_code_after_it() {
+        let after = "fn discover() {\n    std::fs::read(\"x\");\n}\n";
+        for item in [
+            "fn fixture() {}\n",
+            "/// A fixture.\nfn fixture() {}\n",
+            "const DIGEST: &str =\n    \"sha256:0\";\n",
+            "const NAMES: [&str; 1] = [\n    \"a\",\n];\n",
+            "#[allow(dead_code)]\nfn helper<\n    P: AsRef<Path>,\n>(\n    path: P,\n) -> Vec<u8>\n\
+             where\n    P: Copy,\n{\n    std::fs::read(path).unwrap()\n}\n",
+            "mod tests;\n",
+            "mod tests {\n    fn read() {\n        std::fs::read(\"y\");\n    }\n\n    fn more() {}\n}\n",
+        ] {
+            let text = format!("use std::path::Path;\n\n#[cfg(test)]\n{item}{after}");
+            assert_eq!(
+                code_outside_tests(&text),
+                format!("use std::path::Path;\n\n{after}"),
+                "{item}"
+            );
+        }
     }
 }
