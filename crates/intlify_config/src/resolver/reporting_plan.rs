@@ -512,13 +512,14 @@ pub(crate) mod tests {
     use serde_json::json;
 
     use crate::artifacts::count;
+    use crate::construction::registry::check::RecordKind;
     use crate::input_limits::Bound;
     use crate::materialize_tests::limits;
     use crate::resolver::dependency::fixtures::file_entry;
     use crate::resolver::entry::admit_entry;
     use crate::resolver::entry::fixtures::FileFixture;
     use crate::resolver::evaluation::{
-        Causes, Check, Evaluation, ExhaustedBound, IssueKey, Reason, Status, Unit,
+        Causes, Check, Evaluation, ExhaustedBound, IssueKey, Phase, Reason, Status, Unit,
     };
     use intlify_shared_json::encoding::encoded_length;
 
@@ -531,7 +532,8 @@ pub(crate) mod tests {
     };
     use crate::resolver::profile_resolution::tests::Inputs;
     use crate::resolver::record_view::RecordViews;
-    use crate::resolver::reporting::{Record, Reporting, ReportingDomain, Slice};
+    use crate::resolver::reporting::{Record, Reporting, ReportingDomain, Retained, Slice};
+    use crate::resolver::resolution_evidence::Projection;
     use crate::resolver::resource_policy::{self, PolicySubject};
     use crate::resolver::token::{Sha256, Specification, Tokens};
 
@@ -961,6 +963,113 @@ pub(crate) mod tests {
             assert_ne!(keys[0], keys[1]);
             assert!(keys[0] < keys[1], "the Entry Finding comes first");
         });
+    }
+
+    /// Every record kind but the two Findings (D15:2518).
+    const NOT_FINDINGS: [RecordKind; 10] = [
+        RecordKind::EntryEvaluationStatus,
+        RecordKind::FindingOccurrence,
+        RecordKind::CoverageDecisionEvidence,
+        RecordKind::EvidenceIndex,
+        RecordKind::EntryDependency,
+        RecordKind::SharedUnavailabilityCause,
+        RecordKind::SharedEvaluationStatus,
+        RecordKind::CoverageDecisionBasis,
+        RecordKind::SemanticDependency,
+        RecordKind::MaterializedDependency,
+    ];
+
+    /// For each record kind of `reporting`'s slices but a Finding, a
+    /// domain-wide bound that its first record after the domain's first is
+    /// the first to exceed, `maxRecords` at the records before it or
+    /// `maxTotalCanonicalBytes` one byte under the bytes through it, refuses
+    /// its owner's slice whole and ends the domain at that owner, whose
+    /// projection names it as the terminal cursor. Returns the kinds it
+    /// found.
+    fn first_over_by_kind(
+        evaluation: &Evaluation,
+        reporting: &Reporting<'_, '_>,
+    ) -> BTreeSet<RecordKind> {
+        let views = RecordViews::assign(PROFILE, evaluation, &Sha256);
+        let within = report(reporting, &limits_with(None), None).unwrap();
+        let mut found = BTreeSet::new();
+        for (domain, group) in [
+            (ReportingDomain::Entry, Group::DiagnosticsEntry),
+            (ReportingDomain::Shared, Group::DiagnosticsShared),
+        ] {
+            let slices = &of(&within, domain).slices;
+            let records: Vec<(usize, &Retained<'_>)> = slices
+                .iter()
+                .enumerate()
+                .flat_map(|(at, slice)| slice.records.iter().map(move |record| (at, record)))
+                .collect();
+            for kind in NOT_FINDINGS {
+                let Some(at) = (1..records.len()).find(|&at| records[at].1.kind == kind) else {
+                    continue;
+                };
+                let (slice, _) = records[at];
+                let owner = slices[slice].unit;
+                // The unit that produced the record, never a synthetic one.
+                assert_ne!(owner.phase, Phase::ReportingFinalization);
+                let bytes: u64 = records[..=at].iter().map(|(_, record)| record.bytes).sum();
+                for (name, limit) in [
+                    ("maxRecords", count(at)),
+                    ("maxTotalCanonicalBytes", bytes - 1),
+                ] {
+                    let bound = BoundId { group, name };
+                    let over = report(reporting, &limits_with(Some((bound, limit))), None).unwrap();
+                    let committed = of(&over, domain).clone();
+                    assert_eq!(
+                        committed,
+                        Committed {
+                            slices: slices[..slice].to_vec(),
+                            exhausted: Some(Exhausted {
+                                cursor: owner,
+                                bound: ExhaustedBound::Domain(bound),
+                            }),
+                        },
+                        "{kind:?} {name}"
+                    );
+                    let projection = Projection::finalized(reporting, domain, committed).unwrap();
+                    let terminal = projection.terminal.unwrap();
+                    assert_eq!(terminal.exhausted.cursor, owner, "{kind:?} {name}");
+                    assert_eq!(terminal.state["nextUnitCursor"], views.unit(owner).unwrap());
+                }
+                found.insert(kind);
+            }
+        }
+        found
+    }
+
+    /// A record of every kind but a Finding can be the first past a
+    /// domain-wide bound, and the domain then ends at that record's owner,
+    /// never at reporting finalization: statuses, occurrences, the evidence
+    /// index, entry dependencies, and the cause references of an entry that
+    /// materialized no value, and the complete invocation's decision records
+    /// and semantic and materialized dependencies (D15:2205, 2209, 2211,
+    /// 2408, 3454).
+    #[test]
+    fn a_record_of_each_kind_past_a_domain_wide_bound_ends_its_domain_at_its_owner() {
+        let (evaluation, causes) = entered();
+        let reporting = Reporting::new(
+            &evaluation,
+            PROFILE,
+            (Some(&causes), file_entry()),
+            &unbounded(),
+            &Sha256,
+        );
+        let mut found = first_over_by_kind(&evaluation, &reporting);
+        Inputs::complete().resolve(|evaluation, _| {
+            let reporting = Reporting::new(
+                &evaluation,
+                PROFILE,
+                (None, file_entry()),
+                &unbounded(),
+                &Sha256,
+            );
+            found.extend(first_over_by_kind(&evaluation, &reporting));
+        });
+        assert_eq!(found, BTreeSet::from(NOT_FINDINGS));
     }
 
     /// Past a bound of the Shared scope, no slice is planned: each domain is

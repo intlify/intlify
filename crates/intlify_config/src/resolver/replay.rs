@@ -193,7 +193,7 @@ impl Resolver<'_> {
 mod tests {
     use std::sync::Arc;
 
-    use serde_json::Value;
+    use serde_json::{json, Value};
 
     use super::*;
     use crate::artifacts::envelope::{ExactTuple, FormalMember};
@@ -213,6 +213,7 @@ mod tests {
     use crate::resolver::profile_resolution::tests::Inputs;
     use crate::resolver::profile_view::ProfileView;
     use crate::resolver::reporting::ReportingDomain;
+    use crate::resolver::staleness::{compare, Retained, Staleness};
 
     /// What a Shared projection shows: its records, and its terminal Finding
     /// and state when a bound exhausted it.
@@ -372,6 +373,104 @@ mod tests {
         let mut storage = ReplayStorage::default();
         let replay = resolver.replay(&other, &mut storage).unwrap();
         assert_eq!(replay.err(), Some(ConstructionStale));
+    }
+
+    /// The members of the raw Specification Input, in slot order.
+    const SLOTS: [&str; 8] = [
+        "project-profile",
+        "locale-canonicalization",
+        "locale-negotiation",
+        "message-locale-fallback",
+        "coverage",
+        "intent-surface-class-vocabulary",
+        "delivery-graph",
+        "delivery-placement",
+    ];
+
+    /// 015's example with its Specification Input after `edit`, written
+    /// spaced when `spaced`.
+    fn specified(spaced: bool, edit: impl FnOnce(&mut Value)) -> Raw {
+        let mut raw = example(|inputs| inputs);
+        let mut input: Value = serde_json::from_slice(&raw.specification).unwrap();
+        edit(&mut input);
+        let written = if spaced {
+            serde_json::to_vec_pretty(&input)
+        } else {
+            serde_json::to_vec(&input)
+        };
+        raw.specification = written.unwrap();
+        raw
+    }
+
+    /// D15:1146, 2585, 2589, 2659, 3423: each Specification Input member's
+    /// identity and revision is retained in the Materialized Resolution Input
+    /// Set, reproduced, and compared. Another value of any one of the sixteen
+    /// gives another set, an `invocation-stale` invocation, and a replay that
+    /// reproduces that invocation's own Shared projection, unlike the
+    /// example's. The input's members in another order and spacing give an
+    /// equal set, a `fresh` invocation, and the example's replay.
+    #[test]
+    fn each_specification_member_identity_and_revision_is_retained_and_compared() {
+        let resolver = resolver();
+        let earlier = example(|inputs| inputs).file(&resolver, true);
+        let (shown, set) = resolved(&resolver, &earlier);
+        let context = committed().context();
+        let staleness = |later: &InvocationInputs<PinnedFixture>| {
+            let retained = |invocation| Retained {
+                construction: context,
+                invocation,
+            };
+            let root = ConstructionRoot::built_in().unwrap();
+            compare(root, &retained(&earlier), &retained(later))
+        };
+        let reversed = specified(true, |input| {
+            *input = input
+                .as_object()
+                .unwrap()
+                .clone()
+                .into_iter()
+                .rev()
+                .collect();
+        });
+        assert_ne!(
+            reversed.specification,
+            example(|inputs| inputs).specification
+        );
+        let later = reversed.file(&resolver, true);
+        assert_eq!(staleness(&later), Staleness::Fresh);
+        let (_, other) = resolved(&resolver, &later);
+        assert!(other == set);
+        let (identity, shared, profile) = replays(&resolver, &other);
+        assert_eq!(
+            (identity, Some(shared)),
+            (shown.identity, shown.shared.clone())
+        );
+        assert_eq!(profile, shown.checked);
+        let mut edits = 0;
+        for slot in SLOTS {
+            for (member, value) in [
+                ("identity", "test-only-other-specification"),
+                ("revision", "1"),
+            ] {
+                let raw = specified(false, |input| input[slot][member] = json!(value));
+                let later = raw.file(&resolver, true);
+                let name = format!("{slot} {member}");
+                assert_eq!(staleness(&later), Staleness::InvocationStale, "{name}");
+                let (other, edited) = resolved(&resolver, &later);
+                assert!(edited != set, "{name}");
+                assert!(other.checked.is_none(), "{name}");
+                assert_ne!(other.shared, shown.shared, "{name}");
+                let (identity, shared, profile) = replays(&resolver, &edited);
+                assert_eq!(
+                    (identity, Some(shared)),
+                    (other.identity, other.shared),
+                    "{name}"
+                );
+                assert_eq!(profile, None, "{name}");
+                edits += 1;
+            }
+        }
+        assert_eq!(edits, 16);
     }
 
     /// D15:2659: by type, a replay holds the identity, the Shared projection,

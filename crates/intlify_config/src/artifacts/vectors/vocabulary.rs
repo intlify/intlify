@@ -154,7 +154,18 @@ pub(crate) fn formal() -> crate::artifacts::vocabulary::FormalVocabulary {
 /// boundary.
 #[cfg(test)]
 pub(crate) fn formal_of(members: &[&str]) -> crate::artifacts::vocabulary::FormalVocabulary {
-    let artifact = sealed(IDENTITY, REVISION, members).unwrap();
+    formal_named(IDENTITY, REVISION, members)
+}
+
+/// The vocabulary `identity` at `revision` with `members`, past the boundary.
+/// Its name is no part of its semantic digest (D17:1110).
+#[cfg(test)]
+pub(crate) fn formal_named(
+    identity: &'static str,
+    revision: &'static str,
+    members: &[&str],
+) -> crate::artifacts::vocabulary::FormalVocabulary {
+    let artifact = sealed(identity, revision, members).unwrap();
     read(Some(&serde_json::to_vec(&artifact).unwrap()), &ROOM).unwrap()
 }
 

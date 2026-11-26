@@ -55,7 +55,7 @@ The digests cover values, not bytes, so the repository formatter may lay the fil
 
 ## Who checks what
 
-`resolver::profile_view`'s tests build every case's inputs, resolve and project them, and compare the committed file with the views and digests they produce. The same cases drive the unit tests of equality and inequality.
+`resolver::profile_view`'s tests build every case's inputs, resolve and project them, and compare the committed file with the views and digests they produce. The same cases drive the unit tests of equality and inequality. Other unit tests vary what no case declares: the specifications the resolver supports, each reference's artifact, each bound of the selected policy, and the encodings of the file and the artifacts.
 
 The Node checker shares no code with this crate and does not read the design document. It checks every view against its own copy of 015's closed shape:
 
@@ -80,7 +80,9 @@ The unit tests are at the end of `src/resolver/profile_view.rs`, named here by t
 | One member per semantic group, in the Profile Specification's order | `a_checked_profile_projects_every_semantic_group_in_inventory_order`. Node: the committed Profile Specification's `semanticGroups` |
 | The digest is 017's `H` under the domain 017 registers | `the_profile_semantic_digest_is_h_over_the_view`. Node: its own framing and hash |
 | A difference outside the projection keeps the view and the digest | `declarations_of_one_profile_have_one_view_and_digest`. Vectors: the five cases that name `complete` |
+| Another encoding of the file or of each artifact, an accepted spelling, and `$schema` keep the view and the digest | `another_encoding_of_the_configuration_keeps_the_profile`, `another_encoding_of_each_artifact_keeps_the_profile_and_its_bindings`, `accepted_spellings_keep_the_view_and_digest`, `schema_metadata_keeps_the_profile` |
 | A semantic difference changes the view and the digest | `each_semantic_change_changes_the_view_and_its_digest`, `a_second_group_projects_its_own_target_and_relations`. Node: distinct views have distinct digests |
+| Each specification, reference member, bound, target subset, and group member set is one field of the view, which alone changes with it | `each_specification_member_changes_only_its_own_field`, `each_reference_changes_the_view_only_through_its_exact_members`, `a_reference_is_its_five_exact_members`, `each_policy_bound_changes_its_own_field_and_the_policy_digest`, `a_targets_subset_and_a_groups_members_change_only_their_own_fields` |
 | A decision row for every requested locale, empty when the vocabulary has no surface class | `every_requested_locale_has_a_decision_row`. Node: the rows of every view |
 | The view of a checked profile only when every semantic group is established | `resolver::profile_resolution`'s `the_view_exists_exactly_when_every_group_is_established` |
 
