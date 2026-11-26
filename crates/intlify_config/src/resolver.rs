@@ -217,4 +217,109 @@ mod tests {
             }
         }
     }
+
+    /// A module's code without the top-level items behind `#[cfg(test)]`,
+    /// wherever they are. Each item is skipped through its attributes, its
+    /// first line, and the lines that continue it; the first other line ends
+    /// the skip, so a form this does not know leaves more code to scan, not
+    /// less.
+    fn code_outside_tests(text: &str) -> String {
+        let mut code = String::new();
+        let mut lines = text.lines().peekable();
+        while let Some(line) = lines.next() {
+            if line != "#[cfg(test)]" {
+                code.push_str(line);
+                code.push('\n');
+                continue;
+            }
+            while lines
+                .next_if(|line| line.starts_with("#[") || line.starts_with("///"))
+                .is_some()
+            {}
+            lines.next();
+            while lines.next_if(|line| continues_an_item(line)).is_some() {}
+        }
+        code
+    }
+
+    /// Whether a line can be part of a top-level item past its first line:
+    /// rustfmt indents the rest of an item and leaves in column 0 only blank
+    /// lines, the lines that close a bracket, and `where` or `{` after a
+    /// signature.
+    fn continues_an_item(line: &str) -> bool {
+        line.is_empty()
+            || line.starts_with([' ', '}', ')', ']', '>'])
+            || line == "where"
+            || line == "{"
+    }
+
+    /// Nothing a resolution runs through discovers its inputs: beside the
+    /// resolver, no module it calls reads a file, reaches the network, the
+    /// environment, or another process, or looks a name up, so equivalent
+    /// declarations resolve through the collection their caller already
+    /// acquired (D15:3635). Construction embeds the one built-in package its
+    /// implementation fixes (D15:912) and acquires nothing when it runs. The
+    /// benchmark harness, test modules, fixtures, and vectors are no part of a
+    /// resolution.
+    #[test]
+    fn no_module_a_resolution_runs_through_discovers_anything() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut files = Vec::new();
+        sources(&root, &mut files);
+        let compiled_in = ["include_bytes!", "include_str!", "env!"];
+        let outside = ["benchmark", "minimum_tests", "fixtures", "profile_fixtures"];
+        let mut scanned = 0;
+        for file in &files {
+            let parts: Vec<&str> = file
+                .strip_prefix(&root)
+                .unwrap()
+                .iter()
+                .map(|part| part.to_str().unwrap().trim_end_matches(".rs"))
+                .collect();
+            if outside.contains(&parts[0])
+                || parts.contains(&"vectors")
+                || parts[parts.len() - 1].ends_with("tests")
+            {
+                continue;
+            }
+            let code = code_outside_tests(&std::fs::read_to_string(file).unwrap());
+            for forbidden in ACQUIRES.iter().chain(&NAME_WORK) {
+                if parts[0] == "construction" && compiled_in.contains(forbidden) {
+                    continue;
+                }
+                assert!(
+                    !code.contains(forbidden),
+                    "{} uses `{forbidden}`",
+                    file.display()
+                );
+            }
+            scanned += 1;
+        }
+        assert!(scanned >= 130, "{scanned}");
+    }
+
+    /// Skipping a test-only item hides none of the code after it: not after
+    /// one that fits on its first line, one that ends on an indented line, or
+    /// one whose signature spreads over several lines.
+    #[test]
+    fn a_test_only_item_hides_no_code_after_it() {
+        let after = "fn discover() {\n    std::fs::read(\"x\");\n}\n";
+        for item in [
+            "fn fixture() {}\n",
+            "/// A fixture.\nfn fixture() {}\n",
+            "const DIGEST: &str =\n    \"sha256:0\";\n",
+            "const NAMES: [&str; 1] = [\n    \"a\",\n];\n",
+            "#[allow(dead_code)]\nfn helper<\n    P: AsRef<Path>,\n>(\n    path: P,\n) -> Vec<u8>\n\
+             where\n    P: Copy,\n{\n    std::fs::read(path).unwrap()\n}\n",
+            "mod tests;\n",
+            "mod tests {\n    fn read() {\n        std::fs::read(\"y\");\n    }\n\n    fn more() {}\n}\n",
+        ] {
+            let text = format!("use std::path::Path;\n\n#[cfg(test)]\n{item}{after}");
+            assert_eq!(
+                code_outside_tests(&text),
+                format!("use std::path::Path;\n\n{after}"),
+                "{item}"
+            );
+        }
+    }
 }

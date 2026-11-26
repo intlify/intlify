@@ -1392,8 +1392,8 @@ mod tests {
 
     /// Each entry is read on its own, and each element of its `members`: the
     /// counts take what was submitted, an entry whose key failed has no
-    /// subject, and the total waits only when no entry holds an array
-    /// (D15:1932, 1935, 2184, 2367, 3354).
+    /// subject, and the total waits only when no entry holds an admitted
+    /// array (D15:1932, 1935, 2184, 2367, 3354).
     #[test]
     fn the_group_map_is_read_entry_by_entry() {
         let whole = groups(None, |_| {}).unwrap().unwrap();
