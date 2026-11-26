@@ -5,47 +5,47 @@
 //! Snapshot the boundary admitted. As for a file, the phase's first kind owns
 //! the entry dependency records and waits on nothing. Of the complete input's
 //! checks, a Snapshot records those it has something to examine, in
-//! check-rank order (D15:2129; Decision 015-202): the nine Snapshot-bound
+//! check-rank order (D15:2130; Decision 015-202): the nine Snapshot-bound
 //! checks, which read the admitted Snapshot alone, the JSON-compatible domain
-//! on them, and the five root-value bounds on the domain (D15:1876).
+//! on them, and the five root-value bounds on the domain (D15:1877).
 //!
 //! The boundary admitted at most one bootstrap marker, the terminal one: the
 //! last node in canonical traversal order, its witness its bound's limit plus
 //! one, and the tree without it and the edge that holds it within every
-//! Snapshot bound (D15:867, 869). Phase 1 counts neither for any bound, so
+//! Snapshot bound (D15:868, 870). Phase 1 counts neither for any bound, so
 //! only the check of the bound the marker names fails, reporting that bound,
 //! its limit, and the witness as an at-least total, and the other eight hold
-//! (D15:2006, 2008, 2356). Each ordinary marker is a candidate of the
-//! JSON-compatible domain, its reason the marker's (D15:861, 2289). The
+//! (D15:2007, 2009, 2357). Each ordinary marker is a candidate of the
+//! JSON-compatible domain, its reason the marker's (D15:862, 2290). The
 //! domain reports them even when a terminal marker follows, since the values
 //! that prove them stay admitted, and without them passes only once every
-//! Snapshot bound holds, never on a suffix no inspection reached (D15:2006,
+//! Snapshot bound holds, never on a suffix no inspection reached (D15:2007,
 //! 2365; plan 025 decision #266). The root-value bounds count the marker-free
-//! tree as they count a file of the same value (D15:1889) and report alike,
+//! tree as they count a file of the same value (D15:1890) and report alike,
 //! and a document exists only when every check holds.
 //!
 //! Every candidate is observed through the programmatic entry's Entry Source
 //! Evidence, at the Logical input path the resolver projects from the
 //! position's Snapshot Structural Path, each member classified as for a file,
-//! so no raw key is retained (D15:792-798, 802, 895, 897). As for a file, the
+//! so no raw key is retained (D15:793-799, 803, 896, 898). As for a file, the
 //! path is projected only within the path bounds path admission applies, past
 //! which it would be absent, while the position is kept, since the sidecar
 //! maps a span by it. Positions share their prefixes, as a file's facts'
 //! paths do, so the edges Phase 1 holds grow with the nodes on the
-//! candidates' paths, never with the candidates times their depth (D15:776,
+//! candidates' paths, never with the candidates times their depth (D15:777,
 //! 1834, 1851; plan 025 decision #299). A marker and a
 //! string are the values at their positions, a key past the single-string
 //! bound is its member's key, and a total is the root's value. The Evidence
 //! names the call-site source and the span the admitted sidecar maps for the
 //! role that location selects, and without such a span the Programmatic
-//! Entry's identity and locator (D15:747, 796, 798, 802). A terminal marker
+//! Entry's identity and locator (D15:748, 797, 799, 803). A terminal marker
 //! for a key past a string bound stands at the object that owns the key, and
-//! is observed there (D15:867). A bound is observed beside the capability's
+//! is observed there (D15:868). A bound is observed beside the capability's
 //! bound it exceeds.
 //!
 //! The phases after Phase 1 observe the entry through [`ProgrammaticEntry`],
 //! which names a value or a key of the document by its locus, under the
-//! programmatic slots' Safe Origin Kinds (D15:204, 800, 804).
+//! programmatic slots' Safe Origin Kinds (D15:205, 801, 805).
 
 use crate::artifacts::count;
 use crate::boundary::call_site::AdmittedCallSite;
@@ -107,7 +107,7 @@ pub(crate) const SNAPSHOT_BOUNDS: [(Check, SnapshotBound); 9] = [
 /// The Snapshot Phase 1 reads, and what its Evidence names: the source the
 /// Programmatic Entry was admitted under, the call-site sidecar admitted
 /// beside it, if one was submitted, and the classification of the members on
-/// a position's path, as a file's (D15:776, 792-798).
+/// a position's path, as a file's (D15:777, 793-799).
 pub(crate) struct EntrySnapshot<'a> {
     pub(crate) snapshot: &'a AdmittedSnapshot,
     pub(crate) source: Source<'a>,
@@ -136,7 +136,7 @@ impl Observer<'_, '_> {
     /// lead to from the root, each member classified, its Logical input path
     /// projected only within the path bounds: in the call-site source at the
     /// span the sidecar maps for the role there, or without one in the
-    /// Programmatic Entry (D15:747, 792-798, 802, 897).
+    /// Programmatic Entry (D15:748, 793-799, 803, 898).
     fn evidence(
         &self,
         path: &[Edge<'_>],
@@ -162,7 +162,7 @@ impl Observer<'_, '_> {
 /// A programmatic entry as the phases after `entry-admission` observe it: the
 /// Programmatic Entry's source, the classification of the members on a
 /// value's path, and the spans its admitted sidecar, if any, gives the
-/// document Phase 1 materialized (D15:776, 792-800).
+/// document Phase 1 materialized (D15:777, 793-801).
 pub(crate) struct ProgrammaticEntry<'a> {
     source: Source<'a>,
     classify: &'a Classify<'a>,
@@ -186,7 +186,7 @@ impl<'a> ProgrammaticEntry<'a> {
 /// A programmatic entry's slots are `configuration-programmatic` and
 /// `profile-selector-programmatic`, and a value or a key is named in the
 /// call-site source at the span the sidecar maps for it, and otherwise in the
-/// Programmatic Entry without a span (D15:204, 800).
+/// Programmatic Entry without a span (D15:205, 801).
 impl ConfigurationEntry for ProgrammaticEntry<'_> {
     fn origin(&self) -> SafeOriginKind {
         SafeOriginKind::ConfigurationProgrammatic
@@ -208,10 +208,10 @@ impl ConfigurationEntry for ProgrammaticEntry<'_> {
 
 /// Phase 1 over `entry` under `limits`: the materialized document, or the
 /// causes of its absence, which are the blocking Findings of Phase 1 the
-/// Shared projection is unavailable for (D15:2369). A candidate's Logical
+/// Shared projection is unavailable for (D15:2370). A candidate's Logical
 /// input path is projected only within the path bounds of `paths`, the
 /// capability's `bootstrapOnly.evidenceMetadata`, under which path admission
-/// would leave it absent (D15:776, 1834, 1851; plan 025 decision #299).
+/// would leave it absent (D15:777, 1835, 1852; plan 025 decision #299).
 ///
 /// # Errors
 ///
@@ -299,7 +299,7 @@ impl Findings {
         found.compatible = candidates.into_iter().reduce(Found::and);
         if !scan.marked() {
             let violations = limits.value.violations(SnapshotCounts::of(root).value());
-            // A total is observed at the root's value (D15:768).
+            // A total is observed at the root's value (D15:769).
             found.bounds = root_value_bounds(&violations, &scan.long, |string| match string {
                 None => at(None, Located::Value),
                 Some(&(position, located)) => at(position, located),
@@ -312,7 +312,7 @@ impl Findings {
 /// The terminal marker's Finding under `bound`, which it names: the bound,
 /// its limit, and `witness` as an at-least total, observed at the marker's
 /// position, whose Evidence `at` gives, beside the capability's bound
-/// (D15:2006, 2356).
+/// (D15:2007, 2357).
 fn overrun(
     bound: SnapshotBound,
     witness: u64,
@@ -338,7 +338,7 @@ fn overrun(
 }
 
 /// The JSON-compatible domain's result for an ordinary marker of `reason`,
-/// which keeps its reason (D15:861, 2289).
+/// which keeps its reason (D15:862, 2290).
 const fn incompatible(reason: MarkerReason) -> Blocking {
     let reason = match reason {
         MarkerReason::UnsupportedType => Reason::UnsupportedType,
@@ -367,7 +367,7 @@ struct Position(usize);
 /// them, each entered once after the position that holds it, so candidates
 /// share their common prefixes as a file's facts' paths do (plan 025 decision
 /// #299). An edge holds an actual key, which only the classification and the
-/// sidecar lookup read (D15:895).
+/// sidecar lookup read (D15:896).
 #[derive(Debug, Default)]
 struct Positions<'s>(Vec<(Option<Position>, Edge<'s>)>);
 
@@ -394,7 +394,7 @@ impl<'s> Positions<'s> {
 
 /// What a canonical traversal of a Snapshot finds, each at its position:
 /// array elements in index order, object members in key-byte order, each
-/// node before what it holds and a key before its value (D15:867).
+/// node before what it holds and a key before its value (D15:868).
 struct Scan<'s> {
     /// The single-string bound the root-value check applies.
     limit: Bound,
@@ -456,7 +456,7 @@ impl<'s> Scan<'s> {
     /// Visits `node` at the current path, and puts the edges to what it
     /// holds on `pending`, the first on top.
     fn visit(&mut self, node: &'s Node, pending: &mut Vec<Step<'s>>) -> Result<(), EntryInvariant> {
-        // The boundary admits no node after a bootstrap marker (D15:867).
+        // The boundary admits no node after a bootstrap marker (D15:868).
         if self.terminal.is_some() {
             return Err(EntryInvariant::UnadmittedMarker);
         }
@@ -856,7 +856,7 @@ mod tests {
         assert_eq!(document.counts(), None);
     }
 
-    /// D15:2129, 3354: a Snapshot records no raw-byte, parser-token,
+    /// D15:2130, 3479: a Snapshot records no raw-byte, parser-token,
     /// strict-syntax, or duplicate-member unit, a file no Snapshot-bound
     /// unit, and both the owner, the JSON-compatible domain, and the five
     /// root-value bounds (Decision 015-202).
@@ -889,7 +889,7 @@ mod tests {
         );
     }
 
-    /// D15:867, 869, 2006, 2008, 2356: a terminal marker fails only the check
+    /// D15:868, 870, 2007, 2009, 2357: a terminal marker fails only the check
     /// of the bound it names, with its limit and the witness as an at-least
     /// total, observed where it stands beside the capability's bound: at the
     /// root, as an array's last element, or in place of the object that
@@ -962,7 +962,7 @@ mod tests {
     }
 
     /// Under the largest bound the terminal marker's Finding reports the
-    /// witness `u64::MAX`, the bound's limit plus one (D15:889, 2356, 3323).
+    /// witness `u64::MAX`, the bound's limit plus one (D15:890, 2357, 3448).
     #[test]
     fn the_terminal_marker_reports_u64_max_under_the_largest_bound() {
         let mut limits = limits();
@@ -1001,7 +1001,7 @@ mod tests {
         "schemaVersion": "!maxRejectedMarkers"
     }"#;
 
-    /// Plan 025 decision #266 (D15:2151, 2365, 2369): ordinary markers before
+    /// Plan 025 decision #266 (D15:2152, 2366, 2370): ordinary markers before
     /// the terminal marker are reported, one Finding for each reason and an
     /// occurrence for each marker, and what needs the complete value waits
     /// on both their Findings and the overrun, as the Shared projection does.
@@ -1087,7 +1087,7 @@ mod tests {
                 ),
             ]
         );
-        // No raw key enters Evidence (D15:895, 897).
+        // No raw key enters Evidence (D15:896, 898).
         for occurrence in &occurrences {
             assert!(!occurrence.primary().view().to_string().contains("x-secret"));
         }
@@ -1117,7 +1117,7 @@ mod tests {
         assert_eq!(observed(&evaluation).len(), 4);
     }
 
-    /// D15:861, 2289: each ordinary marker reports its own reason, the one
+    /// D15:862, 2290: each ordinary marker reports its own reason, the one
     /// the marker carries.
     #[test]
     fn each_ordinary_marker_reports_its_reason() {
@@ -1153,7 +1153,7 @@ mod tests {
         }
     }
 
-    /// D15:1876, 1889, 3228: the root-value bounds give the same Findings
+    /// D15:1877, 1890, 3233: the root-value bounds give the same Findings
     /// through either entry, at their exact counts and first over them, and
     /// observe them at the same paths beside the same bounds; only the
     /// origin, the source, and the span differ.
@@ -1256,7 +1256,7 @@ mod tests {
         assert_eq!(waits.len(), 9 + 5 * (9 + 1));
     }
 
-    /// D15:2369: a document exists only when every check a Snapshot records
+    /// D15:2370: a document exists only when every check a Snapshot records
     /// admits it (Decision 015-202).
     #[test]
     fn a_document_needs_every_programmatic_check_to_admit_it() {
@@ -1280,7 +1280,7 @@ mod tests {
         }
     }
 
-    /// D15:867, 869: a bootstrap marker the boundary refuses is a resolver
+    /// D15:868, 870: a bootstrap marker the boundary refuses is a resolver
     /// bug: a witness other than its bound's limit plus one under the bounds
     /// Phase 1 reads, a node after the marker, or a second marker.
     #[test]
@@ -1495,7 +1495,7 @@ mod tests {
             .collect()
     }
 
-    /// D15:776, 1851: Phase 1 projects a marker's Logical input path only
+    /// D15:777, 1852: Phase 1 projects a marker's Logical input path only
     /// within the path bounds. Past them only its size is kept, measured as
     /// the projected path would be, and path admission leaves each candidate
     /// as it would have left the projected one, while a path within them is
@@ -1528,7 +1528,7 @@ mod tests {
         assert_eq!(seen, [json!([{ "safe-member": "$schema" }]), Value::Null]);
     }
 
-    /// D15:747, 802: a marker whose Logical input path Phase 1 leaves
+    /// D15:748, 803: a marker whose Logical input path Phase 1 leaves
     /// unprojected still takes the span the sidecar maps at its position,
     /// which Phase 1 keeps (plan 025 decision #299).
     #[test]
@@ -1565,7 +1565,7 @@ mod tests {
         assert_eq!(deepest[0]["span"], span_view(deep));
     }
 
-    /// D15:1889, 3228: under a path bound either entry leaves the same
+    /// D15:1890, 3233: under a path bound either entry leaves the same
     /// Logical input paths: the root's and the long key's within it are
     /// projected, the long string's past it only measured, and each measures
     /// as the other entry's does (plan 025 decision #299).
@@ -1608,7 +1608,7 @@ mod tests {
         }
     }
 
-    /// D15:792-798: without a call-site sidecar, a Snapshot's Entry Source
+    /// D15:793-799: without a call-site sidecar, a Snapshot's Entry Source
     /// Evidence names the Programmatic Entry's identity and the locator
     /// admitted with it, and has no span.
     #[test]
@@ -1643,7 +1643,7 @@ mod tests {
         );
     }
 
-    /// D15:776, 792-798, 3416: programmatic Entry Source Evidence holds the
+    /// D15:777, 793-799, 3541: programmatic Entry Source Evidence holds the
     /// present empty path for a marker at the root, the complete path to a
     /// marker inside the value, the longest safely established prefix when a
     /// further edge would need dynamic behavior, an unsafe member of that
@@ -1700,7 +1700,7 @@ mod tests {
         );
     }
 
-    /// D15:796, 800, 3416: Materialized Value Evidence names one source with
+    /// D15:797, 801, 3541: Materialized Value Evidence names one source with
     /// that source's own admitted locator, `safe-label`, `safe-uri`, or none,
     /// and its required Portable Value Locator, exact or redacted, with the
     /// span where the sidecar maps one and without it where it does not.
@@ -1841,7 +1841,7 @@ mod tests {
         (evaluation, admitted)
     }
 
-    /// D15:747, 802 (Decision 015-203): a marker is observed at the span the
+    /// D15:748, 803 (Decision 015-203): a marker is observed at the span the
     /// sidecar maps for the value at its position, `member-value` at a member
     /// and `node` at an element, in the call-site source. A marker whose
     /// position has only another role mapped, or none, is observed in the
@@ -1900,7 +1900,7 @@ mod tests {
         );
     }
 
-    /// D15:747, 768, 3228 (Decision 015-203): beside a sidecar that maps every
+    /// D15:748, 769, 3233 (Decision 015-203): beside a sidecar that maps every
     /// value and key of the file of the same text at its token, the root-value
     /// bounds are observed at the file's spans in the call-site source, a key
     /// past the single-string bound at its key's rather than its value's; a
@@ -2091,7 +2091,7 @@ mod tests {
     /// The file and the Snapshot of one value, whatever the file's member
     /// order, construct one `IntlifyConfig`, and exactly when the checks that
     /// gate profile projection admitted the whole root; a value with a
-    /// structural failure constructs none through either entry (D15:395,
+    /// structural failure constructs none through either entry (D15:396,
     /// 2130, 2142, 3329, 3339).
     #[test]
     fn both_entries_converge_on_one_intlify_config_only_after_structural_admission() {
@@ -2122,7 +2122,7 @@ mod tests {
     /// root of another type, a missing member of the root and of a
     /// declaration, a member's value, an array element, an undeclared
     /// member's key at the root and nested in a declaration, a target, and a
-    /// group (D15:3414), a malformed Profile ID's key, and a selector no
+    /// group (D15:3539), a malformed Profile ID's key, and a selector no
     /// declaration has, beside the declarations.
     fn locations() -> Vec<(Value, &'static str)> {
         let mut unversioned = minimal_config();
@@ -2213,7 +2213,7 @@ mod tests {
         free
     }
 
-    /// D15:747, 790, 800, 804, 3228 (Decision 015-203): beside a sidecar that
+    /// D15:748, 791, 801, 805, 3233 (Decision 015-203): beside a sidecar that
     /// maps every value and key of the file of the same text at its token,
     /// Phases 2 and 3 observe the programmatic entry at the file's spans, a
     /// missing member at its owning object's, in the call-site source and
@@ -2249,7 +2249,7 @@ mod tests {
         assert!(!origins.contains(&SafeOriginKind::ProfileSelectorCli));
     }
 
-    /// D15:796, 800: Materialized Value Evidence names the call-site source,
+    /// D15:797, 801: Materialized Value Evidence names the call-site source,
     /// with its own locator or none, only where the sidecar maps a span, and
     /// otherwise the Programmatic Entry's identity and locator, with no span.
     #[test]

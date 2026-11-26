@@ -6,7 +6,7 @@
 //! selector under the final projection authority. Selection applies the
 //! pre-policy `maxProfiles` to every declaration and `maxProfileIdBytes` to
 //! the declaration it selects and to the selector, which 015 gives
-//! `profile-selection` (D15:1885, 1886, Decision 015-162).
+//! `profile-selection` (D15:1886, 1887, Decision 015-162).
 
 use serde::de::{value::BorrowedStrDeserializer, DeserializeOwned};
 use serde::Deserialize;
@@ -47,7 +47,7 @@ pub(crate) enum SelectorByteObservation {
 /// No Debug/Serialize: a bounded string can still contain an arbitrary secret.
 /// The explicit bound belongs to the same bootstrap context as structural input.
 /// Two inputs are equal by value, as invocation staleness and the
-/// Materialized Resolution Input Set compare them (D15:205, 2583, 2589).
+/// Materialized Resolution Input Set compare them (D15:206, 2584, 2590).
 #[derive(Clone, PartialEq, Eq)]
 pub(crate) struct SelectorInput {
     bound: Bound,
@@ -117,7 +117,7 @@ impl SelectorInput {
 
 /// 015's String Length Fact of a string selector under the final projection
 /// authority. `OverLimit` keeps no length. The derived order is 015's:
-/// `Exact` in ascending length, then `OverLimit` (D15:810).
+/// `Exact` in ascending length, then `OverLimit` (D15:811).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum StringLengthFact {
     Exact(u64),
@@ -161,7 +161,7 @@ impl SelectorInput {
     /// The declared Profile ID among `declared` that the selector exactly
     /// matches, when it is a complete string within `authority`: the ID a
     /// `safe-profile-id` keeps, taken from the declaration rather than from the
-    /// selector (D15:807).
+    /// selector (D15:808).
     pub(crate) fn declared<'d>(
         &self,
         authority: Bound,
@@ -309,7 +309,7 @@ impl<Policy: DeserializeOwned, Target> StructuralAnalysis<Policy, Target> {
         let NodeKind::Object(profiles) = self.doc.node(container).kind() else {
             return Ok(Selection::Unavailable(SelectionPrerequisite::ProfilesShape));
         };
-        // Every declaration counts (D15:1885).
+        // Every declaration counts (D15:1886).
         let count = u64::try_from(profiles.len()).expect("materialized collection count fits u64");
         if count > self.limits.max_profiles.get() {
             return Ok(Selection::Unavailable(SelectionPrerequisite::ProfilesLimit));
@@ -332,7 +332,7 @@ impl<Policy: DeserializeOwned, Target> StructuralAnalysis<Policy, Target> {
             profiles.first_key_value().expect("non-empty profile map")
         };
         // The selected declaration's ID is within `maxProfileIdBytes` and
-        // has the identifier syntax (D15:1886).
+        // has the identifier syntax (D15:1887).
         let id_bytes = u64::try_from(id.len()).expect("materialized key length fits u64");
         if id_bytes > self.limits.max_profile_id_bytes.get() || !valid_identity(id) {
             return Ok(Selection::Unavailable(
@@ -343,7 +343,7 @@ impl<Policy: DeserializeOwned, Target> StructuralAnalysis<Policy, Target> {
         // A declaration boundary is its value as an object under its admitted
         // key, evaluated against the declaration's schema. A missing required
         // member, an undeclared member, or a failure below suppresses only
-        // what reads it (D15:2131, 2367, 3341; plan 025 interpretation #218).
+        // what reads it (D15:2132, 2368, 3466; plan 025 interpretation #218).
         let boundary_evaluated = evaluation.fragments.iter().any(|fragment| {
             fragment.subject == subject
                 && fragment.schema == self.binding.declaration_schema

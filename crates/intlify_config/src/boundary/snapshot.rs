@@ -4,22 +4,22 @@
 //! 015's `programmatic-entry-snapshot` boundary: the formal Snapshot a
 //! binding built from a host value, its tree and the digest it supplied,
 //! admitted as the canonical tree or refused with one of the five reasons of
-//! its row (D15:869, 871, 891, 3148; 015-199, 015-200).
+//! its row (D15:870, 872, 892, 3153; 015-199, 015-200).
 //!
 //! The binding reports the Snapshot, or that it could not build one without
 //! running host behavior, which includes not being able to construct the
-//! reserved marker (D15:865, 869). The submitted tree can hold every form the
+//! reserved marker (D15:866, 870). The submitted tree can hold every form the
 //! boundary refuses, so tests and conformance supply each without a live
 //! host: a number that is not finite or not portable, a string or key that is
 //! not a sequence of Unicode scalar values, keys in any order or repeated, and
 //! a marker outside the closed model.
 //!
-//! The boundary borrows the report, which stays the binding's (D15:140): it
+//! The boundary borrows the report, which stays the binding's (D15:141): it
 //! builds the canonical tree beside the submitted one and frees none of the
 //! report, so an interval that admits a Snapshot built before it releases no
-//! storage acquired before it (D15:2805).
+//! storage acquired before it (D15:2810).
 //!
-//! The checks follow 015's failure positions (D15:3155), and the first that
+//! The checks follow 015's failure positions (D15:3160), and the first that
 //! fails decides:
 //!
 //! 1. a Snapshot is present, then built safely;
@@ -54,7 +54,7 @@ use crate::snapshot::{
 
 use super::capability::ImplementationCapability;
 
-/// A frame's tag and `U64` length (D15:873).
+/// A frame's tag and `U64` length (D15:874).
 const FRAME: u64 = 9;
 /// A container's `U64` count, and a number's binary64 bytes.
 const EIGHT: u64 = 8;
@@ -64,10 +64,10 @@ const EIGHT: u64 = 8;
 #[cfg_attr(any(test, feature = "benchmark"), derive(Clone, PartialEq))]
 pub(crate) enum SnapshotReport {
     /// The binding could not inspect the host value without running its
-    /// behavior, or could not construct the reserved marker (D15:865, 869).
+    /// behavior, or could not construct the reserved marker (D15:866, 870).
     Unsafe,
     /// The formal Snapshot: the tree the binding built and the digest it
-    /// supplied (D15:891).
+    /// supplied (D15:892).
     Formal { root: SubmittedNode, digest: String },
 }
 
@@ -125,9 +125,9 @@ impl SnapshotRefusal {
 }
 
 /// An admitted Snapshot: its canonical tree and the verified digest, which is
-/// also the Programmatic Entry revision (D15:743, 889). No `Debug`. Two are
+/// also the Programmatic Entry revision (D15:744, 890). No `Debug`. Two are
 /// equal when their trees are equal node for node and their digests are,
-/// as invocation staleness compares them (D15:2583).
+/// as invocation staleness compares them (D15:2584).
 #[derive(PartialEq)]
 pub(crate) struct AdmittedSnapshot {
     root: Node,
@@ -194,7 +194,7 @@ pub(crate) fn read_report(
 
 /// The last node in canonical traversal order, the last element of each array
 /// and the member with the greatest key bytes of each object, when its reason
-/// is `bootstrap-limit-exceeded` (D15:867). Of repeated keys, the one
+/// is `bootstrap-limit-exceeded` (D15:868). Of repeated keys, the one
 /// submitted later comes later.
 fn terminal_marker(root: &SubmittedNode) -> Option<&SubmittedNode> {
     let mut node = root;
@@ -218,7 +218,7 @@ fn is_terminal(node: &SubmittedNode, terminal: Option<&SubmittedNode>) -> bool {
 }
 
 /// Whether `S(root)` and every marker frame fit their byte bounds and the
-/// tree without its terminal marker fits every bound (D15:869, 889; 015-199).
+/// tree without its terminal marker fits every bound (D15:870, 890; 015-199).
 fn within_bounds(
     root: &SubmittedNode,
     terminal: Option<&SubmittedNode>,
@@ -318,7 +318,7 @@ fn string(counts: &mut SnapshotCounts, bytes: &[u8]) -> u64 {
 
 impl SubmittedMarker {
     /// The length of its record, one field frame for each field it carries
-    /// (D15:889).
+    /// (D15:890).
     fn record_length(&self) -> u64 {
         let field = |length: usize| FRAME + count(length);
         field(self.reason.len())
@@ -328,7 +328,7 @@ impl SubmittedMarker {
 
     /// The marker in the closed model: an ordinary reason with no other field,
     /// or `bootstrap-limit-exceeded` with a `bootstrapOnly.snapshot` bound's
-    /// path and a witness (D15:861, 889; 015-200).
+    /// path and a witness (D15:862, 890; 015-200).
     fn model(&self) -> Option<Marker> {
         match (&self.bound, self.witness) {
             (None, None) => MarkerReason::from_id(&self.reason).map(Marker::Rejected),
@@ -704,7 +704,7 @@ mod tests {
     }
 
     /// `S` frames negative zero as positive zero and members in key order, so
-    /// neither is refused (D15:869, 889; 015-200).
+    /// neither is refused (D15:870, 890; 015-200).
     #[test]
     fn negative_zero_and_member_order_are_normalized() {
         let root = object(vec![
@@ -729,7 +729,7 @@ mod tests {
     }
 
     /// Each bound admits a tree that reaches it and refuses the tree once it
-    /// is one less, in the canonical counts' units (D15:1796-1804).
+    /// is one less, in the canonical counts' units (D15:1797-1805).
     #[test]
     fn each_bound_admits_its_exact_count_and_refuses_one_more() {
         let tree = rich();
@@ -792,7 +792,7 @@ mod tests {
     }
 
     /// Ordinary markers and the terminal marker together are a valid Snapshot
-    /// (D15:3165).
+    /// (D15:3170).
     #[test]
     fn ordinary_markers_and_the_terminal_marker_are_admitted() {
         let tree = Node::Array(vec![
@@ -858,7 +858,7 @@ mod tests {
 
     /// Under each bound at its largest value, `limit + 1` is `u64::MAX`: the
     /// marker's witness is representable, framed as its `U64`, and admitted,
-    /// and the value below it is not the witness (D15:869, 889, 3323).
+    /// and the value below it is not the witness (D15:870, 890, 3448).
     #[test]
     fn the_largest_bound_admits_the_witness_u64_max() {
         for bound in SnapshotBound::ALL {
@@ -963,7 +963,7 @@ mod tests {
     }
 
     /// A digest in its presentation that is not the canonical tree's is a
-    /// mismatch (D15:871).
+    /// mismatch (D15:872).
     #[test]
     fn a_digest_other_than_the_trees_is_a_mismatch() {
         assert_eq!(refusal(submitted(&rich()), &roomy()), ContentDigestMismatch);
@@ -978,7 +978,7 @@ mod tests {
 
     /// The boundary borrows the report, so the binding keeps it whole after
     /// either result and the same report is admitted, or refused, alike
-    /// again (D15:140, 2805).
+    /// again (D15:141, 2810).
     #[test]
     fn the_report_stays_the_bindings_and_reads_alike_again() {
         let tree = rich();
@@ -999,7 +999,7 @@ mod tests {
     }
 
     /// The first failing position decides: the bounds, the closed model, the
-    /// remaining value rules, and then the digest (D15:3155; 015-200).
+    /// remaining value rules, and then the digest (D15:3160; 015-200).
     #[test]
     fn the_first_failing_position_decides() {
         let unknown = || marker("unknown", None, None);
@@ -1064,7 +1064,7 @@ mod tests {
 
     /// The boundary counts a submitted tree in the canonical counts' units,
     /// whatever its member order, and leaves out a terminal member or element
-    /// with its edge (D15:1796-1804).
+    /// with its edge (D15:1797-1805).
     #[test]
     fn the_counts_are_the_canonical_counts() {
         let terminal = with_member(

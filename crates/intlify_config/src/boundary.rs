@@ -1,16 +1,16 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! 015's closed pre-invocation boundaries (D15:1106, 3135-3151).
+//! 015's closed pre-invocation boundaries (D15:1107, 3140-3156).
 //!
 //! A binding or adapter admits each raw component of one Resolver Invocation
 //! Input Set at its boundary before the resolver starts. A boundary admits a
 //! component as its normalized value or refuses it with exactly one reason its
 //! row of 015's boundary table lists: the first of the boundary's checks that
-//! fails decides (D15:3155). Each component is admitted on its own, and a
+//! fails decides (D15:3160). Each component is admitted on its own, and a
 //! refused one never becomes a resolver outcome, Finding, or Evidence. The
 //! capability boundary runs first, because every boundary that reads raw input
-//! takes its bounds from the admitted capability (D15:1106). A Safe Origin
+//! takes its bounds from the admitted capability (D15:1107). A Safe Origin
 //! Kind candidate is admitted at its own boundary beside its component's
 //! value, and reads no bound (015-166). A selector is admitted from its
 //! binding's closed report, not from a live host value (015-167). The Common
@@ -31,10 +31,10 @@
 //! that works like the common one (015-172, 015-201); the steps share the
 //! parts in `step`. The reference to the Resolver Construction Identity is
 //! admitted at a boundary of its own, against the identity of the resolver the
-//! invocation runs on (D15:3151). The Resolver Invocation Input Set is
+//! invocation runs on (D15:3156). The Resolver Invocation Input Set is
 //! admitted as these three stages, each evaluated and kept as its own typed
 //! result, the entry step reading the capability the common step admitted
-//! even when another common component is refused (D15:3159, plan 025
+//! even when another common component is refused (D15:3164, plan 025
 //! decision #304).
 
 pub(crate) mod call_site;

@@ -144,7 +144,7 @@ impl LimitKind {
         Self::SingleStringBytes,
     ];
     const STRUCTURAL: [Self; 1] = [Self::StructuralUnits];
-    /// The pre-policy bounds of `profile-selection` (D15:1885, 1886).
+    /// The pre-policy bounds of `profile-selection` (D15:1886, 1887).
     const SELECTION: [Self; 2] = [Self::Profiles, Self::ProfileIdBytes];
 }
 
@@ -1027,12 +1027,12 @@ pub(super) fn declarations() -> Vec<Declaration> {
     // a binding submits through the outcome, on the resolver preparation
     // constructed and every interval reuses, the example checked and every
     // other recipe blocked. No bound has an edge here: a first-over
-    // pre-invocation bound refuses the set, which is no outcome (D15:2826;
+    // pre-invocation bound refuses the set, which is no outcome (D15:2831;
     // plan 025 decisions #34 and #316). Then, without changing any of those
     // 419 rows, the same invocations on a resolver constructed before each
     // start mark, and on the prepared one right after it resolved the
     // Blocked recipe before each start mark, whose outcomes are the reused
-    // one's (D15:2751, 2789, 3689; plan 025 decision #33).
+    // one's (D15:2752, 2792, 3814; plan 025 decision #33).
     for resolver in [
         ResolverState::Reused,
         ResolverState::Fresh,
@@ -1055,7 +1055,7 @@ pub(super) fn declarations() -> Vec<Declaration> {
     // document without changing any of the 431 rows: the value of each
     // recipe a file materialization case materializes but the padded one,
     // whose file case it pairs with, and Minimal's value holding rejected
-    // markers, admitted with no document (D15:140, 2765, 2788; plan 025
+    // markers, admitted with no document (D15:141, 2766, 2791; plan 025
     // decision #316); then, without changing any of those 443 rows, Minimal's
     // value ending with a long string (plan 025 decision #325).
     for recipe in SnapshotRecipe::ALL {
@@ -1074,7 +1074,7 @@ pub(super) fn declarations() -> Vec<Declaration> {
     // edges of each `bootstrapOnly.snapshot` bound a recipe reaches: at the
     // count of the recipe's Snapshot, admitted as it is, and one under it,
     // with the terminal marker where a binding finds the first overrun
-    // (D15:867, 2786; plan 025 decisions #132, #263, and #325).
+    // (D15:868, 2789; plan 025 decisions #132, #263, and #325).
     for (limit, recipe) in snapshot_inputs::EDGES {
         for edge in [LimitEdge::Exact, LimitEdge::FirstOver] {
             let mut case = declaration(
@@ -1095,7 +1095,7 @@ pub(super) fn declarations() -> Vec<Declaration> {
     // without changing any of the 460 rows: through the admission of the
     // formal Snapshot of the value a recipe's file spells, which pairs with
     // that file's case, or the example's value holding an ordinary marker, on
-    // a resolver in each state the file entry's cases run on (D15:2772, 2788,
+    // a resolver in each state the file entry's cases run on (D15:2773, 2791,
     // 2789; plan 025 decision #316).
     for resolver in [
         ResolverState::Reused,
@@ -1120,7 +1120,7 @@ pub(super) fn declarations() -> Vec<Declaration> {
     // entry kind each case names: the Shared projection stage over each
     // recipe with a value, the Entry projection stage over each but the one
     // its file's cases leave to the Shared edges, and outcome finalization
-    // over each, the example checked (D15:2788, 2792; plan 025 decision #255).
+    // over each, the example checked (D15:2791, 2797; plan 025 decision #255).
     let programmatic = [
         (Operation::SharedEvidence, &ProgrammaticRecipe::VALUED[..]),
         (Operation::EntryEvidence, &ProgrammaticRecipe::ENTRY[..]),
@@ -1144,7 +1144,7 @@ pub(super) fn declarations() -> Vec<Declaration> {
     }
     // Then, without changing any of those 487 rows, the replay of the
     // Materialized Resolution Input Set of one file entry's invocation of
-    // each replay recipe, on the resolver that invocation ran on (D15:2659,
+    // each replay recipe, on the resolver that invocation ran on (D15:2660,
     // 2772, 2789; plan 025 decisions #34 and #316).
     for recipe in ReplayRecipe::ALL {
         cases.push(declaration(

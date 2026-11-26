@@ -380,7 +380,7 @@ fn every_projection_declares_the_common_dimensions_it_serializes() {
         assert_eq!(common.memory_domain, None);
         assert!(value.get("memoryObservationDomain").is_none());
         // Only an Evidence stage's case, whose cost both entry kinds have,
-        // declares its entry kind (D15:2792; plan 025 decision #255).
+        // declares its entry kind (D15:2797; plan 025 decision #255).
         let evidence = projection.owner_phase == "profile_evidence_materialize";
         let programmatic = value["variant"]["recipe"]
             .get("programmatic-evidence")
@@ -393,7 +393,7 @@ fn every_projection_declares_the_common_dimensions_it_serializes() {
         // Only a complete invocation's case, which runs on a resolver in a
         // declared state, names that state, as its recipe does (plan 025
         // decision #33); a replay's resolver is no variant of its own
-        // (D15:2789).
+        // (D15:2792).
         let replay = projection.owner_cost == "materialized_reresolution";
         let e2e = projection.owner_phase == "profile_resolve_e2e" && !replay;
         let resolver = value["variant"].get("resolver");
@@ -552,7 +552,7 @@ fn a_memory_run_projects_each_construction_and_invocation_case_as_its_peak() {
         );
         // The fixture, workload, and execution state are the duration
         // case's, its variant is too but for the entry kind only the memory
-        // cost leaves unnamed (D15:2792), and the memory case is another
+        // cost leaves unnamed (D15:2797), and the memory case is another
         // case.
         assert_eq!(memory.variant.entry_kind, entry);
         assert_eq!(duration.variant.entry_kind, None);

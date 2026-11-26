@@ -4,7 +4,7 @@
 //! 015's `external-profile-selector-binding` boundary: the binding's closed
 //! report of what it established about the host selector, admitted as the
 //! normalized External Profile Selector Input or refused with one of the
-//! three reasons of its row (D15:307, 3145; 015-167).
+//! three reasons of its row (D15:308, 3150; 015-167).
 //!
 //! The report is exactly one of six variants. `absent`, a `string` within the
 //! bound, `over-limit-string`, and `invalid-type` with one of the five type
@@ -24,7 +24,7 @@
 //! without a live host; inspecting a live host is the binding's work. A
 //! `string` report borrows the string the binding read, which stays the
 //! binding's, so an interval that admits a report made before it frees none
-//! of it (D15:2805).
+//! of it (D15:2810).
 
 use crate::artifacts::count;
 use crate::input_limits::Bound;
@@ -201,7 +201,7 @@ mod tests {
 
     /// The report borrows the binding's string, so the binding keeps it after
     /// either result and the same report is admitted, or refused, alike
-    /// again (D15:2805).
+    /// again (D15:2810).
     #[test]
     fn the_string_stays_the_bindings_and_reads_alike_again() {
         let under = bound(4);

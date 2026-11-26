@@ -665,7 +665,7 @@ fn deep_object_indexes_also_cleanup_without_recursive_value_destruction() {
     ));
 }
 
-/// D15:802, Decisions 015-150 and 015-194: parsing continues past each
+/// D15:803, Decisions 015-150 and 015-194: parsing continues past each
 /// duplicate member and reports every one in the complete file, each later
 /// member of a name with every other member of the name, in source order.
 #[test]
@@ -703,7 +703,7 @@ fn every_duplicate_of_the_complete_file_relates_every_other_member_of_its_name()
     );
 }
 
-/// D15:802: each fact keeps the internal structural path of its value or
+/// D15:803: each fact keeps the internal structural path of its value or
 /// member, through arrays by index and objects by key, from the root.
 #[test]
 fn every_fact_keeps_the_path_of_its_value_or_member() {
@@ -807,7 +807,7 @@ fn parsing_continues_past_duplicates_and_incompatible_values_but_not_syntax() {
 
 /// The first offending byte decides, in stream order: a syntax failure
 /// before a byte that is not UTF-8 wins, and a byte that is not UTF-8 before
-/// a syntax failure wins (D15:802).
+/// a syntax failure wins (D15:803).
 #[test]
 fn the_first_offending_byte_decides_between_syntax_and_utf8() {
     assert_eq!(
@@ -838,7 +838,7 @@ fn the_first_offending_byte_decides_between_syntax_and_utf8() {
 }
 
 /// The token bound guards tokenization: a byte past the last token it
-/// admits is never inspected, and one before it is (D15:1795, 1999).
+/// admits is never inspected, and one before it is (D15:1796, 2000).
 #[test]
 fn the_token_bound_stops_before_a_later_malformed_byte() {
     let source = b"[1,\xff]";
@@ -864,7 +864,7 @@ fn the_token_bound_stops_before_a_later_malformed_byte() {
     );
 }
 
-/// D15:1884, 2203: each string value and member name past the single-string
+/// D15:1885, 2204: each string value and member name past the single-string
 /// bound is an occurrence of its own, and the bound reports its first-over
 /// witness rather than the longest length.
 #[test]

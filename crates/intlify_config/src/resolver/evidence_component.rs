@@ -3,7 +3,7 @@
 
 //! Design 015's Resolver Input Component Path: where resolver-input Evidence
 //! points inside the complete input its Safe Origin Kind names, with the order
-//! and view of each path (D15:821-838, 2502; Decisions 015-186 and 015-188).
+//! and view of each path (D15:822-839, 2503; Decisions 015-186 and 015-188).
 //!
 //! Every origin permits only its own shapes, and the constructors build only
 //! those: the empty root of any resolver input; one of the eight slots of the
@@ -135,7 +135,7 @@ impl ComponentPath {
         }
     }
 
-    /// One slot of the Profile Resolution Specification Input (D15:831),
+    /// One slot of the Profile Resolution Specification Input (D15:832),
     /// ranked in the slots' canonical order, in which `Slot` is declared.
     pub(crate) fn specification(slot: Slot) -> Self {
         Self {
@@ -145,7 +145,7 @@ impl ComponentPath {
     }
 
     /// The root of the Intent Surface-Class Vocabulary Artifact, where a check
-    /// of the whole artifact looks (D15:832).
+    /// of the whole artifact looks (D15:833).
     pub(crate) const fn vocabulary_root() -> Self {
         Self {
             origin: SafeOriginKind::IntentSurfaceClassVocabulary,
@@ -154,7 +154,7 @@ impl ComponentPath {
     }
 
     /// The root of the locale canonicalization data, the only path a 015
-    /// Finding names in it (D15:833).
+    /// Finding names in it (D15:834).
     pub(crate) const fn data_root() -> Self {
         Self {
             origin: SafeOriginKind::LocaleCanonicalizationData,
@@ -162,7 +162,7 @@ impl ComponentPath {
         }
     }
 
-    /// One member of the Intent Surface-Class Vocabulary Artifact (D15:832).
+    /// One member of the Intent Surface-Class Vocabulary Artifact (D15:833).
     ///
     /// # Errors
     ///
@@ -176,7 +176,7 @@ impl ComponentPath {
     }
 
     /// One member of the Submitted Profile Resolution Artifact Collection
-    /// (D15:834).
+    /// (D15:835).
     ///
     /// # Errors
     ///
@@ -209,7 +209,7 @@ impl ComponentPath {
     }
 
     /// One component of the Resource Limit Policy Verification Input
-    /// (D15:835).
+    /// (D15:836).
     pub(crate) fn verification(component: VerificationRole) -> Self {
         Self {
             origin: SafeOriginKind::ResourceLimitPolicyVerification,
@@ -223,7 +223,7 @@ impl ComponentPath {
     /// One bound of the Admitted Implementation Capability, under its
     /// namespace, group, and name, each ranked in the Capability
     /// Specification's order, in which the group types are declared and the
-    /// inventory lists the bounds (D15:836).
+    /// inventory lists the bounds (D15:837).
     ///
     /// # Errors
     ///
@@ -278,7 +278,7 @@ impl ComponentPath {
     }
 
     /// The path's fixed roles with their ranks, in path order: with
-    /// `key_shape`, the shape the Finding Registry pins (D15:838).
+    /// `key_shape`, the shape the Finding Registry pins (D15:839).
     pub(crate) fn roles(&self) -> Vec<(&'static str, u64)> {
         self.segments
             .iter()
@@ -307,7 +307,7 @@ impl ComponentPath {
     }
 
     /// What the path bounds count of the path: its segments and its view,
-    /// the array of their views (D15:2502), each redacted key written as a
+    /// the array of their views (D15:2503), each redacted key written as a
     /// token without a collision ordinal (plan 025 interpretations #234 and
     /// #238).
     pub(crate) fn size(&self) -> PathSize {
@@ -370,7 +370,7 @@ pub(crate) enum PathComponent {
 
 impl PathComponent {
     /// `{ "fixed-role": ID }`, `{ "safe-key": hex }`, or
-    /// `{ "redacted-key": Token }` (D15:2502).
+    /// `{ "redacted-key": Token }` (D15:2503).
     pub(crate) fn view(&self) -> Value {
         match self {
             Self::FixedRole(role) => json!({ "fixed-role": role.id }),
@@ -708,7 +708,7 @@ mod tests {
     /// Rejected keys of one JSON type are one `redacted-key`. Unequal
     /// projections stay apart under one digest with ordinals in record byte
     /// order, and otherwise the complete digest decides, against that order
-    /// (D15:825, 838, 3367).
+    /// (D15:826, 839, 3492).
     #[test]
     fn redacted_keys_group_and_order_by_digest_then_ordinal() {
         let key = |source| ComponentPath::artifact_member(Key::Unsafe(source)).unwrap();

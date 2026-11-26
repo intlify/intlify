@@ -5,18 +5,18 @@
 //! that a retained record refers to, so that every retained Entry Source,
 //! Materialized Value, selector-origin, specification-input, artifact-input,
 //! verification-input, and implementation-capability evidence reference
-//! resolves (D15:1182). An Evidence view is its identity: the index holds one
+//! resolves (D15:1183). An Evidence view is its identity: the index holds one
 //! record per distinct view, a record refers to Evidence by including the
-//! same view, and resolving a reference is equality (D15:2505).
+//! same view, and resolving a reference is equality (D15:2506).
 //!
 //! Each index record has one Evidence record owner: the earliest unit in
 //! canonical evaluation order that retains a reference to it, whatever order
-//! the references arrive in (D15:1972, 2205). A Finding Occurrence refers to
+//! the references arrive in (D15:1973, 2206). A Finding Occurrence refers to
 //! its primary and related Evidence under the unit of its Finding; Coverage
 //! Decision Evidence refers to its decision sources under the decision
-//! table's unit (D15:1609). The index orders its records as Evidence orders
-//! (D15:840-842, 2143), and accounting charges each record's owner the
-//! record's accounting view, whose record is the Evidence view (D15:2518).
+//! table's unit (D15:1610). The index orders its records as Evidence orders
+//! (D15:841-843, 2144), and accounting charges each record's owner the
+//! record's accounting view, whose record is the Evidence view (D15:2519).
 
 use std::collections::BTreeMap;
 
@@ -66,7 +66,7 @@ impl EvidenceIndex {
         self.records.get(evidence)
     }
 
-    /// The accounting view of every record, in Evidence order (D15:2518).
+    /// The accounting view of every record, in Evidence order (D15:2519).
     ///
     /// # Errors
     ///
@@ -159,7 +159,7 @@ mod tests {
     }
 
     /// A record several units refer to is owned by the earliest of them,
-    /// whatever order their references arrive in (D15:1972, 3300).
+    /// whatever order their references arrive in (D15:1973, 3393).
     #[test]
     fn the_earliest_unit_that_refers_to_a_record_owns_it_whatever_the_order() {
         let intact = vocabulary(Check::IntactArtifact);

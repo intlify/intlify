@@ -3,11 +3,11 @@
 
 //! 015's invocation of a constructed resolver: one admitted Resolver
 //! Invocation Input Set read as Phases 0 to 15 take it, and the one outcome
-//! they return (D15:1106, 1150, 2129-2147).
+//! they return (D15:1107, 1151, 2130-2148).
 //!
 //! [`Resolver`] is a constructed resolver with its Resolver Construction
 //! Identity, derived once after construction as a step of its own rather
-//! than at every invocation (D15:2775), and with what it supports in each
+//! than at every invocation (D15:2776), and with what it supports in each
 //! specification slot. The pre-invocation boundary admits a set against that
 //! identity and the Capability Specification construction admitted
 //! ([`Resolver::admit`]), and [`Resolver::resolve`] reads nothing else of the
@@ -16,33 +16,33 @@
 //! - every bound is the admitted capability's: strict file entry's raw bytes
 //!   and parser tokens are `bootstrapOnly.rawInput`'s, a Snapshot's are
 //!   `bootstrapOnly.snapshot`'s, and the five root-value bounds and the
-//!   structural ones are `policyComparable.configurationInput`'s (D15:2129,
+//!   structural ones are `policyComparable.configurationInput`'s (D15:2130,
 //!   2130, 2675);
 //! - a member on a fact's internal path is classified at its place in the
 //!   resolver's configuration schema under the capability's `policyComparable`
 //!   byte bounds, never a later Policy's, since a key's class is decided only
-//!   from facts fixed when its record is constructed (D15:776);
+//!   from facts fixed when its record is constructed (D15:777);
 //! - the entry's Evidence names the source the entry was admitted under, its
 //!   identity marked non-secret only as its adapter or frontend marked it,
 //!   with only that identity's admitted locator, and a programmatic entry's
-//!   the call-site sidecar admitted beside it (D15:737, 800, 840);
+//!   the call-site sidecar admitted beside it (D15:738, 801, 841);
 //! - the outcome carries the admitted reference, which names the resolver's
 //!   own identity; a set admitted against another identity is not resolved,
-//!   since no outcome could carry an identity equal to both (D15:1150, 2147).
+//!   since no outcome could carry an identity equal to both (D15:1151, 2148).
 //!
 //! What the outcome borrows, the evaluation, the Artifact Set Phase 9
 //! admitted, and what the phases left, its caller holds in an
 //! [`OutcomeStorage`] of its own for each invocation. The resolver itself
 //! changes nothing, so nothing of one invocation, checked or blocked, reaches
 //! the next, and no outcome refers to storage that a later invocation resets
-//! (D15:2749, 2751, 3689).
+//! (D15:2750, 2752, 3814).
 //!
 //! Beside the outcome of every invocation whose Phase 1 materialized a value,
 //! never on request, [`Resolver::resolve`] returns the invocation's
 //! Materialized Resolution Input Set, and none when Phase 1 blocked before a
-//! value existed (D15:2657, 3440). The set owns its value and shares the
+//! value existed (D15:2658, 3565). The set owns its value and shares the
 //! admitted common values, so it outlives the [`OutcomeStorage`] and the
-//! admitted set it came from (D15:2749).
+//! admitted set it came from (D15:2750).
 
 use std::sync::Arc;
 
@@ -82,7 +82,7 @@ pub(crate) struct Resolver<'r> {
 /// What one invocation's outcome borrows: the evaluation its phases
 /// recorded, the Profile Resolution Artifact Set Phase 9 admitted, and what
 /// the phases left. Its caller holds one for each invocation, and the outcome
-/// borrows it for as long as the outcome lives (D15:2749).
+/// borrows it for as long as the outcome lives (D15:2750).
 #[derive(Default)]
 pub(crate) struct OutcomeStorage<'s> {
     evaluation: Evaluation,
@@ -92,7 +92,7 @@ pub(crate) struct OutcomeStorage<'s> {
 
 /// What one invocation returns: its outcome, and beside it the Materialized
 /// Resolution Input Set, `None` when Phase 1 blocked before a value existed
-/// (D15:2657).
+/// (D15:2658).
 pub(crate) struct Resolution<'s, D> {
     pub(crate) outcome: Outcome<'s, 's>,
     pub(crate) materialized: Option<MaterializedInputs<D>>,
@@ -115,7 +115,7 @@ impl<'r> Resolver<'r> {
 
     /// Admit `submitted` against the resolver's identity and the Capability
     /// Specification construction admitted, with the trusted setup path's
-    /// Verification Input `assertion` (D15:1106).
+    /// Verification Input `assertion` (D15:1107).
     pub(crate) fn admit<R, D>(
         &self,
         submitted: SubmittedInvocation<'_, R>,
@@ -262,7 +262,7 @@ impl<'r> Resolver<'r> {
     }
 
     /// The configuration schema construction admitted, which structural
-    /// admission reads and a member's class is decided at (D15:776).
+    /// admission reads and a member's class is decided at (D15:777).
     pub(super) fn configuration_schema(&self) -> &ConfigurationSchema {
         self.constructed.configuration_schema()
     }
@@ -322,7 +322,7 @@ pub(crate) mod tests {
     /// A bound no invocation here reaches.
     pub(crate) const ROOM: u64 = 1 << 30;
 
-    /// What every secret canary of D15:3393's sweep starts with: it has no
+    /// What every secret canary of D15:3518's sweep starts with: it has no
     /// identifier, token, or locale syntax, so no field can admit it.
     const CANARY: &str = "T3 CANARY";
 
@@ -774,7 +774,7 @@ pub(crate) mod tests {
         views
     }
 
-    /// D15:1150, 2147: on the constructed resolver, a valid file or
+    /// D15:1151, 2148: on the constructed resolver, a valid file or
     /// programmatic invocation is checked and carries the reference the
     /// boundary admitted, the resolver's own identity.
     #[test]
@@ -792,7 +792,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// D15:1150: a set admitted against another resolver's identity is not
+    /// D15:1151: a set admitted against another resolver's identity is not
     /// resolved, since no outcome could carry an identity equal to both.
     #[test]
     fn a_set_admitted_against_another_identity_is_not_resolved() {
@@ -809,7 +809,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// D15:2129, 2675: strict file entry reads the file under the
+    /// D15:2130, 2676: strict file entry reads the file under the
     /// capability's `bootstrapOnly.rawInput` bounds.
     #[test]
     fn a_file_is_read_under_the_capabilitys_raw_input_bounds() {
@@ -821,7 +821,7 @@ pub(crate) mod tests {
         assert_eq!(unavailable(&shown), Check::WithinFileBytes);
     }
 
-    /// D15:2129: either entry applies the capability's five root-value
+    /// D15:2130: either entry applies the capability's five root-value
     /// bounds, and a Snapshot is read under its `bootstrapOnly.snapshot`
     /// bounds, whose terminal marker names the bound's limit plus one.
     #[test]
@@ -853,7 +853,7 @@ pub(crate) mod tests {
         assert_eq!(unavailable(&shown), Check::WithinSnapshotNodes);
     }
 
-    /// D15:776, 2130, 2131: structural admission and profile selection run
+    /// D15:777, 2131, 2132: structural admission and profile selection run
     /// under the capability's `configurationInput` bounds, and a key of
     /// `profiles` past its `maxProfileIdBytes` is classified as redacted.
     #[test]
@@ -885,7 +885,7 @@ pub(crate) mod tests {
         assert!(path[1].get("redacted-member").is_some(), "{path}");
     }
 
-    /// D15:737, 800, 840: either entry's Evidence and dependencies name its
+    /// D15:738, 801, 841: either entry's Evidence and dependencies name its
     /// admitted source, `safe-opaque` only when marked non-secret, with its
     /// own admitted locator.
     #[test]
@@ -921,7 +921,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// D15:747, 800: beside the sidecar admitted with it, a Snapshot's
+    /// D15:748, 801: beside the sidecar admitted with it, a Snapshot's
     /// Evidence names the call-site source at the spans it maps, and
     /// without one the Programmatic Entry without a span.
     #[test]
@@ -940,7 +940,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// D15:2751, 3689: after checked and blocked invocations, before or after
+    /// D15:2752, 3814: after checked and blocked invocations, before or after
     /// materialization, a resolver gives each invocation the outcome a fresh
     /// resolver gives it.
     #[test]
@@ -964,7 +964,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// D15:3228, 3414: a file and a Snapshot of its value, beside a mirroring
+    /// D15:3233, 3539: a file and a Snapshot of its value, beside a mirroring
     /// sidecar or not, share the identity, the checked profile, and the Shared
     /// projection, whether the outcome is checked or blocked, and blocked on
     /// an unknown member nested in the declaration too.
@@ -985,7 +985,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// D15:1165, 2369, 2657, 3440: Phase 1 blocking before a complete
+    /// D15:1166, 2370, 2658, 3565: Phase 1 blocking before a complete
     /// JSON-compatible value exists, over a file that is no JSON, one with a
     /// duplicate member, one past each root-value bound, or a Snapshot with a
     /// marker of each ordinary reason, the ancestor cycle's among them, or a
@@ -1094,7 +1094,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// D15:2657: once Phase 1 materialized the value, either entry returns a
+    /// D15:2658: once Phase 1 materialized the value, either entry returns a
     /// set beside its outcome, checked or blocked by a later phase.
     #[test]
     fn a_set_is_returned_however_a_later_phase_ends() {
@@ -1120,7 +1120,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// D15:183, 2385, 3352: an occurrence's ordinal is assigned after
+    /// D15:184, 2386, 3477: an occurrence's ordinal is assigned after
     /// candidate-level admission. Two markers of one Finding at their own
     /// Logical input paths are two groups, each at ordinal 0; past the path
     /// bound both have no path, so their primary Evidence is equal and they
@@ -1194,7 +1194,7 @@ pub(crate) mod tests {
         });
     }
 
-    /// D15:2756, 3449: callers on several threads share one resolver, each
+    /// D15:2757, 3574: callers on several threads share one resolver, each
     /// with its own storage, and each gets the outcome a call alone gets for
     /// its input, checked, blocked, or stopped at entry, from a file or a
     /// Snapshot. The core schedules nothing itself, so what can vary is when
@@ -1247,7 +1247,7 @@ pub(crate) mod tests {
         });
     }
 
-    /// D15:3155, 3321: a report without a formal container is one typed
+    /// D15:3160, 3446: a report without a formal container is one typed
     /// failure of the collection's slot. The pattern names every field of the
     /// refused set, so nothing resolver-shaped can come beside it.
     #[test]
@@ -1280,7 +1280,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// D15:3165, 3322: a formal container is admitted with every representable
+    /// D15:3170, 3447: a formal container is admitted with every representable
     /// invalid member and occurrence, in the order submitted, and the
     /// resolver reports them: one Shared Finding for the repeated member and
     /// one Entry occurrence for each time it was submitted. The same members
@@ -1373,7 +1373,7 @@ pub(crate) mod tests {
     /// What retained text must not hold for `canary`: its bytes, their
     /// hexadecimal spelling, and their direct digest and that of their
     /// canonical framing, in hexadecimal and as a digest's `Debug` lists its
-    /// bytes (D15:2693, 3393).
+    /// bytes (D15:2694, 3518).
     fn traces(canary: &str) -> Vec<String> {
         let framed = encode(&json!(canary)).unwrap();
         let mut traces = vec![canary.to_owned(), hex(canary.as_bytes())];
@@ -1387,7 +1387,7 @@ pub(crate) mod tests {
     /// Every representation `outcome` retains, as one text: the `Debug` of
     /// the outcome, which holds every record, its owner, the terminal cursors,
     /// and a checked profile, and of the unavailability causes; and the view
-    /// of every record and terminal Finding, state, and cause (D15:2697).
+    /// of every record and terminal Finding, state, and cause (D15:2698).
     fn retained(outcome: &Outcome<'_, '_>) -> String {
         let evidence = &outcome.evidence;
         let mut text = format!("{outcome:?}{:?}", evidence.unavailable());
@@ -1406,7 +1406,7 @@ pub(crate) mod tests {
         text
     }
 
-    /// What D15:3393's sweep has scanned: each record kind, and each exhausted
+    /// What D15:3518's sweep has scanned: each record kind, and each exhausted
     /// domain's terminal record.
     #[derive(Default)]
     struct Sweep {
@@ -1459,7 +1459,7 @@ pub(crate) mod tests {
             .any(|(from, to)| from <= start && end <= to && to - from <= within)
     }
 
-    /// D15:3393 over the configuration: each member key and each string of
+    /// D15:3518 over the configuration: each member key and each string of
     /// the example, replaced in turn by a canary, through either entry. The
     /// canary is admitted nowhere, so the outcome is blocked and a Finding's
     /// span holds it, narrower than the root's but for a renamed
@@ -1505,7 +1505,7 @@ pub(crate) mod tests {
     /// in what 015 excludes: an unclassified label and path, a path that
     /// climbs its root, and a URI with user information, a query, a fragment,
     /// the `file` scheme, an escaped unreserved byte, or an uppercase scheme
-    /// (D15:762-766).
+    /// (D15:763-767).
     const LOCATORS: [(LocatorVariant, &str, bool, &str); 9] = [
         (
             LocatorVariant::SafeLabel,
@@ -1563,7 +1563,7 @@ pub(crate) mod tests {
         ),
     ];
 
-    /// D15:3393 over the sources: unmarked identities, each locator candidate
+    /// D15:3518 over the sources: unmarked identities, each locator candidate
     /// a source does not admit, through a file and a Snapshot beside a sidecar
     /// or none. Every configuration Evidence names its source by a redacted
     /// token and has no locator.
@@ -1622,7 +1622,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// D15:3393 over a selector no declaration has, which its Evidence keeps
+    /// D15:3518 over a selector no declaration has, which its Evidence keeps
     /// only as a redacted string with its length.
     fn sweep_selector(sweep: &mut Sweep, resolver: &Resolver<'_>) {
         let mut raw = example(|inputs| inputs);
@@ -1643,7 +1643,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// D15:3393, 3367 over the collection and the vocabulary: a member of
+    /// D15:3518, 3492 over the collection and the vocabulary: a member of
     /// each way to be rejected, every occurrence's Evidence a redacted key.
     fn sweep_artifacts(sweep: &mut Sweep, resolver: &Resolver<'_>) {
         const CANARIES: [&str; 9] = [
@@ -1711,7 +1711,7 @@ pub(crate) mod tests {
         }));
     }
 
-    /// D15:3393 over what Phase 1 rejects: a repeated key and a truncated
+    /// D15:3518 over what Phase 1 rejects: a repeated key and a truncated
     /// file, and a Snapshot's marker under a canary key, each observed with
     /// the key redacted and no value built.
     fn sweep_entries(sweep: &mut Sweep, resolver: &Resolver<'_>) {
@@ -1749,7 +1749,7 @@ pub(crate) mod tests {
             .any(|view| view["primary"]["path"][0].get("redacted-member").is_some()));
     }
 
-    /// D15:776, 3393 over identifiers past the capability's byte bound for
+    /// D15:777, 3518 over identifiers past the capability's byte bound for
     /// them: a key is then unsafe whatever its syntax, and a member or an
     /// endpoint naming one is no admitted identity.
     fn sweep_over_bound_identifiers(sweep: &mut Sweep, resolver: &Resolver<'_>) {
@@ -1796,7 +1796,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// D15:3393 over the terminal records: a domain exhausted by canary keys
+    /// D15:3518 over the terminal records: a domain exhausted by canary keys
     /// names its cursor by tokens alone.
     fn sweep_terminals(sweep: &mut Sweep, resolver: &Resolver<'_>) {
         let tight = [(entry("maxRecords"), 3), (shared("maxRecords"), 3)];
@@ -1810,7 +1810,7 @@ pub(crate) mod tests {
         assert!(sweep.terminals > before);
     }
 
-    /// D15:3393, 3144: what no resolver reads is refused before invocation,
+    /// D15:3518, 3149: what no resolver reads is refused before invocation,
     /// each failure typed with nothing of the input: an origin candidate
     /// beside every slot, and an unreadable specification input, vocabulary,
     /// Verification Input, and capability.
@@ -1850,7 +1850,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// No fixture holds what the sweep's inputs carry (D15:3393).
+    /// No fixture holds what the sweep's inputs carry (D15:3518).
     fn assert_no_fixture_holds_a_canary() {
         fn walk(dir: &std::path::Path, files: &mut usize) {
             for entry in std::fs::read_dir(dir).unwrap() {
@@ -1875,7 +1875,7 @@ pub(crate) mod tests {
         assert!(files > 0);
     }
 
-    /// D15:2693, 2697, 3393: secret canaries in every input kind that reaches
+    /// D15:2694, 2698, 3518: secret canaries in every input kind that reaches
     /// analysis produce Findings that locate them, while neither the bytes nor
     /// a direct digest of them is in any record of any of the twelve kinds,
     /// a terminal record, an owner, or the `Debug` of the outcome, of a

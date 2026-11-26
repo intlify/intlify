@@ -739,7 +739,7 @@ fn outcome_finalization(prepared: &Prepared) -> Option<super::evidence::InputFac
 /// and none builds an authoring model. A replay's interval includes those
 /// from structural analysis through the Shared projection stage: it admits
 /// no entry, and builds neither the Entry projection nor an outcome
-/// (D15:2659, 2765, 2775, 2777, 2824; plan 025 decision #316).
+/// (D15:2660, 2766, 2776, 2780, 2829; plan 025 decision #316).
 fn children(operation: Operation) -> Vec<String> {
     const INVOKED: [Operation; 12] = [
         Operation::StructuralAnalysis,

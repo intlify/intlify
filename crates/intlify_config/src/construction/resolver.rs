@@ -6,9 +6,9 @@
 //! Construction is given its input and keeps it: every component's declared
 //! tuple and exact bytes stay beside the authorities construction admitted,
 //! since staleness compares two retained inputs by value and replay needs
-//! the complete input again (D15:2581, 2589). The resolver takes the input
+//! the complete input again (D15:2582, 2590). The resolver takes the input
 //! rather than copying it, so construction holds no second copy of what the
-//! caller acquired (D15:2805). Nothing changes the resolver after
+//! caller acquired (D15:2810). Nothing changes the resolver after
 //! construction.
 //!
 //! What the resolver supports in each specification slot comes from the
@@ -19,7 +19,7 @@
 //! The resolver analyzes a configuration with the schema the admitted
 //! Configuration Schema Authority Set maps to the `schemaVersion` the model
 //! reads, compiled once at construction, and selects it only for a
-//! configuration whose root `schemaVersion` the mapping maps (D15:403, 424).
+//! configuration whose root `schemaVersion` the mapping maps (D15:404, 425).
 //! The implemented authority fixes the mapping to that one version and its
 //! schema to the one this crate generates from its model.
 
@@ -342,7 +342,7 @@ mod tests {
     }
 
     /// A root `schemaVersion` the admitted mapping does not map is
-    /// unsupported (D15:424).
+    /// unsupported (D15:425).
     #[test]
     fn a_version_the_mapping_does_not_map_is_unsupported() {
         let mut config = minimal_config();

@@ -15,12 +15,12 @@
 //! one (`malformed-container`), or one the adapter could not inspect without
 //! running its behavior (`unsafe-host-inspection`). Tests and conformance
 //! supply every report without a live host; inspecting one is the adapter's
-//! work (D15:3142, 3674). The report is checked in 015's order, an absent one
-//! first, then those two, before any bound of a member (D15:3155). A refused
+//! work (D15:3147, 3799). The report is checked in 015's order, an absent one
+//! first, then those two, before any bound of a member (D15:3160). A refused
 //! container yields nothing, while a formal one keeps its invalid members for
-//! the resolver's Findings (D15:3165, 3322). The boundary never counts the
+//! the resolver's Findings (D15:3170, 3447). The boundary never counts the
 //! submitted occurrences: their number is the resolver's, under the Resource
-//! Limit Policy's `artifactAdmission` (D15:1849).
+//! Limit Policy's `artifactAdmission` (D15:1850).
 
 use intlify_shared_json::decode::{self, DecodeFailure};
 
@@ -110,8 +110,8 @@ impl FormalCollection {
     /// Whether `other` holds the same members, each as many times: the
     /// multisets of their members' `C(member)` bytes, as invocation staleness
     /// and the Materialized Resolution Input Set compare a collection
-    /// (D15:2589). The submission order is not compared, while multiplicity
-    /// is (D15:2585).
+    /// (D15:2590). The submission order is not compared, while multiplicity
+    /// is (D15:2586).
     pub(crate) fn same_members(&self, other: &Self) -> bool {
         self.sorted_bodies() == other.sorted_bodies()
     }
@@ -126,7 +126,7 @@ impl FormalCollection {
 }
 
 /// Read an adapter's report at the pre-invocation boundary. A report that holds
-/// no formal container is refused first (D15:3155). Each member's bytes, the
+/// no formal container is refused first (D15:3160). Each member's bytes, the
 /// total, and each member's depth are checked before any member is decoded;
 /// then every member is decoded and framed once, and a capacity failure
 /// anywhere comes before an unrepresentable member anywhere. However many
@@ -237,7 +237,7 @@ mod tests {
         }
     }
 
-    /// D15:3142, 3155: a report without a formal container is refused with
+    /// D15:3147, 3160: a report without a formal container is refused with
     /// its own reason, at a position before every bound of a member, so that
     /// limits no member could fit change nothing, while the same limits
     /// refuse a formal container.
@@ -309,7 +309,7 @@ mod tests {
     }
 
     /// The boundary never counts the submitted occurrences: their number is
-    /// the resolver's, under the Resource Limit Policy (D15:1849).
+    /// the resolver's, under the Resource Limit Policy (D15:1850).
     #[test]
     fn the_boundary_never_counts_the_members() {
         let members = vec![b"{}".as_slice(); 1_000];

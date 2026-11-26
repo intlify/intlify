@@ -12,7 +12,7 @@
 //!
 //! A bound's Finding is observed where its table's Scope sits in the
 //! declaration, beside the confirmed policy, which supplies the bound
-//! (D15:1896-1897, 1907, 1930-1931, 2249): the declaration for the
+//! (D15:1897-1898, 1908, 1931-1932, 2250): the declaration for the
 //! occurrences, which every locale-bearing field holds, the
 //! `requestedLocales` field for the requested set, the `targetProfiles` map,
 //! and each Target ID at its key.
@@ -129,7 +129,7 @@ pub(super) fn occurrences(
 /// The requested-set bound's unit: the canonical size of what the set holds,
 /// which a repeated locale does not grow and an element without an identity
 /// has none to add to, within `maxRequestedLocales`, observed past it at the
-/// project's `requestedLocales` (D15:1897, 2184, 3354).
+/// project's `requestedLocales` (D15:1898, 2185, 3479).
 pub(super) fn requested(
     evaluation: &mut Evaluation,
     policy: Result<&ConfirmedPolicy, &Causes>,
@@ -168,10 +168,10 @@ pub(super) struct TargetBounds {
 
 /// The target bounds' units: the Target ID map within `maxTargetProfiles`,
 /// every entry counted whatever its key, or waiting on why the map has no
-/// entry to count (D15:1171, 1930), and then each admitted Target ID key
+/// entry to count (D15:1172, 1931), and then each admitted Target ID key
 /// within `maxTargetIdBytes`, which every other check of that target waits
 /// on. Past a bound, the map is observed, or the Target ID at its key, which
-/// is classified by facts fixed when the record is constructed (D15:776).
+/// is classified by facts fixed when the record is constructed (D15:777).
 pub(super) fn targets(
     evaluation: &mut Evaluation,
     confirmed: Result<&ConfirmedPolicy, &Causes>,
@@ -398,7 +398,7 @@ mod tests {
     }
 
     /// Past the bound, the declaration is observed, which holds every field
-    /// the bound counts, beside the policy, which supplies it (D15:1907,
+    /// the bound counts, beside the policy, which supplies it (D15:1908,
     /// 2249).
     #[test]
     fn the_occurrence_bound_holds_at_its_limit_and_reports_the_first_over() {
@@ -448,7 +448,7 @@ mod tests {
     }
 
     /// A field that failed holds the count back no more: the count is of the
-    /// spellings, which is what it is whatever a field's failure (D15:1896,
+    /// spellings, which is what it is whatever a field's failure (D15:1897,
     /// 1907). What it reads is the declaration's own, here beside a field
     /// the caller marked unavailable.
     #[test]
@@ -466,7 +466,7 @@ mod tests {
     }
 
     /// Without a declaration there is nothing to count, and without a policy
-    /// no bound: the unit waits on every cause there is (D15:2131).
+    /// no bound: the unit waits on every cause there is (D15:2132).
     #[test]
     fn an_unconfirmed_policy_leaves_the_bound_not_evaluated_with_every_cause() {
         let declaration = declaration(&minimal_config(), |_| {});
@@ -499,7 +499,7 @@ mod tests {
     }
 
     /// Past the bound, the project's `requestedLocales` is observed beside
-    /// the policy (D15:2249).
+    /// the policy (D15:2250).
     #[test]
     fn the_requested_set_is_bounded_by_its_canonical_size() {
         let requested_unit = unit(LocaleSubject::RequestedLocales, Check::WithinBound);
@@ -573,7 +573,7 @@ mod tests {
 
     /// An element without an identity has none to add: the bound holds over
     /// the others, exactly, and is found past them, observed at the field
-    /// that still holds them (D15:1897, 2184, 3354).
+    /// that still holds them (D15:1898, 2185, 3479).
     #[test]
     fn the_requested_set_is_bounded_by_what_it_holds_beside_a_failed_element() {
         let requested_unit = unit(LocaleSubject::RequestedLocales, Check::WithinBound);
@@ -625,7 +625,7 @@ mod tests {
     }
 
     /// Past a bound, the map is observed, or the Target ID at its key, beside
-    /// the policy (D15:776, 1930-1931, 2249).
+    /// the policy (D15:777, 1931-1932, 2250).
     #[test]
     fn the_target_bounds_hold_at_their_limits_and_the_ids_wait_on_the_map() {
         // `browser` is seven bytes and `server` six.

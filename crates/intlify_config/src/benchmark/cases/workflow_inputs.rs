@@ -11,17 +11,17 @@
 //! supports in each slot, and the benchmark's vocabulary in its own. The
 //! canonicalization data is the committed ICU4X artifact, CLDR 48.2.0's, the
 //! one dataset the resolver supports, so every invocation binds one exact
-//! provider, specification, and data identity (D15:2790). The Verification
+//! provider, specification, and data identity (D15:2793). The Verification
 //! Input pins the policy the declaration selects. The capability is the
 //! owner's for the recipe's bounds, with the `bootstrapOnly` groups the
 //! invocation reads above their minima, which neither the file nor the data
 //! is within. A case reused after a blocked outcome also holds the Blocked
 //! recipe's submission, which it resolves before each start mark. Everything
-//! is built before any interval (D15:2824).
+//! is built before any interval (D15:2829).
 //!
 //! A programmatic entry submits, in place of the file, the formal Snapshot
 //! of the value the file's bytes spell, so a programmatic case pairs with
-//! the file case of its recipe (D15:2788), or, for the recipe no file has,
+//! the file case of its recipe (D15:2791), or, for the recipe no file has,
 //! that value of the example holding an ordinary marker. A replay case
 //! submits one entry's invocation once in preparation, and replays the
 //! Materialized Resolution Input Set beside its outcome.
@@ -54,7 +54,7 @@ use super::{EntryKind, EvidenceRecipe, Recipe, ResolverState};
 /// A programmatic entry's recipes: each Evidence recipe whose value a
 /// Snapshot represents, submitting the value its file spells, and the
 /// example's value holding the ordinary marker of an unsupported host value,
-/// which Phase 1 blocks with no value (D15:861, 2129). The malformed file has
+/// which Phase 1 blocks with no value (D15:862, 2130). The malformed file has
 /// no value, and the inadmissible one's repeated member and lone surrogate
 /// are no host value's.
 #[derive(
@@ -79,7 +79,7 @@ impl ProgrammaticRecipe {
     ];
 
     /// The recipes of the Shared projection stage, the ones with a value
-    /// whose file recipe has that stage's case (D15:2369, 2771).
+    /// whose file recipe has that stage's case (D15:2370, 2772).
     pub(in crate::benchmark) const VALUED: [Self; 3] =
         [Self::Storefront, Self::Blocked, Self::Dense];
 
@@ -116,7 +116,7 @@ impl ProgrammaticRecipe {
 /// blocked after materialization, whose replay has the Shared projection
 /// alone; and the example's under a capability whose `maxTokenInputs` the
 /// Entry scope's token inputs exceed and the Shared scope's are within,
-/// which withholds the invocation's profile but not the replay's (D15:2659).
+/// which withholds the invocation's profile but not the replay's (D15:2660).
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
 )]
@@ -142,7 +142,7 @@ impl ReplayRecipe {
 /// invocation whose set `recipe`'s replay replays: the example's or the
 /// Blocked recipe's submission, and for the withheld one the example's with
 /// `bootstrapOnly.evidenceMetadata.maxTokenInputs` at the Shared evaluation
-/// statuses its checked invocation commits, one token input each (D15:2659).
+/// statuses its checked invocation commits, one token input each (D15:2660).
 /// `None` when a fixture does not encode, or that invocation fails.
 pub(in crate::benchmark) fn replayed(
     recipe: ReplayRecipe,
@@ -231,7 +231,7 @@ pub(in crate::benchmark) fn submission(
 /// What a binding submits for `recipe`'s invocation through a programmatic
 /// entry on `constructed`: its file recipe's submission with the formal
 /// Snapshot of the value the file spells in place of the file, its revision
-/// the Snapshot's digest (D15:889).
+/// the Snapshot's digest (D15:890).
 pub(in crate::benchmark) fn programmatic(
     recipe: ProgrammaticRecipe,
     constructed: &ConstructedResolver,
@@ -252,7 +252,7 @@ pub(in crate::benchmark) fn programmatic(
 
 /// The Snapshot of the value `source`, `recipe`'s file, spells, admitted at
 /// its boundary under room for every count, which a programmatic entry's
-/// Evidence stages enter with (D15:2788, 2824).
+/// Evidence stages enter with (D15:2791, 2829).
 pub(in crate::benchmark) fn admitted(
     recipe: ProgrammaticRecipe,
     source: Arc<[u8]>,
@@ -388,7 +388,7 @@ mod tests {
         ConstructionRoot::built_in().unwrap()
     }
 
-    /// D15:2772, 2775, 2826: on the committed resolver, each recipe's
+    /// D15:2773, 2776, 2831: on the committed resolver, each recipe's
     /// submission is admitted and resolves to an outcome under the resolver's
     /// identity: checked for the example alone, blocked for every other
     /// recipe, with a Shared projection and beside a Materialized Resolution
@@ -436,7 +436,7 @@ mod tests {
         }
     }
 
-    /// D15:2826: a submission naming another resolver's identity is refused
+    /// D15:2831: a submission naming another resolver's identity is refused
     /// at the pre-invocation boundary, a benchmark failure rather than an
     /// outcome.
     #[test]
@@ -487,7 +487,7 @@ mod tests {
         }
     }
 
-    /// D15:2790: the submitted data, read and admitted under the submitted
+    /// D15:2793: the submitted data, read and admitted under the submitted
     /// capability, binds the pins the resolver supports and canonicalizes the
     /// locales the recipes spell as the resolver tests' fixture rows do.
     #[test]
@@ -506,7 +506,7 @@ mod tests {
         }
     }
 
-    /// D15:2788: each programmatic recipe submits the value of the file
+    /// D15:2791: each programmatic recipe submits the value of the file
     /// recipe of its own name, and the marked one the example's.
     #[test]
     fn each_programmatic_recipe_submits_the_value_of_the_file_it_names() {

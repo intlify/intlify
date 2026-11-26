@@ -18,26 +18,26 @@
 //! authoring order is no part of any.
 //!
 //! A count past its bound is observed where the count is, beside the
-//! confirmed policy, which supplies the bound (D15:2249): the Group ID map
+//! confirmed policy, which supplies the bound (D15:2250): the Group ID map
 //! for the groups and the memberships, a Group ID's key for its bytes, a
 //! group's `members` for their count, and each occurrence of a member for its
-//! bytes (D15:2387).
+//! bytes (D15:2388).
 //!
 //! A member that names no declared Target ID is observed at each of its
 //! occurrences beside the declared Target IDs, the set it must belong to, and
-//! a repeated member at each occurrence beside the others (D15:2249). A
+//! a repeated member at each occurrence beside the others (D15:2250). A
 //! declared Target ID that no group names is observed at its key beside the
 //! groups, the set it must belong to; one that several groups name, at each
 //! of its occurrences beside those in the other groups, the conflicting
-//! group/member evidence (D15:2438).
+//! group/member evidence (D15:2439).
 //!
-//! Each group and each member occurrence is read on its own (D15:2149, 2367,
+//! Each group and each member occurrence is read on its own (D15:2150, 2368,
 //! 3445). The counts take what was submitted, an entry whose key failed and a
 //! member that failed included. A value that failed has no subject here, and
 //! holds back only what needs it: a group's members and the partition wait on
 //! every occurrence, while a target's place is found from the groups that can
 //! be read and waits on the others only when none of those names it
-//! (D15:2184, 2365, 3354).
+//! (D15:2185, 2366, 3479).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -137,9 +137,9 @@ pub(crate) struct GroupField<'a> {
 
 /// The Group ID map as Phase 12 reads it: how many entries it holds and how
 /// many member occurrences their arrays hold, whatever their keys and values
-/// (D15:1932, 1935), whether every key was admitted, and each entry with an
+/// (D15:1933, 1936), whether every key was admitted, and each entry with an
 /// admitted key, in Group ID order. An entry whose key failed has no subject
-/// here (D15:2184).
+/// here (D15:2185).
 #[derive(Debug, Clone)]
 pub(crate) struct GroupFields<'a> {
     pub(crate) submitted: usize,
@@ -184,7 +184,7 @@ pub(crate) struct NamedMembers {
 
 impl NamedMembers {
     /// Whether the group names `id`: an admitted member proves it, and naming
-    /// none is proved only once every element was read (D15:2365, 2367).
+    /// none is proved only once every element was read (D15:2366, 2368).
     pub(crate) fn holds(&self, id: &TargetId) -> Admitted<bool> {
         if self.known.contains(id) {
             Ok(true)
@@ -425,7 +425,7 @@ fn own_bounds(
 
 /// Each member the group's admitted elements spell, by its positions among
 /// them, and why the group lacks the others: an element that failed keeps its
-/// position and has no subject (D15:1931, 2184).
+/// position and has no subject (D15:1932, 2185).
 fn occurrences_of<'a>(field: &GroupField<'a>) -> (Occurrences<'a>, Admitted<()>) {
     let mut occurrences: Occurrences<'a> = BTreeMap::new();
     let mut lacking = field.members.as_ref().map(|_| ()).map_err(Causes::clone);
@@ -442,7 +442,7 @@ fn occurrences_of<'a>(field: &GroupField<'a>) -> (Occurrences<'a>, Admitted<()>)
 /// `maxTargetIdBytes`, name a declared Target ID, and occur once; repeated
 /// occurrences are one subject, all spelling the same bytes. The set exists
 /// only when every member holds and none is `lacking`. A check that fails
-/// observes each occurrence of the member (D15:2387): past the bound beside
+/// observes each occurrence of the member (D15:2388): past the bound beside
 /// the policy, naming no Target ID beside the declared Target IDs at
 /// `at_targets`, and repeated beside the other occurrences.
 fn members(
@@ -514,7 +514,7 @@ fn members(
 /// once however often it names the target, among the groups in `read`. Two of
 /// them naming it prove the overlap, and one proves it placed, whatever else
 /// failed; none proves it unassigned only when nothing is `unseen`, and it
-/// waits on that otherwise (D15:2184, 2365). A target out of place is observed
+/// waits on that otherwise (D15:2185, 2366). A target out of place is observed
 /// through `observer`, when there is one.
 fn assignments(
     evaluation: &mut Evaluation,
@@ -567,7 +567,7 @@ fn assignments(
 }
 
 /// A declared Target ID that no group names, at its key beside the groups,
-/// the set it must belong to (D15:2249).
+/// the set it must belong to (D15:2250).
 fn unassigned(
     observer: Option<&DeclarationObserver<'_>>,
     target: &TargetId,
@@ -602,7 +602,7 @@ fn located<'g>(
 }
 
 /// Each occurrence at `at` of a Target ID that several groups name, beside
-/// its occurrences in the other groups (D15:2387, 2438). An occurrence in the
+/// its occurrences in the other groups (D15:2388, 2439). An occurrence in the
 /// same group is no other group the check counts.
 fn beside_other_groups(
     at: &[(&DeploymentGroupId, Option<EvidenceProjection>)],
@@ -1021,7 +1021,7 @@ mod tests {
                     .at(|observer| observer.element(&["deploymentGroups", "web", "members"], index))
             };
             let targets = inputs.at(|observer| observer.value(&["targetProfiles"]));
-            // One candidate for each occurrence of either result (D15:2387).
+            // One candidate for each occurrence of either result (D15:2388).
             assert_eq!(
                 observed(&evaluation),
                 [
@@ -1302,7 +1302,7 @@ mod tests {
                 assert!(groups.get(&group(blocked)).unwrap().is_err());
                 assert!(groups.get(&group(other)).unwrap().is_ok());
                 // Only the places the blocked group alone could give wait on
-                // its bounds (D15:2184, 2365).
+                // its bounds (D15:2185, 2366).
                 let alone: &[&str] = match blocked {
                     "jobs" => &["worker"],
                     _ => &["browser", "server"],
@@ -1373,7 +1373,7 @@ mod tests {
                 }
                 assert_eq!(found, [(bytes.clone(), Code::ResourceLimitExceeded)]);
                 // Each of the two occurrences, at its token, beside the
-                // policy (D15:2387).
+                // policy (D15:2388).
                 let each = |index| {
                     (
                         bytes.clone(),

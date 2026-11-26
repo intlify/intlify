@@ -308,7 +308,7 @@ fn a_prerequisite_failure_leaves_only_what_waits_on_it() {
     };
     // Phase 7 rejects one spelling: the target's three locale checks read
     // the values it admitted, and the whole set, which it no longer forms,
-    // waits on that Finding (D15:2184, 2367, 3354).
+    // waits on that Finding (D15:2185, 2368, 3479).
     let (evaluation, invalid) = ssr(R::TargetLocaleInvalid);
     assert!(evaluation
         .statuses()

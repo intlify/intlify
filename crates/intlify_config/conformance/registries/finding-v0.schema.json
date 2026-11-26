@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "FindingRegistry",
-  "description": "The registry's body: the disclosure policies, one for each evidence kind,\nand the rows (D15:2233).",
+  "description": "The registry's body: the disclosure policies, one for each evidence kind,\nand the rows (D15:2234).",
   "type": "object",
   "properties": {
     "policies": {
@@ -79,7 +79,7 @@
       ]
     },
     "Member": {
-      "description": "A member of an Evidence view (D15:2481).",
+      "description": "A member of an Evidence view (D15:2482).",
       "type": "string",
       "enum": [
         "source",
@@ -126,7 +126,7 @@
       ]
     },
     "Component": {
-      "description": "A component an Evidence view can retain: a leaf variant of one of its\nmembers, in the order of the view's members and of each member's\nvariants (D15:2492).",
+      "description": "A component an Evidence view can retain: a leaf variant of one of its\nmembers, in the order of the view's members and of each member's\nvariants (D15:2493).",
       "type": "string",
       "enum": [
         "source.safe-opaque",
@@ -151,7 +151,7 @@
       ]
     },
     "Disclosure": {
-      "description": "One of the two disclosure policies of a component (D15:720).",
+      "description": "One of the two disclosure policies of a component (D15:721).",
       "type": "string",
       "enum": [
         "non-secret-literal",
@@ -167,37 +167,37 @@
           "const": "owner-marked-identity"
         },
         {
-          "description": "The supplying adapter classifies the canonical locator non-secret\n(D15:766).",
+          "description": "The supplying adapter classifies the canonical locator non-secret\n(D15:767).",
           "type": "string",
           "const": "adapter-classified-locator"
         },
         {
-          "description": "The member name is defined by the configuration schema (D15:776).",
+          "description": "The member name is defined by the configuration schema (D15:777).",
           "type": "string",
           "const": "schema-defined-name"
         },
         {
-          "description": "A `profiles`, `targetProfiles`, or `deploymentGroups` key that matches\nthe identifier syntax within the capability's byte bound (D15:776).",
+          "description": "A `profiles`, `targetProfiles`, or `deploymentGroups` key that matches\nthe identifier syntax within the capability's byte bound (D15:777).",
           "type": "string",
           "const": "identifier-key"
         },
         {
-          "description": "A `localeNegotiation.aliases` or `messageFallback` key for which the\nadmitted canonicalization data returns a canonical identifier\n(D15:776).",
+          "description": "A `localeNegotiation.aliases` or `messageFallback` key for which the\nadmitted canonicalization data returns a canonical identifier\n(D15:777).",
           "type": "string",
           "const": "canonical-locale-key"
         },
         {
-          "description": "A selector that exactly matches a declared Profile ID (D15:807).",
+          "description": "A selector that exactly matches a declared Profile ID (D15:808).",
           "type": "string",
           "const": "declared-profile-id"
         },
         {
-          "description": "A vocabulary member's canonical vocabulary identity (D15:824).",
+          "description": "A vocabulary member's canonical vocabulary identity (D15:825).",
           "type": "string",
           "const": "vocabulary-identity"
         },
         {
-          "description": "An admitted envelope's canonical exact-reference identity (D15:824).",
+          "description": "An admitted envelope's canonical exact-reference identity (D15:825).",
           "type": "string",
           "const": "admitted-exact-reference"
         }
@@ -254,7 +254,7 @@
       ]
     },
     "RoleShape": {
-      "description": "A fixed role of a component path, with its rank within its parent path\n(D15:823).",
+      "description": "A fixed role of a component path, with its rank within its parent path\n(D15:824).",
       "type": "object",
       "properties": {
         "role": {
@@ -626,7 +626,7 @@
       ]
     },
     "PrimaryKind": {
-      "description": "A check's primary evidence kind, or `none` for the terminal reporting\nFinding (D15:2249).",
+      "description": "A check's primary evidence kind, or `none` for the terminal reporting\nFinding (D15:2250).",
       "type": "string",
       "enum": [
         "entry-source",

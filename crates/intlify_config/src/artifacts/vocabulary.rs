@@ -120,7 +120,7 @@ impl IntentSurfaceClassVocabularyArtifact {
 /// The caller's finite limits on one artifact (017 step 1), each checked before
 /// the work it bounds. There are no defaults: 017 asks the caller for them. At
 /// 015's boundary they are the Admitted Implementation Capability's
-/// `inputBoundary` bounds on the vocabulary (D15:1805, 1807-1810).
+/// `inputBoundary` bounds on the vocabulary (D15:1806, 1808-1811).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct VocabularyLimits {
     /// The artifact's bytes, checked before it is decoded.

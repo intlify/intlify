@@ -20,7 +20,7 @@ fn sum(mut values: impl Iterator<Item = u64>) -> Result<u64, WorkFailure> {
 
 impl LogicalWork {
     /// The workload of the Shared projection stage in the units and at the
-    /// stages of the bounds it applies (D15:1851, 1962-1970, 2796): what the
+    /// stages of the bounds it applies (D15:1852, 1963-1971, 2801): what the
     /// Shared domain committed under its seven `diagnostics.shared` counts,
     /// and the Shared scope under its four `evidenceMetadata` counts.
     pub(super) fn shared_evidence(&mut self, resolved: &Resolved) -> Result<(), WorkFailure> {
@@ -76,7 +76,7 @@ impl LogicalWork {
     }
 
     /// The workload of the Entry projection stage in the units and at the
-    /// stages of the bounds it applies (D15:1834-1839, 1851, 1946-1956,
+    /// stages of the bounds it applies (D15:1835-1840, 1852, 1947-1957,
     /// 2796): what the Entry domain committed under its eleven
     /// `diagnostics.entry` counts, and the complete invocation under its six
     /// `evidenceMetadata` counts.
@@ -180,7 +180,7 @@ impl LogicalWork {
 
     /// The workload of outcome finalization: the records each domain's
     /// projection orders, and the mandatory reserve in `maxCanonicalBytes`'
-    /// unit (D15:1847, 2143, 2796).
+    /// unit (D15:1848, 2144, 2801).
     pub(super) fn outcome_finalization(
         &mut self,
         resolved: &outcome::Resolved,

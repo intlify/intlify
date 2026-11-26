@@ -10,13 +10,13 @@
 //! declaration's references against the Set comes after it.
 //!
 //! The collection keeps every submitted occurrence for Finding Occurrence
-//! multiplicity (D15:1663), so a collection check's Finding is observed once
-//! for each occurrence that found it (D15:2387): a member key's checks see
+//! multiplicity (D15:1664), so a collection check's Finding is observed once
+//! for each occurrence that found it (D15:2388): a member key's checks see
 //! every occurrence of every body under the key, and a conflict group's check
 //! every occurrence of every body in the group. No Set admitted the member,
 //! so each is observed at a `redacted-key` that keeps only a JSON type, and
 //! the occurrences of one type are one presentation component, which the
-//! ordinals count (D15:834, 838, 2468; plan 025 interpretation #200).
+//! ordinals count (D15:835, 839, 2469; plan 025 interpretation #200).
 
 use std::collections::BTreeMap;
 
@@ -139,7 +139,7 @@ impl From<ComponentInvariant> for CollectionInvariant {
 
 /// Resolver-input Evidence of a collection member no Set admitted, under a
 /// `redacted-key` that keeps only the member's JSON type: for an envelope
-/// that establishes a tuple, its tuple view's, an object (D15:834, 2468; plan
+/// that establishes a tuple, its tuple view's, an object (D15:835, 2469; plan
 /// 025 interpretation #200).
 ///
 /// # Errors
@@ -152,7 +152,7 @@ pub(crate) fn unadmitted(member: &FormalMember) -> Result<EvidenceProjection, Co
 
 /// Resolver-input Evidence of an admitted envelope, a member of the Set or
 /// the Resource Limit Policy bootstrap admitted, under the canonical
-/// exact-reference identity that keys it (D15:824, 834; plan 025
+/// exact-reference identity that keys it (D15:825, 835; plan 025
 /// interpretation #200).
 ///
 /// # Errors
@@ -164,7 +164,7 @@ pub(crate) fn admitted(tuple: &ExactTuple) -> Result<EvidenceProjection, Compone
 }
 
 /// Resolver-input Evidence of the submitted collection at its root: the one
-/// location of every member together (D15:834).
+/// location of every member together (D15:835).
 ///
 /// # Errors
 ///
@@ -175,7 +175,7 @@ pub(crate) fn collection_root() -> Result<EvidenceProjection, ComponentInvariant
 }
 
 /// One candidate of `blocking` for each of `occurrences`, each at `member`
-/// (D15:2387).
+/// (D15:2388).
 fn each_at(blocking: Blocking, member: &EvidenceProjection, occurrences: usize) -> Found {
     let observed = Observation {
         primary: member.clone(),
@@ -222,7 +222,7 @@ fn admit_member<'a>(
 /// members, and, for a tuple, whether each was submitted only once. Each
 /// conflict group is checked for one body. The Set exists only under a
 /// confirmed policy, which a collection without a member has no unit to wait
-/// on (D15:2365), and when every unit holds, so it then has one body for each
+/// on (D15:2366), and when every unit holds, so it then has one body for each
 /// tuple.
 ///
 /// # Errors
@@ -978,7 +978,7 @@ mod tests {
     }
 
     /// A confirmed policy over a collection without a member admits an empty
-    /// Set, with no unit to record (D15:2137).
+    /// Set, with no unit to record (D15:2138).
     #[test]
     fn an_empty_collection_under_a_confirmed_policy_is_an_empty_set() {
         let empty = collection(&[]);
@@ -992,7 +992,7 @@ mod tests {
 
     /// Without a confirmed policy a collection without a member has no unit
     /// to wait on it, so the Set itself waits on why, and nothing that reads
-    /// the Set can report what the collection lacks (D15:2132, 2137, 2365).
+    /// the Set can report what the collection lacks (D15:2133, 2138, 2366).
     #[test]
     fn an_empty_collection_without_a_confirmed_policy_has_no_set() {
         let causes = unconfirmed();

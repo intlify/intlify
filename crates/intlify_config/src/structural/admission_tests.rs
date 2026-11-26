@@ -183,7 +183,7 @@ fn a_passing_alternative_does_not_admit_an_invalid_enclosing_field() {
     assert!(analysis.construct().unwrap().is_none());
 }
 
-/// D15:1885-1887: `maxProfiles` and `maxProfileIdBytes` are profile
+/// D15:1886-1888: `maxProfiles` and `maxProfileIdBytes` are profile
 /// selection's bounds, so structural admission evaluates every declaration
 /// whatever their values; selection applies them (`selection::tests`).
 #[test]
@@ -217,7 +217,7 @@ fn an_over_long_profile_id_is_still_checked_structurally() {
         .unwrap();
     assert!(analysis.issues().is_empty());
     // The key, and under it, the value's undeclared member and the seven
-    // required members it lacks (D15:2184).
+    // required members it lacks (D15:2185).
     assert_eq!(analysis.schema_issue_count(), 9);
     assert!(analysis.profile("app").unwrap().is_some());
     assert!(analysis.construct().unwrap().is_none());
@@ -228,7 +228,7 @@ fn an_over_long_profile_id_is_still_checked_structurally() {
 }
 
 /// Structural admission evaluates a declaration whose key lacks the
-/// identifier syntax, but later phases have no subject for it (D15:2184).
+/// identifier syntax, but later phases have no subject for it (D15:2185).
 #[test]
 fn a_declaration_under_a_key_without_the_identifier_syntax_is_never_read() {
     let mut value = minimal_config();
@@ -342,7 +342,7 @@ fn an_analysis_keeps_its_candidates_only_when_the_schema_guided_walk_ran() {
 }
 
 /// An entry's key keys the subjects under it only with the identifier
-/// syntax: the analysis names an admitted key and no other (D15:2181, 2184).
+/// syntax: the analysis names an admitted key and no other (D15:2182, 2185).
 #[test]
 fn the_analysis_names_only_an_admitted_key() {
     use super::facts::{At, Check, Level};

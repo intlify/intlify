@@ -138,7 +138,7 @@ impl ValueLimits {
     /// These are not Finding records: occurrence projection is a later stage.
     /// A total is exact; the single-string bound, which 015 checks one
     /// occurrence at a time under a key that stands for every string, reports
-    /// its first-over witness `limit + 1` (D15:1884, 2203).
+    /// its first-over witness `limit + 1` (D15:1885, 2204).
     pub(crate) fn violations(self, counts: ValueCounts) -> Vec<LimitViolation> {
         [
             (InputBound::Nodes, self.max_nodes, counts.nodes),

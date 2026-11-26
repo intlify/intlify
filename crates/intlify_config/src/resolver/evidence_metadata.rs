@@ -6,7 +6,7 @@
 //! Locator, and Resolver Input Component Path that a Finding Occurrence or
 //! Coverage Decision Evidence candidate's Evidence needs is admitted, and the
 //! four counts of the resolver's own Evidence metadata work, which no adapter
-//! applies (D15:724, 1834-1839, 1851; Decision 015-197).
+//! applies (D15:725, 1835-1840, 1852; Decision 015-197).
 //!
 //! Both come once after the last evaluation phase, in two scopes, each before
 //! its domain plans any reporting slice: first the Shared scope, the
@@ -14,16 +14,16 @@
 //! which the construction context and Materialized Resolution Input Set alone
 //! determine, in the Shared projection stage ([`shared_scope`]), and then the
 //! complete invocation, whose paths are checked before evidence token
-//! generation, in the Entry projection stage ([`invocation`]) (D15:1851,
+//! generation, in the Entry projection stage ([`invocation`]) (D15:1852,
 //! 2775; plan 025 decisions #230 and #253). A Logical
-//! input path past either path bound is absent, as path absence is (D15:776).
+//! input path past either path bound is absent, as path absence is (D15:777).
 //! A value locator or component path past one leaves its Evidence invalid
-//! (D15:842), and the Finding Registry fixes each check's evidence kinds, so
+//! (D15:843), and the Finding Registry fixes each check's evidence kinds, so
 //! no other form replaces it: the Entry domain, the only one whose records
 //! carry Evidence, is exhausted instead (plan 025 decisions #232 and #236). So
 //! it is when only a count of the complete invocation exceeds its bound, while
 //! the Shared domain reports as it would within every bound, so that paired
-//! entries keep equal Shared projections (D15:2659, 3228; plan 025 decision
+//! entries keep equal Shared projections (D15:2660, 3233; plan 025 decision
 //! #247). A count of the Shared scope past its bound exhausts every domain
 //! (#229). Each domain's terminal Finding names the first bound in the table's
 //! order that its scope exceeds, which is also the order the work is checked
@@ -35,12 +35,12 @@
 //! logical subject is deduplicated. A token input is the subject of a recorded
 //! unit, one for each unit, or a redacted component of an admitted candidate's
 //! Evidence or of an entry dependency record, whose tokens share Evidence's
-//! colliding sets (D15:2194; plan 025 interpretation #245). A collision
+//! colliding sets (D15:2195; plan 025 interpretation #245). A collision
 //! comparison is one pair of a colliding set of subject or evidence token
 //! records. A metadata work unit is one source identity, locator, Logical
 //! input path or value locator, selector, or component path that an admitted
 //! candidate's Evidence or an entry dependency record carries, or one token
-//! record (D15:1851; plan 025 interpretation #239). The diagnostic domain's
+//! record (D15:1852; plan 025 interpretation #239). The diagnostic domain's
 //! subject token, which only the reserved terminal records name, is outside
 //! the counts (plan 025 interpretation #237).
 
@@ -60,7 +60,7 @@ use super::tally::{total, Tally};
 use super::token::{Digest, Specification, Tokens};
 
 /// One `evidenceMetadata` bound the resolver applies itself, in the order of
-/// 015's table, which `Ord` follows (D15:1834-1839).
+/// 015's table, which `Ord` follows (D15:1835-1840).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum MetadataBound {
     LogicalPathSegments,
@@ -112,7 +112,7 @@ impl MetadataBound {
 }
 
 /// `Err` with the first path bound, in the table's order, that a path of
-/// `size` exceeds in `limits` (D15:1834, 1835).
+/// `size` exceeds in `limits` (D15:1835, 1836).
 pub(crate) fn path_holds(
     limits: &EvidenceMetadataLimits,
     size: PathSize,
@@ -261,7 +261,7 @@ fn reports_into_shared(unit: &Unit) -> bool {
 /// against the four counts of `limits` in the table's order, assigning under
 /// `digest` the scope's subject tokens only once its token inputs are within
 /// their bound. Those subjects have colliding sets of their own, so their
-/// tokens are the invocation's (D15:1851, 2194; plan 025 decisions #171,
+/// tokens are the invocation's (D15:1852, 2195; plan 025 decisions #171,
 /// #247, and #253).
 pub(crate) fn shared_scope(
     evaluation: &Evaluation,
@@ -315,7 +315,7 @@ pub(crate) fn shared_scope(
 /// which holds that of its Shared scope, `scope`, and of the entry dependency
 /// records `entry` names, against the four counts, assigning under `digest`
 /// the tokens of the other units' subjects and of the admitted Evidence only
-/// once the invocation's token inputs are within their bound (D15:1851, 2194;
+/// once the invocation's token inputs are within their bound (D15:1852, 2195;
 /// plan 025 decisions #247 and #253, interpretation #245).
 pub(crate) fn invocation(
     evaluation: &Evaluation,
@@ -656,7 +656,7 @@ mod tests {
     /// The value locators and component paths that the candidates' Evidence
     /// needs pass at the largest segments and bytes among them, and one below
     /// names that path bound, the segments first, while a Logical input path
-    /// past a bound only leaves its Evidence without it (D15:776, 842, 1851;
+    /// past a bound only leaves its Evidence without it (D15:777, 843, 1852;
     /// plan 025 decisions #232 and #236).
     fn required_paths_pass_at_their_largest_size_and_name_it_one_below(evaluation: &Evaluation) {
         let sizes: Vec<PathSize> = projections(evaluation)
@@ -807,7 +807,7 @@ mod tests {
     /// below that every domain is, both naming the bound, the counts checked
     /// after admission and in the table's order, under a digest that makes
     /// every record of a kind collide so the comparisons count too
-    /// (D15:1836-1839, 1851; plan 025 decision #247, interpretation #239).
+    /// (D15:1837-1840, 1852; plan 025 decision #247, interpretation #239).
     fn each_count_passes_exactly_and_names_itself_one_over(evaluation: &Evaluation) {
         let redacted = redacted_entry();
         assert_eq!(
@@ -876,7 +876,7 @@ mod tests {
     /// scope exceeds: past a value locator's path bound and a Shared-scope
     /// count, the Entry domain names the path bound and the Shared domain the
     /// count, whether the Shared scope exceeds its inputs or the work its
-    /// tokens take (D15:1851; plan 025 decision #247).
+    /// tokens take (D15:1852; plan 025 decision #247).
     #[test]
     fn each_domain_names_the_first_bound_its_scope_exceeds() {
         failing().resolve(|evaluation, _| {
@@ -915,7 +915,7 @@ mod tests {
     /// scope's subjects, past an input count it keeps none, since none were
     /// assigned, and past a count of its tokens it keeps them for the counts
     /// of the complete invocation, under a digest that makes every record of
-    /// a kind collide so the comparisons count too (D15:1851; plan 025
+    /// a kind collide so the comparisons count too (D15:1852; plan 025
     /// decision #253).
     #[test]
     fn the_shared_scope_keeps_its_tokens_once_its_inputs_are_within_their_bound() {
@@ -1041,7 +1041,7 @@ mod tests {
 
     /// Evidence that redacts a source identity and a member counts each
     /// component as a token input and each record as work, and the one pair
-    /// of records when they collide (D15:1837-1839; plan 025 interpretation
+    /// of records when they collide (D15:1838-1840; plan 025 interpretation
     /// #239).
     #[test]
     fn each_count_of_redacted_evidence_passes_exactly_and_names_itself_one_over() {
@@ -1057,7 +1057,7 @@ mod tests {
     /// inputs, and their projections, the locator among them, and their two
     /// token records are work, whatever the rest of the invocation counts.
     /// They are Entry records, so past a bound only for them only the Entry
-    /// domain is exhausted (D15:1837, 1839, 1851; plan 025 decision #247,
+    /// domain is exhausted (D15:1838, 1840, 1852; plan 025 decision #247,
     /// interpretation #245).
     #[test]
     fn the_entry_dependencies_count_as_token_inputs_and_work() {

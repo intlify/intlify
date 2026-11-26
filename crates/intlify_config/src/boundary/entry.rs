@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! 015's admission of a file or programmatic Entry Admission Input Set, each
-//! in a step of its own (015-172, 015-201, D15:3159).
+//! in a step of its own (015-172, 015-201, D15:3164).
 //!
 //! A file entry has two typed input slots. The `configuration-file` slot's
 //! value is the raw configuration bytes with their exact logical source
@@ -17,7 +17,7 @@
 //! binding submits each value beside its candidate for the Safe Origin Kind
 //! the slot fixes. The step borrows the Snapshot and selector reports, which
 //! stay the binding's, so an interval that admits them frees neither
-//! (D15:140, 2805). A mark is carried as supplied and never decides
+//! (D15:141, 2810). A mark is carried as supplied and never decides
 //! admission; an adapter that supplies none leaves the identity unmarked
 //! (Decision 015-185).
 //!
@@ -79,7 +79,7 @@ pub(crate) struct FileEntryInputs {
 }
 
 /// Two sets are equal by value, as invocation staleness compares them
-/// (D15:2583): the raw bytes, the pair, the mark, the locator, and the
+/// (D15:2584): the raw bytes, the pair, the mark, the locator, and the
 /// selector. The pattern names every field, so a part added to the set fails
 /// to compile here.
 impl PartialEq for FileEntryInputs {
@@ -161,7 +161,7 @@ pub(crate) struct SubmittedProgrammaticEntry<'a> {
     pub(crate) selector: Component<'a, SelectorReport<'a>>,
 }
 
-/// An admitted programmatic Entry Admission Input Set (D15:3163). Each origin
+/// An admitted programmatic Entry Admission Input Set (D15:3168). Each origin
 /// is the Safe Origin Kind its slot fixes, so the set does not repeat it. No
 /// `Debug`: the Snapshot carries configuration.
 pub(crate) struct ProgrammaticEntryInputs {
@@ -171,14 +171,14 @@ pub(crate) struct ProgrammaticEntryInputs {
     pub(crate) source: SourcePair,
     /// Whether the frontend marked the Programmatic Entry identity non-secret.
     pub(crate) marked: bool,
-    /// The Programmatic Entry locator, never the sidecar's (D15:747).
+    /// The Programmatic Entry locator, never the sidecar's (D15:748).
     pub(crate) locator: Option<Locator>,
     pub(crate) call_site: Option<AdmittedCallSite>,
     pub(crate) selector: SelectorInput,
 }
 
 /// Two sets are equal by value, as invocation staleness compares them
-/// (D15:2583): the Snapshot and its verified digest, the pair, the mark, the
+/// (D15:2584): the Snapshot and its verified digest, the pair, the mark, the
 /// locator, the call-site sidecar or its absence, and the selector. The
 /// pattern names every field, so a part added to the set fails to compile
 /// here.
@@ -514,7 +514,7 @@ pub(crate) mod tests {
 
     /// A stable configuration-root identity plus a logical source slot
     /// establishes the file's identity with no locator, and the same pair
-    /// under any locator: the locator takes no part in it (D15:741, 788,
+    /// under any locator: the locator takes no part in it (D15:742, 789,
     /// 3388).
     #[test]
     fn a_root_identity_and_slot_establish_the_file_identity_without_a_locator() {
@@ -666,7 +666,7 @@ pub(crate) mod tests {
             .expect("the entry is refused")
     }
 
-    /// The admitted set holds what D15:3163 lists for a programmatic entry.
+    /// The admitted set holds what D15:3168 lists for a programmatic entry.
     #[test]
     fn a_complete_programmatic_entry_is_admitted_slot_by_slot() {
         let programmatic = Programmatic::new();
@@ -719,7 +719,7 @@ pub(crate) mod tests {
     }
 
     /// The step borrows the binding's Snapshot and selector reports, so the
-    /// same submission is admitted alike again (D15:140, 2805).
+    /// same submission is admitted alike again (D15:141, 2810).
     #[test]
     fn the_reports_stay_the_bindings_and_admit_alike_again() {
         let programmatic = Programmatic::new();
@@ -934,7 +934,7 @@ pub(crate) mod tests {
 
     /// A Programmatic Entry locator candidate that is not admitted is absence,
     /// and each locator stays with its own source: neither fills the other's
-    /// absence (D15:747, 3403).
+    /// absence (D15:748, 3528).
     #[test]
     fn a_programmatic_locator_that_is_not_admitted_is_absence() {
         let programmatic = Programmatic::new();

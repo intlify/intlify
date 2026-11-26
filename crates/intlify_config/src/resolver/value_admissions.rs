@@ -5,16 +5,16 @@
 //! configuration: the causes of every candidate that did not pass, at the
 //! value it looked at. One unit keyed by a path with `*` holds every element
 //! or entry of the path, so its result cannot tell them apart, while each of
-//! its candidates has a result of its own (D15:2184, 2203). Reading a value
+//! its candidates has a result of its own (D15:2185, 2204). Reading a value
 //! from its candidates therefore keeps a failure of one element out of its
-//! siblings (D15:393, 2367, 3340).
+//! siblings (D15:394, 2368, 3465).
 //!
 //! A value's candidates are its own checks. The check of an identity map's
 //! key is kept apart, by the entry's value: an entry without an admitted key
 //! has no subject in a later phase, while its fields are still checked
-//! (D15:2184). An undeclared member is a failure of the object that holds it,
+//! (D15:2185). An undeclared member is a failure of the object that holds it,
 //! and a missing required member is kept by its object and its name, since it
-//! has no value (D15:2180, 2184). Only what did not pass is kept, so a
+//! has no value (D15:2181, 2185). Only what did not pass is kept, so a
 //! configuration structural admission admitted whole holds nothing here.
 
 use std::collections::BTreeMap;
@@ -70,7 +70,7 @@ impl ValueAdmissions {
 
     /// Whether every candidate that looked at `value` itself passed, or the
     /// causes of those that did not: an array's own type and not its elements',
-    /// each of which has a result of its own (D15:2184).
+    /// each of which has a result of its own (D15:2185).
     pub(crate) fn value(&self, value: NodeId) -> Admitted<()> {
         self.values.get(&value).cloned().map_or(Ok(()), Err)
     }

@@ -171,7 +171,7 @@ impl LocaleSet {
 
 /// A locale set some of whose elements may have no canonical identity: the
 /// identities of those that do, and why the others have none. Membership is
-/// then one of three results (D15:2365, 2367): a locale it holds is a member
+/// then one of three results (D15:2366, 2368): a locale it holds is a member
 /// whatever the rest is, one it does not hold is outside it only when no
 /// element is missing, and is otherwise unproved, with the causes of those
 /// that are.
@@ -209,7 +209,7 @@ impl KnownSet {
     }
 
     /// The identities a count over the set reads: one without an identity has
-    /// none to add, so the count waits only when no element has one (D15:2184,
+    /// none to add, so the count waits only when no element has one (D15:2185,
     /// 3354).
     pub(crate) fn counted(&self) -> Admitted<&LocaleSet> {
         match &self.missing {
@@ -257,7 +257,7 @@ pub(super) fn joined(earlier: Option<Causes>, causes: &Causes) -> Causes {
 /// The selected declaration's locale-bearing fields as structural admission
 /// left them, each admitted or unavailable with the causes behind it. The
 /// spellings are counted apart from them, since no field's failure hides
-/// what its bound counts (D15:1896, 1907); and the project's requested locales
+/// what its bound counts (D15:1897, 1908); and the project's requested locales
 /// are read element by element.
 pub(crate) struct LocaleFields<'a> {
     pub(crate) spellings: Admitted<Tally>,
@@ -275,7 +275,7 @@ pub(crate) struct LocaleFields<'a> {
 }
 
 /// One entry of the alias map: its key, a spelling whatever its value is, and
-/// its destination, or why it has none (D15:1477, 2367).
+/// its destination, or why it has none (D15:1478, 2368).
 #[derive(Debug, Clone)]
 pub(crate) struct AliasField<'a> {
     pub(crate) key: &'a str,
@@ -284,7 +284,7 @@ pub(crate) struct AliasField<'a> {
 
 /// The alias map's entries as Phase 7 reads them, in the map's order, and
 /// whether everything at and below `localeNegotiation` passed: the profile
-/// built from every entry waits on it (D15:2367, 2418).
+/// built from every entry waits on it (D15:2368, 2419).
 #[derive(Debug, Clone)]
 pub(crate) struct AliasFields<'a> {
     pub(crate) entries: Vec<AliasField<'a>>,
@@ -311,7 +311,7 @@ impl<'a> AliasFields<'a> {
 }
 
 /// One entry of `messageFallback`: its key, a spelling whatever its sequence
-/// is, and its sequence candidate by candidate, or why it has none (D15:1519,
+/// is, and its sequence candidate by candidate, or why it has none (D15:1520,
 /// 2367). Phase 7 spells the key; Phase 8 reads the sequence.
 #[derive(Debug, Clone)]
 pub(crate) struct FallbackField<'a> {
@@ -329,10 +329,10 @@ pub(crate) struct TargetLocaleFields<'a> {
 }
 
 /// The Target ID map's entries as Phase 7 reads them: how many it holds, one
-/// whose key failed included (D15:1930), each with an admitted key, in Target
+/// whose key failed included (D15:1931), each with an admitted key, in Target
 /// ID order, whether every key was admitted, and whether everything at and
 /// below the map passed, which what needs every target waits on. An entry
-/// whose key failed has no subject here (D15:2184).
+/// whose key failed has no subject here (D15:2185).
 #[derive(Debug, Clone)]
 pub(crate) struct TargetMapFields<'a> {
     pub(crate) submitted: usize,
@@ -417,7 +417,7 @@ pub(crate) struct Spelled {
 
 /// An alias's key and destination as Phase 7 left them. A destination
 /// structural admission did not admit is no spelling, so it has no subject,
-/// only why it is unavailable (D15:1907, 2367).
+/// only why it is unavailable (D15:1908, 2368).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AliasLocales {
     pub(crate) key: Spelled,
@@ -436,7 +436,7 @@ impl AliasLocales {
 
 /// One target's locales as Phase 7 left them. The set holds the canonical
 /// identities even when a member repeats, which only `distinct` records, and
-/// an element without an identity leaves the others' (D15:2367); Phase 11
+/// an element without an identity leaves the others' (D15:2368); Phase 11
 /// checks the set and the default against the project's.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TargetLocales {
@@ -485,7 +485,7 @@ pub(crate) struct ResolvedLocales {
     pub(crate) occurrences: Vec<LocaleOccurrence>,
     /// The project's canonical requested locales, even when one repeats or
     /// there are too many: membership needs only their identities, and an
-    /// element without one leaves the others' (D15:2367).
+    /// element without one leaves the others' (D15:2368).
     pub(crate) requested_set: KnownSet,
     /// The project's canonical default requested locale, even when it is not
     /// one of the requested locales: a target that inherits it needs only its
@@ -539,7 +539,7 @@ impl From<ObserverInvariant> for LocaleInvariant {
 /// over the selected declaration's `fields`, which its checks observe through
 /// `observer` when the declaration's file is there. The caller hands the
 /// observer what Phase 5 bound, so a locale key is classified as a record
-/// constructed since is (D15:776).
+/// constructed since is (D15:777).
 /// Every spelling is counted first; none is canonicalized unless the count is
 /// proved within `maxLocaleOccurrences`, so an over-bound declaration never has
 /// a valid prefix resolved.
@@ -665,9 +665,9 @@ fn project<P: Provider>(
 
 /// The default's unit: its canonical locale must be one of the project's
 /// requested locales, which an element without an identity leaves unproved
-/// only for a locale the others do not name (D15:2365, 2367). A default
+/// only for a locale the others do not name (D15:2366, 2368). A default
 /// outside them is observed at its token, beside the requested locales, a set
-/// that counts as one location (D15:2249, 2416).
+/// that counts as one location (D15:2250, 2417).
 fn member(
     evaluation: &mut Evaluation,
     default: &Admitted<CanonicalLocale>,
@@ -1024,7 +1024,7 @@ mod tests {
     /// Membership is one of three results: a locale the set holds passes
     /// whatever else it lacks, one it does not hold is outside only a set
     /// that lacks nothing, and otherwise waits, with the causes of what is
-    /// missing and of a locale that has no identity (D15:2365, 2367).
+    /// missing and of a locale that has no identity (D15:2366, 2368).
     #[test]
     fn membership_is_proved_from_what_the_set_holds() {
         let missing = stand_in(Slot::Coverage);
@@ -1050,7 +1050,7 @@ mod tests {
 
     /// A spelling without an identity is missing from the set, beside what
     /// was never spelled; a check that spans the set waits on all of it, and
-    /// a count over it only when nothing has an identity (D15:2184, 3354).
+    /// a count over it only when nothing has an identity (D15:2185, 3479).
     #[test]
     fn a_known_set_holds_the_identities_and_why_the_others_have_none() {
         let excluded = stand_in(Slot::Coverage);
@@ -1338,7 +1338,7 @@ mod tests {
             Some(vec![zz.clone()])
         );
         // The set still holds `en`, so its size and the default's membership
-        // need nothing of `zz` (D15:2184, 2365).
+        // need nothing of `zz` (D15:2185, 2366).
         for independent in [
             unit(
                 LocaleSubject::RequestedLocale(key("en")),
@@ -1370,7 +1370,7 @@ mod tests {
         assert!(resolved.targets.is_ok());
 
         // A default the set does not hold is unproved, not found outside it:
-        // the proof needs the identity that `zz` lacks (D15:2365).
+        // the proof needs the identity that `zz` lacks (D15:2366).
         let unproved = declaration(&minimal_config(), |app| {
             app["requestedLocales"] = json!(["en", "zz"]);
             app["defaultRequestedLocale"] = json!("de");
@@ -1424,7 +1424,7 @@ mod tests {
     /// Phase 7 observes through what its observer was handed, which
     /// classifies an alias key by whether the canonicalizer returns a
     /// canonical identifier: a corrected key is non-secret and a rejected one
-    /// is redacted (D15:776).
+    /// is redacted (D15:777).
     #[test]
     fn an_alias_key_is_classified_by_what_the_observer_was_handed() {
         use crate::resolver::declaration_observer::fixtures::view;
@@ -1462,7 +1462,7 @@ mod tests {
 
     /// The default's spelling is observed at its token: corrected, with
     /// nothing beside it, and outside the requested locales, beside them, a
-    /// set that counts as one location (D15:2249, 2410, 2416).
+    /// set that counts as one location (D15:2250, 2411, 2417).
     #[test]
     fn a_default_outside_the_requested_locales_is_observed_beside_them() {
         let declaration = declaration(&minimal_config(), |app| {
@@ -1501,7 +1501,7 @@ mod tests {
     }
 
     /// Phase 7 observes a requested spelling past the identifier bound at
-    /// its token, beside the confirmed policy it runs under (D15:790, 2249).
+    /// its token, beside the confirmed policy it runs under (D15:791, 2250).
     #[test]
     fn a_spelling_past_the_identifier_bound_is_observed_beside_the_policy() {
         let declaration = declaration(&minimal_config(), |app| {

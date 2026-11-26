@@ -6,7 +6,7 @@
 //!
 //! Construction computes its bounds' totals over the complete input before
 //! any other check, and an artifact contributes its JSON counts only when it
-//! is strict UTF-8 JSON (D15:955), read as design 017 has every decoder read
+//! is strict UTF-8 JSON (D15:956), read as design 017 has every decoder read
 //! it: malformed UTF-8, a byte-order mark, trailing data, a duplicate object
 //! member, and an unpaired surrogate escape are refused, and a number is any
 //! number JSON's grammar admits. The decoder construction reads values with

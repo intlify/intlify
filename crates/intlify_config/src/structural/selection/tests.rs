@@ -347,7 +347,7 @@ fn count_overrun_and_unadmitted_only_identity_never_choose_a_partial_profile() {
     }
 }
 
-/// D15:1886: a declaration's ID bytes are its decoded name's UTF-8 bytes,
+/// D15:1887: a declaration's ID bytes are its decoded name's UTF-8 bytes,
 /// not its escaped spelling's, and selection refuses a declaration past the
 /// bound.
 #[test]
@@ -391,7 +391,7 @@ fn a_declarations_id_bytes_are_its_decoded_names() {
 /// The declaration boundary is its value as an object under its admitted
 /// key: an object missing its required members has a boundary but no
 /// `resourceLimits` reference, and an undeclared member leaves the boundary
-/// admitted (D15:2131, 3341; plan 025 interpretation #218).
+/// admitted (D15:2132, 3466; plan 025 interpretation #218).
 #[test]
 fn selected_declaration_boundary_and_resource_reference_are_independent_prerequisites() {
     let bound = limits().max_profile_id_bytes;

@@ -4,7 +4,7 @@
 //! Where a check of the selected declaration looks: a value under the
 //! declaration, an array's element there, or a member's key there, as
 //! Materialized Value Evidence at the token in the configuration entry Phase 1
-//! read (D15:790, 802), and the configuration around it, the root, the
+//! read (D15:791, 803), and the configuration around it, the root, the
 //! declarations, a declared Profile ID's key, every string past a bound, and
 //! the selector. The phases after profile selection observe their Findings
 //! through it.
@@ -23,7 +23,7 @@ use super::limits::ConfirmedPolicy;
 /// The declaration profile selection selected, in the configuration entry
 /// Phase 1 read and the document it materialized, and what
 /// `specification-admission` bound to classify a locale key in a record
-/// constructed since, when it has (D15:776).
+/// constructed since, when it has (D15:777).
 #[derive(Clone, Copy)]
 pub(crate) struct DeclarationObserver<'a> {
     entry: &'a dyn ConfigurationEntry,
@@ -69,7 +69,7 @@ impl<'a> DeclarationObserver<'a> {
     /// The observer of the records constructed once `specification-admission`
     /// bound `locales`, which then classify a key of `localeNegotiation.aliases`
     /// or `messageFallback` by whether it returns a canonical identifier
-    /// (D15:776).
+    /// (D15:777).
     pub(crate) fn with_locales<'b>(&self, locales: &'b dyn LocaleKeys) -> DeclarationObserver<'b>
     where
         'a: 'b,
@@ -85,7 +85,7 @@ impl<'a> DeclarationObserver<'a> {
     }
 
     /// The value at the member path `path` under the declaration, at its
-    /// token (D15:790).
+    /// token (D15:791).
     ///
     /// # Errors
     ///
@@ -97,7 +97,7 @@ impl<'a> DeclarationObserver<'a> {
     }
 
     /// The element at `index` of the array at the member path `path` under
-    /// the declaration, at its token (D15:790).
+    /// the declaration, at its token (D15:791).
     ///
     /// # Errors
     ///
@@ -119,7 +119,7 @@ impl<'a> DeclarationObserver<'a> {
     }
 
     /// The value at the internal path `steps` under the declaration, through
-    /// members and array elements alike, at its token (D15:790).
+    /// members and array elements alike, at its token (D15:791).
     ///
     /// # Errors
     ///
@@ -149,7 +149,7 @@ impl<'a> DeclarationObserver<'a> {
 
     /// The key of the member `name` of the object at the member path `path`
     /// under the declaration, at the key's token, which is classified by facts
-    /// fixed when the record is constructed, never by a later check (D15:776,
+    /// fixed when the record is constructed, never by a later check (D15:777,
     /// 790).
     ///
     /// # Errors
@@ -170,7 +170,7 @@ impl<'a> DeclarationObserver<'a> {
 
     /// The key of the member at `rank`, in the unsigned byte order of member
     /// names, of the object at the member path `path` under the declaration,
-    /// at the key's token (D15:776, 790).
+    /// at the key's token (D15:777, 791).
     ///
     /// # Errors
     ///
@@ -185,7 +185,7 @@ impl<'a> DeclarationObserver<'a> {
         self.at(&self.edges(path, Some(name)), member.key())
     }
 
-    /// The value of that member, at its token (D15:790).
+    /// The value of that member, at its token (D15:791).
     ///
     /// # Errors
     ///
@@ -239,7 +239,7 @@ impl<'a> DeclarationObserver<'a> {
             .collect()
     }
 
-    /// The root value, at its token (D15:790).
+    /// The root value, at its token (D15:791).
     ///
     /// # Errors
     ///
@@ -249,7 +249,7 @@ impl<'a> DeclarationObserver<'a> {
     }
 
     /// The root's `profiles` object, the declarations as one location, at its
-    /// token (D15:790, 812).
+    /// token (D15:791, 813).
     ///
     /// # Errors
     ///
@@ -263,7 +263,7 @@ impl<'a> DeclarationObserver<'a> {
 
     /// The key of the declared Profile ID `id` in the root's `profiles`
     /// object, at the key's token, which is classified by facts fixed when the
-    /// record is constructed, never by a later check (D15:776, 790).
+    /// record is constructed, never by a later check (D15:777, 791).
     ///
     /// # Errors
     ///
@@ -279,7 +279,7 @@ impl<'a> DeclarationObserver<'a> {
 
     /// Every string value and object key in the configuration longer than
     /// `limit` UTF-8 bytes, with its length, at its token: a key at its
-    /// member, at the key's span (D15:790, 1884, 2203).
+    /// member, at the key's span (D15:791, 1885, 2204).
     ///
     /// # Errors
     ///
@@ -335,10 +335,10 @@ impl<'a> DeclarationObserver<'a> {
     }
 
     /// The selector `input`, under the Safe Origin Kind the entry fixes for
-    /// it (D15:804), projected under its final authority `authority`, beside
-    /// the declarations when they are `available` (D15:812, 816; plan 025
+    /// it (D15:805), projected under its final authority `authority`, beside
+    /// the declarations when they are `available` (D15:813, 817; plan 025
     /// interpretation #215). A selector past the bound names no declaration
-    /// (D15:807).
+    /// (D15:808).
     ///
     /// # Errors
     ///
@@ -375,7 +375,7 @@ impl<'a> DeclarationObserver<'a> {
 
 /// What a bound's unit observes past the confirmed `policy`'s limit: where
 /// `at` looks in the declaration, beside the policy, which supplies the bound
-/// (D15:2249). Nothing is observed without the policy or the declaration's
+/// (D15:2250). Nothing is observed without the policy or the declaration's
 /// entry.
 ///
 /// # Errors
@@ -396,7 +396,7 @@ pub(crate) fn beside<'o>(
 }
 
 /// One observation for each occurrence at `at`, beside `related`, where both
-/// were observed (D15:2387).
+/// were observed (D15:2388).
 pub(crate) fn each_beside(
     at: &[Option<EvidenceProjection>],
     related: Option<&EvidenceProjection>,
@@ -405,7 +405,7 @@ pub(crate) fn each_beside(
 }
 
 /// One observation for each occurrence at `at`, beside every location in
-/// `related`, where all were observed (D15:2387). A check that compares no
+/// `related`, where all were observed (D15:2388). A check that compares no
 /// other location relates none.
 pub(crate) fn each_beside_all(
     at: &[Option<EvidenceProjection>],
@@ -536,7 +536,7 @@ mod tests {
     }
 
     /// A value under the declaration is observed at its token, at the
-    /// pointer of its path from the root (D15:790).
+    /// pointer of its path from the root (D15:791).
     #[test]
     fn a_value_under_the_declaration_is_observed_at_its_token() {
         let config = minimal_config();
@@ -562,7 +562,7 @@ mod tests {
 
     /// The root, the declarations, and a declared Profile ID's key are each
     /// observed at its token: the key at the member, at the key's span
-    /// (D15:776, 790).
+    /// (D15:777, 791).
     #[test]
     fn the_root_the_declarations_and_a_key_are_observed_at_their_tokens() {
         let config = minimal_config();
@@ -591,7 +591,7 @@ mod tests {
     }
 
     /// A member's key under the declaration is observed at its token, at the
-    /// pointer of its member (D15:776, 790).
+    /// pointer of its member (D15:777, 791).
     #[test]
     fn a_key_under_the_declaration_is_observed_at_its_token() {
         // Both names occur elsewhere in the file too: `server` as a group
@@ -640,7 +640,7 @@ mod tests {
     /// A key of `localeNegotiation.aliases` or `messageFallback`, at its rank
     /// among the map's keys, is non-secret in a record constructed once
     /// `specification-admission` bound a canonicalizer that returns a canonical
-    /// identifier for it, and redacted otherwise, and before (D15:776, 3380).
+    /// identifier for it, and redacted otherwise, and before (D15:777, 3505).
     #[test]
     fn a_locale_key_is_classified_by_the_bound_canonicalizer() {
         let mut config = complete_config();
@@ -702,7 +702,7 @@ mod tests {
     }
 
     /// An array's element under the declaration is observed at its token, at
-    /// the pointer of its index (D15:790).
+    /// the pointer of its index (D15:791).
     #[test]
     fn an_element_under_the_declaration_is_observed_at_its_token() {
         let mut config = complete_config();
@@ -747,7 +747,7 @@ mod tests {
 
     /// A value through members and elements alike, such as a coverage rule's
     /// selector item, is observed at its token, and the same path through
-    /// members alone is the value's (D15:790).
+    /// members alone is the value's (D15:791).
     #[test]
     fn a_value_through_members_and_elements_is_observed_at_its_token() {
         use crate::structural::Edge::{Index, Member};
@@ -799,7 +799,7 @@ mod tests {
     }
 
     /// The selector is projected under the authority it is given, beside the
-    /// declarations exactly when they are available (D15:812, 816).
+    /// declarations exactly when they are available (D15:813, 817).
     #[test]
     fn the_selector_is_projected_under_its_authority_beside_the_declarations() {
         let (bytes, document, profiles) = materialized(&minimal_config());
@@ -828,7 +828,7 @@ mod tests {
     }
 
     /// The selector is observed under the Safe Origin Kind its entry fixes,
-    /// beside the declarations in that entry (D15:204, 804, 812).
+    /// beside the declarations in that entry (D15:205, 805, 813).
     #[test]
     fn the_selector_is_observed_under_the_origin_its_entry_fixes() {
         let (bytes, document, profiles) = materialized(&minimal_config());
@@ -884,7 +884,7 @@ mod tests {
     /// Every string value and object key past a bound is observed at its
     /// token, a key at its member, and nothing within the bound is: each
     /// once, at a span holding the string, and at its exact pointer unless a
-    /// member on its path is redacted (D15:776, 790, 1884, 2203).
+    /// member on its path is redacted (D15:777, 791, 1885, 2204).
     #[test]
     fn every_string_past_a_bound_is_observed_at_its_token() {
         // The complete configuration has arrays of several strings and of

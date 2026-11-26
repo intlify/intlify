@@ -119,7 +119,7 @@ impl JsonSchema for LogicalAddress {
 
 /// A measured total: the exact count, or the proof that the count is past
 /// what a `u64` holds, and so past every limit. It never wraps or saturates
-/// (D15:1997).
+/// (D15:1998).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Measured {
     Exact(u64),
@@ -160,7 +160,7 @@ mod tests {
 
     use super::*;
 
-    /// D15:1997: a total is checked, and one past a `u64` is past every limit
+    /// D15:1998: a total is checked, and one past a `u64` is past every limit
     /// instead of a wrapped or saturated count.
     #[test]
     fn a_measured_total_past_u64_is_past_every_limit() {

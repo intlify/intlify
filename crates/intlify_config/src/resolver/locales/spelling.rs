@@ -8,12 +8,12 @@
 //! has none, decides the rest.
 //!
 //! Each spelling a check finds, or corrects, is one candidate of the unit's
-//! Finding, observed at its own token (D15:790, 2387, 2410): a repeated
+//! Finding, observed at its own token (D15:791, 2388, 2411): a repeated
 //! locale at each of its spellings beside the others, and a spelling past the
 //! identifier bound beside the confirmed policy, which supplies the bound
-//! (D15:2249). A key of `localeNegotiation.aliases` or `messageFallback` is
+//! (D15:2250). A key of `localeNegotiation.aliases` or `messageFallback` is
 //! observed at its key's token, and an alias's destination at its value's,
-//! each key classified by the canonicalizer Phase 5 bound (D15:776).
+//! each key classified by the canonicalizer Phase 5 bound (D15:777).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -153,7 +153,7 @@ impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
 
     /// What the spelling at `location` observed when its check found
     /// `blocking`: its token, beside the confirmed policy past the identifier
-    /// bound, which the policy supplies (D15:2249).
+    /// bound, which the policy supplies (D15:2250).
     fn found_at(
         &self,
         location: &Location,
@@ -246,7 +246,7 @@ impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
         for (subject, Group { attempt, spellings }) in groups {
             let unit = unit(subject.clone(), Check::CanonicalLocale);
             // The spellings of one subject share its result: each that a
-            // blocking result finds is one candidate of it (D15:2387), and
+            // blocking result finds is one candidate of it (D15:2388), and
             // each corrected one is a candidate of its notice.
             let (found, corrected): (Vec<_>, Vec<_>) = match &attempt {
                 Ok(Err(_)) => (
@@ -291,7 +291,7 @@ impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
 
     /// The canonical locale of the single-valued field at `location`, or,
     /// when structural admission left it none, its unit waiting on why: its
-    /// path names it without its value (D15:1157, 1171, 2184).
+    /// path names it without its value (D15:1158, 1172, 2185).
     pub(super) fn field(
         &mut self,
         location: Location,
@@ -346,7 +346,7 @@ impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
     /// One set of requested locales, element by element, once `after` holds:
     /// those admitted are spelled at their own positions and checked for a
     /// locale named twice among them, and each that failed adds only why the
-    /// set lacks its identity (D15:1382, 2367). Returns the set and whether
+    /// set lacks its identity (D15:1383, 2368). Returns the set and whether
     /// no locale repeats.
     fn requested_after(
         &mut self,
@@ -424,7 +424,7 @@ impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
 
     /// Alias keys, then each destination under its key's subject key. A
     /// value structural admission left none has no spelling to name a
-    /// subject with, and holds back only its own entry (D15:1477, 2367).
+    /// subject with, and holds back only its own entry (D15:1478, 2368).
     pub(super) fn aliases(
         &mut self,
         aliases: &[AliasField<'_>],
@@ -495,7 +495,7 @@ impl<'e, 'c, 'o, P: Provider> Pass<'e, 'c, 'o, P> {
     /// Each entry's requested locales, element by element, checked for a
     /// locale named twice, and its default, once the target's bounds hold:
     /// `admitted` has each Target ID's result, which includes the map's. A
-    /// field that failed leaves only what reads it waiting (D15:2367).
+    /// field that failed leaves only what reads it waiting (D15:2368).
     pub(super) fn targets(
         &mut self,
         targets: &TargetMapFields<'_>,
@@ -751,7 +751,7 @@ mod tests {
                 (Location::RequestedLocale(2), false),
             ]
         );
-        // The notice is observed at the corrected spelling alone (D15:2410).
+        // The notice is observed at the corrected spelling alone (D15:2411).
         assert_eq!(
             observed_spellings(&evaluation, &["EN", "de", "en"]),
             [(
@@ -764,7 +764,7 @@ mod tests {
     }
 
     /// Each spelling that differs from its canonical form is one candidate of
-    /// the unit's notice, at its own token, equal ones too (D15:2387, 2410).
+    /// the unit's notice, at its own token, equal ones too (D15:2388, 2411).
     #[test]
     fn each_corrected_spelling_is_a_candidate_of_the_notice() {
         let canonicalizer = canonicalizer(64);
@@ -821,7 +821,7 @@ mod tests {
         assert_eq!(notices(&evaluation), []);
         assert!(occurrences.iter().all(|occurrence| !occurrence.corrected));
         // Each spelling is one candidate at its own token, equal ones too,
-        // in the order of their subjects (D15:2387).
+        // in the order of their subjects (D15:2388).
         let invalid = |position| {
             (
                 requested_unit(rejected()),
@@ -863,7 +863,7 @@ mod tests {
                 .unwrap();
             assert_eq!(issues(&evaluation), found, "{limit}");
             // Past the bound, the spelling is observed beside the confirmed
-            // policy, which supplies the bound (D15:2249); within it, the
+            // policy, which supplies the bound (D15:2250); within it, the
             // corrected spelling's notice relates nothing.
             let observed = if found.is_empty() {
                 (
@@ -923,7 +923,7 @@ mod tests {
                 exceeded(2, Actual::Exact(5)),
             )]
         );
-        // It is observed at the field's value, beside the policy (D15:790,
+        // It is observed at the field's value, beside the policy (D15:791,
         // 2249).
         assert_eq!(
             evaluation
@@ -987,7 +987,7 @@ mod tests {
         let (_, _, distinct) = spelled_in(&mut evaluation, Ok(&canonicalizer), &spellings, true);
         let distinct = distinct.unwrap();
         // Each spelling of a repeated locale is one candidate at its own
-        // token, beside the others (D15:2410), after the corrections and the
+        // token, beside the others (D15:2411), after the corrections and the
         // invalid spelling.
         let unique_unit = |key| unit(LocaleSubject::RequestedLocale(key), Check::UniqueLocale);
         let duplicate = |locale, position, other| {
@@ -1083,7 +1083,7 @@ mod tests {
 
     /// An element that failed is passed over: the others keep the positions
     /// they hold in the array, where each repeat is found, and the set adds
-    /// why it lacks one (D15:2367, 2410).
+    /// why it lacks one (D15:2368, 2411).
     #[test]
     fn a_failed_element_leaves_the_others_at_their_positions() {
         let canonicalizer = canonicalizer(64);
@@ -1257,7 +1257,7 @@ mod tests {
         assert_eq!(evaluation.statuses().count(), 6);
         // The corrected alias key is observed at its key's token, the
         // rejected destination at its value's under its key, and the rejected
-        // fallback key at its key's (D15:790, 2410).
+        // fallback key at its key's (D15:791, 2411).
         let [corrected, destination, fallback_key] = at;
         assert_eq!(
             evaluation
@@ -1272,7 +1272,7 @@ mod tests {
             ]
         );
         // A key the bound canonicalizer canonicalizes is non-secret, and one
-        // it rejects is redacted (D15:776).
+        // it rejects is redacted (D15:777).
         assert_eq!(
             view(&corrected)["value"],
             json!({ "exact-json-pointer": "/profiles/app/localeNegotiation/aliases/EN" })
@@ -1325,7 +1325,7 @@ mod tests {
                 canonical_unit(LocaleSubject::NegotiationAliasValue(key("en"), key("fr"))),
             ]
         );
-        // The corrected key's notice is at its own key (D15:2410).
+        // The corrected key's notice is at its own key (D15:2411).
         assert_eq!(
             evaluation
                 .occurrence_candidates()
@@ -1338,7 +1338,7 @@ mod tests {
 
     /// A destination structural admission did not admit keeps its entry:
     /// the key is spelled, the destination names no subject, and the entry
-    /// beside it keeps its rank (D15:1477, 2367).
+    /// beside it keeps its rank (D15:1478, 2368).
     #[test]
     fn a_failed_destination_is_no_spelling_beside_its_key() {
         let canonicalizer = canonicalizer(64);
@@ -1481,7 +1481,7 @@ mod tests {
             ),
             None
         );
-        // A target's spellings are observed at their own tokens (D15:790,
+        // A target's spellings are observed at their own tokens (D15:791,
         // 2410): the browser's corrected `EN` and each spelling of `en`
         // beside the other, then the server's corrected default.
         let en = |check| {
@@ -1536,7 +1536,7 @@ mod tests {
     /// A target's element that failed is passed over: the others keep the
     /// positions they hold in its array, where each repeat is observed, and
     /// its set adds why it lacks one; a field without a value waits on why,
-    /// and on the target's own bound (D15:1171, 2367, 2410).
+    /// and on the target's own bound (D15:1172, 2368, 2411).
     #[test]
     fn a_target_element_that_failed_is_passed_over_at_its_own_position() {
         let (failed, bound) = (stand_in(Slot::Coverage), stand_in(Slot::DeliveryGraph));

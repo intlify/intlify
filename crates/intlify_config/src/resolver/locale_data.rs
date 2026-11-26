@@ -2,26 +2,26 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Phase 5's reading of the Locale Canonicalization Data Artifact past its
-//! boundary, as the checks of its singleton subject (D15:1990). Each of the
+//! boundary, as the checks of its singleton subject (D15:1991). Each of the
 //! nine `bootstrapOnly.localeData` bounds is a check of its own, reporting
 //! `project-profile-bootstrap-limit-exceeded` with the bound's capability path
-//! (D15:2356, 3356; Decision 015-160).
+//! (D15:2357, 3481; Decision 015-160).
 //!
 //! The checks run in the bounds' order, except that a bound measured from a
-//! decoded payload follows the read that decodes it (D15:2008): the two bounds
+//! decoded payload follows the read that decodes it (D15:2009): the two bounds
 //! the manifest decides, the manifest's read, the markers' read and their
 //! bound, the conformance payload's read and its six bounds, what is left of
 //! the reader's steps (the closed conformance structure, the marker payloads,
 //! and the semantic digest), and the match with the admitted specification
 //! (D17:1069 to 1072, 1074). One payload's failure leaves the other's bounds to
-//! report (D15:2365). Past `maxPayloadBytes`
+//! report (D15:2366). Past `maxPayloadBytes`
 //! neither payload is read: the bound is one check of a singleton, and what a
-//! check waits on does not vary with the value it finds (D15:2149).
+//! check waits on does not vary with the value it finds (D15:2150).
 //!
 //! Only the match waits on the `locale-canonicalization` slot. Reading the
 //! data, measuring it, and proving that its dataset holds need the confirmed
 //! policy and no value of the slot, so each of those failures stays provable
-//! beside an invalid slot (D15:2133, 2365).
+//! beside an invalid slot (D15:2134, 2366).
 
 use crate::input_limits::Bound;
 use crate::locale::{
@@ -129,7 +129,7 @@ const CONFORMANCE: [(DataBound, CountOf); 6] = [
 ];
 
 /// The first-over witness of a total no exact count can report: `Bound`
-/// excludes `u64::MAX`, so it is representable (D15:2002, 2006).
+/// excludes `u64::MAX`, so it is representable (D15:2003, 2007).
 const fn first_over(limit: Bound) -> Actual {
     Actual::AtLeast(limit.get() + 1)
 }
@@ -268,7 +268,7 @@ where
         within = both(within, checked).map(|((), ())| ());
     }
     // What is left of the reader's steps needs no value of the slot
-    // (D15:2365; D17:1071, 1072, 1074).
+    // (D15:2366; D17:1071, 1072, 1074).
     let dataset = check_read(
         evaluation,
         Check::IntactDataset,
@@ -276,7 +276,7 @@ where
         |provider| provider,
     )?;
     // The match compares the data with the slot it must be, so it alone is
-    // observed beside the slot (D15:833, 1140, 2249).
+    // observed beside the slot (D15:834, 1141, 2250).
     let observed = Observation {
         primary: root(),
         related: vec![EvidenceProjection::resolver_input(
@@ -491,9 +491,9 @@ pub(crate) mod tests {
         (bound.check(), Code::BootstrapLimitExceeded)
     }
 
-    /// D15:3302: each bound admits its exact value, and the next is its own
+    /// D15:3395: each bound admits its exact value, and the next is its own
     /// check's Finding with its capability path and total, the payload length
-    /// its first-over witness (D15:3859), leaving unevaluated only what needs
+    /// its first-over witness (D15:3984), leaving unevaluated only what needs
     /// the bound.
     #[test]
     fn each_bound_admits_its_limit_and_reports_the_next() {
@@ -524,7 +524,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// D15:1997: a count past a `u64` is past the bound, with the witness.
+    /// D15:1998: a count past a `u64` is past the bound, with the witness.
     #[test]
     fn a_count_past_u64_reports_the_first_over_witness() {
         for (data, _) in BOUNDS {
@@ -534,7 +534,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// D15:2008: no violation hides another, and the match waits on them all.
+    /// D15:2009: no violation hides another, and the match waits on them all.
     #[test]
     fn every_bound_past_its_limit_is_reported_in_order() {
         let facts = BOUNDS[2..]
@@ -556,7 +556,7 @@ pub(crate) mod tests {
         assert_eq!(causes.keys().count(), expected.len());
     }
 
-    /// D15:2008: the two bounds the manifest decides do not hide each other.
+    /// D15:2009: the two bounds the manifest decides do not hide each other.
     #[test]
     fn both_bounds_the_manifest_decides_are_reported_in_order() {
         let both = with(
@@ -572,7 +572,7 @@ pub(crate) mod tests {
         assert_eq!(waiting(&evaluation), CHECKS[2..]);
     }
 
-    /// D15:2365: a manifest that does not read stops what reads the payloads.
+    /// D15:2366: a manifest that does not read stops what reads the payloads.
     #[test]
     fn a_manifest_that_does_not_read_leaves_the_payloads_unread() {
         let (evaluation, bound) = read(DataFacts {
@@ -587,7 +587,7 @@ pub(crate) mod tests {
         assert!(!bound);
     }
 
-    /// D15:2365: one payload that does not read leaves the other's bounds to
+    /// D15:2366: one payload that does not read leaves the other's bounds to
     /// report.
     #[test]
     fn one_payloads_failure_leaves_the_others_bounds_to_report() {
@@ -625,7 +625,7 @@ pub(crate) mod tests {
         assert!(!bound);
     }
 
-    /// D15:2133, 2365: without a value of the slot the bounds still report,
+    /// D15:2134, 2366: without a value of the slot the bounds still report,
     /// and of the checks only the match waits on it.
     #[test]
     fn a_bound_is_reported_without_the_slot_and_only_the_match_waits() {
@@ -639,7 +639,7 @@ pub(crate) mod tests {
     }
 
     /// A bound is observed at the data's root beside the capability's bound,
-    /// and a read at the root alone (D15:2249).
+    /// and a read at the root alone (D15:2250).
     #[test]
     fn each_check_is_observed_at_the_data_root() {
         for (data, _) in BOUNDS {
@@ -665,7 +665,7 @@ pub(crate) mod tests {
         assert_eq!(candidate.related, []);
     }
 
-    /// D15:2365, D17:1071, 1072, 1074: a dataset that does not hold is proved
+    /// D15:2366, D17:1071, 1072, 1074: a dataset that does not hold is proved
     /// without the slot, at the data's root, and only the match waits.
     #[test]
     fn a_dataset_that_does_not_hold_is_reported_with_or_without_the_slot() {
@@ -685,7 +685,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// D15:2365: past a bound the dataset is not evaluated, and the bound's
+    /// D15:2366: past a bound the dataset is not evaluated, and the bound's
     /// Finding is its cause.
     #[test]
     fn a_bound_past_its_limit_is_the_cause_the_dataset_waits_on() {

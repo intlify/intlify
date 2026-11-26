@@ -952,7 +952,7 @@ pub(crate) mod tests {
     }
 
     /// Each stage reports its own failure: the manifest's before any decoding,
-    /// and one payload's decoding leaves the other's to read (D15:2365).
+    /// and one payload's decoding leaves the other's to read (D15:2366).
     #[test]
     fn one_payloads_decoding_leaves_the_others_to_read() {
         let manifest = |bytes: &[u8]| VerifiedManifest::read(bytes, &GENEROUS).unwrap();

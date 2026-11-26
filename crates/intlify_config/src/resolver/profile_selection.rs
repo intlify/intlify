@@ -2,48 +2,48 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Design 015's Phase 3, `profile-selection`, under the capability's
-//! `policyComparable.configurationInput` bounds (D15:2131).
+//! `policyComparable.configurationInput` bounds (D15:2132).
 //!
 //! Once structural admission admitted the root's `profiles` object, its
 //! declarations are checked against `maxProfiles`, every declaration
-//! counted, with their exact count (D15:1885). Each declared Profile ID is a
-//! subject keyed by its identity (D15:2181) and is checked against
-//! `maxProfileIdBytes` with its exact bytes (D15:1886). A declaration whose
+//! counted, with their exact count (D15:1886). Each declared Profile ID is a
+//! subject keyed by its identity (D15:2182) and is checked against
+//! `maxProfileIdBytes` with its exact bytes (D15:1887). A declaration whose
 //! key structural admission did not admit counts, but has no Profile ID
-//! subject (D15:2184). One bound's violation suppresses no other (D15:2008).
+//! subject (D15:2185). One bound's violation suppresses no other (D15:2009).
 //!
-//! The External Profile Selector Input is a singleton subject (D15:1990),
+//! The External Profile Selector Input is a singleton subject (D15:1991),
 //! whose checks record a unit only when the selector has what they examine
 //! (Decision 015-196): `maxProfileIdBytes` for a string selector, with its
-//! exact bytes or the smallest first-over witness (D15:1886); that more
-//! than one declaration has a selector, for every invocation (D15:2295);
+//! exact bytes or the smallest first-over witness (D15:1887); that more
+//! than one declaration has a selector, for every invocation (D15:2296);
 //! and, for a supplied selector, its Profile ID admission, which an
-//! over-limit selector leaves to the bound (D15:2296), and that it names a
-//! declared Profile ID (D15:2297). The checks that compare the selector
+//! over-limit selector leaves to the bound (D15:2297), and that it names a
+//! declared Profile ID (D15:2298). The checks that compare the selector
 //! with the declarations wait on their count within the bound and on the
 //! `profiles` object holding one, which structural admission reports
-//! (D15:2363).
+//! (D15:2364).
 //!
 //! Each Finding Occurrence of Phase 3 is observed where its check looked: the
 //! declarations' count at the `profiles` object and a Profile ID's bytes at
 //! its key, through Materialized Value Evidence in the configuration entry
-//! Phase 1 read (D15:790), each beside the capability's bound (D15:836); the
+//! Phase 1 read (D15:791), each beside the capability's bound (D15:837); the
 //! selector's checks at the selector, under the Safe Origin Kind the entry
-//! fixes for it (D15:804), beside the declarations as one location once
-//! structural admission admitted them (D15:812; plan 025 interpretation
+//! fixes for it (D15:805), beside the declarations as one location once
+//! structural admission admitted them (D15:813; plan 025 interpretation
 //! #215), and the bound's beside the capability's bound too. A selector
 //! Finding leaves no declaration selected, and so no Resource Limit Policy,
 //! so the capability's bound Phase 3 runs under is the selector's final
-//! projection authority (D15:817; interpretation #217). Each check's result
+//! projection authority (D15:818; interpretation #217). Each check's result
 //! is decided before the check runs, so that only a failure is observed.
 //!
 //! The selection is the declaration the selector names, or the only one,
 //! once its Profile ID stays within the bound and structural admission
 //! admitted its boundary, its value an object under its key, and its
-//! `resourceLimits` reference fragment (D15:2131; plan 025 interpretation
+//! `resourceLimits` reference fragment (D15:2132; plan 025 interpretation
 //! #218). The core's provisional selection then selects it; otherwise its
 //! causes hold back each later check that reads the declaration or the Policy
-//! its reference selects (D15:2131). A failure elsewhere in the declaration
+//! its reference selects (D15:2132). A failure elsewhere in the declaration
 //! holds back only what reads that field.
 
 use std::collections::BTreeMap;
@@ -148,7 +148,7 @@ impl From<EvaluationInvariant> for ProfileSelectionInvariant {
 /// Phase 3 over `analysis`, what Phase 2 admitted in `entry`, if anything,
 /// with `input`, the selector, under `limits`, the capability's values: the
 /// declaration the checks select, provisionally, or the causes of its
-/// absence (D15:2131). Every check is recorded whatever the others found,
+/// absence (D15:2132). Every check is recorded whatever the others found,
 /// those without what they need not evaluated with its causes.
 ///
 /// # Errors
@@ -192,7 +192,7 @@ pub(crate) fn select_profile<Policy: DeserializeOwned, Target>(
         Err(causes) => return Ok(Err(causes)),
     };
     // Only a key structural admission admitted names the ID's subject
-    // (D15:2184).
+    // (D15:2185).
     let within = match bounds.ids.get(&id) {
         Some(result) => result.clone(),
         None => match evaluation.admitted_within(|unit| *unit == profile_key(id.as_str())) {
@@ -228,7 +228,7 @@ struct Bounds {
 /// the IDs of those whose keys have the identifier syntax. While the
 /// structural checks have not admitted the `profiles` object, the count is
 /// not evaluated, with their causes. Each Profile ID is checked on its own
-/// once they admitted its key, and has no subject otherwise (D15:1886, 2184).
+/// once they admitted its key, and has no subject otherwise (D15:1887, 2185).
 fn bound_declarations(
     evaluation: &mut Evaluation,
     observer: &Observer<'_, '_>,
@@ -258,7 +258,7 @@ fn bound_declarations(
     let mut ids = BTreeMap::new();
     for id in declarations.map_or(&[][..], |(_, ids)| ids.as_slice()) {
         // A declaration whose key the checks did not admit has no subject in
-        // a later phase (D15:2184); the analysis checks every key it finds.
+        // a later phase (D15:2185); the analysis checks every key it finds.
         let key = profile_key(id.as_str());
         if evaluation.admitted_within(|unit| *unit == key).is_err() {
             continue;
@@ -296,12 +296,12 @@ fn check_selector(
 ) -> Result<Admitted<Option<ProfileId>>, ProfileSelectionInvariant> {
     let limit = input.bound();
     // Comparing the selector with the declarations assumes that `profiles`
-    // holds one (D15:2363).
+    // holds one (D15:2364).
     let compared =
         both(bounds.count.clone(), nonempty_profiles(evaluation)).map(|(count, ())| count);
     let available = profiles(evaluation).is_ok();
     let observe = || observer.selector(input, limit, available);
-    // The bound covers a string selector alone (D15:1886).
+    // The bound covers a string selector alone (D15:1887).
     let bounded = match input
         .length_fact(limit)
         .map_err(ProfileSelectionInvariant::Selection)?
@@ -334,7 +334,7 @@ fn check_selector(
     if absent {
         return Ok(required.map(|()| None));
     }
-    // An over-limit selector is the bound's to report (D15:2296).
+    // An over-limit selector is the bound's to report (D15:2297).
     let text = input.text().filter(|text| valid_identity(text));
     let found = observed(text.ok_or(issue(Code::SelectorInvalid)), observe)?;
     let admitted = evaluation.check_found(selector(Check::ValidSelector), bounded, |()| found)?;
@@ -354,7 +354,7 @@ fn check_selector(
 
 /// The Profile ID of the only declaration, which an absent selector selects
 /// once one declaration requires none, or the causes of its key without the
-/// identifier syntax, which leaves the selection no subject (D15:2184,
+/// identifier syntax, which leaves the selection no subject (D15:2185,
 /// 3341). `declared` is the declarations' Profile IDs.
 fn sole(
     evaluation: &Evaluation,
@@ -385,7 +385,7 @@ fn observed<T>(
 }
 
 /// `observation` beside the capability's `bound`, which a bound's Finding
-/// relates (D15:836).
+/// relates (D15:837).
 fn beside(
     mut observation: Observation,
     bound: BoundId,
@@ -407,7 +407,7 @@ struct Observer<'f, 'd> {
 }
 
 impl Observer<'_, '_> {
-    /// The root's `profiles` object, at its token (D15:790).
+    /// The root's `profiles` object, at its token (D15:791).
     fn declarations(&self) -> Result<Observation, ProfileSelectionInvariant> {
         let (document, profiles) = self
             .profiles
@@ -416,7 +416,7 @@ impl Observer<'_, '_> {
     }
 
     /// The key of `id` in the root's `profiles` object, at the key's token,
-    /// redacted once past the capability's bound (D15:776, 790; plan 025
+    /// redacted once past the capability's bound (D15:777, 791; plan 025
     /// interpretation #216).
     fn key(&self, id: &ProfileId) -> Result<Observation, ProfileSelectionInvariant> {
         let (document, profiles) = self
@@ -435,12 +435,12 @@ impl Observer<'_, '_> {
     }
 
     /// The selector, `input`, under the Safe Origin Kind the entry fixes for
-    /// it (D15:804) and the capability's bound `limit`, its final projection
+    /// it (D15:805) and the capability's bound `limit`, its final projection
     /// authority (plan 025 interpretation #217); beside the declarations when
-    /// they are `available` (D15:812). A selector Finding names no
+    /// they are `available` (D15:813). A selector Finding names no
     /// declaration, since a supplied selector naming a declared Profile ID
     /// within the bound passes every check, so its projection is never a safe
-    /// Profile ID (D15:807).
+    /// Profile ID (D15:808).
     fn selector(
         &self,
         input: &SelectorInput,
@@ -543,7 +543,7 @@ mod tests {
         let bytes: Arc<[u8]> = Arc::from(serde_json::to_vec(value).unwrap());
         let document = materialize_file(Arc::clone(&bytes), input_limits()).unwrap();
         // The capability's `policyComparable` bounds classify the file's
-        // members as well as bound Phase 3 (D15:776).
+        // members as well as bound Phase 3 (D15:777).
         let mut comparable = fixture_limits(100);
         comparable.configuration_input.structural = limits;
         let fixture = FileFixture::new(&comparable);
@@ -698,7 +698,7 @@ mod tests {
     }
 
     /// Each declared ID reports its own exact bytes, and the count's bound
-    /// and the IDs' bound never suppress each other (D15:1886, 2008).
+    /// and the IDs' bound never suppress each other (D15:1887, 2009).
     #[test]
     fn each_declared_profile_id_reports_its_own_exact_bytes() {
         let config = declared(&["app", "storefront", "web"]);
@@ -720,7 +720,7 @@ mod tests {
     }
 
     /// A declaration whose key lacks the identifier syntax counts, but has no
-    /// Profile ID subject (D15:1885, 2184).
+    /// Profile ID subject (D15:1886, 2185).
     #[test]
     fn a_declaration_whose_key_fails_counts_without_an_id_subject() {
         let config = declared(&["Admin Site", "app"]);
@@ -745,7 +745,7 @@ mod tests {
     }
 
     /// Without a `profiles` object the structural checks admitted, nothing
-    /// is counted: the count waits on their Findings (D15:2131).
+    /// is counted: the count waits on their Findings (D15:2132).
     #[test]
     fn without_an_admitted_profiles_object_the_count_waits_on_its_findings() {
         let field = |check| Unit {
@@ -766,7 +766,7 @@ mod tests {
     }
 
     /// A failure elsewhere in the root holds back no count, which waits on
-    /// the `profiles` object alone (D15:2131, 2367).
+    /// the `profiles` object alone (D15:2132, 2368).
     #[test]
     fn a_failure_elsewhere_in_the_root_holds_back_no_count() {
         let mut config = declared(&["app", "web"]);
@@ -785,7 +785,7 @@ mod tests {
     }
 
     /// Without the analysis, the count waits on the causes of its absence,
-    /// and no Profile ID has a subject (D15:2131, 2184).
+    /// and no Profile ID has a subject (D15:2132, 2185).
     #[test]
     fn without_an_analysis_the_count_waits_on_its_causes() {
         let mut config = minimal_config();
@@ -858,7 +858,7 @@ mod tests {
     }
 
     /// More than one declaration and no selector is `selector-required`, and
-    /// nothing is selected (D15:2295).
+    /// nothing is selected (D15:2296).
     #[test]
     fn more_than_one_declaration_requires_a_selector() {
         let limits = bounds(2, 64);
@@ -874,7 +874,7 @@ mod tests {
 
     /// A selector of another type, or a string without the identifier
     /// syntax, is `selector-invalid`, and its declaration is not looked up
-    /// (D15:2296).
+    /// (D15:2297).
     #[test]
     fn a_selector_without_a_profile_id_is_invalid() {
         let limits = bounds(1, 64);
@@ -896,7 +896,7 @@ mod tests {
 
     /// An over-limit selector reports the bound with the smallest first-over
     /// witness instead of `selector-invalid`, and nothing after it is
-    /// evaluated (D15:1886, 2296).
+    /// evaluated (D15:1887, 2297).
     #[test]
     fn an_over_limit_selector_reports_only_the_bound() {
         let limits = bounds(1, 4);
@@ -926,7 +926,7 @@ mod tests {
         assert_eq!(held(selected), BTreeSet::from([bounded]));
     }
 
-    /// A selector naming no declaration is `selector-unknown` (D15:2297).
+    /// A selector naming no declaration is `selector-unknown` (D15:2298).
     #[test]
     fn a_selector_naming_no_declaration_is_unknown() {
         let limits = bounds(1, 64);
@@ -938,7 +938,7 @@ mod tests {
     }
 
     /// The checks comparing the selector with the declarations wait on their
-    /// count and on a `profiles` object holding one (D15:2363).
+    /// count and on a `profiles` object holding one (D15:2364).
     #[test]
     fn the_comparisons_wait_on_the_declarations() {
         let limits = bounds(1, 64);
@@ -975,7 +975,7 @@ mod tests {
 
     /// The only declaration whose key lacks the identifier syntax, or whose
     /// Profile ID exceeds the bound, is selected by no omitted selector: its
-    /// key's Finding, or its ID's, holds the selection back (D15:2184, 3341).
+    /// key's Finding, or its ID's, holds the selection back (D15:2185, 3466).
     #[test]
     fn the_only_declaration_without_an_admitted_id_is_not_selected() {
         let key = Unit {
@@ -999,7 +999,7 @@ mod tests {
     /// A structural failure inside the selected declaration holds the
     /// selection back only at the declaration's boundary or its
     /// `resourceLimits` reference, and one elsewhere in it or outside it does
-    /// not (D15:2131, 2367, 3434; plan 025 interpretation #218).
+    /// not (D15:2132, 2368, 3559; plan 025 interpretation #218).
     #[test]
     fn only_a_declarations_boundary_and_reference_hold_the_selection_back() {
         let limits = bounds(2, 64);
@@ -1025,7 +1025,7 @@ mod tests {
     }
 
     /// A key the structural checks did not admit leaves the selection no
-    /// subject, whatever the selector names (D15:2184).
+    /// subject, whatever the selector names (D15:2185).
     #[test]
     fn a_selected_key_the_checks_did_not_admit_holds_the_selection_back() {
         let limits = bounds(1, 64);
@@ -1039,7 +1039,7 @@ mod tests {
 
     /// The comparisons wait on the closed values of `profiles` alone: another
     /// closed value of the root that holds back nothing else holds them back
-    /// no more (D15:2363, 2367).
+    /// no more (D15:2364, 2368).
     #[test]
     fn the_comparisons_wait_on_no_other_closed_value() {
         let limits = bounds(1, 64);
@@ -1157,7 +1157,7 @@ mod tests {
     }
 
     /// The declarations' count is observed at the `profiles` object, beside
-    /// the capability's bound (D15:790, 836).
+    /// the capability's bound (D15:791, 837).
     #[test]
     fn the_count_is_observed_at_the_declarations_beside_the_bound() {
         let config = declared(&["app", "web"]);
@@ -1173,7 +1173,7 @@ mod tests {
 
     /// A declared Profile ID past the bound is observed at its key, which the
     /// same bound leaves unsafe and so redacted, beside the capability's
-    /// bound (D15:776, 790; plan 025 interpretation #216).
+    /// bound (D15:777, 791; plan 025 interpretation #216).
     #[test]
     fn a_profile_id_past_the_bound_is_observed_at_its_redacted_key() {
         let config = declared(&["catalog"]);
@@ -1195,7 +1195,7 @@ mod tests {
     /// Each selector check is observed at the selector a file entry's
     /// `profile-selector-cli` slot supplies, projected under the capability's
     /// bound, beside the declarations, and the bound's beside the
-    /// capability's bound too (D15:804-812; plan 025 interpretations #215,
+    /// capability's bound too (D15:805-813; plan 025 interpretations #215,
     /// #217).
     #[test]
     fn each_selector_check_observes_the_selector_beside_the_declarations() {
@@ -1267,7 +1267,7 @@ mod tests {
     }
 
     /// The selector is observed under the Safe Origin Kind its entry fixes,
-    /// beside the declarations in that entry (D15:204, 804, 812).
+    /// beside the declarations in that entry (D15:205, 805, 813).
     #[test]
     fn the_selector_is_observed_under_the_origin_its_entry_fixes() {
         let (bytes, document, profiles) = materialized(&declared(&["app", "web"]));
@@ -1299,7 +1299,7 @@ mod tests {
     }
 
     /// The declarations are related only once structural admission admitted
-    /// the `profiles` object (D15:812; plan 025 interpretation #215).
+    /// the `profiles` object (D15:813; plan 025 interpretation #215).
     #[test]
     fn the_declarations_are_related_only_once_admitted() {
         let mut config = minimal_config();

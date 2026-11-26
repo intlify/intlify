@@ -20,11 +20,11 @@
 //! resolution, and nothing projects them to a consumer.
 //!
 //! A reference that names nothing is observed at the reference in the
-//! declaration, beside what it was compared with (D15:2249): nothing when it
+//! declaration, beside what it was compared with (D15:2250): nothing when it
 //! failed its own checks, each artifact of the closest tier in the Set's
-//! order (D15:1734), or the collection as one location when no artifact
+//! order (D15:1735), or the collection as one location when no artifact
 //! shares even its kind or identity. Each artifact of the Set is admitted, so
-//! it is observed under its exact-reference identity (D15:834).
+//! it is observed under its exact-reference identity (D15:835).
 
 use std::collections::BTreeMap;
 
@@ -135,7 +135,7 @@ pub(crate) type Named<'s> = (&'s ExactTuple, &'s AdmittedArtifact<'s>);
 /// reference names or why it names nothing, and whether everything at and
 /// below the Target ID map passed. A later phase that needs one reference
 /// reads its result alone, so a reference that failed leaves only what needs
-/// it unavailable (D15:2367, 3445).
+/// it unavailable (D15:2368, 3570).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ReferenceResults<'s> {
     found: BTreeMap<ReferenceField, Admitted<Named<'s>>>,
@@ -170,7 +170,7 @@ impl<'s> ReferenceResults<'s> {
 
     /// Whether the `policies` object passed apart from its slots and the
     /// reference at each of the policy `slots` resolved: what a semantic
-    /// group of policies needs of this phase (D15:2365). An explicit `null`
+    /// group of policies needs of this phase (D15:2366). An explicit `null`
     /// holds, a slot that failed waits on why, and another group's slot is
     /// not read.
     pub(crate) fn policies(&self, slots: &[PolicySlot]) -> Admitted<()> {
@@ -227,7 +227,7 @@ enum Mismatch {
 
 /// The candidate `blocking` of a reference that names nothing, observed at
 /// the reference, `at`, beside what `mismatch` compared it with, or not
-/// observed without the declaration's file (D15:1734, 2249).
+/// observed without the declaration's file (D15:1735, 2250).
 fn observed(
     blocking: Blocking,
     sight: Option<(&EvidenceProjection, &Compared)>,
@@ -295,7 +295,7 @@ pub(crate) fn resolve_fields<'s>(
     for (field, reference) in present {
         let role = field.role_kind();
         // A reference that failed is there to observe only once it has a
-        // value, and its unit waits on why it has none (D15:1171, 2184).
+        // value, and its unit waits on why it has none (D15:1172, 2185).
         let at = match (&reference, observer) {
             (Ok(_), Some(observer)) => Some(observer.value(&reference_path(&field))?),
             _ => None,
@@ -775,7 +775,7 @@ mod tests {
     fn a_failed_reference_takes_the_first_decision_that_applies() {
         // Each case's edit, its reason, and what the failed reference is
         // observed beside: nothing after its own checks, the closest tier's
-        // artifacts, or the collection (D15:1734, 2249).
+        // artifacts, or the collection (D15:1735, 2250).
         let trust = || artifact(&valid(ArtifactKind::TrustPolicy, "storefront-trust"));
         let cases: [(&str, Edit, Reason, Vec<Value>); 8] = [
             // The two checks of the reference itself come first, the role's
@@ -968,7 +968,7 @@ mod tests {
     }
 
     /// Several artifacts in the closest tier are each related, in the Set's
-    /// order, for the one reason; a farther tier's are not (D15:1734).
+    /// order, for the one reason; a farther tier's are not (D15:1735).
     #[test]
     fn every_artifact_of_the_closest_tier_is_related_in_the_sets_order() {
         let mut inputs = Inputs::new();

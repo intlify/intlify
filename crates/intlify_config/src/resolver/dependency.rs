@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! The owners of design 015's semantic dependency records (D15:2516,
+//! The owners of design 015's semantic dependency records (D15:2517,
 //! 015-161). Each semantic group of the profile view has one singleton unit in
 //! the phase of the last check that establishes the group. The unit ranks
 //! after that check's kind and waits on the group's checks, so it is evaluated
@@ -11,12 +11,12 @@
 //! An owner finds nothing of its own, and nothing waits on it. Not the records
 //! themselves: Resolution Evidence builds them, each under its owner. The
 //! materialized and entry dependencies name the closed input slots 015 lists
-//! (D15:2507), [`MaterializedSlot`] and [`EntrySlot`].
+//! (D15:2508), [`MaterializedSlot`] and [`EntrySlot`].
 //!
 //! A semantic dependency's `inputs` are fixed per group: the slots the group's
 //! values are taken from and the slots 015's dependency paragraphs name as its
 //! semantic inputs, never a slot that only decides whether the group is
-//! established, which a materialized dependency records (D15:2516; plan 025
+//! established, which a materialized dependency records (D15:2517; plan 025
 //! decisions #241 and #242).
 //!
 //! The materialized and entry dependencies' owners wait on nothing, so each is
@@ -26,7 +26,7 @@
 //! established then and its owner names all eight; an entry's `entry-source`,
 //! `profile-selector`, and `origins` are established whenever
 //! `entry-admission` runs, and so is a programmatic entry's `call-site-source`
-//! once a sidecar was admitted beside it (D15:1174, 2516, 3159; plan 025
+//! once a sidecar was admitted beside it (D15:1175, 2517, 3164; plan 025
 //! interpretation #246). A file entry's dependencies name its source's
 //! identity as Evidence projects it, the Source-content revision its bytes
 //! derive, and its locator when present; a programmatic entry's name the
@@ -34,8 +34,8 @@
 //! locator, and the call-site source's identity, Call-Site Source revision,
 //! and locator. Both name the selector under the final projection authority
 //! and the Safe Origin Kind each common and entry input's slot fixes
-//! (D15:701-712, 743, 2516). An owner's records take its slots' vocabulary
-//! order (D15:2143, 2507; plan 025 interpretation #244).
+//! (D15:702-713, 744, 2517). An owner's records take its slots' vocabulary
+//! order (D15:2144, 2508; plan 025 interpretation #244).
 
 use std::sync::Arc;
 
@@ -122,7 +122,7 @@ impl SemanticGroup {
     /// The input slots the group is derived from, in the vocabulary's order:
     /// none for `profileSpecification`, whose values come from construction,
     /// and for every other group the slots its values are taken from and the
-    /// slots 015 names as its semantic inputs (D15:2516, 2541-2573).
+    /// slots 015 names as its semantic inputs (D15:2517, 2542-2574).
     pub(crate) const fn inputs(self) -> &'static [MaterializedSlot] {
         use MaterializedSlot::{
             ArtifactCollection as Collection, ConfigurationValue as Value,
@@ -145,7 +145,7 @@ impl SemanticGroup {
     }
 
     /// The view of the group's semantic dependency, `{ group, inputs }`
-    /// (D15:2510).
+    /// (D15:2511).
     pub(crate) fn view(self) -> Value {
         json!({ "group": self.id(), "inputs": self.inputs() })
     }
@@ -189,7 +189,7 @@ impl MaterializedSlot {
         Self::ProfileSelector,
     ];
 
-    /// The slot's ID (D15:2507).
+    /// The slot's ID (D15:2508).
     pub(crate) const fn id(self) -> &'static str {
         match self {
             Self::SpecificationInput => "specification-input",
@@ -203,7 +203,7 @@ impl MaterializedSlot {
         }
     }
 
-    /// The view of the slot's materialized dependency, `{ slot }` (D15:2511).
+    /// The view of the slot's materialized dependency, `{ slot }` (D15:2512).
     pub(crate) fn view(self) -> Value {
         json!({ "slot": self.id() })
     }
@@ -247,7 +247,7 @@ impl EntrySlot {
         Self::Origins,
     ];
 
-    /// The slot's ID (D15:2507).
+    /// The slot's ID (D15:2508).
     pub(crate) const fn id(self) -> &'static str {
         match self {
             Self::EntrySource => "entry-source",
@@ -262,7 +262,7 @@ impl EntrySlot {
 /// source's identity as Evidence projects it, its revision, and its locator
 /// when present, the same of the call-site source beside a programmatic
 /// entry's admitted sidecar, the selector as the final authority projects it,
-/// and the Safe Origin Kinds the entry fixes (D15:204, 2512, 2516).
+/// and the Safe Origin Kinds the entry fixes (D15:205, 2513, 2517).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct EntryInputs {
     source: SourceInputs,
@@ -274,7 +274,7 @@ pub(crate) struct EntryInputs {
 impl EntryInputs {
     /// The inputs of the file entry `file`, whose selector `selector` the
     /// final projection authority `authority` projects beside the
-    /// independently admitted declared Profile IDs `declared` (D15:806-819).
+    /// independently admitted declared Profile IDs `declared` (D15:807-820).
     ///
     /// # Errors
     ///
@@ -308,7 +308,7 @@ impl EntryInputs {
     /// as a file's: the Programmatic Entry's source, whose revision is the
     /// verified Snapshot digest, and, when a sidecar was admitted beside it,
     /// the call-site source at its Call-Site Source revision, both supplied
-    /// under the `configuration-programmatic` slot (D15:204, 743, 2516).
+    /// under the `configuration-programmatic` slot (D15:205, 744, 2517).
     ///
     /// # Errors
     ///
@@ -366,7 +366,7 @@ impl EntryInputs {
 
     /// The metadata work units of the records' projections: one for each
     /// source identity and each locator present, and one for the selector
-    /// (D15:1839, 1851; plan 025 interpretation #245).
+    /// (D15:1840, 1852; plan 025 interpretation #245).
     pub(crate) fn work(&self) -> u64 {
         std::iter::once(&self.source)
             .chain(&self.call_site)
@@ -377,7 +377,7 @@ impl EntryInputs {
 
     /// The entry dependency records, three or, beside a sidecar, four, in
     /// their slots' order, `None` when `tokens` was not assigned one of their
-    /// components (D15:2507; plan 025 interpretation #244).
+    /// components (D15:2508; plan 025 interpretation #244).
     pub(crate) fn retained(
         &self,
         specification: Specification<'_>,
@@ -401,7 +401,7 @@ impl EntryInputs {
 
 /// What an `entry-source` or `call-site-source` record names: its source's
 /// identity as Evidence projects it, its revision, and its locator when
-/// present (D15:2516).
+/// present (D15:2517).
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SourceInputs {
     identity: SourceIdentity,
@@ -441,7 +441,7 @@ impl SourceInputs {
 
 /// The Safe Origin Kinds an entry fixes for its `entry-source`,
 /// `call-site-source`, and `profile-selector` slots, the call-site source's
-/// only beside an admitted sidecar (D15:204, 2516).
+/// only beside an admitted sidecar (D15:205, 2517).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct EntryOrigins {
     entry_source: SafeOriginKind,
@@ -472,7 +472,7 @@ impl EntryOrigins {
 }
 
 /// A retained `entry-source` or `call-site-source` record's source view,
-/// revision, and locator when present (D15:2516).
+/// revision, and locator when present (D15:2517).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SourceDependency {
     source: PortableSourceIdentity,
@@ -503,7 +503,7 @@ impl EntryDependency {
     /// `{ slot, source, revision, locator? }`, `{ slot, selector }`, or
     /// `{ slot, origins }`, where `origins` maps each common input's slot ID
     /// to the Safe Origin Kind its slot fixes and each entry input's to the
-    /// one the entry fixes (D15:204, 2512-2513, 2516, 3157).
+    /// one the entry fixes (D15:205, 2513-2514, 2517, 3162).
     pub(crate) fn view(&self) -> Value {
         let mut view = Map::new();
         view.insert("slot".to_owned(), json!(self.slot().id()));
@@ -938,7 +938,7 @@ mod tests {
     };
 
     /// Each slot's ID is the one it reads and writes as, and a materialized
-    /// dependency's view is its slot (D15:2507, 2511).
+    /// dependency's view is its slot (D15:2508, 2512).
     #[test]
     fn each_slot_is_its_id() {
         for slot in MaterializedSlot::ALL {
@@ -953,7 +953,7 @@ mod tests {
     /// A file entry's dependencies name its marked source's identity, the
     /// Source-content revision of its bytes, the selector that names a
     /// declared Profile ID, and the origin each common and entry input's slot
-    /// fixes (D15:701-712, 743, 807, 2516, 3157).
+    /// fixes (D15:702-713, 744, 808, 2517, 3162).
     #[test]
     fn the_dependencies_of_a_file_entry_name_its_source_selector_and_origins() {
         let fixture = FileFixture::new(&fixture_limits(100));
@@ -1000,7 +1000,7 @@ mod tests {
     }
 
     /// The `origins` record names the Safe Origin Kinds its entry fixes for
-    /// the entry's slots, and every common slot's own (D15:204, 2516).
+    /// the entry's slots, and every common slot's own (D15:205, 2517).
     #[test]
     fn the_origins_record_names_the_origins_its_entry_fixes() {
         let fixture = FileFixture::new(&fixture_limits(100));
@@ -1019,7 +1019,7 @@ mod tests {
 
     /// An unmarked source identity and an undeclared selector are redacted,
     /// so their records wait on the invocation's evidence tokens, and a
-    /// present locator is kept and counted (D15:734-737, 806-808, 1851,
+    /// present locator is kept and counted (D15:735-738, 807-809, 1852,
     /// 2516).
     #[test]
     fn a_redacted_entry_dependency_waits_on_its_tokens() {
@@ -1064,7 +1064,7 @@ mod tests {
     /// The owner's mark classifies a source identity and nothing else: with
     /// or without it, a declared selector stays `safe-profile-id` and any
     /// other stays what it was, so no caller overrides the selector's
-    /// classification (D15:807, 3363).
+    /// classification (D15:808, 3488).
     #[test]
     fn a_callers_mark_leaves_the_selector_evidence_unchanged() {
         let fixture = FileFixture::new(&fixture_limits(100));
@@ -1094,7 +1094,7 @@ mod tests {
         records.iter().map(EntryDependency::view).collect()
     }
 
-    /// D15:743, 747, 2507, 2516: a programmatic entry's dependencies name the
+    /// D15:744, 748, 2508, 2517: a programmatic entry's dependencies name the
     /// Programmatic Entry's identity, the verified Snapshot digest as its
     /// revision, and its own locator; beside a sidecar, in the slots' order,
     /// the call-site source's identity, Call-Site Source revision, and own
@@ -1168,7 +1168,7 @@ mod tests {
     /// is, each its own component under `configuration-programmatic`, and an
     /// undeclared selector under `profile-selector-programmatic`, so the
     /// records wait on their tokens, and the token inputs count all three
-    /// (D15:734-737, 804, 808, 1851, 2516; plan 025 interpretation #245).
+    /// (D15:735-738, 805, 809, 1852, 2517; plan 025 interpretation #245).
     #[test]
     fn an_unmarked_call_site_identity_waits_on_its_own_token() {
         let snapshot = AdmittedSnapshot::of(from_json(&json!({})));

@@ -111,7 +111,7 @@ pub(crate) struct Declared {
 
 /// The precedence row a check refused at, and, at the construction-root
 /// bounds' row, the first bound the input exceeds: a refusal's only detail
-/// (D15:3100).
+/// (D15:3105).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Refusal {
     row: usize,

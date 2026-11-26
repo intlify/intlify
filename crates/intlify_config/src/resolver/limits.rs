@@ -854,7 +854,7 @@ impl ResolutionLimits {
 pub(crate) struct ConfirmedPolicy {
     limits: ResolutionLimits,
     /// The admitted policy as Evidence names it, which supplies every bound
-    /// checked under it (D15:2249).
+    /// checked under it (D15:2250).
     evidence: EvidenceProjection,
 }
 
@@ -897,7 +897,7 @@ impl ConfirmedPolicy {
     }
 
     /// The admitted policy's Evidence, which a check past one of its bounds
-    /// relates (D15:2249).
+    /// relates (D15:2250).
     pub(crate) const fn evidence(&self) -> &EvidenceProjection {
         &self.evidence
     }

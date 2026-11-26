@@ -4,24 +4,24 @@
 //! 015's replay of a Materialized Resolution Input Set: the Shared projection
 //! and, when the shared result admits them, the profile view and Resolved
 //! Profile Artifact Bindings, recomputed from a retained set under the
-//! construction it names (D15:2657, 2659; Decision 015-205).
+//! construction it names (D15:2658, 2660; Decision 015-205).
 //!
 //! [`Resolver::replay`] replays a set only under a constructed resolver whose
 //! Resolver Construction Identity equals the set's reference. An unequal
 //! reference is construction staleness, [`ConstructionStale`], which runs no
-//! phase and leaves no result (D15:2585, 2659). The set's values were admitted
+//! phase and leaves no result (D15:2586, 2660). The set's values were admitted
 //! when it was created, so a replay admits nothing at a pre-invocation
-//! boundary (D15:2775).
+//! boundary (D15:2776).
 //!
 //! The retained value, as the document of its canonical tree, takes the place
 //! of the one `entry-admission` materialized, and the replay evaluates
 //! `resolver-bootstrap-admission` and `structural-admission` through
 //! `hydration-validation` under the other retained values, so every Derived
-//! Admission State is recomputed rather than read (D15:2657). Phase 0's
+//! Admission State is recomputed rather than read (D15:2658). Phase 0's
 //! Finding and status are Entry-owned, and the replay evaluates it only for the
-//! status that the `profileSpecification` group's owner waits on (D15:2145). No
+//! status that the `profileSpecification` group's owner waits on (D15:2146). No
 //! later check waits on an `entry-admission` check, and the value exists only
-//! because that phase admitted it, so Phase 1 does not run (D15:2659). The
+//! because that phase admitted it, so Phase 1 does not run (D15:2660). The
 //! Shared projection is then built as the invocation built it and finalized
 //! within the Shared domain ([`super::outcome::replayed`]).
 //!
@@ -30,9 +30,9 @@
 //! admitted, never marked non-secret, without a locator or a span, under a
 //! programmatic entry's Safe Origin Kinds, since the document is the one of a
 //! marker-free Snapshot; its members are classified as the invocation
-//! classified them (D15:776). That Evidence stays in the replay's evaluation:
+//! classified them (D15:777). That Evidence stays in the replay's evaluation:
 //! the Shared domain counts each Finding candidate but retains its occurrences
-//! and Evidence nowhere, since they are Entry records (D15:1942), and a replay
+//! and Evidence nowhere, since they are Entry records (D15:1943), and a replay
 //! builds no Entry projection.
 //!
 //! The result is the identity, the Shared projection, and the profile view and
@@ -40,10 +40,10 @@
 //! found no blocking Finding. It has no Entry projection, bundle completeness,
 //! Entry-domain terminal state, Finding Occurrence Key, Coverage Decision
 //! Evidence, or checked or blocked outcome, which need the complete Resolver
-//! Invocation Input Set (D15:2659). What it borrows, the evaluation, the
+//! Invocation Input Set (D15:2660). What it borrows, the evaluation, the
 //! Artifact Set Phase 9 admitted, and the semantic state, its caller holds in a
 //! [`ReplayStorage`] of its own for each replay, which the borrow keeps from
-//! being reset while the result lives (D15:2749).
+//! being reset while the result lives (D15:2750).
 
 use crate::boundary::source::ExactIdentity;
 use crate::construction::identity::ConstructionIdentity;
@@ -67,7 +67,7 @@ use super::token::Sha256;
 
 /// What one replay's result borrows: the evaluation the replayed phases
 /// recorded, the Profile Resolution Artifact Set Phase 9 admitted, and the
-/// semantic state. Its caller holds one for each replay (D15:2749).
+/// semantic state. Its caller holds one for each replay (D15:2750).
 #[derive(Default)]
 pub(crate) struct ReplayStorage<'s> {
     evaluation: Evaluation,
@@ -77,11 +77,11 @@ pub(crate) struct ReplayStorage<'s> {
 
 /// A set whose Resolver Construction Identity reference is not the replaying
 /// resolver's: construction staleness, which a resolver constructed again
-/// answers rather than a replay (D15:2585, 2659).
+/// answers rather than a replay (D15:2586, 2660).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ConstructionStale;
 
-/// What one replay returns (D15:2659).
+/// What one replay returns (D15:2660).
 pub(crate) struct Replay<'e, 's> {
     /// The Resolver Construction Identity, the set's reference and the
     /// resolver's own.
@@ -102,7 +102,7 @@ struct ReplayEntry<'a> {
 }
 
 /// The document is a Snapshot's, so the slots are a programmatic entry's
-/// (D15:204).
+/// (D15:205).
 impl ConfigurationEntry for ReplayEntry<'_> {
     fn origin(&self) -> SafeOriginKind {
         SafeOriginKind::ConfigurationProgrammatic
@@ -128,7 +128,7 @@ impl ConfigurationEntry for ReplayEntry<'_> {
 
 impl Resolver<'_> {
     /// Replays `materialized`, the result borrowing `storage`, or refuses a
-    /// set of another construction (D15:2659).
+    /// set of another construction (D15:2660).
     ///
     /// # Errors
     ///
@@ -273,7 +273,7 @@ mod tests {
     }
 
     /// 015's example with the specification input asserting no
-    /// `project-profile`, which Phase 0 then finds missing (D15:1125).
+    /// `project-profile`, which Phase 0 then finds missing (D15:1126).
     fn unasserted() -> Raw {
         let mut raw = example(|inputs| inputs);
         let mut input: Value = serde_json::from_slice(&raw.specification).unwrap();
@@ -282,7 +282,7 @@ mod tests {
         raw
     }
 
-    /// D15:2659, 3228 (Decision 015-205): replaying the set of a file, of a
+    /// D15:2660, 3233 (Decision 015-205): replaying the set of a file, of a
     /// Snapshot of its value, or of one beside a mirroring sidecar gives the
     /// invocation's identity and Shared projection, every Finding Key in
     /// order, status, cause, Coverage Decision Basis, dependency, and
@@ -330,7 +330,7 @@ mod tests {
         }
     }
 
-    /// D15:2659: an invocation blocked only because its complete token inputs
+    /// D15:2660: an invocation blocked only because its complete token inputs
     /// exceed their bound, which the Shared scope's are within, replays to
     /// its Shared projection and to the profile view and bindings of the
     /// checked invocation without that bound.
@@ -354,7 +354,7 @@ mod tests {
         }
     }
 
-    /// D15:2585, 2659: a set whose reference is another construction's is
+    /// D15:2586, 2660: a set whose reference is another construction's is
     /// construction staleness, and replays to no result.
     #[test]
     fn a_set_of_another_construction_is_not_replayed() {
@@ -402,7 +402,7 @@ mod tests {
         raw
     }
 
-    /// D15:1146, 2585, 2589, 2659, 3423: each Specification Input member's
+    /// D15:1147, 2586, 2590, 2660, 3548: each Specification Input member's
     /// identity and revision is retained in the Materialized Resolution Input
     /// Set, reproduced, and compared. Another value of any one of the sixteen
     /// gives another set, an `invocation-stale` invocation, and a replay that
@@ -473,7 +473,7 @@ mod tests {
         assert_eq!(edits, 16);
     }
 
-    /// D15:2659: by type, a replay holds the identity, the Shared projection,
+    /// D15:2660: by type, a replay holds the identity, the Shared projection,
     /// and the profile, and so no Entry projection, completeness, Entry
     /// terminal state, occurrence, Coverage Decision Evidence, or outcome.
     /// Each pattern names every field, so a field added to either type fails

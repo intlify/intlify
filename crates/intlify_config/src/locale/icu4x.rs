@@ -10,7 +10,7 @@
 //!
 //! [`Icu4xData::read`] is 015's `locale-canonicalization-data-artifact`
 //! pre-invocation boundary, the manifest's envelope alone; specification
-//! admission reads the rest through [`FormalData`] (D15:3165).
+//! admission reads the rest through [`FormalData`] (D15:3170).
 //! [`Icu4xProvider::admit`] does both at once, for callers outside an
 //! invocation.
 
@@ -651,7 +651,7 @@ mod tests {
 
     /// The data's value is its decoded manifest and the bytes of each
     /// payload the manifest names, whatever else the caller supplied: what
-    /// invocation staleness compares (D15:2589).
+    /// invocation staleness compares (D15:2590).
     #[test]
     fn the_data_is_its_decoded_manifest_and_the_payloads_it_names() {
         let (bytes, depth) = envelope();
@@ -841,7 +841,7 @@ mod tests {
         (found, bound.is_ok())
     }
 
-    /// D15:3302 over the committed artifact: each `localeData` bound admits
+    /// D15:3395 over the committed artifact: each `localeData` bound admits
     /// the artifact's exact value, and one below it is that bound's Finding
     /// alone, with its path, its value, and the exact total, except the
     /// payload length's first-over witness (Decision 015-157).
@@ -971,7 +971,7 @@ mod tests {
         (found(&evaluation), waiting(&evaluation))
     }
 
-    /// D15:2365, D17:1071: a conformance value outside the closed structure
+    /// D15:2366, D17:1071: a conformance value outside the closed structure
     /// needs no value of the slot to prove.
     #[test]
     fn a_closed_structure_that_fails_is_reported_without_the_slot() {
@@ -986,7 +986,7 @@ mod tests {
         );
     }
 
-    /// D15:2365, D17:1072: the committed artifact with another semantic digest
+    /// D15:2366, D17:1072: the committed artifact with another semantic digest
     /// needs no value of the slot to prove.
     #[test]
     fn a_semantic_digest_that_differs_is_reported_without_the_slot() {
@@ -1002,7 +1002,7 @@ mod tests {
     }
 
     /// One payload that does not decode leaves the other's counts measured,
-    /// and builds no provider (D15:2365).
+    /// and builds no provider (D15:2366).
     #[test]
     fn one_payload_that_does_not_decode_leaves_the_others_counts() {
         let (bytes, depth) = envelope();

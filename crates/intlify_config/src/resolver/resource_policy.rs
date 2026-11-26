@@ -19,22 +19,22 @@
 //! The checks under the capability observe their Findings beside the
 //! capability's bound: those of the collection at its root, or at each member
 //! past one artifact's bound under a key that keeps only its JSON type
-//! (D15:834, 836; plan 025 interpretation #200), and those of the selected
+//! (D15:835, 837; plan 025 interpretation #200), and those of the selected
 //! declaration's references at the declaration, or at each reference's value,
-//! in the file Phase 1 read (D15:790, 1918, 1921-1922). After selection, the
+//! in the file Phase 1 read (D15:791, 1919, 1922-1923). After selection, the
 //! work bounds and the body are observed at the chosen candidate, beside the
 //! selected reference and, for a work bound, the capability's bootstrap bound
 //! or, for the body, the pins where they do not authenticate the candidate;
 //! the comparison is observed at the admitted Policy, beside the reference and
-//! the capability's bound it needs more of (D15:2249, 2355). Candidate
+//! the capability's bound it needs more of (D15:2250, 2356). Candidate
 //! selection observes a reference that names nothing admissible at the
 //! reference, beside what it compared the reference with, and each occurrence
-//! of a selected group at the member, beside the reference (D15:2249). The
+//! of a selected group at the member, beside the reference (D15:2250). The
 //! rechecks are observed beside the admitted Policy that supplies the bound
-//! (D15:2249): the `artifactAdmission` ones where their checks under the
+//! (D15:2250): the `artifactAdmission` ones where their checks under the
 //! capability are, and the `configurationInput` ones at the materialized
 //! root, each string past the bound, the declarations, each declared Profile
-//! ID's key, or the selector under the policy's bound (D15:790, 812, 816,
+//! ID's key, or the selector under the policy's bound (D15:791, 813, 817,
 //! 1884). Every Finding of Phase 4 carries occurrence Evidence.
 
 use std::collections::BTreeMap;
@@ -248,19 +248,19 @@ impl ReferenceField {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ReferenceOccurrence {
     /// Where it is, which names its byte check: none under a Target ID key
-    /// without the identifier syntax, which has no later subject (D15:2184).
+    /// without the identifier syntax, which has no later subject (D15:2185).
     pub(crate) field: Option<ReferenceField>,
     /// Whether it occurs: not for a required reference the declaration
-    /// lacks, whose byte check still waits on that Finding (D15:1918, 2203).
+    /// lacks, whose byte check still waits on that Finding (D15:1919, 2204).
     pub(crate) occurs: bool,
-    /// Its canonical bytes, or why it has none (D15:1924).
+    /// Its canonical bytes, or why it has none (D15:1925).
     pub(crate) bytes: Admitted<u64>,
 }
 
 /// The canonical bytes of the references that have them: an exact total,
-/// since one that failed structural admission has none to add (D15:1924,
+/// since one that failed structural admission has none to add (D15:1925,
 /// 1997, 2006). Not evaluated only when every value is excluded, with the
-/// causes of each (D15:2184, 3354).
+/// causes of each (D15:2185, 3479).
 fn reference_total(references: &[ReferenceOccurrence]) -> Admitted<Tally> {
     let admitted = references
         .iter()
@@ -285,11 +285,11 @@ pub(crate) struct DeclarationReferences<'a> {
 /// Each `policies` slot, in the name order of the slots, with its reference
 /// or why it has none, so that one that failed holds back no other, and
 /// whether the object passed apart from its slots. An admitted `null` is no
-/// reference and has no entry (D15:2137, 2367).
+/// reference and has no entry (D15:2138, 2368).
 pub(crate) struct PolicyReferences<'a> {
     pub(crate) slots: Vec<(PolicySlot, Admitted<&'a PolicyReference>)>,
     /// The object's own checks: an undeclared member is in no slot, so it
-    /// stops no reference, and both semantic groups wait on it (D15:2184,
+    /// stops no reference, and both semantic groups wait on it (D15:2185,
     /// 2367; plan 025 interpretation #346).
     pub(crate) object: Admitted<()>,
 }
@@ -366,7 +366,7 @@ impl DeclarationReferences<'_> {
 
     /// Whether everything at and below the Target ID map passed, which what
     /// needs every reference waits on: an entry whose key failed has no
-    /// reference to read (D15:2184).
+    /// reference to read (D15:2185).
     pub(crate) fn target_map(&self) -> Admitted<()> {
         self.target_profiles
             .as_ref()
@@ -402,11 +402,11 @@ pub(crate) struct ConfigurationMeasures<'a> {
     pub(crate) value: Admitted<ValueCounts>,
     /// How many declarations the root's `profiles` object holds: every
     /// declaration counts, one whose key lacks the identifier syntax included
-    /// (D15:1885).
+    /// (D15:1886).
     pub(crate) declarations: Admitted<u64>,
     /// Every declared Profile ID, in their unsigned byte order: a declaration
     /// whose key lacks the identifier syntax has no subject in a later phase
-    /// (D15:1886, 2184).
+    /// (D15:1887, 2185).
     pub(crate) profile_ids: Admitted<&'a [ProfileId]>,
     /// The normalized External Profile Selector Input.
     pub(crate) selector: &'a SelectorInput,
@@ -419,14 +419,14 @@ pub(crate) struct ConfigurationMeasures<'a> {
 pub(crate) struct PolicyOutcome {
     /// The selector's final projection authority: the admitted compatible
     /// policy's `maxProfileIdBytes`, or the capability's without such a
-    /// policy (D15:816-817).
+    /// policy (D15:817-818).
     pub(crate) authority: Bound,
     /// The selector's String Length Fact under the final projection
     /// authority, or none for an absent or non-string selector.
     pub(crate) selector_length: Option<StringLengthFact>,
     /// The diagnostic bounds of the admitted policy once it is compatible with
     /// the capability, which then take over ordinary reporting from the
-    /// capability's whatever its rechecks find (D15:2132, 2391), or none
+    /// capability's whatever its rechecks find (D15:2133, 2392), or none
     /// without such a policy.
     pub(crate) diagnostics: Option<DiagnosticsLimits>,
     /// The confirmed policy, which also confirms the provisional selection,
@@ -503,7 +503,7 @@ impl Stage<'_> {
     }
 
     /// What supplies this stage's `bound`, which a Finding past it relates
-    /// (D15:2249): the capability's bound, or the admitted policy. None
+    /// (D15:2250): the capability's bound, or the admitted policy. None
     /// before a policy is admitted, when no recheck is evaluated.
     fn beside(self, bound: BoundId) -> Result<Option<EvidenceProjection>, ComponentInvariant> {
         match self {
@@ -515,7 +515,7 @@ impl Stage<'_> {
     }
 
     /// What this stage's unit of the collection's `bound` observes: the
-    /// collection at its root, beside what supplies the bound (D15:834, 836).
+    /// collection at its root, beside what supplies the bound (D15:835, 837).
     fn at_collection(self, bound: BoundId) -> Result<Option<Observation>, ComponentInvariant> {
         self.beside(bound)?
             .map(|limit| {
@@ -529,7 +529,7 @@ impl Stage<'_> {
 
     /// What this stage's unit of a member key observes past one artifact's
     /// `bound`: each member under the key, with its canonical bytes, at the
-    /// member no Set admitted, beside what supplies the bound (D15:834, 836;
+    /// member no Set admitted, beside what supplies the bound (D15:835, 837;
     /// plan 025 interpretation #200).
     fn at_members(
         self,
@@ -555,7 +555,7 @@ impl Stage<'_> {
 
     /// What this stage's unit of a bound over the selected declaration's
     /// references observes: the value at `path` under the declaration, beside
-    /// what supplies the bound (D15:790, 836). Nothing is observed without the
+    /// what supplies the bound (D15:791, 837). Nothing is observed without the
     /// declaration's file.
     fn at_declaration(
         self,
@@ -582,7 +582,7 @@ pub(super) fn reference_path(field: &ReferenceField) -> Vec<&str> {
 }
 
 /// Resolver-input Evidence of the Implementation Capability's `bound`
-/// (D15:836).
+/// (D15:837).
 fn capability_bound(bound: CapabilityBound) -> Result<EvidenceProjection, ComponentInvariant> {
     ComponentPath::capability(bound).map(EvidenceProjection::resolver_input)
 }
@@ -631,7 +631,7 @@ struct Inspected {
 /// needs the admitted policy; and each recheck needs the compatible policy and
 /// what it measures. A reference that failed structural admission has no bytes
 /// the bounds protect, so it holds no confirmation back; a recheck's Finding
-/// does, and so does a complete input it cannot measure (D15:1736, 1924, 2151,
+/// does, and so does a complete input it cannot measure (D15:1737, 1925, 2152,
 /// 2367; plan 025 decision #342).
 pub(crate) fn admit_resource_policy(
     evaluation: &mut Evaluation,
@@ -652,7 +652,7 @@ pub(crate) fn admit_resource_policy(
         verification,
     )?;
     // The admitted policy supplies every recheck's bound, and every bound a
-    // later phase checks under it (D15:2249).
+    // later phase checks under it (D15:2250).
     let compatible = match compatible {
         Ok(policy) => {
             let evidence = admitted(policy.tuple())?;
@@ -724,7 +724,7 @@ fn admit_and_compare(
         declared,
     )?;
     let limits = &capability.bootstrap_only().artifact_bootstrap;
-    // The scan reads the whole collection, not through the reference (D15:834,
+    // The scan reads the whole collection, not through the reference (D15:835,
     // 836).
     let scan = Observation {
         primary: collection_root()?,
@@ -744,7 +744,7 @@ fn admit_and_compare(
     )?;
     // Every check from candidate selection on compares what it judges with
     // the selected reference, through which it reaches the candidates, so
-    // nothing is observed without the declaration's file (D15:790, 2249).
+    // nothing is observed without the declaration's file (D15:791, 2250).
     let reference = match (declared.1, resource_limits) {
         (Some(observer), Ok(_)) => {
             Some(observer.value(&["policies", PolicySlot::ResourceLimits.name()])?)
@@ -752,7 +752,7 @@ fn admit_and_compare(
         _ => None,
     };
     // A member that selection compares establishes a tuple, so it is an
-    // envelope, a JSON object, which no Set admitted (D15:834; plan 025
+    // envelope, a JSON object, which no Set admitted (D15:835; plan 025
     // interpretation #200).
     let envelope = ComponentPath::artifact_member(Key::Unsafe(JsonType::Object))
         .map(EvidenceProjection::resolver_input)?;
@@ -765,7 +765,7 @@ fn admit_and_compare(
                 .map_err(|rejected| rejection(rejected, reference.as_ref(), (&envelope, &root)))
         },
     )?;
-    // The chosen candidate, which no Set admitted yet (D15:834; plan 025
+    // The chosen candidate, which no Set admitted yet (D15:835; plan 025
     // interpretation #200).
     let chosen = selected
         .as_ref()
@@ -808,7 +808,7 @@ fn admit_and_compare(
         )?;
     }
     // The pins are compared only where they do not authenticate the
-    // candidate (D15:2249).
+    // candidate (D15:2250).
     let unpinned = beside(vec![EvidenceProjection::resolver_input(
         ComponentPath::verification(VerificationRole::Pins),
     )]);
@@ -826,8 +826,8 @@ fn admit_and_compare(
         },
     )?;
     // The admitted Policy needs more of the first bound in fixed declaration
-    // order the capability lacks (D15:2355). It is observed at the Policy,
-    // beside the selected reference and the capability's bound (D15:2249).
+    // order the capability lacks (D15:2356). It is observed at the Policy,
+    // beside the selected reference and the capability's bound (D15:2250).
     let shortfall = decided
         .as_ref()
         .ok()
@@ -853,14 +853,14 @@ fn admit_and_compare(
 }
 
 /// The candidates of a selection that admitted no candidate, each with what
-/// it observed (D15:2249). A reference that names nothing admissible is
+/// it observed (D15:2250). A reference that names nothing admissible is
 /// observed at the reference, beside what it was compared with: nothing when
 /// its own checks fail, the collection as one location when no member shares
 /// even its kind or identity, or each candidate of the closest tier. A
 /// selected group's conflicting or duplicate occurrences are each observed at
 /// the member, beside the reference. Every member is the same `envelope`
 /// Evidence, so a tier's candidates merge into one related record and a
-/// group's occurrences differ only in their ordinals (D15:834). Nothing is
+/// group's occurrences differ only in their ordinals (D15:835). Nothing is
 /// observed without the reference's value.
 fn rejection(
     rejected: Rejected<'_>,
@@ -927,7 +927,7 @@ fn bounded_at(
 /// only the first-over witness, the same for every value the key stands for.
 /// `values` are the values the key stands for, each with its size and what
 /// it is observed through: one candidate for each value past the bound
-/// (D15:2203).
+/// (D15:2204).
 fn witnessed_at(
     evaluation: &mut Evaluation,
     unit: Unit,
@@ -953,7 +953,7 @@ fn witnessed_at(
 
 /// What a `configurationInput` recheck past the admitted `policy`'s bound
 /// observes: where `at` looks in the configuration, beside the policy, which
-/// supplies the bound (D15:2249). Nothing is observed without the policy or
+/// supplies the bound (D15:2250). Nothing is observed without the policy or
 /// the declaration's file.
 fn recheck_at<'o>(
     (policy, observer): (
@@ -979,7 +979,7 @@ fn recheck_at<'o>(
 /// totals and the analysis at the root, each string past the bound at its
 /// token, the declarations at the root's `profiles`, each Profile ID at its
 /// key, and the selector under the policy's bound beside the declarations
-/// (D15:790, 812, 816, 1884, 2249).
+/// (D15:791, 813, 817, 1885, 2250).
 fn configuration_bounds(
     evaluation: &mut Evaluation,
     limits: Result<&ConfigurationInputLimits, &Causes>,
@@ -1033,7 +1033,7 @@ fn configuration_bounds(
     // Each string value and object key is checked on its own, so the longest
     // reports only the first-over witness, and each string past the bound is
     // observed at its token, found only when the longest is past it
-    // (D15:1884, 2203).
+    // (D15:1885, 2204).
     let longest = value.map(|limits| limits.max_single_string_bytes);
     let past: Vec<(u64, Observation)> = match (observed, longest, counts) {
         ((Some(policy), Some(observer)), Ok(limit), Ok(counts))
@@ -1091,7 +1091,7 @@ fn configuration_bounds(
     // An absent selector and a non-string type carry no ID bytes.
     if let Some(length) = selector_length {
         // Past the policy's bound, the selector is projected under it, the
-        // final authority (D15:816, 1889).
+        // final authority (D15:817, 1890).
         let selector = match (observed, id_limit) {
             ((Some(policy), Some(observer)), Ok(limit)) => {
                 let mut observation =
@@ -1138,7 +1138,7 @@ fn configuration_bounds(
 /// occurrences, the declaration's references, each member key and the
 /// collection's bytes, and each reference and the references' bytes. Every
 /// reference that occurs counts, one that failed structural admission
-/// included, and a value of the wrong type holds none (D15:1918, 1924).
+/// included, and a value of the wrong type holds none (D15:1919, 1925).
 fn artifact_bounds(
     evaluation: &mut Evaluation,
     stage: Stage<'_>,
@@ -1149,7 +1149,7 @@ fn artifact_bounds(
 ) -> Result<Inspected, PolicyInvariant> {
     let occurrences = occurrence_bounds(evaluation, stage, limits, submitted.members)?;
     // The declaration's count and total never gate the decision for the
-    // selected reference. Both count over the whole declaration (D15:1918,
+    // selected reference. Both count over the whole declaration (D15:1919,
     // 1922).
     let count = bounded_at(
         evaluation,
@@ -1289,9 +1289,9 @@ fn body_bounds(
 /// Each reference's own bytes: whether the `resourceLimits` reference's hold,
 /// and whether every one that has bytes does. The selected reference is
 /// checked from what selection admitted, even when the rest of `policies` was
-/// not. One without bytes waits on why, and holds nothing back (D15:1924).
+/// not. One without bytes waits on why, and holds nothing back (D15:1925).
 /// Without a selected declaration each slot still names its unit, which waits
-/// on what held the selection back (D15:1171, 2131; plan 025 interpretation
+/// on what held the selection back (D15:1172, 2132; plan 025 interpretation
 /// #220). The units commit in canonical order whatever order they run in.
 fn each_reference(
     evaluation: &mut Evaluation,
@@ -1320,7 +1320,7 @@ fn each_reference(
     };
     let single_limit = limits.map(|limits| limits.max_single_reference_canonical_bytes);
     let selected = ReferenceField::Policy(PolicySlot::ResourceLimits);
-    // Each reference is observed at its value (D15:1921).
+    // Each reference is observed at its value (D15:1922).
     let at = |field: &ReferenceField| {
         // The selected reference is looked at only where selection admitted
         // it, and every other one is visible.
@@ -1981,7 +1981,7 @@ mod tests {
                 "{check:?}"
             );
             // The work it protects, and every check after it, waits on it,
-            // while what was proved before it stands (D15:2006, 3351).
+            // while what was proved before it stands (D15:2007, 3476).
             let rank = BOOTSTRAP.iter().position(|each| *each == check).unwrap();
             for earlier in &BOOTSTRAP[..rank] {
                 assert_eq!(
@@ -2002,7 +2002,7 @@ mod tests {
 
     /// A candidate without the section counts only the four rules of its
     /// body: at that total its body is admitted as far as the missing
-    /// section, and one below it the body is not evaluated (D15:3343).
+    /// section, and one below it the body is not evaluated (D15:3468).
     #[test]
     fn the_validation_total_without_the_section_is_bounded_at_four() {
         let sectionless = envelope_of(
@@ -2054,7 +2054,7 @@ mod tests {
 
     /// Several candidates of the closest mismatch tier are one reason whose
     /// related Evidence is the same in every submission order: no candidate
-    /// is chosen, and a farther tier is not used (D15:1734, 2249, 3343).
+    /// is chosen, and a farther tier is not used (D15:1735, 2250, 3468).
     #[test]
     fn several_candidates_of_one_tier_are_related_evidence_of_one_reason() {
         let policy = |identity: &str, revision: &str| {
@@ -2462,7 +2462,7 @@ mod tests {
     }
 
     /// Each collection bound under the capability is observed at the
-    /// collection's root, beside the capability's bound (D15:834, 836).
+    /// collection's root, beside the capability's bound (D15:835, 837).
     #[test]
     fn the_collection_bounds_under_the_capability_are_observed_at_its_root() {
         type Edit = fn(&mut ArtifactAdmissionLimits);
@@ -2520,7 +2520,7 @@ mod tests {
     /// Each member past one artifact's bound is observed at the member, under
     /// a key that keeps only its JSON type, beside the capability's bound: two
     /// bodies of one tuple are two occurrences of one Finding, told apart by
-    /// their ordinals (D15:183, 834, 838, 2203; plan 025 interpretation
+    /// their ordinals (D15:184, 835, 839, 2204; plan 025 interpretation
     /// #200).
     #[test]
     fn each_member_past_one_artifacts_bound_is_observed_at_the_member() {
@@ -2563,7 +2563,7 @@ mod tests {
 
     /// The metadata scan reads the whole collection, not through the
     /// reference, so it is observed at the collection's root, beside the
-    /// capability's bootstrap bound (D15:834, 836).
+    /// capability's bootstrap bound (D15:835, 837).
     #[test]
     fn the_metadata_scan_is_observed_at_the_collection_beside_its_bound() {
         let total = bootstrap_totals()[0].2;
@@ -2591,7 +2591,7 @@ mod tests {
 
     /// The declaration's reference count and its references' total bytes are
     /// observed at the selected declaration, beside the capability's bound
-    /// (D15:790, 836, 1918, 1922).
+    /// (D15:791, 837, 1919, 1923).
     #[test]
     fn the_declarations_reference_bounds_are_observed_at_the_declaration() {
         type Edit = fn(&mut ArtifactAdmissionLimits);
@@ -2635,7 +2635,7 @@ mod tests {
 
     /// Each reference, the selected one included, is observed at its value
     /// under the selected declaration, beside the capability's bound for one
-    /// reference (D15:790, 836, 1921).
+    /// reference (D15:791, 837, 1922).
     #[test]
     fn each_reference_is_observed_at_its_value() {
         let mut inputs = Inputs::new();
@@ -2700,7 +2700,7 @@ mod tests {
 
     /// A key's values past the bound are its candidates, each through what
     /// it is observed through, and its values within the bound are none
-    /// (D15:2203).
+    /// (D15:2204).
     #[test]
     fn only_the_values_past_the_bound_are_candidates() {
         let through = |bound| Observation {
@@ -2733,7 +2733,7 @@ mod tests {
 
     /// That `evidence` is the selected `resourceLimits` reference, at the
     /// pointer of its path from the root, through which a check from candidate
-    /// selection on reaches the candidates (D15:790, 2249).
+    /// selection on reaches the candidates (D15:791, 2250).
     fn assert_selected_reference(evidence: &Value) {
         assert_eq!(evidence["kind"], "configuration-value", "{evidence}");
         assert_eq!(evidence["origin"], "configuration-file", "{evidence}");
@@ -2758,7 +2758,7 @@ mod tests {
 
     /// Each work bound after selection is observed at the chosen candidate,
     /// beside the selected reference and the capability's bootstrap bound
-    /// (D15:834, 836, 2249; plan 025 interpretation #200).
+    /// (D15:835, 837, 2250; plan 025 interpretation #200).
     #[test]
     fn each_work_bound_after_selection_is_observed_at_the_candidate() {
         for (check, work_bound, total) in bootstrap_totals().into_iter().skip(1) {
@@ -2785,7 +2785,7 @@ mod tests {
 
     /// The body is observed at the chosen candidate beside the selected
     /// reference, and beside the pins only where they do not authenticate
-    /// the candidate (D15:2249).
+    /// the candidate (D15:2250).
     #[test]
     fn the_body_is_observed_beside_the_pins_only_where_they_do_not_authenticate_the_candidate() {
         // The pins authenticate a candidate whose integrity does not hold.
@@ -2830,7 +2830,7 @@ mod tests {
     }
 
     /// The view of the admitted `policy`, under the exact reference that keys
-    /// it: `C` of the reference a declaration writes (D15:824, 834).
+    /// it: `C` of the reference a declaration writes (D15:825, 835).
     fn policy_view(policy: &Value) -> Value {
         let reference = reference_value(&tuple_of(policy));
         json!({
@@ -2888,7 +2888,7 @@ mod tests {
     }
 
     /// The root's totals and the structural analysis are rechecked at the
-    /// materialized root, beside the admitted policy (D15:790, 1880-1883,
+    /// materialized root, beside the admitted policy (D15:791, 1881-1884,
     /// 1887, 2249).
     #[test]
     fn the_roots_totals_and_the_analysis_are_rechecked_at_the_root() {
@@ -2928,7 +2928,7 @@ mod tests {
 
     /// The declarations are rechecked at the root's `profiles`, and each
     /// Profile ID past the policy's bound at its key's token, which keeps the
-    /// classification the capability's bound gives it (D15:776, 790, 1885,
+    /// classification the capability's bound gives it (D15:777, 791, 1886,
     /// 1886, 2249).
     #[test]
     fn the_declarations_and_each_long_profile_id_are_rechecked_at_their_tokens() {
@@ -2969,7 +2969,7 @@ mod tests {
 
     /// Each string past the policy's single-string bound is rechecked at its
     /// token, beside the policy: here the declaration's semantic digests,
-    /// the only strings longer than 64 bytes (D15:790, 1884, 2203, 2249).
+    /// the only strings longer than 64 bytes (D15:791, 1885, 2204, 2250).
     #[test]
     fn each_string_past_the_policy_bound_is_rechecked_at_its_token() {
         let (mut inputs, policy) = rechecking_input(|limits| {
@@ -2997,7 +2997,7 @@ mod tests {
 
     /// A selector past the policy's bound is rechecked under it, its final
     /// projection authority, as over the limit, beside the declarations when
-    /// they are available and the policy (D15:812, 816, 1889, 2249; plan 025
+    /// they are available and the policy (D15:813, 817, 1890, 2250; plan 025
     /// interpretation #215).
     #[test]
     fn a_selector_past_the_policy_bound_is_rechecked_over_the_limit() {
@@ -3046,7 +3046,7 @@ mod tests {
 
     /// The collection's rechecks past the admitted policy's bounds are
     /// observed at its root, as under the capability, beside the policy that
-    /// supplies the bound (D15:834, 2249).
+    /// supplies the bound (D15:835, 2250).
     #[test]
     fn the_collection_rechecks_are_observed_at_its_root_beside_the_policy() {
         type Edit = fn(&mut ArtifactAdmissionLimits);
@@ -3084,7 +3084,7 @@ mod tests {
 
     /// Each member past one artifact's bound under the admitted policy is
     /// observed at the member, as under the capability, beside the policy
-    /// (D15:834, 2249; plan 025 interpretation #200).
+    /// (D15:835, 2250; plan 025 interpretation #200).
     #[test]
     fn each_member_past_one_artifacts_recheck_is_observed_at_the_member() {
         let (inputs, policy) = rechecking(|limits| {
@@ -3113,7 +3113,7 @@ mod tests {
 
     /// The declaration's reference count and bytes, and each reference, are
     /// rechecked at the declaration and at each reference's value, as under
-    /// the capability, beside the admitted policy (D15:790, 1918, 1921, 1922,
+    /// the capability, beside the admitted policy (D15:791, 1919, 1922, 1923,
     /// 2249).
     #[test]
     fn the_declarations_reference_rechecks_are_observed_beside_the_policy() {
@@ -3175,7 +3175,7 @@ mod tests {
 
     /// The comparison is observed at the admitted Policy, under the exact
     /// reference that keys it, beside the selected reference and the
-    /// capability's bound it needs more of first (D15:824, 834, 2249, 2355).
+    /// capability's bound it needs more of first (D15:825, 835, 2250, 2356).
     #[test]
     fn the_comparison_is_observed_at_the_admitted_policy() {
         let mut short = policy_limits();
@@ -3206,7 +3206,7 @@ mod tests {
     /// reference, beside what selection compared it with: nothing when its
     /// own checks fail, the collection as one location when no member shares
     /// even its kind or identity, and otherwise the closest tier's candidates
-    /// (D15:834, 2249).
+    /// (D15:835, 2250).
     #[test]
     fn a_reference_naming_nothing_admissible_is_observed_at_the_reference() {
         // What a case relates to the reference, under the run's tokens.
@@ -3254,7 +3254,7 @@ mod tests {
     /// Each occurrence of a selected group that is not one candidate, a
     /// duplicate or a conflicting body, is observed at the member beside the
     /// reference: one redacted member, whose occurrences differ only in their
-    /// ordinals (D15:834, 2249).
+    /// ordinals (D15:835, 2250).
     #[test]
     fn each_occurrence_of_a_rejected_group_is_observed_at_the_member() {
         let mut repeated = Inputs::new();
@@ -3386,7 +3386,7 @@ mod tests {
     }
 
     /// The total is of the references with bytes, exact, and is not evaluated
-    /// only when none has any (D15:1924, 2006, 3354).
+    /// only when none has any (D15:1925, 2007, 3479).
     #[test]
     fn the_total_waits_only_when_every_reference_is_excluded() {
         let of = |bytes| ReferenceOccurrence {
@@ -4035,7 +4035,7 @@ mod tests {
             keys(&work)
         );
         // A reference that failed waits alone: the count and the total hold
-        // over the others (D15:1918, 1924; plan 025 decision #342).
+        // over the others (D15:1919, 1925; plan 025 decision #342).
         assert_eq!(
             waits_on(
                 &evaluation,

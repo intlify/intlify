@@ -288,7 +288,7 @@ pub(in crate::benchmark) enum EvidenceRecipe {
     Storefront,
     /// The example without its project default and with an invalid target
     /// locale: blocking Findings after materialization, neither of which
-    /// holds the other back (D15:1907, 2367, 3446; plan 025 interpretation
+    /// holds the other back (D15:1908, 2368, 3571; plan 025 interpretation
     /// #252).
     Blocked,
     /// The example with [`DENSE`] more targets, each requesting a locale
@@ -296,18 +296,18 @@ pub(in crate::benchmark) enum EvidenceRecipe {
     /// many Findings, each of a target of its own.
     Dense,
     /// The example's file without its last byte, which is no JSON: no value,
-    /// so no unit reports into the Shared domain (D15:2369; plan 025
+    /// so no unit reports into the Shared domain (D15:2370; plan 025
     /// decision #260).
     Malformed,
     /// The example under a Shared `maxRecords` its Shared records outgrow:
     /// the Shared domain is exhausted, so the bundle is incomplete and the
-    /// outcome blocked (D15:1185, 2408; plan 025 decision #262).
+    /// outcome blocked (D15:1186, 2409; plan 025 decision #262).
     Truncated,
     /// The example's file with its project default three times and a locale
     /// string a lone surrogate: two Entry Findings, one of the duplicate
     /// members, whose two occurrences each relate the other two, and one of
     /// the string that is no JSON-compatible value, and the statuses that
-    /// wait on both name both as causes; no value (D15:3440; plan 025
+    /// wait on both name both as causes; no value (D15:3565; plan 025
     /// decision #264).
     Inadmissible,
 }
@@ -386,7 +386,7 @@ impl EvidenceRecipe {
     ];
 
     /// The recipes with a value, the only ones the Shared projection stage
-    /// applies to (D15:2369, 2771).
+    /// applies to (D15:2370, 2772).
     pub(in crate::benchmark) const VALUED: [Self; 3] =
         [Self::Storefront, Self::Blocked, Self::Dense];
 

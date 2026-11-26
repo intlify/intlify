@@ -3,20 +3,20 @@
 
 //! Design 015's Resolver Construction Identity.
 //!
-//! Only a successful construction has an identity (D15:967). It is the
+//! Only a successful construction has an identity (D15:968). It is the
 //! SHA-256 of an exact ASCII domain separator followed by one canonical
 //! top-level record of eight fields, framed as design 015 frames its typed
 //! records ([`framing`](crate::framing)): the Root Package by its canonical
 //! digest; each component by its identity, revision, and file digest, except
 //! the Profile Specification, by its semantic digest; the set's association;
 //! every configuration mapping, in ascending unsigned UTF-8 `schemaVersion`
-//! order; and the six registry members, in role order (D15:967-987). Strings
+//! order; and the six registry members, in role order (D15:968-988). Strings
 //! contribute their exact UTF-8 bytes and digests their 32 bytes, and the
 //! top-level record is not itself framed. The identity is presented as
 //! `rci0_` and the unpadded base64url of its 32 bytes.
 //!
 //! The construction interval ends when the authorities are admitted and
-//! excludes the identity (D15:2775), so the identity is derived from the
+//! excludes the identity (D15:2776), so the identity is derived from the
 //! admitted authorities as a step of its own.
 
 use intlify_shared_json::encoding::digest_bytes;

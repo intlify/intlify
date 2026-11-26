@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! The Programmatic Entry Snapshot vectors an independent implementation
-//! checks (D15:3319).
+//! checks (D15:3444).
 //!
 //! Each vector is one canonical Snapshot in a JSON notation, with its framing
 //! `S`, its content digest, and what it counts under the nine
@@ -219,7 +219,7 @@ pub fn document() -> Value {
         ));
     }
     // The largest witness is one over the largest bound, `u64::MAX - 1`, so
-    // its U64 has every bit set (D15:139, 2002; plan 025 decision #297).
+    // its U64 has every bit set (D15:140, 2003; plan 025 decision #297).
     snapshots.push(vector(
         "bootstrap-largest-witness",
         &Node::Marker(Marker::BootstrapLimitExceeded {

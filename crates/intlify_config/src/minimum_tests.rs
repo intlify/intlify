@@ -457,7 +457,7 @@ fn resource_edges_stop_at_their_owning_stage_without_later_semantic_work() {
     let mut limits = FixtureLimits::finite();
     limits.structural.max_profiles = Bound::new(1).unwrap();
     // Profile selection, not structural admission, counts the declarations
-    // (D15:1885).
+    // (D15:1886).
     let result = FixtureRunner::new(limits).run(source(&multiple), Some("app"));
     assert_eq!(result.steps, Step::ALL[..4]);
     let Outcome::SelectionUnavailable(prerequisite) = result.outcome else {

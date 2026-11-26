@@ -9,7 +9,7 @@
 //!
 //! The decision accounts for nothing and records nothing. When it admits no
 //! candidate, it says what it compared the reference with, which Phase 4
-//! observes the Finding through (D15:2249). Phase 4 runs it as
+//! observes the Finding through (D15:2250). Phase 4 runs it as
 //! two checks, candidate selection and the chosen candidate's body admission,
 //! after the capability's `artifactAdmission` bounds, then compares the
 //! admitted policy with the capability and rechecks the earlier phases under
@@ -69,7 +69,7 @@ pub(crate) struct Rejected<'m> {
 }
 
 /// What candidate selection compared the selected reference with when it
-/// admitted no candidate (D15:2249).
+/// admitted no candidate (D15:2250).
 #[derive(Debug, Clone)]
 pub(crate) enum Compared<'m> {
     /// Nothing submitted: the reference failed its own checks first.
@@ -622,7 +622,7 @@ mod tests {
     /// candidate, as the submitted values: nothing for the reference's own
     /// checks, the collection when no member shares even its kind or identity,
     /// the closest tier's candidates, or every member of the selected group
-    /// (D15:2249).
+    /// (D15:2250).
     fn compared(reference: &ExactTuple, values: &[Value]) -> (&'static str, Vec<Value>) {
         let members: Vec<FormalMember> = values
             .iter()

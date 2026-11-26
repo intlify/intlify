@@ -26,10 +26,10 @@
 //! Registry come with the Evidence stages.
 //!
 //! The container is written here too ([`container`]): under each role, in
-//! role order, the tuple of the member this crate writes for it (D15:2266).
+//! role order, the tuple of the member this crate writes for it (D15:2267).
 //! The resolver's dispatch tables write every member, so the committed
 //! bytes and the file digests compiled in keep the tables and the package
-//! the same (D15:2279). Construction's last row compares the package it
+//! the same (D15:2280). Construction's last row compares the package it
 //! admitted with those digests.
 
 pub(crate) mod check;
@@ -65,7 +65,7 @@ pub(crate) const PATH: &str = "registries/package-v0.json";
 
 /// The container's file digest, which the resolver is compiled from.
 pub(crate) const DIGEST: &str =
-    "sha256:54cd69129165f4297315cf70e9d4a11527b03e65c0ea93761695bd6b87b5650d";
+    "sha256:3151bc45a6d917a08937d2c457a0eb9d11738375d7110bea50b8f3663fe22c53";
 
 /// A rank's spelling in a registry: a shortest decimal string.
 pub(crate) const RANK_PATTERN: &str = "^(0|[1-9][0-9]*)$";
@@ -275,7 +275,7 @@ fn admit_member<'a>(
 /// The package's container, given each member's bytes in role order: under
 /// each role, in role order, the identity and revision the Root Package
 /// admits for the role and the file digest of its member's bytes
-/// (D15:2266).
+/// (D15:2267).
 pub(crate) fn container(members: [&[u8]; 6]) -> Value {
     let admission = ConstructionAdmission::revision_zero();
     let mut listed = Map::new();
@@ -472,7 +472,7 @@ mod tests {
     }
 
     /// The committed container lists each member's tuple, as construction
-    /// admits it, in role order (D15:2266).
+    /// admits it, in role order (D15:2267).
     #[test]
     fn the_container_lists_each_members_tuple_in_role_order() {
         let members = members();

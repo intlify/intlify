@@ -7,8 +7,8 @@
 //! A member is schema-defined when the object schema at its position, or one
 //! of that schema's `anyOf` branches, names it under `properties`. The keyed
 //! maps are the members at the positions 015 gives them: a key of the root's
-//! `profiles` map (D15:292), or of a profile declaration's `targetProfiles`
-//! or `deploymentGroups` map (D15:469), is a Profile, Target, or Group ID
+//! `profiles` map (D15:293), or of a profile declaration's `targetProfiles`
+//! or `deploymentGroups` map (D15:470), is a Profile, Target, or Group ID
 //! key, and a key of a declaration's `localeNegotiation.aliases` or
 //! `messageFallback` map is a locale key; whether the key itself is
 //! non-secret is the resolver's decision. A member of the same name at any
@@ -16,7 +16,7 @@
 //! is every member below an undefined one, where the schema describes nothing.
 //! Below an ID key, the entry's schema goes on whether or not the key matches
 //! the identifier syntax: structural admission evaluates the entry's value
-//! under it (D15:2184). An array index has no place: Evidence always keeps it.
+//! under it (D15:2185). An array index has no place: Evidence always keeps it.
 
 use super::program::{Additional, SchemaId, SchemaProgram};
 
@@ -298,7 +298,7 @@ mod tests {
     }
 
     /// Below an ID key outside the identifier syntax, the entry's schema goes
-    /// on, as structural admission evaluates the entry's value (D15:2184):
+    /// on, as structural admission evaluates the entry's value (D15:2185):
     /// its names are defined, and its maps place their keys.
     #[test]
     fn the_entry_schema_goes_on_below_a_malformed_id() {

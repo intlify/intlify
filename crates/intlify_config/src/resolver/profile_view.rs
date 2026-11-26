@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! 015's Phase 14, `profile-projection`: a checked profile's canonical semantic
-//! projection, presented as its profile view (D15:1189-1239, 2142).
+//! projection, presented as its profile view (D15:1190-1240, 2143).
 //!
 //! The view is the closed, number-free JSON value with one member per semantic
 //! group, in the order the Profile Specification's `semanticGroups` lists
@@ -12,10 +12,10 @@
 //! fallback candidates keep their semantic order, and explicit absence is
 //! `null`. Two profiles are equal exactly when their views are: the Profile
 //! Specification's identity, revision, and semantic digest, and every other
-//! field (D15:191). The profile semantic digest is 017's `H` over the view
+//! field (D15:192). The profile semantic digest is 017's `H` over the view
 //! (D17:1436). The projection leaves out the Profile ID, the selector, the
 //! configuration schema version, authoring evidence, Findings, the Coverage
-//! Decision Basis and Evidence, and redundant authoring rules (D15:1208).
+//! Decision Basis and Evidence, and redundant authoring rules (D15:1209).
 
 use std::collections::BTreeMap;
 
@@ -228,7 +228,7 @@ struct Delivery {
 /// specifications: the view of the checked profile, or the causes of the
 /// results it needs and does not have. It needs a complete `IntlifyConfig`,
 /// so structural admission must have admitted the whole root, and every
-/// semantic group (D15:2142, 2367): it has a view exactly when the root was
+/// semantic group (D15:2143, 2368): it has a view exactly when the root was
 /// admitted whole and every group's owner was evaluated, and otherwise waits
 /// on the structural Findings and on what those owners wait on.
 pub(crate) fn project<Id: AsRef<str>>(
@@ -1247,7 +1247,7 @@ mod tests {
         "/delivery/placement/revision",
     ];
 
-    /// D15:1189, 1195, 1197-1199, 1204, 2533, 2541, 3426, 3508: the
+    /// D15:1190, 1196, 1198-1200, 1205, 2534, 2542, 3551, 3633: the
     /// specification each slot names, the Active Project Profile
     /// Specification's semantic digest, and the canonicalization dataset are
     /// each one field of the view. A resolver supporting another value, which
@@ -1302,7 +1302,7 @@ mod tests {
         Some(edit)
     }
 
-    /// D15:1206, 1758, 2535, 2563, 3426, 3430, 3639: a reference reaches the
+    /// D15:1207, 1759, 2536, 2564, 3551, 3555, 3764: a reference reaches the
     /// view through its five exact members alone. The artifact a reference
     /// names, sealed again under another identity or revision or with
     /// another admitted content and then named by the reference, changes that
@@ -1362,7 +1362,7 @@ mod tests {
         assert_ne!(other.semantic_digest().unwrap(), digest);
     }
 
-    /// D15:1239, 2563, 3430, 3639: a reference is its five exact members,
+    /// D15:1240, 2564, 3555, 3764: a reference is its five exact members,
     /// each its own field. A tuple differing from the trust policy's in its
     /// kind, identity, revision, specification revision, or semantic digest
     /// projects another reference, and a view holding it is another profile
@@ -1404,7 +1404,7 @@ mod tests {
         }
     }
 
-    /// D15:1200, 1740, 3426: each normalized `projectProfileResolution` bound
+    /// D15:1201, 1741, 3551: each normalized `projectProfileResolution` bound
     /// is a field of the view. The selected policy with one bound lower
     /// changes that bound and the policy reference's semantic digest, which
     /// covers its content, and nothing else.
@@ -1441,7 +1441,7 @@ mod tests {
         }
     }
 
-    /// D15:1202, 1203, 2078, 3426: an existing target's requested-locale
+    /// D15:1203, 1204, 2079, 3551: an existing target's requested-locale
     /// subset and an existing group's member set are fields of the view. The
     /// worker requesting `en` as well, or the server moved from `web`, where
     /// it hydrates nothing, into `jobs`, changes those fields alone.
@@ -1504,7 +1504,7 @@ mod tests {
         }
     }
 
-    /// D15:2541, 3431, 3505, 3622: an accepted spelling is not semantic, nor
+    /// D15:2542, 3556, 3630, 3747: an accepted spelling is not semantic, nor
     /// is the Finding that presents it. The declaration with every `en`
     /// spelled `EN`, its default source locale among them, resolves with a
     /// non-canonical notice for each spelling and has the complete profile's
@@ -1541,7 +1541,7 @@ mod tests {
         resolved(resolver, &inputs).checked.expect("checked")
     }
 
-    /// D15:2533, 3431: profile equality is not source-byte equality. The
+    /// D15:2534, 3556: profile equality is not source-byte equality. The
     /// configuration's file spaced with CRLF line ends, or with characters
     /// escaped, has the same view, digest, and bindings.
     #[test]
@@ -1568,7 +1568,7 @@ mod tests {
         }
     }
 
-    /// D15:1754, 1758, 2565, 3347: another conforming encoding of every
+    /// D15:1755, 1759, 2566, 3472: another conforming encoding of every
     /// artifact, its members in another order, spaced, and with a character
     /// escaped, is the same body under the same exact reference. The checked
     /// profile has the same view and digest, and the same bindings: each
@@ -1606,7 +1606,7 @@ mod tests {
         }
     }
 
-    /// D15:322, 426, 3413: `$schema` is editor metadata that selects
+    /// D15:323, 427, 3538: `$schema` is editor metadata that selects
     /// nothing. The configuration with another `$schema` value, or with
     /// none, has the same view, digest, and bindings. The two values have the
     /// same Shared projection, and without the member it lacks only the

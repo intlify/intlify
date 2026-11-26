@@ -2,8 +2,8 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! 015's Evidence materialization stages over one entry's complete
-//! invocation (D15:2771, 2775): a file's, or a programmatic entry's whose
-//! admitted Snapshot is the value the file spells (D15:2788, 2792). Before the
+//! invocation (D15:2772, 2776): a file's, or a programmatic entry's whose
+//! admitted Snapshot is the value the file spells (D15:2791, 2797). Before the
 //! interval, the invocation's
 //! evaluation phases run on an evaluation of their own over 015's example and
 //! every artifact it names, under fixture-owned inputs: the finite fixture
@@ -169,14 +169,14 @@ impl PreparedEvidence {
     }
 
     /// What the configuration file is admitted under: its keys are classified
-    /// under the capability's `policyComparable` bounds (D15:776), the ones
+    /// under the capability's `policyComparable` bounds (D15:777), the ones
     /// the input context binds.
     fn fixture(&self) -> FileFixture {
         FileFixture::new(self.capability.policy_comparable())
     }
 
     /// What a programmatic entry's Snapshot is admitted under: its keys are
-    /// classified as the file's are, under the same bounds (D15:776, 1889).
+    /// classified as the file's are, under the same bounds (D15:777, 1890).
     fn snapshot_fixture(&self) -> SnapshotFixture {
         SnapshotFixture::new(self.capability.policy_comparable())
     }
@@ -184,8 +184,8 @@ impl PreparedEvidence {
     /// The bounds Phase 1 reads a programmatic entry's Snapshot under: the
     /// `bootstrapOnly.snapshot` bounds the boundary admitted it under, as the
     /// file is read under the fixture capacity rather than the capability's
-    /// minima (D15:869, 2129), and the file's value bounds, the same
-    /// `configurationInput` accounting (D15:1889).
+    /// minima (D15:870, 2130), and the file's value bounds, the same
+    /// `configurationInput` accounting (D15:1890).
     fn entry_limits(&self) -> SnapshotEntryLimits {
         SnapshotEntryLimits {
             snapshot: snapshot_limits(),
@@ -283,7 +283,7 @@ pub(super) fn shared<'e, 'a>(
 }
 
 /// One committed record as the output retains it: its record kind, its view,
-/// the length of `C` of its accounting view (D15:2518), for a not-evaluated
+/// the length of `C` of its accounting view (D15:2519), for a not-evaluated
 /// status its distinct causal Finding Keys, and for a Finding Occurrence its
 /// distinct related Evidence records.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -351,7 +351,7 @@ impl Retained {
 }
 
 /// What the Shared scope counts under the four `evidenceMetadata` counts,
-/// in their units (D15:1836-1839, 1851): the raw candidates and subjects of
+/// in their units (D15:1837-1840, 1852): the raw candidates and subjects of
 /// the units that report into the Shared domain, and the comparisons and
 /// records their tokens take.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -543,7 +543,7 @@ fn unit(
 }
 
 /// The Shared semantic output, framed in its own checksum domain; the stage
-/// has no entry-specific Evidence (D15:2794).
+/// has no entry-specific Evidence (D15:2799).
 pub(super) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure> {
     let retained = require_observable(resolved)?;
     let mut frame = Frame::new("shared-evidence");
@@ -642,7 +642,7 @@ mod tests {
     }
 
     /// The example is a checked outcome, so the stages run over an
-    /// invocation that holds every input it needs (D15:1152).
+    /// invocation that holds every input it needs (D15:1153).
     #[test]
     fn the_storefront_invocation_is_checked() {
         let prepared = prepared(R::Storefront);
@@ -679,7 +679,7 @@ mod tests {
     }
 
     /// The stage commits exactly the records of the outcome's Shared
-    /// projection, which finalization only orders (D15:2143).
+    /// projection, which finalization only orders (D15:2144).
     #[test]
     fn the_stage_commits_the_records_of_the_shared_projection() {
         for recipe in R::VALUED {
@@ -767,7 +767,7 @@ mod tests {
     /// A Shared domain a bound exhausts is retained with its terminal cursor
     /// and the bound its terminal Finding names, and observed apart from the
     /// one committed whole: a diagnostic bound of the domain, and a count of
-    /// the Shared scope past its `evidenceMetadata` bound (D15:1851, 2408).
+    /// the Shared scope past its `evidenceMetadata` bound (D15:1852, 2409).
     #[test]
     fn an_exhausted_shared_domain_is_retained_and_observed_with_its_bound() {
         let records = BoundId {
@@ -802,7 +802,7 @@ mod tests {
 
     /// Each count of the Shared scope is what its bound counts: at the count
     /// the Shared domain is not exhausted, and one under it it is, naming the
-    /// bound (D15:1851). A count of 0 has no bound under it.
+    /// bound (D15:1852). A count of 0 has no bound under it.
     #[test]
     fn the_shared_scope_work_is_what_its_bounds_count() {
         let scope = prepared(R::Storefront).resolve_shared().unwrap().scope;
@@ -875,7 +875,7 @@ mod tests {
     }
 
     /// Each recipe's Shared output has its own checksum, the same each time
-    /// it is observed, and no entry-specific Evidence (D15:2794).
+    /// it is observed, and no entry-specific Evidence (D15:2799).
     #[test]
     fn every_recipe_has_its_own_shared_observation_and_no_entry_domain() {
         let mut seen = Vec::new();
@@ -891,7 +891,7 @@ mod tests {
 
     /// The file's keys are classified under the capability the input context
     /// binds, never under limits of their own: a Profile ID past the
-    /// capability's `maxProfileIdBytes` is unsafe (D15:776).
+    /// capability's `maxProfileIdBytes` is unsafe (D15:777).
     #[test]
     fn the_file_is_classified_under_the_capabilitys_bounds() {
         use crate::resolver::evidence_path::Step;
@@ -931,7 +931,7 @@ mod tests {
     }
 
     /// A programmatic entry's keys are classified as the file's are, under
-    /// the capability the input context binds (D15:776, 1889).
+    /// the capability the input context binds (D15:777, 1890).
     #[test]
     fn the_snapshot_is_classified_under_the_capabilitys_bounds() {
         use crate::benchmark::cases::ProgrammaticRecipe as P;
@@ -957,7 +957,7 @@ mod tests {
         assert_eq!(steps(&prepared), [Step::Safe("profiles"), Step::Unsafe]);
     }
 
-    /// D15:869, 1889, 2129: Phase 1 reads each programmatic recipe's Snapshot
+    /// D15:870, 1890, 2130: Phase 1 reads each programmatic recipe's Snapshot
     /// under the `bootstrapOnly.snapshot` bounds the boundary admits it
     /// under, never the capability's minima, which admit none of them, and
     /// its value under the bounds the file's is read under: the capability's
@@ -1003,7 +1003,7 @@ mod tests {
         assert_eq!(members, SURFACES);
     }
 
-    /// D15:2788, 2792, 2794; plan 025 decision #255: each Evidence stage over
+    /// D15:2791, 2797, 2799; plan 025 decision #255: each Evidence stage over
     /// a programmatic entry's invocation, whose Snapshot is the value its
     /// file case's file spells, frames the Shared domain that file case
     /// does and an Entry domain of its own, and its facts name the entry

@@ -4,7 +4,7 @@
 //! 015's `resource-limit-policy-verification-input` boundary: 018's exact-pin
 //! Verification Input, read from 017's representation and admitted against
 //! the trusted setup path's assertion, or refused with one of the ten reasons
-//! of its row (D15:3143, 3155; D18:226-239).
+//! of its row (D15:3148, 3160; D18:226-239).
 //!
 //! The checks run in 015's order: an input is present; its bytes and depth,
 //! before anything is decoded; its syntax; its pin count over the decoded
@@ -159,7 +159,7 @@ impl VerificationInput {
     }
 
     /// The normalized input: the input as admitted, which the Materialized
-    /// Resolution Input Set carries (D15:205).
+    /// Resolution Input Set carries (D15:206).
     pub(crate) fn normalized(&self) -> Value {
         serde_json::to_value(&self.input).expect("an admitted input serializes")
     }

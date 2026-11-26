@@ -413,7 +413,7 @@ pub(super) fn observe(candidate: &Candidate) -> Result<Digest, ContextFailure> {
 /// invocation on the resolver its preparation constructed from the committed
 /// input: every raw value of that invocation's submission, as the recipe
 /// rebuilds it on that resolver, which binds the set, the one that
-/// invocation materializes there (D15:2657, 2659).
+/// invocation materializes there (D15:2658, 2660).
 fn replay_input(
     frame: &mut Frame,
     candidate: &Candidate,
@@ -902,7 +902,7 @@ mod tests {
         assert_eq!(observe(&candidate), context);
     }
 
-    /// D15:2751, 2824: a case reused after a blocked outcome binds the
+    /// D15:2752, 2829: a case reused after a blocked outcome binds the
     /// Blocked recipe's submission it resolves first as well, and every case
     /// the state its preparation runs: a case whose first submission is not
     /// what the Blocked recipe's rebuilds, or whose declared state is not the
@@ -942,7 +942,7 @@ mod tests {
         assert_eq!(observe(&candidate), context);
     }
 
-    /// D15:2788, 2824; plan 025 decision #316: a programmatic entry's
+    /// D15:2791, 2829; plan 025 decision #316: a programmatic entry's
     /// invocation binds its Snapshot as submitted and its revision, and so
     /// does the Blocked recipe's it resolves first: either changed is
     /// refused, a file in its place is another operation's input, and the
@@ -996,7 +996,7 @@ mod tests {
         assert_eq!(observe(&candidate), refused);
     }
 
-    /// D15:2657, 2659: a replay's context binds the submission whose
+    /// D15:2658, 2660: a replay's context binds the submission whose
     /// invocation's set it replays, and that set: another recipe's
     /// submission or set in its place, a file spaced otherwise, whose set is
     /// the same, a declaration of another selector or recipe, and file
@@ -1052,7 +1052,7 @@ mod tests {
         assert!(context.is_ok() && observe(&candidate) == context);
     }
 
-    /// D15:2788, 2824: a programmatic Evidence stage's context binds the
+    /// D15:2791, 2829: a programmatic Evidence stage's context binds the
     /// Snapshot its entry enters with: none, or another recipe's, in its
     /// place is refused.
     #[test]

@@ -3,37 +3,37 @@
 
 //! Design 015's reporting finalization checks: what Phase 15 verifies of the
 //! records the earlier stages fixed before it returns an outcome, and the
-//! mandatory reserve that the outcome's reserved records take (D15:1185,
+//! mandatory reserve that the outcome's reserved records take (D15:1186,
 //! 1611, 2143, 2385, 2518).
 //!
 //! Finalization only orders: it cannot create or deduplicate a candidate,
 //! assign or change an ordinal, key, owner, or byte size, repair a mapping, or
-//! move a record between domains (D15:2143). It verifies what the slices
+//! move a record between domains (D15:2144). It verifies what the slices
 //! committed instead. Each record is of its projection's domain, and the Check
-//! Registry row of its owner's check lists its kind (D15:2518, 3224); a
+//! Registry row of its owner's check lists its kind (D15:2519, 3229); a
 //! Finding, its occurrences, and the Shared-unavailability cause naming it are
 //! owned by the Finding's unit, and an evidence-index record by the first unit
-//! that refers to its Evidence (D15:1972, 2205). Every Finding candidate but
+//! that refers to its Evidence (D15:1973, 2206). Every Finding candidate but
 //! the terminal one contributed an occurrence candidate, and the occurrences
 //! sharing a Finding Key and a primary Evidence have the ordinals `0..n-1`
-//! (D15:2385). Every Evidence that an occurrence or a Coverage Decision
+//! (D15:2386). Every Evidence that an occurrence or a Coverage Decision
 //! Evidence refers to has its evidence-index record, and every Finding Key that
 //! an occurrence, a not-evaluated status, or a Shared-unavailability cause
 //! names has its Finding, unless the Finding lies in the omitted suffix of its
-//! exhausted domain (D15:1185). When both domains are complete, the Coverage
+//! exhausted domain (D15:1186). When both domains are complete, the Coverage
 //! Decision Evidence covers each Basis exactly: one record for a `default`
 //! Basis and one for each matched rule domain of a `rule` one, in Basis cell
-//! order and then matched-domain order, and no other (D15:1611). A check that
+//! order and then matched-domain order, and no other (D15:1612). A check that
 //! fails is a resolver bug, not an outcome. A replay, which has no entry,
 //! verifies within the Shared domain what those checks verify of it
-//! (D15:2659).
+//! (D15:2660).
 //!
 //! The mandatory reserve holds what no ordinary bound counts: the outcome
 //! envelope `{ outcome, constructionIdentity, complete }`, each exhausted
 //! domain's terminal Finding and `TerminalState`, and the Entry reserve's
 //! Shared-unavailability cause. The lengths of `C` of their views together fit
 //! the capability's `maxCanonicalBytes`, which conformance proves of the
-//! largest outcome its construction permits (D15:1847, 1849, 2518), so an
+//! largest outcome its construction permits (D15:1848, 1850, 2519), so an
 //! outcome past it is a resolver bug too.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -61,19 +61,19 @@ pub(crate) enum FinalizationInvariant {
     /// An evidence-index record owned by another unit than the first that
     /// refers to its Evidence.
     IndexOwner(Unit),
-    /// A Finding candidate that carried nothing it observed (D15:2385).
+    /// A Finding candidate that carried nothing it observed (D15:2386).
     Unobserved(IssueKey),
     /// Occurrences of this Finding sharing a primary Evidence whose ordinals
-    /// are not `0..n-1` (D15:2385).
+    /// are not `0..n-1` (D15:2386).
     Ordinals(IssueKey),
     /// A Finding Key, named by a record, whose Finding is neither retained
-    /// nor in an omitted suffix (D15:1185).
+    /// nor in an omitted suffix (D15:1186).
     UnresolvedFinding(IssueKey),
     /// A record of this unit referring to Evidence without its
-    /// evidence-index record (D15:1182).
+    /// evidence-index record (D15:1183).
     UnresolvedEvidence(Unit),
     /// Coverage Decision Evidence that does not cover each Basis exactly
-    /// (D15:1611).
+    /// (D15:1612).
     Cover,
     /// The mandatory reserve's `bytes` past the capability's `limit`.
     Reserve { bytes: u64, limit: u64 },
@@ -104,10 +104,10 @@ pub(crate) fn verify(
 /// Verifies, within the Shared domain alone, what `evaluation` recorded of
 /// every Finding candidate and what the slices of a replay's `shared`
 /// projection committed: each record's domain and owner, and every Finding
-/// Key and Evidence a record refers to of that domain (D15:2659). A Finding
+/// Key and Evidence a record refers to of that domain (D15:2660). A Finding
 /// Key of the Entry domain, the Phase 0 Finding a status may name, is the
 /// complete bundle's to resolve, as are the occurrence ordinals and the
-/// exact cover, which are Entry records (D15:1185, 2143).
+/// exact cover, which are Entry records (D15:1186, 2144).
 ///
 /// # Errors
 ///
@@ -121,7 +121,7 @@ pub(crate) fn verify_shared(
     resolved(&[shared], &[ReportingDomain::Shared])
 }
 
-/// Whether every Finding candidate carried what it observed (D15:2385).
+/// Whether every Finding candidate carried what it observed (D15:2386).
 fn observed(evaluation: &Evaluation) -> Result<(), FinalizationInvariant> {
     evaluation.unobserved().first().map_or(Ok(()), |key| {
         Err(FinalizationInvariant::Unobserved(key.clone()))
@@ -130,7 +130,7 @@ fn observed(evaluation: &Evaluation) -> Result<(), FinalizationInvariant> {
 
 /// Whether each record of `projection` is of its domain and owned by a unit
 /// that may own it, a unit that produced or first referred to it where the
-/// record names it (D15:1972, 2205, 2518).
+/// record names it (D15:1973, 2206, 2519).
 fn owners(projection: &Projection<'_>) -> Result<(), FinalizationInvariant> {
     let mut first: BTreeMap<&Evidence, &Unit> = BTreeMap::new();
     for (owner, retained) in &projection.records {
@@ -166,7 +166,7 @@ fn owners(projection: &Projection<'_>) -> Result<(), FinalizationInvariant> {
 }
 
 /// Whether each group of occurrences sharing a Finding Key and a primary
-/// Evidence has the ordinals `0..n-1`, in their order (D15:2385, 2389).
+/// Evidence has the ordinals `0..n-1`, in their order (D15:2386, 2390).
 fn ordinals(entry: &Projection<'_>) -> Result<(), FinalizationInvariant> {
     let mut groups: BTreeMap<(&IssueKey, &Evidence), Vec<u64>> = BTreeMap::new();
     for (_, retained) in &entry.records {
@@ -204,7 +204,7 @@ fn references(evidence: &ResolutionEvidence<'_>) -> Result<(), FinalizationInvar
 /// Whether every Finding Key of `domains` that a record of `projections`
 /// names has its Finding, retained or in the omitted suffix of its exhausted
 /// domain, and every Evidence a record refers to its evidence-index record
-/// (D15:1182, 1185).
+/// (D15:1183, 1186).
 fn resolved(
     projections: &[&Projection<'_>],
     domains: &[ReportingDomain],
@@ -224,7 +224,7 @@ fn resolved(
         }
     }
     // A Finding past its exhausted domain's terminal cursor is omitted with
-    // that domain's suffix (D15:2408).
+    // that domain's suffix (D15:2409).
     let omitted = |key: &IssueKey| {
         let domain = ReportingDomain::of(key.unit().phase);
         projections()
@@ -261,7 +261,7 @@ fn named_findings<'r>(record: &'r Record<'_>) -> Box<dyn Iterator<Item = &'r Iss
 
 /// The Evidence `record` refers to, each under the unit that refers to it:
 /// an occurrence's primary and related Evidence and a Coverage Decision
-/// Evidence's (D15:1972).
+/// Evidence's (D15:1973).
 fn referred_evidence<'r>(
     record: &'r Record<'_>,
 ) -> Box<dyn Iterator<Item = (&'r Unit, &'r Evidence)> + 'r> {
@@ -274,7 +274,7 @@ fn referred_evidence<'r>(
 
 /// Whether the Coverage Decision Evidence covers each Coverage Decision
 /// Basis exactly, in Basis cell order and then matched-domain order
-/// (D15:1611).
+/// (D15:1612).
 fn cover(evidence: &ResolutionEvidence<'_>) -> Result<(), FinalizationInvariant> {
     let bases = evidence
         .shared
@@ -307,7 +307,7 @@ fn cover(evidence: &ResolutionEvidence<'_>) -> Result<(), FinalizationInvariant>
 }
 
 /// Whether the mandatory reserve of `outcome` fits `limits`
-/// (D15:1847, 2014, 2518).
+/// (D15:1848, 2015, 2519).
 ///
 /// # Errors
 ///
@@ -327,7 +327,7 @@ pub(crate) fn reserve(
 /// The mandatory reserve of `outcome` in `maxCanonicalBytes`' unit: the
 /// lengths of `C` of the outcome envelope, of each exhausted domain's
 /// terminal Finding and `TerminalState`, and of the Entry reserve's
-/// Shared-unavailability cause, together (D15:1847, 2014, 2518).
+/// Shared-unavailability cause, together (D15:1848, 2015, 2519).
 pub(crate) fn reserved_bytes(outcome: &Outcome<'_, '_>) -> u64 {
     let evidence = &outcome.evidence;
     let envelope = json!({
@@ -419,7 +419,7 @@ mod tests {
     }
 
     /// A record of the other domain's kind, or owned by a unit whose Check
-    /// Registry row does not list its kind, is a resolver bug (D15:2143,
+    /// Registry row does not list its kind, is a resolver bug (D15:2144,
     /// 2518, 3224).
     #[test]
     fn a_record_outside_its_domain_or_its_owners_row_is_a_resolver_bug() {
@@ -454,7 +454,7 @@ mod tests {
 
     /// A Finding, an occurrence, or a Shared-unavailability cause owned by
     /// another unit than the Finding's is a resolver bug, though that unit's
-    /// row lists the record's kind (D15:2205).
+    /// row lists the record's kind (D15:2206).
     #[test]
     fn a_record_owned_by_another_unit_than_its_findings_is_a_resolver_bug() {
         blocked().outcome(None, identity(), |_, _, outcome| {
@@ -508,7 +508,7 @@ mod tests {
     }
 
     /// An evidence-index record owned by another unit than the first that
-    /// refers to its Evidence is a resolver bug (D15:1972, 2205).
+    /// refers to its Evidence is a resolver bug (D15:1973, 2206).
     #[test]
     fn an_index_record_owned_by_another_unit_than_the_first_referrer_is_a_resolver_bug() {
         blocked().outcome(None, identity(), |_, _, outcome| {
@@ -535,7 +535,7 @@ mod tests {
     }
 
     /// A Finding candidate, blocking or not, that carried nothing it observed
-    /// is a resolver bug (D15:2385).
+    /// is a resolver bug (D15:2386).
     #[test]
     fn a_candidate_observed_through_nothing_is_a_resolver_bug() {
         let unit = resource_policy::unit(PolicySubject::ResourceLimits, Check::CompatiblePolicy);
@@ -572,7 +572,7 @@ mod tests {
     /// Within the Shared domain alone, a record of the Entry domain, a
     /// Shared Finding Key without its Finding, and a candidate observed
     /// through nothing are resolver bugs, while the Phase 0 Finding a Shared
-    /// status names is the complete bundle's to resolve (D15:1185, 2659).
+    /// status names is the complete bundle's to resolve (D15:1186, 2660).
     #[test]
     fn a_replay_verifies_the_shared_domain_alone() {
         blocked().outcome(None, identity(), |evaluation, _, outcome| {
@@ -627,7 +627,7 @@ mod tests {
     }
 
     /// Occurrences of one Finding and primary Evidence whose ordinals are not
-    /// `0..n-1` are a resolver bug (D15:2385).
+    /// `0..n-1` are a resolver bug (D15:2386).
     #[test]
     fn occurrences_whose_ordinals_do_not_count_from_zero_are_a_resolver_bug() {
         blocked().outcome(None, identity(), |_, _, outcome| {
@@ -647,7 +647,7 @@ mod tests {
     /// In a complete bundle, a Finding Key that names no retained Finding, or
     /// Evidence without its evidence-index record, is a resolver bug: an
     /// occurrence's or a not-evaluated status's Finding, and a
-    /// Shared-unavailability cause's (D15:1182, 1185).
+    /// Shared-unavailability cause's (D15:1183, 1186).
     #[test]
     fn a_reference_a_complete_bundle_does_not_resolve_is_a_resolver_bug() {
         blocked().outcome(None, identity(), |_, _, outcome| {
@@ -720,7 +720,7 @@ mod tests {
     /// An evidence-index record two units' occurrences refer to is owned by
     /// the earlier one, and owned by the later one is a resolver bug: each
     /// target requesting a locale outside the project relates the project's
-    /// requested locales (D15:1972).
+    /// requested locales (D15:1973).
     #[test]
     fn an_index_record_two_units_refer_to_is_the_earlier_ones() {
         let mut inputs = reporting(&Inputs::complete(), &[], &[]);
@@ -765,7 +765,7 @@ mod tests {
     /// other only when the domain that omits it ends at the decision table,
     /// which owns both: past the Entry domain alone the Basis stays, past the
     /// Shared domain alone the Evidence stays, and past both neither does
-    /// (D15:1185, 1609, 1611, 2143, 3458).
+    /// (D15:1186, 1610, 1612, 2144, 3583).
     #[test]
     fn decision_evidence_covers_each_basis_exactly_once_both_domains_are_complete() {
         let inputs = reporting(&Inputs::complete(), &[], &[]);
@@ -827,7 +827,7 @@ mod tests {
     /// A Coverage Decision Evidence record whose source its Basis does not
     /// admit, beside or in place of the cell's own, and one for a cell with
     /// no Basis are resolver bugs: each mapping references one retained Basis
-    /// and one decision source that Basis admits (D15:1611, 2143, 3410).
+    /// and one decision source that Basis admits (D15:1612, 2144, 3535).
     #[test]
     fn decision_evidence_with_an_extra_source_or_no_basis_is_a_resolver_bug() {
         let mut inputs = reporting(&Inputs::complete(), &[], &[]);
@@ -887,7 +887,7 @@ mod tests {
     /// The mandatory reserve counts the outcome envelope, each exhausted
     /// domain's terminal Finding and `TerminalState`, and the Entry reserve's
     /// cause: an outcome fits a `maxCanonicalBytes` of exactly their total,
-    /// and not one less (D15:1847, 2518).
+    /// and not one less (D15:1848, 2519).
     #[test]
     fn the_reserve_fits_exactly_the_length_of_its_views() {
         reporting(&Inputs::complete(), &[(entry("maxRecords"), 1)], &[]).outcome(
@@ -924,7 +924,7 @@ mod tests {
     /// An outcome runs reporting finalization's checks before it is
     /// returned: a candidate that observed nothing, or a reserve past the
     /// capability's, leaves the invocation without an outcome, and the
-    /// candidate leaves a replay without a result (D15:2143, 2385, 2518,
+    /// candidate leaves a replay without a result (D15:2144, 2386, 2519,
     /// 2659).
     #[test]
     fn an_invocation_without_finalizations_checks_has_no_outcome() {

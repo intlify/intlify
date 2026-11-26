@@ -3,29 +3,29 @@
 
 //! 015's Materialized Resolution Input Set: the finite immutable replay
 //! snapshot an invocation returns beside its outcome once entry admission
-//! materialized a complete JSON-compatible value (D15:205, 2645-2657).
+//! materialized a complete JSON-compatible value (D15:206, 2646-2658).
 //!
 //! It holds exactly the replay inventory: the Resolver Construction Identity
 //! reference the invocation was admitted under, the value as the canonical
 //! tree of a marker-free Snapshot of it, whichever entry materialized it, the
 //! normalized External Profile Selector Input, and the six values of the
-//! Common Invocation Input Set (D15:205, 3436). It holds no entry source,
+//! Common Invocation Input Set (D15:206, 3561). It holds no entry source,
 //! locator, Snapshot digest, or call-site sidecar, which only Entry
-//! reproduction needs (D15:2659), and no Derived Admission State:
+//! reproduction needs (D15:2660), and no Derived Admission State:
 //! Configuration Schema Selection, the confirmed selector, the admitted
 //! Resource Limit Policy, the Sets, the Structural Analysis Result, Findings,
-//! and evaluation status are recomputed, never retained (D15:1667, 2657).
-//! The resolver derives it; no caller supplies one (D15:3218).
+//! and evaluation status are recomputed, never retained (D15:1668, 2658).
+//! The resolver derives it; no caller supplies one (D15:3223).
 //!
 //! The common values are the admitted Resolver Invocation Input Set's,
 //! shared through one `Arc` rather than copied, and the value is the set's
 //! own copy, so the set refers to no storage a later invocation resets
-//! (D15:2749).
+//! (D15:2750).
 //!
 //! Two sets are equal slot by slot, by value: the collection as the multiset
 //! of its members' `C(member)` bytes, so permuting the submitted members
 //! keeps a set equal and changing a member's multiplicity does not, and
-//! every other slot by its admitted value (D15:2589). Comparing neither
+//! every other slot by its admitted value (D15:2590). Comparing neither
 //! hashes nor copies a value. No `Debug`: the value and the selector carry
 //! configuration.
 
@@ -122,7 +122,7 @@ mod tests {
         materialized(&resolver, &raw.file(&resolver, true)).unwrap()
     }
 
-    /// D15:2659, 3228: a file, the same value written otherwise, and a
+    /// D15:2660, 3233: a file, the same value written otherwise, and a
     /// Snapshot of it beside a sidecar or not, each marked or not, give equal
     /// sets, which hold the value's canonical tree.
     #[test]
@@ -144,7 +144,7 @@ mod tests {
         }
     }
 
-    /// D15:2589: the collection is compared as a multiset, so its members in
+    /// D15:2590: the collection is compared as a multiset, so its members in
     /// another order give an equal set and one of them submitted twice does
     /// not.
     #[test]
@@ -158,7 +158,7 @@ mod tests {
         assert!(of_file(&raw) != set);
     }
 
-    /// D15:2589: every other slot is compared by value, so changing the
+    /// D15:2590: every other slot is compared by value, so changing the
     /// value, the selector, or any common value gives an unequal set, and so
     /// does another Resolver Construction Identity reference.
     #[test]
@@ -212,7 +212,7 @@ mod tests {
         assert!(other != set);
     }
 
-    /// D15:205, 3436: by type, a set holds exactly the replay inventory, the
+    /// D15:206, 3561: by type, a set holds exactly the replay inventory, the
     /// reference, the value, the selector, and the six common values, and so
     /// no Derived Admission State. Each pattern names every field, so a field
     /// added to either type fails to compile here.

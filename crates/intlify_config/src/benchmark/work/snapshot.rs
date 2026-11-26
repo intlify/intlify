@@ -8,10 +8,10 @@ use super::{LogicalWork, UnavailableWork, WorkFailure, WorkKind, WorkStage, Work
 
 impl LogicalWork {
     /// The workload of one Snapshot's admission in the units of the bounds
-    /// that count it (D15:1796-1804, 2796): the admitted tree's count under
+    /// that count it (D15:1797-1805, 2801): the admitted tree's count under
     /// each `bootstrapOnly.snapshot` bound, then its document's root-value
     /// counts, unavailable when the tree holds a marker and so no value
-    /// (D15:1889, 2129).
+    /// (D15:1890, 2130).
     pub(super) fn snapshot(&mut self, resolved: &Resolved) -> Result<(), WorkFailure> {
         let admitted = resolved
             .as_ref()
@@ -41,7 +41,7 @@ mod tests {
     use crate::benchmark::snapshot_admission::tests::candidate;
     use crate::materialize::MaterializedDocument;
 
-    /// D15:1796-1804, 1889: each of the nine counts is the admitted tree's
+    /// D15:1797-1805, 1890: each of the nine counts is the admitted tree's
     /// count under its bound, the five value counts are the document's, or
     /// unavailable for a tree that holds a marker, and every fact is counted
     /// over the interval's result.

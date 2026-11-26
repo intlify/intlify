@@ -3,7 +3,7 @@
 
 //! Design 015's Redacted evidence token: the token record of an Evidence
 //! component that is not disclosed, and the token itself, with the collision
-//! ordinals that keep unequal records with one digest apart (D15:722,
+//! ordinals that keep unequal records with one digest apart (D15:723,
 //! 2454-2468; Decisions 015-182 and 015-183).
 //!
 //! A token replaces one component: a Portable Source Identity that its owner
@@ -76,7 +76,7 @@ impl TokenKind {
     /// Whether an input that `origin` supplies can carry a component of this
     /// kind: configuration sources carry identities and path members, the
     /// vocabulary and the artifact collection carry the only keyed component
-    /// paths (D15:832, 834), and the selector slots carry selectors.
+    /// paths (D15:833, 835), and the selector slots carry selectors.
     pub(crate) const fn admits(self, origin: SafeOriginKind) -> bool {
         use SafeOriginKind as O;
         match self {
@@ -97,7 +97,7 @@ impl TokenKind {
     }
 }
 
-/// A JSON type tag (D15:2468).
+/// A JSON type tag (D15:2469).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum JsonType {
     Null,
@@ -261,7 +261,7 @@ impl Redacted {
 
     /// The projected evidence identity: `{ "domain": tag }`,
     /// `{ "type": "string" }`, `{ "type": t }`, or `{ "type": t, "length"?: l }`
-    /// (D15:2468).
+    /// (D15:2469).
     pub(crate) fn projected(&self) -> Value {
         match &self.projected {
             Projected::Domain(tag) => json!({ "domain": tag.as_ref() }),
@@ -279,7 +279,7 @@ impl Redacted {
     }
 }
 
-/// A String Length Fact as a selector's view writes it (D15:2505).
+/// A String Length Fact as a selector's view writes it (D15:2506).
 pub(crate) fn length_view(length: StringLengthFact) -> Value {
     match length {
         StringLengthFact::Exact(bytes) => json!({ "exact": bytes.to_string() }),
@@ -287,7 +287,7 @@ pub(crate) fn length_view(length: StringLengthFact) -> Value {
     }
 }
 
-/// The token record of `redacted`: its six field frames (D15:2454-2466).
+/// The token record of `redacted`: its six field frames (D15:2455-2467).
 ///
 /// # Panics
 ///
@@ -525,7 +525,7 @@ mod tests {
 
     /// Every pair of a token kind and a Safe Origin Kind that can carry it
     /// has a frozen preimage and token, written apart from this crate from
-    /// D15:722 and 2454-2468 (`.plans/drafts/025-pr7/t2-vectors.py`; D15:3319,
+    /// D15:723 and 2455-2469 (`.plans/drafts/025-pr7/t2-vectors.py`; D15:3444,
     /// 3362).
     #[test]
     fn every_kind_and_origin_that_carries_a_token_is_frozen() {
@@ -640,7 +640,7 @@ mod tests {
             tokens.token(PROFILE, &second)
         );
         // Equal projections under different origins are different tokens
-        // (D15:3362), as are the two path-member kinds.
+        // (D15:3487), as are the two path-member kinds.
         assert_ne!(
             tokens.token(PROFILE, &first),
             tokens.token(PROFILE, &programmatic)
@@ -680,7 +680,7 @@ mod tests {
         assert_eq!(tokens.comparisons(), 21);
     }
 
-    /// D15:3362: a subject record and an evidence record with one digest form
+    /// D15:3487: a subject record and an evidence record with one digest form
     /// no colliding set.
     #[test]
     fn subject_and_evidence_records_never_share_a_set() {

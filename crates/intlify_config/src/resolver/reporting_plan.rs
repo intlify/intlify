@@ -3,29 +3,29 @@
 
 //! Design 015's Reporting Slice Plan: each diagnostic domain's ordinary
 //! bounds over the slices its units report, in canonical unit order
-//! (D15:1940-1974, 2209-2211, 2391-2408).
+//! (D15:1941-1975, 2210-2212, 2392-2409).
 //!
 //! Each domain plans its slices on its own, unit by unit, and neither domain
-//! consumes or reduces the other's capacity (D15:1940, 1970). A slice's
+//! consumes or reduces the other's capacity (D15:1941, 1971). A slice's
 //! candidate stage is preflighted first, against the bounds that count each
 //! candidate occurrence, each single item, and what comes before
 //! deduplication; only then does the record stage build the slice's records
 //! and preflight the bounds that count them after deduplication, with the
-//! domain-wide `maxRecords` and `maxTotalCanonicalBytes` (D15:2209). A slice
+//! domain-wide `maxRecords` and `maxTotalCanonicalBytes` (D15:2210). A slice
 //! that passes both commits whole. The first that does not fixes the domain's
 //! terminal cursor at its unit, and no later slice of that domain is planned,
-//! while the other domain goes on (D15:2211). `maxEvaluationStatusEntries`
+//! while the other domain goes on (D15:2212). `maxEvaluationStatusEntries`
 //! counts retained statuses, none of the candidate stage's kinds, so the
 //! record stage checks it; the bound the terminal Finding names is the first,
 //! in the domain's declaration order, that the refused slice exceeds at the
-//! stage that refused it (D15:2408; plan 025 interpretation #226).
+//! stage that refused it (D15:2409; plan 025 interpretation #226).
 //!
 //! Until a Resource Limit Policy is admitted, the capability's
 //! `policyComparable` values are the sole authority. Phase 4 admits the Policy
 //! once it is compatible with the capability, whatever its rechecks find, and
 //! each domain then recounts the slices it committed before, from zero and in
 //! canonical unit order, under the Policy's values, and goes on from the
-//! recounted counts under them (D15:2132, 2391). The admitting unit's own
+//! recounted counts under them (D15:2133, 2392). The admitting unit's own
 //! slice is planned after its check admitted the Policy, so under it. A domain
 //! the capability exhausted before the admission keeps its terminal cursor and
 //! bound unless the recount of what it committed refuses an earlier slice, and
@@ -38,12 +38,12 @@
 //! Finding names that bound by its capability path. A bound of the Shared
 //! scope exhausts both domains; one that only the complete invocation exceeds
 //! exhausts only the Entry domain, and the Shared domain plans its slices as
-//! it would within every bound (D15:1851; plan 025 decisions #229, #231, and
+//! it would within every bound (D15:1852; plan 025 decisions #229, #231, and
 //! #247).
 //!
 //! Counts are checked: a count past `u64` is past every bound. The terminal
 //! Finding and state occupy the domain's reserved slots, not its ordinary
-//! bounds (D15:1972).
+//! bounds (D15:1973).
 
 use std::collections::BTreeSet;
 
@@ -71,7 +71,7 @@ pub(crate) struct Committed<'e> {
 
 /// How a domain was exhausted: the unit whose slice it refused, which is the
 /// domain's terminal cursor, and the bound its terminal Finding names
-/// (D15:2408).
+/// (D15:2409).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Exhausted<'e> {
     pub(crate) cursor: &'e Unit,
@@ -109,7 +109,7 @@ pub(crate) fn report_domain<'e>(
 /// The slices of `domain`: none when the resolver's own Evidence metadata
 /// work exceeded a bound of the domain's scope, the domain then exhausted at
 /// the first unit that reports into it, its terminal Finding naming that
-/// bound, if any unit does (D15:1851, 2408; plan 025 decisions #229 and
+/// bound, if any unit does (D15:1852, 2409; plan 025 decisions #229 and
 /// #247); otherwise those `commit` plans.
 fn plan<'e>(
     reporting: &Reporting<'e, '_>,
@@ -182,7 +182,7 @@ fn commit<'e>(
 /// What a domain committed under the capability alone, `slices`, and the slice
 /// it refused, if any: once the Policy the domain never reached the admitting
 /// unit of, `pending`, recounts them, the first slice it refuses ends the
-/// domain instead (D15:2391).
+/// domain instead (D15:2392).
 fn settle<'e>(
     slices: Vec<Slice<'e>>,
     refused: Option<(&'e Unit, BoundId)>,
@@ -345,7 +345,7 @@ impl Bounds<'_> {
     /// The first bound, in declaration order, that the candidate stage of a
     /// slice whose candidates are `candidates` exceeds once `staged` counts
     /// them: each candidate occurrence, each single item, and what comes
-    /// before deduplication (D15:1946, 1949-1951, 1954, 1962, 1966, 2209).
+    /// before deduplication (D15:1947, 1950-1952, 1955, 1963, 1967, 2210).
     fn candidate_stage(self, staged: &Counters, candidates: &Candidates) -> Option<BoundId> {
         match self {
             Self::Entry(limits) => first_over(
@@ -399,7 +399,7 @@ impl Bounds<'_> {
     /// The first bound, in declaration order, that the record stage of a
     /// slice whose records are `records` exceeds once `staged` counts them:
     /// what comes after deduplication, and the domain-wide `maxRecords` and
-    /// `maxTotalCanonicalBytes` (D15:1947, 1948, 1952, 1953, 1955, 1956,
+    /// `maxTotalCanonicalBytes` (D15:1948, 1949, 1953, 1954, 1956, 1957,
     /// 1963-1965, 1967, 1968, 2209).
     fn record_stage(self, staged: &Counters, records: &[Retained<'_>]) -> Option<BoundId> {
         let related = largest(records.iter().filter_map(|retained| {
@@ -665,7 +665,7 @@ pub(crate) mod tests {
     /// that adds last to a count across slices or the first holding the
     /// largest item: the domain keeps the slices before it and names its unit
     /// and the bound, while the other domain reports as it would without the
-    /// bound (D15:2209, 2211, 2408).
+    /// bound (D15:2210, 2212, 2409).
     fn exactly_and_one_over(reporting: &Reporting<'_, '_>, domain: ReportingDomain) {
         let group = match domain {
             ReportingDomain::Entry => Group::DiagnosticsEntry,
@@ -723,7 +723,7 @@ pub(crate) mod tests {
     /// portable double represents: two Entry Findings, the duplicate's
     /// occurrences each relating the other members of its name, and the
     /// root-value bounds waiting on both, with no Shared projection
-    /// (D15:802, 2149, 2369).
+    /// (D15:803, 2150, 2370).
     pub(crate) fn entered() -> (Evaluation, Causes) {
         let fixture = FileFixture::new(&fixture_limits(100));
         let mut evaluation = Evaluation::default();
@@ -779,7 +779,7 @@ pub(crate) mod tests {
     /// Unbounded, each domain commits every slice as 5g-1's `slices` builds
     /// it, and the Entry domain indexes each Evidence once, in the slice of
     /// the first unit to refer to it, though both targets relate the
-    /// project's locales (D15:1972, 2205).
+    /// project's locales (D15:1973, 2206).
     #[test]
     fn unbounded_domains_commit_every_slice_and_index_each_evidence_once() {
         failing().resolve(|evaluation, _| {
@@ -835,7 +835,7 @@ pub(crate) mod tests {
     /// A slice that exceeds bounds of both stages is refused at its
     /// candidate stage, whose bound the Finding names even when a record-stage
     /// bound comes first in declaration order; of two bounds of one stage, the
-    /// first in declaration order (D15:2209, 2408; plan 025 interpretation
+    /// first in declaration order (D15:2210, 2409; plan 025 interpretation
     /// #226).
     #[test]
     fn a_refused_slice_names_the_first_bound_of_the_stage_that_refused_it() {
@@ -903,7 +903,7 @@ pub(crate) mod tests {
     /// diagnostic domain, its reason the domain and its details the bound,
     /// and its terminal state names the domain, the refused slice's unit,
     /// and that Finding; the two domains' Findings have two keys, the Entry
-    /// domain's first (D15:2359, 2408, 2489).
+    /// domain's first (D15:2360, 2409, 2490).
     #[test]
     fn an_exhausted_domain_reports_its_terminal_finding_and_state() {
         failing().resolve(|evaluation, _| {
@@ -965,7 +965,7 @@ pub(crate) mod tests {
         });
     }
 
-    /// Every record kind but the two Findings (D15:2518).
+    /// Every record kind but the two Findings (D15:2519).
     const NOT_FINDINGS: [RecordKind; 10] = [
         RecordKind::EntryEvaluationStatus,
         RecordKind::FindingOccurrence,
@@ -1046,7 +1046,7 @@ pub(crate) mod tests {
     /// never at reporting finalization: statuses, occurrences, the evidence
     /// index, entry dependencies, and the cause references of an entry that
     /// materialized no value, and the complete invocation's decision records
-    /// and semantic and materialized dependencies (D15:2205, 2209, 2211,
+    /// and semantic and materialized dependencies (D15:2206, 2210, 2212,
     /// 2408, 3454).
     #[test]
     fn a_record_of_each_kind_past_a_domain_wide_bound_ends_its_domain_at_its_owner() {
@@ -1075,7 +1075,7 @@ pub(crate) mod tests {
     /// Past a bound of the Shared scope, no slice is planned: each domain is
     /// exhausted at the first unit that reports into it, its terminal Finding
     /// naming the bound by its capability path and its terminal state the
-    /// cursor that a complete assignment of the subject tokens gives (D15:1851,
+    /// cursor that a complete assignment of the subject tokens gives (D15:1852,
     /// 2359, 2408; plan 025 decisions #229, #231, and #247, interpretation
     /// #237).
     #[test]
@@ -1171,7 +1171,7 @@ pub(crate) mod tests {
     /// only the Entry domain is exhausted, at its first unit and naming the
     /// bound, while the Shared domain commits exactly what it would within
     /// every bound, so that paired entries keep equal Shared projections
-    /// (D15:1851, 2659, 3228; plan 025 decision #247). Under this digest no
+    /// (D15:1852, 2660, 3233; plan 025 decision #247). Under this digest no
     /// record collides, so the comparisons are not counted here.
     #[test]
     fn past_only_an_invocation_bound_only_the_entry_domain_is_exhausted() {
@@ -1233,7 +1233,7 @@ pub(crate) mod tests {
     /// projection stage counts the complete invocation, under the subject
     /// tokens of the Shared scope and those the Entry domain's reserved
     /// terminal records name, and commits what it would under every unit's,
-    /// a Phase 0 Finding that a Shared status names among them (D15:1851,
+    /// a Phase 0 Finding that a Shared status names among them (D15:1852,
     /// 2145, 2516, 2659, 2775; plan 025 decision #253, interpretation #257).
     #[test]
     fn the_shared_domain_commits_alike_under_its_own_scopes_tokens() {
@@ -1265,7 +1265,7 @@ pub(crate) mod tests {
 
     /// With no unit that reports into the Shared domain, a count past its
     /// bound exhausts only the Entry domain, and the Shared domain has
-    /// nothing to commit (D15:1851, 2408).
+    /// nothing to commit (D15:1852, 2409).
     #[test]
     fn without_a_shared_unit_a_count_past_its_bound_exhausts_only_the_entry_domain() {
         let (evaluation, causes) = entered();
@@ -1290,7 +1290,7 @@ pub(crate) mod tests {
     }
 
     /// A Logical input path past a path bound is absent from every record
-    /// that would carry it, and reporting goes on (D15:776; plan 025
+    /// that would carry it, and reporting goes on (D15:777; plan 025
     /// interpretation #234).
     #[test]
     fn a_logical_input_path_past_a_path_bound_is_absent_and_reporting_goes_on() {
@@ -1339,7 +1339,7 @@ pub(crate) mod tests {
     /// keeping the slices before it while the other domain goes on. Exactly
     /// what they count passes, and the Policy then goes on from the recounted
     /// counts: one less than the domain's total refuses its last slice, past
-    /// the admission (D15:2132, 2391).
+    /// the admission (D15:2133, 2392).
     #[test]
     fn the_admitted_policy_recounts_what_was_committed_before_it() {
         failing().resolve(|evaluation, _| {
@@ -1446,7 +1446,7 @@ pub(crate) mod tests {
     /// terminal cursor and bound when the Policy's recount of what it
     /// committed passes, even when the Policy would have refused the slice
     /// for another bound, and ends earlier where the recount refuses
-    /// (D15:2391; plan 025 interpretation #228).
+    /// (D15:2392; plan 025 interpretation #228).
     #[test]
     fn a_domain_exhausted_before_the_admission_ends_no_later_after_the_recount() {
         failing().resolve(|evaluation, _| {

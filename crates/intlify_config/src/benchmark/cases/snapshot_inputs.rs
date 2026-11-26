@@ -2,25 +2,25 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! The formal Snapshots a binding submits for `programmatic_snapshot_admission`
-//! (D15:2765): the value of each recipe a `file_decode_and_source_map` case
+//! (D15:2766): the value of each recipe a `file_decode_and_source_map` case
 //! materializes, other than the padded one, whose value is Minimal's, so a
-//! file and a Snapshot of one value pair (D15:2788); Minimal's value
+//! file and a Snapshot of one value pair (D15:2791); Minimal's value
 //! holding rejected-node markers, which the boundary admits and no document
-//! holds (D15:140, 861); and Minimal's value with a long string as its last
+//! holds (D15:141, 862); and Minimal's value with a long string as its last
 //! node in traversal order, whose envelope can be represented one over its
 //! bound (plan 025 decision #325).
 //!
 //! A Snapshot's tree is what the file's bytes spell: each object's members in
 //! the order the file writes them, so the reversed recipe submits them
 //! reversed, and each number as its token reads, so negative zero reaches
-//! the boundary, which normalizes both (D15:871, 889). Its digest is the one
+//! the boundary, which normalizes both (D15:872, 890). Its digest is the one
 //! the canonical tree has. Everything is built before any interval, as
-//! live-host inspection is (D15:2824).
+//! live-host inspection is (D15:2829).
 //!
 //! At an edge of a `bootstrapOnly.snapshot` bound, a recipe's Snapshot is
 //! admitted under that bound at its count, or at one under it, where the
 //! binding inspects the value in traversal order and puts the terminal
-//! marker at the first overrun (D15:867, 2786; 015-199).
+//! marker at the first overrun (D15:868, 2789; 015-199).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -40,17 +40,17 @@ use super::prepare::fixture_capacity;
 use super::workflow_inputs::ROOM;
 use super::{LimitKind, Recipe};
 
-/// A frame's tag and `U64` payload length (D15:873).
+/// A frame's tag and `U64` payload length (D15:874).
 const HEADER: u64 = 9;
 
 /// Each `bootstrapOnly.snapshot` bound with edges, in the table's order, and
 /// the first recipe whose count of it is over its minimum, so that an
 /// Admitted Implementation Capability can hold both the count and one under
-/// it (D15:1773, 1790), and whose first-over Snapshot the boundary admits.
+/// it (D15:1774, 1791), and whose first-over Snapshot the boundary admits.
 /// One under a recipe's envelope, the first overrun is its last node in
 /// traversal order, which in the recipes before `TrailingString` frames
 /// shorter than the terminal marker taking its place, so the Snapshot is over
-/// the bound it names (D15:869). `maxSingleMarkerCanonicalBytes` has no edge:
+/// the bound it names (D15:870). `maxSingleMarkerCanonicalBytes` has no edge:
 /// no marker frames as long as its minimum, and the terminal marker frames
 /// longer than any ordinary one it would take the place of (plan 025
 /// decisions #132, #134, #263, and #325).
@@ -158,7 +158,7 @@ impl SnapshotRecipe {
     }
 
     /// Whether the Snapshot holds no marker, so its document is its file
-    /// recipe's value (D15:140).
+    /// recipe's value (D15:141).
     pub(in crate::benchmark) const fn materializes(self) -> bool {
         !matches!(
             self,
@@ -167,7 +167,7 @@ impl SnapshotRecipe {
     }
 
     /// Whether the Snapshot is its file recipe's value, which that file's
-    /// case pairs with (D15:2788).
+    /// case pairs with (D15:2791).
     #[cfg(test)]
     pub(in crate::benchmark) fn copies(self) -> bool {
         self.member().is_none()
@@ -371,7 +371,7 @@ enum Slot {
 
 /// The tree at `root` with the terminal marker of `bound`, its witness
 /// `limit + 1`, at the first overrun and no node after it in traversal
-/// order (D15:867; 015-199). `None` when the tree fits.
+/// order (D15:868; 015-199). `None` when the tree fits.
 fn overrun(root: Node, bound: SnapshotBound, limit: Bound) -> Option<Node> {
     let path = first_overrun(&root, bound, limit.get())?;
     let witness = limit.get() + 1;
@@ -407,9 +407,9 @@ fn place(mut root: Node, path: &[Slot], node: Node) -> Option<Node> {
 /// The path to where a binding inspecting the tree at `root` in traversal
 /// order, each edge before the node it holds, finds the first overrun of
 /// `bound` at `limit`, each unit counted as the bound's row counts it
-/// (D15:867, 1796-1804): the node that overruns it, the edge for a
+/// (D15:868, 1797-1805): the node that overruns it, the edge for a
 /// collection entry or traversal unit, and for a key the object that owns
-/// it, as no Snapshot key can be a marker (D15:3901). `None` when the tree
+/// it, as no Snapshot key can be a marker (D15:4026). `None` when the tree
 /// fits. Walked without recursion, each visited node's place kept to read a
 /// path back (plan 025 decision #298).
 fn first_overrun(root: &Node, bound: SnapshotBound, limit: u64) -> Option<Vec<Slot>> {
@@ -575,7 +575,7 @@ mod tests {
         members.iter().map(|(key, _)| key.as_slice()).collect()
     }
 
-    /// D15:871, 889: each Snapshot is admitted with its supplied digest, a
+    /// D15:872, 890: each Snapshot is admitted with its supplied digest, a
     /// value's copy as the canonical tree of its file's value, the reversed
     /// recipe's members submitted in the reverse order and negative zero as
     /// negative, and the member each other recipe adds beside Minimal's value.
@@ -648,7 +648,7 @@ mod tests {
         }
     }
 
-    /// D15:871, 889: at every depth, an array keeps its elements' order, an
+    /// D15:872, 890: at every depth, an array keeps its elements' order, an
     /// object its members' written order, and a number its token's value, so
     /// the tree admitted is the canonical tree of the file's value.
     #[test]
@@ -756,7 +756,7 @@ mod tests {
         assert!(*admitted.root() == *expected, "{bound:?}");
     }
 
-    /// D15:867, 1796-1804, 3901: inspecting in traversal order, each edge
+    /// D15:868, 1797-1805, 4026: inspecting in traversal order, each edge
     /// before the node it holds, the binding puts the terminal marker where
     /// the first node overruns a bound, where the first edge overruns a
     /// collection entry or traversal unit, and, for a key that overruns a
@@ -869,7 +869,7 @@ mod tests {
         read_report(Some(&report), &bounded(bound, limit)).map(|_| ())
     }
 
-    /// Plan 025 decisions #132, #263, and #325; D15:869, 1773, 1790: every
+    /// Plan 025 decisions #132, #263, and #325; D15:870, 1774, 1791: every
     /// bound but `maxSingleMarkerCanonicalBytes` has edges, in the table's
     /// order, each on the first recipe whose count of it is over the bound's
     /// minimum, so the limit one under it is admissible too, and whose
@@ -920,7 +920,7 @@ mod tests {
         assert_eq!(bound(LimitKind::Nodes), None);
     }
 
-    /// D15:869, 1773, 1790, 1803: `maxSingleMarkerCanonicalBytes` has neither
+    /// D15:870, 1774, 1791, 1804: `maxSingleMarkerCanonicalBytes` has neither
     /// edge. Every marker frames shorter than its minimum, below which the
     /// capability boundary refuses a capability first, so no admitted
     /// capability's bound is reached; and the terminal marker naming it
@@ -990,7 +990,7 @@ mod tests {
         }
     }
 
-    /// D15:867, 869; 015-199; plan 025 decision #263: each edge's case is
+    /// D15:868, 870; 015-199; plan 025 decision #263: each edge's case is
     /// admitted under its bound at the count its recipe's unbounded case
     /// reports, or one under it, and every other bound at the room. The
     /// exact edge admits the recipe's Snapshot. The first-over edge's holds

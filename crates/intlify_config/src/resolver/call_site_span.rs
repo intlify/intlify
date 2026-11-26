@@ -3,30 +3,30 @@
 
 //! Design 015's call-site spans: the Portable Source Span that a programmatic
 //! entry's Evidence takes from its admitted Programmatic Call-Site Evidence
-//! Input, and the source that span selects (D15:745-751, 795-802).
+//! Input, and the source that span selects (D15:746-752, 796-803).
 //!
 //! Evidence selects one location role where it points: `member-key` when it
 //! locates a key, and when it locates a value, `member-value` where the
 //! value's path ends at an object member and `node` at the root or an array
 //! element. A missing member is observed at its owning object and a marker at
-//! its position, so each takes the role of the value there (D15:747; Decision
+//! its position, so each takes the role of the value there (D15:748; Decision
 //! 015-203). The sidecar's candidate for the path and that role is a span
 //! only when both coordinates are integers with `start <= end <= length` over
 //! the call-site source bytes, byte coordinates that need not fall on a
-//! character boundary (D15:745). Any other candidate, and a path or role the
-//! sidecar does not map, is absence, and no other role is consulted (D15:747,
+//! character boundary (D15:746). Any other candidate, and a path or role the
+//! sidecar does not map, is absence, and no other role is consulted (D15:748,
 //! 749, 751).
 //!
 //! A span selects the call-site source's identity and locator together;
 //! without one, Evidence names the Programmatic Entry's, so neither locator is
-//! borrowed for the other identity (D15:795, 796, 800).
+//! borrowed for the other identity (D15:796, 797, 801).
 //!
 //! Phase 1 looks a position's mapping up by the position's path. The phases
 //! after it name a value or a key by its locus in the materialized document,
 //! so the spans are resolved once, each mapping's path walked from the root:
 //! a mapping has a locus only when its path names an established node and the
 //! rule selects its role there, and the walk is bounded by the mappings and
-//! the document's depth (D15:747, 1833).
+//! the document's depth (D15:748, 1834).
 
 use std::collections::BTreeMap;
 
@@ -48,7 +48,7 @@ pub(crate) enum Located {
 impl Located {
     /// The role Evidence that locates this selects where its path ends at an
     /// object member when `member`, and otherwise at the root or an array
-    /// element, which have no key (D15:747).
+    /// element, which have no key (D15:748).
     pub(crate) const fn role(self, member: bool) -> Option<LocationRole> {
         match (self, member) {
             (Self::Key, true) => Some(LocationRole::MemberKey),
@@ -62,7 +62,7 @@ impl Located {
 /// The call-site source and the span of Evidence that locates `located` at
 /// the end of the edges `path` from the root, when `call_site` maps the path
 /// and the role the rule selects there to a candidate that is a span
-/// (D15:747, 798, 802).
+/// (D15:748, 799, 803).
 pub(crate) fn mapped<'a>(
     call_site: &'a AdmittedCallSite,
     path: &[Edge<'_>],
@@ -82,7 +82,7 @@ pub(crate) fn mapped<'a>(
 
 /// The source and span Evidence names: the call-site source and its span when
 /// one is `mapped`, and otherwise `entry`, the Programmatic Entry's source,
-/// with none (D15:795, 796, 800).
+/// with none (D15:796, 797, 801).
 pub(crate) fn named<'a>(
     entry: Source<'a>,
     mapped: Option<(Source<'a>, SourceSpan)>,
@@ -101,7 +101,7 @@ impl<'a> CallSiteSpans<'a> {
     /// The spans `call_site` gives `document`: each candidate that is a span,
     /// at the locus of what Evidence selecting its mapping's role locates,
     /// when the mapping's path names an established node and the rule selects
-    /// the role there (D15:747, 749).
+    /// the role there (D15:748, 750).
     pub(crate) fn new(call_site: &'a AdmittedCallSite, document: &MaterializedDocument) -> Self {
         let spans = call_site
             .mappings()
@@ -116,7 +116,7 @@ impl<'a> CallSiteSpans<'a> {
     }
 
     /// The call-site source and the span of the value or key at `locus`, when
-    /// a mapping gives it one (D15:800).
+    /// a mapping gives it one (D15:801).
     pub(crate) fn at(&self, locus: Locus) -> Option<(Source<'a>, SourceSpan)> {
         self.spans.get(&locus).map(|&span| (self.source, span))
     }
@@ -124,7 +124,7 @@ impl<'a> CallSiteSpans<'a> {
 
 /// The locus of what Evidence selecting `role` at the end of `path` locates
 /// in `document`: none when the path names no established node, or when the
-/// rule selects another role there, whether or not `role` applies (D15:747).
+/// rule selects another role there, whether or not `role` applies (D15:748).
 fn locus(
     document: &MaterializedDocument,
     path: &[StructuralEdge],
@@ -161,7 +161,7 @@ fn locus(
 
 /// `candidate` as a span over the bytes of `call_site`'s source: both
 /// coordinates integers with `start <= end <= length`, which need not fall
-/// on a character boundary; absence otherwise (D15:745, 749).
+/// on a character boundary; absence otherwise (D15:746, 750).
 fn admit(candidate: SpanCandidate, call_site: &AdmittedCallSite) -> Option<SourceSpan> {
     let (start, end) = candidate.coordinates()?;
     SourceSpan::admit(start, end, call_site.source().as_bytes())
@@ -169,7 +169,7 @@ fn admit(candidate: SpanCandidate, call_site: &AdmittedCallSite) -> Option<Sourc
 
 /// The call-site source: its identity, whether its frontend marked that
 /// identity non-secret, and its own locator, never the Programmatic Entry's
-/// (D15:747, 796).
+/// (D15:748, 797).
 pub(crate) fn source(call_site: &AdmittedCallSite) -> Source<'_> {
     Source {
         identity: call_site.pair().identity(),
@@ -393,7 +393,7 @@ mod tests {
 
     /// A coordinate pair is a span only when both are integers and
     /// `start <= end <= length` over the source's bytes, which need not fall
-    /// on a character boundary (D15:745, 749).
+    /// on a character boundary (D15:746, 750).
     #[test]
     fn a_candidate_is_a_span_only_with_integer_coordinates_within_the_source() {
         // 2^64, the first integer past `u64::MAX`.
@@ -426,7 +426,7 @@ mod tests {
         }
     }
 
-    /// D15:747 (Decision 015-203): a key selects `member-key`, a value
+    /// D15:748 (Decision 015-203): a key selects `member-key`, a value
     /// `member-value` at an object member and `node` at the root or an
     /// element, where no key is.
     #[test]
@@ -437,7 +437,7 @@ mod tests {
         assert_eq!(Located::Key.role(false), None);
     }
 
-    /// D15:747, 749 (Decision 015-203): a position takes the span mapped for
+    /// D15:748, 750 (Decision 015-203): a position takes the span mapped for
     /// the role it selects, and none when that mapping is missing or no span,
     /// whatever another role maps there.
     #[test]
@@ -481,7 +481,7 @@ mod tests {
         assert_eq!(at(&[], Located::Key), None);
     }
 
-    /// D15:771, 3381: an array edge is a checked integer that keeps no
+    /// D15:772, 3506: an array edge is a checked integer that keeps no
     /// spelling: a number read from `1.0` or `1e0` is the index 1, and a key
     /// spelled like an index names no element of an array.
     #[test]
@@ -507,7 +507,7 @@ mod tests {
         }
     }
 
-    /// D15:795, 796, 800: a span selects the call-site identity and only its
+    /// D15:796, 797, 801: a span selects the call-site identity and only its
     /// own locator, none when it has none even though the Programmatic Entry
     /// has one; without a span, Evidence names the Programmatic Entry's
     /// identity and locator.
@@ -588,7 +588,7 @@ mod tests {
         found
     }
 
-    /// D15:747, 749 (Decision 015-203): a document takes the span of each
+    /// D15:748, 750 (Decision 015-203): a document takes the span of each
     /// mapping whose path names an established node and whose role the rule
     /// selects there, at the locus of the key or the value it locates, with
     /// the call-site source; a role the rule does not select there, a path

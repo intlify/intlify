@@ -2,36 +2,36 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Design 015's Finding Occurrences: where, and through which admitted input
-//! Evidence, an ordinary Finding was observed (D15:253-256, 2385-2389).
+//! Evidence, an ordinary Finding was observed (D15:254-257, 2386-2390).
 //!
 //! Every Finding candidate but the terminal reporting Finding contributes one
 //! occurrence candidate, from the unit that found it, with its primary Evidence
 //! and its related Evidence as projected before the invocation's evidence
-//! tokens are assigned (D15:2385). The evaluation keeps the candidate of every
+//! tokens are assigned (D15:2386). The evaluation keeps the candidate of every
 //! blocking result that carried what it observed. The caller assigns those
 //! tokens once, to every candidate's redacted components together with those of
 //! the invocation's other final Evidence projections, such as Coverage Decision
 //! Evidence's, so that one component keeps one token in every record
-//! (D15:2194). The occurrences retain each record under them, and then group
+//! (D15:2195). The occurrences retain each record under them, and then group
 //! the candidates that share a Finding Key and a primary Evidence, whose view
-//! is its identity (D15:2505). Within a group, related Evidence is merged and
+//! is its identity (D15:2506). Within a group, related Evidence is merged and
 //! deduplicated in Evidence order without any record equal to the primary one
 //! (Decision 015-193), and the candidates' multiplicity becomes the ordinals
-//! `0..n-1`, which follow neither physical nor worker order (D15:2387). Each
-//! ordinal is one record, `{ finding, primary, ordinal, related }` (D15:2479),
-//! whose ordinal is a decimal string (D15:2452). The Finding Occurrence Key is
+//! `0..n-1`, which follow neither physical nor worker order (D15:2388). Each
+//! ordinal is one record, `{ finding, primary, ordinal, related }` (D15:2480),
+//! whose ordinal is a decimal string (D15:2453). The Finding Occurrence Key is
 //! the Finding Key, the primary Evidence, and the ordinal, without the related
-//! Evidence (D15:256, 2703). Occurrences order by Finding, then by primary
-//! Evidence, then by ordinal (D15:2389).
+//! Evidence (D15:257, 2704). Occurrences order by Finding, then by primary
+//! Evidence, then by ordinal (D15:2390).
 //!
 //! An occurrence's Evidence record owner is the unit of its Finding
-//! (D15:2205). Under that unit, the occurrence refers to its primary and
-//! related Evidence, each a record of the evidence index (D15:1972), and
-//! accounting charges the unit the occurrence's accounting view (D15:2518).
+//! (D15:2206). Under that unit, the occurrence refers to its primary and
+//! related Evidence, each a record of the evidence index (D15:1973), and
+//! accounting charges the unit the occurrence's accounting view (D15:2519).
 //!
 //! A stage builds a selector's Evidence under the final selector authority
-//! before it makes the candidate (D15:819). The reporting slice's bounds come
-//! before grouping (D15:2209) and come with their own stage. Every occurrence
+//! before it makes the candidate (D15:820). The reporting slice's bounds come
+//! before grouping (D15:2210) and come with their own stage. Every occurrence
 //! a test builds is checked against the Finding Registry: its primary and
 //! related Evidence must have the kinds, origins, and shapes that its check
 //! and code's pair gives them.
@@ -61,7 +61,7 @@ pub(crate) struct OccurrenceCandidate {
 
 impl OccurrenceCandidate {
     /// The candidate with its Evidence as path admission leaves it under
-    /// `limits` (D15:776, 1851).
+    /// `limits` (D15:777, 1852).
     ///
     /// # Errors
     ///
@@ -86,7 +86,7 @@ impl OccurrenceCandidate {
 /// A resolver bug the occurrences refuse.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum OccurrenceInvariant {
-    /// The terminal reporting Finding has no occurrence (D15:2385).
+    /// The terminal reporting Finding has no occurrence (D15:2386).
     TerminalOccurrence(IssueKey),
     /// The evidence tokens leave out a component of the Finding's candidate.
     UnassignedToken(IssueKey),
@@ -129,7 +129,7 @@ impl FindingOccurrence {
     }
 
     /// The Finding Occurrence Key: the Finding Key, the primary Evidence,
-    /// and the ordinal (D15:256).
+    /// and the ordinal (D15:257).
     pub(crate) const fn key(&self) -> (&IssueKey, &Evidence, u64) {
         (&self.finding, &self.primary, self.ordinal)
     }
@@ -147,7 +147,7 @@ impl FindingOccurrence {
             .map(|evidence| (self.owner(), evidence))
     }
 
-    /// `{ finding, primary, ordinal, related }` (D15:2479).
+    /// `{ finding, primary, ordinal, related }` (D15:2480).
     ///
     /// # Errors
     ///
@@ -164,7 +164,7 @@ impl FindingOccurrence {
         Ok(Value::Object(view))
     }
 
-    /// The occurrence's accounting view, charged to its owner (D15:2518).
+    /// The occurrence's accounting view, charged to its owner (D15:2519).
     ///
     /// # Errors
     ///
@@ -608,7 +608,7 @@ mod tests {
     }
 
     /// Related Evidence does not identify an occurrence: changing it changes
-    /// the record but not the key (D15:2385).
+    /// the record but not the key (D15:2386).
     #[test]
     fn the_key_leaves_related_evidence_out() {
         let mut evaluation = Evaluation::default();
@@ -768,7 +768,7 @@ mod tests {
     }
 
     /// The same failure through a file and through a programmatic entry has
-    /// one Finding Key and different occurrence keys (D15:2389).
+    /// one Finding Key and different occurrence keys (D15:2390).
     #[test]
     fn file_and_programmatic_failures_share_the_finding_key_but_not_the_occurrence_key() {
         let mut evaluation = Evaluation::default();
@@ -1003,7 +1003,7 @@ mod tests {
 
     /// Path admission reaches the primary and every related Evidence: a
     /// Logical input path past a bound is absent wherever it is, and a value
-    /// locator past one among the related refuses the candidate (D15:776,
+    /// locator past one among the related refuses the candidate (D15:777,
     /// 1851; plan 025 decisions #232 and #236).
     #[test]
     fn path_admission_reaches_the_primary_and_every_related_evidence() {

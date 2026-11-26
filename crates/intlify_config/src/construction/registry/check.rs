@@ -6,7 +6,7 @@
 //! strategy.
 //!
 //! Design 015's Check Registry has one row for each `(phase, subject kind,
-//! check)` the resolver evaluates (D15:2173). Revision `"0"` writes the rows
+//! check)` the resolver evaluates (D15:2174). Revision `"0"` writes the rows
 //! from the resolver's own kinds and checks: every check of every kind in
 //! [`SubjectKind::ALL`], the kinds declared only included, in phase, kind-rank,
 //! and check-rank order. A row names its check ID, phase, rule ID, subject
@@ -15,7 +15,7 @@
 //! Evidence record kinds its units may own, the dependency records they own,
 //! and its Finding payload strategy.
 //!
-//! 015 leaves the IDs of kinds, scopes, and checks to the registry (D15:2173,
+//! 015 leaves the IDs of kinds, scopes, and checks to the registry (D15:2174,
 //! 2175). A kind's ID is its name in kebab case. A singleton's owning scope is
 //! its own kind; every other kind names the field, map, or collection its
 //! keys belong to. A check ID reads `<area>.<subject>.<check>` like 015's
@@ -24,52 +24,52 @@
 //! because classifying invalid content as non-secret would expose arbitrary
 //! values (Decision 015-157); every other kind uses `none`.
 //!
-//! A row's prerequisites are the checks its units wait on (D15:2149, 2166): a
+//! A row's prerequisites are the checks its units wait on (D15:2150, 2167): a
 //! unit waits on a check whose result it needs, and is not evaluated without
 //! it, or whose result alone names its subjects, and is then not recorded. A
 //! row lists, in row order, the checks it waits on that none of the others it
 //! lists already waits on: earlier rows, and rows of its own kind, whose units
 //! an earlier subject may run at any check rank, such as the path that contains
 //! a field; a row whose units wait on the same check of an earlier subject
-//! lists itself (D15:2149, Decision 015-195). A check under the admitted
-//! Resource Limit Policy waits on every Policy recheck (D15:1677). Entry
+//! lists itself (D15:2150, Decision 015-195). A check under the admitted
+//! Resource Limit Policy waits on every Policy recheck (D15:1678). Entry
 //! admission's complete input waits along the stages of strict file entry: the
 //! parser's tokens on the file's bytes, strict JSON on the tokens, duplicate
 //! members and the JSON-compatible domain on strict JSON, and the five
 //! root-value bounds on both. Structural admission's schema selection waits
 //! along its checks, a `schemaVersion` member on an object root, its string on
 //! the member, and a supported schema on the string, and the analysis's measure
-//! on the supported schema (D15:2008, 2130). A check of a scope level's fields
+//! on the supported schema (D15:2009, 2131). A check of a scope level's fields
 //! waits on the type check of the value that holds the field, or of the field's
 //! own value, and an identity map's key on its map's type check; an entry's
 //! value is typed under its map's type check, and the root under the analysis's
-//! measure (D15:2149, 2184). Profile selection counts the declarations once
+//! measure (D15:2150, 2185). Profile selection counts the declarations once
 //! structural admission admitted the `profiles` object, and checks a declared
 //! Profile ID once it admitted the key, which alone names the ID's subject
-//! (D15:2131, 2184). The selector's bound waits on nothing; comparing the
+//! (D15:2132, 2185). The selector's bound waits on nothing; comparing the
 //! selector with the declarations waits on their count and on `profiles`
 //! holding one, its Profile ID admission on the bound, and its declaration on
-//! that admission (D15:2296, 2363). The kinds declared only list no
+//! that admission (D15:2297, 2364). The kinds declared only list no
 //! prerequisite until their units exist. No row of a Shared phase lists a check of entry
 //! admission: without a value from entry admission there is no Shared
 //! projection, whose absence the entry's Findings explain, and the phase's
-//! first unit requires no check (D15:2369, 2516). Profile selection selects a
+//! first unit requires no check (D15:2370, 2517). Profile selection selects a
 //! declaration once structural admission admitted its boundary and its
 //! `resourceLimits` reference, and the later phases read its other fields one
-//! by one (D15:2131, 2367, 3340; plan 025 interpretation #218): a row of a
+//! by one (D15:2132, 2368, 3465; plan 025 interpretation #218): a row of a
 //! later phase lists the structural checks of the fields its units read
 //! unless a check it lists already waits on them. The checks of the
 //! declaration's reference counts list those of `policies` and of the Target
 //! ID entries, which every check under the admitted Policy then waits on, and
 //! the group checks those of the Group ID entries. Without a selection, each
 //! check that reads the declaration or the Policy its reference selects waits
-//! on what held the selection back (D15:2131): the reference counts and the
+//! on what held the selection back (D15:2132): the reference counts and the
 //! Resource Limit Policy's metadata scan list the selected Profile ID's bound,
 //! the selector naming a declaration, and the structural checks of the
 //! boundary and the reference fragment, which no check of profile selection
 //! reports, and every later check reaches them through these. Phase 4's checks
 //! of the collection under the capability read neither and list none
-//! (D15:2132).
+//! (D15:2133).
 //!
 //! A row's Finding codes are those its units may report, a notice included,
 //! in 015's table order: what the resolver's checks report, and for the kinds
@@ -84,19 +84,19 @@
 //! codes owns Findings with their occurrences and evidence index, the
 //! decision table owns both coverage decision records, and the first kinds
 //! of entry and structural admission and each semantic group's owner own the
-//! dependency records (D15:2516).
+//! dependency records (D15:2517).
 //!
 //! A row's payload strategy says how every Finding payload it may produce
-//! derives (D15:2173). Where its key can stand for distinct raw values, the
+//! derives (D15:2174). Where its key can stand for distinct raw values, the
 //! payload derives only from its check, code, reason, Logical subject key,
 //! and bound authority, so past a bound it reports the first-over witness
 //! `limit + 1` even for one value (Decision 015-157). Elsewhere its key names
-//! one value, whose exact total it reports (D15:2006). The strategy also
+//! one value, whose exact total it reports (D15:2007). The strategy also
 //! names, for each code the row may report, the members of the code's
-//! `details` from 015's closed vocabulary (D15:2231), and the stable reasons
+//! `details` from 015's closed vocabulary (D15:2232), and the stable reasons
 //! the row may report the code with. Where several checks report one code,
 //! each lists only the reasons it decides, so every check, code, and reason
-//! the registry allows is one a check reaches (D15:2277). Severity, blocking
+//! the registry allows is one a check reaches (D15:2278). Severity, blocking
 //! state, and suggestion kind are each code's own and come with the Finding
 //! Registry. Every evaluation a test runs asserts that each result carries
 //! what its row's strategy gives its code.
@@ -105,18 +105,18 @@
 //! cross-references (row 41), and refuses one this type cannot read or whose
 //! rows do not relate as 015 requires: a check ID names one row, under its own
 //! rule ID; the rows of one kind in one phase agree on its key shape, parent,
-//! and rank (D15:2184); kinds rank uniquely within a phase and checks within a
-//! kind (D15:2199, 2201); only a kind keyed by an identity or content names a
-//! projection (D15:2188); a singleton is unscoped; a parent is a kind with
-//! rows in the same or an earlier phase (D15:2175), from which following
+//! and rank (D15:2185); kinds rank uniquely within a phase and checks within a
+//! kind (D15:2200, 2202); only a kind keyed by an identity or content names a
+//! projection (D15:2189); a singleton is unscoped; a parent is a kind with
+//! rows in the same or an earlier phase (D15:2176), from which following
 //! parents ends at an unscoped kind; a prerequisite names a row once, never
 //! one of a later phase or of a kind its phase ranks later, and following
 //! prerequisites never comes back to a row by way of another row, while a row
 //! may name itself (Decision 015-195); every dependency record is owned
-//! by exactly one row, which lists its record kind (D15:2275); and a row's
+//! by exactly one row, which lists its record kind (D15:2276); and a row's
 //! payload strategy covers exactly the codes it may report, in their order
-//! (D15:2173). A row of
-//! the same kind may be an earlier subject's check (D15:2149), so its rank is
+//! (D15:2174). A row of
+//! the same kind may be an earlier subject's check (D15:2150), so its rank is
 //! not compared. Ranks are compared as the shortest decimal strings the
 //! schema spells them as. Whether the rows are this resolver's own kinds and
 //! checks is not part of the graph: a closed registry that is not the one
@@ -488,8 +488,8 @@ impl CheckRegistry {
     }
 }
 
-/// What the rows of one kind in one phase agree on (D15:2184): the kind's key
-/// shape, its parent, and its rank among the phase's kinds (D15:2199).
+/// What the rows of one kind in one phase agree on (D15:2185): the kind's key
+/// shape, its parent, and its rank among the phase's kinds (D15:2200).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Domain<'a> {
     strategy: KeyStrategy,
@@ -512,9 +512,9 @@ impl<'a> Domain<'a> {
 
     /// Whether 015 allows this key shape in `phase`: a kind keyed by an
     /// identity or content names one closed projection and every other kind
-    /// none (D15:2188), a singleton's phase-global subject is unscoped
-    /// (D15:2179), and a parent comes from the same or an earlier phase
-    /// (D15:2175).
+    /// none (D15:2189), a singleton's phase-global subject is unscoped
+    /// (D15:2180), and a parent comes from the same or an earlier phase
+    /// (D15:2176).
     fn is_sound(self, phase: Phase) -> bool {
         let keyed = self.strategy == KeyStrategy::CanonicalIdentityOrContent;
         keyed == (self.projection != ContentProjection::None)
@@ -524,7 +524,7 @@ impl<'a> Domain<'a> {
     }
 }
 
-/// Whether every kind's parent is a kind with rows (D15:2175) and following
+/// Whether every kind's parent is a kind with rows (D15:2176) and following
 /// parents from any kind ends at an unscoped one, so that no kind scopes
 /// itself.
 fn parents_end(domains: &BTreeMap<(Phase, SubjectKind), Domain<'_>>) -> bool {
@@ -545,7 +545,7 @@ fn parents_end(domains: &BTreeMap<(Phase, SubjectKind), Domain<'_>>) -> bool {
 /// Whether every prerequisite names a row once, never one whose units follow
 /// all of its dependent's in canonical unit order, and whether following the
 /// prerequisites that name other rows ends, so that no prerequisite cycle
-/// joins distinct rows (D15:2275). A row may name itself, whose units wait on
+/// joins distinct rows (D15:2276). A row may name itself, whose units wait on
 /// the same check of an earlier subject (Decision 015-195).
 fn prerequisites_end(rows: &[CheckRow]) -> bool {
     let named: BTreeMap<&str, &CheckRow> = rows
@@ -596,7 +596,7 @@ fn prerequisites_end(rows: &[CheckRow]) -> bool {
 
 /// Whether a row's payload strategy covers exactly the codes the row may
 /// report, in their order: the strategy closes every code the row may emit
-/// and no other (D15:2173).
+/// and no other (D15:2174).
 fn payloads_cover_codes(row: &CheckRow) -> bool {
     row.finding_payload_strategy
         .details
@@ -606,7 +606,7 @@ fn payloads_cover_codes(row: &CheckRow) -> bool {
 }
 
 /// Whether every dependency record is owned by exactly one row, which lists
-/// its record kind among those it may own (D15:2275).
+/// its record kind among those it may own (D15:2276).
 fn dependencies_owned_once(rows: &[CheckRow]) -> bool {
     let mut owned = BTreeSet::new();
     for row in rows {
@@ -625,7 +625,7 @@ fn dependencies_owned_once(rows: &[CheckRow]) -> bool {
 
 /// Whether `prerequisite`'s units follow all of `dependent`'s in canonical
 /// unit order: it is of a later phase, or of a kind its phase ranks later
-/// (D15:2149). A row of the same kind may be an earlier subject's check.
+/// (D15:2150). A row of the same kind may be an earlier subject's check.
 fn follows(prerequisite: &CheckRow, dependent: &CheckRow) -> bool {
     place(prerequisite) > place(dependent)
 }
@@ -656,7 +656,7 @@ pub(crate) fn kind_id(kind: SubjectKind) -> String {
 
 /// The key shape every row of a kind names: its key strategy, its owning
 /// scope, the kind whose subjects scope its own, and its Subject content
-/// projection. A Redacted subject token frames all but the parent (D15:2454).
+/// projection. A Redacted subject token frames all but the parent (D15:2455).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct KeyShape {
     pub(crate) strategy: KeyStrategy,
@@ -1148,7 +1148,7 @@ const DECODED: &[&str] = &[
 ];
 
 /// What a check under the admitted Resource Limit Policy waits on: every
-/// Policy recheck, in row order (D15:1677).
+/// Policy recheck, in row order (D15:1678).
 const CONFIRMED_POLICY: &[&str] = &[
     "resource-policy.root-nodes.within-bound",
     "resource-policy.root-depth.within-bound",
@@ -1172,7 +1172,7 @@ const CONFIRMED_POLICY: &[&str] = &[
 
 /// What the total of the member occurrences waits on: the structural checks
 /// that leave a group's `members` without an array to count, which it waits on
-/// when no group has one (D15:1935, 2184), then every Policy recheck, in row
+/// when no group has one (D15:1936, 2185), then every Policy recheck, in row
 /// order.
 const MEMBER_ARRAYS_UNDER_POLICY: &[&str] = &[
     "structural.group.required-field",
@@ -1199,7 +1199,7 @@ const MEMBER_ARRAYS_UNDER_POLICY: &[&str] = &[
 
 /// What the total of the relation occurrences waits on: the structural check
 /// that leaves a group without a `hydrationRelations` array to count, which it
-/// waits on when no group has one (D15:1936, 2184), then every Policy recheck,
+/// waits on when no group has one (D15:1937, 2185), then every Policy recheck,
 /// in row order.
 const RELATION_ARRAYS_UNDER_POLICY: &[&str] = &[
     "structural.group.field-type",
@@ -1242,11 +1242,11 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         | K::CapabilityArtifact
         | K::CapabilityArtifactBytes => &[NONE],
         // A target's reference waits on the structural checks of its key and
-        // `profile` (D15:1921, 1924). Each reference bound waits on the
+        // `profile` (D15:1922, 1925). Each reference bound waits on the
         // selection: its Profile ID, the selector naming it, and the structural
         // checks of its boundary and `resourceLimits` reference, which no check
-        // of profile selection reports (D15:2131). No one reference's failure
-        // holds the count or the total back (D15:1918, 1922, 1924, 3354).
+        // of profile selection reports (D15:2132). No one reference's failure
+        // holds the count or the total back (D15:1919, 1923, 1925, 3479).
         K::CapabilityTargetProfileReference => &[&[
             "structural.profile.required-field",
             "structural.profile.field-value",
@@ -1269,8 +1269,8 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         }
         K::ProfileSpecificationDependency => &[&["specification.project-profile.supported"]],
         // The selection's checks wait on the one before them: a `schemaVersion`
-        // member of an object root, then its string (D15:2130, 2149). The
-        // analysis is measured under the schema the selection names (D15:2008).
+        // member of an object root, then its string (D15:2131, 2150). The
+        // analysis is measured under the schema the selection names (D15:2009).
         K::ConfigurationSchemaSelection => &[
             NONE,
             &["structural.schema-selection.object-root"],
@@ -1284,7 +1284,7 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         // holds the field, or of the field's own value, and a key on the type
         // check of its map; an entry's value is typed under its map's type,
         // and the root under the analysis's measure. A type check thus waits
-        // on the same check of the path that contains it (D15:2149, 2184,
+        // on the same check of the path that contains it (D15:2150, 2185,
         // Decision 015-195).
         K::RootField => &[
             &["structural.root.field-type"],
@@ -1329,7 +1329,7 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         // JSON-compatible domain a parsed file or a Snapshot within its
         // bounds, which read the admitted Snapshot alone, and the root-value
         // bounds measure the root that entry materializes, so they wait on
-        // both (D15:802, 869, 1794-1804, 1876, 2289). A unit waits only on the
+        // both (D15:803, 870, 1795-1805, 1877, 2290). A unit waits only on the
         // checks its entry path records (Decision 015-202), and the
         // JSON-compatible domain's pass alone needs the Snapshot's bounds
         // (plan 025 decision #266).
@@ -1356,7 +1356,7 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         ],
         // The scan waits on the selected `resourceLimits` reference and the
         // collection's bounds; selection, on the scan and the reference's own
-        // bytes; and each later check, on the one before it (D15:2132;
+        // bytes; and each later check, on the one before it (D15:2133;
         // Decision 015-164).
         K::ResourceLimits => &[
             &[
@@ -1429,7 +1429,7 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         // The bounds the manifest decides wait on the confirmed policy alone,
         // its read on both, each payload's read on it, each count on its
         // payload's read, the dataset on every count, and only the comparison
-        // with the slot on the slot and the dataset (D15:2008, 2133, 2149,
+        // with the slot on the slot and the dataset (D15:2009, 2134, 2150,
         // 2365).
         K::CanonicalizationData => &[
             CONFIRMED_POLICY,
@@ -1628,7 +1628,7 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
             "target.requested-locales.directed",
         ]],
         // A Group ID's checks need its admitted key, and its member count an
-        // array to count (D15:2184, 3354).
+        // array to count (D15:2185, 3479).
         K::Group => &[&[
             "structural.group-key.field-value",
             "group.groups.within-bound",
@@ -1655,7 +1655,7 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
             "group.members.within-bound",
         ]],
         // An endpoint needs its admitted value, and its relation's key both
-        // endpoints (D15:1931, 2181, 2184).
+        // endpoints (D15:1932, 2182, 2185).
         K::RelationEndpoint => &[
             &[
                 "structural.group.required-field",
@@ -1710,13 +1710,13 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         // Profile selection counts the declarations once structural
         // admission admitted the `profiles` object, its required check
         // waiting on the type checks, and checks a declared Profile ID once
-        // it admitted the key (D15:2131, 2184).
+        // it admitted the key (D15:2132, 2185).
         K::CapabilityProfiles => &[&["structural.root.required-field"]],
         K::CapabilityProfileId => &[&["structural.profile-key.field-value"]],
         // The selector's bound waits on nothing. Comparing the selector with
         // the declarations waits on their count and on `profiles` holding
         // one, its Profile ID admission on the bound, and its declaration on
-        // that admission (D15:2131, 2296, 2363).
+        // that admission (D15:2132, 2297, 2364).
         K::ProfileSelector => &[
             NONE,
             &[
@@ -1969,7 +1969,7 @@ const fn finding_codes(kind: SubjectKind) -> &'static [&'static [Code]] {
     }
 }
 
-/// The dependency records a kind's one check owns (D15:2516): entry
+/// The dependency records a kind's one check owns (D15:2517): entry
 /// admission's first kind owns every entry slot's, structural admission's
 /// first every common and materialized slot's, and each semantic group's
 /// owner its group's.
@@ -1989,7 +1989,7 @@ fn owned_dependencies(kind: SubjectKind) -> Vec<OwnedDependency> {
 
 /// The ordinary Evidence record kinds the units of `check` of `kind` may own:
 /// the `possibleEvidenceRecordKinds` of its Check Registry row, which
-/// reporting finalization verifies each record's owner against (D15:2143,
+/// reporting finalization verifies each record's owner against (D15:2144,
 /// 3224). A check its kind does not run has no row, so its units may own
 /// none.
 pub(crate) fn possible_record_kinds(kind: SubjectKind, check: Check) -> Vec<RecordKind> {
@@ -2003,16 +2003,16 @@ pub(crate) fn possible_record_kinds(kind: SubjectKind, check: Check) -> Vec<Reco
 
 /// The ordinary Evidence record kinds a check's units may own, by 015's
 /// rules: every unit's evaluation status, in the Entry domain for phases 0
-/// and 1 and the Shared one after (D15:177, 1171); where the check reports
+/// and 1 and the Shared one after (D15:178, 1172); where the check reports
 /// codes, a Finding in that domain, its Entry-owned occurrences, and the
-/// evidence index they refer to (D15:2207, 2385), and in entry admission
+/// evidence index they refer to (D15:2208, 2386), and in entry admission
 /// also the causes of a Shared projection that cannot materialize
-/// (D15:1165); both coverage decision records for the decision table
+/// (D15:1166); both coverage decision records for the decision table
 /// (Decision 015-161), with the evidence index records its Coverage
 /// Decision Evidence refers to, which it owns when no earlier unit refers
-/// to them (D15:1609, 1972); and the dependency records the check owns.
+/// to them (D15:1610, 1973); and the dependency records the check owns.
 /// Reporting finalization owns no ordinary record: its domains' terminal
-/// Finding and state take their reserved slots (D15:2408).
+/// Finding and state take their reserved slots (D15:2409).
 fn record_kinds(kind: SubjectKind, codes: &[Code], owned: &[OwnedDependency]) -> Vec<RecordKind> {
     use RecordKind as R;
     let phase = kind.phase();
@@ -2070,7 +2070,7 @@ fn payload_strategy(kind: SubjectKind, check: Check, codes: &[Code]) -> PayloadS
 }
 
 /// The stable reasons each check may report each of its codes with, in the
-/// order 015 lists the code's reasons (D15:2231). A code one check reports
+/// order 015 lists the code's reasons (D15:2232). A code one check reports
 /// takes all of its reasons there. A code several checks report splits its
 /// reasons among them, each check reporting the subcondition it decides: the
 /// vocabulary's body and then its assertion, a fallback candidate's self
@@ -2079,7 +2079,7 @@ fn payload_strategy(kind: SubjectKind, check: Check, codes: &[Code]) -> PayloadS
 /// hydration relations' and their endpoints'. Phase 9 never finds a
 /// specification revision mismatch: every member of its Set has the
 /// supported revision, which a reference is checked to request first
-/// (D15:2336).
+/// (D15:2337).
 const fn reasons(kind: SubjectKind, check: Check, code: Code) -> &'static [Reason] {
     use Check as K;
     use Code as C;
@@ -2147,7 +2147,7 @@ const fn reasons(kind: SubjectKind, check: Check, code: Code) -> &'static [Reaso
 
 /// What each check's payloads derive from (Decision 015-157): only its key
 /// where the key can stand for distinct raw values, and otherwise the one
-/// value the key names (D15:2006).
+/// value the key names (D15:2007).
 ///
 /// A key stands for distinct raw values when spellings share its canonical
 /// locale or its content projection groups them: a locale's own key, an
@@ -2157,10 +2157,10 @@ const fn reasons(kind: SubjectKind, check: Check, code: Code) -> &'static [Reaso
 /// structural admission, where a key that fails admission is keyed by its
 /// content. So does a structural field path, which holds `*` for elements
 /// and entries and names the object of its undeclared members; a singleton
-/// whose check sees each occurrence on its own (D15:1884, 1895); and a key
+/// whose check sees each occurrence on its own (D15:1885, 1896); and a key
 /// under a parent whose key stands for distinct raw parents. A Target ID,
 /// Group ID, or Profile ID after structural admission is its own key and
-/// names one raw ID (D15:1886, 1931, 1933), a single-valued field's path
+/// names one raw ID (D15:1887, 1932, 1934), a single-valued field's path
 /// names one value, and a singleton's total is one value.
 #[expect(clippy::too_many_lines, reason = "one arm for each of 015's kinds")]
 const fn derivation(kind: SubjectKind, check: Check) -> Derivation {
@@ -2298,14 +2298,14 @@ const fn derivation(kind: SubjectKind, check: Check) -> Derivation {
     }
 }
 
-/// The members of each code's `details`, in 015's order (D15:2231): a
+/// The members of each code's `details`, in 015's order (D15:2232): a
 /// stable reason where 015 gives the code reasons, the schema field of the
 /// schema codes, the missing slot, and the delivery specification's
 /// component. A bound's code names its group and bound, and either its
 /// value and the total with the total's relation, or what the policy
 /// requires and the capability makes available. An exceeded policy bound
 /// also names its subject kind, a capability bound's path holds its group,
-/// and the reporting bound's reason names its domain (D15:2355, 2356, 2358,
+/// and the reporting bound's reason names its domain (D15:2356, 2357, 2359,
 /// 2359).
 pub(crate) const fn details_members(code: Code) -> &'static [DetailsMember] {
     use Code as C;
@@ -2522,7 +2522,7 @@ mod tests {
     }
 
     /// The check IDs 015 gives as examples name the checks they describe
-    /// (D15:2173).
+    /// (D15:2174).
     #[test]
     fn the_example_check_ids_of_015_name_their_checks() {
         for (kind, check, id) in [
@@ -2574,7 +2574,7 @@ mod tests {
     }
 
     /// Every row of one kind agrees on the kind's key shape and rank
-    /// (D15:2184), and only a kind keyed by an identity or content projects
+    /// (D15:2185), and only a kind keyed by an identity or content projects
     /// it.
     #[test]
     fn a_strategy_and_a_projection_are_spelled_as_a_row_spells_them() {
@@ -2655,7 +2655,7 @@ mod tests {
     }
 
     /// A parent is a kind keyed by an identity or content, of the same or an
-    /// earlier phase (D15:2175), and a singleton is never scoped.
+    /// earlier phase (D15:2176), and a singleton is never scoped.
     #[test]
     fn a_parent_is_an_identity_kind_of_the_same_or_an_earlier_phase() {
         let mut parents = 0;
@@ -2674,7 +2674,7 @@ mod tests {
             assert_ne!(own.strategy, KeyStrategy::Singleton, "{kind:?}");
         }
         assert_eq!(parents, 20);
-        // The structural key kinds name the `profiles` key kind (D15:2173).
+        // The structural key kinds name the `profiles` key kind (D15:2174).
         for kind in [
             SubjectKind::TargetProfileKey,
             SubjectKind::DeploymentGroupKey,
@@ -2707,7 +2707,7 @@ mod tests {
     }
 
     /// A parent names the `(phaseId, subjectKind)` of the rows whose subjects
-    /// scope the row's own, in the same or an earlier phase (D15:2175).
+    /// scope the row's own, in the same or an earlier phase (D15:2176).
     #[test]
     fn a_parented_row_names_its_parents_phase_and_kind() {
         let endpoint = row(SubjectKind::RelationEndpoint, Check::KnownEndpoint);
@@ -2778,12 +2778,12 @@ mod tests {
         }
     }
 
-    /// The parent-scoped subjects 015 names (D15:2190), a locale of one
+    /// The parent-scoped subjects 015 names (D15:2191), a locale of one
     /// Target ID, an item of one coverage rule, a destination of one alias
     /// key, a member of one group, and a candidate of one fallback sequence,
     /// are scoped by their parents. The candidate is keyed by its position in
-    /// a sequence whose order is semantic (D15:2182), and the others, elements
-    /// of collections whose order is not, by identity or content (D15:2184).
+    /// a sequence whose order is semantic (D15:2183), and the others, elements
+    /// of collections whose order is not, by identity or content (D15:2185).
     #[test]
     fn the_parent_scoped_subjects_015_names_are_elements_under_their_parents() {
         use KeyStrategy::{CanonicalIdentityOrContent as Identity, SemanticPosition};
@@ -2923,7 +2923,7 @@ mod tests {
                 .collect();
             // An earlier row, or a row of the same kind, whose units an
             // earlier subject may run at any check rank, itself included
-            // (D15:2149, Decision 015-195).
+            // (D15:2150, Decision 015-195).
             assert!(
                 listed.iter().all(|&at| {
                     let prerequisite = &registry.rows[at];
@@ -3037,8 +3037,8 @@ mod tests {
         }
         // Entry admission and the kinds declared only report what 015 gives
         // their checks: the raw file's bounds are resolver-side bootstrap
-        // bounds (D15:2356), the root's are the policy's (D15:1876), and so is
-        // an over-long selector (D15:2296).
+        // bounds (D15:2357), the root's are the policy's (D15:1877), and so is
+        // an over-long selector (D15:2297).
         for (kind, check, code) in [
             (
                 K::CompleteInput,
@@ -3311,7 +3311,7 @@ mod tests {
     }
 
     /// Each code's details carry the members 015's code tables give it, in
-    /// the vocabulary's order (D15:2231, 2283-2359).
+    /// the vocabulary's order (D15:2232, 2284-2360).
     #[test]
     fn each_codes_details_are_the_members_015_gives_it() {
         use Code as C;
@@ -3451,8 +3451,8 @@ mod tests {
     }
 
     /// Where several checks report one code, each lists the reasons it
-    /// decides (D15:2277); Phase 9 never finds a specification revision
-    /// mismatch (D15:2336).
+    /// decides (D15:2278); Phase 9 never finds a specification revision
+    /// mismatch (D15:2337).
     #[test]
     fn a_row_lists_the_reasons_its_check_may_report_each_code_with() {
         use Code as C;
@@ -3630,7 +3630,7 @@ mod tests {
 
     /// A row derives its payloads from its key alone where the key can stand
     /// for distinct raw values (Decision 015-157), and otherwise from the one
-    /// value its key names (D15:2006).
+    /// value its key names (D15:2007).
     #[test]
     fn a_row_derives_its_payloads_from_its_key_alone_where_it_can_stand_for_several_values() {
         use Derivation::{Exact, KeyOnly};
@@ -3675,7 +3675,7 @@ mod tests {
             assert_eq!(derivation_of(kind), KeyOnly, "{kind:?}");
         }
         // A singleton is one value, except where its check sees each
-        // occurrence on its own (D15:1884, 1895).
+        // occurrence on its own (D15:1885, 1896).
         let independent = [
             (K::CompleteInput, Check::UniqueMembers),
             (K::CompleteInput, Check::JsonCompatible),
@@ -3702,7 +3702,7 @@ mod tests {
             }
         }
         // The identity-keyed kinds whose key is a raw ID, which names one
-        // value (D15:1886, 1931, 1933); every other identity-keyed kind's key
+        // value (D15:1887, 1932, 1934); every other identity-keyed kind's key
         // can stand for several values.
         let exact_identities: Vec<SubjectKind> = SubjectKind::ALL
             .into_iter()
@@ -4079,7 +4079,7 @@ mod tests {
     }
 
     /// A row may name itself, whose units wait on the same check of an
-    /// earlier subject; no cycle may join distinct rows (D15:2275, Decision
+    /// earlier subject; no cycle may join distinct rows (D15:2276, Decision
     /// 015-195).
     #[test]
     fn a_row_may_name_itself_while_no_cycle_joins_distinct_rows() {

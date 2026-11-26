@@ -13,7 +13,7 @@
 //! cross-authority rules in the order the construction-admission body lists
 //! them ([`rules`](super::rules)), and ends with one check after every other:
 //! every admitted authority must be the one the resolver is compiled from
-//! (D15:991). It reports the first row that fails and nothing else.
+//! (D15:992). It reports the first row that fails and nothing else.
 
 use super::authority_set::{self, AdmittedSet, SubmittedSet};
 use super::bounds;
@@ -94,7 +94,7 @@ pub(crate) fn construct(
 
 /// Whether every admitted authority is the one the resolver is compiled from:
 /// the Profile Specification by its semantic digest alone, and every other
-/// component and member by its file digest (D15:991).
+/// component and member by its file digest (D15:992).
 ///
 /// The rows before have checked each declared digest against the bytes, so
 /// the declared digests are the ones compared.
@@ -578,7 +578,7 @@ mod tests {
 
     /// `input` in another order: every declared tuple's members, every
     /// body's members, and the order its members were found in. A container's
-    /// own keys keep their order, which is part of its form (D15:1011, 3073).
+    /// own keys keep their order, which is part of its form (D15:1012, 3078).
     fn in_another_order(input: &ConstructionInput) -> ConstructionInput {
         let mut input = input.clone();
         for submitted in [
@@ -666,7 +666,7 @@ mod tests {
 
     /// One failure is reported of several, the first in the precedence's
     /// order, whatever order their tuples', bodies', and mappings' members
-    /// come in and whichever worker finishes first (D15:3100, 3317).
+    /// come in and whichever worker finishes first (D15:3105, 3442).
     #[test]
     fn several_invalid_authorities_select_one_reason_in_any_order() {
         // The order alone refuses nothing: the committed authorities, every
@@ -724,7 +724,7 @@ mod tests {
     /// equal the Active Profile Specification's: they pass the rule together,
     /// and fail only at the implemented authority, which maps one. No mapped
     /// schema can name a Profile Specification of its own, in its record or
-    /// in its bytes (D15:1017-1020, 3073, 3320).
+    /// in its bytes (D15:1018-1021, 3078, 3445).
     #[test]
     fn several_mapped_schemas_target_the_one_association() {
         let second = compact(&value(CONFIGURATION_SCHEMA));

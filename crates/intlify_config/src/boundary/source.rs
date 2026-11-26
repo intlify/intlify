@@ -7,7 +7,7 @@
 //! `programmatic-entry-identity-revision`, which admits a Programmatic Entry
 //! identity and revision against the digest of the admitted Snapshot. Each
 //! refuses with one of the seven reasons of its row, and the two rows spell
-//! the same checks (D15:743, 3146, 3147; 015-149, 015-170, 015-201).
+//! the same checks (D15:744, 3151, 3152; 015-149, 015-170, 015-201).
 //!
 //! An identity is a versioned identity-domain tag, `:`, and a non-empty
 //! payload. The tag is a name, `.v`, and a decimal version without a leading
@@ -131,7 +131,7 @@ impl ExactIdentity {
 
     /// The identity that the entry a replay observes its retained value
     /// through names, which no boundary admitted: a replay has no entry
-    /// source, and nothing that names this one leaves it (D15:2659).
+    /// source, and nothing that names this one leaves it (D15:2660).
     pub(crate) fn replayed() -> Self {
         let tag = "intlify-materialized-replay.v0";
         Self {
@@ -214,7 +214,7 @@ pub(crate) fn read_entry_pair(
 
 /// The Call-Site Source pair's checks under `limits`, the revision compared
 /// with the Call-Site Source revision of `source`, the sidecar's exact source
-/// bytes (D15:741, 743).
+/// bytes (D15:742, 744).
 pub(crate) fn read_call_site_pair(
     identity: Option<&str>,
     revision: Option<&str>,
@@ -311,14 +311,14 @@ fn valid_version(version: &str) -> bool {
 
 /// The Source-content revision of `bytes`, as presented: SHA-256 over
 /// `intlify.project-profile.file-source-revision.v0` followed by the record
-/// whose one field `0x01` holds the exact bytes (D15:743, 987).
+/// whose one field `0x01` holds the exact bytes (D15:744, 988).
 pub(crate) fn file_source_revision(bytes: &[u8]) -> String {
     content_revision(FILE_SOURCE_REVISION_DOMAIN, bytes)
 }
 
 /// The Call-Site Source revision of a sidecar's exact source bytes, as
 /// presented: the same over
-/// `intlify.project-profile.call-site-source-revision.v0` (D15:743).
+/// `intlify.project-profile.call-site-source-revision.v0` (D15:744).
 pub(crate) fn call_site_source_revision(bytes: &[u8]) -> String {
     content_revision(CALL_SITE_SOURCE_REVISION_DOMAIN, bytes)
 }
@@ -397,8 +397,8 @@ pub(super) mod tests {
 
     /// Both source-revision domains, each over a one-field record of the
     /// exact bytes: frozen preimages and digests that a Python script computed
-    /// apart from this crate from D15:743 and the field framing
-    /// (`.plans/drafts/025-pr7/t2-vectors.py`; D15:3319).
+    /// apart from this crate from D15:744 and the field framing
+    /// (`.plans/drafts/025-pr7/t2-vectors.py`; D15:3444).
     #[test]
     fn both_revision_domains_digest_their_frozen_preimages() {
         let vectors: serde_json::Value =
@@ -696,7 +696,7 @@ pub(super) mod tests {
     /// Identities outside the form: no `:`, an empty payload, a tag without
     /// `.v` and a version, an empty name, a name that begins or ends with `.`
     /// or `-` or holds an uppercase letter or `_`, and a version with a
-    /// leading zero (D15:743, 3389).
+    /// leading zero (D15:744, 3514).
     pub(in crate::boundary) const UNSTABLE: [&str; 21] = [
         "", "a.v0", "a.v0:", ":", ":p", "a:p", "a.v:p", "a.vx:p", "a.V0:p", ".v0:p", ".a.v0:p",
         "a..v0:p", "-a.v0:p", "a-.v0:p", "A.v0:p", "aB.v0:p", "a_b.v0:p", "a b.v0:p", "a.v01:p",
@@ -704,7 +704,7 @@ pub(super) mod tests {
     ];
 
     /// The contrasts: a name with `.` and `-` inside, a longer or zero
-    /// version, and payloads that hold a further `:` (D15:743, 3389).
+    /// version, and payloads that hold a further `:` (D15:744, 3514).
     pub(in crate::boundary) const STABLE: [(&str, &str, &str); 7] = [
         ("x.y-z.v3:p", "x.y-z.v3", "p"),
         ("a.v12:p", "a.v12", "p"),
@@ -718,7 +718,7 @@ pub(super) mod tests {
     /// What a host knows of a source, none of which alone establishes a pair:
     /// a normalized path, a URI, a modification timestamp, filesystem
     /// metadata, a process-local object address, a stack frame, and a value
-    /// random per invocation (D15:741, 3388).
+    /// random per invocation (D15:742, 3513).
     pub(in crate::boundary) const HOST_FACTS: [&str; 14] = [
         "config/intlify.json",
         "/repository/intlify.config.json",
@@ -777,7 +777,7 @@ pub(super) mod tests {
 
     /// Every pair applies one form: each spelling outside it is the row's
     /// unstable identity, and each contrast is admitted with the first `:`
-    /// as the end of its tag (D15:743, 3389).
+    /// as the end of its tag (D15:744, 3514).
     #[test]
     fn every_pair_applies_the_identity_form() {
         for identity in UNSTABLE {
@@ -809,7 +809,7 @@ pub(super) mod tests {
 
     /// None of a host's facts establishes any pair, as its identity or as
     /// its revision, while the content-derived revision of each pair still
-    /// establishes it under a stable identity (D15:741, 743, 3388).
+    /// establishes it under a stable identity (D15:742, 744, 3513).
     #[test]
     fn no_host_fact_alone_establishes_a_pair() {
         for fact in HOST_FACTS {
@@ -826,7 +826,7 @@ pub(super) mod tests {
     }
 
     /// A Programmatic Entry pair runs the same checks in the same order, its
-    /// revision compared with the Snapshot's digest (D15:743, 3147).
+    /// revision compared with the Snapshot's digest (D15:744, 3152).
     #[test]
     fn the_entry_pair_runs_the_same_checks_against_the_digest() {
         use SourceRefusal as R;

@@ -1,35 +1,35 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! The Finding Registry rows' occurrence Evidence columns (D15:2242-2245,
+//! The Finding Registry rows' occurrence Evidence columns (D15:2243-2246,
 //! 2249, 2251; Decisions 015-189 to 015-193).
 //!
 //! For each check that may report its code, in `allowedCheckIds` order, a
 //! row names the primary evidence kind of the check's Finding Occurrences,
 //! or `none` for the terminal reporting Finding, which has no occurrence,
 //! and the related evidence kinds, without repeats and in the order of the
-//! admitted evidence kinds (D15:2249). For each kind those name, in that
+//! admitted evidence kinds (D15:2250). For each kind those name, in that
 //! order, the row names the kind's disclosure policy with, for a
 //! resolver-input kind, the component path shapes its occurrences can carry,
 //! a subset of the shapes the policy pins, and the Safe Origin Kinds it
 //! allows the kind, a non-empty subset of the Safe Origin Kind Registry's
-//! compatibility table (D15:716, 2251).
+//! compatibility table (D15:717, 2252).
 //!
 //! The table below gives each (check, code) pair of the Check Registry its
 //! Evidence. Where 015 names an occurrence's Evidence, the table follows it:
 //! a root-value bound applied before materialization is `entry-source`, an
 //! over-limit selector `profile-selector`, and a bound over the materialized
-//! configuration `configuration-value` (D15:2249); a selector Finding
-//! relates the declarations as one location when available (D15:812); the
-//! bootstrap's mismatch candidates are related (D15:1734); and each
+//! configuration `configuration-value` (D15:2250); a selector Finding
+//! relates the declarations as one location when available (D15:813); the
+//! bootstrap's mismatch candidates are related (D15:1735); and each
 //! conflicting locale spelling is primary with the others related
-//! (D15:2410). Elsewhere the primary Evidence is where the check observes
+//! (D15:2411). Elsewhere the primary Evidence is where the check observes
 //! the value its Finding reports, and the related Evidence every other
 //! location it compares with that value, a set counting as one (Decision
 //! 015-191): the source of an exceeded bound, which is the capability until
 //! the Resource Limit Policy is admitted and the admitted Policy after; the
 //! configuration reference through which the check reaches a primary
-//! resolver input (D15:714); the `pins` that do not authenticate a
+//! resolver input (D15:715); the `pins` that do not authenticate a
 //! candidate; and the collection a reference fails to resolve in. A related
 //! record equal to the primary one is omitted (Decision 015-193), so a
 //! member that only a redacted key names relates no other member. What 015
@@ -51,7 +51,7 @@
 //! admitted Safe Origin Kind Registry permits the kind, in rank order, and
 //! for a resolver-input kind exactly those of its shapes; and every shape a
 //! policy pins is one some row, or Coverage Decision Evidence, can carry
-//! (D15:838, 1609, 2274).
+//! (D15:839, 1610, 2275).
 
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
@@ -71,7 +71,7 @@ use super::policy::{self, DisclosurePolicy, KeyKind, PathShape};
 use super::safe_origin::SafeOriginKindRegistry;
 
 /// A check's primary evidence kind, or `none` for the terminal reporting
-/// Finding (D15:2249).
+/// Finding (D15:2250).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum PrimaryKind {
@@ -272,10 +272,10 @@ const LOCALE_DATA: SafeOriginKind = SafeOriginKind::LocaleCanonicalizationData;
 const COLLECTION: SafeOriginKind = SafeOriginKind::ProfileResolutionArtifactCollection;
 
 /// A member of the Profile Resolution Artifact Set, or the admitted Resource
-/// Limit Policy, whose exact reference is its key (D15:824).
+/// Limit Policy, whose exact reference is its key (D15:825).
 const ADMITTED: Shape = Shape::Member(COLLECTION, KeyKind::SafeKey);
 /// A collection member not admitted, which only a redacted key names
-/// (D15:834).
+/// (D15:835).
 const CANDIDATE: Shape = Shape::Member(COLLECTION, KeyKind::RedactedKey);
 /// A vocabulary member that establishes its identity.
 const VOCABULARY_MEMBER: Shape = Shape::Member(VOCABULARY, KeyKind::SafeKey);
@@ -742,13 +742,13 @@ fn origins_are_closed(
 
 /// The shapes Coverage Decision Evidence can carry besides those of Finding
 /// Occurrences: the applicable Coverage Specification input, when the safe
-/// default is omitted (D15:1609).
+/// default is omitted (D15:1610).
 fn coverage_decision_shapes() -> Vec<PathShape> {
     vec![PathShape::of(&ComponentPath::specification(Slot::Coverage))]
 }
 
 /// Whether every shape `policies` pin is one some row's occurrences, or
-/// Coverage Decision Evidence, can carry (D15:838, 2274).
+/// Coverage Decision Evidence, can carry (D15:839, 2275).
 pub(crate) fn are_reachable(rows: &[FindingRow], policies: &[DisclosurePolicy]) -> bool {
     let carried: Vec<&PathShape> = rows
         .iter()
@@ -946,12 +946,12 @@ mod tests {
     /// The kinds 015 names: a root-value bound applied before
     /// materialization is `entry-source`, an over-limit selector
     /// `profile-selector`, and a bound over the materialized configuration
-    /// `configuration-value` (D15:2249); a selector Finding relates the
-    /// declarations (D15:812); the bootstrap's mismatch candidates are
-    /// related (D15:1734); a conflicting spelling relates the others and a
-    /// non-canonical one nothing (D15:2410); the pins that do not
-    /// authenticate a candidate are related (D15:2249); and the terminal
-    /// reporting Finding has `none` (D15:2249).
+    /// `configuration-value` (D15:2250); a selector Finding relates the
+    /// declarations (D15:813); the bootstrap's mismatch candidates are
+    /// related (D15:1735); a conflicting spelling relates the others and a
+    /// non-canonical one nothing (D15:2411); the pins that do not
+    /// authenticate a candidate are related (D15:2250); and the terminal
+    /// reporting Finding has `none` (D15:2250).
     #[test]
     fn the_kinds_015_names_are_the_tables() {
         let rle = Code::ResourceLimitExceeded;

@@ -1335,7 +1335,7 @@ fn select_config(config: &Value, selector: Selector) -> Result<SelectedConfig, P
 
 /// One file entry's complete invocation under fixture-owned inputs, whose
 /// evaluation phases run before each interval, and one of 015's Evidence
-/// materialization stages over it once (D15:2771, 2775). An edge of a bound
+/// materialization stages over it once (D15:2772, 2776). An edge of a bound
 /// a projection stage counts sits at the count an unbounded baseline run of
 /// that stage reports in its logical work, or one under it (plan 025
 /// decisions #263 and #264).
@@ -1502,9 +1502,9 @@ fn prepare_evidence(declaration: &Declaration) -> Result<Candidate, PreparationF
 /// constructed here from the committed input, with what a binding submits
 /// for it on that resolver and what each repetition in the declared state
 /// runs before its start mark, and the invocation run once in that state
-/// (D15:2772, 2775, 2789). The outcome is checked or blocked as declared; a
+/// (D15:2773, 2776, 2792). The outcome is checked or blocked as declared; a
 /// refused set, a resolver defect, or a failure of what the state runs first
-/// fails the preparation (D15:2826).
+/// fails the preparation (D15:2831).
 fn prepare_workflow(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
     use crate::benchmark::workflow::PreparedWorkflow;
     use crate::construction::resolver::{build, committed};
@@ -1548,7 +1548,7 @@ fn prepare_workflow(declaration: &Declaration) -> Result<Candidate, PreparationF
 /// invokes the recipe's file entry submission once, and the Materialized
 /// Resolution Input Set beside that outcome, replayed once as declared, with
 /// the profile or with the Shared projection alone; a stale set or a
-/// resolver defect fails the preparation (D15:2659, 2824, 2826).
+/// resolver defect fails the preparation (D15:2660, 2829, 2831).
 fn prepare_replay(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
     use crate::benchmark::reresolution::PreparedReplay;
     use crate::construction::resolver::{build, committed};
@@ -1593,13 +1593,13 @@ fn prepare_replay(declaration: &Declaration) -> Result<Candidate, PreparationFai
 
 /// The formal Snapshot a binding built for a recipe before the case, as a
 /// file of the recipe's value spells it, admitted once under the case's
-/// bounds through the document of its value (D15:2765, 2824). An edge of a
+/// bounds through the document of its value (D15:2766, 2829). An edge of a
 /// `bootstrapOnly.snapshot` bound sits at the count an unbounded baseline
 /// admission of the recipe's Snapshot reports in its work, with that
 /// Snapshot, or one under it, with the terminal marker at the first overrun
 /// (plan 025 decision #263; 015-199). It is admitted with a document,
 /// holding a marker without one, or ending with the marker of its bound, as
-/// declared; a refused report fails the preparation (D15:2826).
+/// declared; a refused report fails the preparation (D15:2831).
 fn prepare_snapshot(declaration: &Declaration) -> Result<Candidate, PreparationFailure> {
     use super::snapshot_inputs::{bound, bounded, first_over, limits, report};
     use crate::benchmark::snapshot_admission::{admit, markers, PreparedSnapshot};

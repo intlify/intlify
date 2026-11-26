@@ -3,7 +3,7 @@
 
 //! The selected declaration as the semantic phases read it: each member's
 //! value once every candidate at and below it passed, or the causes of those
-//! that did not, as [`ValueAdmissions`] kept them (D15:393, 2367, 3340). The
+//! that did not, as [`ValueAdmissions`] kept them (D15:394, 2368, 3465). The
 //! checks decide: a member they admitted and the analysis did not, or a
 //! required one they admitted though it is absent, is a resolver bug.
 
@@ -33,10 +33,10 @@ type Members = BTreeMap<String, ObjectMember>;
 
 /// The `policies` object slot by slot: each slot's reference or why it has
 /// none, so that one that failed holds back no other, with no entry for an
-/// admitted `null`, the explicit absence of a reference (D15:2137, 2367); and
+/// admitted `null`, the explicit absence of a reference (D15:2138, 2368); and
 /// whether the object itself passed apart from its slots. An undeclared
 /// member is a failure of the object and in no slot, so it stops no
-/// reference, while both semantic groups of the object wait on it (D15:2184,
+/// reference, while both semantic groups of the object wait on it (D15:2185,
 /// 2367; plan 025 interpretation #346).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PolicySlots<Policy> {
@@ -47,7 +47,7 @@ pub(crate) struct PolicySlots<Policy> {
 /// One entry of `targetProfiles` whose key structural admission admitted:
 /// its reference, and each locale-bearing field's value, element by element,
 /// or why it has none. Its key names the subjects of its fields, so one field
-/// that failed holds back neither the other nor another entry (D15:2184,
+/// that failed holds back neither the other nor another entry (D15:2185,
 /// 2367).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TargetEntry<Target> {
@@ -58,11 +58,11 @@ pub(crate) struct TargetEntry<Target> {
 }
 
 /// The Target ID map entry by entry: how many entries it holds, every one
-/// counted whatever its key (D15:1930), each entry with an admitted key, in
+/// counted whatever its key (D15:1931), each entry with an admitted key, in
 /// the map's order, whether every key was admitted, which decides that a value
 /// naming none of them names no declared Target ID, and whether everything at
 /// and below the map passed, which what needs every target waits on. An entry
-/// whose key failed has no later subject (D15:2184, 3354).
+/// whose key failed has no later subject (D15:2185, 3479).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TargetEntries<Target> {
     pub(crate) submitted: usize,
@@ -73,7 +73,7 @@ pub(crate) struct TargetEntries<Target> {
 
 /// One object of a group's `hydrationRelations`: what names it, its identity
 /// once both endpoints were admitted and otherwise its content, and each
-/// endpoint or why it has none (D15:2181, 2367).
+/// endpoint or why it has none (D15:2182, 2368).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct RelationEntry {
     pub(crate) key: RelationKey,
@@ -84,7 +84,7 @@ pub(crate) struct RelationEntry {
 /// One entry of `deploymentGroups` whose key structural admission admitted:
 /// its `members`, element by element, and its `hydrationRelations`, each
 /// element a relation or why it is none, each or why it has none to read
-/// (D15:2184, 2367).
+/// (D15:2185, 2368).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct GroupEntry {
     pub(crate) id: DeploymentGroupId,
@@ -94,10 +94,10 @@ pub(crate) struct GroupEntry {
 
 /// The Group ID map entry by entry: how many entries it holds and how many
 /// member and relation occurrences their arrays hold, each counted whatever
-/// its key or its value (D15:1932, 1935, 1936), whether every key was admitted,
+/// its key or its value (D15:1933, 1936, 1937), whether every key was admitted,
 /// each entry with an admitted key, in the map's order, and whether everything
 /// at and below the map passed, which what needs every relation waits on. An
-/// entry whose key failed has no later subject (D15:2184, 3354).
+/// entry whose key failed has no later subject (D15:2185, 3479).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct GroupEntries {
     pub(crate) submitted: usize,
@@ -109,7 +109,7 @@ pub(crate) struct GroupEntries {
 }
 
 /// One entry of `localeNegotiation.aliases`: its key, a spelling whatever its
-/// value is, and its destination or why it has none (D15:1477, 2367).
+/// value is, and its destination or why it has none (D15:1478, 2368).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AliasEntry {
     pub(crate) key: String,
@@ -119,7 +119,7 @@ pub(crate) struct AliasEntry {
 /// The alias map entry by entry, in the map's order, and whether everything
 /// at and below `localeNegotiation` passed, which the profile built from
 /// every entry waits on: an undeclared member beside `aliases` holds back no
-/// entry (D15:2184, 2367, 2418).
+/// entry (D15:2185, 2368, 2419).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AliasEntries {
     pub(crate) entries: Vec<AliasEntry>,
@@ -127,7 +127,7 @@ pub(crate) struct AliasEntries {
 }
 
 /// One entry of `messageFallback`: its key, a spelling whatever its sequence
-/// is, and its sequence candidate by candidate, or why it has none (D15:1519,
+/// is, and its sequence candidate by candidate, or why it has none (D15:1520,
 /// 2367).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FallbackEntry {
@@ -136,13 +136,13 @@ pub(crate) struct FallbackEntry {
 }
 
 /// A selector of a coverage rule: absent, why it has no item to read, or each
-/// item's value or why it has none (D15:2367).
+/// item's value or why it has none (D15:2368).
 pub(crate) type SelectorEntry = Admitted<Option<Vec<Admitted<String>>>>;
 
 /// One object of `coverage.rules`: the content naming it, whatever failed in
-/// it, and what structural admission left of its members (D15:2190, 2367). A
+/// it, and what structural admission left of its members (D15:2191, 2368). A
 /// rule with no selector has neither, for the failed alternative that
-/// requires one (D15:516).
+/// requires one (D15:517).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct RuleEntry {
     pub(crate) content: RuleContent,
@@ -154,7 +154,7 @@ pub(crate) struct RuleEntry {
 /// The declaration's `coverage`, rule by rule: its default mode, each element
 /// as a rule or why it is none, the raw items of each selector kind, and
 /// whether everything at and below `coverage` passed, which the policy built
-/// from all of it waits on (D15:1902, 1903, 2426).
+/// from all of it waits on (D15:1903, 1904, 2427).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CoverageEntries {
     pub(crate) default_mode: Admitted<Option<CoverageMode>>,
@@ -255,7 +255,7 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
 
     /// The required array of strings `name`, element by element: each one's
     /// value or why it has none, so that one that failed holds back no other
-    /// (D15:2367). The array itself failing leaves no element to read.
+    /// (D15:2368). The array itself failing leaves no element to read.
     ///
     /// # Errors
     ///
@@ -294,7 +294,7 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
     }
 
     /// The value of the declaration's `policies`, which a selected declaration
-    /// holds (D15:2131).
+    /// holds (D15:2132).
     fn policies(&self) -> Result<NodeId, StructuralInvariant> {
         self.member_value(self.declaration, "policies")
             .ok_or(StructuralInvariant::UnreportedFailure)
@@ -364,7 +364,7 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
     /// The Group ID map, entry by entry, or why it has no entry to read. Each
     /// total counts the elements of every array of its member, of an entry
     /// whose key failed too, since a value that is none holds no occurrence;
-    /// it waits on why only when no entry holds one (D15:1935, 1936, 2184,
+    /// it waits on why only when no entry holds one (D15:1936, 1937, 2185,
     /// 3354). An omitted `hydrationRelations` is no value, while an empty one
     /// is a value that holds no occurrence.
     ///
@@ -451,7 +451,7 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
 
     /// The element `relation` of a group's `hydrationRelations`, or why it
     /// is no relation. Both endpoints admitted are its identity; otherwise
-    /// its content keys it (D15:2181, 2190, 2203).
+    /// its content keys it (D15:2182, 2191, 2204).
     fn relation_entry(
         &self,
         relation: NodeId,
@@ -594,10 +594,10 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
     }
 
     /// How many raw items the selectors `name` of `rules` hold: every element
-    /// of a selector that is an array, whatever the element is (D15:1902,
+    /// of a selector that is an array, whatever the element is (D15:1903,
     /// 1903). A rule that is no object, or a selector that failed, has no item
     /// to count, so the count waits on why only when no selector holds one
-    /// (D15:2184, 3354).
+    /// (D15:2185, 3479).
     fn selector_items(
         &self,
         rules: &[NodeId],
@@ -624,7 +624,7 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
     }
 
     /// The element `rule` of `coverage.rules`, or why it is no rule: a value
-    /// that is no object has no member to read (D15:2184).
+    /// that is no object has no member to read (D15:2185).
     fn rule_entry(&self, rule: NodeId) -> Result<Admitted<RuleEntry>, StructuralInvariant> {
         let NodeKind::Object(members) = self.document.node(rule).kind() else {
             return self.failed(rule);
@@ -811,7 +811,7 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
     /// counts them, whatever structural admission made of the fields that hold
     /// them: each string at a locale role and each key of a map keyed by
     /// locale. A value that is no string is no spelling, and an invalid string
-    /// is one (D15:1896, 1907, 2184, 3348).
+    /// is one (D15:1897, 1908, 2185, 3473).
     pub(crate) fn locale_spellings(&self) -> Tally {
         let declaration = self.declaration;
         let member = |object, name| self.member_value(object, name);
@@ -891,7 +891,7 @@ impl DeclarationFragments<'_, PolicyReference, TargetProfileReference> {
     /// Every reference of the declaration, whether or not structural
     /// admission admitted it, with what Phase 4's bounds read of each: each
     /// `policies` slot but an admitted `null`, then each entry's `profile`
-    /// (D15:1918, 1924).
+    /// (D15:1919, 1925).
     ///
     /// # Errors
     ///
@@ -924,7 +924,7 @@ impl DeclarationFragments<'_, PolicyReference, TargetProfileReference> {
 
     /// The `profile` of the entry `key` of `targetProfiles`. An entry whose key
     /// failed has no later subject, so one without a `profile` has nothing
-    /// to report here (D15:2184).
+    /// to report here (D15:2185).
     fn target_occurrence(
         &self,
         key: &str,
@@ -1115,7 +1115,7 @@ mod tests {
     }
 
     /// Each element is read on its own: one that failed holds back no other,
-    /// and an array that failed itself has no element to read (D15:2367).
+    /// and an array that failed itself has no element to read (D15:2368).
     #[test]
     fn an_array_of_strings_is_read_element_by_element() {
         assert_eq!(items(None, |_| {}), Ok(Ok(vec![Ok("en".to_owned())])));
@@ -1169,7 +1169,7 @@ mod tests {
 
     /// Each slot is read on its own: one that failed or is missing holds back
     /// no other, an admitted `null` has no entry, and an object that failed
-    /// leaves every slot with why (D15:2137, 2367).
+    /// leaves every slot with why (D15:2138, 2368).
     #[test]
     fn the_policies_are_read_slot_by_slot() {
         let held =
@@ -1218,7 +1218,7 @@ mod tests {
     }
 
     /// An undeclared member is the object's own failure, in no slot, while a
-    /// slot that failed or is missing is that slot's alone (D15:2184, 2367).
+    /// slot that failed or is missing is that slot's alone (D15:2185, 2368).
     #[test]
     fn the_policies_object_passes_apart_from_its_slots() {
         assert_eq!(policy_object(|_| {}), Ok(()));
@@ -1270,7 +1270,7 @@ mod tests {
     /// Each entry is read on its own: a field that failed holds back neither
     /// its sibling field nor another entry, an entry that is no object keeps
     /// its key's subject, and one whose key failed counts without one
-    /// (D15:1930, 2184, 2367, 3354).
+    /// (D15:1931, 2185, 2368, 3479).
     #[test]
     fn the_target_map_is_read_entry_by_entry() {
         let whole = entries(None, |_| {}).unwrap().unwrap();
@@ -1393,7 +1393,7 @@ mod tests {
     /// Each entry is read on its own, and each element of its `members`: the
     /// counts take what was submitted, an entry whose key failed has no
     /// subject, and the total waits only when no entry holds an admitted
-    /// array (D15:1932, 1935, 2184, 2367, 3354).
+    /// array (D15:1933, 1936, 2185, 2368, 3479).
     #[test]
     fn the_group_map_is_read_entry_by_entry() {
         let whole = groups(None, |_| {}).unwrap().unwrap();
@@ -1444,7 +1444,7 @@ mod tests {
     /// Each relation is read on its own: an element that is no object has
     /// no relation, and one with an endpoint that failed keeps the other under
     /// its content. The total takes every element of every array, of an entry
-    /// whose key failed too (D15:1936, 2181, 2184, 2367).
+    /// whose key failed too (D15:1937, 2182, 2185, 2368).
     #[test]
     fn the_relations_of_a_group_are_read_element_by_element() {
         let read = groups(None, |app| {
@@ -1469,7 +1469,7 @@ mod tests {
     }
 
     /// A relation's content tells raw relations apart, a nested array in its
-    /// order, and is never shown (D15:2186, 2190).
+    /// order, and is never shown (D15:2187, 2191).
     #[test]
     fn a_relation_without_an_identity_is_named_by_its_content() {
         let read = groups(None, |app| {
@@ -1490,7 +1490,7 @@ mod tests {
 
     /// The total waits only when no array can be read: an omitted array is
     /// no value, an empty one holds no occurrence, and a group that is no
-    /// object has none to read (D15:569, 1936, 2184, 3354).
+    /// object has none to read (D15:570, 1937, 2185, 3479).
     #[test]
     fn the_relation_total_waits_only_when_no_array_can_be_read() {
         let total = |edit| groups(None, edit).unwrap().unwrap().relations;
@@ -1580,7 +1580,7 @@ mod tests {
 
     /// Each entry is read on its own: a destination that failed holds back
     /// no other, and an undeclared member beside the map holds back no entry
-    /// while the whole waits on it (D15:1477, 2367, 3354).
+    /// while the whole waits on it (D15:1478, 2368, 3479).
     #[test]
     fn the_alias_map_is_read_entry_by_entry() {
         let whole = aliases(None, |_| {}).unwrap().unwrap();
@@ -1676,7 +1676,7 @@ mod tests {
 
     /// Each entry and each candidate is read on its own: a sequence that
     /// failed holds back no other, and a candidate that failed none beside it
-    /// (D15:1519, 2367).
+    /// (D15:1520, 2368).
     #[test]
     fn the_fallback_map_is_read_entry_by_entry() {
         let whole = fallback(None, |_| {}).unwrap().unwrap();
@@ -1746,7 +1746,7 @@ mod tests {
 
     /// Each rule is read on its own, each member and item as structural
     /// admission left it, and only what is at or below `coverage` holds back
-    /// the whole (D15:2184, 2190, 2367, 2426).
+    /// the whole (D15:2185, 2191, 2368, 2427).
     #[test]
     fn the_coverage_is_read_rule_by_rule() {
         let whole = coverage(None, |_| {}).unwrap().unwrap();
@@ -1802,7 +1802,7 @@ mod tests {
     }
 
     /// A selector count takes every element of a selector that is an array,
-    /// and waits only when no selector holds one (D15:1902, 1903, 2184, 3354).
+    /// and waits only when no selector holds one (D15:1903, 1904, 2185, 3479).
     #[test]
     fn a_selector_count_takes_every_item_of_what_is_an_array() {
         let read = rules(&json!([
@@ -1827,7 +1827,7 @@ mod tests {
 
     /// A rule of the admitted form reads as the typed rule's content, and any
     /// other is told apart by what it holds: the selectors as sets with every
-    /// repeat, any other array in order (D15:2186, 2190).
+    /// repeat, any other array in order (D15:2187, 2191).
     #[test]
     fn a_rule_is_named_by_the_content_it_was_authored_with() {
         let content = |value: Value| rule(&rules(&json!([value])), 0).content.clone();
@@ -1875,7 +1875,7 @@ mod tests {
     }
 
     /// Contents order as 015's identity does: by type, then within it, a
-    /// shorter exact prefix first and members by name (D15:2186).
+    /// shorter exact prefix first and members by name (D15:2187).
     #[test]
     fn a_rule_content_orders_as_its_canonical_identity() {
         let content = |mode: Value| rule(&rules(&json!([{"mode": mode}])), 0).content.clone();
@@ -1948,7 +1948,7 @@ mod tests {
     }
 
     /// What the document holds of a declaration admitted whole is what its
-    /// type counts, every role included (D15:1907).
+    /// type counts, every role included (D15:1908).
     #[test]
     fn the_spellings_of_a_declaration_admitted_whole_are_those_its_type_counts() {
         for config in [minimal_config(), complete_config()] {
@@ -2002,7 +2002,7 @@ mod tests {
 
     /// Each slot of a complete declaration has its bytes. A value that failed
     /// occurs without them, a required member that is missing does not occur,
-    /// and an admitted `null` is no reference (D15:1918, 1924).
+    /// and an admitted `null` is no reference (D15:1919, 1925).
     #[test]
     fn each_slot_occurs_as_structural_admission_left_it() {
         let app = Inputs::complete().declaration().clone();
@@ -2027,7 +2027,7 @@ mod tests {
 
     /// A target's `profile` occurs as a slot does; one under a key that
     /// failed has no subject but still counts with its bytes; and a map of
-    /// the wrong type holds none (D15:1918, 1924, 2184).
+    /// the wrong type holds none (D15:1919, 1925, 2185).
     #[test]
     fn each_target_profile_occurs_as_structural_admission_left_it() {
         let references = occurrences(|app| app["targetProfiles"]["server"]["profile"] = json!(1));

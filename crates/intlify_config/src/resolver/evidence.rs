@@ -3,7 +3,7 @@
 
 //! Design 015's Evidence record: one origin-bearing location that a Finding
 //! Occurrence or Coverage Decision Evidence names, built from the parts plan
-//! 025 PR 5d defines, with its kind, order, and view (D15:840-842, 2481,
+//! 025 PR 5d defines, with its kind, order, and view (D15:841-843, 2482,
 //! 2492; Decision 015-187).
 //!
 //! Every record has one Safe Origin Kind, and its constructor projects every
@@ -54,7 +54,7 @@ pub(crate) enum EvidenceInvariant {
 
 /// The configuration source one record names: its admitted exact identity,
 /// whether its owner marked that identity non-secret, and only the locator
-/// associated with that same identity (D15:840).
+/// associated with that same identity (D15:841).
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Source<'a> {
     pub(crate) identity: &'a ExactIdentity,
@@ -69,7 +69,7 @@ enum Location {
     /// Entry Source Evidence whose Logical input path, of this size, is past
     /// a path bound path admission applies: never projected, since path
     /// admission leaves it absent, and kept only as the size the bounds
-    /// count (D15:776, 1851; plan 025 decision #299).
+    /// count (D15:777, 1852; plan 025 decision #299).
     Measured(PathSize),
     Value(ValueLocation),
 }
@@ -97,7 +97,7 @@ pub(crate) struct EvidenceProjection {
 
 impl EvidenceProjection {
     /// Entry Source Evidence: `source`, the Logical input path `path` when
-    /// one was established, and the admitted span `span` (D15:780-786).
+    /// one was established, and the admitted span `span` (D15:781-787).
     ///
     /// # Errors
     ///
@@ -119,7 +119,7 @@ impl EvidenceProjection {
     /// of `limits`, the ones path admission applies: as [`Self::entry_source`]
     /// when `path` is within both, and otherwise with `path` only measured,
     /// never projected, since path admission leaves it absent, so a candidate
-    /// holds no path past them (D15:776, 1834, 1851; plan 025 decision #299).
+    /// holds no path past them (D15:777, 1835, 1852; plan 025 decision #299).
     ///
     /// # Errors
     ///
@@ -143,7 +143,7 @@ impl EvidenceProjection {
     }
 
     /// Materialized Value Evidence: `source`, the required value locator of
-    /// `value`, and the admitted span `span` (D15:790).
+    /// `value`, and the admitted span `span` (D15:791).
     ///
     /// # Errors
     ///
@@ -183,7 +183,7 @@ impl EvidenceProjection {
     }
 
     /// Profile-selector Evidence: the projection of `input` under the final
-    /// authority and the admitted declared Profile IDs (D15:804).
+    /// authority and the admitted declared Profile IDs (D15:805).
     ///
     /// # Errors
     ///
@@ -203,7 +203,7 @@ impl EvidenceProjection {
     }
 
     /// Resolver-input Evidence: `path` inside the input its origin names
-    /// (D15:821).
+    /// (D15:822).
     pub(crate) fn resolver_input(path: ComponentPath) -> Self {
         Self {
             origin: path.origin(),
@@ -212,7 +212,7 @@ impl EvidenceProjection {
     }
 
     /// The size of the path the record cannot do without, its value locator
-    /// or component path, if it has one (D15:842).
+    /// or component path, if it has one (D15:843).
     pub(crate) fn required_path(&self) -> Option<PathSize> {
         match &self.parts {
             Parts::Configuration {
@@ -226,14 +226,14 @@ impl EvidenceProjection {
 
     /// The record as path admission leaves it under `limits`, before token
     /// generation: a Logical input path past either path bound is absent, as
-    /// path absence is, whether projected or only measured (D15:724, 776,
+    /// path absence is, whether projected or only measured (D15:725, 777,
     /// 1851).
     ///
     /// # Errors
     ///
     /// Returns the first path bound, in the table's order, that the record's
     /// value locator or component path exceeds, which leaves the record
-    /// invalid with no other form to replace it (D15:842; plan 025 decisions
+    /// invalid with no other form to replace it (D15:843; plan 025 decisions
     /// #232 and #236).
     pub(crate) fn admitted(&self, limits: &EvidenceMetadataLimits) -> Result<Self, MetadataBound> {
         if let Some(size) = self.required_path() {
@@ -253,7 +253,7 @@ impl EvidenceProjection {
 
     /// The size of the Logical input path of Entry Source Evidence, projected
     /// or only measured, which path admission leaves absent past either path
-    /// bound (D15:776, 1851).
+    /// bound (D15:777, 1852).
     pub(crate) fn entry_path(&self) -> Option<PathSize> {
         match &self.parts {
             Parts::Configuration {
@@ -270,7 +270,7 @@ impl EvidenceProjection {
 
     /// The metadata work units of the record: one for each source identity,
     /// locator, Logical input path or value locator, selector, and component
-    /// path it carries, a path only measured being none it carries (D15:1839;
+    /// path it carries, a path only measured being none it carries (D15:1840;
     /// plan 025 interpretation #239).
     pub(crate) fn work(&self) -> u64 {
         match &self.parts {
@@ -320,7 +320,7 @@ impl EvidenceProjection {
                 locator: locator.clone(),
                 location: match location {
                     // A path only measured is absent, as path admission
-                    // leaves it (D15:776).
+                    // leaves it (D15:777).
                     Location::Entry(None) | Location::Measured(_) => RetainedLocation::Entry(None),
                     Location::Entry(Some(path)) => {
                         RetainedLocation::Entry(Some(path.retained(specification, tokens)?))
@@ -394,7 +394,7 @@ impl Evidence {
     }
 
     /// `{ kind, origin, source?, locator?, path?, value?, span?, selector?,
-    /// component? }` with only the members the record's kind has (D15:2481,
+    /// component? }` with only the members the record's kind has (D15:2482,
     /// 2492).
     pub(crate) fn view(&self) -> Value {
         let mut view = Map::new();
@@ -819,7 +819,7 @@ mod tests {
     /// At both path bounds a record is admitted unchanged. One past either,
     /// its Logical input path is absent, as path absence is, while a value
     /// locator or component path leaves the record invalid, naming the
-    /// segments before the bytes (D15:776, 842, 1851; plan 025 decisions #232
+    /// segments before the bytes (D15:777, 843, 1852; plan 025 decisions #232
     /// and #236).
     #[test]
     fn path_admission_drops_a_logical_input_path_and_refuses_a_required_one() {
@@ -888,7 +888,7 @@ mod tests {
     /// which path admission measures as it would the projected path, and
     /// leaves absent; meanwhile the record carries, counts, and retains no
     /// path, as an absent one. Absence stays absence, and an origin that
-    /// supplies no Logical input path is refused either way (D15:776, 1834,
+    /// supplies no Logical input path is refused either way (D15:777, 1835,
     /// 1851; plan 025 decision #299).
     #[test]
     fn phase_1_projects_a_logical_input_path_only_within_the_path_bounds() {

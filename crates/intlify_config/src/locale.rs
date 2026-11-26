@@ -5,7 +5,7 @@
 //! The enclosing owner supplies admitted immutable data and identities; reading
 //! 017's Locale Canonicalization Data Artifact is the adapter's job, not this
 //! module's. An adapter reads the envelope at 015's pre-invocation boundary and
-//! leaves the rest to specification admission as [`FormalData`] (D15:3165). A binding keeps what a checked profile would retain (the
+//! leaves the rest to specification admission as [`FormalData`] (D15:3170). A binding keeps what a checked profile would retain (the
 //! specification and the dataset it admits) apart from facts about the admitted
 //! artifact, which make a binding reproducible but never enter profile semantics.
 //! Behind the non-default `icu4x` feature, `icu4x` makes the ICU4X 2.2.0
@@ -185,7 +185,7 @@ pub(crate) struct LocaleDataLimits {
 }
 
 /// One count an adapter measured reading the data: exact, or past what a
-/// `u64` holds, and so past every bound (D15:1997).
+/// `u64` holds, and so past every bound (D15:1998).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum DataCount {
     Exact(u64),
@@ -205,7 +205,7 @@ pub(crate) struct DataCounts {
 }
 
 /// What each payload's own read established, past the manifest's read: one
-/// payload's failure leaves the other's to report (D15:2365).
+/// payload's failure leaves the other's to report (D15:2366).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct PayloadFacts {
     /// The bytes of the four marker payloads as compact JSON text.
@@ -213,7 +213,7 @@ pub(crate) struct PayloadFacts {
     pub(crate) conformance: Result<DataCounts, DataNotAdmitted>,
 }
 
-/// What reading the data established, for its checks to judge (D15:1820 to
+/// What reading the data established, for its checks to judge (D15:1821 to
 /// 1828, 2008).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct DataFacts {
@@ -266,12 +266,12 @@ impl<P> DataReading<P> {
 /// Canonicalization data past the pre-invocation boundary: its envelope
 /// admitted, the rest still to read. Specification admission reads the rest
 /// under the capability's `localeData` bounds: past one is that bound's
-/// `project-profile-bootstrap-limit-exceeded` (D15:2356), and a failure of the
+/// `project-profile-bootstrap-limit-exceeded` (D15:2357), and a failure of the
 /// integrity, a payload, or the dataset is
 /// `project-profile-locale-data-not-admitted`, Resolver Cases and not boundary
-/// failures (D15:3165). The data is a Common Invocation Input Set
+/// failures (D15:3170). The data is a Common Invocation Input Set
 /// value that invocation staleness compares by value and the Materialized
-/// Resolution Input Set retains (D15:2583, 2589, 2651), so it has a value
+/// Resolution Input Set retains (D15:2584, 2590, 2652), so it has a value
 /// equality and its caller keeps it past the invocation.
 pub(crate) trait FormalData: Eq {
     type Provider: Provider;

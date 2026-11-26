@@ -4,31 +4,31 @@
 //! 015's Semantic Profile Resolver over one invocation: Phases 4 to 13 of the
 //! Deterministic Resolution Algorithm, in 015's order, over one evaluation in
 //! which Phase 0 ran before configuration entry, so that its Finding and
-//! status remain whatever entry finds (D15:2145), and Phase 1 then admitted
+//! status remain whatever entry finds (D15:2146), and Phase 1 then admitted
 //! the complete input ([`super::entry`]); without its value there is no Shared
-//! projection, and these phases do not run (D15:2369). Each phase takes the
+//! projection, and these phases do not run (D15:2370). Each phase takes the
 //! values the earlier ones admitted, or the causes of their absence, and
 //! evaluates every check whose prerequisites were admitted, so a blocking
 //! result leaves only the checks that depend on it not evaluated. Once the phases that establish a semantic group have run, the
 //! entry records the unit that owns the group's semantic dependency, which
-//! waits on what they established (D15:2516). The `profileSpecification`
+//! waits on what they established (D15:2517). The `profileSpecification`
 //! group's owner is a unit of Phase 2, which [`super::structural_admission`]
 //! records.
 //!
 //! The semantic phases start from the declaration Phase 3 provisionally
 //! selected once structural admission admitted its boundary and its
 //! `resourceLimits` reference, whatever else of it or of the root it rejected
-//! (D15:2131, 2367, 3434; plan 025 interpretation #218), and read each of its
+//! (D15:2132, 2368, 3559; plan 025 interpretation #218), and read each of its
 //! fields on its own ([`super::declaration_fields`]), from what each
 //! candidate left at its value ([`super::value_admissions`]): a value
 //! structural admission did not admit, whether a field, a map entry, an array
 //! element, or a `policies` slot, holds back only the checks that read it,
-//! with its Findings as their causes, and its siblings continue (D15:2367,
+//! with its Findings as their causes, and its siblings continue (D15:2368,
 //! 3340).
 //! Without a selection, each check that reads the declaration, or the Policy
 //! its reference selects, is not evaluated with what held the selection back,
-//! while Phase 4 still checks the collection under the capability (D15:2131,
-//! 2132). Profile projection waits on the whole root (D15:2142). What the entry
+//! while Phase 4 still checks the collection under the capability (D15:2132,
+//! 2132). Profile projection waits on the whole root (D15:2143). What the entry
 //! returns is crate-private semantic state, not a `LocalizationProjectProfile`,
 //! a checked or blocked outcome, or Resolution Evidence. The profile
 //! projection is 015's Implementation Phase 5.
@@ -39,12 +39,12 @@
 //! programmatic entry's alike, Phase 1 over its Snapshot
 //! ([`super::snapshot_entry`]). Without a value either leaves instead the
 //! blocking Phase 1 Finding Keys that make the Shared projection unavailable
-//! (D15:2369). Either way it leaves what the entry dependency records name,
+//! (D15:2370). Either way it leaves what the entry dependency records name,
 //! the selector projected under the final projection authority Phase 4 fixed,
 //! or the capability's without a value, beside the Profile IDs the root
-//! declares (D15:807, 816-817, 2516). With a value, it also copies that
+//! declares (D15:808, 817-818, 2517). With a value, it also copies that
 //! value out as the canonical tree of the Materialized Resolution Input Set
-//! after Phase 1 and before Phase 2 consumes the document (D15:2657). The
+//! after Phase 1 and before Phase 2 consumes the document (D15:2658). The
 //! construction and invocation inputs it takes are assembled outside it, by
 //! [`super::invocation`]. A replay runs the phases after Phase 1 over the
 //! retained value ([`resolve_materialized`], [`super::replay`]).
@@ -114,13 +114,13 @@ type Declaration = ProfileDeclaration<PolicyReference, TargetProfileReference>;
 /// One invocation's configuration past Phases 1 to 3, as the semantic phases
 /// read it: the fields of the declaration Phase 3 provisionally selected once
 /// structural admission admitted its boundary and its `resourceLimits`
-/// reference, whatever else of it or of the root it rejected (D15:2131,
-/// 2367, 3434), each read on its own, where a check of it looks (D15:790),
+/// reference, whatever else of it or of the root it rejected (D15:2132,
+/// 2367, 3434), each read on its own, where a check of it looks (D15:791),
 /// and the `resourceLimits` reference it selected with, or, without a
-/// selection, the causes of its absence in their place (D15:2131); the
+/// selection, the causes of its absence in their place (D15:2132); the
 /// selector; what Phase 4 rechecks of those phases' measures; and whether
 /// structural admission admitted the whole root, which profile projection
-/// needs (D15:2142).
+/// needs (D15:2143).
 pub(crate) struct SelectedConfiguration<'a> {
     fields: DeclarationFields<PolicyReference, TargetProfileReference>,
     /// Every reference of the declaration as Phase 4's bounds read it, whether
@@ -143,7 +143,7 @@ impl<'a> SelectedConfiguration<'a> {
     /// The configuration of `analysis`, which `entry` holds, once Phase 3
     /// provisionally selected one of its declarations, `selection`, with
     /// `selector`, each field as `values` holds what structural admission's
-    /// candidates left at and below it, observed in the entry (D15:790).
+    /// candidates left at and below it, observed in the entry (D15:791).
     /// `whole` is whether structural admission admitted the whole root.
     ///
     /// # Errors
@@ -185,10 +185,10 @@ impl<'a> SelectedConfiguration<'a> {
     /// `selector`, for `causes`, why it selected none: each field of the
     /// declaration and the `resourceLimits` reference are unavailable with
     /// them, so that each check that reads one is not evaluated with them
-    /// (D15:2131). Without a Policy no recheck runs, each waiting on the same
+    /// (D15:2132). Without a Policy no recheck runs, each waiting on the same
     /// causes, so the measures are unavailable with them, but for the
     /// declarations `analysis` holds once its `profiles` member is an object:
-    /// each declared Profile ID still names its recheck (D15:1171, 2184).
+    /// each declared Profile ID still names its recheck (D15:1172, 2185).
     ///
     /// # Errors
     ///
@@ -234,7 +234,7 @@ impl<'a> SelectedConfiguration<'a> {
 
     /// Every Profile ID the root's `profiles` object declares, in unsigned
     /// byte order, or none when structural admission did not admit the object:
-    /// the declared Profile IDs a selector can name (D15:807).
+    /// the declared Profile IDs a selector can name (D15:808).
     pub(crate) fn declared(&self) -> &[ProfileId] {
         self.declarations
             .as_ref()
@@ -275,7 +275,7 @@ pub(crate) struct Invocation<'a, Id> {
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct SemanticState<'s, Id> {
     /// Phase 2: whether structural admission admitted the whole root, which a
-    /// complete `IntlifyConfig` and so profile projection need (D15:2142,
+    /// complete `IntlifyConfig` and so profile projection need (D15:2143,
     /// 2367).
     pub(crate) structure: Admitted<()>,
     /// Phase 4: the confirmed policy, which also confirms the provisional
@@ -285,7 +285,7 @@ pub(crate) struct SemanticState<'s, Id> {
     pub(crate) specifications: Admitted<SpecificationSet<Id>>,
     /// Phase 5: the canonicalization specification and the dataset the
     /// canonicalization data was bound under, which a checked profile
-    /// retains (D15:1313).
+    /// retains (D15:1314).
     pub(crate) canonicalization: Admitted<SemanticPins<Id>>,
     /// Phase 5: the admitted vocabulary.
     pub(crate) vocabulary: Admitted<SurfaceVocabulary>,
@@ -347,10 +347,10 @@ pub(crate) enum ResolverInvariant {
     Unprojected(Causes),
     /// The invocation's inputs were admitted against another resolver's
     /// Resolver Construction Identity, so no outcome could carry one equal to
-    /// both the resolver's and the admitted reference (D15:1150).
+    /// both the resolver's and the admitted reference (D15:1151).
     OtherConstruction,
     /// A replayed Materialized Resolution Input Set's value held a marker,
-    /// which no value that entry admitted holds (D15:2657).
+    /// which no value that entry admitted holds (D15:2658).
     RetainedMarker,
 }
 
@@ -482,7 +482,7 @@ impl From<LocaleInvariant> for ResolverInvariant {
 /// run. `project_profile` is what Phase 0 admitted, which the invocation
 /// records before configuration entry. `data` is the canonicalization data past the
 /// pre-invocation boundary, which Phase 5 reads the rest of and binds, leaving
-/// it to the caller to retain with the invocation's other inputs (D15:2589).
+/// it to the caller to retain with the invocation's other inputs (D15:2590).
 /// The Profile Resolution Artifact Set Phase 9 admits is kept in `set`, which the
 /// resolved references and the bindings borrow.
 pub(crate) fn resolve_profile<'s, P, D>(
@@ -529,7 +529,7 @@ where
         held(canonicalizer),
     )?;
     // A record constructed since classifies a locale key by the canonicalizer
-    // Phase 5 bound (D15:776).
+    // Phase 5 bound (D15:777).
     let observer = configuration
         .observer
         .as_ref()
@@ -615,7 +615,7 @@ where
     )?;
     // Both policy groups are the confirmed declaration's, and each waits on
     // the object apart from its slots and only on the slots it holds
-    // (D15:2137, 2365, 3445). The required one also holds the confirmed
+    // (D15:2138, 2366, 3570). The required one also holds the confirmed
     // policy's bounds.
     own(
         evaluation,
@@ -708,8 +708,8 @@ pub(crate) type ConfigurationSchema = AuthoringSchema<PolicyReference, TargetPro
 
 /// What one entry's invocation leaves for its outcome: the semantic state
 /// once the entry materialized a value, or else the blocking Phase 1 Finding
-/// Keys that leave the Shared projection unavailable (D15:2369), and what the
-/// entry dependency records name (D15:2516).
+/// Keys that leave the Shared projection unavailable (D15:2370), and what the
+/// entry dependency records name (D15:2517).
 #[derive(Debug)]
 pub(crate) struct Invoked<'s, Id> {
     pub(crate) state: Result<SemanticState<'s, Id>, Causes>,
@@ -722,13 +722,13 @@ pub(crate) struct Invoked<'s, Id> {
 /// Phase 1 admits with `schema` under `structural`, Phase 3 selecting
 /// `selector`'s declaration, and the semantic phases over the configuration,
 /// or, without a declaration Phase 3 selected, over the causes of its
-/// absence (D15:2131). Without a value there is no Shared projection and so
-/// no semantic state (D15:2369). The selector's final projection authority is
+/// absence (D15:2132). Without a value there is no Shared projection and so
+/// no semantic state (D15:2370). The selector's final projection authority is
 /// the one Phase 4 fixed, or the capability's without a value, and the
 /// Profile IDs it may name are those the root's `profiles` object declares,
-/// none without a value (D15:807, 816-817). `value` receives the canonical
+/// none without a value (D15:808, 817-818). `value` receives the canonical
 /// tree of the value Phase 1 admits, and stays as it was without one
-/// (D15:2657).
+/// (D15:2658).
 ///
 /// # Errors
 ///
@@ -771,7 +771,7 @@ where
 /// One programmatic entry's invocation over `evaluation`, as a file entry's
 /// with Phase 1 over the Snapshot of `entry` under `limits`. The phases after
 /// it observe the entry through the document Phase 1 materialized
-/// (D15:2129, 3228).
+/// (D15:2130, 3233).
 ///
 /// # Errors
 ///
@@ -818,7 +818,7 @@ where
 
 /// What an invocation's phases leave: the semantic state or the causes of its
 /// absence, and for the entry dependencies the selector's final projection
-/// authority and the Profile IDs the selector may name (D15:807, 816-817).
+/// authority and the Profile IDs the selector may name (D15:808, 817-818).
 struct Resolved<'s, Id> {
     state: Result<SemanticState<'s, Id>, Causes>,
     authority: Bound,
@@ -827,7 +827,7 @@ struct Resolved<'s, Id> {
 
 impl<Id> Resolved<'_, Id> {
     /// Without a value, for `causes`: the capability's authority, and no
-    /// declared Profile ID (D15:2369).
+    /// declared Profile ID (D15:2370).
     fn unentered(causes: Causes, invocation: &Invocation<'_, Id>) -> Self {
         Self {
             state: Err(causes),
@@ -863,7 +863,7 @@ where
     D: FormalData<Provider = P>,
 {
     // The Materialized Resolution Input Set's value, copied once Phase 1
-    // materialized it and before Phase 2 consumes the document (D15:2657).
+    // materialized it and before Phase 2 consumes the document (D15:2658).
     *value = Some(document.canonical_value());
     let (state, declared) = resolve_materialized(
         evaluation,
@@ -882,10 +882,10 @@ where
 
 /// Phases 2 to 13 over `document`, a materialized value, observed through
 /// `entry`: Phases 2 and 3, and the semantic phases over the configuration
-/// Phase 3 selected or over the causes of its absence (D15:2131). It leaves
+/// Phase 3 selected or over the causes of its absence (D15:2132). It leaves
 /// the semantic state and the Profile IDs the root declares. An invocation
 /// runs them over the document Phase 1 admitted, and a replay over the one
-/// of its retained value (D15:2659).
+/// of its retained value (D15:2660).
 ///
 /// # Errors
 ///
@@ -919,11 +919,11 @@ where
         held(project_profile.as_ref()),
     )?;
     // Phase 3 records its checks whatever Phase 2 admitted, with its causes
-    // where it admitted nothing (D15:2131). The semantic phases read the
+    // where it admitted nothing (D15:2132). The semantic phases read the
     // declaration it selects once structural admission admitted its boundary
     // and its `resourceLimits` reference, whatever else of it or of the root
     // it rejected (plan 025 interpretation #218), and without one each check
-    // that reads the declaration waits on the causes (D15:2131).
+    // that reads the declaration waits on the causes (D15:2132).
     let selection = select_profile(
         evaluation,
         entry,
@@ -1246,7 +1246,7 @@ pub(super) mod tests {
     /// the requested locales and coverage selectors, the rules, and each
     /// group's members and hydration relations. A fallback sequence's order
     /// is semantic, so it stays, and nothing under `messageFallback` is read
-    /// by name: a source locale there may spell a set's name (D15:516, 1519,
+    /// by name: a source locale there may spell a set's name (D15:517, 1520,
     /// 2184).
     fn reverse_sets(value: &mut Value) {
         match value {
@@ -1364,7 +1364,7 @@ pub(super) mod tests {
         /// `complete`'s profile requesting one locale, so that a check over
         /// the requested set waits once that locale's unit does not pass: a
         /// unit over several values waits only when every one is excluded
-        /// (D15:2184).
+        /// (D15:2185).
         pub(crate) fn one_locale() -> Self {
             let mut inputs = Self::complete();
             let app = inputs.declaration();
@@ -1458,7 +1458,7 @@ pub(super) mod tests {
         }
 
         /// The specification input without its `project-profile` assertion,
-        /// which Phase 0 then finds missing (D15:1125).
+        /// which Phase 0 then finds missing (D15:1126).
         pub(crate) fn unasserted(&mut self) {
             self.specifications.project_profile = None;
         }
@@ -1568,7 +1568,7 @@ pub(super) mod tests {
         /// `inspect` with the invocation's other inputs, what it recorded, and
         /// what it left: the boundary admits the Snapshot and a pair whose
         /// revision is its digest, and Phase 1 reads it under the capability's
-        /// root-value bounds, as it reads the file (D15:743, 3228).
+        /// root-value bounds, as it reads the file (D15:744, 3233).
         pub(crate) fn programmatic_under<R>(
             &self,
             call_site: Option<&AdmittedCallSite>,
@@ -1694,7 +1694,7 @@ pub(super) mod tests {
 
         /// The same inputs with every schema-declared unordered collection
         /// in another order, whatever its members: each set, every object's
-        /// members, and the artifact collection (D15:3353).
+        /// members, and the artifact collection (D15:3478).
         pub(crate) fn permuted(&self) -> Self {
             let mut config = self.config.clone();
             reverse_sets(&mut config);
@@ -2142,7 +2142,7 @@ pub(super) mod tests {
             .collect();
         candidates.sort();
         // Where a candidate was observed is presentation Evidence, which
-        // reordering a set moves (D15:2389): only what each one found stays.
+        // reordering a set moves (D15:2390): only what each one found stays.
         let mut observed: Vec<&IssueKey> = evaluation
             .occurrence_candidates()
             .iter()
@@ -2197,7 +2197,7 @@ pub(super) mod tests {
 
     /// When Phase 1 admits no value, the Shared projection is unavailable for
     /// Phase 1's blocking Findings alone: Phase 0's explain no missing value
-    /// (D15:1165, 2369).
+    /// (D15:1166, 2370).
     #[test]
     fn the_shared_projection_is_unavailable_for_phase_1s_findings_alone() {
         let mut inputs = Inputs::complete();
@@ -2227,7 +2227,7 @@ pub(super) mod tests {
 
     /// When strict file entry admits no value there is no Shared projection,
     /// so no unit after Phase 1 is recorded, while Phase 0 and Phase 1 keep
-    /// their statuses and Findings (D15:2145, 2369).
+    /// their statuses and Findings (D15:2146, 2370).
     #[test]
     fn without_an_entered_value_no_unit_after_entry_is_recorded() {
         let inputs = Inputs::complete();
@@ -2281,7 +2281,7 @@ pub(super) mod tests {
     /// declaration's ID is a safe Profile ID; past the policy's bound it is
     /// over the limit and redacted; and without a value the capability
     /// measures it, with no declared Profile ID to name. The entry source
-    /// names the Source-content revision of the file's bytes (D15:743, 807,
+    /// names the Source-content revision of the file's bytes (D15:744, 808,
     /// 816-819, 2516).
     #[test]
     fn the_entry_dependencies_name_the_final_selector_projection() {
@@ -2326,7 +2326,7 @@ pub(super) mod tests {
     /// it with them, waiting on the same check, and no Profile ID. Every later
     /// phase records its checks waiting on the same check, but Phase 4's
     /// checks of the collection under the capability, which read no
-    /// declaration (D15:2130, 2131, 2132, 2151).
+    /// declaration (D15:2131, 2132, 2133, 2152).
     #[test]
     fn without_a_selected_schema_each_later_check_waits_on_the_version() {
         let mut inputs = Inputs::complete();
@@ -2384,7 +2384,7 @@ pub(super) mod tests {
     /// Policy its reference selects, waits on what held the selection back,
     /// and Phase 4 still checks the collection under the capability: here the
     /// selector names no declaration, while structural admission admitted the
-    /// whole root (D15:2131, 2132).
+    /// whole root (D15:2132, 2133).
     #[test]
     fn without_a_selection_each_later_check_waits_on_its_causes() {
         let mut inputs = Inputs::complete();
@@ -2402,7 +2402,7 @@ pub(super) mod tests {
                 BTreeSet::from(COLLECTION_UNDER_CAPABILITY)
             );
             // Each Profile ID structural admission admitted still names its
-            // recheck under the Policy, which waits (D15:1171).
+            // recheck under the Policy, which waits (D15:1172).
             assert_eq!(
                 rechecked_ids(&evaluation),
                 [PolicySubject::ProfileId(
@@ -2428,7 +2428,7 @@ pub(super) mod tests {
     /// the outcome is blocked on the selector's one Finding, with a complete
     /// bundle whose every later status waits on it, no Policy confirmed, and
     /// no semantic result. A Profile ID a file writes twice is Phase 1's
-    /// duplicate member, so no value exists to select from (D15:802, 2129,
+    /// duplicate member, so no value exists to select from (D15:803, 2130,
     /// 2131, 2295, 2297, 3463).
     #[test]
     fn a_missing_or_unknown_selection_leaves_no_partial_profile() {
@@ -2485,7 +2485,7 @@ pub(super) mod tests {
 
     /// Without a `profiles` object no declaration is counted or selected:
     /// each later check waits on its Finding, and no Profile ID names a
-    /// recheck (D15:2131, 2184).
+    /// recheck (D15:2132, 2185).
     #[test]
     fn without_a_profiles_object_each_later_check_waits_on_its_finding() {
         let mut inputs = Inputs::complete();
@@ -2659,7 +2659,7 @@ pub(super) mod tests {
     /// unsupported, leave no schema to read the value under: each later
     /// selection or semantic check waits on that one Finding, with no
     /// synthetic Finding of its own, and only the collection is still checked
-    /// under the capability (D15:2130, 2151, 3341, 3447).
+    /// under the capability (D15:2131, 2152, 3466, 3572).
     #[test]
     fn without_a_schema_every_later_check_waits_on_what_held_it_back() {
         type Edit = fn(&mut Value);
@@ -2712,7 +2712,7 @@ pub(super) mod tests {
 
     /// A `profiles` member of another type or with no declaration, and a
     /// selected declaration that is no object, hold the selection back: each
-    /// later check waits on that one structural Finding (D15:2131, 2184,
+    /// later check waits on that one structural Finding (D15:2132, 2185,
     /// 3341). A declaration that is no object keeps its admitted key, so its
     /// Profile ID still names a recheck, which waits too.
     #[test]
@@ -2781,7 +2781,7 @@ pub(super) mod tests {
     /// Without the canonicalization slot no locale can be interpreted: every
     /// check that needs a canonical locale, through the locale, policy,
     /// target, and hydration phases, waits on that one Finding, while a phase
-    /// that compares only Target IDs still runs (D15:2133, 2151, 2365, 3447).
+    /// that compares only Target IDs still runs (D15:2134, 2152, 2366, 3572).
     #[test]
     fn without_canonicalization_semantics_each_locale_check_waits_on_the_slot() {
         let mut inputs = Inputs::complete();
@@ -2829,7 +2829,7 @@ pub(super) mod tests {
     /// blocking Findings of the fields they name, and a Group ID a file names
     /// twice is Phase 1's duplicate-member Finding, which leaves no value at
     /// all. No group is inferred for the targets: Phase 12 has no partition
-    /// and no such group, and the outcome no profile (D15:2438, 3530).
+    /// and no such group, and the outcome no profile (D15:2439, 3655).
     #[test]
     fn a_missing_or_empty_group_is_a_finding_and_no_group_is_inferred() {
         use crate::resolver::outcome::tests::{identity, reporting};
@@ -2903,7 +2903,7 @@ pub(super) mod tests {
     }
 
     /// Phase 4 observes a bound over the selected declaration's references at
-    /// the declaration, in the file entry admitted (D15:790, 1918).
+    /// the declaration, in the file entry admitted (D15:791, 1919).
     #[test]
     fn a_reference_bound_is_observed_at_the_declaration_in_the_file() {
         use crate::resolver::evidence_token::EvidenceTokens;
@@ -2939,7 +2939,7 @@ pub(super) mod tests {
     }
 
     /// The rows of Phase 4's checks of the collection under the capability,
-    /// which read no declaration (D15:2132).
+    /// which read no declaration (D15:2133).
     const COLLECTION_UNDER_CAPABILITY: [&str; 5] = [
         "resource-policy.artifacts.within-capability",
         "resource-policy.policy-artifacts.within-capability",
@@ -2982,10 +2982,10 @@ pub(super) mod tests {
                 .statuses()
                 .all(|(_, status)| *status == Status::Evaluated));
             // Phase 1 records its owner and the complete input's ten checks
-            // (D15:1876, 2129, 2516), and Phase 2 its owner, the schema
+            // (D15:1877, 2130, 2517), and Phase 2 its owner, the schema
             // selection's four checks, the analysis's measure, the units of
             // its scope levels, and the `profileSpecification` group's owner
-            // (D15:2130, 2173, 2516). The root's nine are the types of the
+            // (D15:2131, 2174, 2517). The root's nine are the types of the
             // root, `$schema`, `profiles`, and `schemaVersion`, the two
             // required members, the closed values of `profiles` and
             // `schemaVersion`, and the root's known members; each entry's key
@@ -3031,7 +3031,7 @@ pub(super) mod tests {
             );
             assert_eq!(count(Phase::StructuralAdmission), 232);
             // Phase 3 counts the declarations, checks the one Profile ID, and
-            // runs the four checks of the string selector (D15:1885, 1886,
+            // runs the four checks of the string selector (D15:1886, 1887,
             // 2295-2297, Decision 015-196).
             assert_eq!(count(Phase::ProfileSelection), 6);
             assert_eq!(unestablished(&evaluation), []);
@@ -3152,7 +3152,7 @@ pub(super) mod tests {
     /// unit's row through the Check Registry's prerequisites, and each
     /// prerequisite a row lists is such a wait. Candidates show what a unit
     /// over several values hides: it stays evaluated while any candidate is
-    /// (D15:2184).
+    /// (D15:2185).
     #[test]
     fn the_check_registry_lists_what_each_check_waits_on() {
         let mut waits = BTreeSet::new();
@@ -3350,7 +3350,7 @@ pub(super) mod tests {
     }
 
     /// Phase 4 rechecks the exact measures: a Policy whose bounds are what
-    /// Phases 1 and 2 measured admits each of them (D15:2132).
+    /// Phases 1 and 2 measured admits each of them (D15:2133).
     #[test]
     fn phase_4_rechecks_the_exact_measures() {
         let mut inputs = Inputs::complete();
@@ -3382,7 +3382,7 @@ pub(super) mod tests {
                 [(duplicate.clone(), Code::LocaleDuplicate, None)]
             );
             // Each spelling is a candidate at its own token beside the other
-            // (D15:2410), and the corrected one's notice is at its own token.
+            // (D15:2411), and the corrected one's notice is at its own token.
             let pointer = |index: u64| {
                 json!({ "exact-json-pointer": format!("/profiles/web/requestedLocales/{index}") })
             };
@@ -3669,7 +3669,7 @@ pub(super) mod tests {
     /// admissible Policy another declaration names, submitted beside it, end
     /// a domain the capability leaves room for, while the capability's Shared
     /// `maxRecords` one under the Shared records refuses the last Shared
-    /// slice, after Phase 4 (D15:1940, 2132, 2391, 3467).
+    /// slice, after Phase 4 (D15:1941, 2133, 2392, 3592).
     #[test]
     fn a_selected_policy_that_cannot_be_admitted_leaves_one_outcome_under_the_capability() {
         use crate::resolver::evaluation::ExhaustedBound;
@@ -3873,7 +3873,7 @@ pub(super) mod tests {
 
     /// Past a bound the confirmed policy supplies, Phase 7 observes the
     /// declaration's field in the file beside the policy Phase 4 admitted,
-    /// under the exact reference that keys it (D15:824, 834, 2249).
+    /// under the exact reference that keys it (D15:825, 835, 2250).
     #[test]
     fn a_locale_bound_is_observed_beside_the_admitted_policy() {
         use intlify_shared_json::encoding::encode;
@@ -3911,7 +3911,7 @@ pub(super) mod tests {
 
     /// Coverage observes through the same observer: past the rule count's
     /// bound, the rules are observed beside the policy Phase 4 admitted,
-    /// which supplies the bound (D15:1901, 2249).
+    /// which supplies the bound (D15:1902, 2250).
     #[test]
     fn a_coverage_count_is_observed_beside_the_admitted_policy() {
         use crate::resolver::coverage::{self, CoverageSubject};
@@ -3942,7 +3942,7 @@ pub(super) mod tests {
 
     /// Phase 12 observes through the same observer: past the member count's
     /// bound, a group's members are observed beside the policy Phase 4
-    /// admitted, which supplies the bound (D15:2249).
+    /// admitted, which supplies the bound (D15:2250).
     #[test]
     fn a_group_count_is_observed_beside_the_admitted_policy() {
         use crate::resolver::groups::{self, GroupSubject};
@@ -4059,7 +4059,7 @@ pub(super) mod tests {
 
     /// A group that failed holds back no other group: both counts and the
     /// other group's checks run, with no Finding made up for it, and the
-    /// partition waits on what failed (D15:2149, 2184, 2365, 2367, 3445).
+    /// partition waits on what failed (D15:2150, 2185, 2366, 2368, 3570).
     #[test]
     fn a_group_that_failed_leaves_the_other_groups_checked() {
         use crate::resolver::groups::GroupSubject as G;
@@ -4098,7 +4098,7 @@ pub(super) mod tests {
     /// A member that failed holds back none of its siblings: the group's
     /// count takes it, each other member is checked, and what they find
     /// among themselves is found; the group, which needs every member, waits
-    /// (D15:1934, 2184, 2190, 2367, 2438).
+    /// (D15:1935, 2185, 2191, 2368, 2439).
     #[test]
     fn a_member_that_failed_leaves_its_siblings_checked() {
         use crate::resolver::groups::GroupSubject as G;
@@ -4153,7 +4153,7 @@ pub(super) mod tests {
     /// The group bounds count what was submitted: a member that failed is
     /// an occurrence of its array and of the total, and an entry whose key
     /// failed is a group of the map whose members the total still takes
-    /// (D15:1932, 1934, 1935).
+    /// (D15:1933, 1935, 1936).
     #[test]
     fn the_group_counts_take_every_occurrence_beside_what_failed() {
         use crate::resolver::evaluation::{Actual, LimitExceeded};
@@ -4210,7 +4210,7 @@ pub(super) mod tests {
     }
 
     /// The total waits only once no group's members can be read, since a
-    /// unit over several values evaluates what is admitted (D15:2184, 3354).
+    /// unit over several values evaluates what is admitted (D15:2185, 3479).
     #[test]
     fn the_membership_total_waits_only_when_every_array_failed() {
         use crate::resolver::groups::GroupSubject as G;
@@ -4229,7 +4229,7 @@ pub(super) mod tests {
 
     /// An entry whose key failed has no subject in Phase 12, and the targets
     /// it might hold cannot be proved placed or unplaced; the other group
-    /// goes on (D15:2184, 2365, 3354).
+    /// goes on (D15:2185, 2366, 3479).
     #[test]
     fn a_group_whose_key_failed_has_no_subject() {
         use crate::resolver::groups::GroupSubject as G;
@@ -4268,7 +4268,7 @@ pub(super) mod tests {
     /// A target's place is found from the groups that can be read: one that
     /// a group names is placed whatever else failed, and one that none names
     /// waits on exactly what could not be read, since it may be there
-    /// (D15:2184, 2365, 2438).
+    /// (D15:2185, 2366, 2439).
     #[test]
     fn a_place_is_found_from_the_groups_that_can_be_read() {
         type Case = (
@@ -4345,7 +4345,7 @@ pub(super) mod tests {
 
     /// A target that two groups name is found whatever else failed, while
     /// one that no admitted element names waits on what failed: it cannot be
-    /// proved unassigned (D15:2365, 2438).
+    /// proved unassigned (D15:2366, 2439).
     #[test]
     fn a_target_two_groups_name_is_found_beside_a_member_that_failed() {
         let mut inputs = Inputs::two_groups();
@@ -4367,7 +4367,7 @@ pub(super) mod tests {
 
     /// Beside a Target ID key that failed, a member naming an admitted Target
     /// ID is known, and one naming none is unproved rather than unknown
-    /// (D15:2184, 2365, 2367).
+    /// (D15:2185, 2366, 2368).
     #[test]
     fn a_member_beside_a_target_key_that_failed_is_unproved_only_when_it_names_none() {
         let mut inputs = Inputs::two_groups();
@@ -4412,7 +4412,7 @@ pub(super) mod tests {
     }
 
     /// A target that failed in a field other than its key still takes its
-    /// place: Phase 12 reads no more of it than its Target ID (D15:2367,
+    /// place: Phase 12 reads no more of it than its Target ID (D15:2368,
     /// 3445).
     #[test]
     fn a_target_whose_field_failed_is_still_placed() {
@@ -4438,7 +4438,7 @@ pub(super) mod tests {
     }
 
     /// Without a Group ID map to read, each declared target's place is still
-    /// recorded, waiting on why there is none (D15:1171, 2184).
+    /// recorded, waiting on why there is none (D15:1172, 2185).
     #[test]
     fn a_place_beside_no_group_map_waits_on_the_map() {
         use crate::resolver::groups::GroupSubject as G;
@@ -4462,7 +4462,7 @@ pub(super) mod tests {
 
     /// A group past its own bound is left out of what the places read: a
     /// target another group names is placed, and one only it names waits on
-    /// the bound (D15:1934, 2184, 2365).
+    /// the bound (D15:1935, 2185, 2366).
     #[test]
     fn a_group_past_its_bound_holds_back_only_the_targets_it_alone_could_place() {
         use crate::resolver::groups::GroupSubject as G;
@@ -4490,7 +4490,7 @@ pub(super) mod tests {
 
     /// Phase 13 observes through the same observer: a relation's client that
     /// names no declared Target ID is observed at its field, beside the
-    /// declared Target IDs (D15:2249).
+    /// declared Target IDs (D15:2250).
     #[test]
     fn an_unknown_endpoint_is_observed_beside_the_declared_targets() {
         use crate::resolver::hydration::{self, EndpointField, HydrationSubject};
@@ -4578,7 +4578,7 @@ pub(super) mod tests {
         });
     }
 
-    /// A subject of the group `web` as 015 projects it (D15:2190).
+    /// A subject of the group `web` as 015 projects it (D15:2191).
     fn of_web(subject: &Value) -> Value {
         json!({ "parent": { "identity": "web" }, "subject": subject })
     }
@@ -4589,7 +4589,7 @@ pub(super) mod tests {
     }
 
     /// The one subject of `web`'s relations without an identity: their
-    /// Subject content projection (D15:2181, 2188, 2203).
+    /// Subject content projection (D15:2182, 2189, 2204).
     fn unidentified() -> Value {
         of_web(&json!({ "content": { "type": "object" } }))
     }
@@ -4664,7 +4664,7 @@ pub(super) mod tests {
 
     /// A relation that failed holds back no other: the other's checks run,
     /// nothing is found for it, and it has no subject, since no object holds
-    /// endpoints to key; what needs every relation waits on it (D15:2149,
+    /// endpoints to key; what needs every relation waits on it (D15:2150,
     /// 2184, 2365, 2367, 3445).
     #[test]
     fn a_relation_that_failed_leaves_the_others_checked() {
@@ -4699,7 +4699,7 @@ pub(super) mod tests {
 
     /// A relation beside members that failed checks all but whether the
     /// group names its endpoints, and observes no array the group lacks
-    /// (D15:2184, 2365).
+    /// (D15:2185, 2366).
     #[test]
     fn a_relation_beside_members_that_failed_waits_only_on_them() {
         let mut inputs = Inputs::complete();
@@ -4730,7 +4730,7 @@ pub(super) mod tests {
     }
 
     /// Every occurrence counts: a relation that failed, and one in an entry
-    /// whose key failed (D15:1936).
+    /// whose key failed (D15:1937).
     #[test]
     fn the_relation_count_takes_every_occurrence_beside_what_failed() {
         use crate::resolver::evaluation::{Actual, LimitExceeded};
@@ -4770,7 +4770,7 @@ pub(super) mod tests {
 
     /// The total waits only when no array can be read: an empty array is one
     /// that holds no occurrence, while an omitted one is no value at all
-    /// (D15:569, 1936, 2184, 3354).
+    /// (D15:570, 1937, 2185, 3479).
     #[test]
     fn the_relation_total_waits_only_when_every_array_failed() {
         let total = hydration::unit(HydrationSubject::Relations, Check::WithinBound);
@@ -4806,7 +4806,7 @@ pub(super) mod tests {
 
     /// An undeclared member holds back no relation, while what needs the
     /// whole map waits on it, so no profile leaves a problem unseen inside
-    /// what it could not read (D15:2367).
+    /// what it could not read (D15:2368).
     #[test]
     fn what_needs_every_relation_waits_on_what_could_not_be_read() {
         let edits: [fn(&mut Value); 2] = [
@@ -4829,7 +4829,7 @@ pub(super) mod tests {
     }
 
     /// A group whose key failed has no subject here, its relations still
-    /// count, and what needs every group waits on it (D15:1936, 2184).
+    /// count, and what needs every group waits on it (D15:1937, 2185).
     #[test]
     fn a_group_whose_key_failed_has_no_relation_subject() {
         let mut inputs = Inputs::two_groups();
@@ -4886,7 +4886,7 @@ pub(super) mod tests {
 
     /// One endpoint that failed leaves the other checked: the relation has
     /// no identity, so it is keyed by its content; the endpoint that failed
-    /// has no subject, and what compares the two waits on it (D15:1931, 2181,
+    /// has no subject, and what compares the two waits on it (D15:1932, 2182,
     /// 2184, 2190, 2203, 2367).
     #[test]
     fn an_endpoint_that_failed_leaves_the_other_checked() {
@@ -4916,7 +4916,7 @@ pub(super) mod tests {
     }
 
     /// A relation with neither endpoint keeps its subject, whose checks wait
-    /// on both failures, and has no endpoint or role to check (D15:2184,
+    /// on both failures, and has no endpoint or role to check (D15:2185,
     /// 2190).
     #[test]
     fn a_relation_with_neither_endpoint_waits_on_both() {
@@ -4944,7 +4944,7 @@ pub(super) mod tests {
 
     /// The endpoint left reports what it alone proves, under the relation's
     /// content, and an endpoint that fails holds back only what needs it
-    /// (D15:2190, 2365, 2367).
+    /// (D15:2191, 2366, 2368).
     #[test]
     fn the_endpoint_left_reports_what_it_alone_proves() {
         let found = |server: &str| {
@@ -4973,7 +4973,7 @@ pub(super) mod tests {
 
     /// A Target ID's two roles are proved from the endpoints admitted, and
     /// one role among them passes: a unit over several values evaluates what
-    /// is admitted (D15:2098, 2184, 2365).
+    /// is admitted (D15:2099, 2185, 2366).
     #[test]
     fn a_target_two_relations_give_both_roles_is_found_beside_an_endpoint_that_failed() {
         for relations in [
@@ -5003,7 +5003,7 @@ pub(super) mod tests {
 
     /// Relations without an identity share one subject, each checked on its
     /// own: a check of the endpoint under it finds each raw parent at its
-    /// occurrences (D15:2190, 2203).
+    /// occurrences (D15:2191, 2204).
     #[test]
     fn relations_without_an_identity_share_a_subject_and_are_checked_apart() {
         let mut inputs = Inputs::complete();
@@ -5048,7 +5048,7 @@ pub(super) mod tests {
 
     /// A relation's key can stand for distinct raw parents, so past
     /// `maxTargetIdBytes` an endpoint reports the first-over witness, even
-    /// under an identity and for one value (D15:2203, 3355, Decision 015-157).
+    /// under an identity and for one value (D15:2204, 3480, Decision 015-157).
     #[test]
     fn an_endpoint_past_its_bound_reports_the_first_over_witness() {
         use crate::resolver::evaluation::{Actual, LimitExceeded};
@@ -5087,7 +5087,7 @@ pub(super) mod tests {
     }
 
     /// A failure under a target that a relation does not name holds back
-    /// none of that relation's checks (D15:2149, 2367, 3445).
+    /// none of that relation's checks (D15:2150, 2368, 3570).
     #[test]
     fn a_relation_waits_only_on_the_targets_it_names() {
         let mut inputs = Inputs::two_groups();
@@ -5107,7 +5107,7 @@ pub(super) mod tests {
     }
 
     /// A failure under a target a relation names holds back only what
-    /// compares that fact (D15:2149, 2365, 2367).
+    /// compares that fact (D15:2150, 2366, 2368).
     #[test]
     fn a_relation_beside_a_target_that_failed_waits_only_on_what_it_compares() {
         let mut inputs = Inputs::complete();
@@ -5139,7 +5139,7 @@ pub(super) mod tests {
 
     /// An endpoint naming an admitted Target ID is declared whatever key
     /// failed; one naming none is unproved while a key failed, and nothing
-    /// is found for it (D15:2365, 2367).
+    /// is found for it (D15:2366, 2368).
     #[test]
     fn an_endpoint_beside_a_target_key_that_failed_is_unproved_only_when_it_names_none() {
         let mut inputs = Inputs::complete();
@@ -5169,7 +5169,7 @@ pub(super) mod tests {
 
     /// An endpoint is in its group by the members that can be read: one
     /// they name passes, and one they do not name is unproved beside a
-    /// member that failed, with no Finding (D15:2098, 2365, 2367).
+    /// member that failed, with no Finding (D15:2099, 2366, 2368).
     #[test]
     fn an_endpoint_is_in_its_group_by_the_members_that_can_be_read() {
         let mut inputs = Inputs::complete();
@@ -5197,7 +5197,7 @@ pub(super) mod tests {
     }
 
     /// An undeclared member under a target holds back no relation, while
-    /// what needs every target waits on it (D15:2367).
+    /// what needs every target waits on it (D15:2368).
     #[test]
     fn what_needs_every_target_waits_on_an_undeclared_member() {
         let mut inputs = Inputs::complete();
@@ -5217,7 +5217,7 @@ pub(super) mod tests {
 
     /// The phases after Phase 5 classify a locale key by the canonicalizer it
     /// bound: Phase 7 observes a corrected alias key under its non-secret
-    /// name and a rejected one redacted (D15:776).
+    /// name and a rejected one redacted (D15:777).
     #[test]
     fn an_alias_key_is_classified_by_the_canonicalizer_phase_5_bound() {
         use crate::resolver::locales::fixtures::rejected;
@@ -5245,7 +5245,7 @@ pub(super) mod tests {
 
     /// Phase 8 observes through what Phase 5 bound as well: a key two entries
     /// name is found at each entry's key under its non-secret name, beside
-    /// the other's (D15:776, 2410).
+    /// the other's (D15:777, 2411).
     #[test]
     fn a_negotiation_key_is_classified_by_the_canonicalizer_phase_5_bound() {
         use crate::resolver::negotiation::{self, NegotiationSubject};
@@ -5288,7 +5288,7 @@ pub(super) mod tests {
 
     /// The message fallback observes through what Phase 5 bound as well: a
     /// source outside the requested locales is found at its key, under its
-    /// non-secret name, beside them (D15:776, 2249).
+    /// non-secret name, beside them (D15:777, 2250).
     #[test]
     fn a_fallback_key_is_classified_by_the_canonicalizer_phase_5_bound() {
         use crate::resolver::fallback::{self, FallbackSubject};
@@ -5672,7 +5672,7 @@ pub(super) mod tests {
     /// A structural failure outside the selected declaration leaves the
     /// semantic phases running over the declaration, while profile
     /// projection, which needs a complete `IntlifyConfig`, waits on the
-    /// structural Findings (D15:2142, 2367, 3434).
+    /// structural Findings (D15:2143, 2368, 3559).
     #[test]
     fn a_failure_outside_the_selected_declaration_holds_back_only_the_view() {
         let unselected = |inputs: &mut Inputs| {
@@ -5709,7 +5709,7 @@ pub(super) mod tests {
     /// structural Finding with a complete bundle, and composes nothing of it
     /// into the selected declaration: every Shared record of the checks after
     /// structural admission is the one the configuration gives while the
-    /// other declaration is valid (D15:2131, 2142, 2367, 2587, 3434; plan 025
+    /// other declaration is valid (D15:2132, 2143, 2368, 2588, 3559; plan 025
     /// decision #212).
     #[test]
     fn breaking_an_unselected_declaration_blocks_without_composing_it() {
@@ -5753,9 +5753,9 @@ pub(super) mod tests {
 
     /// A structural failure inside the selected declaration holds back only
     /// the checks that read its field, with its Finding as their cause, while
-    /// the semantic phases read the declaration's other fields (D15:2367,
+    /// the semantic phases read the declaration's other fields (D15:2368,
     /// 3340; plan 025 interpretation #218). Profile projection still waits on
-    /// the whole root (D15:2142).
+    /// the whole root (D15:2143).
     #[test]
     fn a_failure_inside_the_selected_declaration_holds_back_only_what_reads_it() {
         let mut inputs = Inputs::complete();
@@ -5843,7 +5843,7 @@ pub(super) mod tests {
 
     /// One policy slot that fails, or is missing, has no canonical bytes: its
     /// byte checks wait on its Finding, an independent slot's are evaluated,
-    /// and the selection is confirmed (D15:1918, 1924, 2149, 2367; plan 025
+    /// and the selection is confirmed (D15:1919, 1925, 2150, 2368; plan 025
     /// decision #342).
     #[test]
     fn a_policy_slot_that_fails_leaves_the_selection_confirmed() {
@@ -5864,7 +5864,7 @@ pub(super) mod tests {
 
     /// A failure in a target's field other than `profile` is no failure of a
     /// reference, and one target's `profile` that fails leaves the other's
-    /// checked (D15:1921, 1924, 2367; plan 025 decision #342).
+    /// checked (D15:1922, 1925, 2368; plan 025 decision #342).
     #[test]
     fn a_target_that_fails_leaves_the_selection_confirmed() {
         confirmed_beside(
@@ -5881,7 +5881,7 @@ pub(super) mod tests {
 
     /// A reference that failed still occurs, and past the bound it is a
     /// Finding, which holds the selection back. A missing one does not
-    /// occur, so eight are within a bound of eight (D15:1736, 1918, 1924).
+    /// occur, so eight are within a bound of eight (D15:1737, 1919, 1925).
     #[test]
     fn a_bound_past_its_limit_beside_a_failed_reference_holds_the_selection_back() {
         let count = BoundId {
@@ -5914,7 +5914,7 @@ pub(super) mod tests {
 
     /// The bound counts spellings, so no field that failed holds it back: a
     /// value that is no string is no spelling, an invalid string is one, and
-    /// an entry under a key that failed still holds its own (D15:1896, 1907,
+    /// an entry under a key that failed still holds its own (D15:1897, 1908,
     /// 2184, 3348).
     #[test]
     fn the_occurrence_bound_counts_the_spellings_beside_a_field_that_failed() {
@@ -5977,7 +5977,7 @@ pub(super) mod tests {
 
     /// One element of the project's `requestedLocales` that failed leaves the
     /// others spelled, each repeat still found and each correction suggested
-    /// (D15:1382, 2367, 3445).
+    /// (D15:1383, 2368, 3570).
     #[test]
     fn a_requested_element_that_failed_leaves_its_siblings_checked() {
         use crate::resolver::locales::fixtures::key;
@@ -6003,7 +6003,7 @@ pub(super) mod tests {
 
     /// A missing project default holds back only what needs it: the target
     /// locale Phase 7 finds invalid is a Finding beside it, and the default's
-    /// own checks are named and wait on it (D15:1157, 1171, 2365, 2367, 2416,
+    /// own checks are named and wait on it (D15:1158, 1172, 2366, 2368, 2417,
     /// 3446; plan 025 interpretation #252).
     #[test]
     fn a_missing_default_leaves_an_invalid_target_locale_found() {
@@ -6050,7 +6050,7 @@ pub(super) mod tests {
 
     /// Membership in a set with an element that failed is proved from the
     /// elements it holds: one of them passes, and any other waits, since
-    /// proving it outside needs the identity that element lacks (D15:2365,
+    /// proving it outside needs the identity that element lacks (D15:2366,
     /// 2367).
     #[test]
     fn a_set_with_a_failed_element_proves_only_what_it_holds() {
@@ -6108,7 +6108,7 @@ pub(super) mod tests {
 
     /// A target with no admitted value in its set waits on why, and on what
     /// the project's set lacks, which it would need to compare a locale it
-    /// does not hold (D15:2184, 2365, 2367, 3354).
+    /// does not hold (D15:2185, 2366, 2368, 3479).
     #[test]
     fn a_target_without_its_set_waits_on_the_projects_missing_element_too() {
         let mut inputs = Inputs::complete();
@@ -6140,7 +6140,7 @@ pub(super) mod tests {
 
     /// End to end, one target's failed `profile` leaves one Finding, and each
     /// row is evaluated or waits on it alone; only the failed reference's own
-    /// rows are both (D15:1924, 2149, 2367, 3446).
+    /// rows are both (D15:1925, 2150, 2368, 3571).
     #[test]
     fn a_failed_target_profile_changes_only_what_reads_the_targets() {
         let rows = |evaluation: &Evaluation| {
@@ -6200,7 +6200,7 @@ pub(super) mod tests {
 
     /// One element of a target's `requestedLocales` that failed holds back
     /// neither its sibling nor the other target's checks, and the map's bound
-    /// and each Target ID's are evaluated (D15:1930, 1931, 2367, 3445).
+    /// and each Target ID's are evaluated (D15:1931, 1932, 2368, 3570).
     #[test]
     fn a_target_element_that_failed_leaves_every_other_locale_check() {
         use crate::resolver::locales::fixtures::{key, target};
@@ -6233,7 +6233,7 @@ pub(super) mod tests {
 
     /// An entry whose value is no object keeps its key's subject: its bound
     /// is checked and its default's unit waits on why, while the other
-    /// target's checks run (D15:1171, 2184, 2367).
+    /// target's checks run (D15:1172, 2185, 2368).
     #[test]
     fn a_target_entry_that_is_no_object_keeps_its_subject() {
         use crate::resolver::locales::fixtures::{key, target};
@@ -6264,7 +6264,7 @@ pub(super) mod tests {
     }
 
     /// A map that is no object has no entry to read, but its bound's unit is
-    /// named by its path, and waits on why (D15:1157, 1171, 1930).
+    /// named by its path, and waits on why (D15:1158, 1172, 1931).
     #[test]
     fn a_target_map_that_failed_still_records_its_bound() {
         use crate::resolver::locales::LocaleSubject as L;
@@ -6290,7 +6290,7 @@ pub(super) mod tests {
 
     /// An entry whose key fails counts under `maxTargetProfiles` and has no
     /// later subject of its own, while the entries beside it wait only on the
-    /// map's bound (D15:1930, 2184, 3354).
+    /// map's bound (D15:1931, 2185, 3479).
     #[test]
     fn a_target_whose_key_fails_counts_without_a_subject() {
         use crate::resolver::evaluation::Actual;
@@ -6330,7 +6330,7 @@ pub(super) mod tests {
 
     /// An entry whose key fails has no reference to resolve, while what
     /// needs every reference, or every target, waits on its Finding, and
-    /// each target beside it resolves (D15:2184, 2367, 3354).
+    /// each target beside it resolves (D15:2185, 2368, 3479).
     #[test]
     fn a_target_whose_key_fails_holds_back_what_needs_every_target() {
         use crate::resolver::locales::fixtures::target;
@@ -6352,7 +6352,7 @@ pub(super) mod tests {
     /// One target's failed `profile` holds back only the checks that need
     /// that profile: its reference and its directions wait on the Finding,
     /// and every other check of it, and of the other target, is evaluated
-    /// (D15:2139, 2367, 3445, 3446).
+    /// (D15:2140, 2368, 3570, 3571).
     #[test]
     fn a_target_profile_that_failed_stops_only_what_needs_it() {
         use crate::resolver::locales::fixtures::target;
@@ -6428,7 +6428,7 @@ pub(super) mod tests {
     /// A target's checks over its set read the values admitted: one that the
     /// project's set proves outside it is a Finding, and one it cannot prove
     /// waits. A default its admitted values do not hold is unproved beside
-    /// an element without an identity (D15:2184, 2365, 2367, 3354).
+    /// an element without an identity (D15:2185, 2366, 2368, 3479).
     #[test]
     fn a_target_set_with_a_failed_element_is_checked_over_what_it_holds() {
         let type_found = Code::FieldTypeInvalid;
@@ -6470,7 +6470,7 @@ pub(super) mod tests {
     /// One alias destination that failed holds back only what names it: the
     /// map's bound counts it, every key and every other destination is
     /// checked, and the profile, built from every entry, waits on it
-    /// (D15:1477, 1898, 2367, 2418).
+    /// (D15:1478, 1899, 2368, 2419).
     #[test]
     fn an_alias_destination_that_failed_leaves_every_other_alias_check() {
         use crate::resolver::locales::fixtures::key;
@@ -6508,7 +6508,7 @@ pub(super) mod tests {
 
     /// An undeclared member of `localeNegotiation` is a failure of that
     /// object alone: its aliases are checked, and the profile waits on it
-    /// (D15:2184, 2367, 3354).
+    /// (D15:2185, 2368, 3479).
     #[test]
     fn an_undeclared_negotiation_member_holds_back_only_the_profile() {
         use crate::resolver::locales::fixtures::key;
@@ -6537,7 +6537,7 @@ pub(super) mod tests {
 
     /// Entries naming one key beside a destination that failed: its reason
     /// needs that destination, so the duplicate is unproved rather than
-    /// reported with a reason made up (D15:1477, 2365, 2418).
+    /// reported with a reason made up (D15:1478, 2366, 2419).
     #[test]
     fn a_duplicate_alias_key_beside_a_failed_destination_waits_on_it() {
         use crate::resolver::locales::fixtures::key;
@@ -6557,7 +6557,7 @@ pub(super) mod tests {
     /// One fallback candidate that failed holds back only itself: its
     /// position has no unit, while the sequence's bound counts those
     /// admitted, every other candidate is checked, and a repeat among them is
-    /// found; the policy, built from every candidate, waits on it (D15:1519,
+    /// found; the policy, built from every candidate, waits on it (D15:1520,
     /// 1899, 1900, 2184, 2367, 2422, 3354).
     #[test]
     fn a_fallback_candidate_that_failed_leaves_every_other_candidate_checked() {
@@ -6615,7 +6615,7 @@ pub(super) mod tests {
 
     /// A sequence that failed as a whole holds back only its own checks: its
     /// key's are evaluated, its bound waits on why, and the other key's
-    /// sequence is checked (D15:1519, 2184, 2367, 3354).
+    /// sequence is checked (D15:1520, 2185, 2368, 3479).
     #[test]
     fn a_fallback_sequence_that_failed_leaves_its_key_and_the_others_checked() {
         use crate::resolver::fallback::{unit as fallback, FallbackSubject as F};
@@ -6653,7 +6653,7 @@ pub(super) mod tests {
     }
 
     /// Keys that collide report the collision, and their sequences' checks
-    /// wait on it alone, whatever a sequence's own failure (D15:1519).
+    /// wait on it alone, whatever a sequence's own failure (D15:1520).
     #[test]
     fn a_colliding_fallback_key_holds_back_its_sequences_on_the_collision() {
         use crate::resolver::fallback::{unit as fallback, FallbackSubject as F};
@@ -6722,7 +6722,7 @@ pub(super) mod tests {
 
     /// With every count able to read an admitted selector, a rule that failed
     /// still holds back every cell and the table, which need every rule
-    /// (D15:2426, 3409).
+    /// (D15:2427, 3534).
     #[test]
     fn a_rule_that_failed_holds_back_every_cell_beside_an_admitted_rule() {
         for failed in [
@@ -6753,7 +6753,7 @@ pub(super) mod tests {
     /// One rule that failed, in whatever way, holds back no other rule's
     /// items, no count, and no bound over the table's size: only what needs
     /// every rule waits, and no Finding is made up for the rule that failed
-    /// (D15:1901, 1902, 1903, 1905, 2190, 2365, 2367, 2426).
+    /// (D15:1902, 1903, 1904, 1906, 2191, 2366, 2368, 2427).
     #[test]
     fn a_coverage_rule_that_failed_leaves_the_other_rules_checked() {
         use crate::resolver::coverage::CoverageSubject as C;
@@ -6809,7 +6809,7 @@ pub(super) mod tests {
 
     /// One selector item that failed holds back neither its siblings' checks
     /// nor what they find among themselves; the rule, which needs every item,
-    /// waits (D15:1567, 2367, 2426, 3409).
+    /// waits (D15:1568, 2368, 2427, 3534).
     #[test]
     fn a_selector_item_that_failed_leaves_its_siblings_checked() {
         use crate::resolver::coverage::{unit, CoverageSubject as C, RuleContent, SurfaceKey};
@@ -6865,7 +6865,7 @@ pub(super) mod tests {
 
     /// Each count takes every occurrence it names, whatever became of its
     /// value: past the bound with a rule or item that failed among them
-    /// (D15:1901, 1902, 1903, 1905).
+    /// (D15:1902, 1903, 1904, 1906).
     #[test]
     fn the_coverage_counts_take_every_occurrence_beside_what_failed() {
         use crate::resolver::coverage::CoverageSubject as C;
@@ -6921,7 +6921,7 @@ pub(super) mod tests {
 
     /// A selector count waits only when every selector it would read failed:
     /// a rule or selector that failed has no item to count, and one beside it
-    /// that was admitted is counted (D15:1902, 1903, 2184, 3354).
+    /// that was admitted is counted (D15:1903, 1904, 2185, 3479).
     #[test]
     fn a_selector_count_waits_only_when_every_selector_failed() {
         use crate::resolver::coverage::CoverageSubject as C;
@@ -6961,7 +6961,7 @@ pub(super) mod tests {
     }
 
     /// A rule whose mode failed still has a domain, which a duplicate is
-    /// found against, while the mode the table needs is missing (D15:2365,
+    /// found against, while the mode the table needs is missing (D15:2366,
     /// 2426).
     #[test]
     fn a_rule_whose_mode_failed_still_holds_its_domain() {
@@ -6988,7 +6988,7 @@ pub(super) mod tests {
 
     /// A cell no rule matches is what needs the default mode, so a default
     /// that failed holds back only such cells: a conflict between rules is
-    /// still found (D15:2365, 2426).
+    /// still found (D15:2366, 2427).
     #[test]
     fn a_default_mode_that_failed_holds_back_only_the_cells_taking_it() {
         let mut inputs = Inputs::complete();
@@ -7025,7 +7025,7 @@ pub(super) mod tests {
     }
 
     /// An unknown default mode blocks coverage, so the table keeps no Basis
-    /// even when a rule decides every cell (D15:2426, 3607).
+    /// even when a rule decides every cell (D15:2427, 3732).
     #[test]
     fn a_default_mode_that_failed_holds_back_the_table() {
         let mut inputs = Inputs::complete();
@@ -7042,7 +7042,7 @@ pub(super) mod tests {
 
     /// A cell a rule known to match never takes the default, so beside a rule
     /// that failed it waits on that rule alone, and only a cell no such rule
-    /// matches waits on the default as well (D15:2365).
+    /// matches waits on the default as well (D15:2366).
     #[test]
     fn a_cell_waits_on_the_default_only_when_no_known_rule_matches_it() {
         let mut inputs = Inputs::complete();
@@ -7064,7 +7064,7 @@ pub(super) mod tests {
 
     /// A rule whose mode failed still holds its domain, so a cell it matches
     /// waits on that mode and not on the default, and a cell no rule matches
-    /// on the default and not on that mode (D15:2365).
+    /// on the default and not on that mode (D15:2366).
     #[test]
     fn a_cell_a_rule_without_a_mode_matches_waits_on_that_mode_alone() {
         let only = |coverage: Value| {
@@ -7085,7 +7085,7 @@ pub(super) mod tests {
 
     /// A conflict needs only the modes of the rules that conflict: a mode
     /// that failed in a rule outside the cell, or in a third maximally
-    /// specific rule, leaves it found, while the table waits (D15:2365, 2410,
+    /// specific rule, leaves it found, while the table waits (D15:2366, 2411,
     /// 2426).
     #[test]
     fn a_conflict_is_found_beside_a_mode_that_failed() {
@@ -7133,7 +7133,7 @@ pub(super) mod tests {
 
     /// A maximally specific rule whose mode failed holds back the cells it
     /// could decide, even beside a rule with a mode, and no other cell
-    /// (D15:2365).
+    /// (D15:2366).
     #[test]
     fn a_maximal_rule_without_a_mode_holds_back_only_its_cells() {
         let mut inputs = Inputs::complete();
@@ -7165,7 +7165,7 @@ pub(super) mod tests {
 
     /// Each mode that failed is a cause of what needs it: a cell both rules
     /// decide waits on the two, a cell one rule decides on that rule's alone,
-    /// and the table on both (D15:2365, 2426).
+    /// and the table on both (D15:2366, 2427).
     #[test]
     fn each_mode_that_failed_is_a_cause_of_what_needs_it() {
         let mut inputs = Inputs::complete();
@@ -7200,7 +7200,7 @@ pub(super) mod tests {
     }
 
     /// A domain two rules hold keeps the mode of each as a cause of the table,
-    /// though the rule whose mode failed orders after the other (D15:2365,
+    /// though the rule whose mode failed orders after the other (D15:2366,
     /// 2426).
     #[test]
     fn a_domain_held_twice_keeps_each_rules_mode_as_a_cause() {
@@ -7220,7 +7220,7 @@ pub(super) mod tests {
     }
 
     /// A rule narrower rules outrank at every cell it matches holds back no
-    /// cell, and its unknown mode still blocks the table (D15:2426, 3607).
+    /// cell, and its unknown mode still blocks the table (D15:2427, 3732).
     #[test]
     fn a_rule_outranked_at_every_cell_holds_back_only_the_table() {
         let mut inputs = Inputs::complete();
@@ -7246,7 +7246,7 @@ pub(super) mod tests {
     /// selector failed and so holds no domain included: under a vocabulary
     /// with no surface class, where no cell waits on the selector, the table
     /// waits on that mode alone, and with cells it waits on the mode beside
-    /// the selector (D15:2365, 2426, 3607).
+    /// the selector (D15:2366, 2427, 3732).
     #[test]
     fn the_table_waits_on_the_mode_of_a_rule_whose_selector_failed() {
         let rule = json!({"intentSurfaceClasses": ["nowhere"], "mode": 7});
@@ -7272,7 +7272,7 @@ pub(super) mod tests {
     /// No check reads an undeclared member under `coverage` or a rule: every
     /// cell and the table, whose only prerequisite is its cells, are
     /// evaluated, and the policy built from all of `coverage` waits on it
-    /// (D15:1609, 2149, 2367).
+    /// (D15:1610, 2150, 2368).
     #[test]
     fn an_undeclared_coverage_member_holds_back_only_the_policy() {
         for edit in [
@@ -7300,7 +7300,7 @@ pub(super) mod tests {
 
     /// A declaration whose key lacks the identifier syntax counts under the
     /// policy's `maxProfiles`, while no later phase has a subject for its ID
-    /// (D15:1885, 1886, 2184).
+    /// (D15:1886, 1887, 2185).
     #[test]
     fn a_declaration_whose_key_fails_counts_without_an_id_subject() {
         let mut inputs = Inputs::complete();
@@ -7353,7 +7353,7 @@ pub(super) mod tests {
     /// The capability's `localeData` bounds reach Phase 5, which reads the
     /// rest of the data past the boundary under them. Data whose rest does
     /// not read is not admitted, a Finding of the data's unit rather than a
-    /// refusal before invocation (D15:3165).
+    /// refusal before invocation (D15:3170).
     #[test]
     fn phase_5_reads_the_data_under_the_capabilitys_locale_data_bounds() {
         #[derive(PartialEq, Eq)]
@@ -7414,7 +7414,7 @@ pub(super) mod tests {
     /// The invocation records Phase 0 before configuration entry: Phase 0's
     /// status, Finding, and occurrence candidate stand when no configuration
     /// follows, and the semantic phases record no Phase 0 unit of their own
-    /// (D15:2145).
+    /// (D15:2146).
     #[test]
     fn phase_0_is_recorded_apart_from_the_semantic_phases() {
         let mut inputs = Inputs::complete();
@@ -7504,7 +7504,7 @@ pub(super) mod tests {
     /// path admission reads: under a tight `maxLogicalPathSegments`, a string
     /// past a tight single-string bound too deep for it keeps no projected
     /// path, and path admission leaves each candidate's primary Evidence as
-    /// it would have left the projected one (D15:1851; plan 025 decision
+    /// it would have left the projected one (D15:1852; plan 025 decision
     /// #299).
     #[test]
     fn phase_1_reads_the_path_bounds_path_admission_applies() {
@@ -7546,7 +7546,7 @@ pub(super) mod tests {
 
     /// One `policies` slot that fails, or is missing, leaves only its own
     /// reference unresolved, and only the group that holds the slot waits
-    /// (D15:2137, 2365, 2367, 3445).
+    /// (D15:2138, 2366, 2368, 3570).
     #[test]
     fn a_policy_slot_that_failed_stops_only_its_reference_and_its_group() {
         use SemanticGroup::{OptionalPolicies, RequiredPolicies};
@@ -7605,7 +7605,7 @@ pub(super) mod tests {
 
     /// A member `policies` does not declare is in no slot, so every reference
     /// is still resolved, while both groups of the object wait on its Finding,
-    /// as the groups of `localeNegotiation` and `coverage` do (D15:2184, 2367;
+    /// as the groups of `localeNegotiation` and `coverage` do (D15:2185, 2368;
     /// plan 025 interpretations #346, #347).
     #[test]
     fn an_undeclared_policies_member_holds_back_no_reference() {
@@ -7630,7 +7630,7 @@ pub(super) mod tests {
 
     /// Without a selection each `policies` slot still names its reference's
     /// units, which wait on what held the selection back, while no unit is
-    /// made up for a target, whose key only the declaration holds (D15:1171,
+    /// made up for a target, whose key only the declaration holds (D15:1172,
     /// 2131, 2184; plan 025 interpretation #220).
     #[test]
     fn without_a_selection_each_slot_records_its_reference_units() {
@@ -7654,7 +7654,7 @@ pub(super) mod tests {
 
     /// Both policy groups are the confirmed declaration's: even over an empty
     /// collection, whose admission has no unit to wait on the policy, each
-    /// waits on what left the policy unconfirmed (D15:2132, 2516).
+    /// waits on what left the policy unconfirmed (D15:2133, 2517).
     #[test]
     fn an_empty_collection_leaves_both_policy_groups_waiting_on_the_policy() {
         let mut inputs = Inputs::complete();
@@ -7681,7 +7681,7 @@ pub(super) mod tests {
 
     /// Without a confirmed policy an empty collection proves nothing about a
     /// reference: every unit of Phase 9 waits on what left the policy
-    /// unconfirmed, and the phase adds no Finding (D15:2137, 2365).
+    /// unconfirmed, and the phase adds no Finding (D15:2138, 2366).
     #[test]
     fn an_empty_collection_without_a_confirmed_policy_finds_nothing_in_phase_9() {
         let mut inputs = Inputs::complete();
@@ -8038,7 +8038,7 @@ pub(super) mod tests {
     }
 
     /// The Conformance rows that one invalid value stops only what needs it
-    /// (D15:3340, 3445, 3446), over a whole invocation. Breaking each place
+    /// (D15:3465, 3570, 3571), over a whole invocation. Breaking each place
     /// in turn must report exactly its one Finding, leave not evaluated
     /// exactly the rows the case lists, each unit waiting on that Finding
     /// through the Check Registry's prerequisites, and keep the sibling units
@@ -8096,7 +8096,7 @@ pub(super) mod tests {
 
     /// The `policies` object itself holds the selected reference, so without
     /// it no declaration is selected: the wide stop 015 allows for the
-    /// selected declaration's boundary (D15:2131, 2367). Each slot still names
+    /// selected declaration's boundary (D15:2132, 2368). Each slot still names
     /// its reference's units, which wait on that Finding.
     #[test]
     fn a_policies_object_that_failed_holds_the_selection_back() {
@@ -8118,7 +8118,7 @@ pub(super) mod tests {
 
     /// Independent values that fail together are all reported in the one
     /// invocation, each with the Finding it has alone, rather than stopping
-    /// at the first (D15:2149, 3445).
+    /// at the first (D15:2150, 3570).
     #[test]
     fn independent_failures_are_all_found_in_one_invocation() {
         let independent = [
