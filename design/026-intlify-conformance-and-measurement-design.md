@@ -2583,7 +2583,7 @@ Normal CI MUST gate:
 - Measurement Projection tests; and
 - common structured report generation.
 
-Where an implementation provides profiling, normal CI also compiles and smoke-tests the profiling feature separately, verifies enabled/disabled logical-result equivalence, and validates Instrumentation Isolation Evidence proving that ordinary production feature selection does not retain profiler call-site work, runtime, or recorder dependencies.
+Where an implementation provides profiling, normal CI also compiles and smoke-tests the profiling feature separately and verifies enabled/disabled logical-result equivalence. Where it also claims the zero-required-runtime-work capability, CI validates Instrumentation Isolation Evidence proving that ordinary production feature selection does not retain profiler call-site work, runtime, or recorder dependencies.
 
 Deterministic artifact-size and delivery-topology budgets MAY also gate normal CI when at least two retained generations of identical checked inputs satisfy the applicable `artifact-generation` Determinism Proof.
 
@@ -2809,7 +2809,7 @@ The initial implementation MAY also expose non-default timing spans aligned with
 | `profile_artifact_admit` costs       | `toolchain`     | `component`     | `core`              |
 | `profile_target_group_resolve` costs | `toolchain`     | `component`     | `core`              |
 | `profile_evidence_materialize` costs | `toolchain`     | `component`     | `core`              |
-| `profile_resolve_e2e` costs          | `toolchain`     | `workflow`      | `product_workflow`  |
+| `profile_resolve_e2e` costs          | `toolchain`     | `workflow`      | `core`              |
 | `profile_resolve_peak_memory` costs  | `memory`        | `peak_live`     | `core`              |
 
 This table does not define the owner pair meanings. It only fixes their common grouping. Each `profile_resolve_peak_memory` case additionally references the 015-owned Memory Observation Domain for resolver construction or invocation, `profile-resolver-construction` or `profile-resolver-invocation`, which [015's measurement records](./015-intlify-project-profile-and-locale-policy-design.md#measurement-records-and-common-projection) define.
@@ -2860,7 +2860,7 @@ Component specifications own the semantic fixture bodies imported by those campa
 
 ### Required projection fixtures
 
-Every Measurement Projection includes cases for:
+Every Measurement Projection includes the following cases where they apply to the profiles it projects. A profile whose inventory is all required and unconditional has no optional or not-applicable evaluation; in place of the optional and not-applicable part of the inventory item below, its projection includes a case that rejects an optional or conditional inventory entry:
 
 - the exact admitted owner schema/profile revision;
 - unknown phase or cost;
@@ -2898,7 +2898,7 @@ Every Measurement Projection includes cases for:
 Profiling fixtures cover:
 
 - an ordinary build with instrumentation call sites disabled and no required profiler recorder dependency;
-- Instrumentation Isolation Evidence covering exhaustive-inventory and construction-proof call-site coverage, dependency closure, symbols/imports/registries/sections, code generation, and non-evaluation of disabled arguments;
+- when the zero-required-runtime-work capability is claimed, Instrumentation Isolation Evidence covering exhaustive-inventory and construction-proof call-site coverage, dependency closure, symbols/imports/registries/sections, code generation, and non-evaluation of disabled arguments;
 - enabled/disabled logical-result and deterministic-artifact equality;
 - event-trace and aggregate-table recorder modes;
 - preissued profiling execution identity on complete, truncated, and data-less recorder-failed observations; missing/mismatched identities, fresh rerun identities, preserved subject/build/fixture/workload checks, and exclusion of execution identity from semantic equality;

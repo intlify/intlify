@@ -383,7 +383,7 @@ For SSR, locale modules, prepared messages, locale data, and immutable Runtime E
 
 The application, framework, HTTP layer, or platform obtains user or request preferences. Locale negotiation then chooses one supported requested locale before Localizer construction. The application may select a supported locale directly or use an optional Intlify Locale Negotiator. Negotiation is not single-message formatting.
 
-The versioned `LocaleNegotiationProfile` and its algorithms are owned by 015. The reference Runtime consumes an application-selected supported locale or may implement an adapter for an admitted profile. If 015 admits deterministic lookup as the initial portable profile, the reference adapter follows the specified sequence, conceptually:
+The versioned `LocaleNegotiationProfile` and its algorithms are owned by 015. The reference Runtime consumes an application-selected supported locale or may implement an adapter for an admitted profile. When it implements that adapter, it owns the adapter's typed invocation failures and its per-invocation preference and candidate-probe bounds, which 015 assigns to the negotiation adapter's owner; this revision defines no resource section for them, so 015's Conditional Obligation `015-HV-001` stays inactive. If 015 admits deterministic lookup as the initial portable profile, the reference adapter follows the specified sequence, conceptually:
 
 1. canonicalize preferences through the declared versioned rules;
 2. select an exact supported match;
