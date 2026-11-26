@@ -358,6 +358,146 @@
         }
       }
     },
+    "bytesInput": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bytes"
+          ],
+          "properties": {
+            "bytes": {
+              "type": "string",
+              "pattern": "^(?:[0-9a-f]{2})*$"
+            }
+          }
+        },
+        {
+          "$ref": "#/definitions/reference"
+        }
+      ]
+    },
+    "constructionInputFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "profileSpecificationSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tuple",
+            "bytes"
+          ],
+          "properties": {
+            "tuple": {
+              "$ref": "#/definitions/json"
+            },
+            "bytes": {
+              "$ref": "#/definitions/bytesInput"
+            }
+          }
+        },
+        "profileSpecification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tuple",
+            "bytes"
+          ],
+          "properties": {
+            "tuple": {
+              "$ref": "#/definitions/json"
+            },
+            "bytes": {
+              "$ref": "#/definitions/bytesInput"
+            }
+          }
+        },
+        "configurationSchemaAuthoritySet": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tuple",
+            "bytes",
+            "members"
+          ],
+          "properties": {
+            "tuple": {
+              "$ref": "#/definitions/json"
+            },
+            "bytes": {
+              "$ref": "#/definitions/bytesInput"
+            },
+            "members": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/bytesInput"
+              }
+            }
+          }
+        },
+        "resolverCapabilitySpecification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tuple",
+            "bytes"
+          ],
+          "properties": {
+            "tuple": {
+              "$ref": "#/definitions/json"
+            },
+            "bytes": {
+              "$ref": "#/definitions/bytesInput"
+            }
+          }
+        },
+        "registryPackage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tuple",
+            "bytes",
+            "members"
+          ],
+          "properties": {
+            "tuple": {
+              "$ref": "#/definitions/json"
+            },
+            "bytes": {
+              "$ref": "#/definitions/bytesInput"
+            },
+            "members": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [],
+              "properties": {
+                "safe-origin-kind-registry-schema": {
+                  "$ref": "#/definitions/bytesInput"
+                },
+                "check-registry-schema": {
+                  "$ref": "#/definitions/bytesInput"
+                },
+                "finding-registry-schema": {
+                  "$ref": "#/definitions/bytesInput"
+                },
+                "safe-origin-kind-registry": {
+                  "$ref": "#/definitions/bytesInput"
+                },
+                "check-registry": {
+                  "$ref": "#/definitions/bytesInput"
+                },
+                "finding-registry": {
+                  "$ref": "#/definitions/bytesInput"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "snapshotNode": {
       "oneOf": [
         {

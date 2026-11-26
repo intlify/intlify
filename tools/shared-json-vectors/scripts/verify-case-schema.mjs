@@ -495,8 +495,8 @@ const pinnedRoot = read('suite-index-v0.json').value.resolverConstructionRootPac
 const pinnedBody = pinnedRoot?.members?.['construction-admission-specification']
 if (
   !isDeepStrictEqual(
-    Object.keys(precedence).sort(),
-    ['resolver-construction', ...BOUNDARIES.map(([kind]) => kind)].sort()
+    new Set(Object.keys(precedence)),
+    new Set(['resolver-construction', ...BOUNDARIES.map(([kind]) => kind)])
   )
 ) {
   fail('schema: failurePrecedence does not hold exactly the boundary kinds and the construction')
@@ -682,8 +682,45 @@ const side = node =>
   closedOf(node, PAIRED) ||
   (closedOf(node, ['unpaired']) &&
     closedOf(node.properties.unpaired, ['reason', 'verificationOwner']))
+// The construction input fixture: each component a closed `{ tuple, bytes }`,
+// the containers with their members, the Registry Package's closed to the
+// roles of the committed container, and bytes hexadecimal or a reference.
+const fixtureForm = definitions.constructionInputFixture
+const component = name => fixtureForm?.properties?.[name]
+const roles = Object.keys(read('registries/package-v0.json').value.members ?? {})
+const bytesForm = definitions.bytesInput?.oneOf ?? []
 const closures = [
   ['traceability', closedOf(definitions.traceability, ['decisionIds', 'ruleIds', 'checkIds'])],
+  [
+    'constructionInputFixture',
+    closedOf(
+      fixtureForm,
+      [],
+      [
+        'profileSpecificationSchema',
+        'profileSpecification',
+        'configurationSchemaAuthoritySet',
+        'resolverCapabilitySpecification',
+        'registryPackage'
+      ]
+    ) &&
+      [
+        'profileSpecificationSchema',
+        'profileSpecification',
+        'resolverCapabilitySpecification'
+      ].every(name => closedOf(component(name), ['tuple', 'bytes'])) &&
+      closedOf(component('configurationSchemaAuthoritySet'), ['tuple', 'bytes', 'members']) &&
+      closedOf(component('registryPackage'), ['tuple', 'bytes', 'members']) &&
+      roles.length === 6 &&
+      closedOf(component('registryPackage')?.properties?.members, [], roles)
+  ],
+  [
+    'bytesInput',
+    bytesForm.length === 2 &&
+      closedOf(bytesForm[0], ['bytes']) &&
+      bytesForm[0].properties.bytes.pattern === '^(?:[0-9a-f]{2})*$' &&
+      isDeepStrictEqual(bytesForm[1], { $ref: '#/definitions/reference' })
+  ],
   [
     'resolverConstruction',
     closedOf(definitions.resolverConstruction, ['caseId', 'identityReference'])

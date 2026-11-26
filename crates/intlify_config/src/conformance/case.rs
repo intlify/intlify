@@ -24,11 +24,15 @@
 //! the construction-admission body that holds the construction rows. Draft 7
 //! ignores the keyword, so it changes nothing that the schema admits.
 //!
-//! What a manifest names besides itself, its fixtures, keeps the form the
-//! cases that read it will give it: the forms of the input and
-//! expected-outcome fixtures join this schema with those cases, as revision
-//! `"0"` is written (plan 027 decision 32). A manifest refers to a fixture by
-//! a suite-root-relative path and a file digest only.
+//! What a manifest names besides itself, its fixtures, takes the form the
+//! cases that read it give it: the forms of the input and expected-outcome
+//! fixtures join this schema with those cases, as revision `"0"` is written
+//! (plan 027 decision 32). A manifest refers to a fixture by a
+//! suite-root-relative path and a file digest only. The construction input
+//! fixture is here: each of the five components as its declared tuple, a
+//! decoded JSON value, and its bytes, the two containers with their members
+//! by `schemaVersion` and by role (D15:3252). Bytes are lowercase
+//! hexadecimal or a reference to a file the case keeps them in (D15:3243-3248).
 
 use serde_json::{json, Map, Value};
 
@@ -41,6 +45,7 @@ use crate::construction::failure::ConstructionFailure;
 use crate::construction::generate::{self, Artifact};
 use crate::construction::profile::MARKER_REASONS;
 use crate::construction::registry::check::{CHECK_ID_PATTERN, RULE_ID_PATTERN};
+use crate::construction::registry::RegistryRole;
 use crate::construction::root::RootRole;
 use crate::resolver::dependency::SemanticGroup;
 use crate::resolver::origin::SafeOriginKind;
@@ -59,7 +64,7 @@ pub(crate) const PATH: &str = "schemas/case-v0.schema.json";
 
 /// The Case Schema's file digest, which the runner pins.
 pub(crate) const DIGEST: &str =
-    "sha256:50d2a9d4dbd5faa9acb533e7538a82f6b9af577a9d5061b694eeda102281b3f7";
+    "sha256:d01599c8f072903a8d9a058cf05b26da1007c39a58c601ab81bb3dcc708884ee";
 
 /// A case or Handoff Vector ID: `015-` and lowercase kebab-case.
 pub(crate) const CASE_ID_PATTERN: &str = "^015-[a-z0-9]+(?:-[a-z0-9]+)*$";
@@ -85,6 +90,9 @@ const COVERAGE_ITEM_PATTERN: &str = "^015-COV-[0-9]{3}$";
 /// A Resolver Construction Identity's text: `rci0_` and the unpadded
 /// base64url of 32 bytes, whose last character carries four bits.
 const CONSTRUCTION_IDENTITY_PATTERN: &str = "^rci0_[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$";
+
+/// Bytes in lowercase hexadecimal, two digits a byte (D15:3245).
+const HEX_PATTERN: &str = "^(?:[0-9a-f]{2})*$";
 
 /// A decimal number's text.
 const DECIMAL_PATTERN: &str = "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$";
@@ -784,6 +792,48 @@ fn construction(definitions: &mut Map<String, Value>) {
         ("traceability", definition("traceability")),
     ]);
     definitions.insert(kind.definition().into(), closed(&members));
+    construction_fixture(definitions);
+}
+
+/// The construction input fixture (D15:3252): each component present is its
+/// declared tuple, which construction reads as a decoded JSON value, and the
+/// declared artifact's bytes, and the two containers add their members' bytes,
+/// the Configuration Schema Authority Set's by `schemaVersion` and the
+/// Registry Package's by role. An absent component, or an absent member of a
+/// container, is an omitted member.
+fn construction_fixture(definitions: &mut Map<String, Value>) {
+    definitions.insert(
+        "bytesInput".into(),
+        json!({
+            "oneOf": [
+                closed(&[("bytes", pattern(HEX_PATTERN))]),
+                definition("reference"),
+            ]
+        }),
+    );
+    let component = |members: Option<Value>| {
+        let mut fields = vec![
+            ("tuple", definition("json")),
+            ("bytes", definition("bytesInput")),
+        ];
+        fields.extend(members.map(|members| ("members", members)));
+        closed(&fields)
+    };
+    let set = json!({ "type": "object", "additionalProperties": definition("bytesInput") });
+    let roles = RegistryRole::ALL.map(|role| (role.name(), definition("bytesInput")));
+    definitions.insert(
+        "constructionInputFixture".into(),
+        closed_with(
+            &[],
+            &[
+                ("profileSpecificationSchema", component(None)),
+                ("profileSpecification", component(None)),
+                ("configurationSchemaAuthoritySet", component(Some(set))),
+                ("resolverCapabilitySpecification", component(None)),
+                ("registryPackage", component(Some(closed_with(&[], &roles)))),
+            ],
+        ),
+    );
 }
 
 /// A canonical Snapshot node (D15:3250).
@@ -1305,6 +1355,21 @@ mod tests {
             Self {
                 read: Schema::compile(&schema).unwrap(),
                 oracle: jsonschema::draft7::new(&schema).unwrap(),
+            }
+        }
+
+        /// Both validators over one definition of the schema, as the root of
+        /// its definitions, as the runner reads a fixture's form.
+        fn of(definition: &str) -> Self {
+            let schema = schema().unwrap();
+            let root = json!({
+                "$schema": DRAFT_7,
+                "$ref": format!("#/definitions/{definition}"),
+                "definitions": schema["definitions"],
+            });
+            Self {
+                read: Schema::compile(&root).unwrap(),
+                oracle: jsonschema::draft7::new(&root).unwrap(),
             }
         }
 
@@ -2492,5 +2557,48 @@ mod tests {
             body["failurePrecedence"],
             serde_json::to_value(PRECEDENCE.as_slice()).unwrap()
         );
+    }
+
+    /// The construction input fixture: each component a closed
+    /// `{ tuple, bytes }`, its tuple a decoded value and its bytes lowercase
+    /// hexadecimal or a reference, the containers with their members, the
+    /// Registry Package's closed to its six roles. An omitted component is an
+    /// absent one, so an empty fixture has the form.
+    #[test]
+    fn the_construction_fixture_closes_its_components() {
+        let validators = Validators::of("constructionInputFixture");
+        let fixture = super::super::construction_cases::cases()
+            .unwrap()
+            .files
+            .into_iter()
+            .find(|file| file.path == "fixtures/construction/015-construction-revision-0.json")
+            .unwrap();
+        let fixture: Value = serde_json::from_slice(&fixture.bytes).unwrap();
+        assert!(validators.admits(&fixture));
+        assert!(validators.admits(&json!({})));
+        let refused: [fn(&mut Value); 8] = [
+            |fixture| fixture["profileSpecificationSchema"]["tuple"] = json!({ "bytes": "" }),
+            |fixture| fixture["profileSpecificationSchema"]["bytes"] = json!({ "json": {} }),
+            |fixture| fixture["profileSpecificationSchema"]["bytes"] = json!({ "bytes": "7B" }),
+            |fixture| fixture["profileSpecificationSchema"]["members"] = json!({}),
+            |fixture| {
+                let set = fixture["configurationSchemaAuthoritySet"]
+                    .as_object_mut()
+                    .unwrap();
+                set.remove("members");
+            },
+            |fixture| {
+                fixture["configurationSchemaAuthoritySet"]["members"]["0"] = json!({ "json": {} });
+            },
+            |fixture| {
+                fixture["registryPackage"]["members"]["unknown-registry"] = json!({ "bytes": "" });
+            },
+            |fixture| fixture["unknown"] = json!({}),
+        ];
+        for (index, change) in refused.into_iter().enumerate() {
+            let mut changed = fixture.clone();
+            change(&mut changed);
+            assert!(!validators.admits(&changed), "change {index}");
+        }
     }
 }

@@ -11,23 +11,31 @@
 //! schema, validates the index against it, compares what the index pins with
 //! the artifacts this crate is compiled from, and verifies every body the
 //! index names by its file digest, and every manifest against the Case Schema
-//! ([`case`], [`runner`]). Whatever stops a suite from
+//! ([`case`], [`runner`]), with the fixtures the construction cases name and
+//! the bodies they reference ([`fixture`]). Whatever stops a suite from
 //! opening is a Conformance harness failure, never a construction failure, an
-//! input-admission failure, a Finding, or a resolver outcome.
+//! input-admission failure, a Finding, or a resolver outcome. A suite that
+//! opened runs its cases: each construction case constructs from its
+//! fixture's input and compares what construction does with what the case
+//! expects ([`construction`]).
 //!
 //! This crate checks in its suite below `conformance/`, with the index at
-//! `suite-index-v0.json`. The runner reads files, so like the benchmark it is
+//! `suite-index-v0.json`, and writes its construction cases
+//! ([`construction_cases`]). The runner reads files, so like the benchmark it is
 //! no part of a resolution: only tests and the developer examples build it.
 
 pub(crate) mod case;
+pub(crate) mod construction;
+pub(crate) mod construction_cases;
+pub(crate) mod fixture;
 pub(crate) mod index;
 pub(crate) mod runner;
 
-/// The developer entry points: write the committed Suite Index and its
-/// schema, and open a suite at an explicit Suite Index path.
+/// The developer entry points: write the committed suite, and open a suite at
+/// an explicit Suite Index path and run its cases.
 #[cfg(feature = "conformance")]
 pub mod support {
     pub use super::case::schema_digest as case_schema_digest;
-    pub use super::index::{artifacts, schema_digest, Member};
-    pub use super::runner::{open, HarnessFailure, Opened};
+    pub use super::index::{artifacts, schema_digest, Member, SuiteFile};
+    pub use super::runner::{open, HarnessFailure, Opened, Outcome};
 }

@@ -1,0 +1,67 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-construction",
+  "id": "015-construction-revision-0",
+  "constructionInputFixture": {
+    "path": "fixtures/construction/015-construction-revision-0.json",
+    "digest": "sha256:a6af200b77132beb17a2abd26b8a039d7a58b1f242a26ecbd5112c4c7174da6b"
+  },
+  "expected": {
+    "constructed": true,
+    "resolverConstructionIdentity": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids",
+    "resolverInvoked": false
+  },
+  "traceability": {
+    "decisionIds": [
+      "015-095",
+      "015-125",
+      "015-140"
+    ],
+    "ruleIds": [
+      "015.construction.all.construction-bounds",
+      "015.construction.profileSpecificationSchema.presence",
+      "015.construction.profileSpecificationSchema.envelope",
+      "015.construction.profileSpecificationSchema.identity",
+      "015.construction.profileSpecificationSchema.revision",
+      "015.construction.profileSpecificationSchema.file-digest",
+      "015.construction.profileSpecificationSchema.meta-schema",
+      "015.construction.profileSpecification.presence",
+      "015.construction.profileSpecification.envelope",
+      "015.construction.profileSpecification.identity",
+      "015.construction.profileSpecification.revision",
+      "015.construction.profileSpecification.file-digest",
+      "015.construction.profileSpecification.body-schema",
+      "015.construction.profileSpecification.semantic-digest",
+      "015.construction.configurationSchemaAuthoritySet.presence",
+      "015.construction.configurationSchemaAuthoritySet.envelope",
+      "015.construction.configurationSchemaAuthoritySet.identity",
+      "015.construction.configurationSchemaAuthoritySet.revision",
+      "015.construction.configurationSchemaAuthoritySet.file-digest",
+      "015.construction.configurationSchemaMember.identity",
+      "015.construction.configurationSchemaMember.revision",
+      "015.construction.configurationSchemaMember.dialect",
+      "015.construction.configurationSchemaMember.file-digest",
+      "015.construction.configurationSchemaMember.meta-schema",
+      "015.construction.resolverCapabilitySpecification.presence",
+      "015.construction.resolverCapabilitySpecification.envelope",
+      "015.construction.resolverCapabilitySpecification.identity",
+      "015.construction.resolverCapabilitySpecification.revision",
+      "015.construction.resolverCapabilitySpecification.file-digest",
+      "015.construction.resolverCapabilitySpecification.body-schema",
+      "015.construction.registryPackage.presence",
+      "015.construction.registryPackage.envelope",
+      "015.construction.registryPackage.identity",
+      "015.construction.registryPackage.revision",
+      "015.construction.registryPackage.file-digest",
+      "015.construction.registryMember.presence",
+      "015.construction.registryMember.identity",
+      "015.construction.registryMember.revision",
+      "015.construction.registryMember.file-digest",
+      "015.construction.registryMember.member-schema",
+      "015.construction.registryPackage.cross-references",
+      "015.construction.all.cross-authority-rules",
+      "015.construction.all.implemented-authority"
+    ],
+    "checkIds": []
+  }
+}

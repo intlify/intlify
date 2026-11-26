@@ -23,8 +23,10 @@
 //! member, authority, and Registry Package member at the path this crate
 //! writes it to, with the file digest of the bytes it writes there. It pins
 //! the Case Schema ([`super::case`]) the same way, and lists each manifest by
-//! its ID, path, and file digest in the array of its kind; the arrays stay
-//! empty until the cases are written.
+//! its ID, path, and file digest in the array of its kind, in ascending
+//! unsigned byte order of the IDs. The construction cases are written
+//! ([`super::construction_cases`]); the other arrays stay empty until their
+//! cases are.
 
 use serde_json::{json, Map, Value};
 
@@ -39,6 +41,7 @@ use crate::construction::root::{self, RootRole};
 use crate::model::CONFIGURATION_SCHEMA_VERSION;
 
 use super::case::{self, ManifestKind, CASE_ID_PATTERN, OBLIGATION_ID_PATTERN};
+use super::construction_cases;
 
 /// The Suite Index Schema's identity.
 pub(crate) const SCHEMA_IDENTITY: &str = "intlify-project-profile-conformance-suite-index";
@@ -242,27 +245,49 @@ pub fn schema_digest() -> Result<String, serde_json::Error> {
         .to_owned())
 }
 
-/// Write the Suite Index Schema, and then the Suite Index, which pins it.
+/// A file of the suite this crate writes: its path below the suite root and
+/// its bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SuiteFile {
+    pub path: String,
+    pub bytes: Vec<u8>,
+}
+
+impl From<Artifact> for SuiteFile {
+    fn from(artifact: Artifact) -> Self {
+        Self {
+            path: artifact.path.to_owned(),
+            bytes: artifact.bytes,
+        }
+    }
+}
+
+/// Write the Suite Index Schema, the Case Schema, the Suite Index, which pins
+/// both and lists the cases, and then each case's manifest, fixture, and the
+/// bodies its fixture keeps in files of their own.
 ///
 /// # Errors
 ///
 /// Returns the serialization failure of an artifact, which the values rule
 /// out.
-pub fn artifacts() -> Result<Vec<Artifact>, serde_json::Error> {
+pub fn artifacts() -> Result<Vec<SuiteFile>, serde_json::Error> {
     let schema = generate::write(&schema())?;
     let case_schema = case::artifact()?;
-    let index = generate::write(&index(&schema, &case_schema)?)?;
-    Ok(vec![
-        Artifact {
-            path: SCHEMA_PATH,
+    let cases = construction_cases::cases()?;
+    let index = generate::write(&index(&schema, &case_schema, &cases.listing)?)?;
+    let mut files = vec![
+        SuiteFile {
+            path: SCHEMA_PATH.to_owned(),
             bytes: schema,
         },
-        case_schema,
-        Artifact {
-            path: PATH,
+        case_schema.into(),
+        SuiteFile {
+            path: PATH.to_owned(),
             bytes: index,
         },
-    ])
+    ];
+    files.extend(cases.files);
+    Ok(files)
 }
 
 /// An entry that pins `artifact` under `identity` and `revision`.
@@ -276,9 +301,13 @@ fn entry(identity: &str, revision: Option<&String>, artifact: &Artifact) -> Valu
 }
 
 /// The index of the artifacts this crate writes, under the identities and
-/// revisions the Root Package admits, of the schema written as `schema`, and
-/// of the Case Schema.
-fn index(schema: &[u8], case_schema: &Artifact) -> Result<Value, serde_json::Error> {
+/// revisions the Root Package admits, of the schema written as `schema`, of
+/// the Case Schema, and of the construction cases `construction` lists.
+fn index(
+    schema: &[u8],
+    case_schema: &Artifact,
+    construction: &[Value],
+) -> Result<Value, serde_json::Error> {
     let admission = ConstructionAdmission::revision_zero();
     let components = &admission.components;
     let root_artifacts = generate::artifacts()?;
@@ -404,8 +433,8 @@ fn index(schema: &[u8], case_schema: &Artifact) -> Result<Value, serde_json::Err
                 Some(&case::REVISION.to_owned()),
                 case_schema,
             ),
-            Member::ResolverConstructionCases
-            | Member::ResolverInputAdmissionCases
+            Member::ResolverConstructionCases => Value::Array(construction.to_vec()),
+            Member::ResolverInputAdmissionCases
             | Member::ResolverCases
             | Member::HandoffVectors
             | Member::ConditionalObligations => json!([]),
@@ -457,7 +486,9 @@ mod tests {
     #[test]
     fn the_committed_schema_and_index_are_the_ones_this_crate_writes() {
         let artifacts = artifacts().unwrap();
-        assert_eq!(artifacts.len(), COMMITTED.len());
+        let cases = construction_cases::cases().unwrap().files;
+        assert_eq!(artifacts.len(), COMMITTED.len() + cases.len());
+        assert_eq!(artifacts[COMMITTED.len()..], cases);
         for (artifact, (path, bytes)) in artifacts.iter().zip(COMMITTED) {
             assert_eq!(artifact.path, path);
             assert_eq!(
@@ -498,41 +529,48 @@ mod tests {
         assert_eq!(index["suiteIndexSchema"]["digest"], SCHEMA_DIGEST);
     }
 
-    /// The index names every artifact this crate writes, but the
-    /// construction vectors, which are no member, by its path and file
-    /// digest.
+    /// The index names every artifact this crate writes by its path and file
+    /// digest, but the construction vectors, which are no member, and the
+    /// fixtures and bodies that the manifests it lists name.
     #[test]
     fn the_index_names_every_artifact_this_crate_writes() {
         fn collect<'a>(value: &'a Value, named: &mut BTreeMap<&'a str, &'a str>) {
-            if let Value::Object(members) = value {
-                if let (Some(path), Some(digest)) = (members.get("path"), members.get("digest")) {
-                    named.insert(path.as_str().unwrap(), digest.as_str().unwrap());
+            match value {
+                Value::Object(members) => {
+                    if let (Some(path), Some(digest)) = (members.get("path"), members.get("digest"))
+                    {
+                        named.insert(path.as_str().unwrap(), digest.as_str().unwrap());
+                    }
+                    members.values().for_each(|member| collect(member, named));
                 }
-                members.values().for_each(|member| collect(member, named));
+                Value::Array(items) => items.iter().for_each(|item| collect(item, named)),
+                _ => {}
             }
         }
         let index = written();
         let mut named = BTreeMap::new();
         collect(&index, &mut named);
+        let written = artifacts().unwrap();
+        let manifests = written
+            .iter()
+            .filter(|file| file.path.starts_with("cases/"))
+            .cloned();
         let artifacts = generate::artifacts()
             .unwrap()
             .into_iter()
             .chain(generate::authorities().unwrap())
             .chain(generate::registries().unwrap())
-            .chain(artifacts().unwrap().into_iter().take(2))
-            .map(|artifact| {
-                (
-                    artifact.path,
-                    file_digest(&artifact.bytes).as_str().to_owned(),
-                )
-            })
+            .map(SuiteFile::from)
+            .chain(written.iter().take(2).cloned())
+            .chain(manifests)
+            .map(|file| (file.path, file_digest(&file.bytes).as_str().to_owned()))
             .collect::<BTreeMap<_, _>>();
-        assert_eq!(named.len(), 20);
+        assert_eq!(named.len(), 20 + 44);
         assert_eq!(
             named,
             artifacts
                 .iter()
-                .map(|(path, digest)| (*path, digest.as_str()))
+                .map(|(path, digest)| (path.as_str(), digest.as_str()))
                 .collect::<BTreeMap<_, _>>()
         );
     }

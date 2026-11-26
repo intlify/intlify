@@ -1,0 +1,25 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-construction",
+  "id": "015-construction-resolver-capability-specification-envelope",
+  "constructionInputFixture": {
+    "path": "fixtures/construction/015-construction-resolver-capability-specification-envelope.json",
+    "digest": "sha256:e2fc05a1a0b9d3c80845b351227195076f70469e8cd23898539d54ed7cb6b952"
+  },
+  "expected": {
+    "constructed": false,
+    "resolverConstructionIdentity": null,
+    "failureReason": "resolver-capability-specification-schema-invalid",
+    "resolverInvoked": false
+  },
+  "traceability": {
+    "decisionIds": [
+      "015-110",
+      "015-142"
+    ],
+    "ruleIds": [
+      "015.construction.resolverCapabilitySpecification.envelope"
+    ],
+    "checkIds": []
+  }
+}

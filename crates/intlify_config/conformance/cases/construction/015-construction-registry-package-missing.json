@@ -1,0 +1,25 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-construction",
+  "id": "015-construction-registry-package-missing",
+  "constructionInputFixture": {
+    "path": "fixtures/construction/015-construction-registry-package-missing.json",
+    "digest": "sha256:3d3eb76b59ec387281acbc966d194d17dadd17d9cfb597f719b6cde546672a47"
+  },
+  "expected": {
+    "constructed": false,
+    "resolverConstructionIdentity": null,
+    "failureReason": "registry-package-incomplete",
+    "resolverInvoked": false
+  },
+  "traceability": {
+    "decisionIds": [
+      "015-086",
+      "015-142"
+    ],
+    "ruleIds": [
+      "015.construction.registryPackage.presence"
+    ],
+    "checkIds": []
+  }
+}

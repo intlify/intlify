@@ -1,0 +1,25 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-construction",
+  "id": "015-construction-profile-specification-identity",
+  "constructionInputFixture": {
+    "path": "fixtures/construction/015-construction-profile-specification-identity.json",
+    "digest": "sha256:e8b72a6527eba2456a62180d76f17bad90f6c0d16a57ccbb7564de3069a91bb7"
+  },
+  "expected": {
+    "constructed": false,
+    "resolverConstructionIdentity": null,
+    "failureReason": "profile-specification-identity-mismatch",
+    "resolverInvoked": false
+  },
+  "traceability": {
+    "decisionIds": [
+      "015-140",
+      "015-142"
+    ],
+    "ruleIds": [
+      "015.construction.profileSpecification.identity"
+    ],
+    "checkIds": []
+  }
+}

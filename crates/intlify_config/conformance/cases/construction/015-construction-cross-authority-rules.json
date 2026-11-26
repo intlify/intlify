@@ -1,0 +1,25 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-construction",
+  "id": "015-construction-cross-authority-rules",
+  "constructionInputFixture": {
+    "path": "fixtures/construction/015-construction-cross-authority-rules.json",
+    "digest": "sha256:b96110d4c61b4497b3ef76152c4ba0592ce2713a26ca734daecda986877c9fcb"
+  },
+  "expected": {
+    "constructed": false,
+    "resolverConstructionIdentity": null,
+    "failureReason": "construction-cross-authority-reference-invalid",
+    "resolverInvoked": false
+  },
+  "traceability": {
+    "decisionIds": [
+      "015-124",
+      "015-142"
+    ],
+    "ruleIds": [
+      "015.construction.all.cross-authority-rules"
+    ],
+    "checkIds": []
+  }
+}

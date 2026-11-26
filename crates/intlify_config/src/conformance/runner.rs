@@ -26,20 +26,31 @@
 //!    declares for it, the Profile Specification's body has the semantic
 //!    digest the index declares, and each manifest is strict UTF-8 JSON, valid
 //!    against the Case Schema, with the `id` that lists it and the
-//!    `manifestKind` of its array.
+//!    `manifestKind` of its array; then each fixture a construction case
+//!    names has the digest the case declares for it, is strict UTF-8 JSON of
+//!    the form the Case Schema gives it, and every body it references has the
+//!    digest the fixture declares (D15:3247). A body two references name is
+//!    read once, and both must declare its digest.
+//!
+//! A suite that opened runs its cases from what it verified, and reads no
+//! file again ([`Opened::run`]). A construction case constructs from its
+//! fixture's input under the built-in construction root
+//! ([`super::construction`]); the case passes when what construction does is
+//! what the case expects. A case that does not pass is a conformance
+//! failure of the implementation, not a harness failure.
 //!
 //! An artifact whose file digest is the one this crate pins has fixed
 //! contents, so the Root Package's member list, the Configuration Schema
 //! Authority Set's Profile Specification, and the Registry Package's container
 //! need no reading of their own.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::path::Path;
 
 use serde_json::{json, Map, Value};
 
-use crate::construction::admission::{ComponentAdmission, ConstructionAdmission};
+use crate::construction::admission::{ComponentAdmission, ConstructionAdmission, DRAFT_7};
 use crate::construction::component::{file_digest, strict_json};
 use crate::construction::registry::{self, RegistryRole};
 use crate::construction::root::{self, RootPackage, RootRole};
@@ -48,6 +59,8 @@ use crate::construction::{authority_set, capability, profile};
 use crate::model::CONFIGURATION_SCHEMA_VERSION;
 
 use super::case::{self, ManifestKind};
+use super::construction;
+use super::fixture::{references, Bodies};
 use super::index::{
     Member, SCHEMA_DIGEST, SCHEMA_IDENTITY, SCHEMA_PATH, SCHEMA_REVISION, SUITE_REVISION,
 };
@@ -60,14 +73,16 @@ pub enum HarnessFailure {
     /// The path passes through a symbolic link below the suite root, so the
     /// file it reaches may lie outside the suite.
     SymbolicLink(String),
-    /// The file's bytes do not have the digest the index declares for them,
-    /// or, for the Suite Index Schema, the one the runner pins.
+    /// The file's bytes do not have the digest the index, or the manifest or
+    /// fixture that references them, declares for them, or, for the Suite
+    /// Index Schema, the one the runner pins.
     DigestMismatch(String),
     /// The file is not strict UTF-8 JSON.
     Malformed(String),
     /// The index is not valid against the Suite Index Schema, or a manifest
-    /// against the Case Schema: it lacks a member, leaving a body it must list
-    /// unlisted, holds one too many, or spells a value outside its form.
+    /// or a fixture against the Case Schema: it lacks a member, leaving a body
+    /// it must list unlisted, holds one too many, or spells a value outside
+    /// its form.
     SchemaInvalid(String),
     /// The member is not revision `"0"`'s: it pins another artifact, its
     /// roles are out of order, the Profile Specification's body does not have
@@ -103,9 +118,55 @@ impl fmt::Display for HarnessFailure {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Opened {
     /// The suite-root-relative path and file digest of each body the runner
-    /// verified, in the order it verified them: the Suite Index Schema first,
-    /// then each member's bodies in the order of the index's members.
+    /// verified, once each, in the order it verified them: the Suite Index
+    /// Schema first, then each member's bodies in the order of the index's
+    /// members, a manifest followed by its fixture and the bodies the fixture
+    /// references first.
     pub verified: Vec<(String, String)>,
+    /// Every verified body, by its path.
+    bodies: Bodies,
+    /// Each construction case, in the order of its array.
+    construction: Vec<ListedCase>,
+}
+
+/// A case the suite lists: its ID, its fixture, and what it expects.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ListedCase {
+    id: String,
+    fixture: Value,
+    expected: Value,
+}
+
+/// One case run: what it expects, and what the implementation did, in the
+/// same form.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Outcome {
+    pub id: String,
+    pub expected: Value,
+    pub actual: Value,
+}
+
+impl Outcome {
+    /// Whether the implementation did what the case expects.
+    #[must_use]
+    pub fn passed(&self) -> bool {
+        self.expected == self.actual
+    }
+}
+
+impl Opened {
+    /// Run each case, in the order of the index's arrays.
+    #[must_use]
+    pub fn run(&self) -> Vec<Outcome> {
+        self.construction
+            .iter()
+            .map(|case| Outcome {
+                id: case.id.clone(),
+                expected: case.expected.clone(),
+                actual: construction::outcome(&construction::input(&case.fixture, &self.bodies)),
+            })
+            .collect()
+    }
 }
 
 /// Open the suite whose Suite Index is at `index`.
@@ -129,13 +190,18 @@ pub fn open(index: &Path) -> Result<Opened, HarnessFailure> {
     let mut closure = Closure {
         root,
         verified: vec![(SCHEMA_PATH.to_owned(), SCHEMA_DIGEST.to_owned())],
+        bodies: Bodies::new(),
         case_schema: None,
+        fixture_schemas: BTreeMap::new(),
+        construction: Vec::new(),
     };
     for member in Member::ALL {
         closure.verify(member, &value[member.name()])?;
     }
     Ok(Opened {
         verified: closure.verified,
+        bodies: closure.bodies,
+        construction: closure.construction,
     })
 }
 
@@ -367,12 +433,16 @@ fn canonical(member: Member) -> Value {
     }
 }
 
-/// The closure as the runner verifies it: the bodies verified so far, and the
-/// Case Schema once its body is.
+/// The closure as the runner verifies it: the bodies verified so far, the
+/// Case Schema and its document once its body is, the forms of the fixtures
+/// read from it, and the cases listed so far.
 struct Closure<'a> {
     root: &'a Path,
     verified: Vec<(String, String)>,
-    case_schema: Option<Schema>,
+    bodies: Bodies,
+    case_schema: Option<(Schema, Value)>,
+    fixture_schemas: BTreeMap<&'static str, Schema>,
+    construction: Vec<ListedCase>,
 }
 
 impl Closure<'_> {
@@ -384,27 +454,79 @@ impl Closure<'_> {
         }
         for entry in entries(value) {
             let path = text(&entry["path"]);
-            let digest = text(&entry["digest"]);
-            let bytes = read(self.root, path)?;
-            if file_digest(&bytes).as_str() != digest {
-                return Err(HarnessFailure::DigestMismatch(path.to_owned()));
-            }
+            let bytes = self.body(path, text(&entry["digest"]))?;
             if member == Member::ProfileSpecification {
                 semantic(path, &bytes, text(&entry["semanticDigest"]))?;
             } else if member == Member::CaseSchema {
-                self.case_schema = Some(compile(&bytes));
+                let document = strict_json(&bytes).expect("a pinned schema is strict JSON");
+                self.case_schema = Some((compile(&bytes), document));
             } else if let Some(kind) = member.manifests() {
                 self.manifest(member, kind, entry, &bytes)?;
             }
-            self.verified.push((path.to_owned(), digest.to_owned()));
         }
         Ok(())
     }
 
+    /// Read the body at `path` with the file digest declared for it, once: a
+    /// body already verified must be declared with the digest it has.
+    fn body(&mut self, path: &str, digest: &str) -> Result<Vec<u8>, HarnessFailure> {
+        let bytes = match self.bodies.get(path) {
+            Some(bytes) => bytes.clone(),
+            None => read(self.root, path)?,
+        };
+        if file_digest(&bytes).as_str() != digest {
+            return Err(HarnessFailure::DigestMismatch(path.to_owned()));
+        }
+        if !self.bodies.contains_key(path) {
+            self.verified.push((path.to_owned(), digest.to_owned()));
+            self.bodies.insert(path.to_owned(), bytes.clone());
+        }
+        Ok(bytes)
+    }
+
+    /// Read a fixture: the body its reference names, strict UTF-8 JSON of the
+    /// form the Case Schema's `definition` gives it, and every body it
+    /// references.
+    fn fixture(
+        &mut self,
+        reference: &Value,
+        definition: &'static str,
+    ) -> Result<Value, HarnessFailure> {
+        let path = text(&reference["path"]);
+        let bytes = self.body(path, text(&reference["digest"]))?;
+        let fixture =
+            strict_json(&bytes).ok_or_else(|| HarnessFailure::Malformed(path.to_owned()))?;
+        if !self.fixture_schema(definition).validate(&fixture).valid {
+            return Err(HarnessFailure::SchemaInvalid(path.to_owned()));
+        }
+        for raw in references(&fixture) {
+            self.body(text(&raw["path"]), text(&raw["digest"]))?;
+        }
+        Ok(fixture)
+    }
+
+    /// The form the Case Schema gives a fixture: its `definition`, as the root
+    /// of the schema's definitions.
+    fn fixture_schema(&mut self, definition: &'static str) -> &Schema {
+        let (_, document) = self
+            .case_schema
+            .as_ref()
+            .expect("the Case Schema is verified before the manifests");
+        self.fixture_schemas.entry(definition).or_insert_with(|| {
+            let root = json!({
+                "$schema": DRAFT_7,
+                "$ref": format!("#/definitions/{definition}"),
+                "definitions": document["definitions"],
+            });
+            Schema::compile(&root).expect("a definition of the pinned Case Schema compiles")
+        })
+    }
+
     /// Check a manifest: strict UTF-8 JSON, valid against the Case Schema,
-    /// with the `id` of the entry that lists it and the kind of its array.
+    /// with the `id` of the entry that lists it and the kind of its array;
+    /// and list a construction case with its fixture.
     fn manifest(
-        &self,
+        &mut self,
         member: Member,
         kind: ManifestKind,
         entry: &Value,
@@ -413,7 +535,7 @@ impl Closure<'_> {
         let path = text(&entry["path"]);
         let manifest =
             strict_json(bytes).ok_or_else(|| HarnessFailure::Malformed(path.to_owned()))?;
-        let schema = self
+        let (schema, _) = self
             .case_schema
             .as_ref()
             .expect("the Case Schema is verified before the manifests");
@@ -422,6 +544,17 @@ impl Closure<'_> {
         }
         if manifest["id"] != entry["id"] || manifest["manifestKind"] != kind.name() {
             return Err(HarnessFailure::NotRevisionZero(member));
+        }
+        if kind == ManifestKind::ResolverConstruction {
+            let fixture = self.fixture(
+                &manifest["constructionInputFixture"],
+                "constructionInputFixture",
+            )?;
+            self.construction.push(ListedCase {
+                id: text(&manifest["id"]).to_owned(),
+                fixture,
+                expected: manifest["expected"].clone(),
+            });
         }
         Ok(())
     }
@@ -452,6 +585,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
+    use crate::conformance::construction_cases::{self, CONSTRUCTED};
     use crate::conformance::index::PATH;
     use crate::construction::generate;
 
@@ -568,7 +702,15 @@ mod tests {
             .iter()
             .map(|(path, _)| path.as_str())
             .collect::<Vec<_>>();
-        assert_eq!(paths, BODIES);
+        assert_eq!(paths[..BODIES.len()], BODIES);
+        // Then each case's manifest, its fixture, and the bodies only the
+        // fixture names, each once.
+        let cases = paths[BODIES.len()..]
+            .iter()
+            .map(|path| (*path).to_owned())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(cases.len(), paths.len() - BODIES.len());
+        assert_eq!(cases, written_cases());
         for (path, digest) in &opened.verified {
             let bytes = std::fs::read(committed().join(path)).unwrap();
             assert_eq!(file_digest(&bytes).as_str(), digest, "{path}");
@@ -580,7 +722,10 @@ mod tests {
     #[test]
     fn the_suite_root_is_the_directory_that_holds_the_index() {
         let suite = Suite::new();
-        assert_eq!(suite.open().unwrap().verified.len(), BODIES.len());
+        assert_eq!(
+            suite.open().unwrap().verified.len(),
+            BODIES.len() + written_cases().len()
+        );
         let elsewhere = tempfile::tempdir().unwrap();
         let moved = elsewhere.path().join(PATH);
         std::fs::copy(suite.index_path(), &moved).unwrap();
@@ -861,15 +1006,30 @@ mod tests {
         })
     }
 
-    /// A Resolver Construction Case's manifest with this ID.
+    /// The committed fixture of the constructing case.
+    const FIXTURE: &str = "fixtures/construction/015-construction-revision-0.json";
+
+    /// The paths of the files the committed cases add to the suite.
+    fn written_cases() -> BTreeSet<String> {
+        construction_cases::cases()
+            .unwrap()
+            .files
+            .into_iter()
+            .map(|file| file.path)
+            .collect()
+    }
+
+    /// A Resolver Construction Case's manifest with this ID, of the committed
+    /// constructing case's fixture.
     fn construction_case(id: &str) -> Value {
+        let fixture = std::fs::read(committed().join(FIXTURE)).unwrap();
         json!({
             "suiteRevision": "0",
             "manifestKind": "resolver-construction",
             "id": id,
             "constructionInputFixture": {
-                "path": "fixtures/construction/a.json",
-                "digest": format!("sha256:{}", "0".repeat(64))
+                "path": FIXTURE,
+                "digest": file_digest(&fixture).as_str()
             },
             "expected": {
                 "constructed": false,
@@ -954,6 +1114,7 @@ mod tests {
             paths,
             [
                 "cases/resolverConstructionCases/015-construction-a.json",
+                FIXTURE,
                 "cases/conditionalObligations/015-XV-001.json",
                 "cases/conditionalObligations/015-XV-002.json",
             ]
@@ -1063,10 +1224,12 @@ mod tests {
         }
     }
 
-    /// Where a body lies below the suite root is the index's to say.
+    /// Where a body lies below the suite root is the index's to say: with no
+    /// fixture naming its old path, nothing reads it there.
     #[test]
     fn a_body_may_lie_anywhere_below_the_suite_root() {
         let suite = Suite::new();
+        suite.list(Member::ResolverConstructionCases, &[]);
         let bytes = suite.read(capability::PATH);
         suite.remove(capability::PATH);
         suite.write("moved/capability.json", &bytes);
@@ -1104,7 +1267,8 @@ mod tests {
     }
 
     /// The Profile Specification is pinned by its semantic digest: another
-    /// representation of its body opens, and another body does not.
+    /// representation of its body opens, and another body does not. No case
+    /// is listed, since a fixture names the committed body by its file digest.
     #[test]
     fn the_profile_specification_is_pinned_by_its_semantic_digest() {
         let pointer = "/profileSpecification/digest";
@@ -1113,12 +1277,14 @@ mod tests {
                 .unwrap();
 
         let suite = Suite::new();
+        suite.list(Member::ResolverConstructionCases, &[]);
         suite.replace(profile::PATH, &serde_json::to_vec(&body).unwrap(), pointer);
         assert!(suite.open().is_ok());
 
         let mut other = body.clone();
         other["unknown"] = json!("unknown");
         let suite = Suite::new();
+        suite.list(Member::ResolverConstructionCases, &[]);
         suite.replace(profile::PATH, &serde_json::to_vec(&other).unwrap(), pointer);
         assert_eq!(
             suite.open(),
@@ -1130,6 +1296,7 @@ mod tests {
         let mut numbered = body;
         numbered["unknown"] = json!(1);
         let suite = Suite::new();
+        suite.list(Member::ResolverConstructionCases, &[]);
         suite.replace(
             profile::PATH,
             &serde_json::to_vec(&numbered).unwrap(),
@@ -1143,6 +1310,7 @@ mod tests {
         );
 
         let suite = Suite::new();
+        suite.list(Member::ResolverConstructionCases, &[]);
         suite.replace(profile::PATH, b"{", pointer);
         assert_eq!(
             suite.open(),
@@ -1213,5 +1381,126 @@ mod tests {
         ] {
             assert_eq!(failure.to_string(), message);
         }
+    }
+
+    /// The committed cases run in the order of their array, and each does
+    /// what it expects.
+    #[test]
+    fn the_committed_cases_run_and_pass() {
+        let outcomes = open(&committed().join(PATH)).unwrap().run();
+        let listed = construction_cases::cases()
+            .unwrap()
+            .listing
+            .iter()
+            .map(|entry| entry["id"].as_str().unwrap().to_owned())
+            .collect::<Vec<_>>();
+        let ids = outcomes
+            .iter()
+            .map(|outcome| outcome.id.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(ids, listed);
+        assert!(ids.contains(&CONSTRUCTED.to_owned()));
+        for outcome in &outcomes {
+            assert!(
+                outcome.passed(),
+                "{}: expected {}, got {}",
+                outcome.id,
+                outcome.expected,
+                outcome.actual
+            );
+        }
+    }
+
+    /// A case whose expectation construction does not meet opens and runs,
+    /// and does not pass: a conformance failure, not a harness failure.
+    #[test]
+    fn a_case_construction_does_not_meet_does_not_pass() {
+        let suite = Suite::new();
+        let id = "015-construction-a";
+        suite.list(
+            Member::ResolverConstructionCases,
+            &[(id, bytes(&construction_case(id)))],
+        );
+        let outcomes = suite.open().unwrap().run();
+        assert_eq!(outcomes.len(), 1);
+        assert!(!outcomes[0].passed());
+        assert_eq!(outcomes[0].expected["constructed"], false);
+        assert_eq!(outcomes[0].actual["constructed"], true);
+    }
+
+    /// A construction case's fixture is verified before any case runs: it
+    /// has its declared digest and is strict UTF-8 JSON of the form the Case
+    /// Schema gives it, and each body it references has the digest it
+    /// declares, a body already verified the one it was verified with.
+    #[test]
+    fn a_construction_fixture_is_verified_before_any_case_runs() {
+        let cases = Member::ResolverConstructionCases;
+        let path = "fixtures/construction/a.json";
+        let open_with = |fixture: &[u8]| {
+            let suite = Suite::new();
+            suite.write(path, fixture);
+            let mut manifest = construction_case("015-a");
+            manifest["constructionInputFixture"] =
+                json!({ "path": path, "digest": file_digest(fixture).as_str() });
+            suite.list(cases, &[("015-a", bytes(&manifest))]);
+            suite.open()
+        };
+        let fixture: Value =
+            serde_json::from_slice(&std::fs::read(committed().join(FIXTURE)).unwrap()).unwrap();
+        assert!(open_with(&bytes(&fixture)).is_ok());
+        assert_eq!(
+            open_with(b"{"),
+            Err(HarnessFailure::Malformed(path.to_owned()))
+        );
+        for change in [
+            |fixture: &mut Value| fixture["unknown"] = json!({}),
+            |fixture: &mut Value| {
+                fixture["profileSpecificationSchema"]["bytes"] = json!({ "bytes": "0" });
+            },
+            |fixture: &mut Value| {
+                fixture["registryPackage"]["members"]["unknown-registry"] = json!({ "bytes": "" });
+            },
+        ] {
+            let mut changed = fixture.clone();
+            change(&mut changed);
+            assert_eq!(
+                open_with(&bytes(&changed)),
+                Err(HarnessFailure::SchemaInvalid(path.to_owned()))
+            );
+        }
+        let schema = fixture["profileSpecificationSchema"]["bytes"]["path"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let mut elsewhere = fixture.clone();
+        elsewhere["profileSpecificationSchema"]["bytes"]["path"] = json!("nowhere.json");
+        assert_eq!(
+            open_with(&bytes(&elsewhere)),
+            Err(HarnessFailure::Missing("nowhere.json".to_owned()))
+        );
+        let mut other = fixture;
+        other["profileSpecificationSchema"]["bytes"]["digest"] = other_digest();
+        assert_eq!(
+            open_with(&bytes(&other)),
+            Err(HarnessFailure::DigestMismatch(schema))
+        );
+        let listed = |change: &dyn Fn(&Suite)| {
+            let suite = Suite::new();
+            suite.list(cases, &[("015-a", bytes(&construction_case("015-a")))]);
+            change(&suite);
+            suite.open()
+        };
+        assert_eq!(
+            listed(&|suite| suite.remove(FIXTURE)),
+            Err(HarnessFailure::Missing(FIXTURE.to_owned()))
+        );
+        assert_eq!(
+            listed(&|suite| {
+                let mut changed = suite.read(FIXTURE);
+                changed.push(b'\n');
+                suite.write(FIXTURE, &changed);
+            }),
+            Err(HarnessFailure::DigestMismatch(FIXTURE.to_owned()))
+        );
     }
 }
