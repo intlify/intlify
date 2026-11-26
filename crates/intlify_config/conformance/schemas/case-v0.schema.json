@@ -1,0 +1,3352 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "oneOf": [
+    {
+      "$ref": "#/definitions/resolverConstructionCase"
+    },
+    {
+      "$ref": "#/definitions/resolverInputAdmissionCase"
+    },
+    {
+      "$ref": "#/definitions/resolverCase"
+    },
+    {
+      "$ref": "#/definitions/handoffVector"
+    },
+    {
+      "$ref": "#/definitions/conditionalObligation"
+    }
+  ],
+  "definitions": {
+    "caseId": {
+      "type": "string",
+      "pattern": "^015-[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "obligationId": {
+      "type": "string",
+      "pattern": "^015-(?:XV|AD|HV)-[0-9]{3}$"
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "digest"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "traceability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decisionIds",
+        "ruleIds",
+        "checkIds"
+      ],
+      "properties": {
+        "decisionIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^015-[0-9]{3}$"
+          },
+          "uniqueItems": true
+        },
+        "ruleIds": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^015\\.[a-z][a-z0-9]*(-[a-z0-9]+)*\\.[a-z][a-z0-9]*(-[a-z0-9]+)*\\.[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+              },
+              {
+                "type": "string",
+                "pattern": "^015\\.construction\\.[a-z][A-Za-z0-9]*\\.[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+              },
+              {
+                "type": "string",
+                "pattern": "^015\\.input-admission\\.[a-z][a-z0-9]*(?:-[a-z0-9]+)*\\.[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+              }
+            ]
+          },
+          "uniqueItems": true
+        },
+        "checkIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*\\.[a-z][a-z0-9]*(-[a-z0-9]+)*\\.[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "verificationOwner": {
+      "type": "string",
+      "enum": [
+        "intlify_config",
+        "016",
+        "019",
+        "020",
+        "021",
+        "022",
+        "023",
+        "024",
+        "025",
+        "026",
+        "027",
+        "029",
+        "030",
+        "product-integration"
+      ]
+    },
+    "constructionIdentity": {
+      "type": "string",
+      "pattern": "^rci0_[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"
+    },
+    "resolverConstruction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "caseId",
+        "identityReference"
+      ],
+      "properties": {
+        "caseId": {
+          "$ref": "#/definitions/caseId"
+        },
+        "identityReference": {
+          "$ref": "#/definitions/constructionIdentity"
+        }
+      }
+    },
+    "json": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "json"
+      ],
+      "properties": {
+        "json": {}
+      }
+    },
+    "jsonObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "json"
+      ],
+      "properties": {
+        "json": {
+          "type": "object"
+        }
+      }
+    },
+    "resolverConstructionCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suiteRevision",
+        "manifestKind",
+        "id",
+        "constructionInputFixture",
+        "expected",
+        "traceability"
+      ],
+      "properties": {
+        "suiteRevision": {
+          "const": "0"
+        },
+        "manifestKind": {
+          "const": "resolver-construction"
+        },
+        "id": {
+          "$ref": "#/definitions/caseId"
+        },
+        "constructionInputFixture": {
+          "$ref": "#/definitions/reference"
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "constructed",
+                "resolverConstructionIdentity",
+                "resolverInvoked"
+              ],
+              "properties": {
+                "constructed": {
+                  "const": true
+                },
+                "resolverConstructionIdentity": {
+                  "$ref": "#/definitions/constructionIdentity"
+                },
+                "resolverInvoked": {
+                  "const": false
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "constructed",
+                "resolverConstructionIdentity",
+                "failureReason",
+                "resolverInvoked"
+              ],
+              "properties": {
+                "constructed": {
+                  "const": false
+                },
+                "resolverConstructionIdentity": {
+                  "type": "null"
+                },
+                "failureReason": {
+                  "allOf": [
+                    {
+                      "enum": [
+                        "construction-input-limit-exceeded",
+                        "profile-specification-schema-missing",
+                        "profile-specification-schema-invalid",
+                        "profile-specification-schema-identity-mismatch",
+                        "profile-specification-schema-revision-unsupported",
+                        "profile-specification-schema-digest-mismatch",
+                        "profile-specification-missing",
+                        "profile-specification-body-schema-invalid",
+                        "profile-specification-identity-mismatch",
+                        "profile-specification-revision-unsupported",
+                        "profile-specification-digest-mismatch",
+                        "configuration-schema-authority-set-missing",
+                        "configuration-schema-authority-set-schema-invalid",
+                        "configuration-schema-authority-set-identity-mismatch",
+                        "configuration-schema-authority-set-revision-unsupported",
+                        "configuration-schema-authority-set-digest-mismatch",
+                        "configuration-schema-member-identity-mismatch",
+                        "configuration-schema-member-revision-unsupported",
+                        "configuration-schema-member-dialect-unsupported",
+                        "configuration-schema-member-digest-mismatch",
+                        "configuration-schema-member-schema-invalid",
+                        "resolver-capability-specification-missing",
+                        "resolver-capability-specification-schema-invalid",
+                        "resolver-capability-specification-identity-mismatch",
+                        "resolver-capability-specification-revision-unsupported",
+                        "resolver-capability-specification-digest-mismatch",
+                        "registry-package-incomplete",
+                        "registry-package-schema-invalid",
+                        "registry-package-identity-mismatch",
+                        "registry-package-revision-unsupported",
+                        "registry-package-digest-mismatch",
+                        "registry-member-identity-mismatch",
+                        "registry-member-revision-unsupported",
+                        "registry-member-digest-mismatch",
+                        "registry-member-schema-invalid",
+                        "registry-cross-reference-invalid",
+                        "construction-cross-authority-reference-invalid",
+                        "construction-authority-not-implemented"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "not": {
+                        "const": "construction-input-limit-exceeded"
+                      }
+                    }
+                  ]
+                },
+                "resolverInvoked": {
+                  "const": false
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "constructed",
+                "resolverConstructionIdentity",
+                "failureReason",
+                "failureDetails",
+                "resolverInvoked"
+              ],
+              "properties": {
+                "constructed": {
+                  "const": false
+                },
+                "resolverConstructionIdentity": {
+                  "type": "null"
+                },
+                "failureReason": {
+                  "const": "construction-input-limit-exceeded"
+                },
+                "failureDetails": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "boundId"
+                  ],
+                  "properties": {
+                    "boundId": {
+                      "enum": [
+                        "input.maxTotalArtifactBytes",
+                        "input.maxSingleArtifactBytes",
+                        "input.maxDepth",
+                        "input.maxNodes",
+                        "input.maxCollectionEntries",
+                        "input.maxTotalStringBytes",
+                        "input.maxSingleStringBytes",
+                        "schema.maxConfigurationSchemas",
+                        "schema.maxSingleArtifactBytes",
+                        "schema.maxTotalArtifactBytes",
+                        "schema.maxNodes",
+                        "schema.maxReferences",
+                        "schema.maxValidationWorkUnits",
+                        "registry.maxRows",
+                        "registry.maxSingleMemberArtifactBytes",
+                        "registry.maxTotalArtifactBytes",
+                        "registry.maxValidationWorkUnits",
+                        "crossAuthority.maxChecks"
+                      ],
+                      "type": "string"
+                    }
+                  }
+                },
+                "resolverInvoked": {
+                  "const": false
+                }
+              }
+            }
+          ]
+        },
+        "traceability": {
+          "$ref": "#/definitions/traceability"
+        }
+      }
+    },
+    "snapshotNode": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "null"
+          ],
+          "properties": {
+            "null": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "boolean"
+          ],
+          "properties": {
+            "boolean": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "number"
+          ],
+          "properties": {
+            "number": {
+              "type": "string",
+              "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "string"
+          ],
+          "properties": {
+            "string": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "array"
+          ],
+          "properties": {
+            "array": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/snapshotNode"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "object"
+          ],
+          "properties": {
+            "object": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "$ref": "#/definitions/snapshotNode"
+                  }
+                ],
+                "minItems": 2,
+                "additionalItems": false
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "marker"
+          ],
+          "properties": {
+            "marker": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "reason"
+                  ],
+                  "properties": {
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "unsupported-type",
+                        "non-finite-number",
+                        "non-portable-number",
+                        "invalid-unicode",
+                        "non-string-key",
+                        "dynamic-container",
+                        "dynamic-property",
+                        "sparse-array",
+                        "cycle"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "reason",
+                    "boundPath",
+                    "witness"
+                  ],
+                  "properties": {
+                    "reason": {
+                      "const": "bootstrap-limit-exceeded"
+                    },
+                    "boundPath": {
+                      "type": "string",
+                      "pattern": "^bootstrapOnly\\.snapshot\\.[a-z][A-Za-z0-9]*$"
+                    },
+                    "witness": {
+                      "type": "string",
+                      "pattern": "^[1-9][0-9]*$"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot",
+        "digest"
+      ],
+      "properties": {
+        "snapshot": {
+          "$ref": "#/definitions/snapshotNode"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "admittedSelector": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "report"
+          ],
+          "properties": {
+            "report": {
+              "const": "absent"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "report",
+            "value"
+          ],
+          "properties": {
+            "report": {
+              "const": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "report"
+          ],
+          "properties": {
+            "report": {
+              "const": "over-limit-string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "report",
+            "type"
+          ],
+          "properties": {
+            "report": {
+              "const": "invalid-type"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "null",
+                "boolean",
+                "number",
+                "array",
+                "object"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "resolverInputAdmissionCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suiteRevision",
+        "manifestKind",
+        "id",
+        "resolverConstruction",
+        "boundaryKind",
+        "inputFixture",
+        "expected",
+        "verificationOwner",
+        "traceability"
+      ],
+      "properties": {
+        "suiteRevision": {
+          "const": "0"
+        },
+        "manifestKind": {
+          "const": "resolver-input-admission"
+        },
+        "id": {
+          "$ref": "#/definitions/caseId"
+        },
+        "resolverConstruction": {
+          "$ref": "#/definitions/resolverConstruction"
+        },
+        "boundaryKind": {
+          "type": "string",
+          "enum": [
+            "profile-resolution-specification-input",
+            "intent-surface-class-vocabulary-artifact",
+            "locale-canonicalization-data-artifact",
+            "submitted-profile-resolution-artifact-collection",
+            "resource-limit-policy-verification-input",
+            "safe-origin-kind",
+            "external-profile-selector-binding",
+            "file-source-identity-revision",
+            "programmatic-entry-identity-revision",
+            "programmatic-entry-snapshot",
+            "programmatic-call-site-evidence-input",
+            "implementation-capability",
+            "resolver-construction-identity-reference",
+            "common-invocation-input-set",
+            "entry-admission-input-set"
+          ]
+        },
+        "inputFixture": {
+          "$ref": "#/definitions/reference"
+        },
+        "expected": {
+          "type": "object"
+        },
+        "verificationOwner": {
+          "$ref": "#/definitions/verificationOwner"
+        },
+        "traceability": {
+          "$ref": "#/definitions/traceability"
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "boundaryKind": {
+              "const": "profile-resolution-specification-input"
+            },
+            "expected": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": true
+                    },
+                    "normalizedInput": {
+                      "$ref": "#/definitions/jsonObject"
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "failureReason",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": false
+                    },
+                    "normalizedInput": {
+                      "type": "null"
+                    },
+                    "failureReason": {
+                      "type": "string",
+                      "enum": [
+                        "missing-input",
+                        "over-bound-member",
+                        "malformed-input",
+                        "duplicate-member",
+                        "unknown-member"
+                      ]
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "boundaryKind": {
+              "const": "intent-surface-class-vocabulary-artifact"
+            },
+            "expected": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": true
+                    },
+                    "normalizedInput": {
+                      "$ref": "#/definitions/jsonObject"
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "failureReason",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": false
+                    },
+                    "normalizedInput": {
+                      "type": "null"
+                    },
+                    "failureReason": {
+                      "type": "string",
+                      "enum": [
+                        "missing-input",
+                        "over-bound-envelope",
+                        "malformed-envelope",
+                        "duplicate-member",
+                        "unknown-member"
+                      ]
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "boundaryKind": {
+              "const": "locale-canonicalization-data-artifact"
+            },
+            "expected": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": true
+                    },
+                    "normalizedInput": {
+                      "$ref": "#/definitions/jsonObject"
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "failureReason",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": false
+                    },
+                    "normalizedInput": {
+                      "type": "null"
+                    },
+                    "failureReason": {
+                      "type": "string",
+                      "enum": [
+                        "missing-input",
+                        "over-bound-envelope",
+                        "malformed-envelope",
+                        "duplicate-member",
+                        "unknown-member"
+                      ]
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "boundaryKind": {
+              "const": "submitted-profile-resolution-artifact-collection"
+            },
+            "expected": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": true
+                    },
+                    "normalizedInput": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "members"
+                      ],
+                      "properties": {
+                        "members": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/definitions/jsonObject"
+                          }
+                        }
+                      }
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "failureReason",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": false
+                    },
+                    "normalizedInput": {
+                      "type": "null"
+                    },
+                    "failureReason": {
+                      "type": "string",
+                      "enum": [
+                        "missing-input",
+                        "unsafe-host-inspection",
+                        "malformed-container",
+                        "formal-envelope-over-bound",
+                        "unrepresentable-member"
+                      ]
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "boundaryKind": {
+              "const": "resource-limit-policy-verification-input"
+            },
+            "expected": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": true
+                    },
+                    "normalizedInput": {
+                      "$ref": "#/definitions/jsonObject"
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "failureReason",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": false
+                    },
+                    "normalizedInput": {
+                      "type": "null"
+                    },
+                    "failureReason": {
+                      "type": "string",
+                      "enum": [
+                        "missing-input",
+                        "over-bound-input",
+                        "malformed-input",
+                        "duplicate-member",
+                        "unknown-member",
+                        "secret-bearing-input",
+                        "ambient-authority",
+                        "verification-identity-mismatch",
+                        "verification-revision-mismatch",
+                        "verification-digest-mismatch"
+                      ]
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "boundaryKind": {
+              "const": "safe-origin-kind"
+            },
+            "expected": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": true
+                    },
+                    "normalizedInput": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "safeOriginKind"
+                      ],
+                      "properties": {
+                        "safeOriginKind": {
+                          "type": "string",
+                          "enum": [
+                            "configuration-file",
+                            "configuration-programmatic",
+                            "profile-selector-cli",
+                            "profile-selector-programmatic",
+                            "profile-resolution-specification-input",
+                            "intent-surface-class-vocabulary",
+                            "locale-canonicalization-data",
+                            "profile-resolution-artifact-collection",
+                            "resource-limit-policy-verification",
+                            "implementation-capability"
+                          ]
+                        }
+                      }
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "failureReason",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": false
+                    },
+                    "normalizedInput": {
+                      "type": "null"
+                    },
+                    "failureReason": {
+                      "type": "string",
+                      "enum": [
+                        "missing-safe-origin-kind",
+                        "unknown-safe-origin-kind",
+                        "non-canonical-safe-origin-kind",
+                        "evidence-kind-incompatible"
+                      ]
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "boundaryKind": {
+              "const": "external-profile-selector-binding"
+            },
+            "expected": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": true
+                    },
+                    "normalizedInput": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "selector"
+                      ],
+                      "properties": {
+                        "selector": {
+                          "$ref": "#/definitions/admittedSelector"
+                        }
+                      }
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "failureReason",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": false
+                    },
+                    "normalizedInput": {
+                      "type": "null"
+                    },
+                    "failureReason": {
+                      "type": "string",
+                      "enum": [
+                        "unsafe-host-inspection",
+                        "unrepresentable-selector",
+                        "malformed-normalized-selector"
+                      ]
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "boundaryKind": {
+              "const": "file-source-identity-revision"
+            },
+            "expected": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": true
+                    },
+                    "normalizedInput": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "identity",
+                        "nonSecret",
+                        "revision"
+                      ],
+                      "properties": {
+                        "identity": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "nonSecret": {
+                          "type": "boolean"
+                        },
+                        "revision": {
+                          "type": "string",
+                          "pattern": "^sha256:[0-9a-f]{64}$"
+                        }
+                      }
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "failureReason",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": false
+                    },
+                    "normalizedInput": {
+                      "type": "null"
+                    },
+                    "failureReason": {
+                      "type": "string",
+                      "enum": [
+                        "missing-source-identity",
+                        "missing-source-revision",
+                        "over-bound-source-identity",
+                        "over-bound-source-revision",
+                        "unstable-source-identity",
+                        "unbound-source-revision",
+                        "source-snapshot-mismatch"
+                      ]
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "boundaryKind": {
+              "const": "programmatic-entry-identity-revision"
+            },
+            "expected": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": true
+                    },
+                    "normalizedInput": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "identity",
+                        "nonSecret",
+                        "revision"
+                      ],
+                      "properties": {
+                        "identity": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "nonSecret": {
+                          "type": "boolean"
+                        },
+                        "revision": {
+                          "type": "string",
+                          "pattern": "^sha256:[0-9a-f]{64}$"
+                        }
+                      }
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "failureReason",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": false
+                    },
+                    "normalizedInput": {
+                      "type": "null"
+                    },
+                    "failureReason": {
+                      "type": "string",
+                      "enum": [
+                        "missing-entry-identity",
+                        "missing-entry-revision",
+                        "over-bound-entry-identity",
+                        "over-bound-entry-revision",
+                        "unstable-entry-identity",
+                        "unbound-entry-revision",
+                        "snapshot-identity-mismatch"
+                      ]
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "boundaryKind": {
+              "const": "programmatic-entry-snapshot"
+            },
+            "expected": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": true
+                    },
+                    "normalizedInput": {
+                      "$ref": "#/definitions/snapshot"
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "failureReason",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": false
+                    },
+                    "normalizedInput": {
+                      "type": "null"
+                    },
+                    "failureReason": {
+                      "type": "string",
+                      "enum": [
+                        "missing-snapshot",
+                        "unsafe-host-inspection",
+                        "snapshot-envelope-over-bound",
+                        "malformed-snapshot",
+                        "snapshot-content-digest-mismatch"
+                      ]
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "boundaryKind": {
+              "const": "programmatic-call-site-evidence-input"
+            },
+            "expected": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": true
+                    },
+                    "normalizedInput": {
+                      "$ref": "#/definitions/jsonObject"
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "failureReason",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": false
+                    },
+                    "normalizedInput": {
+                      "type": "null"
+                    },
+                    "failureReason": {
+                      "type": "string",
+                      "enum": [
+                        "unsafe-host-inspection",
+                        "over-bound-input",
+                        "malformed-input",
+                        "invalid-utf8-source",
+                        "duplicate-mapping",
+                        "missing-source-identity",
+                        "missing-source-revision",
+                        "unstable-source-identity",
+                        "unbound-source-revision",
+                        "source-snapshot-mismatch"
+                      ]
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "boundaryKind": {
+              "const": "implementation-capability"
+            },
+            "expected": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": true
+                    },
+                    "normalizedInput": {
+                      "$ref": "#/definitions/jsonObject"
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "failureReason",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": false
+                    },
+                    "normalizedInput": {
+                      "type": "null"
+                    },
+                    "failureReason": {
+                      "type": "string",
+                      "enum": [
+                        "missing-capability",
+                        "malformed-capability",
+                        "capability-specification-identity-mismatch",
+                        "capability-specification-revision-mismatch",
+                        "incomplete-capability",
+                        "non-canonical-bound",
+                        "non-positive-bound",
+                        "unrepresentable-bound",
+                        "below-bootstrap-minimum"
+                      ]
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "boundaryKind": {
+              "const": "resolver-construction-identity-reference"
+            },
+            "expected": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": true
+                    },
+                    "normalizedInput": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "resolverConstructionIdentity"
+                      ],
+                      "properties": {
+                        "resolverConstructionIdentity": {
+                          "$ref": "#/definitions/constructionIdentity"
+                        }
+                      }
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "failureReason",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": false
+                    },
+                    "normalizedInput": {
+                      "type": "null"
+                    },
+                    "failureReason": {
+                      "type": "string",
+                      "enum": [
+                        "missing-construction-identity",
+                        "malformed-construction-identity",
+                        "construction-identity-mismatch"
+                      ]
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "boundaryKind": {
+              "const": "common-invocation-input-set"
+            },
+            "expected": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": true
+                    },
+                    "normalizedInput": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "profile-resolution-specification-input",
+                        "intent-surface-class-vocabulary",
+                        "locale-canonicalization-data",
+                        "profile-resolution-artifact-collection",
+                        "resource-limit-policy-verification",
+                        "implementation-capability"
+                      ],
+                      "properties": {
+                        "profile-resolution-specification-input": {
+                          "$ref": "#/definitions/jsonObject"
+                        },
+                        "intent-surface-class-vocabulary": {
+                          "$ref": "#/definitions/jsonObject"
+                        },
+                        "locale-canonicalization-data": {
+                          "$ref": "#/definitions/jsonObject"
+                        },
+                        "profile-resolution-artifact-collection": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "members"
+                          ],
+                          "properties": {
+                            "members": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/definitions/jsonObject"
+                              }
+                            }
+                          }
+                        },
+                        "resource-limit-policy-verification": {
+                          "$ref": "#/definitions/jsonObject"
+                        },
+                        "implementation-capability": {
+                          "$ref": "#/definitions/jsonObject"
+                        }
+                      }
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "failures",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": false
+                    },
+                    "normalizedInput": {
+                      "type": "null"
+                    },
+                    "failures": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "slot",
+                              "boundaryKind",
+                              "failureReason"
+                            ],
+                            "properties": {
+                              "slot": {
+                                "type": "string",
+                                "enum": [
+                                  "profile-resolution-specification-input",
+                                  "intent-surface-class-vocabulary",
+                                  "locale-canonicalization-data",
+                                  "profile-resolution-artifact-collection",
+                                  "resource-limit-policy-verification",
+                                  "implementation-capability"
+                                ]
+                              },
+                              "boundaryKind": {
+                                "const": "safe-origin-kind"
+                              },
+                              "failureReason": {
+                                "type": "string",
+                                "enum": [
+                                  "missing-safe-origin-kind",
+                                  "unknown-safe-origin-kind",
+                                  "non-canonical-safe-origin-kind",
+                                  "evidence-kind-incompatible"
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "slot",
+                              "boundaryKind",
+                              "failureReason"
+                            ],
+                            "properties": {
+                              "slot": {
+                                "const": "profile-resolution-specification-input"
+                              },
+                              "boundaryKind": {
+                                "const": "profile-resolution-specification-input"
+                              },
+                              "failureReason": {
+                                "type": "string",
+                                "enum": [
+                                  "missing-input",
+                                  "over-bound-member",
+                                  "malformed-input",
+                                  "duplicate-member",
+                                  "unknown-member"
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "slot",
+                              "boundaryKind",
+                              "failureReason"
+                            ],
+                            "properties": {
+                              "slot": {
+                                "const": "intent-surface-class-vocabulary"
+                              },
+                              "boundaryKind": {
+                                "const": "intent-surface-class-vocabulary-artifact"
+                              },
+                              "failureReason": {
+                                "type": "string",
+                                "enum": [
+                                  "missing-input",
+                                  "over-bound-envelope",
+                                  "malformed-envelope",
+                                  "duplicate-member",
+                                  "unknown-member"
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "slot",
+                              "boundaryKind",
+                              "failureReason"
+                            ],
+                            "properties": {
+                              "slot": {
+                                "const": "locale-canonicalization-data"
+                              },
+                              "boundaryKind": {
+                                "const": "locale-canonicalization-data-artifact"
+                              },
+                              "failureReason": {
+                                "type": "string",
+                                "enum": [
+                                  "missing-input",
+                                  "over-bound-envelope",
+                                  "malformed-envelope",
+                                  "duplicate-member",
+                                  "unknown-member"
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "slot",
+                              "boundaryKind",
+                              "failureReason"
+                            ],
+                            "properties": {
+                              "slot": {
+                                "const": "profile-resolution-artifact-collection"
+                              },
+                              "boundaryKind": {
+                                "const": "submitted-profile-resolution-artifact-collection"
+                              },
+                              "failureReason": {
+                                "type": "string",
+                                "enum": [
+                                  "missing-input",
+                                  "unsafe-host-inspection",
+                                  "malformed-container",
+                                  "formal-envelope-over-bound",
+                                  "unrepresentable-member"
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "slot",
+                              "boundaryKind",
+                              "failureReason"
+                            ],
+                            "properties": {
+                              "slot": {
+                                "const": "resource-limit-policy-verification"
+                              },
+                              "boundaryKind": {
+                                "const": "resource-limit-policy-verification-input"
+                              },
+                              "failureReason": {
+                                "type": "string",
+                                "enum": [
+                                  "missing-input",
+                                  "over-bound-input",
+                                  "malformed-input",
+                                  "duplicate-member",
+                                  "unknown-member",
+                                  "secret-bearing-input",
+                                  "ambient-authority",
+                                  "verification-identity-mismatch",
+                                  "verification-revision-mismatch",
+                                  "verification-digest-mismatch"
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "slot",
+                              "boundaryKind",
+                              "failureReason"
+                            ],
+                            "properties": {
+                              "slot": {
+                                "const": "implementation-capability"
+                              },
+                              "boundaryKind": {
+                                "const": "implementation-capability"
+                              },
+                              "failureReason": {
+                                "type": "string",
+                                "enum": [
+                                  "missing-capability",
+                                  "malformed-capability",
+                                  "capability-specification-identity-mismatch",
+                                  "capability-specification-revision-mismatch",
+                                  "incomplete-capability",
+                                  "non-canonical-bound",
+                                  "non-positive-bound",
+                                  "unrepresentable-bound",
+                                  "below-bootstrap-minimum"
+                                ]
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "minItems": 0
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "boundaryKind": {
+              "const": "entry-admission-input-set"
+            },
+            "expected": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": true
+                    },
+                    "normalizedInput": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "configuration-file",
+                            "profile-selector-cli"
+                          ],
+                          "properties": {
+                            "configuration-file": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "bytes",
+                                "identity",
+                                "nonSecret",
+                                "revision",
+                                "locator"
+                              ],
+                              "properties": {
+                                "bytes": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "bytes"
+                                      ],
+                                      "properties": {
+                                        "bytes": {
+                                          "type": "string",
+                                          "pattern": "^(?:[0-9a-f]{2})*$"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "$ref": "#/definitions/reference"
+                                    }
+                                  ]
+                                },
+                                "identity": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "nonSecret": {
+                                  "type": "boolean"
+                                },
+                                "revision": {
+                                  "type": "string",
+                                  "pattern": "^sha256:[0-9a-f]{64}$"
+                                },
+                                "locator": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "relative-path"
+                                      ],
+                                      "properties": {
+                                        "relative-path": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "safe-label"
+                                      ],
+                                      "properties": {
+                                        "safe-label": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "safe-uri"
+                                      ],
+                                      "properties": {
+                                        "safe-uri": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              }
+                            },
+                            "profile-selector-cli": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "selector"
+                              ],
+                              "properties": {
+                                "selector": {
+                                  "$ref": "#/definitions/admittedSelector"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "configuration-programmatic",
+                            "profile-selector-programmatic"
+                          ],
+                          "properties": {
+                            "configuration-programmatic": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "snapshot",
+                                "digest",
+                                "identity",
+                                "nonSecret",
+                                "revision",
+                                "locator",
+                                "callSite"
+                              ],
+                              "properties": {
+                                "snapshot": {
+                                  "$ref": "#/definitions/snapshotNode"
+                                },
+                                "digest": {
+                                  "type": "string",
+                                  "pattern": "^sha256:[0-9a-f]{64}$"
+                                },
+                                "identity": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "nonSecret": {
+                                  "type": "boolean"
+                                },
+                                "revision": {
+                                  "type": "string",
+                                  "pattern": "^sha256:[0-9a-f]{64}$"
+                                },
+                                "locator": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "relative-path"
+                                      ],
+                                      "properties": {
+                                        "relative-path": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "safe-label"
+                                      ],
+                                      "properties": {
+                                        "safe-label": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "safe-uri"
+                                      ],
+                                      "properties": {
+                                        "safe-uri": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "callSite": {
+                                  "oneOf": [
+                                    {
+                                      "$ref": "#/definitions/jsonObject"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              }
+                            },
+                            "profile-selector-programmatic": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "selector"
+                              ],
+                              "properties": {
+                                "selector": {
+                                  "$ref": "#/definitions/admittedSelector"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "admitted",
+                    "normalizedInput",
+                    "failures",
+                    "resolverInvoked"
+                  ],
+                  "properties": {
+                    "admitted": {
+                      "const": false
+                    },
+                    "normalizedInput": {
+                      "type": "null"
+                    },
+                    "failures": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "slot",
+                              "boundaryKind",
+                              "failureReason"
+                            ],
+                            "properties": {
+                              "slot": {
+                                "type": "string",
+                                "enum": [
+                                  "configuration-file",
+                                  "configuration-programmatic",
+                                  "profile-selector-cli",
+                                  "profile-selector-programmatic"
+                                ]
+                              },
+                              "boundaryKind": {
+                                "const": "safe-origin-kind"
+                              },
+                              "failureReason": {
+                                "type": "string",
+                                "enum": [
+                                  "missing-safe-origin-kind",
+                                  "unknown-safe-origin-kind",
+                                  "non-canonical-safe-origin-kind",
+                                  "evidence-kind-incompatible"
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "slot",
+                              "boundaryKind",
+                              "failureReason"
+                            ],
+                            "properties": {
+                              "slot": {
+                                "const": "configuration-file"
+                              },
+                              "boundaryKind": {
+                                "const": "file-source-identity-revision"
+                              },
+                              "failureReason": {
+                                "type": "string",
+                                "enum": [
+                                  "missing-source-identity",
+                                  "missing-source-revision",
+                                  "over-bound-source-identity",
+                                  "over-bound-source-revision",
+                                  "unstable-source-identity",
+                                  "unbound-source-revision",
+                                  "source-snapshot-mismatch"
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "slot",
+                              "boundaryKind",
+                              "failureReason"
+                            ],
+                            "properties": {
+                              "slot": {
+                                "const": "configuration-programmatic"
+                              },
+                              "boundaryKind": {
+                                "const": "programmatic-entry-identity-revision"
+                              },
+                              "failureReason": {
+                                "type": "string",
+                                "enum": [
+                                  "missing-entry-identity",
+                                  "missing-entry-revision",
+                                  "over-bound-entry-identity",
+                                  "over-bound-entry-revision",
+                                  "unstable-entry-identity",
+                                  "unbound-entry-revision",
+                                  "snapshot-identity-mismatch"
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "slot",
+                              "boundaryKind",
+                              "failureReason"
+                            ],
+                            "properties": {
+                              "slot": {
+                                "const": "configuration-programmatic"
+                              },
+                              "boundaryKind": {
+                                "const": "programmatic-entry-snapshot"
+                              },
+                              "failureReason": {
+                                "type": "string",
+                                "enum": [
+                                  "missing-snapshot",
+                                  "unsafe-host-inspection",
+                                  "snapshot-envelope-over-bound",
+                                  "malformed-snapshot",
+                                  "snapshot-content-digest-mismatch"
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "slot",
+                              "boundaryKind",
+                              "failureReason"
+                            ],
+                            "properties": {
+                              "slot": {
+                                "const": "configuration-programmatic"
+                              },
+                              "boundaryKind": {
+                                "const": "programmatic-call-site-evidence-input"
+                              },
+                              "failureReason": {
+                                "type": "string",
+                                "enum": [
+                                  "unsafe-host-inspection",
+                                  "over-bound-input",
+                                  "malformed-input",
+                                  "invalid-utf8-source",
+                                  "duplicate-mapping",
+                                  "missing-source-identity",
+                                  "missing-source-revision",
+                                  "unstable-source-identity",
+                                  "unbound-source-revision",
+                                  "source-snapshot-mismatch"
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "slot",
+                              "boundaryKind",
+                              "failureReason"
+                            ],
+                            "properties": {
+                              "slot": {
+                                "const": "profile-selector-cli"
+                              },
+                              "boundaryKind": {
+                                "const": "external-profile-selector-binding"
+                              },
+                              "failureReason": {
+                                "type": "string",
+                                "enum": [
+                                  "unsafe-host-inspection",
+                                  "unrepresentable-selector",
+                                  "malformed-normalized-selector"
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "slot",
+                              "boundaryKind",
+                              "failureReason"
+                            ],
+                            "properties": {
+                              "slot": {
+                                "const": "profile-selector-programmatic"
+                              },
+                              "boundaryKind": {
+                                "const": "external-profile-selector-binding"
+                              },
+                              "failureReason": {
+                                "type": "string",
+                                "enum": [
+                                  "unsafe-host-inspection",
+                                  "unrepresentable-selector",
+                                  "malformed-normalized-selector"
+                                ]
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "minItems": 0
+                    },
+                    "resolverInvoked": {
+                      "const": false
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "resolverCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suiteRevision",
+        "manifestKind",
+        "id",
+        "resolverConstruction",
+        "commonInvocationInputFixture",
+        "entries",
+        "traceability"
+      ],
+      "properties": {
+        "suiteRevision": {
+          "const": "0"
+        },
+        "manifestKind": {
+          "const": "resolver"
+        },
+        "id": {
+          "$ref": "#/definitions/caseId"
+        },
+        "resolverConstruction": {
+          "$ref": "#/definitions/resolverConstruction"
+        },
+        "commonInvocationInputFixture": {
+          "$ref": "#/definitions/reference"
+        },
+        "entries": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "file",
+                "programmatic"
+              ],
+              "properties": {
+                "file": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "entryAdmissionInputFixture",
+                    "expectedOutcomeFixture"
+                  ],
+                  "properties": {
+                    "entryAdmissionInputFixture": {
+                      "$ref": "#/definitions/reference"
+                    },
+                    "expectedOutcomeFixture": {
+                      "$ref": "#/definitions/reference"
+                    }
+                  }
+                },
+                "programmatic": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "entryAdmissionInputFixture",
+                    "expectedOutcomeFixture"
+                  ],
+                  "properties": {
+                    "entryAdmissionInputFixture": {
+                      "$ref": "#/definitions/reference"
+                    },
+                    "expectedOutcomeFixture": {
+                      "$ref": "#/definitions/reference"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "file",
+                "programmatic"
+              ],
+              "properties": {
+                "file": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "entryAdmissionInputFixture",
+                    "expectedOutcomeFixture"
+                  ],
+                  "properties": {
+                    "entryAdmissionInputFixture": {
+                      "$ref": "#/definitions/reference"
+                    },
+                    "expectedOutcomeFixture": {
+                      "$ref": "#/definitions/reference"
+                    }
+                  }
+                },
+                "programmatic": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "unpaired"
+                  ],
+                  "properties": {
+                    "unpaired": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "reason",
+                        "verificationOwner"
+                      ],
+                      "properties": {
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "raw-json-syntax",
+                            "duplicate-object-member",
+                            "malformed-encoding",
+                            "exact-token-span"
+                          ]
+                        },
+                        "verificationOwner": {
+                          "$ref": "#/definitions/verificationOwner"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "file",
+                "programmatic"
+              ],
+              "properties": {
+                "file": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "unpaired"
+                  ],
+                  "properties": {
+                    "unpaired": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "reason",
+                        "verificationOwner"
+                      ],
+                      "properties": {
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "programmatic-source-label",
+                            "programmatic-call-site",
+                            "programmatic-entry-snapshot",
+                            "safe-host-inspection"
+                          ]
+                        },
+                        "verificationOwner": {
+                          "$ref": "#/definitions/verificationOwner"
+                        }
+                      }
+                    }
+                  }
+                },
+                "programmatic": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "entryAdmissionInputFixture",
+                    "expectedOutcomeFixture"
+                  ],
+                  "properties": {
+                    "entryAdmissionInputFixture": {
+                      "$ref": "#/definitions/reference"
+                    },
+                    "expectedOutcomeFixture": {
+                      "$ref": "#/definitions/reference"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "traceability": {
+          "$ref": "#/definitions/traceability"
+        },
+        "relations": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "role",
+                  "kind",
+                  "case",
+                  "class"
+                ],
+                "properties": {
+                  "role": {
+                    "const": "equivalence"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "profile-equal",
+                      "profile-changed",
+                      "invocation-stale",
+                      "invocation-not-stale",
+                      "materialized-input-equal",
+                      "materialized-input-changed"
+                    ]
+                  },
+                  "case": {
+                    "$ref": "#/definitions/caseId"
+                  },
+                  "class": {
+                    "type": "string",
+                    "pattern": "^015-COV-[0-9]{3}$"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "role",
+                  "kind",
+                  "case",
+                  "class"
+                ],
+                "properties": {
+                  "role": {
+                    "const": "mutation"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "profile-equal",
+                      "profile-changed",
+                      "invocation-stale",
+                      "invocation-not-stale",
+                      "materialized-input-equal",
+                      "materialized-input-changed"
+                    ]
+                  },
+                  "case": {
+                    "$ref": "#/definitions/caseId"
+                  },
+                  "class": {
+                    "type": "string",
+                    "enum": [
+                      "projectIdentity",
+                      "localeCanonicalization",
+                      "projectLocales",
+                      "localeNegotiation",
+                      "messageFallback",
+                      "coverage",
+                      "requiredPolicies",
+                      "optionalPolicies",
+                      "targets",
+                      "deploymentGroups",
+                      "delivery"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "exactReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "identity",
+        "revision",
+        "specificationRevision",
+        "semanticDigest"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "approval-policy",
+            "glossary-set",
+            "provider-routing-policy",
+            "resource-limit-policy",
+            "selection-policy",
+            "source-admission-policy",
+            "target-profile",
+            "trust-policy"
+          ]
+        },
+        "identity": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "specificationRevision": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "semanticDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "handoffVector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suiteRevision",
+        "manifestKind",
+        "id",
+        "producerCaseId",
+        "producerProfileFacts",
+        "producerArtifactBindings",
+        "consumerInputs",
+        "expectedRelationship",
+        "verificationOwner",
+        "traceability"
+      ],
+      "properties": {
+        "suiteRevision": {
+          "const": "0"
+        },
+        "manifestKind": {
+          "const": "handoff-vector"
+        },
+        "id": {
+          "$ref": "#/definitions/caseId"
+        },
+        "producerCaseId": {
+          "$ref": "#/definitions/caseId"
+        },
+        "producerProfileFacts": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "type": "string",
+            "enum": [
+              "profileSpecification",
+              "projectIdentity",
+              "localeCanonicalization",
+              "projectLocales",
+              "localeNegotiation",
+              "messageFallback",
+              "coverage",
+              "requiredPolicies",
+              "optionalPolicies",
+              "targets",
+              "deploymentGroups",
+              "delivery"
+            ]
+          }
+        },
+        "producerArtifactBindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key"
+            ],
+            "properties": {
+              "key": {
+                "$ref": "#/definitions/exactReference"
+              }
+            }
+          }
+        },
+        "consumerInputs": {
+          "$ref": "#/definitions/json"
+        },
+        "expectedRelationship": {
+          "$ref": "#/definitions/json"
+        },
+        "verificationOwner": {
+          "type": "string",
+          "enum": [
+            "016",
+            "019",
+            "020",
+            "021",
+            "022",
+            "023",
+            "024",
+            "025",
+            "026",
+            "027",
+            "030"
+          ]
+        },
+        "traceability": {
+          "$ref": "#/definitions/traceability"
+        }
+      }
+    },
+    "conditionalObligation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "notApplicableReason",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-XV-001"
+            },
+            "activation": {
+              "const": "second-configuration-schema-revision"
+            },
+            "activationState": {
+              "const": "inactive"
+            },
+            "notApplicableReason": {
+              "const": "no-second-admitted-configuration-schema-revision"
+            },
+            "verificationOwner": {
+              "const": "intlify_config"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-XV-001"
+            },
+            "activation": {
+              "const": "second-configuration-schema-revision"
+            },
+            "activationState": {
+              "const": "active"
+            },
+            "verificationOwner": {
+              "const": "intlify_config"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "notApplicableReason",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-XV-002"
+            },
+            "activation": {
+              "const": "extension-admitting-canonicalization-specification-revision"
+            },
+            "activationState": {
+              "const": "inactive"
+            },
+            "notApplicableReason": {
+              "const": "no-extension-admitting-canonicalization-specification-revision"
+            },
+            "verificationOwner": {
+              "const": "intlify_config"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-XV-002"
+            },
+            "activation": {
+              "const": "extension-admitting-canonicalization-specification-revision"
+            },
+            "activationState": {
+              "const": "active"
+            },
+            "verificationOwner": {
+              "const": "intlify_config"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "notApplicableReason",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-AD-001"
+            },
+            "activation": {
+              "const": "trusted-local-editor-navigation-adapter"
+            },
+            "activationState": {
+              "const": "inactive"
+            },
+            "notApplicableReason": {
+              "const": "no-trusted-local-editor-navigation-adapter"
+            },
+            "verificationOwner": {
+              "const": "product-integration"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-AD-001"
+            },
+            "activation": {
+              "const": "trusted-local-editor-navigation-adapter"
+            },
+            "activationState": {
+              "const": "active"
+            },
+            "verificationOwner": {
+              "const": "product-integration"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "notApplicableReason",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-AD-002"
+            },
+            "activation": {
+              "const": "compatibility-conversion-adapter"
+            },
+            "activationState": {
+              "const": "inactive"
+            },
+            "notApplicableReason": {
+              "const": "no-compatibility-conversion-adapter"
+            },
+            "verificationOwner": {
+              "const": "029"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-AD-002"
+            },
+            "activation": {
+              "const": "compatibility-conversion-adapter"
+            },
+            "activationState": {
+              "const": "active"
+            },
+            "verificationOwner": {
+              "const": "029"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "notApplicableReason",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-AD-003"
+            },
+            "activation": {
+              "const": "baked-canonicalization-provider"
+            },
+            "activationState": {
+              "const": "inactive"
+            },
+            "notApplicableReason": {
+              "const": "no-baked-canonicalization-provider"
+            },
+            "verificationOwner": {
+              "const": "intlify_config"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-AD-003"
+            },
+            "activation": {
+              "const": "baked-canonicalization-provider"
+            },
+            "activationState": {
+              "const": "active"
+            },
+            "verificationOwner": {
+              "const": "intlify_config"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "notApplicableReason",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-AD-004"
+            },
+            "activation": {
+              "const": "cli-adapter"
+            },
+            "activationState": {
+              "const": "inactive"
+            },
+            "notApplicableReason": {
+              "const": "no-cli-adapter"
+            },
+            "verificationOwner": {
+              "const": "product-integration"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-AD-004"
+            },
+            "activation": {
+              "const": "cli-adapter"
+            },
+            "activationState": {
+              "const": "active"
+            },
+            "verificationOwner": {
+              "const": "product-integration"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "notApplicableReason",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-001"
+            },
+            "activation": {
+              "const": "negotiation-adapter-resource-section"
+            },
+            "activationState": {
+              "const": "inactive"
+            },
+            "notApplicableReason": {
+              "const": "no-negotiation-adapter-resource-section"
+            },
+            "verificationOwner": {
+              "const": "027"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-001"
+            },
+            "activation": {
+              "const": "negotiation-adapter-resource-section"
+            },
+            "activationState": {
+              "const": "active"
+            },
+            "verificationOwner": {
+              "const": "027"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "notApplicableReason",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-002"
+            },
+            "activation": {
+              "const": "expanded-fallback-probes"
+            },
+            "activationState": {
+              "const": "inactive"
+            },
+            "notApplicableReason": {
+              "const": "no-expanded-fallback-probes"
+            },
+            "verificationOwner": {
+              "const": "020"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-002"
+            },
+            "activation": {
+              "const": "expanded-fallback-probes"
+            },
+            "activationState": {
+              "const": "active"
+            },
+            "verificationOwner": {
+              "const": "020"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

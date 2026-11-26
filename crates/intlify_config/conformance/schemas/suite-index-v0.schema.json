@@ -10,7 +10,13 @@
     "profileSpecification",
     "configurationSchemaAuthoritySet",
     "resolverCapabilitySpecification",
-    "registryPackage"
+    "caseSchema",
+    "registryPackage",
+    "resolverConstructionCases",
+    "resolverInputAdmissionCases",
+    "resolverCases",
+    "handoffVectors",
+    "conditionalObligations"
   ],
   "properties": {
     "suiteRevision": {
@@ -364,6 +370,34 @@
         }
       }
     },
+    "caseSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "revision",
+        "path",
+        "digest"
+      ],
+      "properties": {
+        "identity": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
     "registryPackage": {
       "type": "object",
       "additionalProperties": false,
@@ -571,6 +605,136 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "resolverConstructionCases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "path",
+          "digest"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^015-[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "resolverInputAdmissionCases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "path",
+          "digest"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^015-[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "resolverCases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "path",
+          "digest"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^015-[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "handoffVectors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "path",
+          "digest"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^015-[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "conditionalObligations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "path",
+          "digest"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^015-(?:XV|AD|HV)-[0-9]{3}$"
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
           }
         }
       }

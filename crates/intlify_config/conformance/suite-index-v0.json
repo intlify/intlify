@@ -4,7 +4,7 @@
     "identity": "intlify-project-profile-conformance-suite-index",
     "revision": "0",
     "path": "schemas/suite-index-v0.schema.json",
-    "digest": "sha256:fecebb541699b09e1c628bc72726f2098fc61048970c72dc2a2e281557afe5d4"
+    "digest": "sha256:91cd21269a9f33ba8154616e581aeaeb080a8d35c8f5af5e1994a4e9a219e2b4"
   },
   "resolverConstructionRootPackage": {
     "identity": "intlify-resolver-construction-root-package",
@@ -74,6 +74,12 @@
     "path": "authorities/resolver-capability-v0.json",
     "digest": "sha256:7ffcd14a9197e777182f4c67c971d864a3157e7b8d112cdbb000cead88a9bc6e"
   },
+  "caseSchema": {
+    "identity": "intlify-project-profile-conformance-case",
+    "revision": "0",
+    "path": "schemas/case-v0.schema.json",
+    "digest": "sha256:21339b0c6f0e3a90108d60c7c75f5afcef126c1c6def4d24a01c670733297153"
+  },
   "registryPackage": {
     "identity": "intlify-project-profile-resolver-registry-package",
     "revision": "0",
@@ -117,5 +123,10 @@
         "digest": "sha256:d405c874231d337898513ca326d38e097a460f337eea62c60e4e88f854ead4e8"
       }
     }
-  }
+  },
+  "resolverConstructionCases": [],
+  "resolverInputAdmissionCases": [],
+  "resolverCases": [],
+  "handoffVectors": [],
+  "conditionalObligations": []
 }

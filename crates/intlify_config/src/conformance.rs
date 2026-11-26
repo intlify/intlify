@@ -10,7 +10,8 @@
 //! Schema, whose identity and file digest it pins ([`index`]). It checks that
 //! schema, validates the index against it, compares what the index pins with
 //! the artifacts this crate is compiled from, and verifies every body the
-//! index names by its file digest ([`runner`]). Whatever stops a suite from
+//! index names by its file digest, and every manifest against the Case Schema
+//! ([`case`], [`runner`]). Whatever stops a suite from
 //! opening is a Conformance harness failure, never a construction failure, an
 //! input-admission failure, a Finding, or a resolver outcome.
 //!
@@ -18,6 +19,7 @@
 //! `suite-index-v0.json`. The runner reads files, so like the benchmark it is
 //! no part of a resolution: only tests and the developer examples build it.
 
+pub(crate) mod case;
 pub(crate) mod index;
 pub(crate) mod runner;
 
@@ -25,6 +27,7 @@ pub(crate) mod runner;
 /// schema, and open a suite at an explicit Suite Index path.
 #[cfg(feature = "conformance")]
 pub mod support {
+    pub use super::case::schema_digest as case_schema_digest;
     pub use super::index::{artifacts, schema_digest, Member};
     pub use super::runner::{open, HarnessFailure, Opened};
 }

@@ -21,8 +21,10 @@
 //! This crate writes the schema and the index from its own values, as it
 //! writes the construction artifacts: the index names each construction root
 //! member, authority, and Registry Package member at the path this crate
-//! writes it to, with the file digest of the bytes it writes there. The Case
-//! Schema and the five manifest arrays are not part of the index yet.
+//! writes it to, with the file digest of the bytes it writes there. It pins
+//! the Case Schema ([`super::case`]) the same way, and lists each manifest by
+//! its ID, path, and file digest in the array of its kind; the arrays stay
+//! empty until the cases are written.
 
 use serde_json::{json, Map, Value};
 
@@ -36,6 +38,8 @@ use crate::construction::registry::RegistryRole;
 use crate::construction::root::{self, RootRole};
 use crate::model::CONFIGURATION_SCHEMA_VERSION;
 
+use super::case::{self, ManifestKind, CASE_ID_PATTERN, OBLIGATION_ID_PATTERN};
+
 /// The Suite Index Schema's identity.
 pub(crate) const SCHEMA_IDENTITY: &str = "intlify-project-profile-conformance-suite-index";
 
@@ -47,7 +51,7 @@ pub(crate) const SCHEMA_PATH: &str = "schemas/suite-index-v0.schema.json";
 
 /// The Suite Index Schema's file digest: the runner's trust root.
 pub(crate) const SCHEMA_DIGEST: &str =
-    "sha256:fecebb541699b09e1c628bc72726f2098fc61048970c72dc2a2e281557afe5d4";
+    "sha256:91cd21269a9f33ba8154616e581aeaeb080a8d35c8f5af5e1994a4e9a219e2b4";
 
 /// The suite revision an index declares.
 pub(crate) const SUITE_REVISION: &str = "0";
@@ -70,12 +74,18 @@ pub enum Member {
     ProfileSpecification,
     ConfigurationSchemaAuthoritySet,
     ResolverCapabilitySpecification,
+    CaseSchema,
     RegistryPackage,
+    ResolverConstructionCases,
+    ResolverInputAdmissionCases,
+    ResolverCases,
+    HandoffVectors,
+    ConditionalObligations,
 }
 
 impl Member {
     /// Every member, in the order this crate writes them.
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 14] = [
         Self::SuiteRevision,
         Self::SuiteIndexSchema,
         Self::ResolverConstructionRootPackage,
@@ -83,7 +93,13 @@ impl Member {
         Self::ProfileSpecification,
         Self::ConfigurationSchemaAuthoritySet,
         Self::ResolverCapabilitySpecification,
+        Self::CaseSchema,
         Self::RegistryPackage,
+        Self::ResolverConstructionCases,
+        Self::ResolverInputAdmissionCases,
+        Self::ResolverCases,
+        Self::HandoffVectors,
+        Self::ConditionalObligations,
     ];
 
     /// The member's name in the index.
@@ -96,7 +112,33 @@ impl Member {
             Self::ProfileSpecification => "profileSpecification",
             Self::ConfigurationSchemaAuthoritySet => "configurationSchemaAuthoritySet",
             Self::ResolverCapabilitySpecification => "resolverCapabilitySpecification",
+            Self::CaseSchema => "caseSchema",
             Self::RegistryPackage => "registryPackage",
+            Self::ResolverConstructionCases => "resolverConstructionCases",
+            Self::ResolverInputAdmissionCases => "resolverInputAdmissionCases",
+            Self::ResolverCases => "resolverCases",
+            Self::HandoffVectors => "handoffVectors",
+            Self::ConditionalObligations => "conditionalObligations",
+        }
+    }
+
+    /// The kind of the manifests the member lists, when it lists manifests.
+    pub(crate) const fn manifests(self) -> Option<ManifestKind> {
+        match self {
+            Self::ResolverConstructionCases => Some(ManifestKind::ResolverConstruction),
+            Self::ResolverInputAdmissionCases => Some(ManifestKind::ResolverInputAdmission),
+            Self::ResolverCases => Some(ManifestKind::Resolver),
+            Self::HandoffVectors => Some(ManifestKind::HandoffVector),
+            Self::ConditionalObligations => Some(ManifestKind::ConditionalObligation),
+            Self::SuiteRevision
+            | Self::SuiteIndexSchema
+            | Self::ResolverConstructionRootPackage
+            | Self::ProfileSpecificationSchema
+            | Self::ProfileSpecification
+            | Self::ConfigurationSchemaAuthoritySet
+            | Self::ResolverCapabilitySpecification
+            | Self::CaseSchema
+            | Self::RegistryPackage => None,
         }
     }
 }
@@ -145,7 +187,8 @@ pub(crate) fn schema() -> Value {
             Member::SuiteRevision => token(),
             Member::SuiteIndexSchema
             | Member::ProfileSpecificationSchema
-            | Member::ResolverCapabilitySpecification => pinned(&[]),
+            | Member::ResolverCapabilitySpecification
+            | Member::CaseSchema => pinned(&[]),
             Member::ResolverConstructionRootPackage => {
                 pinned(&[("canonicalDigest", digest()), ("members", closed(&roots))])
             }
@@ -162,6 +205,25 @@ pub(crate) fn schema() -> Value {
                 ("members", mapped.clone()),
             ]),
             Member::RegistryPackage => pinned(&[("members", closed(&registries))]),
+            Member::ResolverConstructionCases
+            | Member::ResolverInputAdmissionCases
+            | Member::ResolverCases
+            | Member::HandoffVectors
+            | Member::ConditionalObligations => {
+                let id = if member == Member::ConditionalObligations {
+                    OBLIGATION_ID_PATTERN
+                } else {
+                    CASE_ID_PATTERN
+                };
+                json!({
+                    "type": "array",
+                    "items": closed(&[
+                        ("id", json!({ "type": "string", "pattern": id })),
+                        ("path", path()),
+                        ("digest", digest()),
+                    ]),
+                })
+            }
         };
         (member.name(), schema)
     });
@@ -188,12 +250,14 @@ pub fn schema_digest() -> Result<String, serde_json::Error> {
 /// out.
 pub fn artifacts() -> Result<Vec<Artifact>, serde_json::Error> {
     let schema = generate::write(&schema())?;
-    let index = generate::write(&index(&schema)?)?;
+    let case_schema = case::artifact()?;
+    let index = generate::write(&index(&schema, &case_schema)?)?;
     Ok(vec![
         Artifact {
             path: SCHEMA_PATH,
             bytes: schema,
         },
+        case_schema,
         Artifact {
             path: PATH,
             bytes: index,
@@ -212,8 +276,9 @@ fn entry(identity: &str, revision: Option<&String>, artifact: &Artifact) -> Valu
 }
 
 /// The index of the artifacts this crate writes, under the identities and
-/// revisions the Root Package admits, and of the schema written as `schema`.
-fn index(schema: &[u8]) -> Result<Value, serde_json::Error> {
+/// revisions the Root Package admits, of the schema written as `schema`, and
+/// of the Case Schema.
+fn index(schema: &[u8], case_schema: &Artifact) -> Result<Value, serde_json::Error> {
     let admission = ConstructionAdmission::revision_zero();
     let components = &admission.components;
     let root_artifacts = generate::artifacts()?;
@@ -334,6 +399,16 @@ fn index(schema: &[u8]) -> Result<Value, serde_json::Error> {
                 value["members"] = Value::Object(members);
                 value
             }
+            Member::CaseSchema => entry(
+                case::IDENTITY,
+                Some(&case::REVISION.to_owned()),
+                case_schema,
+            ),
+            Member::ResolverConstructionCases
+            | Member::ResolverInputAdmissionCases
+            | Member::ResolverCases
+            | Member::HandoffVectors
+            | Member::ConditionalObligations => json!([]),
         };
         index.insert(member.name().to_owned(), value);
     }
@@ -349,10 +424,14 @@ mod tests {
     use crate::construction::validator::schema::Schema;
 
     /// The committed schema and index, at their paths.
-    const COMMITTED: [(&str, &[u8]); 2] = [
+    const COMMITTED: [(&str, &[u8]); 3] = [
         (
             SCHEMA_PATH,
             include_bytes!("../../conformance/schemas/suite-index-v0.schema.json"),
+        ),
+        (
+            case::PATH,
+            include_bytes!("../../conformance/schemas/case-v0.schema.json"),
         ),
         (
             PATH,
@@ -362,7 +441,7 @@ mod tests {
 
     /// The index this crate writes.
     fn written() -> Value {
-        serde_json::from_slice(&artifacts().unwrap()[1].bytes).unwrap()
+        serde_json::from_slice(&artifacts().unwrap()[2].bytes).unwrap()
     }
 
     /// Whether the schema admits an index, as this crate's validator and the
@@ -440,7 +519,7 @@ mod tests {
             .into_iter()
             .chain(generate::authorities().unwrap())
             .chain(generate::registries().unwrap())
-            .chain(artifacts().unwrap().into_iter().take(1))
+            .chain(artifacts().unwrap().into_iter().take(2))
             .map(|artifact| {
                 (
                     artifact.path,
@@ -448,7 +527,7 @@ mod tests {
                 )
             })
             .collect::<BTreeMap<_, _>>();
-        assert_eq!(named.len(), 19);
+        assert_eq!(named.len(), 20);
         assert_eq!(
             named,
             artifacts
@@ -503,6 +582,41 @@ mod tests {
         }
     }
 
+    /// Each manifest array lists closed references whose ID has its kind's
+    /// grammar: a case or vector ID, or, in the obligations' array, an
+    /// obligation ID.
+    #[test]
+    fn a_manifest_array_lists_ids_of_its_kind() {
+        let digest = format!("sha256:{}", "0".repeat(64));
+        let listing = |member: Member, id: &str| {
+            let mut index = written();
+            index[member.name()] = json!([{ "id": id, "path": "cases/a.json", "digest": digest }]);
+            index
+        };
+        for member in Member::ALL
+            .into_iter()
+            .filter(|member| member.manifests().is_some())
+        {
+            let (own, other) = if member == Member::ConditionalObligations {
+                ("015-XV-001", "015-construction-revision-0")
+            } else {
+                ("015-construction-revision-0", "015-XV-001")
+            };
+            assert!(admits(&listing(member, own)), "{member:?}");
+            assert!(!admits(&listing(member, other)), "{member:?}");
+            for id in [
+                "015-",
+                "015-Upper",
+                "016-a",
+                "015-a--b",
+                "015-XV-01",
+                "015-XX-001",
+            ] {
+                assert!(!admits(&listing(member, id)), "{member:?} {id}");
+            }
+        }
+    }
+
     /// The schema constrains form only: another identity, revision, or
     /// digest of the right form is the runner's to compare, and another
     /// mapped schema version is too.
@@ -534,7 +648,7 @@ mod tests {
         let index = written();
         let mut pointers = Vec::new();
         objects(&index, "", &mut pointers);
-        assert_eq!(pointers.len(), 24);
+        assert_eq!(pointers.len(), 25);
         for pointer in &pointers {
             let names = index.pointer(pointer).unwrap().as_object().unwrap().keys();
             for name in names {
@@ -577,6 +691,11 @@ mod tests {
                 json!(["a"]),
             ),
             ("/registryPackage/members", json!([])),
+            ("/resolverCases", json!({})),
+            (
+                "/handoffVectors",
+                json!([{ "id": "015-a", "path": "a.json" }]),
+            ),
         ];
         for (pointer, value) in out_of_form {
             let mut changed = index.clone();
