@@ -4,7 +4,7 @@ Shared configuration support for [Intlify](../../design/000-intlify-overview-des
 
 > [!IMPORTANT]
 >
-> This crate is currently a minimum implementation. A complete project-profile resolver and an application-facing `LocalizationProjectProfile` API are not yet available. See [Current status](#current-status) for the implemented scope and remaining work.
+> This crate is not yet an application-facing configuration API. Its project-profile resolver is crate-private, and no `LocalizationProjectProfile` API is available yet. See [Current status](#current-status) for the implemented scope and remaining work.
 
 `intlify_config` is the Rust crate that brings Intlify's project-configuration rules into one place. Its purpose is to give the CLI and compiler stages a consistent understanding of a project's languages and localization settings, so each tool does not need its own configuration parser or defaults.
 
@@ -19,7 +19,7 @@ A profile describes one application's localization project: which languages its 
 
 The CLI or another host is responsible for finding and reading the configuration file. This crate is responsible for interpreting and validating the supplied configuration. The intended result is one checked profile that downstream tools can share.
 
-This crate handles configuration, not message translation or runtime formatting. The complete profile resolver described above is still under development.
+This crate handles configuration, not message translation or runtime formatting. The profile resolver described above exists inside the crate, but no host calls it yet.
 
 ## Current status
 
@@ -30,6 +30,7 @@ The current implementation includes:
 - Shared JSON decoding, error locations, and JSON Schema utilities already used by the existing Intlify CLI.
 - A generated [JSON Schema for project-profile configuration](./schema/project-profile-config-v0.schema.json).
 - Internal configuration validation, named-profile selection, and the semantic resolution of the selected profile: the specification input, the Resource Limit Policy bootstrap that confirms the selection, project identity, every locale occurrence, locale negotiation aliases, message fallback, coverage with its surface-class vocabulary, the admission of the submitted artifact collection with its exact references and bindings, delivery placement, each target's locale subset, effective default, and Target Profile directions, the exact partition of the targets into Deployment Compatibility Groups, and their hydration relations between the roles each Target Profile declares. The result is crate-private semantic state, not a profile.
+- Internal resolver construction under the built-in Resolver Construction Root Package, with a bounded Draft 7 validator, the closed pre-invocation boundaries, and an invocation whose checked or blocked outcome carries its Resolver Construction Identity and Resolution Evidence, and, when checked, the profile view and the bindings. None of it is public.
 - An optional locale provider over the ICU4X 2.2.0 reference adapter, [`intlify_locale_icu4x`](../intlify_locale_icu4x/README.md), behind the non-default `icu4x` feature. It admits a locale canonicalization data artifact from bytes its caller supplies, and the boundary binds it only when it carries the one supported specification, revision `"0"`, with its CLDR 48.2.0 dataset.
 - Optional developer measurements for the implemented configuration operations, including locale-policy resolution, the resource policy bootstrap, collection admission, binding construction, target and group resolution, hydration validation, resolver construction with its identity, the Shared projection, Entry projection, and outcome finalization stages of the Evidence materialization over a file entry's invocation, a file entry's complete invocation, from the admission of what a binding submits through the outcome, on a resolver constructed for each call, on one reused across calls, and on one reused right after a blocked outcome, and the admission of an already constructed programmatic Snapshot through the document of its value, and a programmatic entry's complete invocation in the same three states and its Evidence materialization stages, whose Snapshot of a file's value shares that file's Shared outcome, and the replay of a file invocation's Materialized Resolution Input Set. Locale canonicalization and locale-policy resolution are measured through both the finite test provider and the ICU4X provider, which runs once with an engine reused across calls and once with a new engine for each call.
 
@@ -39,7 +40,9 @@ Phase 3, the semantic profile resolver, is complete up to that crate-private sta
 
 Phase 4, targets and compatibility groups, extends that state with target resolution, the group partition, and hydration validation, and fixes the [Group ID selection vectors](./fixtures/handoff/README.md) design 020 verifies. The [Phase 4 fixtures](./fixtures/phase4/README.md) map its coverage. It is complete: each Target Profile declares its hydration roles in its body and has a direction for each locale its targets request, and two Target Profiles are compatible by design 024's closed rule.
 
-The project-profile path does not yet produce a public `LocalizationProjectProfile` or replace the CLI's existing configuration workflow. No configuration path uses the ICU4X provider yet: locale normalization in the example still uses a finite test provider, and only the measurements run the ICU4X provider. The checked profile and its outcomes, and resolver construction, remain follow-up work (Phase 5).
+Phase 5, resolver construction, invocation, and Evidence, constructs one immutable resolver under the built-in Resolver Construction Root Package, admits each input of an invocation at its closed boundary, and returns a checked or blocked outcome with its Resolver Construction Identity, Findings, Resolution Evidence under the reporting bounds, the profile view and its semantic digest, and the inputs a replay reads. The [Phase 5 fixtures](./fixtures/phase5/README.md) map its coverage. It is complete inside the crate: the resolver, its boundaries, and its outcomes are crate-private, and only the tests, the measurements, and the developer example construct a resolver.
+
+The project-profile path does not yet produce a public `LocalizationProjectProfile` or replace the CLI's existing configuration workflow. No binding or CLI calls the resolver yet, so no configuration path uses the ICU4X provider: locale normalization in the example still uses a finite test provider, and only the tests and the measurements run the ICU4X provider. The conformance suite (Phase 6) and product integration (Phase 7) remain follow-up work.
 
 ## Try it from the terminal
 
