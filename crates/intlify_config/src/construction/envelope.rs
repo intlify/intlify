@@ -30,16 +30,18 @@ use super::capability;
 /// A `sha256:` presentation of a complete digest.
 pub(crate) const DIGEST_PATTERN: &str = "^sha256:[0-9a-f]{64}$";
 
-fn token() -> Value {
+/// A token, as an identity or a revision is spelled.
+pub(crate) fn token() -> Value {
     json!({ "type": "string", "pattern": ID_PATTERN })
 }
 
-fn digest() -> Value {
+/// A digest's `sha256:` presentation.
+pub(crate) fn digest() -> Value {
     json!({ "type": "string", "pattern": DIGEST_PATTERN })
 }
 
 /// A closed object with exactly these members, each required.
-fn closed(members: &[(&str, Value)]) -> Value {
+pub(crate) fn closed(members: &[(&str, Value)]) -> Value {
     let mut properties = Map::new();
     for (name, schema) in members {
         properties.insert((*name).to_owned(), schema.clone());
@@ -61,7 +63,7 @@ fn tuple() -> Value {
 }
 
 /// Place a schema at the root of its own document.
-fn document(mut schema: Value) -> Value {
+pub(crate) fn document(mut schema: Value) -> Value {
     let mut root = Map::new();
     root.insert("$schema".to_owned(), json!(DRAFT_7));
     if let Value::Object(members) = schema.take() {

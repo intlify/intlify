@@ -19,6 +19,10 @@ cargo test -p intlify_config --all-features --lib construction
 # the written authorities construct under the pinned digests
 cargo run -p intlify_config --features vectors --example generate_construction_artifacts -- --write
 
+# then rewrite the conformance suite's index, which pins these artifacts by
+# their file digests
+cargo run -p intlify_config --features conformance --example generate_conformance_suite -- --write
+
 # the committed bytes, and the independent Node check
 vp run construction:check
 ```

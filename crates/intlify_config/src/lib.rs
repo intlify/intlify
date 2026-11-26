@@ -90,6 +90,12 @@ pub use artifacts::vectors as vector_support;
 #[doc(hidden)]
 pub use construction::generate as construction_support;
 
+// Developer-only conformance suite: writing the committed Suite Index and its
+// schema, and opening a suite at an explicit Suite Index path.
+#[cfg(feature = "conformance")]
+#[doc(hidden)]
+pub use conformance::support as conformance_support;
+
 /// Non-default developer measurements only; no configuration resolver or Profile API.
 #[cfg(feature = "benchmark")]
 pub use benchmark::facade as measurement;
@@ -109,6 +115,11 @@ mod artifacts;
 // benchmark, and the developer example build a resolver from it yet.
 #[allow(dead_code)]
 mod construction;
+
+// 015's Conformance Suite: the Suite Index and the runner that opens a suite
+// from it. It reads files, so only tests and the developer examples build it.
+#[cfg(any(test, feature = "conformance"))]
+mod conformance;
 
 // 015's typed-record framing and the Resolver Construction Identity's text.
 // Construction and the invocation boundaries will use them; no codec is public.

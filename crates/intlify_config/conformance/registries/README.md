@@ -19,6 +19,10 @@ cargo test -p intlify_config --all-features --lib construction
 # src/construction/registry/safe_origin.rs, check.rs, and finding.rs
 cargo run -p intlify_config --features vectors --example generate_construction_artifacts -- --write
 
+# then rewrite the conformance suite's index, which pins these artifacts by
+# their file digests
+cargo run -p intlify_config --features conformance --example generate_conformance_suite -- --write
+
 # the committed bytes, and the independent Node checks
 vp run construction:check
 ```
