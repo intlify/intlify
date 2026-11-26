@@ -5,8 +5,9 @@
 //! handed.
 //!
 //! The suite root is the directory that holds the index (D15:2858). Opening
-//! reads the Suite Index Schema and what the index names, and nothing else.
-//! It checks in this order, and the first failure stops it:
+//! reads the Suite Index Schema and what the index names, and nothing else,
+//! and never through a symbolic link below the suite root, which could reach
+//! a file outside it. It checks in this order, and the first failure stops it:
 //!
 //! 1. the trust root: the Suite Index Schema at its fixed path below the
 //!    suite root has the file digest the runner pins (D15:3029);
@@ -49,6 +50,9 @@ use super::index::{
 pub enum HarnessFailure {
     /// No file is at the path, or it cannot be read.
     Missing(String),
+    /// The path passes through a symbolic link below the suite root, so the
+    /// file it reaches may lie outside the suite.
+    SymbolicLink(String),
     /// The file's bytes do not have the digest the index declares for them,
     /// or, for the Suite Index Schema, the one the runner pins.
     DigestMismatch(String),
@@ -68,6 +72,9 @@ impl fmt::Display for HarnessFailure {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Missing(path) => write!(formatter, "{path} is missing or unreadable"),
+            Self::SymbolicLink(path) => {
+                write!(formatter, "{path} passes through a symbolic link")
+            }
             Self::DigestMismatch(path) => {
                 write!(formatter, "{path} does not have its declared digest")
             }
@@ -117,9 +124,21 @@ pub fn open(index: &Path) -> Result<Opened, HarnessFailure> {
     Ok(Opened { verified })
 }
 
-/// Read a body below the suite root.
+/// Read a body below the suite root, refusing a path that passes through a
+/// symbolic link: the suite is the files below its root, and a link could
+/// reach one outside it with the bytes the index declares. A segment that is
+/// absent is left for the read to report.
 fn read(root: &Path, path: &str) -> Result<Vec<u8>, HarnessFailure> {
-    std::fs::read(root.join(path)).map_err(|_| HarnessFailure::Missing(path.to_owned()))
+    let mut file = root.to_path_buf();
+    for segment in path.split('/') {
+        file.push(segment);
+        let link = std::fs::symlink_metadata(&file)
+            .is_ok_and(|metadata| metadata.file_type().is_symlink());
+        if link {
+            return Err(HarnessFailure::SymbolicLink(path.to_owned()));
+        }
+    }
+    std::fs::read(&file).map_err(|_| HarnessFailure::Missing(path.to_owned()))
 }
 
 /// Read the Suite Index Schema from its fixed path, as the one the runner
@@ -831,6 +850,38 @@ mod tests {
         );
     }
 
+    /// A body reached through a symbolic link below the suite root does not
+    /// open, though the link reaches the bytes the index declares: a linked
+    /// file, a linked directory on the way, and the schema at its fixed path.
+    #[cfg(unix)]
+    #[test]
+    fn a_body_reached_through_a_symbolic_link_does_not_open() {
+        let outside = tempfile::tempdir().unwrap();
+        copy_tree(&committed(), outside.path());
+        let link = |suite: &Suite, path: &str| {
+            let at = suite.root().join(path);
+            if at.is_dir() {
+                std::fs::remove_dir_all(&at).unwrap();
+            } else {
+                std::fs::remove_file(&at).unwrap();
+            }
+            std::os::unix::fs::symlink(outside.path().join(path), at).unwrap();
+        };
+        for (linked, refused) in [
+            (capability::PATH, capability::PATH),
+            ("registries", registry::PATH),
+            (SCHEMA_PATH, SCHEMA_PATH),
+        ] {
+            let suite = Suite::new();
+            link(&suite, linked);
+            assert_eq!(
+                suite.open(),
+                Err(HarnessFailure::SymbolicLink(refused.to_owned())),
+                "{linked}"
+            );
+        }
+    }
+
     #[test]
     fn each_failure_says_what_failed() {
         let path = "registries/check-v0.json".to_owned();
@@ -838,6 +889,10 @@ mod tests {
             (
                 HarnessFailure::Missing(path.clone()),
                 "registries/check-v0.json is missing or unreadable",
+            ),
+            (
+                HarnessFailure::SymbolicLink(path.clone()),
+                "registries/check-v0.json passes through a symbolic link",
             ),
             (
                 HarnessFailure::DigestMismatch(path.clone()),

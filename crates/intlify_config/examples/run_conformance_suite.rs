@@ -15,18 +15,20 @@ use std::process::ExitCode;
 use intlify_config::conformance_support::open;
 
 fn main() -> ExitCode {
-    let mut args = std::env::args().skip(1);
+    let mut args = std::env::args_os().skip(1);
     let (Some(index), None) = (args.next(), args.next()) else {
         eprintln!("usage: run_conformance_suite <suite-index>");
         return ExitCode::FAILURE;
     };
-    match open(Path::new(&index)) {
+    let index = Path::new(&index);
+    match open(index) {
         Ok(opened) => {
             for (path, digest) in &opened.verified {
                 println!("{digest} {path}");
             }
             println!(
-                "the suite at {index} opens: {} bodies verified",
+                "the suite at {} opens: {} bodies verified",
+                index.display(),
                 opened.verified.len()
             );
             ExitCode::SUCCESS

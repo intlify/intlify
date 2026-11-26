@@ -17,10 +17,11 @@ use std::process::ExitCode;
 const ROOT: &str = "conformance";
 
 fn main() -> ExitCode {
-    let write = match std::env::args().nth(1).as_deref() {
-        None | Some("--check") => false,
-        Some("--write") => true,
-        Some(_) => {
+    let args = std::env::args_os().skip(1).collect::<Vec<_>>();
+    let write = match args.iter().map(|arg| arg.to_str()).collect::<Vec<_>>()[..] {
+        [] | [Some("--check")] => false,
+        [Some("--write")] => true,
+        _ => {
             eprintln!("usage: generate_conformance_suite [--check | --write]");
             return ExitCode::FAILURE;
         }

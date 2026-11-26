@@ -212,12 +212,101 @@ function at(value, pointer) {
 }
 
 /**
- * Read a committed artifact and check its form: one final newline, no
- * carriage return, and exactly the bytes two-space indentation writes, so
- * no member repeats.
+ * Read a file's bytes, recording why when it cannot be read, as when its
+ * path names a directory.
+ *
+ * @param file - The file.
+ * @param shown - Its path as messages show it.
+ * @returns The bytes, or undefined.
+ */
+function readBytes(file, shown) {
+  try {
+    return readFileSync(file)
+  } catch (error) {
+    fail(`${shown}: unreadable (${error.code ?? error.message})`)
+    return undefined
+  }
+}
+
+/**
+ * Whether a JSON text repeats a member name within one object, which
+ * `JSON.parse` hides by keeping the last value. The text is valid JSON, and
+ * names compare as decoded strings.
+ *
+ * @param text - The JSON text.
+ * @returns Whether a member repeats.
+ */
+function repeatsMember(text) {
+  const open = []
+  let name = false
+  for (let at = 0; at < text.length; at += 1) {
+    const character = text[at]
+    if (character === '"') {
+      let end = at + 1
+      while (text[end] !== '"') {
+        end += text[end] === '\\' ? 2 : 1
+      }
+      const names = open.at(-1)
+      if (name && names instanceof Set) {
+        const decoded = JSON.parse(text.slice(at, end + 1))
+        if (names.has(decoded)) {
+          return true
+        }
+        names.add(decoded)
+        name = false
+      }
+      at = end
+    } else if (character === '{') {
+      open.push(new Set())
+      name = true
+    } else if (character === '[') {
+      open.push(null)
+      name = false
+    } else if (character === '}' || character === ']') {
+      open.pop()
+      name = false
+    } else if (character === ',') {
+      name = open.at(-1) instanceof Set
+    }
+  }
+  return false
+}
+
+/**
+ * Read a JSON file strictly: its bytes, then its value, which must not
+ * repeat a member.
+ *
+ * @param file - The file.
+ * @param shown - Its path as messages show it.
+ * @returns The bytes and the value, either undefined when unavailable.
+ */
+function readJson(file, shown) {
+  const bytes = readBytes(file, shown)
+  if (bytes === undefined) {
+    return { bytes, value: undefined }
+  }
+  const text = bytes.toString('utf8')
+  let value
+  try {
+    value = JSON.parse(text)
+  } catch {
+    fail(`${shown}: not JSON`)
+    return { bytes, value: undefined }
+  }
+  if (repeatsMember(text)) {
+    fail(`${shown}: repeats a member`)
+    return { bytes, value: undefined }
+  }
+  return { bytes, value }
+}
+
+/**
+ * Read a committed artifact and check its form: a JSON object, one final
+ * newline, no carriage return, and exactly the bytes two-space indentation
+ * writes.
  *
  * @param path - Its path below the suite root.
- * @returns Its bytes and value.
+ * @returns Its bytes and value, the value undefined unless it is an object.
  */
 function artifact(path) {
   const file = resolve(root, path)
@@ -225,15 +314,15 @@ function artifact(path) {
     fail(`${path}: missing`)
     return { bytes: undefined, value: undefined }
   }
-  const bytes = readFileSync(file)
-  const text = bytes.toString('utf8')
-  let value
-  try {
-    value = JSON.parse(text)
-  } catch {
-    fail(`${path}: not JSON`)
+  const { bytes, value } = readJson(file, path)
+  if (value === undefined) {
+    return { bytes, value }
+  }
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    fail(`${path}: not a JSON object`)
     return { bytes, value: undefined }
   }
+  const text = bytes.toString('utf8')
   if (bytes.includes(0x0d) || !text.endsWith('}\n') || text.endsWith('\n\n')) {
     fail(`${path}: not one final newline without carriage returns`)
   }
@@ -291,11 +380,7 @@ function named(entry) {
   if (!existsSync(file)) {
     return undefined
   }
-  try {
-    return JSON.parse(readFileSync(file, 'utf8'))
-  } catch {
-    return undefined
-  }
+  return readJson(file, entry.path).value
 }
 
 /**
@@ -342,6 +427,8 @@ const forms = {
   semanticDigest: digestForm,
   dialect: { type: 'string', minLength: 1 }
 }
+/** The keywords of a closed object, and nothing that could reopen it. */
+const CLOSED = ['type', 'additionalProperties', 'required', 'properties']
 let objects = 0
 /**
  * Check one object schema of the index and the object schemas below it.
@@ -353,7 +440,8 @@ let objects = 0
 function closes(node, names, where) {
   objects += 1
   if (
-    node?.type !== 'object' ||
+    !isDeepStrictEqual(Object.keys(node ?? {}), CLOSED) ||
+    node.type !== 'object' ||
     node.additionalProperties !== false ||
     !isDeepStrictEqual(node.required, names) ||
     !isDeepStrictEqual(Object.keys(node.properties ?? {}), names)
@@ -386,7 +474,13 @@ for (const [member, shape] of Object.entries(SHAPES)) {
       `${member}/profileSpecification`
     )
     if (
-      roles?.type !== 'object' ||
+      !isDeepStrictEqual(Object.keys(roles ?? {}), [
+        'type',
+        'minProperties',
+        'propertyNames',
+        'additionalProperties'
+      ]) ||
+      roles.type !== 'object' ||
       roles.minProperties !== 1 ||
       !isDeepStrictEqual(roles.propertyNames, { pattern: TOKEN_PATTERN })
     ) {
@@ -427,7 +521,8 @@ function names(entry, where) {
     return
   }
   bodies += 1
-  if (fileDigest(readFileSync(file)) !== entry.digest) {
+  const bytes = readBytes(file, entry.path)
+  if (bytes !== undefined && fileDigest(bytes) !== entry.digest) {
     fail(`index: ${entry.path} does not have the digest ${where} declares`)
   }
 }
