@@ -1,0 +1,82 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-entry-programmatic-no-call-site",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "entry-admission-input-set",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-entry-programmatic-no-call-site.json",
+    "digest": "sha256:526843475d7959be2a7bc3e7a00ae7c453f8c70bc210469019fe3232d186a7ac"
+  },
+  "expected": {
+    "admitted": true,
+    "normalizedInput": {
+      "configuration-programmatic": {
+        "snapshot": {
+          "null": null
+        },
+        "digest": "sha256:1dcd2e02d5702083fb37800e12fca137b28d2b85ccddc89f378a06638607db7e",
+        "identity": "intlify-programmatic-entry.v0:storefront",
+        "nonSecret": false,
+        "revision": "sha256:1dcd2e02d5702083fb37800e12fca137b28d2b85ccddc89f378a06638607db7e",
+        "locator": {
+          "safe-label": "app"
+        },
+        "callSite": null
+      },
+      "profile-selector-programmatic": {
+        "selector": {
+          "report": "string",
+          "value": "app"
+        }
+      }
+    },
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-173",
+      "015-201"
+    ],
+    "ruleIds": [
+      "015.input-admission.safe-origin-kind.missing-safe-origin-kind",
+      "015.input-admission.safe-origin-kind.unknown-safe-origin-kind",
+      "015.input-admission.safe-origin-kind.non-canonical-safe-origin-kind",
+      "015.input-admission.safe-origin-kind.evidence-kind-incompatible",
+      "015.input-admission.programmatic-entry-identity-revision.missing-entry-identity",
+      "015.input-admission.programmatic-entry-identity-revision.missing-entry-revision",
+      "015.input-admission.programmatic-entry-identity-revision.over-bound-entry-identity",
+      "015.input-admission.programmatic-entry-identity-revision.over-bound-entry-revision",
+      "015.input-admission.programmatic-entry-identity-revision.unstable-entry-identity",
+      "015.input-admission.programmatic-entry-identity-revision.unbound-entry-revision",
+      "015.input-admission.programmatic-entry-identity-revision.snapshot-identity-mismatch",
+      "015.input-admission.programmatic-entry-snapshot.missing-snapshot",
+      "015.input-admission.programmatic-entry-snapshot.unsafe-host-inspection",
+      "015.input-admission.programmatic-entry-snapshot.snapshot-envelope-over-bound",
+      "015.input-admission.programmatic-entry-snapshot.malformed-snapshot",
+      "015.input-admission.programmatic-entry-snapshot.snapshot-content-digest-mismatch",
+      "015.input-admission.programmatic-call-site-evidence-input.unsafe-host-inspection",
+      "015.input-admission.programmatic-call-site-evidence-input.over-bound-input",
+      "015.input-admission.programmatic-call-site-evidence-input.malformed-input",
+      "015.input-admission.programmatic-call-site-evidence-input.invalid-utf8-source",
+      "015.input-admission.programmatic-call-site-evidence-input.duplicate-mapping",
+      "015.input-admission.programmatic-call-site-evidence-input.missing-source-identity",
+      "015.input-admission.programmatic-call-site-evidence-input.missing-source-revision",
+      "015.input-admission.programmatic-call-site-evidence-input.unstable-source-identity",
+      "015.input-admission.programmatic-call-site-evidence-input.unbound-source-revision",
+      "015.input-admission.programmatic-call-site-evidence-input.source-snapshot-mismatch",
+      "015.input-admission.external-profile-selector-binding.unsafe-host-inspection",
+      "015.input-admission.external-profile-selector-binding.unrepresentable-selector",
+      "015.input-admission.external-profile-selector-binding.malformed-normalized-selector"
+    ],
+    "checkIds": []
+  }
+}

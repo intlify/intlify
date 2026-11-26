@@ -1,0 +1,53 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-entry-programmatic-value-order",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "entry-admission-input-set",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-entry-programmatic-value-order.json",
+    "digest": "sha256:ac56fc9546e4a485b6ccd01da7be0bb3bdb0e590c10b549a4c1bef99edf1f5c1"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failures": [
+      {
+        "slot": "configuration-programmatic",
+        "boundaryKind": "programmatic-entry-identity-revision",
+        "failureReason": "unstable-entry-identity"
+      },
+      {
+        "slot": "configuration-programmatic",
+        "boundaryKind": "programmatic-call-site-evidence-input",
+        "failureReason": "invalid-utf8-source"
+      },
+      {
+        "slot": "profile-selector-programmatic",
+        "boundaryKind": "external-profile-selector-binding",
+        "failureReason": "unsafe-host-inspection"
+      }
+    ],
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-173",
+      "015-201"
+    ],
+    "ruleIds": [
+      "015.input-admission.programmatic-entry-identity-revision.unstable-entry-identity",
+      "015.input-admission.programmatic-call-site-evidence-input.invalid-utf8-source",
+      "015.input-admission.external-profile-selector-binding.unsafe-host-inspection"
+    ],
+    "checkIds": []
+  }
+}

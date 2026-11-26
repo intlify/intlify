@@ -78,7 +78,7 @@
     "identity": "intlify-project-profile-conformance-case",
     "revision": "0",
     "path": "schemas/case-v0.schema.json",
-    "digest": "sha256:fee287f3d7200b62cd162011e25f61795c89c9a2bd861f5f834272e959748cbc"
+    "digest": "sha256:f039664eec285d6f3e089e98581c4c1fc99f23e21ceb11553ec7098550b12e48"
   },
   "registryPackage": {
     "identity": "intlify-project-profile-resolver-registry-package",
@@ -498,6 +498,26 @@
       "digest": "sha256:9da12f439d9ec73fb62635c6a1e3e2f2983b519412e7059be46304798638550d"
     },
     {
+      "id": "015-admission-common-admitted",
+      "path": "cases/admission/015-admission-common-admitted.json",
+      "digest": "sha256:4f2ce67faf7d590b4aeaaef691f40b1d1c940262ece077ed3ab69b701c51516d"
+    },
+    {
+      "id": "015-admission-common-origin-before-value",
+      "path": "cases/admission/015-admission-common-origin-before-value.json",
+      "digest": "sha256:12000a51f810ce5620e1aa1e2a44c9ae91619eaff17db324c7501ad40522e0e5"
+    },
+    {
+      "id": "015-admission-common-rank-order",
+      "path": "cases/admission/015-admission-common-rank-order.json",
+      "digest": "sha256:a85c4bd4e1e509a4f85f6e73c99570ee67aba2f7de8d96a4ebcb423f81277ca1"
+    },
+    {
+      "id": "015-admission-common-refused-capability",
+      "path": "cases/admission/015-admission-common-refused-capability.json",
+      "digest": "sha256:f751a824e935227cc143e23b9553e236c7286cf78a75ac01d0ad7e9ad155e11b"
+    },
+    {
       "id": "015-admission-construction-identity-admitted",
       "path": "cases/admission/015-admission-construction-identity-admitted.json",
       "digest": "sha256:6da538359d54b31779eff569d4bfd80fe9524f1ceb9b435eb2c5c5095b213faa"
@@ -521,6 +541,51 @@
       "id": "015-admission-construction-identity-value-rules",
       "path": "cases/admission/015-admission-construction-identity-value-rules.json",
       "digest": "sha256:b5784153148b367ee68c739032e2212fda8d69d9c1d6af4f7df02e31f7835f42"
+    },
+    {
+      "id": "015-admission-entry-file-admitted",
+      "path": "cases/admission/015-admission-entry-file-admitted.json",
+      "digest": "sha256:eba9746e47dfbb1be734467158e76f48d2816a51787e1607ed2121d5107efc2e"
+    },
+    {
+      "id": "015-admission-entry-file-locator-absence",
+      "path": "cases/admission/015-admission-entry-file-locator-absence.json",
+      "digest": "sha256:3027caad5da2be6a312ca1f2a2d55aa72fa9bb875798d07767a3565a995bb3ff"
+    },
+    {
+      "id": "015-admission-entry-file-rank-order",
+      "path": "cases/admission/015-admission-entry-file-rank-order.json",
+      "digest": "sha256:855c3264409ae64d51273e2e14bcb7dbc20f9498a928afed20ab2e7874b3440e"
+    },
+    {
+      "id": "015-admission-entry-file-refused-capability",
+      "path": "cases/admission/015-admission-entry-file-refused-capability.json",
+      "digest": "sha256:65c0009bdf9931aebae1e7a85c1297726ce3ad23833da238c981c3379f326f96"
+    },
+    {
+      "id": "015-admission-entry-file-refused-capability-origin",
+      "path": "cases/admission/015-admission-entry-file-refused-capability-origin.json",
+      "digest": "sha256:a2c4b0cd3d6f394df7d1f89d79d07ddac26556e9989890584124dff512fb245b"
+    },
+    {
+      "id": "015-admission-entry-programmatic-admitted",
+      "path": "cases/admission/015-admission-entry-programmatic-admitted.json",
+      "digest": "sha256:9db8913c44ce3a71009355f48e3ff0b170c361ec92a6ef5074018ce29e03437a"
+    },
+    {
+      "id": "015-admission-entry-programmatic-no-call-site",
+      "path": "cases/admission/015-admission-entry-programmatic-no-call-site.json",
+      "digest": "sha256:6c2d2b1e3842afa39a403641abe4648d6119895cb8f95b36549f74b13e256f6b"
+    },
+    {
+      "id": "015-admission-entry-programmatic-refused-snapshot",
+      "path": "cases/admission/015-admission-entry-programmatic-refused-snapshot.json",
+      "digest": "sha256:9bf339a2987ac8cdc025e4dc55730139be2808a852bacd5700b85a65ee1e6f98"
+    },
+    {
+      "id": "015-admission-entry-programmatic-value-order",
+      "path": "cases/admission/015-admission-entry-programmatic-value-order.json",
+      "digest": "sha256:a864b2da63e42d95ee968e6477046d5eb636918aa7f5643d3e2f807a279a33bd"
     },
     {
       "id": "015-admission-entry-source-admitted",

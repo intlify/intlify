@@ -1,0 +1,47 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-common-refused-capability",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "common-invocation-input-set",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-common-refused-capability.json",
+    "digest": "sha256:6bb4456063f218a3aa9e8fbacfd7e3d7e0d113acbe88493af196d0a6e65b18b1"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failures": [
+      {
+        "slot": "locale-canonicalization-data",
+        "boundaryKind": "safe-origin-kind",
+        "failureReason": "unknown-safe-origin-kind"
+      },
+      {
+        "slot": "implementation-capability",
+        "boundaryKind": "implementation-capability",
+        "failureReason": "malformed-capability"
+      }
+    ],
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-168",
+      "015-169"
+    ],
+    "ruleIds": [
+      "015.input-admission.safe-origin-kind.unknown-safe-origin-kind",
+      "015.input-admission.implementation-capability.malformed-capability"
+    ],
+    "checkIds": []
+  }
+}

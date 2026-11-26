@@ -1026,7 +1026,223 @@ const NORMALIZED = {
       ? { resolverConstructionIdentity: vectorIdentity }
       : undefined
 }
+// An admission step's case (D15:3164-3168). An admitted one expects each
+// slot's normalized input, which this script derives from the fixture as the
+// slot's boundary kind would: the common step's through the kinds' own
+// derivations; an entry's from its raw bytes as hexadecimal, its pair, its
+// locator, which a file entry admits as a canonical `relative-path` and a
+// programmatic one as a non-empty `safe-label`, each marked non-secret and
+// within the capability's locator bound, its selector, its Snapshot, and its
+// call-site sidecar or its absence. A refused one expects its failures in
+// slot rank, an origin's first and then the slot's values in the boundary
+// table's order, at most one for each boundary of a slot; a refused
+// capability leaves no other value of the common step evaluated, and a
+// refused Snapshot leaves the identity and revision unevaluated. A refused
+// common step has a failure, while a refused entry has none when only its
+// capability is refused.
+const STEPS = ['common-invocation-input-set', 'entry-admission-input-set']
+const ORIGIN = 'safe-origin-kind'
+const COMMON_SLOTS = [
+  ['profile-resolution-specification-input', 'profile-resolution-specification-input'],
+  ['intent-surface-class-vocabulary', 'intent-surface-class-vocabulary-artifact'],
+  ['locale-canonicalization-data', 'locale-canonicalization-data-artifact'],
+  ['profile-resolution-artifact-collection', 'submitted-profile-resolution-artifact-collection'],
+  ['resource-limit-policy-verification', 'resource-limit-policy-verification-input'],
+  ['implementation-capability', 'implementation-capability']
+]
+/** Each step form's slots in rank order, each with its value boundaries in the table's order. */
+const STEP_FORMS = {
+  common: COMMON_SLOTS.map(([slot, kind]) => [slot, [kind]]),
+  'entry-file': [
+    ['configuration-file', ['file-source-identity-revision']],
+    ['profile-selector-cli', ['external-profile-selector-binding']]
+  ],
+  'entry-programmatic': [
+    [
+      'configuration-programmatic',
+      [
+        'programmatic-entry-identity-revision',
+        'programmatic-entry-snapshot',
+        'programmatic-call-site-evidence-input'
+      ]
+    ],
+    ['profile-selector-programmatic', ['external-profile-selector-binding']]
+  ]
+}
+const originRows = named(registryMembers['safe-origin-kind-registry'])?.rows ?? []
+const ranks = new Map(originRows.map(row => [row.id, Number(row.rank)]))
+
+/**
+ * Whether a payload is a canonical `relative-path`: no drive, no NUL or
+ * backslash, and no empty, `.`, or `..` segment.
+ *
+ * @param payload - The payload.
+ * @returns Whether it is.
+ */
+function relativePath(payload) {
+  return (
+    !/^[a-z]:/i.test(payload) &&
+    !payload.includes('\0') &&
+    !payload.includes('\\') &&
+    payload.split('/').every(segment => !['', '.', '..'].includes(segment))
+  )
+}
+
+/**
+ * An entry's admitted locator: the candidate, marked non-secret and within
+ * the capability's locator bound, of a variant and payload the entry admits.
+ *
+ * @param candidate - The locator candidate, or undefined.
+ * @param capability - The capability value that bounds it.
+ * @param admits - Whether the entry admits a variant and its payload.
+ * @returns The locator's canonical form, or null for absence.
+ */
+function locatorOf(candidate, capability, admits) {
+  const bound = Number(capability?.bootstrapOnly?.evidenceMetadata?.maxLocatorBytes)
+  return candidate?.nonSecret === true &&
+    Buffer.byteLength(String(candidate.payload)) <= bound &&
+    admits(candidate.variant, String(candidate.payload))
+    ? { [candidate.variant]: candidate.payload }
+    : null
+}
+
+/**
+ * The common step's admitted set: each slot's normalized input, derived as
+ * its boundary kind's admitted case is.
+ *
+ * @param fixture - The step's fixture.
+ * @returns The set, or undefined.
+ */
+function commonNormalized(fixture) {
+  const set = {}
+  for (const [slot, kind] of COMMON_SLOTS) {
+    const value =
+      fixture[slot]?.candidate === slot
+        ? NORMALIZED[kind]?.({ assertion: fixture.assertion, input: fixture[slot]?.input })
+        : undefined
+    if (value === undefined) {
+      return undefined
+    }
+    set[slot] = value
+  }
+  return set
+}
+
+/**
+ * An entry step's admitted set: a file's raw bytes as hexadecimal, pair, and
+ * locator, or a programmatic entry's Snapshot, pair, locator, and call-site
+ * sidecar or its absence; and the selector's report.
+ *
+ * @param fixture - The step's fixture.
+ * @returns The set, or undefined. A `safe-uri` locator is not derived here.
+ */
+function entryNormalized(fixture) {
+  const entry = fixture.entry ?? {}
+  const capability = fixture.capability?.json
+  const file = entry['configuration-file']
+  if (file !== undefined) {
+    const cli = entry['profile-selector-cli']
+    const input = file.input ?? {}
+    const pair = NORMALIZED['file-source-identity-revision']({ input })
+    if (
+      file.candidate !== 'configuration-file' ||
+      cli?.candidate !== 'profile-selector-cli' ||
+      pair === undefined
+    ) {
+      return undefined
+    }
+    return {
+      'configuration-file': {
+        bytes: { bytes: rawBytes(input.bytes).toString('hex') },
+        ...pair,
+        locator: locatorOf(
+          input.locator,
+          capability,
+          (variant, payload) => variant === 'relative-path' && relativePath(payload)
+        )
+      },
+      'profile-selector-cli': { selector: cli.input }
+    }
+  }
+  const programmatic = entry['configuration-programmatic']
+  const selector = entry['profile-selector-programmatic']
+  const input = programmatic?.input ?? {}
+  const sidecar = input.callSite === undefined ? null : callSite(input.callSite)
+  if (
+    programmatic?.candidate !== 'configuration-programmatic' ||
+    selector?.candidate !== 'profile-selector-programmatic' ||
+    input.locator?.variant === 'safe-uri' ||
+    !committedSnapshot(input.snapshot) ||
+    input.revision !== input.snapshot?.digest ||
+    sidecar === undefined
+  ) {
+    return undefined
+  }
+  return {
+    'configuration-programmatic': {
+      snapshot: input.snapshot.snapshot,
+      digest: input.snapshot.digest,
+      ...pairOf(input),
+      locator: locatorOf(
+        input.locator,
+        capability,
+        (variant, payload) => variant === 'safe-label' && payload !== ''
+      ),
+      callSite: sidecar
+    },
+    'profile-selector-programmatic': { selector: selector.input }
+  }
+}
+
+/**
+ * What is wrong with a refused step case's failures, given its form's slots.
+ *
+ * @param form - The step form's name.
+ * @param failures - The failures the case expects.
+ * @returns The first wrong thing, or undefined.
+ */
+function stepFailuresWrong(form, failures) {
+  const slots = new Map(STEP_FORMS[form])
+  let previous = [-1, -1]
+  const seen = new Set()
+  for (const failure of failures) {
+    const values = slots.get(failure?.slot)
+    const index = values?.indexOf(failure?.boundaryKind) ?? -1
+    const position = failure?.boundaryKind === ORIGIN ? 0 : index < 0 ? -1 : 1 + index
+    const at = [ranks.get(failure?.slot) ?? -1, position]
+    if (values === undefined || position < 0 || at[0] < 0) {
+      return 'names a slot or a boundary outside its step'
+    }
+    if (at[0] < previous[0] || (at[0] === previous[0] && at[1] <= previous[1])) {
+      return 'does not list its failures in slot rank, an origin first'
+    }
+    previous = at
+    seen.add(`${failure.slot} ${failure.boundaryKind}`)
+  }
+  const has = (slot, kind) => seen.has(`${slot} ${kind}`)
+  if (
+    has('implementation-capability', 'implementation-capability') &&
+    failures.some(
+      failure => failure.slot !== 'implementation-capability' && failure.boundaryKind !== ORIGIN
+    )
+  ) {
+    return 'evaluates a value after a refused capability'
+  }
+  if (
+    has('configuration-programmatic', 'programmatic-entry-snapshot') &&
+    has('configuration-programmatic', 'programmatic-entry-identity-revision')
+  ) {
+    return 'evaluates the identity and revision after a refused Snapshot'
+  }
+  if (form === 'common' && failures.length === 0) {
+    return 'refuses the common step without a failure'
+  }
+  return undefined
+}
+
 let admissionFixtures = 0
+let stepCases = 0
+const stepForms = new Map()
 const admissionIds = new Map()
 for (const entry of index.value.resolverInputAdmissionCases ?? []) {
   const manifest = named(entry)
@@ -1046,6 +1262,57 @@ for (const entry of index.value.resolverInputAdmissionCases ?? []) {
     resolverConstruction.identityReference !== vectorIdentity
   ) {
     fail(`${entry.path}: does not name a listed construction case with the vector's identity`)
+  }
+  if (STEPS.includes(kind)) {
+    stepCases += 1
+    const form =
+      kind === STEPS[0]
+        ? 'common'
+        : fixture.entry?.['configuration-file'] === undefined
+          ? 'entry-programmatic'
+          : 'entry-file'
+    const pairs = list => [
+      ...new Set(list.map(([boundary, reason]) => `015.input-admission.${boundary}.${reason}`))
+    ]
+    const boundaries = [ORIGIN, ...STEP_FORMS[form].flatMap(([, values]) => values)]
+    const own = stepForms.get(form) ?? { admitted: 0, refused: 0 }
+    stepForms.set(form, own)
+    const rules = traceability?.ruleIds ?? []
+    if (!entry.id.startsWith(`015-admission-${form}-`)) {
+      fail(`${entry.path}: does not name its step's form`)
+    }
+    if (expected?.admitted === true) {
+      own.admitted += 1
+      const normalized = form === 'common' ? commonNormalized(fixture) : entryNormalized(fixture)
+      const all = pairs(
+        boundaries.flatMap(boundary =>
+          (boundaryPrecedence[boundary] ?? []).map(row => [boundary, row.reason])
+        )
+      )
+      if (
+        normalized === undefined ||
+        !isDeepStrictEqual(rules, all) ||
+        JSON.stringify(expected.normalizedInput) !== JSON.stringify(normalized)
+      ) {
+        fail(`${entry.path}: does not expect its fixture's admitted set under each pair`)
+      }
+      continue
+    }
+    own.refused += 1
+    const failures = Array.isArray(expected?.failures) ? expected.failures : []
+    const wrong = stepFailuresWrong(form, failures)
+    if (wrong !== undefined) {
+      fail(`${entry.path}: ${wrong}`)
+    }
+    if (
+      !isDeepStrictEqual(
+        rules,
+        pairs(failures.map(failure => [failure.boundaryKind, failure.failureReason]))
+      )
+    ) {
+      fail(`${entry.path}: does not trace the pair of each of its failures`)
+    }
+    continue
   }
   const rows = boundaryPrecedence[kind]
   if (rows === undefined) {
@@ -1083,6 +1350,12 @@ for (const [kind, rows] of Object.entries(boundaryPrecedence)) {
   ].sort(byBytes)
   if (!isDeepStrictEqual([...(admissionIds.get(kind) ?? [])].sort(byBytes), ids)) {
     fail(`index: ${kind} does not have its admitted case and one case for each row`)
+  }
+}
+for (const form of Object.keys(STEP_FORMS)) {
+  const own = stepForms.get(form)
+  if (!(own?.admitted > 0 && own?.refused > 0)) {
+    fail(`index: the ${form} step does not have an admitted case and a refused one`)
   }
 }
 
@@ -1137,5 +1410,5 @@ for (const [module, name, pointer] of PINS) {
 finish()
 
 console.log(
-  `conformance suite index agrees: ${MEMBERS.length} members, ${bodies} bodies of which ${manifests} manifests, ${fixtures} construction fixtures, ${admissionFixtures} input admission fixtures, ${objects} closed schema objects, ${PINS.length} pinned digests`
+  `conformance suite index agrees: ${MEMBERS.length} members, ${bodies} bodies of which ${manifests} manifests, ${fixtures} construction fixtures, ${admissionFixtures} input admission fixtures (${stepCases} of the admission steps), ${objects} closed schema objects, ${PINS.length} pinned digests`
 )

@@ -1,0 +1,47 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-common-origin-before-value",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "common-invocation-input-set",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-common-origin-before-value.json",
+    "digest": "sha256:3855ef5230e0b8e6faa550922ef82286c41df7e95a7751b3de05a546c3944040"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failures": [
+      {
+        "slot": "resource-limit-policy-verification",
+        "boundaryKind": "safe-origin-kind",
+        "failureReason": "missing-safe-origin-kind"
+      },
+      {
+        "slot": "resource-limit-policy-verification",
+        "boundaryKind": "resource-limit-policy-verification-input",
+        "failureReason": "malformed-input"
+      }
+    ],
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-168",
+      "015-169"
+    ],
+    "ruleIds": [
+      "015.input-admission.safe-origin-kind.missing-safe-origin-kind",
+      "015.input-admission.resource-limit-policy-verification-input.malformed-input"
+    ],
+    "checkIds": []
+  }
+}

@@ -998,6 +998,89 @@ closures.push(
     closedOf(definitions[name], [], ['input']) && isDeepStrictEqual(inputOf(name), ref('json'))
   ])
 )
+// The input fixtures of the two admission steps (D15:3166, 3168, 3252): the
+// common one holds the Verification Input assertion and one member per slot,
+// keyed by the Safe Origin Kind ID the slot fixes, with the slot's candidate
+// and, as its input, what the slot's boundary fixture holds as its input,
+// either omitted for absence. An entry's holds its two slots: a file's input
+// with its raw bytes, which are always present, its mark, its pair, and its
+// locator candidate; a programmatic entry's with its mark and, each omitted
+// for absence, its Snapshot, its pair, its locator candidate, and its
+// call-site input; and a selector slot's input its report. The entry step's
+// fixture holds the entry beside the capability value.
+const COMMON_SLOT_FIXTURES = [
+  ['profile-resolution-specification-input', 'specificationInputFixture'],
+  ['intent-surface-class-vocabulary', 'vocabularyInputFixture'],
+  ['locale-canonicalization-data', 'canonicalizationDataInputFixture'],
+  ['profile-resolution-artifact-collection', 'collectionInputFixture'],
+  ['resource-limit-policy-verification', 'verificationInputFixture'],
+  ['implementation-capability', 'capabilityInputFixture']
+]
+const TEXT = { type: 'string' }
+const MARK = { type: 'boolean' }
+const commonFixture = definitions.commonInvocationInputFixture
+const entryForms = definitions.entryAdmissionInputFixture?.oneOf ?? []
+const [fileEntry, programmaticEntry] = entryForms
+const optionalSlot = (node, input) =>
+  closedOf(node, [], ['candidate', 'input']) &&
+  isDeepStrictEqual(node.properties.candidate, {}) &&
+  isDeepStrictEqual(node.properties.input, input)
+const presentSlot = (node, form) =>
+  closedOf(node, ['input'], ['candidate']) &&
+  isDeepStrictEqual(node.properties.candidate, {}) &&
+  form(node.properties.input)
+const selectorSlot = node =>
+  presentSlot(node, input => isDeepStrictEqual(input, inputOf('selectorInputFixture')))
+const fileInput = input =>
+  closedOf(input, ['bytes', 'nonSecret'], ['identity', 'revision', 'locator']) &&
+  raw(input.properties.bytes) &&
+  isDeepStrictEqual(input.properties.nonSecret, MARK) &&
+  isDeepStrictEqual(input.properties.identity, TEXT) &&
+  isDeepStrictEqual(input.properties.revision, TEXT) &&
+  isDeepStrictEqual(input.properties.locator, ref('locatorCandidate'))
+const programmaticInput = input =>
+  closedOf(input, ['nonSecret'], ['snapshot', 'identity', 'revision', 'locator', 'callSite']) &&
+  isDeepStrictEqual(input.properties.nonSecret, MARK) &&
+  isDeepStrictEqual(input.properties.snapshot, inputOf('snapshotInputFixture')) &&
+  isDeepStrictEqual(input.properties.identity, TEXT) &&
+  isDeepStrictEqual(input.properties.revision, TEXT) &&
+  isDeepStrictEqual(input.properties.locator, ref('locatorCandidate')) &&
+  isDeepStrictEqual(input.properties.callSite, inputOf('callSiteInputFixture'))
+closures.push(
+  [
+    'commonInvocationInputFixture',
+    closedOf(commonFixture, ['assertion', ...COMMON_SLOT_FIXTURES.map(([slot]) => slot)]) &&
+      isDeepStrictEqual(
+        commonFixture.properties.assertion,
+        verificationFixture?.properties?.assertion
+      ) &&
+      COMMON_SLOT_FIXTURES.every(([slot, name]) =>
+        optionalSlot(commonFixture.properties[slot], inputOf(name))
+      )
+  ],
+  [
+    'entryAdmissionInputFixture',
+    entryForms.length === 2 &&
+      closedOf(fileEntry, ['configuration-file', 'profile-selector-cli']) &&
+      presentSlot(fileEntry.properties['configuration-file'], fileInput) &&
+      selectorSlot(fileEntry.properties['profile-selector-cli']) &&
+      closedOf(programmaticEntry, [
+        'configuration-programmatic',
+        'profile-selector-programmatic'
+      ]) &&
+      presentSlot(programmaticEntry.properties['configuration-programmatic'], programmaticInput) &&
+      selectorSlot(programmaticEntry.properties['profile-selector-programmatic'])
+  ],
+  [
+    'entryInputFixture',
+    closedOf(definitions.entryInputFixture, ['capability', 'entry']) &&
+      holdsCapability('entryInputFixture') &&
+      isDeepStrictEqual(
+        definitions.entryInputFixture.properties.entry,
+        ref('entryAdmissionInputFixture')
+      )
+  ]
+)
 for (const [name, closedForm] of closures) {
   if (!closedForm) {
     fail(`schema: ${name} is not a closed object of exactly its members`)

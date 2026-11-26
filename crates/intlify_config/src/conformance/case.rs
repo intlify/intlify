@@ -64,7 +64,7 @@ pub(crate) const PATH: &str = "schemas/case-v0.schema.json";
 
 /// The Case Schema's file digest, which the runner pins.
 pub(crate) const DIGEST: &str =
-    "sha256:fee287f3d7200b62cd162011e25f61795c89c9a2bd861f5f834272e959748cbc";
+    "sha256:f039664eec285d6f3e089e98581c4c1fc99f23e21ceb11553ec7098550b12e48";
 
 /// A case or Handoff Vector ID: `015-` and lowercase kebab-case.
 pub(crate) const CASE_ID_PATTERN: &str = "^015-[a-z0-9]+(?:-[a-z0-9]+)*$";
@@ -465,15 +465,15 @@ pub(crate) const BOUNDARY_PRECEDENCE: [(&str, &[(&str, &str)]); 13] = [
 ];
 
 /// The kind that admits a whole Common Invocation Input Set.
-const COMMON_SET: &str = "common-invocation-input-set";
+pub(crate) const COMMON_SET: &str = "common-invocation-input-set";
 
 /// The kind that admits a whole file or programmatic Entry Admission Input
 /// Set.
-const ENTRY_SET: &str = "entry-admission-input-set";
+pub(crate) const ENTRY_SET: &str = "entry-admission-input-set";
 
 /// The Common Invocation Input Set's slots, in rank order, each with the
 /// boundary kind of its value.
-const COMMON_SLOTS: [(SafeOriginKind, &str); 6] = [
+pub(crate) const COMMON_SLOTS: [(SafeOriginKind, &str); 6] = [
     (
         SafeOriginKind::ProfileResolutionSpecificationInput,
         "profile-resolution-specification-input",
@@ -945,6 +945,23 @@ pub(crate) const ADMISSION_FIXTURES: [(&str, &str); 13] = [
     ),
 ];
 
+/// The input fixture of each admission step's kind, by the name of its
+/// definition: the Common Invocation Input Set's, and an entry's beside the
+/// capability value that bounds it (D15:3166, 3168, 3252).
+pub(crate) const STEP_FIXTURES: [(&str, &str); 2] = [
+    (COMMON_SET, "commonInvocationInputFixture"),
+    (ENTRY_SET, "entryInputFixture"),
+];
+
+/// An input admission case's kind and the definition of its input fixture,
+/// `None` for a kind the Case Schema does not have.
+pub(crate) fn input_fixture(kind: &str) -> Option<(&'static str, &'static str)> {
+    ADMISSION_FIXTURES
+        .into_iter()
+        .chain(STEP_FIXTURES)
+        .find(|(name, _)| *name == kind)
+}
+
 /// The input fixtures of the boundary kinds in the table (D15:3162, 3252). A
 /// boundary that reads capability bounds holds the capability value beside
 /// its input, a decoded value the harness admits first; the Verification
@@ -1079,6 +1096,91 @@ fn admission_fixtures(definitions: &mut Map<String, Value>) {
     }
 }
 
+/// The input fixtures of the two admission steps (D15:3166, 3168, 3252). A
+/// common invocation input fixture holds the Verification Input assertion
+/// and one member per slot, keyed by the Safe Origin Kind ID the slot fixes:
+/// the slot's candidate and, as its input, what the slot's boundary fixture
+/// holds as its input, either of which may be absent. An entry admission
+/// input fixture is keyed the same way by an entry's two slots: a file's
+/// input holds its raw bytes, which are always present, its mark, its pair,
+/// and its locator candidate; a programmatic entry's holds its mark and may
+/// hold the Snapshot, the pair, the locator candidate, and the call-site
+/// input; and a selector slot's input is its report. The entry step's
+/// fixture holds the entry beside the capability value that bounds it.
+fn step_fixtures(definitions: &mut Map<String, Value>) {
+    let input = |kind: &str| {
+        let (_, definition) = ADMISSION_FIXTURES
+            .into_iter()
+            .find(|(name, _)| *name == kind)
+            .expect("a slot's boundary kind has an input fixture");
+        definitions[definition]["properties"]["input"].clone()
+    };
+    let candidate = || ("candidate", json!({}));
+    let text = || json!({ "type": "string" });
+    let flag = || ("nonSecret", json!({ "type": "boolean" }));
+    let locator = || ("locator", definition("locatorCandidate"));
+    let mut common = vec![(
+        "assertion",
+        definitions["verificationInputFixture"]["properties"]["assertion"].clone(),
+    )];
+    for (slot, kind) in COMMON_SLOTS {
+        common.push((
+            slot.id(),
+            closed_with(&[], &[candidate(), ("input", input(kind))]),
+        ));
+    }
+    let selector = closed_with(
+        &[("input", input("external-profile-selector-binding"))],
+        &[candidate()],
+    );
+    let file = closed_with(
+        &[(
+            "input",
+            closed_with(
+                &[("bytes", definition("bytesInput")), flag()],
+                &[("identity", text()), ("revision", text()), locator()],
+            ),
+        )],
+        &[candidate()],
+    );
+    let programmatic = closed_with(
+        &[(
+            "input",
+            closed_with(
+                &[flag()],
+                &[
+                    ("snapshot", input("programmatic-entry-snapshot")),
+                    ("identity", text()),
+                    ("revision", text()),
+                    locator(),
+                    ("callSite", input("programmatic-call-site-evidence-input")),
+                ],
+            ),
+        )],
+        &[candidate()],
+    );
+    let entry = json!({
+        "oneOf": [
+            closed(&[
+                (SafeOriginKind::ConfigurationFile.id(), file),
+                (SafeOriginKind::ProfileSelectorCli.id(), selector.clone()),
+            ]),
+            closed(&[
+                (SafeOriginKind::ConfigurationProgrammatic.id(), programmatic),
+                (SafeOriginKind::ProfileSelectorProgrammatic.id(), selector),
+            ]),
+        ]
+    });
+    let common = closed(&common);
+    let step = closed(&[
+        ("capability", definition("json")),
+        ("entry", definition("entryAdmissionInputFixture")),
+    ]);
+    definitions.insert(STEP_FIXTURES[0].1.into(), common);
+    definitions.insert("entryAdmissionInputFixture".into(), entry);
+    definitions.insert(STEP_FIXTURES[1].1.into(), step);
+}
+
 /// A locator in its admitted canonical form, or its absence.
 fn locator() -> Value {
     let variants = [
@@ -1157,6 +1259,7 @@ fn input_admission(definitions: &mut Map<String, Value>) {
     snapshot_node(definitions);
     selector(definitions);
     admission_fixtures(definitions);
+    step_fixtures(definitions);
     let refused = |failure: Value| {
         closed(&[
             ("admitted", json!({ "const": false })),
@@ -2808,6 +2911,116 @@ mod tests {
         }
     }
 
+    /// A step's fixture holds what its slots read, in the form 015 gives it
+    /// (D15:3166, 3168, 3252): the common step's slots, each with a candidate
+    /// of any value and an input in its slot's boundary fixture form, either
+    /// absent, beside the assertion; an entry's file input with its raw bytes
+    /// and its mark always, and its pair and locator candidate when present;
+    /// a programmatic entry's input with its mark always and the rest when
+    /// present; a selector slot's report always; and the entry beside the
+    /// capability value, of one form, not a mix of the two.
+    #[test]
+    fn a_step_fixture_holds_what_its_slots_read() {
+        let digest = format!("sha256:{}", "0".repeat(64));
+        let common = |change: &dyn Fn(&mut Value)| {
+            let mut fixture = json!({
+                "assertion": { "identity": "a", "revision": "0", "semanticDigest": digest },
+            });
+            for (slot, _) in COMMON_SLOTS {
+                fixture[slot.id()] = json!({});
+            }
+            change(&mut fixture);
+            fixture
+        };
+        let selector = json!({ "input": { "report": "absent" } });
+        let entry = |slots: Value| json!({ "capability": { "json": {} }, "entry": slots });
+        let file = |input: Value| {
+            entry(json!({
+                "configuration-file": { "input": input },
+                "profile-selector-cli": selector,
+            }))
+        };
+        let programmatic = |input: Value| {
+            entry(json!({
+                "configuration-programmatic": { "input": input },
+                "profile-selector-programmatic": selector,
+            }))
+        };
+        let unsafe_host = json!({ "hostInspection": "unsafe" });
+        // The common form is the one D15:3252 names, which a Resolver Case's
+        // `commonInvocationInputFixture` holds too.
+        let common_form = Validators::of("commonInvocationInputFixture");
+        let entry_form = Validators::of("entryInputFixture");
+        for fixture in [
+            common(&|_| {}),
+            common(&|fixture| {
+                fixture[SafeOriginKind::ImplementationCapability.id()] =
+                    json!({ "candidate": [1], "input": { "json": {} } });
+            }),
+        ] {
+            assert!(common_form.admits(&fixture), "{fixture}");
+        }
+        for fixture in [
+            common(&|fixture| {
+                fixture.as_object_mut().unwrap().remove("assertion");
+            }),
+            common(&|fixture| {
+                fixture
+                    .as_object_mut()
+                    .unwrap()
+                    .remove(SafeOriginKind::ImplementationCapability.id());
+            }),
+            common(&|fixture| {
+                fixture[SafeOriginKind::LocaleCanonicalizationData.id()]["unknown"] = json!(1);
+            }),
+            common(&|fixture| {
+                fixture[SafeOriginKind::ProfileResolutionSpecificationInput.id()]["input"] =
+                    json!({ "json": {} });
+            }),
+        ] {
+            assert!(!common_form.admits(&fixture), "{fixture}");
+        }
+        for fixture in [
+            file(json!({ "bytes": { "bytes": "" }, "nonSecret": true })),
+            file(json!({
+                "bytes": { "bytes": "" },
+                "nonSecret": false,
+                "identity": "a",
+                "revision": "b",
+                "locator": { "variant": "relative-path", "payload": "a", "nonSecret": true },
+            })),
+            programmatic(json!({ "nonSecret": false })),
+            programmatic(json!({
+                "nonSecret": true,
+                "snapshot": unsafe_host,
+                "callSite": unsafe_host,
+            })),
+        ] {
+            assert!(entry_form.admits(&fixture), "{fixture}");
+        }
+        let mut mixed = file(json!({ "bytes": { "bytes": "" }, "nonSecret": true }));
+        let entry_slots = mixed["entry"].as_object_mut().unwrap();
+        let cli = entry_slots.remove("profile-selector-cli").unwrap();
+        entry_slots.insert("profile-selector-programmatic".into(), cli);
+        let mut without_capability = file(json!({ "bytes": { "bytes": "" }, "nonSecret": true }));
+        without_capability
+            .as_object_mut()
+            .unwrap()
+            .remove("capability");
+        let mut without_report = file(json!({ "bytes": { "bytes": "" }, "nonSecret": true }));
+        without_report["entry"]["profile-selector-cli"] = json!({});
+        for fixture in [
+            file(json!({ "nonSecret": true })),
+            file(json!({ "bytes": { "bytes": "" } })),
+            programmatic(json!({ "snapshot": unsafe_host })),
+            mixed,
+            without_capability,
+            without_report,
+        ] {
+            assert!(!entry_form.admits(&fixture), "{fixture}");
+        }
+    }
+
     /// Every fixture of the committed input admission cases has its kind's
     /// form, a refused input's included, and has none with a member outside
     /// it (D15:3162, 3252).
@@ -2818,8 +3031,11 @@ mod tests {
             let file = cases.files.iter().find(|file| file.path == path).unwrap();
             serde_json::from_slice(&file.bytes).unwrap()
         };
-        let validators =
-            ADMISSION_FIXTURES.map(|(kind, definition)| (kind, Validators::of(definition)));
+        let validators = ADMISSION_FIXTURES
+            .into_iter()
+            .chain(STEP_FIXTURES)
+            .map(|(kind, definition)| (kind, Validators::of(definition)))
+            .collect::<Vec<_>>();
         for entry in &cases.listing {
             let manifest = file(entry["path"].as_str().unwrap());
             let fixture = file(manifest["inputFixture"]["path"].as_str().unwrap());

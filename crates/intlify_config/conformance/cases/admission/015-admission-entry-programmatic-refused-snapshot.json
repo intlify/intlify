@@ -1,0 +1,41 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-entry-programmatic-refused-snapshot",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "entry-admission-input-set",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-entry-programmatic-refused-snapshot.json",
+    "digest": "sha256:a59e8c53b8632730e0f1ae40ee9612ae9adb977984cf96269046cf7f8d4f5779"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failures": [
+      {
+        "slot": "configuration-programmatic",
+        "boundaryKind": "programmatic-entry-snapshot",
+        "failureReason": "malformed-snapshot"
+      }
+    ],
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-173",
+      "015-201"
+    ],
+    "ruleIds": [
+      "015.input-admission.programmatic-entry-snapshot.malformed-snapshot"
+    ],
+    "checkIds": []
+  }
+}

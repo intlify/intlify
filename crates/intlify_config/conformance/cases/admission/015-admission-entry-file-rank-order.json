@@ -1,0 +1,47 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-entry-file-rank-order",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "entry-admission-input-set",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-entry-file-rank-order.json",
+    "digest": "sha256:df9712695435d94c8c0cbea6e3c4f8b5681457a57fc2a6a08f644b9f9b3967c2"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failures": [
+      {
+        "slot": "configuration-file",
+        "boundaryKind": "file-source-identity-revision",
+        "failureReason": "unstable-source-identity"
+      },
+      {
+        "slot": "profile-selector-cli",
+        "boundaryKind": "external-profile-selector-binding",
+        "failureReason": "unsafe-host-inspection"
+      }
+    ],
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-172",
+      "015-173"
+    ],
+    "ruleIds": [
+      "015.input-admission.file-source-identity-revision.unstable-source-identity",
+      "015.input-admission.external-profile-selector-binding.unsafe-host-inspection"
+    ],
+    "checkIds": []
+  }
+}
