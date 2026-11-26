@@ -12,8 +12,9 @@
 //! capability boundary runs first, because every boundary that reads raw input
 //! takes its bounds from the admitted capability (D15:1107). A Safe Origin
 //! Kind candidate is admitted at its own boundary beside its component's
-//! value, and reads no bound (015-166). A selector is admitted from its
-//! binding's closed report, not from a live host value (015-167). The Common
+//! value, and reads no bound (015-166); a candidate that is no text is refused
+//! there too (D15:3162). A selector is admitted from its binding's closed
+//! report, not from a live host value (015-167). The Common
 //! Invocation Input Set is admitted in one step that yields the admitted set
 //! or every failure in the rank of its slots (015-168). A file entry's source
 //! identity and revision are admitted against its bytes (015-170), and its
@@ -50,4 +51,5 @@ pub(crate) mod snapshot;
 pub(crate) mod source;
 pub(crate) mod specification;
 pub(crate) mod step;
+pub(crate) mod text;
 pub(crate) mod verification;

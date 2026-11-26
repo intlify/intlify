@@ -294,6 +294,7 @@ pub(crate) mod tests {
     use crate::boundary::snapshot::{submitted, SnapshotReport};
     use crate::boundary::source::{call_site_source_revision, file_source_revision};
     use crate::boundary::step::{Component, InputFailure, Refusal};
+    use crate::boundary::text::TextInput;
     use crate::construction::flow::construct;
     use crate::construction::identity::derive;
     use crate::construction::registry::check::RecordKind;
@@ -542,7 +543,7 @@ pub(crate) mod tests {
         fn selector(&self, slot: Kind) -> Component<'_, SelectorReport<'_>> {
             Component {
                 value: SelectorReport::String(&self.selected),
-                origin: Some(self.origin(slot)),
+                origin: Some(self.origin(slot).into()),
             }
         }
 
@@ -591,7 +592,7 @@ pub(crate) mod tests {
                 SubmittedEntry::File(SubmittedFileEntry {
                     file: Component {
                         value: file,
-                        origin: Some(self.origin(Kind::ConfigurationFile)),
+                        origin: Some(self.origin(Kind::ConfigurationFile).into()),
                     },
                     selector: self.selector(Kind::ProfileSelectorCli),
                 }),
@@ -639,7 +640,7 @@ pub(crate) mod tests {
                 SubmittedEntry::Programmatic(SubmittedProgrammaticEntry {
                     programmatic: Component {
                         value: programmatic,
-                        origin: Some(self.origin(Kind::ConfigurationProgrammatic)),
+                        origin: Some(self.origin(Kind::ConfigurationProgrammatic).into()),
                     },
                     selector: self.selector(Kind::ProfileSelectorProgrammatic),
                 }),
@@ -681,7 +682,7 @@ pub(crate) mod tests {
             entry: SubmittedEntry<'_>,
             report: CollectionReport<'_>,
         ) -> Result<InvocationInputs<PinnedFixture>, InvocationFailures> {
-            let own = |slot: Kind| Some(self.origin(slot));
+            let own = |slot: Kind| Some(TextInput::Text(self.origin(slot)));
             let provider = self.provider.clone();
             let common = Submitted {
                 specification: Component {
@@ -711,7 +712,7 @@ pub(crate) mod tests {
             };
             let reference = resolver.identity().text();
             let submitted = SubmittedInvocation {
-                construction_identity: Some(&reference),
+                construction_identity: Some(TextInput::Text(&reference)),
                 common,
                 entry,
             };

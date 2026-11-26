@@ -21,13 +21,14 @@ use super::selector::SelectorRefusal;
 use super::snapshot::SnapshotRefusal;
 use super::source::SourceRefusal;
 use super::specification::SpecificationRefusal;
+use super::text::TextInput;
 use super::verification::VerificationRefusal;
 
 /// One typed input slot as a binding submits it: the raw value its boundary
 /// reads, and beside it the Safe Origin Kind candidate, `None` when absent.
 pub(crate) struct Component<'a, T> {
     pub(crate) value: T,
-    pub(crate) origin: Option<&'a str>,
+    pub(crate) origin: Option<TextInput<'a>>,
 }
 
 /// One boundary's refusal, as that boundary types it.
@@ -102,7 +103,7 @@ pub(crate) struct InputFailure {
 pub(super) fn slot<T>(
     failures: &mut Vec<InputFailure>,
     slot: SafeOriginKind,
-    candidate: Option<&str>,
+    candidate: Option<TextInput<'_>>,
     value: Option<Result<T, Refusal>>,
 ) -> Option<T> {
     admit_origin(failures, slot, candidate);
@@ -114,7 +115,7 @@ pub(super) fn slot<T>(
 pub(super) fn admit_origin(
     failures: &mut Vec<InputFailure>,
     slot: SafeOriginKind,
-    candidate: Option<&str>,
+    candidate: Option<TextInput<'_>>,
 ) {
     if let Err(refusal) = origin::admit(slot, candidate) {
         failures.push(InputFailure {

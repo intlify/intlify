@@ -10,11 +10,14 @@
 //! that kind. Only that kind's exact ID is admitted. A candidate that differs
 //! from a registered ID only in ASCII case or surrounding ASCII whitespace is
 //! non-canonical, whichever ID it varies; another registered ID is
-//! incompatible with the slot; anything else is unknown. The candidate is
-//! admitted on its own: the value beside it neither skips it nor is skipped
-//! by it, and it reads no capability bound.
+//! incompatible with the slot; anything else is unknown, a candidate that is
+//! not text included (D15:3162). The candidate is admitted on its own: the
+//! value beside it neither skips it nor is skipped by it, and it reads no
+//! capability bound.
 
 use crate::resolver::origin::SafeOriginKind;
+
+use super::text::TextInput;
 
 /// Why the boundary refuses a candidate: one of the four reasons of its row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -46,9 +49,11 @@ impl OriginRefusal {
 /// fixes `slot`. An absent candidate is `None`.
 pub(crate) fn admit(
     slot: SafeOriginKind,
-    candidate: Option<&str>,
+    candidate: Option<TextInput<'_>>,
 ) -> Result<SafeOriginKind, OriginRefusal> {
-    let candidate = candidate.ok_or(OriginRefusal::Missing)?;
+    let TextInput::Text(candidate) = candidate.ok_or(OriginRefusal::Missing)? else {
+        return Err(OriginRefusal::Unknown);
+    };
     if candidate == slot.id() {
         return Ok(slot);
     }
@@ -82,13 +87,13 @@ mod tests {
     #[test]
     fn a_slot_admits_only_the_id_it_fixes() {
         for slot in SafeOriginKind::ALL {
-            assert_eq!(admit(slot, Some(slot.id())), Ok(slot));
+            assert_eq!(admit(slot, Some(slot.id().into())), Ok(slot));
             for other in SafeOriginKind::ALL
                 .into_iter()
                 .filter(|other| *other != slot)
             {
                 assert_eq!(
-                    admit(slot, Some(other.id())),
+                    admit(slot, Some(other.id().into())),
                     Err(OriginRefusal::EvidenceKindIncompatible),
                     "{} in {}",
                     other.id(),
@@ -123,7 +128,7 @@ mod tests {
             " implementation-capability",
         ] {
             assert_eq!(
-                admit(slot, Some(candidate)),
+                admit(slot, Some(candidate.into())),
                 Err(OriginRefusal::NonCanonical),
                 "{candidate:?}"
             );
@@ -148,7 +153,7 @@ mod tests {
             "configuration-file-",
         ] {
             assert_eq!(
-                admit(slot, Some(candidate)),
+                admit(slot, Some(candidate.into())),
                 Err(OriginRefusal::Unknown),
                 "{candidate:?}"
             );
@@ -171,6 +176,18 @@ mod tests {
             ),
         ] {
             assert_eq!(refusal.reason(), reason);
+        }
+    }
+
+    /// A candidate that is no text is unknown, beside whichever slot it is
+    /// (D15:3162).
+    #[test]
+    fn a_candidate_that_is_no_text_is_unknown() {
+        for slot in SafeOriginKind::ALL {
+            assert_eq!(
+                admit(slot, Some(TextInput::NotText)),
+                Err(OriginRefusal::Unknown)
+            );
         }
     }
 }
