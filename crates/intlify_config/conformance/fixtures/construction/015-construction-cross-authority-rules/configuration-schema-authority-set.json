@@ -1,0 +1,15 @@
+{
+  "profileSpecification": {
+    "identity": "intlify-project-profile",
+    "revision": "0",
+    "semanticDigest": "sha256:d9298a10d1b0735837dc4bd85dac641b0f3cef27a47e5d53a54f2f3f5b2fcffa"
+  },
+  "members": {
+    "0": {
+      "identity": "intlify-configuration-schema",
+      "revision": "0",
+      "dialect": "http://json-schema.org/draft-07/schema#",
+      "digest": "sha256:3fdaf3ba99feb64947154dc430a1fc573c438f559f526a203aecbab9c6eae2d1"
+    }
+  }
+}

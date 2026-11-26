@@ -1,0 +1,24 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-construction",
+  "id": "015-construction-implemented-authority",
+  "constructionInputFixture": {
+    "path": "fixtures/construction/015-construction-implemented-authority.json",
+    "digest": "sha256:395d25bcf2d63ef22c0af2d85e6bf7539a8a783df5d94f5f50826449e33d63b2"
+  },
+  "expected": {
+    "constructed": false,
+    "resolverConstructionIdentity": null,
+    "failureReason": "construction-authority-not-implemented",
+    "resolverInvoked": false
+  },
+  "traceability": {
+    "decisionIds": [
+      "015-142"
+    ],
+    "ruleIds": [
+      "015.construction.all.implemented-authority"
+    ],
+    "checkIds": []
+  }
+}

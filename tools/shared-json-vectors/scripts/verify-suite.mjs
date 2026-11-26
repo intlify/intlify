@@ -12,7 +12,11 @@
  * Package list the digests the index declares for their members, that the
  * Profile Specification has the semantic digest this package's own framing
  * computes, and that every digest is the one the crate pins in its source.
- * It does not read the design document.
+ * For each construction case it checks the fixture closure, the fixture and
+ * every body it references outside a decoded JSON value by their digests,
+ * and that the case expects what the row its rule ID names refuses with, or,
+ * constructing, the committed construction vector's identity. It does not
+ * read the design document.
  */
 
 import { createHash } from 'node:crypto'
@@ -617,6 +621,94 @@ for (const [member, [kind, , id]] of Object.entries(ARRAYS)) {
   }
 }
 
+// Each construction case's fixture, and every body the fixture references
+// outside a decoded JSON value, have the digests declared for them. A failing
+// case names one construction rule, a row of the construction-admission body,
+// and expects that row's reason, with its bound only for the bounds' row; the
+// constructing case traces every row and expects the identity of the
+// committed construction vector.
+/**
+ * Every `{ path, digest }` reference outside a decoded JSON value.
+ *
+ * @param value - A fixture or a part of one.
+ * @returns The references, in document order.
+ */
+function references(value) {
+  if (Array.isArray(value)) {
+    return value.flatMap(references)
+  }
+  if (value === null || typeof value !== 'object') {
+    return []
+  }
+  const keys = Object.keys(value)
+  if (isDeepStrictEqual(keys, ['json'])) {
+    return []
+  }
+  if (keys.length === 2 && typeof value.path === 'string' && typeof value.digest === 'string') {
+    return [value]
+  }
+  return Object.values(value).flatMap(references)
+}
+/**
+ * Check that a reference names a file below the root with its digest.
+ *
+ * @param reference - The `{ path, digest }` reference.
+ * @param where - What holds it, for messages.
+ */
+function referenced(reference, where) {
+  const file = typeof reference?.path === 'string' && path.test(reference.path)
+  if (!file || !existsSync(resolve(root, reference.path))) {
+    fail(`${where}: references ${String(reference?.path)}, which is missing`)
+    return
+  }
+  const bytes = readBytes(resolve(root, reference.path), reference.path)
+  if (bytes !== undefined && fileDigest(bytes) !== reference.digest) {
+    fail(`${where}: ${reference.path} does not have the digest it declares`)
+  }
+}
+const admissionBody = named(
+  index.value.resolverConstructionRootPackage?.members?.['construction-admission-specification']
+)
+const precedence = admissionBody?.failurePrecedence ?? []
+const ruleOf = id => precedence.find(row => `015.construction.${row.component}.${row.check}` === id)
+const vectorPath = 'construction/construction-vectors-v0.json'
+const vectorIdentity = readJson(resolve(root, vectorPath), vectorPath).value?.constructionIdentity
+  ?.text
+let fixtures = 0
+for (const entry of index.value.resolverConstructionCases ?? []) {
+  const manifest = named(entry)
+  const reference = manifest?.constructionInputFixture
+  referenced(reference, entry.path)
+  const fixture = named(reference)
+  if (fixture === undefined) {
+    continue
+  }
+  fixtures += 1
+  for (const body of references(fixture)) {
+    referenced(body, reference.path)
+  }
+  const { expected, traceability } = manifest
+  const rules = traceability?.ruleIds ?? []
+  if (expected?.constructed === true) {
+    if (
+      expected.resolverConstructionIdentity !== vectorIdentity ||
+      rules.length !== precedence.length ||
+      !rules.every(ruleOf)
+    ) {
+      fail(`${entry.path}: does not expect the vector's identity under every rule`)
+    }
+    continue
+  }
+  const row = rules.length === 1 ? ruleOf(rules[0]) : undefined
+  if (
+    row === undefined ||
+    expected?.failureReason !== row.reason ||
+    (row.check === 'construction-bounds') !== Object.hasOwn(expected, 'failureDetails')
+  ) {
+    fail(`${entry.path}: does not expect what its rule's row refuses with`)
+  }
+}
+
 // The containers list the digests the index declares for their members.
 const without = (entry, name) =>
   Object.fromEntries(Object.entries(entry ?? {}).filter(([key]) => key !== name))
@@ -668,5 +760,5 @@ for (const [module, name, pointer] of PINS) {
 finish()
 
 console.log(
-  `conformance suite index agrees: ${MEMBERS.length} members, ${bodies} bodies of which ${manifests} manifests, ${objects} closed schema objects, ${PINS.length} pinned digests`
+  `conformance suite index agrees: ${MEMBERS.length} members, ${bodies} bodies of which ${manifests} manifests, ${fixtures} construction fixtures, ${objects} closed schema objects, ${PINS.length} pinned digests`
 )

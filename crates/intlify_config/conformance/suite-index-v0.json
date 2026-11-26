@@ -78,7 +78,7 @@
     "identity": "intlify-project-profile-conformance-case",
     "revision": "0",
     "path": "schemas/case-v0.schema.json",
-    "digest": "sha256:a8112fdf3d05623126d8e2ec224e79fb7f204886453d042628686347be26bca4"
+    "digest": "sha256:d01599c8f072903a8d9a058cf05b26da1007c39a58c601ab81bb3dcc708884ee"
   },
   "registryPackage": {
     "identity": "intlify-project-profile-resolver-registry-package",
@@ -124,7 +124,228 @@
       }
     }
   },
-  "resolverConstructionCases": [],
+  "resolverConstructionCases": [
+    {
+      "id": "015-construction-bounds",
+      "path": "cases/construction/015-construction-bounds.json",
+      "digest": "sha256:55f385c80564b1dfe8bfaf51df3b593df57238f39ddd65dc75da83483a75889b"
+    },
+    {
+      "id": "015-construction-configuration-schema-authority-set-envelope",
+      "path": "cases/construction/015-construction-configuration-schema-authority-set-envelope.json",
+      "digest": "sha256:4b34e5213a48f76b9f53920f456268892e592d307dfa021bad3cce82e609a678"
+    },
+    {
+      "id": "015-construction-configuration-schema-authority-set-file-digest",
+      "path": "cases/construction/015-construction-configuration-schema-authority-set-file-digest.json",
+      "digest": "sha256:a923195d201c0bcd4ca79b3525191d72268c54f101099bf4c715c178fe6a1a94"
+    },
+    {
+      "id": "015-construction-configuration-schema-authority-set-identity",
+      "path": "cases/construction/015-construction-configuration-schema-authority-set-identity.json",
+      "digest": "sha256:63bc9a3e88c151c2db9e44e78e643429b26120b17d8be6225167e754c4700fe1"
+    },
+    {
+      "id": "015-construction-configuration-schema-authority-set-missing",
+      "path": "cases/construction/015-construction-configuration-schema-authority-set-missing.json",
+      "digest": "sha256:f3976280f62657ff7f51fd7ae845ea561d2352d9a8348232c8efac4ac90c91b2"
+    },
+    {
+      "id": "015-construction-configuration-schema-authority-set-revision",
+      "path": "cases/construction/015-construction-configuration-schema-authority-set-revision.json",
+      "digest": "sha256:cc89eb89f5ae6294394e47a539af0676a5701224737dd7094da74d7b81ed6497"
+    },
+    {
+      "id": "015-construction-configuration-schema-member-dialect",
+      "path": "cases/construction/015-construction-configuration-schema-member-dialect.json",
+      "digest": "sha256:d4cf6e8fe10a3ab489bab987912d39bedb1c088832c3d153bd378cc85ea37ba2"
+    },
+    {
+      "id": "015-construction-configuration-schema-member-file-digest",
+      "path": "cases/construction/015-construction-configuration-schema-member-file-digest.json",
+      "digest": "sha256:4b840d7910658e0b7caa8098522e4d37de3376bf77c9040e70f519089d1724f2"
+    },
+    {
+      "id": "015-construction-configuration-schema-member-identity",
+      "path": "cases/construction/015-construction-configuration-schema-member-identity.json",
+      "digest": "sha256:64fc9da51e6f7a03bbc618123bb1f944629618ebfbf5680cce4e19aa2725b5c7"
+    },
+    {
+      "id": "015-construction-configuration-schema-member-meta-schema",
+      "path": "cases/construction/015-construction-configuration-schema-member-meta-schema.json",
+      "digest": "sha256:e77484c6bcda11165b763672554eb769d2419b7857ac647d1efd3facbce665b5"
+    },
+    {
+      "id": "015-construction-configuration-schema-member-revision",
+      "path": "cases/construction/015-construction-configuration-schema-member-revision.json",
+      "digest": "sha256:b1d0d73e60fb8232070c54a00178267d4a5c85abe162cbde7d72cc4dc797f490"
+    },
+    {
+      "id": "015-construction-cross-authority-rules",
+      "path": "cases/construction/015-construction-cross-authority-rules.json",
+      "digest": "sha256:b868b3915293736ebab2aae5e9f8c22a84bd2961739835699cac7da107d5b316"
+    },
+    {
+      "id": "015-construction-implemented-authority",
+      "path": "cases/construction/015-construction-implemented-authority.json",
+      "digest": "sha256:cf30b94b8dd8313e1d020900cafccbe4ed274bdb1922bee34a05e2efe44bdb99"
+    },
+    {
+      "id": "015-construction-profile-specification-body-schema",
+      "path": "cases/construction/015-construction-profile-specification-body-schema.json",
+      "digest": "sha256:996d81d35e7743e3d36b1a81e6c4a4665ca6daadc9cf5796cb97780e68d4cdda"
+    },
+    {
+      "id": "015-construction-profile-specification-envelope",
+      "path": "cases/construction/015-construction-profile-specification-envelope.json",
+      "digest": "sha256:467e7d89316b66d9a5cbb5c4b169dd07dc75df6e4ed27220acc8294987a1553f"
+    },
+    {
+      "id": "015-construction-profile-specification-file-digest",
+      "path": "cases/construction/015-construction-profile-specification-file-digest.json",
+      "digest": "sha256:f6e5fa3aecf13466c421f341e6875163bcc04e8b8e04760226f3a9b3d672c7b1"
+    },
+    {
+      "id": "015-construction-profile-specification-identity",
+      "path": "cases/construction/015-construction-profile-specification-identity.json",
+      "digest": "sha256:66124312d661efb11fac2574bd50534c12179f2a3abfb08e5795cd2891757387"
+    },
+    {
+      "id": "015-construction-profile-specification-missing",
+      "path": "cases/construction/015-construction-profile-specification-missing.json",
+      "digest": "sha256:6f3517c92ddc90f487148ff057313154103ef31ca41a4081e664fd244556e981"
+    },
+    {
+      "id": "015-construction-profile-specification-revision",
+      "path": "cases/construction/015-construction-profile-specification-revision.json",
+      "digest": "sha256:687abef12388ad99c27a28bf6321b17fd326d0e3d94305f3df11b948c26db688"
+    },
+    {
+      "id": "015-construction-profile-specification-schema-envelope",
+      "path": "cases/construction/015-construction-profile-specification-schema-envelope.json",
+      "digest": "sha256:459fe0c464ccbb55f987f928a59c050068af11e99a69cc09c6fc0f15c57bbb89"
+    },
+    {
+      "id": "015-construction-profile-specification-schema-file-digest",
+      "path": "cases/construction/015-construction-profile-specification-schema-file-digest.json",
+      "digest": "sha256:f7536472fcd743e2993e356333b8b986639426d28ee935f7b5a3cd8c531d11e0"
+    },
+    {
+      "id": "015-construction-profile-specification-schema-identity",
+      "path": "cases/construction/015-construction-profile-specification-schema-identity.json",
+      "digest": "sha256:6250c5b3e69a3b2471b8624dcbe4e9a13e8b11edd2c2ffba64b5001f4ee1c9a8"
+    },
+    {
+      "id": "015-construction-profile-specification-schema-meta-schema",
+      "path": "cases/construction/015-construction-profile-specification-schema-meta-schema.json",
+      "digest": "sha256:52802cb94db787d67e9119482fc7504faf65c675b9f88076ec7fd024876023d9"
+    },
+    {
+      "id": "015-construction-profile-specification-schema-missing",
+      "path": "cases/construction/015-construction-profile-specification-schema-missing.json",
+      "digest": "sha256:912c3fd44c80aeb33343c6d2143ef4d3b4aff125d75126d17a46f6ce544f0414"
+    },
+    {
+      "id": "015-construction-profile-specification-schema-revision",
+      "path": "cases/construction/015-construction-profile-specification-schema-revision.json",
+      "digest": "sha256:0d8ee2066df4ede0b262d3bd9662e6a4ba83d7026712449e1a3770b548452cc3"
+    },
+    {
+      "id": "015-construction-profile-specification-semantic-digest",
+      "path": "cases/construction/015-construction-profile-specification-semantic-digest.json",
+      "digest": "sha256:e3e74525c98d005f4edcafe66bcdbeb8392cd796b99b77fcd0e3c9acd7130c3b"
+    },
+    {
+      "id": "015-construction-registry-member-file-digest",
+      "path": "cases/construction/015-construction-registry-member-file-digest.json",
+      "digest": "sha256:71074d2d5d3bcff839f471a73b5c6a4f2775a5a2afe1276ad29a548e14a102a9"
+    },
+    {
+      "id": "015-construction-registry-member-identity",
+      "path": "cases/construction/015-construction-registry-member-identity.json",
+      "digest": "sha256:4ee1b78298fb71396a8fd431c927e79df5acf06e2cfe04c7a6b214ea1d8600e8"
+    },
+    {
+      "id": "015-construction-registry-member-member-schema",
+      "path": "cases/construction/015-construction-registry-member-member-schema.json",
+      "digest": "sha256:766d637aa1116b1c86869fd1ae100fc805a709f24b9f271a50dc08f026ef30f8"
+    },
+    {
+      "id": "015-construction-registry-member-missing",
+      "path": "cases/construction/015-construction-registry-member-missing.json",
+      "digest": "sha256:384122776dc10b8cd7f9899991ad3c899a20aaf10054dbb6df582cacd77ba6ac"
+    },
+    {
+      "id": "015-construction-registry-member-revision",
+      "path": "cases/construction/015-construction-registry-member-revision.json",
+      "digest": "sha256:7befb7fcf607d9fae36d2d2e0454feb968e5d4035a00fa5f3463af5b6d10a3f4"
+    },
+    {
+      "id": "015-construction-registry-package-cross-references",
+      "path": "cases/construction/015-construction-registry-package-cross-references.json",
+      "digest": "sha256:9a715899b4808677094c6c572ce69cdb48717c4cb0319acaa695824be201be00"
+    },
+    {
+      "id": "015-construction-registry-package-envelope",
+      "path": "cases/construction/015-construction-registry-package-envelope.json",
+      "digest": "sha256:3f4158bc2d68b92ec437b37474a4b3d85170917e401228a60cfae08a4b4af716"
+    },
+    {
+      "id": "015-construction-registry-package-file-digest",
+      "path": "cases/construction/015-construction-registry-package-file-digest.json",
+      "digest": "sha256:b81efe37d877dcb7a65b310cfd0a019a9309f70bfe9f32df47c0fb23fa45d0be"
+    },
+    {
+      "id": "015-construction-registry-package-identity",
+      "path": "cases/construction/015-construction-registry-package-identity.json",
+      "digest": "sha256:5f9f65b255b0acacea6319fc392e56a34485fae39eb520d6f66a37a5ab44fba2"
+    },
+    {
+      "id": "015-construction-registry-package-missing",
+      "path": "cases/construction/015-construction-registry-package-missing.json",
+      "digest": "sha256:ef68eb173b7e4cd42ebef7f0078381b2cf83eef50bcdeda7ca1f20af9e2abef2"
+    },
+    {
+      "id": "015-construction-registry-package-revision",
+      "path": "cases/construction/015-construction-registry-package-revision.json",
+      "digest": "sha256:e3710b3f04abd3211b081ea7e70f81c06908acb941cd48eb461495b0f0562a97"
+    },
+    {
+      "id": "015-construction-resolver-capability-specification-body-schema",
+      "path": "cases/construction/015-construction-resolver-capability-specification-body-schema.json",
+      "digest": "sha256:d18385b31e0dd411507365540166296ec58b23cb4e04001ce52d97244cc50a5a"
+    },
+    {
+      "id": "015-construction-resolver-capability-specification-envelope",
+      "path": "cases/construction/015-construction-resolver-capability-specification-envelope.json",
+      "digest": "sha256:e8f780fad6e58d8b281b4e38f0190a6abf3a78fb0531ace6a84db0a77e00410f"
+    },
+    {
+      "id": "015-construction-resolver-capability-specification-file-digest",
+      "path": "cases/construction/015-construction-resolver-capability-specification-file-digest.json",
+      "digest": "sha256:dd2a8c246572b476b4bf3d8be9ad26af6fbb2249ad5dcc494df3b81a00c2d23a"
+    },
+    {
+      "id": "015-construction-resolver-capability-specification-identity",
+      "path": "cases/construction/015-construction-resolver-capability-specification-identity.json",
+      "digest": "sha256:52d725b59c4121d1ce1d29b32e10508cb8280a8f59ad35d9342f678bd61b2f36"
+    },
+    {
+      "id": "015-construction-resolver-capability-specification-missing",
+      "path": "cases/construction/015-construction-resolver-capability-specification-missing.json",
+      "digest": "sha256:b6ec2ac5f28b8418e94b1e55ad229af09341a7d71d41db0a97d9cbd4c8635e67"
+    },
+    {
+      "id": "015-construction-resolver-capability-specification-revision",
+      "path": "cases/construction/015-construction-resolver-capability-specification-revision.json",
+      "digest": "sha256:32b7e41f14ef90068658de843693ff173c9ab8effb99783f1b3e5c7e4a66142e"
+    },
+    {
+      "id": "015-construction-revision-0",
+      "path": "cases/construction/015-construction-revision-0.json",
+      "digest": "sha256:05455a4558eb154099cf9f2406b618a18fdb1c8b85a28a3b0c398d026276c598"
+    }
+  ],
   "resolverInputAdmissionCases": [],
   "resolverCases": [],
   "handoffVectors": [],

@@ -1,0 +1,28 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-construction",
+  "id": "015-construction-bounds",
+  "constructionInputFixture": {
+    "path": "fixtures/construction/015-construction-bounds.json",
+    "digest": "sha256:aa5491ed0309b73c2a88f2f9594b86363cc09eb11d7203a956a6aae34dc36205"
+  },
+  "expected": {
+    "constructed": false,
+    "resolverConstructionIdentity": null,
+    "failureReason": "construction-input-limit-exceeded",
+    "failureDetails": {
+      "boundId": "input.maxDepth"
+    },
+    "resolverInvoked": false
+  },
+  "traceability": {
+    "decisionIds": [
+      "015-141",
+      "015-142"
+    ],
+    "ruleIds": [
+      "015.construction.all.construction-bounds"
+    ],
+    "checkIds": []
+  }
+}

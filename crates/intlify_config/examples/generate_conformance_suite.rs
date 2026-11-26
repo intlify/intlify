@@ -1,8 +1,8 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Write the conformance suite's Suite Index, its schema, and the Case
-//! Schema.
+//! Write the conformance suite's Suite Index, its schema, the Case Schema,
+//! and the construction cases' manifests, fixtures, and changed bodies.
 //!
 //! The index pins each construction root member, authority, and Registry
 //! Package member by the file digest of the bytes this crate writes, so it is
@@ -46,7 +46,7 @@ fn main() -> ExitCode {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(ROOT);
     let mut stale = false;
     for artifact in &artifacts {
-        let path = root.join(artifact.path);
+        let path = root.join(&artifact.path);
         if write {
             if let Some(parent) = path.parent() {
                 if let Err(error) = std::fs::create_dir_all(parent) {

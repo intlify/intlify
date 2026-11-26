@@ -1,0 +1,25 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-construction",
+  "id": "015-construction-registry-package-cross-references",
+  "constructionInputFixture": {
+    "path": "fixtures/construction/015-construction-registry-package-cross-references.json",
+    "digest": "sha256:33fa9756346f744730889d387aa59ad1dfc5808cd98d6d15777df8bfdb150b64"
+  },
+  "expected": {
+    "constructed": false,
+    "resolverConstructionIdentity": null,
+    "failureReason": "registry-cross-reference-invalid",
+    "resolverInvoked": false
+  },
+  "traceability": {
+    "decisionIds": [
+      "015-086",
+      "015-142"
+    ],
+    "ruleIds": [
+      "015.construction.registryPackage.cross-references"
+    ],
+    "checkIds": []
+  }
+}

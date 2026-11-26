@@ -1,0 +1,25 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-construction",
+  "id": "015-construction-configuration-schema-authority-set-identity",
+  "constructionInputFixture": {
+    "path": "fixtures/construction/015-construction-configuration-schema-authority-set-identity.json",
+    "digest": "sha256:37e6fe51f3ee33d13557240498e02842271972795526e77becb0c11e67a164f9"
+  },
+  "expected": {
+    "constructed": false,
+    "resolverConstructionIdentity": null,
+    "failureReason": "configuration-schema-authority-set-identity-mismatch",
+    "resolverInvoked": false
+  },
+  "traceability": {
+    "decisionIds": [
+      "015-108",
+      "015-142"
+    ],
+    "ruleIds": [
+      "015.construction.configurationSchemaAuthoritySet.identity"
+    ],
+    "checkIds": []
+  }
+}
